@@ -60,7 +60,7 @@ func (r *Inviter) PerformInvite(
 		"room_version":     req.RoomVersion,
 		"target_user_id":   targetUserID,
 		"room_info_exists": info != nil,
-	}).Info("processing invite event")
+	}).Debug("processing invite event")
 
 	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
 	isTargetLocal := domain == r.Cfg.Matrix.ServerName

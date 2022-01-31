@@ -162,7 +162,7 @@ func Send(
 	t.TransactionID = txnID
 	t.Destination = cfg.Matrix.ServerName
 
-	util.GetLogger(httpReq.Context()).Infof("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
+	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
 
 	resp, jsonErr := t.processTransaction(httpReq.Context())
 	if jsonErr != nil {
@@ -221,7 +221,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
 		verRes := api.QueryRoomVersionForRoomResponse{}
 		if err := t.rsAPI.QueryRoomVersionForRoom(ctx, &verReq, &verRes); err != nil {
-			util.GetLogger(ctx).WithError(err).Warn("Transaction: Failed to query room version for room", verReq.RoomID)
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to query room version for room", verReq.RoomID)
 			return ""
 		}
 		roomVersions[roomID] = verRes.RoomVersion
@@ -234,7 +234,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			RoomID string `json:"room_id"`
 		}
 		if err := json.Unmarshal(pdu, &header); err != nil {
-			util.GetLogger(ctx).WithError(err).Warn("Transaction: Failed to extract room ID from event")
+			util.GetLogger(ctx).WithError(err).Debug("Transaction: Failed to extract room ID from event")
 			// We don't know the event ID at this point so we can't return the
 			// failure in the PDU results
 			continue
@@ -255,7 +255,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 					JSON: jsonerror.BadJSON("PDU contains bad JSON"),
 				}
 			}
-			util.GetLogger(ctx).WithError(err).Warnf("Transaction: Failed to parse event JSON of event %s", string(pdu))
+			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Failed to parse event JSON of event %s", string(pdu))
 			continue
 		}
 		if api.IsServerBannedFromRoom(ctx, t.rsAPI, event.RoomID(), t.Origin) {
@@ -265,7 +265,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			continue
 		}
 		if err = event.VerifyEventSignatures(ctx, t.keys); err != nil {
-			util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
+			util.GetLogger(ctx).WithError(err).Debugf("Transaction: Couldn't validate signature of event %q", event.EventID())
 			results[event.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
@@ -287,7 +287,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			nil,
 			true,
 		); err != nil {
-			util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
+			util.GetLogger(ctx).WithError(err).Errorf("Transaction: Couldn't submit event %q to input queue: %s", event.EventID(), err)
 			results[event.EventID()] = gomatrixserverlib.PDUResult{
 				Error: err.Error(),
 			}
@@ -314,16 +314,16 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				Typing bool   `json:"typing"`
 			}
 			if err := json.Unmarshal(e.Content, &typingPayload); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal typing event")
+				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal typing event")
 				continue
 			}
 			_, domain, err := gomatrixserverlib.SplitID('@', typingPayload.UserID)
 			if err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to split domain from typing event sender")
+				util.GetLogger(ctx).WithError(err).Debug("Failed to split domain from typing event sender")
 				continue
 			}
 			if domain != t.Origin {
-				util.GetLogger(ctx).Warnf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+				util.GetLogger(ctx).Debugf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 				continue
 			}
 			if err := eduserverAPI.SendTyping(ctx, t.eduAPI, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
@@ -333,7 +333,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
 			var directPayload gomatrixserverlib.ToDeviceMessage
 			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal send-to-device events")
+				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal send-to-device events")
 				continue
 			}
 			for userID, byUser := range directPayload.Messages {
@@ -355,7 +355,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			payload := map[string]eduserverAPI.FederationReceiptMRead{}
 
 			if err := json.Unmarshal(e.Content, &payload); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal receipt event")
+				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
 				continue
 			}
 
@@ -363,11 +363,11 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				for userID, mread := range receipt.User {
 					_, domain, err := gomatrixserverlib.SplitID('@', userID)
 					if err != nil {
-						util.GetLogger(ctx).WithError(err).Error("Failed to split domain from receipt event sender")
+						util.GetLogger(ctx).WithError(err).Debug("Failed to split domain from receipt event sender")
 						continue
 					}
 					if t.Origin != domain {
-						util.GetLogger(ctx).Warnf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+						util.GetLogger(ctx).Debugf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 						continue
 					}
 					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
@@ -386,7 +386,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
 				util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 					"user_id": updatePayload.UserID,
-				}).Error("Failed to send signing key update to edu server")
+				}).Debug("Failed to send signing key update to edu server")
 				continue
 			}
 			inputReq := &eduserverAPI.InputCrossSigningKeyUpdateRequest{

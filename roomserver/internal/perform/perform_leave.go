@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 type Leaver struct {
@@ -51,7 +52,14 @@ func (r *Leaver) PerformLeave(
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.UserID)
 	}
 	if strings.HasPrefix(req.RoomID, "!") {
-		return r.performLeaveRoomByID(ctx, req, res)
+		output, err := r.performLeaveRoomByID(ctx, req, res)
+		if err != nil {
+			logrus.WithContext(ctx).WithFields(logrus.Fields{
+				"room_id": req.RoomID,
+				"user_id": req.UserID,
+			}).WithError(err).Error("Failed to leave room")
+		}
+		return output, err
 	}
 	return nil, fmt.Errorf("room ID %q is invalid", req.RoomID)
 }

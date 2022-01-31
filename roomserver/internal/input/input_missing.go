@@ -327,7 +327,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 		queryReq := api.QueryEventsByIDRequest{
 			EventIDs: missingEventList,
 		}
-		util.GetLogger(ctx).WithField("count", len(missingEventList)).Infof("Fetching missing auth events")
+		util.GetLogger(ctx).WithField("count", len(missingEventList)).Debugf("Fetching missing auth events")
 		var queryRes api.QueryEventsByIDResponse
 		if err = t.queryer.QueryEventsByID(ctx, &queryReq, &queryRes); err != nil {
 			return nil
@@ -382,7 +382,7 @@ retryAllowedState:
 			default:
 				return nil, fmt.Errorf("missing auth event %s and failed to look it up: %w", missing.AuthEventID, err2)
 			}
-			util.GetLogger(ctx).Infof("fetched event %s", missing.AuthEventID)
+			util.GetLogger(ctx).Tracef("fetched event %s", missing.AuthEventID)
 			resolvedStateEvents = append(resolvedStateEvents, h.Unwrap())
 			goto retryAllowedState
 		default:
@@ -429,7 +429,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 			missingResp = &m
 			break
 		} else {
-			logger.WithError(err).Errorf("%s pushed us an event but %q did not respond to /get_missing_events", t.origin, server)
+			logger.WithError(err).Warnf("%s pushed us an event but %q did not respond to /get_missing_events", t.origin, server)
 			if errors.Is(err, context.DeadlineExceeded) {
 				select {
 				case <-ctx.Done(): // the parent request context timed out
@@ -442,7 +442,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	}
 
 	if missingResp == nil {
-		logger.WithError(err).Errorf(
+		logger.WithError(err).Warnf(
 			"%s pushed us an event but %d server(s) couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
 			t.origin, len(t.servers),
 		)
@@ -454,7 +454,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 
 	// Make sure events from the missingResp are using the cache - missing events
 	// will be added and duplicates will be removed.
-	logger.Infof("get_missing_events returned %d events", len(missingResp.Events))
+	logger.Debugf("get_missing_events returned %d events", len(missingResp.Events))
 	for i, ev := range missingResp.Events {
 		missingResp.Events[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}
@@ -474,7 +474,7 @@ Event:
 	}
 	if !hasPrevEvent {
 		err = fmt.Errorf("called /get_missing_events but server %s didn't return any prev_events with IDs %v", t.origin, shouldHaveSomeEventIDs)
-		logger.WithError(err).Errorf(
+		logger.WithError(err).Warnf(
 			"%s pushed us an event but couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
 			t.origin,
 		)
@@ -565,7 +565,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 	concurrentRequests := 8
 	missingCount := len(missing)
-	util.GetLogger(ctx).WithField("room_id", roomID).WithField("event_id", eventID).Infof("lookupMissingStateViaStateIDs missing %d/%d events", missingCount, len(wantIDs))
+	util.GetLogger(ctx).WithField("room_id", roomID).WithField("event_id", eventID).Debugf("lookupMissingStateViaStateIDs missing %d/%d events", missingCount, len(wantIDs))
 
 	// If over 50% of the auth/state events from /state_ids are missing
 	// then we'll just call /state instead, otherwise we'll just end up
@@ -577,7 +577,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 			"room_id":           roomID,
 			"total_state":       len(stateIDs.StateEventIDs),
 			"total_auth_events": len(stateIDs.AuthEventIDs),
-		}).Info("Fetching all state at event")
+		}).Debug("Fetching all state at event")
 		return t.lookupMissingStateViaState(ctx, roomID, eventID, roomVersion)
 	}
 
@@ -589,7 +589,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 			"total_state":         len(stateIDs.StateEventIDs),
 			"total_auth_events":   len(stateIDs.AuthEventIDs),
 			"concurrent_requests": concurrentRequests,
-		}).Info("Fetching missing state at event")
+		}).Debug("Fetching missing state at event")
 
 		// Create a queue containing all of the missing event IDs that we want
 		// to retrieve.
@@ -626,7 +626,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 				util.GetLogger(ctx).WithFields(logrus.Fields{
 					"event_id": missingEventID,
 					"room_id":  roomID,
-				}).Info("Failed to fetch missing event")
+				}).Warn("Failed to fetch missing event")
 				return
 			}
 			haveEventsMutex.Lock()
