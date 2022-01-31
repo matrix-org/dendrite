@@ -51,13 +51,17 @@ func (r *Leaver) PerformLeave(
 	if domain != r.Cfg.Matrix.ServerName {
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.UserID)
 	}
+	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
+		"room_id": req.RoomID,
+		"user_id": req.UserID,
+	})
+	logger.Info("User requested to leave join")
 	if strings.HasPrefix(req.RoomID, "!") {
 		output, err := r.performLeaveRoomByID(context.Background(), req, res)
 		if err != nil {
-			logrus.WithContext(ctx).WithFields(logrus.Fields{
-				"room_id": req.RoomID,
-				"user_id": req.UserID,
-			}).WithError(err).Error("Failed to leave room")
+			logger.WithError(err).Error("Failed to leave room")
+		} else {
+			logger.Info("User left room successfully")
 		}
 		return output, err
 	}
