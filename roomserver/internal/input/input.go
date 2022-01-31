@@ -120,7 +120,7 @@ func (r *Inputer) Start() error {
 		nats.DeliverAll(),
 		// Ensure that NATS doesn't try to resend us something that wasn't done
 		// within the period of time that we might still be processing it.
-		nats.AckWait(MaximumProcessingTime+(time.Second*10)),
+		nats.AckWait((MaximumMissingProcessingTime*2)+(time.Second*10)),
 	)
 	return err
 }
