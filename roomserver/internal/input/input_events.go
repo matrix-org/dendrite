@@ -472,7 +472,7 @@ func (r *Inputer) calculateAndSetState(
 	var err error
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 
-	if input.HasState && !isRejected {
+	if input.HasState {
 		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
