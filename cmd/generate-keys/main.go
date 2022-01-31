@@ -35,8 +35,9 @@ var (
 	tlsCertFile       = flag.String("tls-cert", "", "An X509 certificate file to generate for use for TLS")
 	tlsKeyFile        = flag.String("tls-key", "", "An RSA private key file to generate for use for TLS")
 	privateKeyFile    = flag.String("private-key", "", "An Ed25519 private key to generate for use for object signing")
-	authorityCertFile = flag.String("tls-authority-cert", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for testing.")
-	authorityKeyFile  = flag.String("tls-authority-key", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for testing.")
+	authorityCertFile = flag.String("tls-authority-cert", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for integration testing.")
+	authorityKeyFile  = flag.String("tls-authority-key", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for integration testing.")
+	serverName        = flag.String("server", "", "Optional: Create TLS certificate/keys with this domain name set. Useful for integration testing.")
 )
 
 func main() {
@@ -62,7 +63,7 @@ func main() {
 			}
 		} else {
 			// generate the TLS cert/key based on the authority given.
-			if err := test.NewTLSKeyWithAuthority(*authorityKeyFile, *authorityCertFile, *tlsKeyFile, *tlsCertFile); err != nil {
+			if err := test.NewTLSKeyWithAuthority(*serverName, *tlsKeyFile, *tlsCertFile, *authorityKeyFile, *authorityCertFile); err != nil {
 				panic(err)
 			}
 		}

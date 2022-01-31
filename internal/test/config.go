@@ -159,7 +159,7 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 
 const certificateDuration = time.Hour * 24 * 365 * 10
 
-func generateTLSTemplate() (*rsa.PrivateKey, *x509.Certificate, error) {
+func generateTLSTemplate(dnsNames []string) (*rsa.PrivateKey, *x509.Certificate, error) {
 	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, nil, err
@@ -180,6 +180,7 @@ func generateTLSTemplate() (*rsa.PrivateKey, *x509.Certificate, error) {
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+		DNSNames:              dnsNames,
 	}
 	return priv, &template, nil
 }
@@ -208,7 +209,7 @@ func writePrivateKey(tlsKeyPath string, priv *rsa.PrivateKey) error {
 
 // NewTLSKey generates a new RSA TLS key and certificate and writes it to a file.
 func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
-	priv, template, err := generateTLSTemplate()
+	priv, template, err := generateTLSTemplate(nil)
 	if err != nil {
 		return err
 	}
@@ -225,8 +226,8 @@ func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
 	return writePrivateKey(tlsKeyPath, priv)
 }
 
-func NewTLSKeyWithAuthority(tlsKeyPath, tlsCertPath, authorityKeyPath, authorityCertPath string) error {
-	priv, template, err := generateTLSTemplate()
+func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPath, authorityCertPath string) error {
+	priv, template, err := generateTLSTemplate([]string{serverName})
 	if err != nil {
 		return err
 	}
