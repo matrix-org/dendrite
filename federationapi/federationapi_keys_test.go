@@ -68,6 +68,13 @@ func TestMain(m *testing.M) {
 			panic("can't create cache: " + err.Error())
 		}
 
+		// Create a temporary directory for JetStream.
+		d, err := ioutil.TempDir("./", "jetstream*")
+		if err != nil {
+			panic(err)
+		}
+		defer os.RemoveAll(d)
+
 		// Draw up just enough Dendrite config for the server key
 		// API to work.
 		cfg := &config.Dendrite{}
@@ -75,6 +82,8 @@ func TestMain(m *testing.M) {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 		cfg.Global.PrivateKey = testPriv
 		cfg.Global.JetStream.InMemory = true
+		cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
+		cfg.Global.JetStream.StoragePath = config.Path(d)
 		cfg.Global.KeyID = serverKeyID
 		cfg.Global.KeyValidityPeriod = s.validity
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")

@@ -89,7 +89,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	// Send all the events
-	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, evs, cfg.Matrix.ServerName, nil, false); err != nil {
+	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, evs, "TODO", cfg.Matrix.ServerName, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -178,6 +178,7 @@ func ExchangeThirdPartyInvite(
 		[]*gomatrixserverlib.HeaderedEvent{
 			signedEvent.Event.Headered(verRes.RoomVersion),
 		},
+		request.Origin(),
 		cfg.Matrix.ServerName,
 		nil,
 		false,

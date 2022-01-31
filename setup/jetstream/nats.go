@@ -33,6 +33,7 @@ func Prepare(cfg *config.JetStream) (nats.JetStreamContext, sarama.Consumer, sar
 			StoreDir:         string(cfg.StoragePath),
 			NoSystemAccount:  true,
 			AllowNewAccounts: false,
+			MaxPayload:       16 * 1024 * 1024,
 		})
 		if err != nil {
 			panic(err)
@@ -75,13 +76,18 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (nats.JetStreamContex
 		}
 		if info == nil {
 			stream.Subjects = []string{name}
+
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {
 				stream.Storage = nats.MemoryStorage
 			}
 
-			if _, err = s.AddStream(stream); err != nil {
+			// Namespace the streams without modifying the original streams
+			// array, otherwise we end up with namespaces on namespaces.
+			namespaced := *stream
+			namespaced.Name = name
+			if _, err = s.AddStream(&namespaced); err != nil {
 				logrus.WithError(err).WithField("stream", name).Fatal("Unable to add stream")
 			}
 		}

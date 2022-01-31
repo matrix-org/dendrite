@@ -842,8 +842,12 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil {
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
+	}
+	// e.g invited rooms
+	if roomInfo.IsStub {
+		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
 	if err == sql.ErrNoRows {

@@ -368,6 +368,7 @@ logging:
 - type: std
   level: info
 - type: file
+  # The logging level, must be one of debug, info, warn, error, fatal, panic.
   level: info
   params:
     path: ./logs

@@ -79,7 +79,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 	response.LatestEvent = sortedLatestEvents[0].Headered(info.RoomVersion)
 
 	// XXX: do we actually need to do a state resolution here?
-	roomState := state.NewStateResolution(r.DB, *info)
+	roomState := state.NewStateResolution(r.DB, info)
 
 	var stateEntries []types.StateEntry
 	stateEntries, err = roomState.LoadStateAtSnapshot(

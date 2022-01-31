@@ -1,5 +1,33 @@
 # Changelog
 
+## Dendrite 0.6.0 (2022-01-28)
+
+### Features
+
+* NATS JetStream is now used instead of Kafka and Naffka
+  * For monolith deployments, a built-in NATS Server is embedded into Dendrite or a standalone NATS Server deployment can be optionally used instead
+  * For polylith deployments, a standalone NATS Server deployment is required
+  * Requires the version 2 configuration file — please see the new `dendrite-config.yaml` sample config file
+  * Kafka and Naffka are no longer supported as of this release
+* The roomserver is now responsible for fetching missing events and state instead of the federation API
+  * Removes a number of race conditions between the federation API and roomserver, which reduces duplicate work and overall lowers CPU usage
+* The roomserver input API is now strictly ordered with support for asynchronous requests, smoothing out incoming federation significantly
+* Consolidated the federation API, federation sender and signing key server into a single component
+  * If multiple databases are used, tables for the federation sender and signing key server should be merged into the federation API database (table names have not changed)
+* Device list synchronisation is now database-backed rather than using the now-removed Kafka logs
+
+### Fixes
+
+* The code for fetching missing events and state now correctly identifies when gaps in history have been closed, so federation traffic will consume less CPU and memory than before
+* The stream position is now correctly advanced when typing notifications time out in the sync API
+* Event NIDs are now correctly returned when persisting events in the roomserver in SQLite mode
+  * The built-in SQLite was updated to version 3.37.0 as a result
+* The `/event_auth` endpoint now strictly returns the auth chain for the requested event without loading the room state, which should reduce spikes in memory usage
+* Filters are now correctly sent when using federated public room directories (contributed by [S7evinK](https://github.com/S7evinK))
+* Login usernames are now squashed to lower-case (contributed by [BernardZhao](https://github.com/BernardZhao))
+* The logs should no longer be flooded with `Failed to get server ACLs for room` warnings at startup
+* Backfilling will now attempt federation as a last resort when trying to retrieve missing events from the database fails
+
 ## Dendrite 0.5.1 (2021-11-16)
 
 ### Features

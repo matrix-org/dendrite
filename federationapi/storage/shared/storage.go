@@ -29,6 +29,7 @@ import (
 
 type Database struct {
 	DB                       *sql.DB
+	ServerName               gomatrixserverlib.ServerName
 	Cache                    caching.FederationCache
 	Writer                   sqlutil.Writer
 	FederationQueuePDUs      tables.FederationQueuePDUs
@@ -102,8 +103,19 @@ func (d *Database) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.S
 	return d.FederationJoinedHosts.SelectAllJoinedHosts(ctx)
 }
 
-func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string) ([]gomatrixserverlib.ServerName, error) {
-	return d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs)
+func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf bool) ([]gomatrixserverlib.ServerName, error) {
+	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	if excludeSelf {
+		for i, server := range servers {
+			if server == d.ServerName {
+				servers = append(servers[:i], servers[i+1:]...)
+			}
+		}
+	}
+	return servers, nil
 }
 
 // StoreJSON adds a JSON blob into the queue JSON table and returns

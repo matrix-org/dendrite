@@ -643,9 +643,8 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 	var ires []roomserver.InputRoomEvent
 	for _, outlier := range append(eventsInOrder, messageEvents...) {
 		ires = append(ires, roomserver.InputRoomEvent{
-			Kind:         roomserver.KindOutlier,
-			Event:        outlier.Headered(outlier.Version()),
-			AuthEventIDs: outlier.AuthEventIDs(),
+			Kind:  roomserver.KindOutlier,
+			Event: outlier.Headered(outlier.Version()),
 		})
 	}
 	// we've got the data by this point so use a background context

@@ -53,6 +53,11 @@ func (r *Joiner) PerformJoin(
 ) {
 	roomID, joinedVia, err := r.performJoin(ctx, req)
 	if err != nil {
+		logrus.WithContext(ctx).WithFields(logrus.Fields{
+			"room_id": req.RoomIDOrAlias,
+			"user_id": req.UserID,
+			"servers": req.ServerNames,
+		}).WithError(err).Error("Failed to join room")
 		sentry.CaptureException(err)
 		perr, ok := err.(*rsAPI.PerformError)
 		if ok {
@@ -271,7 +276,6 @@ func (r *Joiner) performJoinRoomByID(
 					{
 						Kind:         rsAPI.KindNew,
 						Event:        event.Headered(buildRes.RoomVersion),
-						AuthEventIDs: event.AuthEventIDs(),
 						SendAsServer: string(r.Cfg.Matrix.ServerName),
 					},
 				},

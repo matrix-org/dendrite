@@ -63,7 +63,12 @@ func GetPostPublicRooms(
 	serverName := gomatrixserverlib.ServerName(request.Server)
 
 	if serverName != "" && serverName != cfg.Matrix.ServerName {
-		res, err := federation.GetPublicRooms(req.Context(), serverName, int(request.Limit), request.Since, false, "")
+		res, err := federation.GetPublicRoomsFiltered(
+			req.Context(), serverName,
+			int(request.Limit), request.Since,
+			request.Filter.SearchTerms, false,
+			"",
+		)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("failed to get public rooms")
 			return jsonerror.InternalServerError()

@@ -179,7 +179,7 @@ func GetMembershipsAtState(
 	return events, nil
 }
 
-func StateBeforeEvent(ctx context.Context, db storage.Database, info types.RoomInfo, eventNID types.EventNID) ([]types.StateEntry, error) {
+func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventNID types.EventNID) ([]types.StateEntry, error) {
 	roomState := state.NewStateResolution(db, info)
 	// Lookup the event NID
 	eIDs, err := db.EventIDs(ctx, []types.EventNID{eventNID})
@@ -223,7 +223,7 @@ func LoadStateEvents(
 }
 
 func CheckServerAllowedToSeeEvent(
-	ctx context.Context, db storage.Database, info types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
@@ -279,7 +279,7 @@ func CheckServerAllowedToSeeEvent(
 
 // TODO: Remove this when we have tests to assert correctness of this function
 func ScanEventTree(
-	ctx context.Context, db storage.Database, info types.RoomInfo, front []string, visited map[string]bool, limit int,
+	ctx context.Context, db storage.Database, info *types.RoomInfo, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
 ) ([]types.EventNID, error) {
 	var resultNIDs []types.EventNID
@@ -387,7 +387,7 @@ func QueryLatestEventsAndState(
 		return nil
 	}
 
-	roomState := state.NewStateResolution(db, *roomInfo)
+	roomState := state.NewStateResolution(db, roomInfo)
 	response.RoomExists = true
 	response.RoomVersion = roomInfo.RoomVersion
 
