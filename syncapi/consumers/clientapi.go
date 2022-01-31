@@ -85,7 +85,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *nats.Msg) {
 		log.WithFields(log.Fields{
 			"type":    output.Type,
 			"room_id": output.RoomID,
-		}).Info("received data from client API server")
+		}).Debug("Received data from client API server")
 
 		streamPos, err := s.db.UpsertAccountData(
 			s.ctx, userID, output.RoomID, output.Type,
