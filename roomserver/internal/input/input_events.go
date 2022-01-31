@@ -130,7 +130,10 @@ func (r *Inputer) processRoomEvent(
 			return fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
 		}
 	}
-	if len(missingRes.MissingAuthEventIDs) > 0 || len(missingRes.MissingPrevEventIDs) > 0 {
+	missingAuth := len(missingRes.MissingAuthEventIDs) > 0
+	missingPrev := !input.HasState && len(missingRes.MissingPrevEventIDs) > 0
+
+	if missingAuth || missingPrev {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
 			RoomID:      event.RoomID(),
 			ExcludeSelf: true,
@@ -138,9 +141,26 @@ func (r *Inputer) processRoomEvent(
 		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
-	}
-	if input.Origin != "" {
-		serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
+		// Sort all of the servers into a map so that we can randomise
+		// their order. Then make sure that the input origin and the
+		// event origin are first on the list.
+		servers := map[gomatrixserverlib.ServerName]struct{}{}
+		for _, server := range serverRes.ServerNames {
+			servers[server] = struct{}{}
+		}
+		serverRes.ServerNames = serverRes.ServerNames[:0]
+		if input.Origin != "" {
+			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
+			delete(servers, input.Origin)
+		}
+		if origin := event.Origin(); origin != input.Origin {
+			serverRes.ServerNames = append(serverRes.ServerNames, origin)
+			delete(servers, origin)
+		}
+		for server := range servers {
+			serverRes.ServerNames = append(serverRes.ServerNames, server)
+			delete(servers, server)
+		}
 	}
 
 	// First of all, check that the auth events of the event are known.
@@ -149,7 +169,7 @@ func (r *Inputer) processRoomEvent(
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
 	if err = r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
-		return fmt.Errorf("r.checkForMissingAuthEvents: %w", err)
+		return fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
 	// Check if the event is allowed by its auth events. If it isn't then
@@ -190,7 +210,6 @@ func (r *Inputer) processRoomEvent(
 	// typical federated room join) then we won't bother trying to fetch prev events
 	// because we may not be allowed to see them and we have no choice but to trust
 	// the state event IDs provided to us in the join instead.
-	missingPrev := !input.HasState && len(missingRes.MissingPrevEventIDs) > 0
 	if missingPrev && input.Kind == api.KindNew {
 		// Don't do this for KindOld events, otherwise old events that we fetch
 		// to satisfy missing prev events/state will end up recursively calling
@@ -204,12 +223,9 @@ func (r *Inputer) processRoomEvent(
 				federation: r.FSAPI,
 				keys:       r.KeyRing,
 				roomsMu:    internal.NewMutexByRoom(),
-				servers:    map[gomatrixserverlib.ServerName]struct{}{},
+				servers:    serverRes.ServerNames,
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
-			}
-			for _, serverName := range serverRes.ServerNames {
-				missingState.servers[serverName] = struct{}{}
 			}
 			if err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				isRejected = true
@@ -399,12 +415,11 @@ func (r *Inputer) fetchAuthEvents(
 			continue
 		}
 
-		// Check the signatures of the event.
-		// TODO: It really makes sense for the federation API to be doing this,
-		// because then it can attempt another server if one serves up an event
-		// with an invalid signature. For now this will do.
+		// Check the signatures of the event. If this fails then we'll simply
+		// skip it, because gomatrixserverlib.Allowed() will notice a problem
+		// if a critical event is missing anyway.
 		if err := authEvent.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
-			return fmt.Errorf("event.VerifyEventSignatures: %w", err)
+			continue
 		}
 
 		// In order to store the new auth event, we need to know its auth chain
@@ -457,7 +472,7 @@ func (r *Inputer) calculateAndSetState(
 	var err error
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 
-	if input.HasState && !isRejected {
+	if input.HasState {
 		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
