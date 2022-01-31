@@ -13,6 +13,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
 	github.com/Shopify/sarama v1.31.0
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/docker/docker v20.10.12+incompatible
@@ -23,6 +24,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/testing v0.0.0-20211215003918-77eb13d6cad2 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/lib/pq v1.10.4
@@ -54,7 +56,9 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/common v0.32.1 // indirect
+	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tidwall/gjson v1.13.0
 	github.com/tidwall/sjson v1.2.4
@@ -66,6 +70,7 @@ require (
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 	golang.org/x/mobile v0.0.0-20220112015953-858099ff7816
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
