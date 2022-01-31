@@ -93,8 +93,16 @@ func (r *Inputer) processRoomEvent(
 	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id": event.EventID(),
 		"room_id":  event.RoomID(),
+		"kind":     input.Kind,
+		"origin":   input.Origin,
 		"type":     event.Type(),
 	})
+	if input.HasState {
+		logger = logger.WithFields(logrus.Fields{
+			"has_state": input.HasState,
+			"state_ids": len(input.StateEventIDs),
+		})
+	}
 
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
 	// Outliers contain no extra information which may warrant a re-processing.
