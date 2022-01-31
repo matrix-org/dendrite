@@ -53,6 +53,8 @@ Arguments:
 
 var (
 	username = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	# usernames are lower-case per spec
+	username = strings.ToLower(*username)
 	password = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
 	pwdFile  = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
 	pwdStdin = flag.Bool("passwordstdin", false, "Reads the password from stdin")
