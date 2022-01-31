@@ -251,7 +251,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 			event.Headered(respMakeJoin.RoomVersion),
 			serverName,
 			nil,
-			false,
+			true,
 		); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"room_id": roomID,
