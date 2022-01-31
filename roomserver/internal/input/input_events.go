@@ -159,6 +159,7 @@ func (r *Inputer) processRoomEvent(
 		}
 		for server := range servers {
 			serverRes.ServerNames = append(serverRes.ServerNames, server)
+			delete(servers, server)
 		}
 	}
 
