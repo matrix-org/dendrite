@@ -51,7 +51,7 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 		"user_id":   userID,
 		"room_id":   roomID,
 		"data_type": dataType,
-	}).Infof("Producing to topic '%s'", p.Topic)
+	}).Tracef("Producing to topic '%s'", p.Topic)
 
 	_, err = p.JetStream.PublishMsg(m)
 	return err

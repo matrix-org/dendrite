@@ -98,7 +98,7 @@ func (t *EDUServerInputAPI) InputCrossSigningKeyUpdate(
 
 	logrus.WithFields(logrus.Fields{
 		"user_id": request.UserID,
-	}).Infof("Producing to topic '%s'", t.OutputKeyChangeEventTopic)
+	}).Tracef("Producing to topic '%s'", t.OutputKeyChangeEventTopic)
 
 	_, err = t.JetStream.PublishMsg(&nats.Msg{
 		Subject: t.OutputKeyChangeEventTopic,
@@ -134,7 +134,7 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 		"room_id": ite.RoomID,
 		"user_id": ite.UserID,
 		"typing":  ite.Typing,
-	}).Infof("Producing to topic '%s'", t.OutputTypingEventTopic)
+	}).Tracef("Producing to topic '%s'", t.OutputTypingEventTopic)
 
 	_, err = t.JetStream.PublishMsg(&nats.Msg{
 		Subject: t.OutputTypingEventTopic,
@@ -175,7 +175,7 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		"user_id":     ise.UserID,
 		"num_devices": len(devices),
 		"type":        ise.Type,
-	}).Infof("Producing to topic '%s'", t.OutputSendToDeviceEventTopic)
+	}).Tracef("Producing to topic '%s'", t.OutputSendToDeviceEventTopic)
 	for _, device := range devices {
 		ote := &api.OutputSendToDeviceEvent{
 			UserID:            ise.UserID,
@@ -208,7 +208,7 @@ func (t *EDUServerInputAPI) InputReceiptEvent(
 	request *api.InputReceiptEventRequest,
 	response *api.InputReceiptEventResponse,
 ) error {
-	logrus.WithFields(logrus.Fields{}).Infof("Producing to topic '%s'", t.OutputReceiptEventTopic)
+	logrus.WithFields(logrus.Fields{}).Tracef("Producing to topic '%s'", t.OutputReceiptEventTopic)
 	output := &api.OutputReceiptEvent{
 		UserID:    request.InputReceiptEvent.UserID,
 		RoomID:    request.InputReceiptEvent.RoomID,
