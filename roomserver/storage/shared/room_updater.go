@@ -32,12 +32,8 @@ func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *typ
 	// we will just run with a normal database transaction. It'll either
 	// succeed, processing a create event which creates the room, or it won't.
 	if roomInfo == nil {
-		tx, err := d.DB.Begin()
-		if err != nil {
-			return nil, fmt.Errorf("d.DB.Begin: %w", err)
-		}
 		return &RoomUpdater{
-			transaction{ctx, tx}, d, nil, nil, "", 0,
+			transaction{ctx, txn}, d, nil, nil, "", 0,
 		}, nil
 	}
 
