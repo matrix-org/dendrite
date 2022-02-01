@@ -18,9 +18,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Shopify/sarama"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -64,8 +64,8 @@ func DeviceListCatchup(
 	}
 
 	// now also track users who we already share rooms with but who have updated their devices between the two tokens
-	offset := sarama.OffsetOldest
-	toOffset := sarama.OffsetNewest
+	offset := jetstream.OffsetOldest
+	toOffset := jetstream.OffsetNewest
 	if to > 0 && to > from {
 		toOffset = int64(to)
 	}
