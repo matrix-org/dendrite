@@ -92,7 +92,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	js, consumer, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
@@ -120,7 +120,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start typing server consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
-		base.ProcessContext, &base.Cfg.KeyServer, consumer, queues, federationDB, rsAPI,
+		base.ProcessContext, &base.Cfg.KeyServer, js, queues, federationDB, rsAPI,
 	)
 	if err := keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")

@@ -125,7 +125,10 @@ func (s *OutputRoomEventConsumer) onMessage(msg *nats.Msg) {
 				}).Panicf("roomserver output log: remote peek event failure")
 				return false
 			}
-
+		case api.OutputTypeNewInviteEvent:
+			log.WithField("type", output.Type).Debug(
+				"received new invite, send device keys",
+			)
 		default:
 			log.WithField("type", output.Type).Debug(
 				"roomserver output log: ignoring unknown output type",
