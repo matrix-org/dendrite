@@ -11,13 +11,12 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/S7evinK/saramajetstream v0.0.0-20210709110708-de6efc8c4a32
-	github.com/Shopify/sarama v1.31.0
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/getsentry/sentry-go v0.12.0
 	github.com/gologme/log v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -74,6 +73,7 @@ require (
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	nhooyr.io/websocket v1.8.7
 )
 
