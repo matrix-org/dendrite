@@ -497,11 +497,11 @@ func (d *Database) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
-	return d.storeEvent(ctx, nil, nil, event, authEventNIDs, isRejected)
+	return d.storeEvent(ctx, nil, event, authEventNIDs, isRejected)
 }
 
 func (d *Database) storeEvent(
-	ctx context.Context, txn *sql.Tx, updater *RoomUpdater, event *gomatrixserverlib.Event,
+	ctx context.Context, updater *RoomUpdater, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
@@ -514,7 +514,10 @@ func (d *Database) storeEvent(
 		redactedEventID  string
 		err              error
 	)
-
+	var txn *sql.Tx
+	if updater != nil {
+		txn = updater.txn
+	}
 	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
 		// TODO: Here we should aim to have two different code paths for new rooms
 		// vs existing ones.
@@ -610,22 +613,10 @@ func (d *Database) storeEvent(
 			}
 			defer sqlutil.EndTransactionWithCheck(updater.txn, &succeeded, &err)
 		}
-		// Ensure that we atomically store prev events AND commit them. If we don't wrap StorePreviousEvents
-		// and EndTransaction in a writer then it's possible for a new write txn to be made between the two
-		// function calls which will then fail with 'database is locked'. This new write txn would HAVE to be
-		// something like SetRoomAlias/RemoveRoomAlias as normal input events are already done sequentially due to
-		// SupportsConcurrentRoomInputs() == false on sqlite, though this does not apply to setting room aliases
-		// as they don't go via InputRoomEvents
-		err = d.Writer.Do(d.DB, updater.txn, func(txn *sql.Tx) error {
-			if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
-				return fmt.Errorf("updater.StorePreviousEvents: %w", err)
-			}
-			succeeded = true
-			return nil
-		})
-		if err != nil {
-			return 0, 0, types.StateAtEvent{}, nil, "", err
+		if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
+			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("updater.StorePreviousEvents: %w", err)
 		}
+		succeeded = true
 	}
 
 	return eventNID, roomNID, types.StateAtEvent{
