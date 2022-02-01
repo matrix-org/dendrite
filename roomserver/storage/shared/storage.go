@@ -42,7 +42,7 @@ type Database struct {
 	MembershipTable     tables.Membership
 	PublishedTable      tables.Published
 	RedactionsTable     tables.Redactions
-	GetRoomUpdaterFn    func(ctx context.Context, roomInfo types.RoomInfo) (*RoomUpdater, error)
+	GetRoomUpdaterFn    func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
 func (d *Database) SupportsConcurrentRoomInputs() bool {
@@ -476,7 +476,7 @@ func (d *Database) MembershipUpdater(
 }
 
 func (d *Database) GetRoomUpdater(
-	ctx context.Context, roomInfo types.RoomInfo,
+	ctx context.Context, roomInfo *types.RoomInfo,
 ) (*RoomUpdater, error) {
 	if d.GetRoomUpdaterFn != nil {
 		return d.GetRoomUpdaterFn(ctx, roomInfo)
@@ -497,11 +497,11 @@ func (d *Database) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
-	return d.storeEvent(ctx, nil, event, authEventNIDs, isRejected)
+	return d.storeEvent(ctx, nil, nil, event, authEventNIDs, isRejected)
 }
 
 func (d *Database) storeEvent(
-	ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.Event,
+	ctx context.Context, txn *sql.Tx, updater *RoomUpdater, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	var (
@@ -589,7 +589,6 @@ func (d *Database) storeEvent(
 	// that there's a row-level lock on the latest room events (well,
 	// on Postgres at least).
 	var roomInfo *types.RoomInfo
-	var updater *RoomUpdater
 	if prevEvents := event.PrevEvents(); len(prevEvents) > 0 {
 		roomInfo, err = d.RoomInfo(ctx, event.RoomID())
 		if err != nil {
@@ -603,9 +602,11 @@ func (d *Database) storeEvent(
 		// function only does SELECTs though so the created txn (at this point) is just a read txn like
 		// any other so this is fine. If we ever update GetLatestEventsForUpdate or NewLatestEventsUpdater
 		// to do writes however then this will need to go inside `Writer.Do`.
-		updater, err = d.GetRoomUpdater(ctx, *roomInfo)
-		if err != nil {
-			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("NewLatestEventsUpdater: %w", err)
+		if updater == nil {
+			updater, err = d.GetRoomUpdater(ctx, roomInfo)
+			if err != nil {
+				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("GetRoomUpdater: %w", err)
+			}
 		}
 		// Ensure that we atomically store prev events AND commit them. If we don't wrap StorePreviousEvents
 		// and EndTransaction in a writer then it's possible for a new write txn to be made between the two

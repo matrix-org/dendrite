@@ -151,7 +151,7 @@ func (r *Inputer) processRoomEventUsingUpdater(
 	if err != nil {
 		return false, fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
-	updater, err := r.DB.GetRoomUpdater(ctx, *roomInfo)
+	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
 		return true, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
 	}

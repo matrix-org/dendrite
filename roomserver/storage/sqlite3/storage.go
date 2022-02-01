@@ -202,7 +202,7 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 }
 
 func (d *Database) GetRoomUpdater(
-	ctx context.Context, roomInfo types.RoomInfo,
+	ctx context.Context, roomInfo *types.RoomInfo,
 ) (*shared.RoomUpdater, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional

@@ -12,7 +12,7 @@ import (
 type RoomUpdater struct {
 	transaction
 	d                       *Database
-	roomInfo                types.RoomInfo
+	roomInfo                *types.RoomInfo
 	latestEvents            []types.StateAtEventAndReference
 	lastEventIDSent         string
 	currentStateSnapshotNID types.StateSnapshotNID
@@ -25,7 +25,22 @@ func rollback(txn *sql.Tx) {
 	txn.Rollback() // nolint: errcheck
 }
 
-func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo types.RoomInfo) (*RoomUpdater, error) {
+func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *types.RoomInfo) (*RoomUpdater, error) {
+	// If the roomInfo is nil then that means that the room doesn't exist
+	// yet, so we can't do `SelectLatestEventsNIDsForUpdate` because that
+	// would involve locking a row on the table that doesn't exist. Instead
+	// we will just run with a normal database transaction. It'll either
+	// succeed, processing a create event which creates the room, or it won't.
+	if roomInfo == nil {
+		tx, err := d.DB.Begin()
+		if err != nil {
+			return nil, fmt.Errorf("d.DB.Begin: %w", err)
+		}
+		return &RoomUpdater{
+			transaction{ctx, tx}, d, nil, nil, "", 0,
+		}, nil
+	}
+
 	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomInfo.RoomNID)
 	if err != nil {
@@ -84,7 +99,7 @@ func (u *RoomUpdater) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
-	return u.d.storeEvent(ctx, u.txn, event, authEventNIDs, isRejected)
+	return u.d.storeEvent(ctx, u.txn, u, event, authEventNIDs, isRejected)
 }
 
 func (u *RoomUpdater) AddState(

@@ -89,7 +89,7 @@ type Database interface {
 	// Opens and returns a room updater, which locks the room and opens a transaction.
 	// The GetRoomUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// If this returns an error then no further action is required.
-	GetRoomUpdater(ctx context.Context, roomInfo types.RoomInfo) (*shared.RoomUpdater, error)
+	GetRoomUpdater(ctx context.Context, roomInfo *types.RoomInfo) (*shared.RoomUpdater, error)
 	// Look up event references for the latest events in the room and the current state snapshot.
 	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
 	// Returns an error if there was a problem talking to the database.
