@@ -76,15 +76,19 @@ func (s *eventJSONStatements) InsertEventJSON(
 }
 
 func (s *eventJSONStatements) BulkSelectEventJSON(
-	ctx context.Context, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]tables.EventJSONPair, error) {
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for k, v := range eventNIDs {
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventJSONSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
-
-	rows, err := s.db.QueryContext(ctx, selectOrig, iEventNIDs...)
+	selectStmt, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}
