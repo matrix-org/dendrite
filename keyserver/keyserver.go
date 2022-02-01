@@ -40,7 +40,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
 ) api.KeyInternalAPI {
-	js, consumer, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	db, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
@@ -66,7 +66,7 @@ func NewInternalAPI(
 	}()
 
 	keyconsumer := consumers.NewOutputCrossSigningKeyUpdateConsumer(
-		base.ProcessContext, base.Cfg, consumer, db, ap,
+		base.ProcessContext, base.Cfg, js, db, ap,
 	)
 	if err := keyconsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start keyserver EDU server consumer")
