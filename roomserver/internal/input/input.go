@@ -113,10 +113,10 @@ func (r *Inputer) Start() error {
 						"type":     inputRoomEvent.Event.Type(),
 					}).Warn("Roomserver failed to process async event")
 				}
-				if !retry {
-					_ = msg.Ack()
-				} else {
+				if retry {
 					_ = msg.Nak()
+				} else {
+					_ = msg.Ack()
 				}
 			})
 		},
