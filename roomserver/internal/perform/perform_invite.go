@@ -222,17 +222,9 @@ func (r *Inviter) PerformInvite(
 		return nil, nil
 	}
 
-	// Notify the sync api of this event in the same way as a federated invite so the invitee
-	// gets the invite.
-	return []api.OutputEvent{
-		{
-			Type: api.OutputTypeNewInviteEvent,
-			NewInviteEvent: &api.OutputNewInviteEvent{
-				Event:       event.Headered(req.RoomVersion),
-				RoomVersion: req.RoomVersion,
-			},
-		},
-	}, nil
+	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
+	// gets the invite, as the roomserver will do this when it processes the m.room.member invite.
+	return nil, nil
 }
 
 func buildInviteStrippedState(
