@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -54,17 +55,22 @@ func (r *Inviter) PerformInvite(
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 
-	log.WithFields(log.Fields{
-		"event_id":         event.EventID(),
-		"room_id":          roomID,
-		"room_version":     req.RoomVersion,
-		"target_user_id":   targetUserID,
-		"room_info_exists": info != nil,
-	}).Debug("processing invite event")
-
 	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
 	isTargetLocal := domain == r.Cfg.Matrix.ServerName
 	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
+
+	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
+		"inviter":  event.Sender(),
+		"invitee":  *event.StateKey(),
+		"room_id":  roomID,
+		"event_id": event.EventID(),
+	})
+	logger.WithFields(log.Fields{
+		"room_version":     req.RoomVersion,
+		"room_info_exists": info != nil,
+		"target_local":     isTargetLocal,
+		"origin_local":     isOriginLocal,
+	}).Debug("processing invite event")
 
 	inviteState := req.InviteRoomState
 	if len(inviteState) == 0 && info != nil {
@@ -122,75 +128,17 @@ func (r *Inviter) PerformInvite(
 			Code: api.PerformErrorNotAllowed,
 			Msg:  "User is already joined to room",
 		}
+		logger.Debugf("user already joined")
 		return nil, nil
 	}
 
-	if isOriginLocal {
-		// The invite originated locally. Therefore we have a responsibility to
-		// try and see if the user is allowed to make this invite. We can't do
-		// this for invites coming in over federation - we have to take those on
-		// trust.
-		_, err = helpers.CheckAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
-		if err != nil {
-			log.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
-				"processInviteEvent.checkAuthEvents failed for event",
-			)
-			res.Error = &api.PerformError{
-				Msg:  err.Error(),
-				Code: api.PerformErrorNotAllowed,
-			}
-		}
-
-		// If the invite originated from us and the target isn't local then we
-		// should try and send the invite over federation first. It might be
-		// that the remote user doesn't exist, in which case we can give up
-		// processing here.
-		if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
-			fsReq := &federationAPI.PerformInviteRequest{
-				RoomVersion:     req.RoomVersion,
-				Event:           event,
-				InviteRoomState: inviteState,
-			}
-			fsRes := &federationAPI.PerformInviteResponse{}
-			if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
-				res.Error = &api.PerformError{
-					Msg:  err.Error(),
-					Code: api.PerformErrorNotAllowed,
-				}
-				log.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
-				return nil, nil
-			}
-			event = fsRes.Event
-		}
-
-		// Send the invite event to the roomserver input stream. This will
-		// notify existing users in the room about the invite, update the
-		// membership table and ensure that the event is ready and available
-		// to use as an auth event when accepting the invite.
-		inputReq := &api.InputRoomEventsRequest{
-			InputRoomEvents: []api.InputRoomEvent{
-				{
-					Kind:         api.KindNew,
-					Event:        event,
-					Origin:       event.Origin(),
-					SendAsServer: req.SendAsServer,
-				},
-			},
-		}
-		inputRes := &api.InputRoomEventsResponse{}
-		r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
-		if err = inputRes.Err(); err != nil {
-			res.Error = &api.PerformError{
-				Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
-				Code: api.PerformErrorNotAllowed,
-			}
-			log.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
-			return nil, nil
-		}
-	} else {
+	if !isOriginLocal {
 		// The invite originated over federation. Process the membership
 		// update, which will notify the sync API etc about the incoming
-		// invite.
+		// invite. We do NOT send an InputRoomEvent for the invite as it
+		// will never pass auth checks due to lacking room state, but we
+		// still need to tell the client about the invite so we can accept
+		// it, hence we return an output event to send to the sync api.
 		updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
 		if err != nil {
 			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
@@ -205,10 +153,77 @@ func (r *Inviter) PerformInvite(
 		if err = updater.Commit(); err != nil {
 			return nil, fmt.Errorf("updater.Commit: %w", err)
 		}
-
+		logger.Debugf("updated membership to invite and sending invite OutputEvent")
 		return outputUpdates, nil
 	}
 
+	// The invite originated locally. Therefore we have a responsibility to
+	// try and see if the user is allowed to make this invite. We can't do
+	// this for invites coming in over federation - we have to take those on
+	// trust.
+	_, err = helpers.CheckAuthEvents(ctx, r.DB, event, event.AuthEventIDs())
+	if err != nil {
+		logger.WithError(err).WithField("event_id", event.EventID()).WithField("auth_event_ids", event.AuthEventIDs()).Error(
+			"processInviteEvent.checkAuthEvents failed for event",
+		)
+		res.Error = &api.PerformError{
+			Msg:  err.Error(),
+			Code: api.PerformErrorNotAllowed,
+		}
+		return nil, nil
+	}
+
+	// If the invite originated from us and the target isn't local then we
+	// should try and send the invite over federation first. It might be
+	// that the remote user doesn't exist, in which case we can give up
+	// processing here.
+	if req.SendAsServer != api.DoNotSendToOtherServers && !isTargetLocal {
+		fsReq := &federationAPI.PerformInviteRequest{
+			RoomVersion:     req.RoomVersion,
+			Event:           event,
+			InviteRoomState: inviteState,
+		}
+		fsRes := &federationAPI.PerformInviteResponse{}
+		if err = r.FSAPI.PerformInvite(ctx, fsReq, fsRes); err != nil {
+			res.Error = &api.PerformError{
+				Msg:  err.Error(),
+				Code: api.PerformErrorNotAllowed,
+			}
+			logger.WithError(err).WithField("event_id", event.EventID()).Error("r.FSAPI.PerformInvite failed")
+			return nil, nil
+		}
+		event = fsRes.Event
+		logger.Debugf("Federated PerformInvite success with event ID %s", event.EventID())
+	}
+
+	// Send the invite event to the roomserver input stream. This will
+	// notify existing users in the room about the invite, update the
+	// membership table and ensure that the event is ready and available
+	// to use as an auth event when accepting the invite.
+	// It will NOT notify the invitee of this invite.
+	inputReq := &api.InputRoomEventsRequest{
+		InputRoomEvents: []api.InputRoomEvent{
+			{
+				Kind:         api.KindNew,
+				Event:        event,
+				Origin:       event.Origin(),
+				SendAsServer: req.SendAsServer,
+			},
+		},
+	}
+	inputRes := &api.InputRoomEventsResponse{}
+	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+	if err = inputRes.Err(); err != nil {
+		res.Error = &api.PerformError{
+			Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
+			Code: api.PerformErrorNotAllowed,
+		}
+		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
+		return nil, nil
+	}
+
+	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
+	// gets the invite, as the roomserver will do this when it processes the m.room.member invite.
 	return nil, nil
 }
 

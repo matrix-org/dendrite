@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-
-	"github.com/nats-io/nats.go"
 )
 
 type JetStream struct {
@@ -25,8 +23,8 @@ func (c *JetStream) TopicFor(name string) string {
 	return fmt.Sprintf("%s%s", c.TopicPrefix, name)
 }
 
-func (c *JetStream) Durable(name string) nats.SubOpt {
-	return nats.Durable(c.TopicFor(name))
+func (c *JetStream) Durable(name string) string {
+	return c.TopicFor(name)
 }
 
 func (c *JetStream) Defaults(generate bool) {
