@@ -40,6 +40,11 @@ type Transaction interface {
 // You MUST check the error returned from this function to be sure that the transaction
 // was applied correctly. For example, 'database is locked' errors in sqlite will happen here.
 func EndTransaction(txn Transaction, succeeded *bool) error {
+	if txn == nil {
+		// Sometimes in SQLite mode we have nil transactions. If that's the case
+		// then we are working outside of a transaction and should do nothing here.
+		return nil
+	}
 	if *succeeded {
 		return txn.Commit()
 	} else {
