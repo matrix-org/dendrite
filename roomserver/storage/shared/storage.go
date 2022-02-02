@@ -62,7 +62,7 @@ func (d *Database) EventTypeNIDs(
 		}
 	}
 	if len(remaining) > 0 {
-		nids, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, remaining)
+		nids, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, nil, remaining)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +77,7 @@ func (d *Database) EventTypeNIDs(
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
-	return d.EventStateKeysTable.BulkSelectEventStateKey(ctx, eventStateKeyNIDs)
+	return d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, eventStateKeyNIDs)
 }
 
 func (d *Database) EventStateKeyNIDs(
@@ -93,7 +93,7 @@ func (d *Database) EventStateKeyNIDs(
 		}
 	}
 	if len(remaining) > 0 {
-		nids, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, remaining)
+		nids, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, remaining)
 		if err != nil {
 			return nil, err
 		}
@@ -980,7 +980,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	}
 	// we don't bother failing the request if we get asked for event types we don't know about, as all that would result in is no matches which
 	// isn't a failure.
-	eventTypeNIDMap, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, eventTypes)
+	eventTypeNIDMap, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, nil, eventTypes)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to map event type nids: %w", err)
 	}
@@ -1000,7 +1000,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 
 	}
 
-	eventStateKeyNIDMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, eventStateKeys)
+	eventStateKeyNIDMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, eventStateKeys)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to map state key nids: %w", err)
 	}
@@ -1076,7 +1076,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 		stateKeyNIDs[i] = nid
 		i++
 	}
-	nidToUserID, err := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, stateKeyNIDs)
+	nidToUserID, err := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, stateKeyNIDs)
 	if err != nil {
 		return nil, err
 	}

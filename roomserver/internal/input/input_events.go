@@ -483,7 +483,7 @@ func (r *Inputer) calculateAndSetState(
 	isRejected bool,
 ) error {
 	var err error
-	roomState := state.NewStateResolution(r.DB, roomInfo)
+	roomState := state.NewStateResolution(updater, roomInfo)
 
 	if input.HasState {
 		// Check here if we think we're in the room already.

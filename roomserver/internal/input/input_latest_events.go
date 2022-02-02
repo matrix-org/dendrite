@@ -191,7 +191,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	roomState := state.NewStateResolution(u.api.DB, u.roomInfo)
+	roomState := state.NewStateResolution(u.updater, u.roomInfo)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
