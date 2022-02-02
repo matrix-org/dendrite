@@ -60,12 +60,12 @@ func (r *Inviter) PerformInvite(
 	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
-		"inviter": event.Sender(),
-		"invitee": *event.StateKey(),
-		"room_id": roomID,
+		"inviter":  event.Sender(),
+		"invitee":  *event.StateKey(),
+		"room_id":  roomID,
+		"event_id": event.EventID(),
 	})
 	logger.WithFields(log.Fields{
-		"event_id":         event.EventID(),
 		"room_version":     req.RoomVersion,
 		"room_info_exists": info != nil,
 		"target_local":     isTargetLocal,
