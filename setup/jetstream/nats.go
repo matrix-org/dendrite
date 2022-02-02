@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
-	"github.com/nats-io/nats.go"
 	natsclient "github.com/nats-io/nats.go"
 )
 
@@ -60,7 +59,7 @@ func Prepare(cfg *config.JetStream) natsclient.JetStreamContext {
 func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) natsclient.JetStreamContext {
 	if nc == nil {
 		var err error
-		nc, err = nats.Connect(strings.Join(cfg.Addresses, ","))
+		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","))
 		if err != nil {
 			logrus.WithError(err).Panic("Unable to connect to NATS")
 			return nil
@@ -85,7 +84,7 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) natsclient.JetStreamC
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {
-				stream.Storage = nats.MemoryStorage
+				stream.Storage = natsclient.MemoryStorage
 			}
 
 			// Namespace the streams without modifying the original streams
