@@ -13,7 +13,7 @@ func JetStreamConsumer(
 	f func(ctx context.Context, msg *nats.Msg) bool,
 	opts ...nats.SubOpt,
 ) error {
-	if _, err := nats.ConsumerInfo(subj, durable); err == nil {
+	if cinfo, err := nats.ConsumerInfo(subj, durable); err == nil && cinfo.PushBound {
 		if err := nats.DeleteConsumer(subj, durable); err != nil {
 			return fmt.Errorf("nats.DeleteConsumer: %w", err)
 		}
