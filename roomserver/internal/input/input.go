@@ -157,18 +157,15 @@ func (r *Inputer) processRoomEventUsingUpdater(
 	}
 	commit, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
 	if commit {
-		if err = updater.Commit(); err != nil {
-			return false, fmt.Errorf("updater.Commit: %w", err)
+		if cerr := updater.Commit(); err != nil {
+			return true, fmt.Errorf("updater.Commit: %w", cerr)
 		}
 	} else {
 		if rerr := updater.Rollback(); rerr != nil {
-			return true, fmt.Errorf("updater.Rollback: %w", err)
+			return true, fmt.Errorf("updater.Rollback: %w", rerr)
 		}
 	}
-	if err != nil {
-		return true, err
-	}
-	return false, nil
+	return false, err
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
