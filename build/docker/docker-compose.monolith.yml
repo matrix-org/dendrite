@@ -20,6 +20,20 @@ services:
     networks:
       - internal
 
+  jetstream:
+    hostname: jetstream
+    image: nats:latest
+    command: |
+      --jetstream
+      --store_dir /var/lib/nats
+      --cluster_name Dendrite
+    volumes:
+      # To persist your NATS JetStream streams outside of the Docker image,
+      # prevent data loss, modify the following ./path_to path:
+      - ./path_to/nats:/var/lib/nats
+    networks:
+      - internal
+
   monolith:
     hostname: monolith
     image: matrixdotorg/dendrite-monolith:latest
@@ -35,6 +49,7 @@ services:
       - ./media:/var/dendrite/media
     depends_on:
       - postgres
+      - jetstream
     networks:
       - internal
     restart: unless-stopped
