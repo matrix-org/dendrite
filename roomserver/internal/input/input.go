@@ -157,7 +157,7 @@ func (r *Inputer) processRoomEventUsingUpdater(
 	}
 	commit, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
 	if commit {
-		if cerr := updater.Commit(); err != nil {
+		if cerr := updater.Commit(); cerr != nil {
 			return true, fmt.Errorf("updater.Commit: %w", cerr)
 		}
 	} else {
