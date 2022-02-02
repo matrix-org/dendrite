@@ -93,11 +93,43 @@ func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEvent
 	})
 }
 
+func (u *RoomUpdater) Events(
+	ctx context.Context, eventNIDs []types.EventNID,
+) ([]types.Event, error) {
+	return u.d.events(ctx, u.txn, eventNIDs)
+}
+
+func (u *RoomUpdater) SnapshotNIDFromEventID(
+	ctx context.Context, eventID string,
+) (types.StateSnapshotNID, error) {
+	return u.d.snapshotNIDFromEventID(ctx, u.txn, eventID)
+}
+
 func (u *RoomUpdater) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,
 ) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
 	return u.d.storeEvent(ctx, u, event, authEventNIDs, isRejected)
+}
+
+func (u *RoomUpdater) StateBlockNIDs(
+	ctx context.Context, stateNIDs []types.StateSnapshotNID,
+) ([]types.StateBlockNIDList, error) {
+	return u.d.stateBlockNIDs(ctx, u.txn, stateNIDs)
+}
+
+func (u *RoomUpdater) StateEntries(
+	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
+) ([]types.StateEntryList, error) {
+	return u.d.stateEntries(ctx, u.txn, stateBlockNIDs)
+}
+
+func (u *RoomUpdater) StateEntriesForTuples(
+	ctx context.Context,
+	stateBlockNIDs []types.StateBlockNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntryList, error) {
+	return u.d.stateEntriesForTuples(ctx, u.txn, stateBlockNIDs, stateKeyTuples)
 }
 
 func (u *RoomUpdater) AddState(
@@ -115,6 +147,18 @@ func (u *RoomUpdater) SetState(
 	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
 		return u.d.EventsTable.UpdateEventState(ctx, txn, eventNID, stateNID)
 	})
+}
+
+func (u *RoomUpdater) EventTypeNIDs(
+	ctx context.Context, eventTypes []string,
+) (map[string]types.EventTypeNID, error) {
+	return u.d.eventTypeNIDs(ctx, u.txn, eventTypes)
+}
+
+func (u *RoomUpdater) EventStateKeyNIDs(
+	ctx context.Context, eventStateKeys []string,
+) (map[string]types.EventStateKeyNID, error) {
+	return u.d.eventStateKeyNIDs(ctx, u.txn, eventStateKeys)
 }
 
 func (u *RoomUpdater) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {

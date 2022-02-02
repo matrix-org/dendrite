@@ -52,6 +52,12 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 func (d *Database) EventTypeNIDs(
 	ctx context.Context, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
+	return d.eventTypeNIDs(ctx, nil, eventTypes)
+}
+
+func (d *Database) eventTypeNIDs(
+	ctx context.Context, txn *sql.Tx, eventTypes []string,
+) (map[string]types.EventTypeNID, error) {
 	result := make(map[string]types.EventTypeNID)
 	remaining := []string{}
 	for _, eventType := range eventTypes {
@@ -62,7 +68,7 @@ func (d *Database) EventTypeNIDs(
 		}
 	}
 	if len(remaining) > 0 {
-		nids, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, nil, remaining)
+		nids, err := d.EventTypesTable.BulkSelectEventTypeNID(ctx, txn, remaining)
 		if err != nil {
 			return nil, err
 		}
@@ -83,6 +89,12 @@ func (d *Database) EventStateKeys(
 func (d *Database) EventStateKeyNIDs(
 	ctx context.Context, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
+	return d.eventStateKeyNIDs(ctx, nil, eventStateKeys)
+}
+
+func (d *Database) eventStateKeyNIDs(
+	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
+) (map[string]types.EventStateKeyNID, error) {
 	result := make(map[string]types.EventStateKeyNID)
 	remaining := []string{}
 	for _, eventStateKey := range eventStateKeys {
@@ -93,7 +105,7 @@ func (d *Database) EventStateKeyNIDs(
 		}
 	}
 	if len(remaining) > 0 {
-		nids, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, remaining)
+		nids, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, txn, remaining)
 		if err != nil {
 			return nil, err
 		}
@@ -116,15 +128,23 @@ func (d *Database) StateEntriesForTuples(
 	stateBlockNIDs []types.StateBlockNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntryList, error) {
+	return d.stateEntriesForTuples(ctx, nil, stateBlockNIDs, stateKeyTuples)
+}
+
+func (d *Database) stateEntriesForTuples(
+	ctx context.Context, txn *sql.Tx,
+	stateBlockNIDs []types.StateBlockNID,
+	stateKeyTuples []types.StateKeyTuple,
+) ([]types.StateEntryList, error) {
 	entries, err := d.StateBlockTable.BulkSelectStateBlockEntries(
-		ctx, nil, stateBlockNIDs,
+		ctx, txn, stateBlockNIDs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
 	}
 	lists := []types.StateEntryList{}
 	for i, entry := range entries {
-		entries, err := d.EventsTable.BulkSelectStateEventByNID(ctx, nil, entry, stateKeyTuples)
+		entries, err := d.EventsTable.BulkSelectStateEventByNID(ctx, txn, entry, stateKeyTuples)
 		if err != nil {
 			return nil, fmt.Errorf("d.EventsTable.BulkSelectStateEventByNID: %w", err)
 		}
@@ -244,7 +264,13 @@ func (d *Database) StateAtEventIDs(
 func (d *Database) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (types.StateSnapshotNID, error) {
-	_, stateNID, err := d.EventsTable.SelectEvent(ctx, nil, eventID)
+	return d.snapshotNIDFromEventID(ctx, nil, eventID)
+}
+
+func (d *Database) snapshotNIDFromEventID(
+	ctx context.Context, txn *sql.Tx, eventID string,
+) (types.StateSnapshotNID, error) {
+	_, stateNID, err := d.EventsTable.SelectEvent(ctx, txn, eventID)
 	return stateNID, err
 }
 
@@ -294,21 +320,33 @@ func (d *Database) LatestEventIDs(
 func (d *Database) StateBlockNIDs(
 	ctx context.Context, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
-	return d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, nil, stateNIDs)
+	return d.stateBlockNIDs(ctx, nil, stateNIDs)
+}
+
+func (d *Database) stateBlockNIDs(
+	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
+) ([]types.StateBlockNIDList, error) {
+	return d.StateSnapshotTable.BulkSelectStateBlockNIDs(ctx, txn, stateNIDs)
 }
 
 func (d *Database) StateEntries(
 	ctx context.Context, stateBlockNIDs []types.StateBlockNID,
 ) ([]types.StateEntryList, error) {
+	return d.stateEntries(ctx, nil, stateBlockNIDs)
+}
+
+func (d *Database) stateEntries(
+	ctx context.Context, txn *sql.Tx, stateBlockNIDs []types.StateBlockNID,
+) ([]types.StateEntryList, error) {
 	entries, err := d.StateBlockTable.BulkSelectStateBlockEntries(
-		ctx, nil, stateBlockNIDs,
+		ctx, txn, stateBlockNIDs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("d.StateBlockTable.BulkSelectStateBlockEntries: %w", err)
 	}
 	lists := make([]types.StateEntryList, 0, len(entries))
 	for i, entry := range entries {
-		eventNIDs, err := d.EventsTable.BulkSelectStateEventByNID(ctx, nil, entry, nil)
+		eventNIDs, err := d.EventsTable.BulkSelectStateEventByNID(ctx, txn, entry, nil)
 		if err != nil {
 			return nil, fmt.Errorf("d.EventsTable.BulkSelectStateEventByNID: %w", err)
 		}
