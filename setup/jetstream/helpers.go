@@ -9,11 +9,17 @@ import (
 )
 
 func JetStreamConsumer(
-	ctx context.Context, nats nats.JetStreamContext, subj string,
+	ctx context.Context, nats nats.JetStreamContext, subj, durable string,
 	f func(ctx context.Context, msg *nats.Msg) bool,
 	opts ...nats.SubOpt,
 ) error {
-	sub, err := nats.SubscribeSync(subj, opts...)
+	if _, err := nats.ConsumerInfo(subj, durable); err == nil {
+		if err := nats.DeleteConsumer(subj, durable); err != nil {
+			return fmt.Errorf("nats.DeleteConsumer: %w", err)
+		}
+	}
+
+	sub, err := nats.PullSubscribe(subj, durable, opts...)
 	if err != nil {
 		return fmt.Errorf("nats.SubscribeSync: %w", err)
 	}

@@ -35,7 +35,7 @@ import (
 type OutputTypingEventConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
-	durable   nats.SubOpt
+	durable   string
 	topic     string
 	eduCache  *cache.EDUCache
 	stream    types.StreamProvider
@@ -67,8 +67,8 @@ func NewOutputTypingEventConsumer(
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.onMessage,
-		s.durable, nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 

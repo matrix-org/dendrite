@@ -34,7 +34,7 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx          context.Context
 	jetstream    nats.JetStreamContext
-	durable      nats.SubOpt
+	durable      string
 	topic        string
 	asDB         storage.Database
 	rsAPI        api.RoomserverInternalAPI
@@ -67,8 +67,8 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.onMessage,
-		s.durable, nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 

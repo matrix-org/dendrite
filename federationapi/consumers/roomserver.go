@@ -37,7 +37,7 @@ type OutputRoomEventConsumer struct {
 	cfg       *config.FederationAPI
 	rsAPI     api.RoomserverInternalAPI
 	jetstream nats.JetStreamContext
-	durable   nats.SubOpt
+	durable   string
 	db        storage.Database
 	queues    *queue.OutgoingQueues
 	topic     string
@@ -67,8 +67,8 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.onMessage,
-		s.durable, nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 

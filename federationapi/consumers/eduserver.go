@@ -34,7 +34,7 @@ import (
 type OutputEDUConsumer struct {
 	ctx               context.Context
 	jetstream         nats.JetStreamContext
-	durable           nats.SubOpt
+	durable           string
 	db                storage.Database
 	queues            *queue.OutgoingQueues
 	ServerName        gomatrixserverlib.ServerName
@@ -67,20 +67,20 @@ func NewOutputEDUConsumer(
 // Start consuming from EDU servers
 func (t *OutputEDUConsumer) Start() error {
 	if err := jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.typingTopic, t.onTypingEvent,
-		t.durable, nats.DeliverAll(), nats.ManualAck(),
+		t.ctx, t.jetstream, t.typingTopic, t.durable, t.onTypingEvent,
+		nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {
 		return err
 	}
 	if err := jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.sendToDeviceTopic, t.onSendToDeviceEvent,
-		t.durable, nats.DeliverAll(), nats.ManualAck(),
+		t.ctx, t.jetstream, t.sendToDeviceTopic, t.durable, t.onSendToDeviceEvent,
+		nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {
 		return err
 	}
 	if err := jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.receiptTopic, t.onReceiptEvent,
-		t.durable, nats.DeliverAll(), nats.ManualAck(),
+		t.ctx, t.jetstream, t.receiptTopic, t.durable, t.onReceiptEvent,
+		nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {
 		return err
 	}
