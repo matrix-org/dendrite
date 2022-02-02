@@ -35,6 +35,7 @@ import (
 type KeyChangeConsumer struct {
 	ctx        context.Context
 	jetstream  nats.JetStreamContext
+	durable    string
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 	serverName gomatrixserverlib.ServerName
@@ -54,6 +55,7 @@ func NewKeyChangeConsumer(
 	return &KeyChangeConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
+		durable:    cfg.Matrix.JetStream.TopicFor("FederationAPIKeyChangeConsumer"),
 		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
 		queues:     queues,
 		db:         store,
@@ -64,37 +66,33 @@ func NewKeyChangeConsumer(
 
 // Start consuming from key servers
 func (t *KeyChangeConsumer) Start() error {
-	_, err := t.jetstream.Subscribe(
-		t.topic, t.onMessage,
-		nats.DeliverAll(),
+	return jetstream.JetStreamConsumer(
+		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
 	)
-	return err
 }
 
 // onMessage is called in response to a message received on the
 // key change events topic from the key server.
-func (t *KeyChangeConsumer) onMessage(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		var m api.DeviceMessage
-		if err := json.Unmarshal(msg.Data, &m); err != nil {
-			logrus.WithError(err).Errorf("failed to read device message from key change topic")
-			return true
-		}
-		if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
-			// This probably shouldn't happen but stops us from panicking if we come
-			// across an update that doesn't satisfy either types.
-			return true
-		}
-		switch m.Type {
-		case api.TypeCrossSigningUpdate:
-			return t.onCrossSigningMessage(m)
-		case api.TypeDeviceKeyUpdate:
-			fallthrough
-		default:
-			return t.onDeviceKeyMessage(m)
-		}
-	})
-
+func (t *KeyChangeConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	var m api.DeviceMessage
+	if err := json.Unmarshal(msg.Data, &m); err != nil {
+		logrus.WithError(err).Errorf("failed to read device message from key change topic")
+		return true
+	}
+	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
+		// This probably shouldn't happen but stops us from panicking if we come
+		// across an update that doesn't satisfy either types.
+		return true
+	}
+	switch m.Type {
+	case api.TypeCrossSigningUpdate:
+		return t.onCrossSigningMessage(m)
+	case api.TypeDeviceKeyUpdate:
+		fallthrough
+	default:
+		return t.onDeviceKeyMessage(m)
+	}
 }
 
 func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {

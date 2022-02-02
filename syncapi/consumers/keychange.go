@@ -21,6 +21,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -35,6 +36,7 @@ import (
 type OutputKeyChangeEventConsumer struct {
 	ctx        context.Context
 	jetstream  nats.JetStreamContext
+	durable    string
 	topic      string
 	db         storage.Database
 	notifier   *notifier.Notifier
@@ -48,7 +50,7 @@ type OutputKeyChangeEventConsumer struct {
 // Call Start() to begin consuming from the key server.
 func NewOutputKeyChangeEventConsumer(
 	process *process.ProcessContext,
-	serverName gomatrixserverlib.ServerName,
+	cfg *config.SyncAPI,
 	topic string,
 	js nats.JetStreamContext,
 	keyAPI api.KeyInternalAPI,
@@ -60,9 +62,10 @@ func NewOutputKeyChangeEventConsumer(
 	s := &OutputKeyChangeEventConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPIKeyChangeConsumer"),
 		topic:      topic,
 		db:         store,
-		serverName: serverName,
+		serverName: cfg.Matrix.ServerName,
 		keyAPI:     keyAPI,
 		rsAPI:      rsAPI,
 		notifier:   notifier,
@@ -74,34 +77,31 @@ func NewOutputKeyChangeEventConsumer(
 
 // Start consuming from the key server
 func (s *OutputKeyChangeEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(
-		s.topic, s.onMessage,
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
 	)
-	return err
 }
 
-func (s *OutputKeyChangeEventConsumer) onMessage(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		var m api.DeviceMessage
-		if err := json.Unmarshal(msg.Data, &m); err != nil {
-			logrus.WithError(err).Errorf("failed to read device message from key change topic")
-			return true
-		}
-		if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
-			// This probably shouldn't happen but stops us from panicking if we come
-			// across an update that doesn't satisfy either types.
-			return true
-		}
-		switch m.Type {
-		case api.TypeCrossSigningUpdate:
-			return s.onCrossSigningMessage(m, m.DeviceChangeID)
-		case api.TypeDeviceKeyUpdate:
-			fallthrough
-		default:
-			return s.onDeviceKeyMessage(m, m.DeviceChangeID)
-		}
-	})
-
+func (s *OutputKeyChangeEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	var m api.DeviceMessage
+	if err := json.Unmarshal(msg.Data, &m); err != nil {
+		logrus.WithError(err).Errorf("failed to read device message from key change topic")
+		return true
+	}
+	if m.DeviceKeys == nil && m.OutputCrossSigningKeyUpdate == nil {
+		// This probably shouldn't happen but stops us from panicking if we come
+		// across an update that doesn't satisfy either types.
+		return true
+	}
+	switch m.Type {
+	case api.TypeCrossSigningUpdate:
+		return s.onCrossSigningMessage(m, m.DeviceChangeID)
+	case api.TypeDeviceKeyUpdate:
+		fallthrough
+	default:
+		return s.onDeviceKeyMessage(m, m.DeviceChangeID)
+	}
 }
 
 func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, deviceChangeID int64) bool {
