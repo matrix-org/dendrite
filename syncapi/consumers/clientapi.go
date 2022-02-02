@@ -34,7 +34,7 @@ import (
 type OutputClientDataConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
-	durable   nats.SubOpt
+	durable   string
 	topic     string
 	db        storage.Database
 	stream    types.StreamProvider
@@ -63,45 +63,45 @@ func NewOutputClientDataConsumer(
 
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
-	return err
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
 // onMessage is called when the sync server receives a new event from the client API server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputClientDataConsumer) onMessage(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		// Parse out the event JSON
-		userID := msg.Header.Get(jetstream.UserID)
-		var output eventutil.AccountData
-		if err := json.Unmarshal(msg.Data, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("client API server output log: message parse failure")
-			sentry.CaptureException(err)
-			return true
-		}
-
-		log.WithFields(log.Fields{
-			"type":    output.Type,
-			"room_id": output.RoomID,
-		}).Debug("Received data from client API server")
-
-		streamPos, err := s.db.UpsertAccountData(
-			s.ctx, userID, output.RoomID, output.Type,
-		)
-		if err != nil {
-			sentry.CaptureException(err)
-			log.WithFields(log.Fields{
-				"type":       output.Type,
-				"room_id":    output.RoomID,
-				log.ErrorKey: err,
-			}).Panicf("could not save account data")
-		}
-
-		s.stream.Advance(streamPos)
-		s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
-
+func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	// Parse out the event JSON
+	userID := msg.Header.Get(jetstream.UserID)
+	var output eventutil.AccountData
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("client API server output log: message parse failure")
+		sentry.CaptureException(err)
 		return true
-	})
+	}
+
+	log.WithFields(log.Fields{
+		"type":    output.Type,
+		"room_id": output.RoomID,
+	}).Debug("Received data from client API server")
+
+	streamPos, err := s.db.UpsertAccountData(
+		s.ctx, userID, output.RoomID, output.Type,
+	)
+	if err != nil {
+		sentry.CaptureException(err)
+		log.WithFields(log.Fields{
+			"type":       output.Type,
+			"room_id":    output.RoomID,
+			log.ErrorKey: err,
+		}).Panicf("could not save account data")
+	}
+
+	s.stream.Advance(streamPos)
+	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
+
+	return true
 }
