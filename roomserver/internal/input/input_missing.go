@@ -79,7 +79,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
-			err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
+			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
 				Kind:         api.KindNew,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
@@ -188,7 +188,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	// TODO: we could do this concurrently?
 	for _, ire := range outlierRoomEvents {
-		if err = t.inputer.processRoomEvent(ctx, t.db, &ire); err != nil {
+		if _, err = t.inputer.processRoomEvent(ctx, t.db, &ire); err != nil {
 			return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
 		}
 	}
@@ -201,7 +201,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		stateIDs = append(stateIDs, event.EventID())
 	}
 
-	err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
+	_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
 		Kind:          api.KindOld,
 		Event:         backwardsExtremity.Headered(roomVersion),
 		Origin:        t.origin,
@@ -218,7 +218,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// they will automatically fast-forward based on the room state at the
 	// extremity in the last step.
 	for _, newEvent := range newEvents {
-		err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
+		_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
 			Kind:         api.KindOld,
 			Event:        newEvent.Headered(roomVersion),
 			Origin:       t.origin,

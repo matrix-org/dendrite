@@ -155,14 +155,18 @@ func (r *Inputer) processRoomEventUsingUpdater(
 	if err != nil {
 		return true, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
 	}
-	if err = r.processRoomEvent(ctx, updater, inputRoomEvent); err != nil {
-		if rerr := updater.Rollback(); rerr != nil {
-			return false, fmt.Errorf("r.processRoomEvent: %w (with additional error rolling back transaction: %s)", err, rerr)
+	commit, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
+	if commit {
+		if err = updater.Commit(); err != nil {
+			return false, fmt.Errorf("updater.Commit: %w", err)
 		}
-		return false, fmt.Errorf("r.processRoomEvent: %w", err)
+	} else {
+		if rerr := updater.Rollback(); rerr != nil {
+			return true, fmt.Errorf("updater.Rollback: %w", err)
+		}
 	}
-	if err = updater.Commit(); err != nil {
-		return true, fmt.Errorf("updater.Commit: %w", err)
+	if err != nil {
+		return true, err
 	}
 	return false, nil
 }
