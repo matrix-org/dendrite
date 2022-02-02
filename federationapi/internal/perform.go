@@ -253,7 +253,6 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		}
 	}()
 
-	<-ctx.Done()
 	return nil
 }
 
