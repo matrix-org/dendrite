@@ -33,24 +33,24 @@ func JetStreamConsumer(
 	}
 	go func() {
 		for {
-			// For reasons that don't make any sense to me, the nats.Context is
-			// actually not completely limiting. We can't supply context.Background
-			// because that is not allowed. If we supply a context without a deadline
-			// then it will just enforce the JetStream timeout of 5 seconds. So it
-			// is quite likely that we will end up looping here at that timeout.
+			// The context behaviour here is surprising — we supply a context
+			// so that we can interrupt the fetch if we want, but NATS will still
+			// enforce its own deadline (roughly 5 seconds by default). Therefore
+			// it is our responsibility to check whether our context expired or
+			// not when a context error is returned. Footguns. Footguns everywhere.
 			msgs, err := sub.Fetch(1, nats.Context(ctx))
 			if err != nil {
 				if err == context.Canceled || err == context.DeadlineExceeded {
-					// Work out whether it was the JetStream context that
-					// expired, or whether it was the supplied context.
+					// Work out whether it was the JetStream context that expired
+					// or whether it was our supplied context.
 					select {
 					case <-ctx.Done():
 						// The supplied context expired, so we want to stop the
 						// consumer altogether.
 						return
 					default:
-						// The JetStream context expired, so the fetch just timed
-						// out and we should try again.
+						// The JetStream context expired, so the fetch probably
+						// just timed out and we should try again.
 						continue
 					}
 				} else {
