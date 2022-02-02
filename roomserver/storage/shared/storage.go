@@ -649,7 +649,7 @@ func (d *Database) storeEvent(
 			if err != nil {
 				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("GetRoomUpdater: %w", err)
 			}
-			defer sqlutil.EndTransactionWithCheck(updater.txn, &succeeded, &err)
+			defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 		}
 		if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
 			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("updater.StorePreviousEvents: %w", err)

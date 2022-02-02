@@ -61,6 +61,22 @@ func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *typ
 	}, nil
 }
 
+// Implements sqlutil.Transaction
+func (u *RoomUpdater) Commit() error {
+	if u.txn == nil { // SQLite mode probably
+		return nil
+	}
+	return u.txn.Commit()
+}
+
+// Implements sqlutil.Transaction
+func (u *RoomUpdater) Rollback() error {
+	if u.txn == nil { // SQLite mode probably
+		return nil
+	}
+	return u.txn.Commit()
+}
+
 // RoomVersion implements types.RoomRecentEventsUpdater
 func (u *RoomUpdater) RoomVersion() (version gomatrixserverlib.RoomVersion) {
 	return u.roomInfo.RoomVersion
