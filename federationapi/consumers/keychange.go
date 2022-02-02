@@ -144,10 +144,11 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		Keys:              m.KeyJSON,
 	}
 	if edu.Content, err = json.Marshal(event); err != nil {
+		logger.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
 
-	logrus.Infof("Sending device list update message to %q", destinations)
+	logger.Infof("Sending device list update message to %q", destinations)
 	err = t.queues.SendEDU(edu, t.serverName, destinations)
 	return err == nil
 }
