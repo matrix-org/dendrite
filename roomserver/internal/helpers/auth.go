@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type checkForSoftFailStorage interface {
+type checkForAuthAndSoftFailStorage interface {
 	state.StateResolutionStorage
 	StateEntriesForEventIDs(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
 	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
@@ -35,7 +35,7 @@ type checkForSoftFailStorage interface {
 // the soft-fail bool.
 func CheckForSoftFail(
 	ctx context.Context,
-	db checkForSoftFailStorage,
+	db checkForAuthAndSoftFailStorage,
 	event *gomatrixserverlib.HeaderedEvent,
 	stateEventIDs []string,
 ) (bool, error) {
@@ -97,7 +97,7 @@ func CheckForSoftFail(
 // Returns the numeric IDs for the auth events.
 func CheckAuthEvents(
 	ctx context.Context,
-	db checkForSoftFailStorage,
+	db checkForAuthAndSoftFailStorage,
 	event *gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {

@@ -18,8 +18,7 @@ import (
 )
 
 type missingStateReq struct {
-	origin gomatrixserverlib.ServerName
-	//db              storage.Database
+	origin          gomatrixserverlib.ServerName
 	db              *shared.RoomUpdater
 	inputer         *Inputer
 	queryer         *query.Queryer
