@@ -161,7 +161,6 @@ func (r *Inputer) InputRoomEvents(
 		}
 	} else {
 		responses := make(chan error, len(request.InputRoomEvents))
-		defer close(responses)
 		for _, e := range request.InputRoomEvents {
 			inputRoomEvent := e
 			roomID := inputRoomEvent.Event.RoomID()
