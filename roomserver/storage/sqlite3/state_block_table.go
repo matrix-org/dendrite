@@ -93,7 +93,8 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	if err != nil {
 		return 0, fmt.Errorf("json.Marshal: %w", err)
 	}
-	err = s.insertStateDataStmt.QueryRowContext(
+	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
+	err = stmt.QueryRowContext(
 		ctx, nids.Hash(), js,
 	).Scan(&id)
 	return

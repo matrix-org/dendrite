@@ -405,7 +405,7 @@ func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.Ro
 	if len(extraEventIDs) == 0 {
 		return nil, nil
 	}
-	extraEvents, err := u.api.DB.EventsFromIDs(u.ctx, extraEventIDs)
+	extraEvents, err := u.updater.EventsFromIDs(u.ctx, extraEventIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +428,7 @@ func (u *latestEventsUpdater) stateEventMap() (map[types.EventNID]string, error)
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
 	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
-	return u.api.DB.EventIDs(u.ctx, stateEventNIDs)
+	return u.updater.EventIDs(u.ctx, stateEventNIDs)
 }
 
 type eventNIDSorter []types.EventNID
