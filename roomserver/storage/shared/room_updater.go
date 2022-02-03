@@ -74,7 +74,7 @@ func (u *RoomUpdater) Rollback() error {
 	if u.txn == nil { // SQLite mode probably
 		return nil
 	}
-	return u.txn.Commit()
+	return u.txn.Rollback()
 }
 
 // RoomVersion implements types.RoomRecentEventsUpdater
