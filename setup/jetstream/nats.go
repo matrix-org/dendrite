@@ -12,13 +12,6 @@ import (
 	natsclient "github.com/nats-io/nats.go"
 )
 
-const (
-	// OffsetNewest tells e.g. the database to get the most current data
-	OffsetNewest int64 = -1
-	// OffsetOldest tells e.g. the database to get the oldest data
-	OffsetOldest int64 = -2
-)
-
 var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
 

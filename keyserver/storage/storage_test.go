@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
 var ctx = context.Background()
@@ -50,7 +50,7 @@ func TestKeyChanges(t *testing.T) {
 	MustNotError(t, err)
 	deviceChangeIDC, err := db.StoreKeyChange(ctx, "@charlie:localhost")
 	MustNotError(t, err)
-	userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDB, jetstream.OffsetNewest)
+	userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDB, types.OffsetNewest)
 	if err != nil {
 		t.Fatalf("Failed to KeyChanges: %s", err)
 	}
@@ -74,7 +74,7 @@ func TestKeyChangesNoDupes(t *testing.T) {
 	}
 	deviceChangeID, err := db.StoreKeyChange(ctx, "@alice:localhost")
 	MustNotError(t, err)
-	userIDs, latest, err := db.KeyChanges(ctx, 0, jetstream.OffsetNewest)
+	userIDs, latest, err := db.KeyChanges(ctx, 0, types.OffsetNewest)
 	if err != nil {
 		t.Fatalf("Failed to KeyChanges: %s", err)
 	}
