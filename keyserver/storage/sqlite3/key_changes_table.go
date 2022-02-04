@@ -17,9 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"math"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
@@ -76,9 +74,6 @@ func (s *keyChangesStatements) InsertKeyChange(ctx context.Context, userID strin
 func (s *keyChangesStatements) SelectKeyChanges(
 	ctx context.Context, fromOffset, toOffset int64,
 ) (userIDs []string, latestOffset int64, err error) {
-	if toOffset == sarama.OffsetNewest {
-		toOffset = math.MaxInt64
-	}
 	latestOffset = fromOffset
 	rows, err := s.selectKeyChangesStmt.QueryContext(ctx, fromOffset, toOffset)
 	if err != nil {

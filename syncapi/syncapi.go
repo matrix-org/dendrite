@@ -48,7 +48,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	js, consumer, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
@@ -65,8 +65,8 @@ func AddPublicRoutes(
 	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier)
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		process, cfg.Matrix.ServerName, cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
-		consumer, keyAPI, rsAPI, syncDB, notifier,
+		process, cfg, cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
+		js, keyAPI, rsAPI, syncDB, notifier,
 		streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {

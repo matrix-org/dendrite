@@ -18,29 +18,30 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
-
-	"github.com/Shopify/sarama"
 )
 
 type OutputCrossSigningKeyUpdateConsumer struct {
-	eduServerConsumer *internal.ContinualConsumer
-	keyDB             storage.Database
-	keyAPI            api.KeyInternalAPI
-	serverName        string
+	ctx        context.Context
+	keyDB      storage.Database
+	keyAPI     api.KeyInternalAPI
+	serverName string
+	jetstream  nats.JetStreamContext
+	durable    string
+	topic      string
 }
 
 func NewOutputCrossSigningKeyUpdateConsumer(
 	process *process.ProcessContext,
 	cfg *config.Dendrite,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	keyDB storage.Database,
 	keyAPI api.KeyInternalAPI,
 ) *OutputCrossSigningKeyUpdateConsumer {
@@ -48,60 +49,58 @@ func NewOutputCrossSigningKeyUpdateConsumer(
 	// topic. We will only produce events where the UserID matches our server name,
 	// and we will only consume events where the UserID does NOT match our server
 	// name (because the update came from a remote server).
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "keyserver/keyserver",
-		Topic:          cfg.Global.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
-		Consumer:       kafkaConsumer,
-		PartitionStore: keyDB,
-	}
 	s := &OutputCrossSigningKeyUpdateConsumer{
-		eduServerConsumer: &consumer,
-		keyDB:             keyDB,
-		keyAPI:            keyAPI,
-		serverName:        string(cfg.Global.ServerName),
+		ctx:        process.Context(),
+		keyDB:      keyDB,
+		jetstream:  js,
+		durable:    cfg.Global.JetStream.Durable("KeyServerCrossSigningConsumer"),
+		topic:      cfg.Global.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
+		keyAPI:     keyAPI,
+		serverName: string(cfg.Global.ServerName),
 	}
-	consumer.ProcessMessage = s.onMessage
 
 	return s
 }
 
 func (s *OutputCrossSigningKeyUpdateConsumer) Start() error {
-	return s.eduServerConsumer.Start()
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
 // onMessage is called in response to a message received on the
 // key change events topic from the key server.
-func (t *OutputCrossSigningKeyUpdateConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+func (t *OutputCrossSigningKeyUpdateConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	var m api.DeviceMessage
-	if err := json.Unmarshal(msg.Value, &m); err != nil {
+	if err := json.Unmarshal(msg.Data, &m); err != nil {
 		logrus.WithError(err).Errorf("failed to read device message from key change topic")
-		return nil
+		return true
 	}
 	if m.OutputCrossSigningKeyUpdate == nil {
 		// This probably shouldn't happen but stops us from panicking if we come
 		// across an update that doesn't satisfy either types.
-		return nil
+		return true
 	}
 	switch m.Type {
 	case api.TypeCrossSigningUpdate:
 		return t.onCrossSigningMessage(m)
 	default:
-		return nil
+		return true
 	}
 }
 
-func (s *OutputCrossSigningKeyUpdateConsumer) onCrossSigningMessage(m api.DeviceMessage) error {
+func (s *OutputCrossSigningKeyUpdateConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
 		logrus.WithError(err).Errorf("eduserver output log: user ID parse failure")
-		return nil
+		return true
 	}
 	if host == gomatrixserverlib.ServerName(s.serverName) {
 		// Ignore any messages that contain information about our own users, as
 		// they already originated from this server.
-		return nil
+		return true
 	}
 	uploadReq := &api.PerformUploadDeviceKeysRequest{
 		UserID: output.UserID,
@@ -114,5 +113,8 @@ func (s *OutputCrossSigningKeyUpdateConsumer) onCrossSigningMessage(m api.Device
 	}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
 	s.keyAPI.PerformUploadDeviceKeys(context.TODO(), uploadReq, uploadRes)
-	return uploadRes.Error
+	if uploadRes.Error != nil {
+		return false
+	}
+	return true
 }

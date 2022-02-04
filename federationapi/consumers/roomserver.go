@@ -114,6 +114,11 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 			}
 		}
 
+	case api.OutputTypeNewInviteEvent:
+		log.WithField("type", output.Type).Debug(
+			"received new invite, send device keys",
+		)
+
 	case api.OutputTypeNewInboundPeek:
 		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
 			log.WithFields(log.Fields{
