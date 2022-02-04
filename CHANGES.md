@@ -1,5 +1,26 @@
 # Changelog
 
+## Dendrite 0.6.1 (2022-02-04)
+
+### Features
+
+* Roomserver inputs now take place with full transactional isolation in PostgreSQL deployments
+* Pull consumers are now used instead of push consumers when retrieving messages from NATS to better guarantee ordering and to reduce redelivery of duplicate messages
+* Further logging tweaks, particularly when joining rooms
+* Improved calculation of servers in the room, when checking for missing auth/prev events or state
+* Dendrite will now skip dead servers more quickly when federating by reducing the TCP dial timeout
+* The key change consumers have now been converted to use native NATS code rather than a wrapper
+* Go 1.16 is now the minimum supported version for Dendrite
+
+### Fixes
+
+* Local clients should now be notified correctly of invites
+* The roomserver input API now has more time to process events, particularly when fetching missing events or state, which should fix a number of errors from expired contexts
+* Fixed a panic that could happen due to a closed channel in the roomserver input API
+* Logging in with uppercase usernames from old installations is now supported again (contributed by [hoernschen](https://github.com/hoernschen))
+* Federated room joins now have more time to complete and should not fail due to expired contexts
+* Events that were sent to the roomserver along with a complete state snapshot are now persisted with the correct state, even if they were rejected or soft-failed
+
 ## Dendrite 0.6.0 (2022-01-28)
 
 ### Features
