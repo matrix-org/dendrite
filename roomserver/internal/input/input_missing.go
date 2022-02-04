@@ -37,10 +37,6 @@ type missingStateReq struct {
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) error {
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, MaximumMissingProcessingTime)
-	defer cancel()
-
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
