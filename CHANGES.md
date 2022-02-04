@@ -1,5 +1,11 @@
 # Changelog
 
+## Dendrite 0.6.2 (2022-02-04)
+
+### Fixes
+
+* Resolves an issue where the key change consumer in the keyserver could consume extreme amounts of CPU
+
 ## Dendrite 0.6.1 (2022-02-04)
 
 ### Features
