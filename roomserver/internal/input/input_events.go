@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -67,14 +68,15 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
+	updater *shared.RoomUpdater,
 	input *api.InputRoomEvent,
-) (err error) {
+) (commitAction, error) {
 	select {
 	case <-ctx.Done():
 		// Before we do anything, make sure the context hasn't expired for this pending task.
 		// If it has then we'll give up straight away — it's probably a synchronous input
 		// request and the caller has already given up, but the inbox task was still queued.
-		return context.DeadlineExceeded
+		return rollbackTransaction, context.DeadlineExceeded
 	default:
 	}
 
@@ -107,7 +109,7 @@ func (r *Inputer) processRoomEvent(
 	// if we have already got this event then do not process it again, if the input kind is an outlier.
 	// Outliers contain no extra information which may warrant a re-processing.
 	if input.Kind == api.KindOutlier {
-		evs, err2 := r.DB.EventsFromIDs(ctx, []string{event.EventID()})
+		evs, err2 := updater.EventsFromIDs(ctx, []string{event.EventID()})
 		if err2 == nil && len(evs) == 1 {
 			// check hash matches if we're on early room versions where the event ID was a random string
 			idFormat, err2 := headered.RoomVersion.EventIDFormat()
@@ -116,11 +118,11 @@ func (r *Inputer) processRoomEvent(
 				case gomatrixserverlib.EventIDFormatV1:
 					if bytes.Equal(event.EventReference().EventSHA256, evs[0].EventReference().EventSHA256) {
 						logger.Debugf("Already processed event; ignoring")
-						return nil
+						return rollbackTransaction, nil
 					}
 				default:
 					logger.Debugf("Already processed event; ignoring")
-					return nil
+					return rollbackTransaction, nil
 				}
 			}
 		}
@@ -134,8 +136,8 @@ func (r *Inputer) processRoomEvent(
 			AuthEventIDs: event.AuthEventIDs(),
 			PrevEventIDs: event.PrevEventIDs(),
 		}
-		if err = r.Queryer.QueryMissingAuthPrevEvents(ctx, missingReq, missingRes); err != nil {
-			return fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
+		if err := r.Queryer.QueryMissingAuthPrevEvents(ctx, missingReq, missingRes); err != nil {
+			return rollbackTransaction, fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
 		}
 	}
 	missingAuth := len(missingRes.MissingAuthEventIDs) > 0
@@ -146,8 +148,8 @@ func (r *Inputer) processRoomEvent(
 			RoomID:      event.RoomID(),
 			ExcludeSelf: true,
 		}
-		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
-			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
+		if err := r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
+			return rollbackTransaction, fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
 		// Sort all of the servers into a map so that we can randomise
 		// their order. Then make sure that the input origin and the
@@ -176,8 +178,8 @@ func (r *Inputer) processRoomEvent(
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	if err = r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
-		return fmt.Errorf("r.fetchAuthEvents: %w", err)
+	if err := r.fetchAuthEvents(ctx, updater, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+		return rollbackTransaction, fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
 	// Check if the event is allowed by its auth events. If it isn't then
@@ -193,7 +195,7 @@ func (r *Inputer) processRoomEvent(
 	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
 	for _, authEventID := range authEventIDs {
 		if _, ok := knownEvents[authEventID]; !ok {
-			return fmt.Errorf("missing auth event %s", authEventID)
+			return rollbackTransaction, fmt.Errorf("missing auth event %s", authEventID)
 		}
 		authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
 	}
@@ -202,7 +204,8 @@ func (r *Inputer) processRoomEvent(
 	if input.Kind == api.KindNew {
 		// Check that the event passes authentication checks based on the
 		// current room state.
-		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
+		var err error
+		softfail, err = helpers.CheckForSoftFail(ctx, updater, headered, input.StateEventIDs)
 		if err != nil {
 			logger.WithError(err).Warn("Error authing soft-failed event")
 		}
@@ -227,7 +230,7 @@ func (r *Inputer) processRoomEvent(
 				origin:     input.Origin,
 				inputer:    r,
 				queryer:    r.Queryer,
-				db:         r.DB,
+				db:         updater,
 				federation: r.FSAPI,
 				keys:       r.KeyRing,
 				roomsMu:    internal.NewMutexByRoom(),
@@ -235,7 +238,7 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 			}
-			if err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			if err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
 			} else {
@@ -248,16 +251,16 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Store the event.
-	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
+	_, _, stateAtEvent, redactionEvent, redactedEventID, err := updater.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
-		return fmt.Errorf("r.DB.StoreEvent: %w", err)
+		return rollbackTransaction, fmt.Errorf("updater.StoreEvent: %w", err)
 	}
 
 	// if storing this event results in it being redacted then do so.
 	if !isRejected && redactedEventID == event.EventID() {
 		r, rerr := eventutil.RedactEvent(redactionEvent, event)
 		if rerr != nil {
-			return fmt.Errorf("eventutil.RedactEvent: %w", rerr)
+			return rollbackTransaction, fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
 		event = r
 	}
@@ -268,23 +271,23 @@ func (r *Inputer) processRoomEvent(
 	if input.Kind == api.KindOutlier {
 		logger.Debug("Stored outlier")
 		hooks.Run(hooks.KindNewEventPersisted, headered)
-		return nil
+		return commitTransaction, nil
 	}
 
-	roomInfo, err := r.DB.RoomInfo(ctx, event.RoomID())
+	roomInfo, err := updater.RoomInfo(ctx, event.RoomID())
 	if err != nil {
-		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return rollbackTransaction, fmt.Errorf("updater.RoomInfo: %w", err)
 	}
 	if roomInfo == nil {
-		return fmt.Errorf("r.DB.RoomInfo missing for room %s", event.RoomID())
+		return rollbackTransaction, fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
 	}
 
 	if !missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0 {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
-		err = r.calculateAndSetState(ctx, input, roomInfo, &stateAtEvent, event, isRejected)
+		err = r.calculateAndSetState(ctx, updater, input, roomInfo, &stateAtEvent, event, isRejected)
 		if err != nil {
-			return fmt.Errorf("r.calculateAndSetState: %w", err)
+			return rollbackTransaction, fmt.Errorf("r.calculateAndSetState: %w", err)
 		}
 	}
 
@@ -294,13 +297,14 @@ func (r *Inputer) processRoomEvent(
 			"soft_fail":    softfail,
 			"missing_prev": missingPrev,
 		}).Warn("Stored rejected event")
-		return rejectionErr
+		return commitTransaction, rejectionErr
 	}
 
 	switch input.Kind {
 	case api.KindNew:
 		if err = r.updateLatestEvents(
 			ctx,                 // context
+			updater,             // room updater
 			roomInfo,            // room info for the room being updated
 			stateAtEvent,        // state at event (below)
 			event,               // event
@@ -308,7 +312,7 @@ func (r *Inputer) processRoomEvent(
 			input.TransactionID, // transaction ID
 			input.HasState,      // rewrites state?
 		); err != nil {
-			return fmt.Errorf("r.updateLatestEvents: %w", err)
+			return rollbackTransaction, fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
 		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
@@ -320,7 +324,7 @@ func (r *Inputer) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("r.WriteOutputEvents (old): %w", err)
+			return rollbackTransaction, fmt.Errorf("r.WriteOutputEvents (old): %w", err)
 		}
 	}
 
@@ -339,14 +343,14 @@ func (r *Inputer) processRoomEvent(
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
+			return rollbackTransaction, fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
 		}
 	}
 
 	// Everything was OK — the latest events updater didn't error and
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
-	return nil
+	return commitTransaction, nil
 }
 
 // fetchAuthEvents will check to see if any of the
@@ -358,6 +362,7 @@ func (r *Inputer) processRoomEvent(
 // they are now in the database.
 func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
+	updater *shared.RoomUpdater,
 	logger *logrus.Entry,
 	event *gomatrixserverlib.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
@@ -375,7 +380,7 @@ func (r *Inputer) fetchAuthEvents(
 	}
 
 	for _, authEventID := range authEventIDs {
-		authEvents, err := r.DB.EventsFromIDs(ctx, []string{authEventID})
+		authEvents, err := updater.EventsFromIDs(ctx, []string{authEventID})
 		if err != nil || len(authEvents) == 0 || authEvents[0].Event == nil {
 			unknown[authEventID] = struct{}{}
 			continue
@@ -454,9 +459,9 @@ func (r *Inputer) fetchAuthEvents(
 		}
 
 		// Finally, store the event in the database.
-		eventNID, _, _, _, _, err := r.DB.StoreEvent(ctx, authEvent, authEventNIDs, isRejected)
+		eventNID, _, _, _, _, err := updater.StoreEvent(ctx, authEvent, authEventNIDs, isRejected)
 		if err != nil {
-			return fmt.Errorf("r.DB.StoreEvent: %w", err)
+			return fmt.Errorf("updater.StoreEvent: %w", err)
 		}
 
 		// Now we know about this event, it was stored and the signatures were OK.
@@ -471,6 +476,7 @@ func (r *Inputer) fetchAuthEvents(
 
 func (r *Inputer) calculateAndSetState(
 	ctx context.Context,
+	updater *shared.RoomUpdater,
 	input *api.InputRoomEvent,
 	roomInfo *types.RoomInfo,
 	stateAtEvent *types.StateAtEvent,
@@ -478,14 +484,14 @@ func (r *Inputer) calculateAndSetState(
 	isRejected bool,
 ) error {
 	var err error
-	roomState := state.NewStateResolution(r.DB, roomInfo)
+	roomState := state.NewStateResolution(updater, roomInfo)
 
 	if input.HasState {
 		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
 		var joinEventNIDs []types.EventNID
 		// Request join memberships only for local users only.
-		if joinEventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true); err == nil {
+		if joinEventNIDs, err = updater.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true); err == nil {
 			// If we have no local users that are joined to the room then any state about
 			// the room that we have is quite possibly out of date. Therefore in that case
 			// we should overwrite it rather than merge it.
@@ -495,13 +501,13 @@ func (r *Inputer) calculateAndSetState(
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
-			return fmt.Errorf("r.DB.StateEntriesForEventIDs: %w", err)
+		if entries, err = updater.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+			return fmt.Errorf("updater.StateEntriesForEventIDs: %w", err)
 		}
 		entries = types.DeduplicateStateEntries(entries)
 
-		if stateAtEvent.BeforeStateSnapshotNID, err = r.DB.AddState(ctx, roomInfo.RoomNID, nil, entries); err != nil {
-			return fmt.Errorf("r.DB.AddState: %w", err)
+		if stateAtEvent.BeforeStateSnapshotNID, err = updater.AddState(ctx, roomInfo.RoomNID, nil, entries); err != nil {
+			return fmt.Errorf("updater.AddState: %w", err)
 		}
 	} else {
 		stateAtEvent.Overwrite = false
@@ -512,7 +518,7 @@ func (r *Inputer) calculateAndSetState(
 		}
 	}
 
-	err = r.DB.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
+	err = updater.SetState(ctx, stateAtEvent.EventNID, stateAtEvent.BeforeStateSnapshotNID)
 	if err != nil {
 		return fmt.Errorf("r.DB.SetState: %w", err)
 	}

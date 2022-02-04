@@ -86,11 +86,10 @@ type Database interface {
 	// Lookup the event IDs for a batch of event numeric IDs.
 	// Returns an error if the retrieval went wrong.
 	EventIDs(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error)
-	// Look up the latest events in a room in preparation for an update.
-	// The RoomRecentEventsUpdater must have Commit or Rollback called on it if this doesn't return an error.
-	// Returns the latest events in the room and the last eventID sent to the log along with an updater.
+	// Opens and returns a room updater, which locks the room and opens a transaction.
+	// The GetRoomUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// If this returns an error then no further action is required.
-	GetLatestEventsForUpdate(ctx context.Context, roomInfo types.RoomInfo) (*shared.LatestEventsUpdater, error)
+	GetRoomUpdater(ctx context.Context, roomInfo *types.RoomInfo) (*shared.RoomUpdater, error)
 	// Look up event references for the latest events in the room and the current state snapshot.
 	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
 	// Returns an error if there was a problem talking to the database.

@@ -81,9 +81,10 @@ func (s *eventJSONStatements) InsertEventJSON(
 }
 
 func (s *eventJSONStatements) BulkSelectEventJSON(
-	ctx context.Context, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) ([]tables.EventJSONPair, error) {
-	rows, err := s.bulkSelectEventJSONStmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventJSONStmt)
+	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs))
 	if err != nil {
 		return nil, err
 	}

@@ -133,9 +133,10 @@ func (s *eventTypeStatements) SelectEventTypeNID(
 }
 
 func (s *eventTypeStatements) BulkSelectEventTypeNID(
-	ctx context.Context, eventTypes []string,
+	ctx context.Context, txn *sql.Tx, eventTypes []string,
 ) (map[string]types.EventTypeNID, error) {
-	rows, err := s.bulkSelectEventTypeNIDStmt.QueryContext(ctx, pq.StringArray(eventTypes))
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventTypeNIDStmt)
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventTypes))
 	if err != nil {
 		return nil, err
 	}

@@ -91,9 +91,10 @@ func (s *roomAliasesStatements) InsertRoomAlias(
 }
 
 func (s *roomAliasesStatements) SelectRoomIDFromAlias(
-	ctx context.Context, alias string,
+	ctx context.Context, txn *sql.Tx, alias string,
 ) (roomID string, err error) {
-	err = s.selectRoomIDFromAliasStmt.QueryRowContext(ctx, alias).Scan(&roomID)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomIDFromAliasStmt)
+	err = stmt.QueryRowContext(ctx, alias).Scan(&roomID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -101,10 +102,11 @@ func (s *roomAliasesStatements) SelectRoomIDFromAlias(
 }
 
 func (s *roomAliasesStatements) SelectAliasesFromRoomID(
-	ctx context.Context, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (aliases []string, err error) {
 	aliases = []string{}
-	rows, err := s.selectAliasesFromRoomIDStmt.QueryContext(ctx, roomID)
+	stmt := sqlutil.TxStmt(txn, s.selectAliasesFromRoomIDStmt)
+	rows, err := stmt.QueryContext(ctx, roomID)
 	if err != nil {
 		return
 	}
@@ -124,9 +126,10 @@ func (s *roomAliasesStatements) SelectAliasesFromRoomID(
 }
 
 func (s *roomAliasesStatements) SelectCreatorIDFromAlias(
-	ctx context.Context, alias string,
+	ctx context.Context, txn *sql.Tx, alias string,
 ) (creatorID string, err error) {
-	err = s.selectCreatorIDFromAliasStmt.QueryRowContext(ctx, alias).Scan(&creatorID)
+	stmt := sqlutil.TxStmt(txn, s.selectCreatorIDFromAliasStmt)
+	err = stmt.QueryRowContext(ctx, alias).Scan(&creatorID)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
