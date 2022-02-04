@@ -114,7 +114,10 @@ func (s *OutputCrossSigningKeyUpdateConsumer) onCrossSigningMessage(m api.Device
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
 	s.keyAPI.PerformUploadDeviceKeys(context.TODO(), uploadReq, uploadRes)
 	if uploadRes.Error != nil {
-		return false
+		// If the error is due to a missing or invalid parameter then we'd might
+		// as well just acknowledge the message, because otherwise otherwise we'll
+		// just keep getting delivered a faulty message over and over again.
+		return uploadRes.Error.IsMissingParam || uploadRes.Error.IsInvalidParam
 	}
 	return true
 }
