@@ -22,7 +22,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -30,13 +29,25 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+type StateResolutionStorage interface {
+	EventTypeNIDs(ctx context.Context, eventTypes []string) (map[string]types.EventTypeNID, error)
+	EventStateKeyNIDs(ctx context.Context, eventStateKeys []string) (map[string]types.EventStateKeyNID, error)
+	StateBlockNIDs(ctx context.Context, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
+	StateEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
+	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
+	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
+	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
+	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
+	Events(ctx context.Context, eventNIDs []types.EventNID) ([]types.Event, error)
+}
+
 type StateResolution struct {
-	db       storage.Database
+	db       StateResolutionStorage
 	roomInfo *types.RoomInfo
 	events   map[types.EventNID]*gomatrixserverlib.Event
 }
 
-func NewStateResolution(db storage.Database, roomInfo *types.RoomInfo) StateResolution {
+func NewStateResolution(db StateResolutionStorage, roomInfo *types.RoomInfo) StateResolution {
 	return StateResolution{
 		db:       db,
 		roomInfo: roomInfo,

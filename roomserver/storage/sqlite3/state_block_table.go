@@ -81,8 +81,7 @@ func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 }
 
 func (s *stateBlockStatements) BulkInsertStateData(
-	ctx context.Context,
-	txn *sql.Tx,
+	ctx context.Context, txn *sql.Tx,
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
@@ -94,14 +93,15 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	if err != nil {
 		return 0, fmt.Errorf("json.Marshal: %w", err)
 	}
-	err = s.insertStateDataStmt.QueryRowContext(
+	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
+	err = stmt.QueryRowContext(
 		ctx, nids.Hash(), js,
 	).Scan(&id)
 	return
 }
 
 func (s *stateBlockStatements) BulkSelectStateBlockEntries(
-	ctx context.Context, stateBlockNIDs types.StateBlockNIDs,
+	ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs,
 ) ([][]types.EventNID, error) {
 	intfs := make([]interface{}, len(stateBlockNIDs))
 	for i := range stateBlockNIDs {
@@ -112,6 +112,7 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	if err != nil {
 		return nil, err
 	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
 	rows, err := selectStmt.QueryContext(ctx, intfs...)
 	if err != nil {
 		return nil, err
