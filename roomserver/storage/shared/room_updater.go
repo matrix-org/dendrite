@@ -25,16 +25,7 @@ func rollback(txn *sql.Tx) {
 	txn.Rollback() // nolint: errcheck
 }
 
-func NewRoomUpdater(ctx context.Context, d *Database, roomInfo *types.RoomInfo) (*RoomUpdater, error) {
-	var txn *sql.Tx
-	if d.SupportsTransactionalIsolation() {
-		var err error
-		txn, err = d.DB.Begin()
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *types.RoomInfo) (*RoomUpdater, error) {
 	// If the roomInfo is nil then that means that the room doesn't exist
 	// yet, so we can't do `SelectLatestEventsNIDsForUpdate` because that
 	// would involve locking a row on the table that doesn't exist. Instead

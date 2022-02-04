@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -192,12 +193,24 @@ func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
 	return nil
 }
 
-func (d *Database) SupportsTransactionalIsolation() bool {
+func (d *Database) SupportsConcurrentRoomInputs() bool {
 	// This isn't supported in SQLite mode yet because of issues with
 	// database locks.
 	// TODO: Look at this again - the problem is probably to do with
 	// the membership updaters and latest events updaters.
 	return false
+}
+
+func (d *Database) GetRoomUpdater(
+	ctx context.Context, roomInfo *types.RoomInfo,
+) (*shared.RoomUpdater, error) {
+	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
+	// multiple write transactions on sqlite. The code will perform additional
+	// write transactions independent of this one which will consistently cause
+	// 'database is locked' errors. As sqlite doesn't support multi-process on the
+	// same DB anyway, and we only execute updates sequentially, the only worries
+	// are for rolling back when things go wrong. (atomicity)
+	return shared.NewRoomUpdater(ctx, &d.Database, nil, roomInfo)
 }
 
 func (d *Database) MembershipUpdater(

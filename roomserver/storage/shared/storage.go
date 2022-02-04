@@ -45,7 +45,7 @@ type Database struct {
 	GetRoomUpdaterFn    func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
-func (d *Database) SupportsTransactionalIsolation() bool {
+func (d *Database) SupportsConcurrentRoomInputs() bool {
 	return true
 }
 
@@ -447,7 +447,7 @@ func (d *Database) events(
 	if err != nil {
 		return nil, err
 	}
-	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, txn, eventNIDs)
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
@@ -501,15 +501,16 @@ func (d *Database) MembershipUpdater(
 	ctx context.Context, roomID, targetUserID string,
 	targetLocal bool, roomVersion gomatrixserverlib.RoomVersion,
 ) (*MembershipUpdater, error) {
-	var txn *sql.Tx
-	var err error
-	if d.SupportsTransactionalIsolation() {
-		txn, err = d.DB.Begin()
-		if err != nil {
-			return nil, err
-		}
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
 	}
-	return NewMembershipUpdater(ctx, d, txn, roomID, targetUserID, targetLocal, roomVersion)
+	var updater *MembershipUpdater
+	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		updater, err = NewMembershipUpdater(ctx, d, txn, roomID, targetUserID, targetLocal, roomVersion)
+		return err
+	})
+	return updater, err
 }
 
 func (d *Database) GetRoomUpdater(
@@ -518,7 +519,16 @@ func (d *Database) GetRoomUpdater(
 	if d.GetRoomUpdaterFn != nil {
 		return d.GetRoomUpdaterFn(ctx, roomInfo)
 	}
-	return NewRoomUpdater(ctx, d, roomInfo)
+	txn, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	var updater *RoomUpdater
+	_ = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+		updater, err = NewRoomUpdater(ctx, d, txn, roomInfo)
+		return err
+	})
+	return updater, err
 }
 
 func (d *Database) StoreEvent(
