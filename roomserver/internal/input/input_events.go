@@ -369,10 +369,6 @@ func (r *Inputer) fetchAuthEvents(
 	known map[string]*types.Event,
 	servers []gomatrixserverlib.ServerName,
 ) error {
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, MaximumMissingProcessingTime)
-	defer cancel()
-
 	unknown := map[string]struct{}{}
 	authEventIDs := event.AuthEventIDs()
 	if len(authEventIDs) == 0 {
