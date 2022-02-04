@@ -35,7 +35,7 @@ import (
 type OutputTypingEventConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
-	durable   nats.SubOpt
+	durable   string
 	topic     string
 	eduCache  *cache.EDUCache
 	stream    types.StreamProvider
@@ -66,41 +66,41 @@ func NewOutputTypingEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputTypingEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
-	return err
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
-func (s *OutputTypingEventConsumer) onMessage(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		var output api.OutputTypingEvent
-		if err := json.Unmarshal(msg.Data, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("EDU server output log: message parse failure")
-			sentry.CaptureException(err)
-			return true
-		}
-
-		log.WithFields(log.Fields{
-			"room_id": output.Event.RoomID,
-			"user_id": output.Event.UserID,
-			"typing":  output.Event.Typing,
-		}).Debug("received data from EDU server")
-
-		var typingPos types.StreamPosition
-		typingEvent := output.Event
-		if typingEvent.Typing {
-			typingPos = types.StreamPosition(
-				s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
-			)
-		} else {
-			typingPos = types.StreamPosition(
-				s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
-			)
-		}
-
-		s.stream.Advance(typingPos)
-		s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
-
+func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	var output api.OutputTypingEvent
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return true
-	})
+	}
+
+	log.WithFields(log.Fields{
+		"room_id": output.Event.RoomID,
+		"user_id": output.Event.UserID,
+		"typing":  output.Event.Typing,
+	}).Debug("received data from EDU server")
+
+	var typingPos types.StreamPosition
+	typingEvent := output.Event
+	if typingEvent.Typing {
+		typingPos = types.StreamPosition(
+			s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
+		)
+	} else {
+		typingPos = types.StreamPosition(
+			s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
+		)
+	}
+
+	s.stream.Advance(typingPos)
+	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+
+	return true
 }

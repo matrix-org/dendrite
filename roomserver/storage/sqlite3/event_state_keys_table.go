@@ -112,15 +112,20 @@ func (s *eventStateKeyStatements) SelectEventStateKeyNID(
 }
 
 func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
-	ctx context.Context, eventStateKeys []string,
+	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	iEventStateKeys := make([]interface{}, len(eventStateKeys))
 	for k, v := range eventStateKeys {
 		iEventStateKeys[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", sqlutil.QueryVariadic(len(eventStateKeys)), 1)
-
-	rows, err := s.db.QueryContext(ctx, selectOrig, iEventStateKeys...)
+	var rows *sql.Rows
+	var err error
+	if txn != nil {
+		rows, err = txn.QueryContext(ctx, selectOrig, iEventStateKeys...)
+	} else {
+		rows, err = s.db.QueryContext(ctx, selectOrig, iEventStateKeys...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -138,15 +143,19 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 }
 
 func (s *eventStateKeyStatements) BulkSelectEventStateKey(
-	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
+	ctx context.Context, txn *sql.Tx, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
 	iEventStateKeyNIDs := make([]interface{}, len(eventStateKeyNIDs))
 	for k, v := range eventStateKeyNIDs {
 		iEventStateKeyNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventStateKeyNIDSQL, "($1)", sqlutil.QueryVariadic(len(eventStateKeyNIDs)), 1)
-
-	rows, err := s.db.QueryContext(ctx, selectOrig, iEventStateKeyNIDs...)
+	selectPrep, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
+	stmt := sqlutil.TxStmt(txn, selectPrep)
+	rows, err := stmt.QueryContext(ctx, iEventStateKeyNIDs...)
 	if err != nil {
 		return nil, err
 	}

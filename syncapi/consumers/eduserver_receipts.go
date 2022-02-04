@@ -34,7 +34,7 @@ import (
 type OutputReceiptEventConsumer struct {
 	ctx       context.Context
 	jetstream nats.JetStreamContext
-	durable   nats.SubOpt
+	durable   string
 	topic     string
 	db        storage.Database
 	stream    types.StreamProvider
@@ -64,36 +64,36 @@ func NewOutputReceiptEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputReceiptEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
-	return err
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
-func (s *OutputReceiptEventConsumer) onMessage(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		var output api.OutputReceiptEvent
-		if err := json.Unmarshal(msg.Data, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("EDU server output log: message parse failure")
-			sentry.CaptureException(err)
-			return true
-		}
-
-		streamPos, err := s.db.StoreReceipt(
-			s.ctx,
-			output.RoomID,
-			output.Type,
-			output.UserID,
-			output.EventID,
-			output.Timestamp,
-		)
-		if err != nil {
-			sentry.CaptureException(err)
-			return true
-		}
-
-		s.stream.Advance(streamPos)
-		s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
-
+func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	var output api.OutputReceiptEvent
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return true
-	})
+	}
+
+	streamPos, err := s.db.StoreReceipt(
+		s.ctx,
+		output.RoomID,
+		output.Type,
+		output.UserID,
+		output.EventID,
+		output.Timestamp,
+	)
+	if err != nil {
+		sentry.CaptureException(err)
+		return true
+	}
+
+	s.stream.Advance(streamPos)
+	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
+
+	return true
 }

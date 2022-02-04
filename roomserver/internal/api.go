@@ -41,7 +41,7 @@ type RoomserverInternalAPI struct {
 	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
 	JetStream              nats.JetStreamContext
-	Durable                nats.SubOpt
+	Durable                string
 	InputRoomEventTopic    string // JetStream topic for new input room events
 	OutputRoomEventTopic   string // JetStream topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
@@ -87,7 +87,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 		InputRoomEventTopic:  r.InputRoomEventTopic,
 		OutputRoomEventTopic: r.OutputRoomEventTopic,
 		JetStream:            r.JetStream,
-		Durable:              r.Durable,
+		Durable:              nats.Durable(r.Durable),
 		ServerName:           r.Cfg.Matrix.ServerName,
 		FSAPI:                fsAPI,
 		KeyRing:              keyRing,

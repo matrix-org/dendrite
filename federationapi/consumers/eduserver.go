@@ -34,7 +34,7 @@ import (
 type OutputEDUConsumer struct {
 	ctx               context.Context
 	jetstream         nats.JetStreamContext
-	durable           nats.SubOpt
+	durable           string
 	db                storage.Database
 	queues            *queue.OutgoingQueues
 	ServerName        gomatrixserverlib.ServerName
@@ -66,13 +66,22 @@ func NewOutputEDUConsumer(
 
 // Start consuming from EDU servers
 func (t *OutputEDUConsumer) Start() error {
-	if _, err := t.jetstream.Subscribe(t.typingTopic, t.onTypingEvent, t.durable); err != nil {
+	if err := jetstream.JetStreamConsumer(
+		t.ctx, t.jetstream, t.typingTopic, t.durable, t.onTypingEvent,
+		nats.DeliverAll(), nats.ManualAck(),
+	); err != nil {
 		return err
 	}
-	if _, err := t.jetstream.Subscribe(t.sendToDeviceTopic, t.onSendToDeviceEvent, t.durable); err != nil {
+	if err := jetstream.JetStreamConsumer(
+		t.ctx, t.jetstream, t.sendToDeviceTopic, t.durable, t.onSendToDeviceEvent,
+		nats.DeliverAll(), nats.ManualAck(),
+	); err != nil {
 		return err
 	}
-	if _, err := t.jetstream.Subscribe(t.receiptTopic, t.onReceiptEvent, t.durable); err != nil {
+	if err := jetstream.JetStreamConsumer(
+		t.ctx, t.jetstream, t.receiptTopic, t.durable, t.onReceiptEvent,
+		nats.DeliverAll(), nats.ManualAck(),
+	); err != nil {
 		return err
 	}
 	return nil
@@ -80,175 +89,169 @@ func (t *OutputEDUConsumer) Start() error {
 
 // onSendToDeviceEvent is called in response to a message received on the
 // send-to-device events topic from the EDU server.
-func (t *OutputEDUConsumer) onSendToDeviceEvent(msg *nats.Msg) {
+func (t *OutputEDUConsumer) onSendToDeviceEvent(ctx context.Context, msg *nats.Msg) bool {
 	// Extract the send-to-device event from msg.
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		var ote api.OutputSendToDeviceEvent
-		if err := json.Unmarshal(msg.Data, &ote); err != nil {
-			log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
-			return true
-		}
-
-		// only send send-to-device events which originated from us
-		_, originServerName, err := gomatrixserverlib.SplitID('@', ote.Sender)
-		if err != nil {
-			log.WithError(err).WithField("user_id", ote.Sender).Error("Failed to extract domain from send-to-device sender")
-			return true
-		}
-		if originServerName != t.ServerName {
-			log.WithField("other_server", originServerName).Info("Suppressing send-to-device: originated elsewhere")
-			return true
-		}
-
-		_, destServerName, err := gomatrixserverlib.SplitID('@', ote.UserID)
-		if err != nil {
-			log.WithError(err).WithField("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
-			return true
-		}
-
-		// Pack the EDU and marshal it
-		edu := &gomatrixserverlib.EDU{
-			Type:   gomatrixserverlib.MDirectToDevice,
-			Origin: string(t.ServerName),
-		}
-		tdm := gomatrixserverlib.ToDeviceMessage{
-			Sender:    ote.Sender,
-			Type:      ote.Type,
-			MessageID: util.RandomString(32),
-			Messages: map[string]map[string]json.RawMessage{
-				ote.UserID: {
-					ote.DeviceID: ote.Content,
-				},
-			},
-		}
-		if edu.Content, err = json.Marshal(tdm); err != nil {
-			log.WithError(err).Error("failed to marshal EDU JSON")
-			return true
-		}
-
-		log.Infof("Sending send-to-device message into %q destination queue", destServerName)
-		if err := t.queues.SendEDU(edu, t.ServerName, []gomatrixserverlib.ServerName{destServerName}); err != nil {
-			log.WithError(err).Error("failed to send EDU")
-			return false
-		}
-
+	var ote api.OutputSendToDeviceEvent
+	if err := json.Unmarshal(msg.Data, &ote); err != nil {
+		log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
 		return true
-	})
+	}
+
+	// only send send-to-device events which originated from us
+	_, originServerName, err := gomatrixserverlib.SplitID('@', ote.Sender)
+	if err != nil {
+		log.WithError(err).WithField("user_id", ote.Sender).Error("Failed to extract domain from send-to-device sender")
+		return true
+	}
+	if originServerName != t.ServerName {
+		log.WithField("other_server", originServerName).Info("Suppressing send-to-device: originated elsewhere")
+		return true
+	}
+
+	_, destServerName, err := gomatrixserverlib.SplitID('@', ote.UserID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
+		return true
+	}
+
+	// Pack the EDU and marshal it
+	edu := &gomatrixserverlib.EDU{
+		Type:   gomatrixserverlib.MDirectToDevice,
+		Origin: string(t.ServerName),
+	}
+	tdm := gomatrixserverlib.ToDeviceMessage{
+		Sender:    ote.Sender,
+		Type:      ote.Type,
+		MessageID: util.RandomString(32),
+		Messages: map[string]map[string]json.RawMessage{
+			ote.UserID: {
+				ote.DeviceID: ote.Content,
+			},
+		},
+	}
+	if edu.Content, err = json.Marshal(tdm); err != nil {
+		log.WithError(err).Error("failed to marshal EDU JSON")
+		return true
+	}
+
+	log.Infof("Sending send-to-device message into %q destination queue", destServerName)
+	if err := t.queues.SendEDU(edu, t.ServerName, []gomatrixserverlib.ServerName{destServerName}); err != nil {
+		log.WithError(err).Error("failed to send EDU")
+		return false
+	}
+
+	return true
 }
 
 // onTypingEvent is called in response to a message received on the typing
 // events topic from the EDU server.
-func (t *OutputEDUConsumer) onTypingEvent(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		// Extract the typing event from msg.
-		var ote api.OutputTypingEvent
-		if err := json.Unmarshal(msg.Data, &ote); err != nil {
-			// Skip this msg but continue processing messages.
-			log.WithError(err).Errorf("eduserver output log: message parse failed (expected typing)")
-			_ = msg.Ack()
-			return true
-		}
-
-		// only send typing events which originated from us
-		_, typingServerName, err := gomatrixserverlib.SplitID('@', ote.Event.UserID)
-		if err != nil {
-			log.WithError(err).WithField("user_id", ote.Event.UserID).Error("Failed to extract domain from typing sender")
-			_ = msg.Ack()
-			return true
-		}
-		if typingServerName != t.ServerName {
-			return true
-		}
-
-		joined, err := t.db.GetJoinedHosts(t.ctx, ote.Event.RoomID)
-		if err != nil {
-			log.WithError(err).WithField("room_id", ote.Event.RoomID).Error("failed to get joined hosts for room")
-			return false
-		}
-
-		names := make([]gomatrixserverlib.ServerName, len(joined))
-		for i := range joined {
-			names[i] = joined[i].ServerName
-		}
-
-		edu := &gomatrixserverlib.EDU{Type: ote.Event.Type}
-		if edu.Content, err = json.Marshal(map[string]interface{}{
-			"room_id": ote.Event.RoomID,
-			"user_id": ote.Event.UserID,
-			"typing":  ote.Event.Typing,
-		}); err != nil {
-			log.WithError(err).Error("failed to marshal EDU JSON")
-			return true
-		}
-
-		if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
-			log.WithError(err).Error("failed to send EDU")
-			return false
-		}
-
+func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bool {
+	// Extract the typing event from msg.
+	var ote api.OutputTypingEvent
+	if err := json.Unmarshal(msg.Data, &ote); err != nil {
+		// Skip this msg but continue processing messages.
+		log.WithError(err).Errorf("eduserver output log: message parse failed (expected typing)")
+		_ = msg.Ack()
 		return true
-	})
+	}
+
+	// only send typing events which originated from us
+	_, typingServerName, err := gomatrixserverlib.SplitID('@', ote.Event.UserID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", ote.Event.UserID).Error("Failed to extract domain from typing sender")
+		_ = msg.Ack()
+		return true
+	}
+	if typingServerName != t.ServerName {
+		return true
+	}
+
+	joined, err := t.db.GetJoinedHosts(ctx, ote.Event.RoomID)
+	if err != nil {
+		log.WithError(err).WithField("room_id", ote.Event.RoomID).Error("failed to get joined hosts for room")
+		return false
+	}
+
+	names := make([]gomatrixserverlib.ServerName, len(joined))
+	for i := range joined {
+		names[i] = joined[i].ServerName
+	}
+
+	edu := &gomatrixserverlib.EDU{Type: ote.Event.Type}
+	if edu.Content, err = json.Marshal(map[string]interface{}{
+		"room_id": ote.Event.RoomID,
+		"user_id": ote.Event.UserID,
+		"typing":  ote.Event.Typing,
+	}); err != nil {
+		log.WithError(err).Error("failed to marshal EDU JSON")
+		return true
+	}
+
+	if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
+		log.WithError(err).Error("failed to send EDU")
+		return false
+	}
+
+	return true
 }
 
 // onReceiptEvent is called in response to a message received on the receipt
 // events topic from the EDU server.
-func (t *OutputEDUConsumer) onReceiptEvent(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		// Extract the typing event from msg.
-		var receipt api.OutputReceiptEvent
-		if err := json.Unmarshal(msg.Data, &receipt); err != nil {
-			// Skip this msg but continue processing messages.
-			log.WithError(err).Errorf("eduserver output log: message parse failed (expected receipt)")
-			return true
-		}
-
-		// only send receipt events which originated from us
-		_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
-		if err != nil {
-			log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")
-			return true
-		}
-		if receiptServerName != t.ServerName {
-			return true
-		}
-
-		joined, err := t.db.GetJoinedHosts(t.ctx, receipt.RoomID)
-		if err != nil {
-			log.WithError(err).WithField("room_id", receipt.RoomID).Error("failed to get joined hosts for room")
-			return false
-		}
-
-		names := make([]gomatrixserverlib.ServerName, len(joined))
-		for i := range joined {
-			names[i] = joined[i].ServerName
-		}
-
-		content := map[string]api.FederationReceiptMRead{}
-		content[receipt.RoomID] = api.FederationReceiptMRead{
-			User: map[string]api.FederationReceiptData{
-				receipt.UserID: {
-					Data: api.ReceiptTS{
-						TS: receipt.Timestamp,
-					},
-					EventIDs: []string{receipt.EventID},
-				},
-			},
-		}
-
-		edu := &gomatrixserverlib.EDU{
-			Type:   gomatrixserverlib.MReceipt,
-			Origin: string(t.ServerName),
-		}
-		if edu.Content, err = json.Marshal(content); err != nil {
-			log.WithError(err).Error("failed to marshal EDU JSON")
-			return true
-		}
-
-		if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
-			log.WithError(err).Error("failed to send EDU")
-			return false
-		}
-
+func (t *OutputEDUConsumer) onReceiptEvent(ctx context.Context, msg *nats.Msg) bool {
+	// Extract the typing event from msg.
+	var receipt api.OutputReceiptEvent
+	if err := json.Unmarshal(msg.Data, &receipt); err != nil {
+		// Skip this msg but continue processing messages.
+		log.WithError(err).Errorf("eduserver output log: message parse failed (expected receipt)")
 		return true
-	})
+	}
+
+	// only send receipt events which originated from us
+	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
+	if err != nil {
+		log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")
+		return true
+	}
+	if receiptServerName != t.ServerName {
+		return true
+	}
+
+	joined, err := t.db.GetJoinedHosts(ctx, receipt.RoomID)
+	if err != nil {
+		log.WithError(err).WithField("room_id", receipt.RoomID).Error("failed to get joined hosts for room")
+		return false
+	}
+
+	names := make([]gomatrixserverlib.ServerName, len(joined))
+	for i := range joined {
+		names[i] = joined[i].ServerName
+	}
+
+	content := map[string]api.FederationReceiptMRead{}
+	content[receipt.RoomID] = api.FederationReceiptMRead{
+		User: map[string]api.FederationReceiptData{
+			receipt.UserID: {
+				Data: api.ReceiptTS{
+					TS: receipt.Timestamp,
+				},
+				EventIDs: []string{receipt.EventID},
+			},
+		},
+	}
+
+	edu := &gomatrixserverlib.EDU{
+		Type:   gomatrixserverlib.MReceipt,
+		Origin: string(t.ServerName),
+	}
+	if edu.Content, err = json.Marshal(content); err != nil {
+		log.WithError(err).Error("failed to marshal EDU JSON")
+		return true
+	}
+
+	if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
+		log.WithError(err).Error("failed to send EDU")
+		return false
+	}
+
+	return true
 }

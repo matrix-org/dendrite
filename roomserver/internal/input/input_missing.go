@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
-	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -19,13 +19,13 @@ import (
 
 type missingStateReq struct {
 	origin          gomatrixserverlib.ServerName
-	db              storage.Database
+	db              *shared.RoomUpdater
 	inputer         *Inputer
 	queryer         *query.Queryer
 	keys            gomatrixserverlib.JSONVerifier
 	federation      fedapi.FederationInternalAPI
 	roomsMu         *internal.MutexByRoom
-	servers         map[gomatrixserverlib.ServerName]struct{}
+	servers         []gomatrixserverlib.ServerName
 	hadEvents       map[string]bool
 	hadEventsMutex  sync.Mutex
 	haveEvents      map[string]*gomatrixserverlib.HeaderedEvent
@@ -37,10 +37,6 @@ type missingStateReq struct {
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) error {
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, MaximumMissingProcessingTime)
-	defer cancel()
-
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -78,7 +74,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
-			err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
 				Kind:         api.KindNew,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
@@ -187,7 +183,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	// TODO: we could do this concurrently?
 	for _, ire := range outlierRoomEvents {
-		if err = t.inputer.processRoomEvent(ctx, &ire); err != nil {
+		if _, err = t.inputer.processRoomEvent(ctx, t.db, &ire); err != nil {
 			return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
 		}
 	}
@@ -200,7 +196,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		stateIDs = append(stateIDs, event.EventID())
 	}
 
-	err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+	_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
 		Kind:          api.KindOld,
 		Event:         backwardsExtremity.Headered(roomVersion),
 		Origin:        t.origin,
@@ -217,7 +213,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// they will automatically fast-forward based on the room state at the
 	// extremity in the last step.
 	for _, newEvent := range newEvents {
-		err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
+		_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
 			Kind:         api.KindOld,
 			Event:        newEvent.Headered(roomVersion),
 			Origin:       t.origin,
@@ -417,7 +413,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	}
 
 	var missingResp *gomatrixserverlib.RespMissingEvents
-	for server := range t.servers {
+	for _, server := range t.servers {
 		var m gomatrixserverlib.RespMissingEvents
 		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
 			Limit: 20,
@@ -666,7 +662,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib
 	for i := range stateIDs.StateEventIDs {
 		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]
 		if !ok {
-			logrus.Warnf("Missing state event in createRespStateFromStateIDs: %s", stateIDs.StateEventIDs[i])
+			logrus.Tracef("Missing state event in createRespStateFromStateIDs: %s", stateIDs.StateEventIDs[i])
 			continue
 		}
 		respState.StateEvents = append(respState.StateEvents, ev.Unwrap())
@@ -674,7 +670,7 @@ func (t *missingStateReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib
 	for i := range stateIDs.AuthEventIDs {
 		ev, ok := t.haveEvents[stateIDs.AuthEventIDs[i]]
 		if !ok {
-			logrus.Warnf("Missing auth event in createRespStateFromStateIDs: %s", stateIDs.AuthEventIDs[i])
+			logrus.Tracef("Missing auth event in createRespStateFromStateIDs: %s", stateIDs.AuthEventIDs[i])
 			continue
 		}
 		respState.AuthEvents = append(respState.AuthEvents, ev.Unwrap())
@@ -700,7 +696,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 	}
 	var event *gomatrixserverlib.Event
 	found := false
-	for serverName := range t.servers {
+	for _, serverName := range t.servers {
 		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
 		defer cancel()
 		txn, err := t.federation.GetEvent(reqctx, serverName, missingEventID)
@@ -718,7 +714,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		}
 		event, err = gomatrixserverlib.NewEventFromUntrustedJSON(txn.PDUs[0], roomVersion)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warnf("Transaction: Failed to parse event JSON of event")
+			util.GetLogger(ctx).WithError(err).WithField("event_id", missingEventID).Warnf("Failed to parse event JSON of event returned from /event")
 			continue
 		}
 		found = true
@@ -729,7 +725,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 		return nil, fmt.Errorf("wasn't able to find event via %d server(s)", len(t.servers))
 	}
 	if err := event.VerifyEventSignatures(ctx, t.keys); err != nil {
-		util.GetLogger(ctx).WithError(err).Warnf("Transaction: Couldn't validate signature of event %q", event.EventID())
+		util.GetLogger(ctx).WithError(err).Warnf("Couldn't validate signature of event %q from /event", event.EventID())
 		return nil, verifySigError{event.EventID(), err}
 	}
 	return t.cacheAndReturn(event.Headered(roomVersion)), nil

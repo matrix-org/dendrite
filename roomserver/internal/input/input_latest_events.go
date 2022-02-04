@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -48,6 +47,7 @@ import (
 // Can only be called once at a time
 func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
+	updater *shared.RoomUpdater,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
 	event *gomatrixserverlib.Event,
@@ -55,13 +55,6 @@ func (r *Inputer) updateLatestEvents(
 	transactionID *api.TransactionID,
 	rewritesState bool,
 ) (err error) {
-	updater, err := r.DB.GetLatestEventsForUpdate(ctx, *roomInfo)
-	if err != nil {
-		return fmt.Errorf("r.DB.GetLatestEventsForUpdate: %w", err)
-	}
-	succeeded := false
-	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
-
 	u := latestEventsUpdater{
 		ctx:           ctx,
 		api:           r,
@@ -78,7 +71,6 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
-	succeeded = true
 	return
 }
 
@@ -89,7 +81,7 @@ func (r *Inputer) updateLatestEvents(
 type latestEventsUpdater struct {
 	ctx           context.Context
 	api           *Inputer
-	updater       *shared.LatestEventsUpdater
+	updater       *shared.RoomUpdater
 	roomInfo      *types.RoomInfo
 	stateAtEvent  types.StateAtEvent
 	event         *gomatrixserverlib.Event
@@ -199,7 +191,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 
 func (u *latestEventsUpdater) latestState() error {
 	var err error
-	roomState := state.NewStateResolution(u.api.DB, u.roomInfo)
+	roomState := state.NewStateResolution(u.updater, u.roomInfo)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
@@ -413,7 +405,7 @@ func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.Ro
 	if len(extraEventIDs) == 0 {
 		return nil, nil
 	}
-	extraEvents, err := u.api.DB.EventsFromIDs(u.ctx, extraEventIDs)
+	extraEvents, err := u.updater.EventsFromIDs(u.ctx, extraEventIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +428,7 @@ func (u *latestEventsUpdater) stateEventMap() (map[types.EventNID]string, error)
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
 	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
-	return u.api.DB.EventIDs(u.ctx, stateEventNIDs)
+	return u.updater.EventIDs(u.ctx, stateEventNIDs)
 }
 
 type eventNIDSorter []types.EventNID
