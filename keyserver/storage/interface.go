@@ -68,7 +68,7 @@ type Database interface {
 	StoreKeyChange(ctx context.Context, userID string) (int64, error)
 
 	// KeyChanges returns a list of user IDs who have modified their keys from the offset given (exclusive) to the offset given (inclusive).
-	// A to offset of jetstream.OffsetNewest means no upper limit.
+	// A to offset of types.OffsetNewest means no upper limit.
 	// Returns the offset of the latest key change.
 	KeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
 
