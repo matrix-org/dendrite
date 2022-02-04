@@ -447,7 +447,7 @@ func (d *Database) events(
 	if err != nil {
 		return nil, err
 	}
-	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, txn, eventNIDs)
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}

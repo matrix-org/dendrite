@@ -102,7 +102,7 @@ func (r *Inputer) Start() error {
 				_ = msg.InProgress() // resets the acknowledgement wait timer
 				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				retry, err := r.processRoomEventUsingUpdater(context.Background(), roomID, &inputRoomEvent)
+				action, err := r.processRoomEventUsingUpdater(context.Background(), roomID, &inputRoomEvent)
 				if err != nil {
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
@@ -113,9 +113,10 @@ func (r *Inputer) Start() error {
 						"type":     inputRoomEvent.Event.Type(),
 					}).Warn("Roomserver failed to process async event")
 				}
-				if retry {
+				switch action {
+				case retryLater:
 					_ = msg.Nak()
-				} else {
+				case doNotRetry:
 					_ = msg.Ack()
 				}
 			})
@@ -137,35 +138,41 @@ func (r *Inputer) Start() error {
 	return err
 }
 
+type retryAction int
+
+const (
+	doNotRetry retryAction = iota
+	retryLater
+)
+
 // processRoomEventUsingUpdater opens up a room updater and tries to
-// process the event. It returns two values: the bool signifying whether
-// we should retry later if possible (i.e. using NATS, because we couldn't
-// commit the transaction) and an error signifying anything else that may
-// have gone wrong.
+// process the event. It returns whether or not we should positively
+// or negatively acknowledge the event (i.e. for NATS) and an error
+// if it occurred.
 func (r *Inputer) processRoomEventUsingUpdater(
 	ctx context.Context,
 	roomID string,
 	inputRoomEvent *api.InputRoomEvent,
-) (bool, error) {
+) (retryAction, error) {
 	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
 	if err != nil {
-		return false, fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return doNotRetry, fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
-		return true, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
+		return retryLater, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
 	}
 	commit, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
 	if commit {
 		if cerr := updater.Commit(); cerr != nil {
-			return true, fmt.Errorf("updater.Commit: %w", cerr)
+			return retryLater, fmt.Errorf("updater.Commit: %w", cerr)
 		}
 	} else {
 		if rerr := updater.Rollback(); rerr != nil {
-			return true, fmt.Errorf("updater.Rollback: %w", rerr)
+			return retryLater, fmt.Errorf("updater.Rollback: %w", rerr)
 		}
 	}
-	return false, err
+	return doNotRetry, err
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
