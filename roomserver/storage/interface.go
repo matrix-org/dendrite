@@ -24,8 +24,8 @@ import (
 )
 
 type Database interface {
-	// Do we support processing input events for more than one room at a time?
-	SupportsConcurrentRoomInputs() bool
+	// Do we support transactional isolation on this database engine?
+	SupportsTransactionalIsolation() bool
 	// RoomInfo returns room information for the given room ID, or nil if there is no room.
 	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
 	// Store the room state at an event in the database
