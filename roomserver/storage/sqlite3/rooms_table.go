@@ -261,12 +261,13 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roo
 		iRoomNIDs[i] = v
 	}
 	sqlQuery := strings.Replace(bulkSelectRoomIDsSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
-	sqlPrep, err := s.db.Prepare(sqlQuery)
-	if err != nil {
-		return nil, err
+	var rows *sql.Rows
+	var err error
+	if txn != nil {
+		rows, err = txn.QueryContext(ctx, sqlQuery, iRoomNIDs...)
+	} else {
+		rows, err = s.db.QueryContext(ctx, sqlQuery, iRoomNIDs...)
 	}
-	stmt := sqlutil.TxStmt(txn, sqlPrep)
-	rows, err := stmt.QueryContext(ctx, iRoomNIDs...)
 	if err != nil {
 		return nil, err
 	}
@@ -288,12 +289,13 @@ func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, ro
 		iRoomIDs[i] = v
 	}
 	sqlQuery := strings.Replace(bulkSelectRoomNIDsSQL, "($1)", sqlutil.QueryVariadic(len(roomIDs)), 1)
-	sqlPrep, err := s.db.Prepare(sqlQuery)
-	if err != nil {
-		return nil, err
+	var rows *sql.Rows
+	var err error
+	if txn != nil {
+		rows, err = txn.QueryContext(ctx, sqlQuery, iRoomIDs...)
+	} else {
+		rows, err = s.db.QueryContext(ctx, sqlQuery, iRoomIDs...)
 	}
-	stmt := sqlutil.TxStmt(txn, sqlPrep)
-	rows, err := stmt.QueryContext(ctx, iRoomIDs...)
 	if err != nil {
 		return nil, err
 	}

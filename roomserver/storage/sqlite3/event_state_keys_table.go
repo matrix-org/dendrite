@@ -119,12 +119,13 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKeyNID(
 		iEventStateKeys[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventStateKeySQL, "($1)", sqlutil.QueryVariadic(len(eventStateKeys)), 1)
-	selectPrep, err := s.db.Prepare(selectOrig)
-	if err != nil {
-		return nil, err
+	var rows *sql.Rows
+	var err error
+	if txn != nil {
+		rows, err = txn.QueryContext(ctx, selectOrig, iEventStateKeys...)
+	} else {
+		rows, err = s.db.QueryContext(ctx, selectOrig, iEventStateKeys...)
 	}
-	stmt := sqlutil.TxStmt(txn, selectPrep)
-	rows, err := stmt.QueryContext(ctx, iEventStateKeys...)
 	if err != nil {
 		return nil, err
 	}

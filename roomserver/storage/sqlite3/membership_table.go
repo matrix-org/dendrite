@@ -286,11 +286,13 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 		iRoomNIDs[i] = v
 	}
 	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomNIDs)), 1)
-	stmt, err := s.db.Prepare(query)
-	if err != nil {
-		return nil, err
+	var rows *sql.Rows
+	var err error
+	if txn != nil {
+		rows, err = txn.QueryContext(ctx, query, iRoomNIDs...)
+	} else {
+		rows, err = s.db.QueryContext(ctx, query, iRoomNIDs...)
 	}
-	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, iRoomNIDs...)
 	if err != nil {
 		return nil, err
 	}
