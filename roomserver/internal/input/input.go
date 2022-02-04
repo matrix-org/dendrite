@@ -39,6 +39,19 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+type retryAction int
+type commitAction int
+
+const (
+	doNotRetry retryAction = iota
+	retryLater
+)
+
+const (
+	commitTransaction commitAction = iota
+	rollbackTransaction
+)
+
 var keyContentFields = map[string]string{
 	"m.room.join_rules":         "join_rule",
 	"m.room.history_visibility": "history_visibility",
@@ -138,13 +151,6 @@ func (r *Inputer) Start() error {
 	return err
 }
 
-type retryAction int
-
-const (
-	doNotRetry retryAction = iota
-	retryLater
-)
-
 // processRoomEventUsingUpdater opens up a room updater and tries to
 // process the event. It returns whether or not we should positively
 // or negatively acknowledge the event (i.e. for NATS) and an error
@@ -162,12 +168,13 @@ func (r *Inputer) processRoomEventUsingUpdater(
 	if err != nil {
 		return retryLater, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
 	}
-	commit, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
-	if commit {
+	action, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
+	switch action {
+	case commitTransaction:
 		if cerr := updater.Commit(); cerr != nil {
 			return retryLater, fmt.Errorf("updater.Commit: %w", cerr)
 		}
-	} else {
+	case rollbackTransaction:
 		if rerr := updater.Rollback(); rerr != nil {
 			return retryLater, fmt.Errorf("updater.Rollback: %w", rerr)
 		}
