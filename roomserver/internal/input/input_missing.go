@@ -82,7 +82,9 @@ func (t *missingStateReq) processEventWithMissingState(
 				SendAsServer: api.DoNotSendToOtherServers,
 			})
 			if err != nil {
-				return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+				if _, ok := err.(types.RejectedError); !ok {
+					return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+				}
 			}
 		}
 		return nil
@@ -184,8 +186,11 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	// TODO: we could do this concurrently?
 	for _, ire := range outlierRoomEvents {
-		if _, err = t.inputer.processRoomEvent(ctx, t.db, &ire); err != nil {
-			return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
+		_, err = t.inputer.processRoomEvent(ctx, t.db, &ire)
+		if err != nil {
+			if _, ok := err.(types.RejectedError); !ok {
+				return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
+			}
 		}
 	}
 
