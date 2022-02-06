@@ -327,7 +327,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		}
 		// Genuine create events are the only case where it's OK to have no previous state.
 		isCreate := result.EventTypeNID == types.MRoomCreateNID && result.EventStateKeyNID == 1
-		if result.BeforeStateSnapshotNID == 0 && !isCreate {
+		if result.BeforeStateSnapshotNID == 0 && !result.IsRejected && !isCreate {
 			return nil, types.MissingEventError(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
