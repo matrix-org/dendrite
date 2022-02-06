@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -205,7 +206,9 @@ func (t *missingStateReq) processEventWithMissingState(
 		SendAsServer:  api.DoNotSendToOtherServers,
 	})
 	if err != nil {
-		return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+		if _, ok := err.(types.RejectedError); !ok {
+			return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+		}
 	}
 
 	// Then send all of the newer backfilled events, of which will all be newer
@@ -220,7 +223,9 @@ func (t *missingStateReq) processEventWithMissingState(
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 		if err != nil {
-			return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+			if _, ok := err.(types.RejectedError); !ok {
+				return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+			}
 		}
 	}
 

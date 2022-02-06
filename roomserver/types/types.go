@@ -209,6 +209,12 @@ type MissingEventError string
 
 func (e MissingEventError) Error() string { return string(e) }
 
+// A RejectedError is returned when an event is stored as rejected. The error
+// contains the reason why.
+type RejectedError string
+
+func (e RejectedError) Error() string { return string(e) }
+
 // RoomInfo contains metadata about a room
 type RoomInfo struct {
 	RoomNID          RoomNID
