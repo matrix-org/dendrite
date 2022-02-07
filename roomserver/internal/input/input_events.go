@@ -297,8 +297,8 @@ func (r *Inputer) processRoomEvent(
 			"soft_fail":    softfail,
 			"missing_prev": missingPrev,
 		}).Warn("Stored rejected event")
-		if err != nil {
-			return commitTransaction, types.RejectedError(err.Error())
+		if rejectionErr != nil {
+			return commitTransaction, types.RejectedError(rejectionErr.Error())
 		}
 		return commitTransaction, nil
 	}
