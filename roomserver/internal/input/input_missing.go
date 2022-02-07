@@ -76,7 +76,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
 			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
-				Kind:         api.KindNew,
+				Kind:         api.KindOld,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
 				SendAsServer: api.DoNotSendToOtherServers,
