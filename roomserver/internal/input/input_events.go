@@ -221,7 +221,7 @@ func (r *Inputer) processRoomEvent(
 	// typical federated room join) then we won't bother trying to fetch prev events
 	// because we may not be allowed to see them and we have no choice but to trust
 	// the state event IDs provided to us in the join instead.
-	if missingPrev && input.Kind == api.KindNew {
+	if !input.HasState && missingPrev {
 		// Don't do this for KindOld events, otherwise old events that we fetch
 		// to satisfy missing prev events/state will end up recursively calling
 		// processRoomEvent.
