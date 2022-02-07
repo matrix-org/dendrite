@@ -71,11 +71,11 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	if isGapFilled {
 		logger.Infof("gap filled by /get_missing_events, injecting %d new events", len(newEvents))
-		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
+		// we can just inject all the newEvents as old as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
 			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
-				Kind:         api.KindNew,
+				Kind:         api.KindOld,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
 				SendAsServer: api.DoNotSendToOtherServers,
