@@ -83,7 +83,7 @@ func (t *missingStateReq) processEventWithMissingState(
 			})
 			if err != nil {
 				if _, ok := err.(types.RejectedError); !ok {
-					return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+					return fmt.Errorf("t.inputer.processRoomEvent (filling gap): %w", err)
 				}
 			}
 		}
@@ -189,7 +189,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		_, err = t.inputer.processRoomEvent(ctx, t.db, &ire)
 		if err != nil {
 			if _, ok := err.(types.RejectedError); !ok {
-				return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
+				return fmt.Errorf("t.inputer.processRoomEvent (outlier): %w", err)
 			}
 		}
 	}
@@ -212,7 +212,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	})
 	if err != nil {
 		if _, ok := err.(types.RejectedError); !ok {
-			return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+			return fmt.Errorf("t.inputer.processRoomEvent (backward extremity): %w", err)
 		}
 	}
 
@@ -229,7 +229,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		})
 		if err != nil {
 			if _, ok := err.(types.RejectedError); !ok {
-				return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+				return fmt.Errorf("t.inputer.processRoomEvent (fast forward): %w", err)
 			}
 		}
 	}
