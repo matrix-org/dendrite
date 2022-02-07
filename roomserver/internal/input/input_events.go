@@ -486,16 +486,7 @@ func (r *Inputer) calculateAndSetState(
 	roomState := state.NewStateResolution(updater, roomInfo)
 
 	if input.HasState {
-		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
-		var joinEventNIDs []types.EventNID
-		// Request join memberships only for local users only.
-		if joinEventNIDs, err = updater.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true); err == nil {
-			// If we have no local users that are joined to the room then any state about
-			// the room that we have is quite possibly out of date. Therefore in that case
-			// we should overwrite it rather than merge it.
-			stateAtEvent.Overwrite = len(joinEventNIDs) == 0
-		}
 
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
