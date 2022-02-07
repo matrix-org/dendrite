@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -75,13 +76,15 @@ func (t *missingStateReq) processEventWithMissingState(
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
 			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
-				Kind:         api.KindNew,
+				Kind:         api.KindOld,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
 				SendAsServer: api.DoNotSendToOtherServers,
 			})
 			if err != nil {
-				return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+				if _, ok := err.(types.RejectedError); !ok {
+					return fmt.Errorf("t.inputer.processRoomEvent (filling gap): %w", err)
+				}
 			}
 		}
 		return nil
@@ -183,8 +186,11 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	// TODO: we could do this concurrently?
 	for _, ire := range outlierRoomEvents {
-		if _, err = t.inputer.processRoomEvent(ctx, t.db, &ire); err != nil {
-			return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
+		_, err = t.inputer.processRoomEvent(ctx, t.db, &ire)
+		if err != nil {
+			if _, ok := err.(types.RejectedError); !ok {
+				return fmt.Errorf("t.inputer.processRoomEvent (outlier): %w", err)
+			}
 		}
 	}
 
@@ -205,7 +211,9 @@ func (t *missingStateReq) processEventWithMissingState(
 		SendAsServer:  api.DoNotSendToOtherServers,
 	})
 	if err != nil {
-		return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+		if _, ok := err.(types.RejectedError); !ok {
+			return fmt.Errorf("t.inputer.processRoomEvent (backward extremity): %w", err)
+		}
 	}
 
 	// Then send all of the newer backfilled events, of which will all be newer
@@ -220,7 +228,9 @@ func (t *missingStateReq) processEventWithMissingState(
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 		if err != nil {
-			return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+			if _, ok := err.(types.RejectedError); !ok {
+				return fmt.Errorf("t.inputer.processRoomEvent (fast forward): %w", err)
+			}
 		}
 	}
 
@@ -395,20 +405,11 @@ retryAllowedState:
 // without `e`. If `isGapFilled=false` then `newEvents` contains the response to /get_missing_events
 func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, isGapFilled bool, err error) {
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
-	needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{e})
-	// query latest events (our trusted forward extremities)
-	req := api.QueryLatestEventsAndStateRequest{
-		RoomID:       e.RoomID(),
-		StateToFetch: needed.Tuples(),
-	}
-	var res api.QueryLatestEventsAndStateResponse
-	if err = t.queryer.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
-		logger.WithError(err).Warn("Failed to query latest events")
-		return nil, false, err
-	}
-	latestEvents := make([]string, len(res.LatestEvents))
-	for i, ev := range res.LatestEvents {
-		latestEvents[i] = res.LatestEvents[i].EventID
+
+	latest := t.db.LatestEvents()
+	latestEvents := make([]string, len(latest))
+	for i, ev := range latest {
+		latestEvents[i] = ev.EventID
 		t.hadEvent(ev.EventID)
 	}
 
