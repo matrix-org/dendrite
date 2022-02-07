@@ -405,20 +405,11 @@ retryAllowedState:
 // without `e`. If `isGapFilled=false` then `newEvents` contains the response to /get_missing_events
 func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, isGapFilled bool, err error) {
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
-	needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{e})
-	// query latest events (our trusted forward extremities)
-	req := api.QueryLatestEventsAndStateRequest{
-		RoomID:       e.RoomID(),
-		StateToFetch: needed.Tuples(),
-	}
-	var res api.QueryLatestEventsAndStateResponse
-	if err = t.queryer.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
-		logger.WithError(err).Warn("Failed to query latest events")
-		return nil, false, err
-	}
-	latestEvents := make([]string, len(res.LatestEvents))
-	for i, ev := range res.LatestEvents {
-		latestEvents[i] = res.LatestEvents[i].EventID
+
+	latest := t.db.LatestEvents()
+	latestEvents := make([]string, len(latest))
+	for i, ev := range latest {
+		latestEvents[i] = ev.EventID
 		t.hadEvent(ev.EventID)
 	}
 
