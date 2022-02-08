@@ -138,9 +138,13 @@ func (t *missingStateReq) processEventWithMissingState(
 	case 1:
 		// There's only one previous state - if it's trustworthy (came from a
 		// local state snapshot which will already have been through state res),
-		// use it as-is. There's no point in resolving it again.
-		if states[0].trustworthy {
+		// use it as-is. There's no point in resolving it again. Only trust a
+		// trustworthy state snapshot if it actually contains some state for all
+		// non-create events, otherwise we need to resolve what came from federation.
+		isCreate := backwardsExtremity.Type() == gomatrixserverlib.MRoomCreate && backwardsExtremity.StateKeyEquals("")
+		if states[0].trustworthy && (isCreate || len(states[0].StateEvents) > 0) {
 			resolvedState = states[0].RespState
+			logger.Infof("Found single trustworthy state snapshot for backward extremity %s", backwardsExtremity.EventID())
 			break
 		}
 		// Otherwise, if it isn't trustworthy (came from federation), run it through
@@ -492,9 +496,11 @@ Event:
 			return newEvents, true, nil
 		}
 		// we don't have the state at this earliest event from /g_m_e so we won't have state for later events either
+		logger.Warnf("State unknown for backward extremity %s", earliestNewEvent.EventID())
 		return newEvents, false, nil
 	}
 	// StateAtEventIDs returned some kind of state for the earliest event so we can fill in the gap!
+	logger.Infof("State known for backward extremity %s", earliestNewEvent.EventID())
 	return newEvents, true, nil
 }
 
