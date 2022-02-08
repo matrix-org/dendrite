@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS roomserver_events (
 const insertEventSQL = "" +
 	"INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
-	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique" +
+	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique DO UPDATE" +
 	" SET is_rejected = $8" +
 	" RETURNING event_nid, state_snapshot_nid"
 
