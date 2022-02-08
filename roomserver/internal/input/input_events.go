@@ -436,6 +436,7 @@ func (r *Inputer) fetchAuthEvents(
 	// Reuse these to reduce allocations.
 	authEventNIDs := make([]types.EventNID, 0, 5)
 	isRejected := false
+nextAuthEvent:
 	for _, authEvent := range gomatrixserverlib.ReverseTopologicalOrdering(
 		res.AuthEvents,
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
@@ -444,14 +445,14 @@ func (r *Inputer) fetchAuthEvents(
 		// need to store it again or do anything further with it, so just skip
 		// over it rather than wasting cycles.
 		if ev, ok := known[authEvent.EventID()]; ok && ev != nil {
-			continue
+			continue nextAuthEvent
 		}
 
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
 		if err := authEvent.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
-			continue
+			continue nextAuthEvent
 		}
 
 		// In order to store the new auth event, we need to know its auth chain
@@ -459,9 +460,10 @@ func (r *Inputer) fetchAuthEvents(
 		authEventNIDs = authEventNIDs[:0]
 		for _, eventID := range authEvent.AuthEventIDs() {
 			knownEvent, ok := known[eventID]
-			if ok {
-				authEventNIDs = append(authEventNIDs, knownEvent.EventNID)
+			if !ok {
+				continue nextAuthEvent
 			}
+			authEventNIDs = append(authEventNIDs, knownEvent.EventNID)
 		}
 
 		// Check if the auth event should be rejected.
