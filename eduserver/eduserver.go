@@ -51,7 +51,6 @@ func NewInternalAPI(
 		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
-		OutputKeyChangeEventTopic:    cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }
