@@ -195,9 +195,26 @@ func (r *Inputer) processRoomEvent(
 	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
 	for _, authEventID := range authEventIDs {
 		if _, ok := knownEvents[authEventID]; !ok {
-			return rollbackTransaction, fmt.Errorf("missing auth event %s", authEventID)
+			// Unknown auth events only really matter if the event actually failed
+			// auth. If it passed auth then we can assume that everything that was
+			// known was sufficient, even if extraneous auth events were specified
+			// but weren't found.
+			if isRejected {
+				if event.StateKey() != nil {
+					return commitTransaction, fmt.Errorf(
+						"missing auth event %s for state event %s (type %q, state key %q)",
+						authEventID, event.EventID(), event.Type(), *event.StateKey(),
+					)
+				} else {
+					return commitTransaction, fmt.Errorf(
+						"missing auth event %s for timeline event %s (type %q)",
+						authEventID, event.EventID(), event.Type(),
+					)
+				}
+			}
+		} else {
+			authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
 		}
-		authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
 	}
 
 	var softfail bool
@@ -416,6 +433,10 @@ func (r *Inputer) fetchAuthEvents(
 		return fmt.Errorf("no servers provided event auth for event ID %q, tried servers %v", event.EventID(), servers)
 	}
 
+	// Reuse these to reduce allocations.
+	authEventNIDs := make([]types.EventNID, 0, 5)
+	isRejected := false
+nextAuthEvent:
 	for _, authEvent := range gomatrixserverlib.ReverseTopologicalOrdering(
 		res.AuthEvents,
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
@@ -424,36 +445,30 @@ func (r *Inputer) fetchAuthEvents(
 		// need to store it again or do anything further with it, so just skip
 		// over it rather than wasting cycles.
 		if ev, ok := known[authEvent.EventID()]; ok && ev != nil {
-			continue
+			continue nextAuthEvent
 		}
 
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
 		if err := authEvent.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
-			continue
+			continue nextAuthEvent
 		}
 
 		// In order to store the new auth event, we need to know its auth chain
 		// as NIDs for the `auth_event_nids` column. Let's see if we can find those.
-		authEventNIDs := make([]types.EventNID, 0, len(authEvent.AuthEventIDs()))
+		authEventNIDs = authEventNIDs[:0]
 		for _, eventID := range authEvent.AuthEventIDs() {
 			knownEvent, ok := known[eventID]
 			if !ok {
-				return fmt.Errorf("missing auth event %s for %s", eventID, authEvent.EventID())
+				continue nextAuthEvent
 			}
 			authEventNIDs = append(authEventNIDs, knownEvent.EventNID)
 		}
 
-		// Let's take a note of the fact that we now know about this event.
-		if err := auth.AddEvent(authEvent); err != nil {
-			return fmt.Errorf("auth.AddEvent: %w", err)
-		}
-
 		// Check if the auth event should be rejected.
-		isRejected := false
-		if err := gomatrixserverlib.Allowed(authEvent, auth); err != nil {
-			isRejected = true
+		err := gomatrixserverlib.Allowed(authEvent, auth)
+		if isRejected = err != nil; isRejected {
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
 		}
 
@@ -461,6 +476,14 @@ func (r *Inputer) fetchAuthEvents(
 		eventNID, _, _, _, _, err := updater.StoreEvent(ctx, authEvent, authEventNIDs, isRejected)
 		if err != nil {
 			return fmt.Errorf("updater.StoreEvent: %w", err)
+		}
+
+		// Let's take a note of the fact that we now know about this event for
+		// authenticating future events.
+		if !isRejected {
+			if err := auth.AddEvent(authEvent); err != nil {
+				return fmt.Errorf("auth.AddEvent: %w", err)
+			}
 		}
 
 		// Now we know about this event, it was stored and the signatures were OK.
