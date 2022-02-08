@@ -297,7 +297,7 @@ func (oq *destinationQueue) backgroundSend() {
 			// We haven't backed off yet, so wait for the suggested amount of
 			// time.
 			duration := time.Until(*until)
-			logrus.Warnf("Backing off %q for %s", oq.destination, duration)
+			logrus.Debugf("Backing off %q for %s", oq.destination, duration)
 			oq.backingOff.Store(true)
 			destinationQueueBackingOff.Inc()
 			select {
