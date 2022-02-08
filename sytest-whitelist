@@ -590,3 +590,4 @@ Can reject invites over federation for rooms with version 9
 Can receive redactions from regular users over federation in room version 9
 Forward extremities remain so even after the next events are populated as outliers
 If a device list update goes missing, the server resyncs on the next one
+uploading self-signing key notifies over federation

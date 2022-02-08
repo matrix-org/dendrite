@@ -100,10 +100,4 @@ type EDUServerInputAPI interface {
 		request *InputReceiptEventRequest,
 		response *InputReceiptEventResponse,
 	) error
-
-	InputCrossSigningKeyUpdate(
-		ctx context.Context,
-		request *InputCrossSigningKeyUpdateRequest,
-		response *InputCrossSigningKeyUpdateResponse,
-	) error
 }

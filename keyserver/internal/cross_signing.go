@@ -219,25 +219,23 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 	}
 
 	// Finally, generate a notification that we updated the keys.
-	if _, host, err := gomatrixserverlib.SplitID('@', req.UserID); err == nil && host == a.ThisServer {
-		update := eduserverAPI.CrossSigningKeyUpdate{
-			UserID: req.UserID,
+	update := eduserverAPI.CrossSigningKeyUpdate{
+		UserID: req.UserID,
+	}
+	if mk, ok := byPurpose[gomatrixserverlib.CrossSigningKeyPurposeMaster]; ok {
+		update.MasterKey = &mk
+	}
+	if ssk, ok := byPurpose[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning]; ok {
+		update.SelfSigningKey = &ssk
+	}
+	if update.MasterKey == nil && update.SelfSigningKey == nil {
+		return
+	}
+	if err := a.Producer.ProduceSigningKeyUpdate(update); err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
 		}
-		if mk, ok := byPurpose[gomatrixserverlib.CrossSigningKeyPurposeMaster]; ok {
-			update.MasterKey = &mk
-		}
-		if ssk, ok := byPurpose[gomatrixserverlib.CrossSigningKeyPurposeSelfSigning]; ok {
-			update.SelfSigningKey = &ssk
-		}
-		if update.MasterKey == nil && update.SelfSigningKey == nil {
-			return
-		}
-		if err := a.Producer.ProduceSigningKeyUpdate(update); err != nil {
-			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
-			}
-			return
-		}
+		return
 	}
 }
 
@@ -310,16 +308,14 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 
 	// Finally, generate a notification that we updated the signatures.
 	for userID := range req.Signatures {
-		if _, host, err := gomatrixserverlib.SplitID('@', userID); err == nil && host == a.ThisServer {
-			update := eduserverAPI.CrossSigningKeyUpdate{
-				UserID: userID,
+		update := eduserverAPI.CrossSigningKeyUpdate{
+			UserID: userID,
+		}
+		if err := a.Producer.ProduceSigningKeyUpdate(update); err != nil {
+			res.Error = &api.KeyError{
+				Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
 			}
-			if err := a.Producer.ProduceSigningKeyUpdate(update); err != nil {
-				res.Error = &api.KeyError{
-					Err: fmt.Sprintf("a.Producer.ProduceSigningKeyUpdate: %s", err),
-				}
-				return
-			}
+			return
 		}
 	}
 }

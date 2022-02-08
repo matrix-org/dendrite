@@ -18,7 +18,6 @@ import (
 	"github.com/gorilla/mux"
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
-	"github.com/matrix-org/dendrite/keyserver/consumers"
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
 	"github.com/matrix-org/dendrite/keyserver/producers"
@@ -64,13 +63,6 @@ func NewInternalAPI(
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
-
-	keyconsumer := consumers.NewOutputCrossSigningKeyUpdateConsumer(
-		base.ProcessContext, base.Cfg, js, db, ap,
-	)
-	if err := keyconsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start keyserver EDU server consumer")
-	}
 
 	return ap
 }
