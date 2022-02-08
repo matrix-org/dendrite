@@ -417,7 +417,7 @@ func (r *Inputer) fetchAuthEvents(
 	}
 
 	for _, authEvent := range gomatrixserverlib.ReverseTopologicalOrdering(
-		res.AuthEvents,
+		res.AuthEvents.UntrustedEvents(event.RoomVersion),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	) {
 		// If we already know about this event from the database then we don't

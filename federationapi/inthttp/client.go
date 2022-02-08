@@ -387,13 +387,9 @@ func (h *httpFederationInternalAPI) LookupMissingEvents(
 	if request.Err != nil {
 		return res, request.Err
 	}
-	res.Events = make([]*gomatrixserverlib.Event, 0, len(request.Res.Events))
-	for _, js := range request.Res.Events {
-		ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(js, roomVersion)
-		if err != nil {
-			return res, err
-		}
-		res.Events = append(res.Events, ev)
+	res.Events = make(gomatrixserverlib.EventJSONs, len(request.Res.Events))
+	for i, ev := range request.Res.Events {
+		res.Events[i] = gomatrixserverlib.EventJSON(ev)
 	}
 	return res, nil
 }
