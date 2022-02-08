@@ -299,7 +299,7 @@ func (r *Inputer) processRoomEvent(
 		return rollbackTransaction, fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
 	}
 
-	if !missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0 {
+	if input.HasState || (!missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0) {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, updater, input, roomInfo, &stateAtEvent, event, isRejected)
