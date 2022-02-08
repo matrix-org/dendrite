@@ -486,7 +486,7 @@ Event:
 
 	// now check if we can fill the gap. Look to see if we have state snapshot IDs for the earliest event
 	earliestNewEvent := newEvents[0]
-	if state, err := t.db.StateAtEventIDs(ctx, []string{earliestNewEvent.EventID()}); err != nil || len(state) == 0 {
+	if state, err := t.db.StateAtEventIDs(ctx, []string{earliestNewEvent.EventID()}); err != nil || len(state) == 0 || state[0].BeforeStateSnapshotNID == 0 {
 		if earliestNewEvent.Type() == gomatrixserverlib.MRoomCreate && earliestNewEvent.StateKeyEquals("") {
 			// we got to the beginning of the room so there will be no state! It's all good we can process this
 			return newEvents, true, nil
