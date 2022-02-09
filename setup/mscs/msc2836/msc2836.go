@@ -82,9 +82,15 @@ type EventRelationshipResponse struct {
 	Limited   bool                            `json:"limited"`
 }
 
-func toClientResponse(res *gomatrixserverlib.MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
+type MSC2836EventRelationshipsResponse struct {
+	gomatrixserverlib.MSC2836EventRelationshipsResponse
+	ParsedEvents    []*gomatrixserverlib.Event
+	ParsedAuthChain []*gomatrixserverlib.Event
+}
+
+func toClientResponse(res *MSC2836EventRelationshipsResponse) *EventRelationshipResponse {
 	out := &EventRelationshipResponse{
-		Events:    gomatrixserverlib.ToClientEvents(res.Events, gomatrixserverlib.FormatAll),
+		Events:    gomatrixserverlib.ToClientEvents(res.ParsedEvents, gomatrixserverlib.FormatAll),
 		Limited:   res.Limited,
 		NextBatch: res.NextBatch,
 	}
@@ -210,7 +216,7 @@ func federatedEventRelationship(
 	// add auth chain information
 	requiredAuthEventsSet := make(map[string]bool)
 	var requiredAuthEvents []string
-	for _, ev := range res.Events {
+	for _, ev := range res.ParsedEvents {
 		for _, a := range ev.AuthEventIDs() {
 			if requiredAuthEventsSet[a] {
 				continue
@@ -227,19 +233,24 @@ func federatedEventRelationship(
 		// they may already have the auth events so don't fail this request
 		util.GetLogger(ctx).WithError(err).Error("Failed to QueryAuthChain")
 	}
-	res.AuthChain = make([]*gomatrixserverlib.Event, len(queryRes.AuthChain))
+	res.AuthChain = make(gomatrixserverlib.EventJSONs, len(queryRes.AuthChain))
 	for i := range queryRes.AuthChain {
-		res.AuthChain[i] = queryRes.AuthChain[i].Unwrap()
+		res.AuthChain[i] = queryRes.AuthChain[i].JSON()
+	}
+
+	res.Events = make(gomatrixserverlib.EventJSONs, len(res.ParsedEvents))
+	for i := range res.ParsedEvents {
+		res.Events[i] = res.ParsedEvents[i].JSON()
 	}
 
 	return util.JSONResponse{
 		Code: 200,
-		JSON: res,
+		JSON: res.MSC2836EventRelationshipsResponse,
 	}
 }
 
-func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsResponse, *util.JSONResponse) {
-	var res gomatrixserverlib.MSC2836EventRelationshipsResponse
+func (rc *reqCtx) process() (*MSC2836EventRelationshipsResponse, *util.JSONResponse) {
+	var res MSC2836EventRelationshipsResponse
 	var returnEvents []*gomatrixserverlib.HeaderedEvent
 	// Can the user see (according to history visibility) event_id? If no, reject the request, else continue.
 	event := rc.getLocalEvent(rc.req.EventID)
@@ -290,11 +301,11 @@ func (rc *reqCtx) process() (*gomatrixserverlib.MSC2836EventRelationshipsRespons
 		)
 		returnEvents = append(returnEvents, events...)
 	}
-	res.Events = make([]*gomatrixserverlib.Event, len(returnEvents))
+	res.ParsedEvents = make([]*gomatrixserverlib.Event, len(returnEvents))
 	for i, ev := range returnEvents {
 		// for each event, extract the children_count | hash and add it as unsigned data.
 		rc.addChildMetadata(ev)
-		res.Events[i] = ev.Unwrap()
+		res.ParsedEvents[i] = ev.Unwrap()
 	}
 	res.Limited = remaining == 0 || walkLimited
 	return &res, nil
@@ -357,7 +368,7 @@ func (rc *reqCtx) fetchUnknownEvent(eventID, roomID string) *gomatrixserverlib.H
 			continue
 		}
 		rc.injectResponseToRoomserver(res)
-		for _, ev := range res.Events {
+		for _, ev := range res.ParsedEvents {
 			if ev.EventID() == eventID {
 				return ev.Headered(ev.Version())
 			}
@@ -384,7 +395,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 	if rc.hasUnexploredChildren(parentID) {
 		// we need to do a remote request to pull in the children as we are missing them locally.
 		serversToQuery := rc.getServersForEventID(parentID)
-		var result *gomatrixserverlib.MSC2836EventRelationshipsResponse
+		var result *MSC2836EventRelationshipsResponse
 		for _, srv := range serversToQuery {
 			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
 				EventID:     parentID,
@@ -397,7 +408,12 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 			if err != nil {
 				util.GetLogger(rc.ctx).WithError(err).WithField("server", srv).Error("includeChildren: failed to call MSC2836EventRelationships")
 			} else {
-				result = &res
+				mscRes := &MSC2836EventRelationshipsResponse{
+					MSC2836EventRelationshipsResponse: res,
+				}
+				mscRes.ParsedEvents = res.Events.UntrustedEvents(rc.roomVersion)
+				mscRes.ParsedAuthChain = res.AuthChain.UntrustedEvents(rc.roomVersion)
+				result = mscRes
 				break
 			}
 		}
@@ -467,7 +483,7 @@ func walkThread(
 }
 
 // MSC2836EventRelationships performs an /event_relationships request to a remote server
-func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*gomatrixserverlib.MSC2836EventRelationshipsResponse, error) {
+func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
 	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
 		DepthFirst:  rc.req.DepthFirst,
@@ -481,7 +497,12 @@ func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverli
 		util.GetLogger(rc.ctx).WithError(err).Error("Failed to call MSC2836EventRelationships")
 		return nil, err
 	}
-	return &res, nil
+	mscRes := &MSC2836EventRelationshipsResponse{
+		MSC2836EventRelationshipsResponse: res,
+	}
+	mscRes.ParsedEvents = res.Events.UntrustedEvents(ver)
+	mscRes.ParsedAuthChain = res.AuthChain.UntrustedEvents(ver)
+	return mscRes, nil
 
 }
 
@@ -550,12 +571,12 @@ func (rc *reqCtx) getServersForEventID(eventID string) []gomatrixserverlib.Serve
 	return serversToQuery
 }
 
-func (rc *reqCtx) remoteEventRelationships(eventID string) *gomatrixserverlib.MSC2836EventRelationshipsResponse {
+func (rc *reqCtx) remoteEventRelationships(eventID string) *MSC2836EventRelationshipsResponse {
 	if rc.isFederatedRequest {
 		return nil // we don't query remote servers for remote requests
 	}
 	serversToQuery := rc.getServersForEventID(eventID)
-	var res *gomatrixserverlib.MSC2836EventRelationshipsResponse
+	var res *MSC2836EventRelationshipsResponse
 	var err error
 	for _, srv := range serversToQuery {
 		res, err = rc.MSC2836EventRelationships(eventID, srv, rc.roomVersion)
@@ -577,7 +598,7 @@ func (rc *reqCtx) lookForEvent(eventID string) *gomatrixserverlib.HeaderedEvent 
 		if queryRes != nil {
 			// inject all the events into the roomserver then return the event in question
 			rc.injectResponseToRoomserver(queryRes)
-			for _, ev := range queryRes.Events {
+			for _, ev := range queryRes.ParsedEvents {
 				if ev.EventID() == eventID && rc.req.RoomID == ev.RoomID() {
 					return ev.Headered(ev.Version())
 				}
@@ -619,12 +640,12 @@ func (rc *reqCtx) getLocalEvent(eventID string) *gomatrixserverlib.HeaderedEvent
 
 // injectResponseToRoomserver injects the events
 // into the roomserver as KindOutlier, with auth chains.
-func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836EventRelationshipsResponse) {
-	var stateEvents []*gomatrixserverlib.Event
+func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsResponse) {
+	var stateEvents gomatrixserverlib.EventJSONs
 	var messageEvents []*gomatrixserverlib.Event
-	for _, ev := range res.Events {
+	for _, ev := range res.ParsedEvents {
 		if ev.StateKey() != nil {
-			stateEvents = append(stateEvents, ev)
+			stateEvents = append(stateEvents, ev.JSON())
 		} else {
 			messageEvents = append(messageEvents, ev)
 		}
@@ -633,7 +654,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *gomatrixserverlib.MSC2836Event
 		AuthEvents:  res.AuthChain,
 		StateEvents: stateEvents,
 	}
-	eventsInOrder, err := respState.Events()
+	eventsInOrder, err := respState.Events(rc.roomVersion)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to calculate order to send events in MSC2836EventRelationshipsResponse")
 		return

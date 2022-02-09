@@ -35,12 +35,15 @@ func GetState(
 		return *err
 	}
 
-	state, err := getState(ctx, request, rsAPI, roomID, eventID)
+	stateEvents, authChain, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: state}
+	return util.JSONResponse{Code: http.StatusOK, JSON: &gomatrixserverlib.RespState{
+		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
+		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
+	}}
 }
 
 // GetStateIDs returns state event IDs & auth event IDs for the roomID, eventID
@@ -55,13 +58,13 @@ func GetStateIDs(
 		return *err
 	}
 
-	state, err := getState(ctx, request, rsAPI, roomID, eventID)
+	stateEvents, authEvents, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
 
-	stateEventIDs := getIDsFromEvent(state.StateEvents)
-	authEventIDs := getIDsFromEvent(state.AuthEvents)
+	stateEventIDs := getIDsFromEvent(stateEvents)
+	authEventIDs := getIDsFromEvent(authEvents)
 
 	return util.JSONResponse{Code: http.StatusOK, JSON: gomatrixserverlib.RespStateIDs{
 		StateEventIDs: stateEventIDs,
@@ -97,18 +100,18 @@ func getState(
 	rsAPI api.RoomserverInternalAPI,
 	roomID string,
 	eventID string,
-) (*gomatrixserverlib.RespState, *util.JSONResponse) {
+) (stateEvents, authEvents []*gomatrixserverlib.HeaderedEvent, errRes *util.JSONResponse) {
 	event, resErr := fetchEvent(ctx, rsAPI, eventID)
 	if resErr != nil {
-		return nil, resErr
+		return nil, nil, resErr
 	}
 
 	if event.RoomID() != roomID {
-		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
+		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: jsonerror.NotFound("event does not belong to this room")}
 	}
 	resErr = allowedToSeeEvent(ctx, request.Origin(), rsAPI, eventID)
 	if resErr != nil {
-		return nil, resErr
+		return nil, nil, resErr
 	}
 
 	var response api.QueryStateAndAuthChainResponse
@@ -123,20 +126,17 @@ func getState(
 	)
 	if err != nil {
 		resErr := util.ErrorResponse(err)
-		return nil, &resErr
+		return nil, nil, &resErr
 	}
 
 	if !response.RoomExists {
-		return nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
+		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
-	return &gomatrixserverlib.RespState{
-		StateEvents: gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
-		AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
-	}, nil
+	return response.StateEvents, response.AuthChainEvents, nil
 }
 
-func getIDsFromEvent(events []*gomatrixserverlib.Event) []string {
+func getIDsFromEvent(events []*gomatrixserverlib.HeaderedEvent) []string {
 	IDs := make([]string, len(events))
 	for i := range events {
 		IDs[i] = events[i].EventID()
