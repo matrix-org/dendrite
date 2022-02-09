@@ -37,7 +37,7 @@ If a job fails, click the "details" button and you should be taken to the job's
 logs.
 
 ![Click the details button on the failing build
-step](https://raw.githubusercontent.com/matrix-org/dendrite/master/docs/images/details-button-location.jpg)
+step](https://raw.githubusercontent.com/matrix-org/dendrite/main/docs/images/details-button-location.jpg)
 
 Scroll down to the failing step and you should see some log output. Scan the
 logs until you find what it's complaining about, fix it, submit a new commit,
@@ -57,7 +57,7 @@ significant amount of CPU and RAM.
 
 Once the code builds, run [Sytest](https://github.com/matrix-org/sytest)
 according to the guide in
-[docs/sytest.md](https://github.com/matrix-org/dendrite/blob/master/docs/sytest.md#using-a-sytest-docker-image)
+[docs/sytest.md](https://github.com/matrix-org/dendrite/blob/main/docs/sytest.md#using-a-sytest-docker-image)
 so you can see whether something is being broken and whether there are newly
 passing tests.
 
@@ -94,4 +94,4 @@ For more general questions please use
 
 We ask that everyone who contributes to the project signs off their
 contributions, in accordance with the
-[DCO](https://github.com/matrix-org/matrix-doc/blob/master/CONTRIBUTING.rst#sign-off).
+[DCO](https://github.com/matrix-org/matrix-doc/blob/main/CONTRIBUTING.rst#sign-off).
