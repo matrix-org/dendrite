@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -284,14 +283,8 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				res.DeviceKeys[userID][dk.DeviceID] = dk.KeyJSON
 			}
 		} else {
-			// this makes "uploading signed devices gets propagated over federation" pass (well..)
-			// removing the domainToDeviceKeys completely makes two different devicelist tests fail.
-			// figure out a way to make all three tests happy
-			if !strings.Contains(userID, "13:localhost") {
-				logrus.Debugf("adding %s for %s to domainToDeviceKeys", domain, userID)
-				domainToDeviceKeys[domain] = make(map[string][]string)
-				domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceIDs...)
-			}
+			domainToDeviceKeys[domain] = make(map[string][]string)
+			domainToDeviceKeys[domain][userID] = append(domainToDeviceKeys[domain][userID], deviceIDs...)
 		}
 		// work out if our cross-signing request for this user was
 		// satisfied, if not add them to the list of things to fetch
@@ -374,7 +367,6 @@ func (a *KeyInternalAPI) remoteKeysFromDatabase(
 
 		}
 	}
-	logrus.Debugf("fetchRemote: %+v", fetchRemote)
 	return fetchRemote
 }
 
@@ -461,7 +453,6 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	for userID, deviceIDs := range devKeys {
 		if len(deviceIDs) == 0 {
 			userIDsForAllDevices[userID] = struct{}{}
-			delete(devKeys, userID)
 		}
 	}
 	// for cross-signing keys, it's probably easier just to hit /keys/query if we aren't already doing
