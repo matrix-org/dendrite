@@ -83,6 +83,10 @@ type StateKeyTuple struct {
 	EventStateKeyNID EventStateKeyNID
 }
 
+func (a StateKeyTuple) IsCreate() bool {
+	return a.EventTypeNID == MRoomCreateNID && a.EventStateKeyNID == EmptyStateKeyNID
+}
+
 // LessThan returns true if this state key is less than the other state key.
 // The ordering is arbitrary and is used to implement binary search and to efficiently deduplicate entries.
 func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
