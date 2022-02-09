@@ -255,20 +255,20 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 			}
-			if override, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			if stateSnapshot, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				// Something went wrong with retrieving the missing state, so we can't
 				// really do anything with the event other than reject it at this point.
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
-			} else if override != nil {
+			} else if stateSnapshot != nil {
 				// We retrieved some state and we ended up having to call /state_ids for
 				// the new event in question (probably because closing the gap by using
 				// /get_missing_events didn't do what we hoped) so we'll instead overwrite
 				// the state snapshot with the newly resolved state.
 				missingPrev = false
 				input.HasState = true
-				input.StateEventIDs = make([]string, 0, len(override.StateEvents))
-				for _, e := range override.StateEvents {
+				input.StateEventIDs = make([]string, 0, len(stateSnapshot.StateEvents))
+				for _, e := range stateSnapshot.StateEvents {
 					input.StateEventIDs = append(input.StateEventIDs, e.EventID())
 				}
 			} else {
