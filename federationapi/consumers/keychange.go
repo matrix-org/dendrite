@@ -127,6 +127,9 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
+	if len(destinations) == 0 {
+		return true
+	}
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MDeviceListUpdate,
@@ -146,7 +149,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
-	logger.Infof("Sending device list update message to %q", destinations)
+	logger.Debugf("Sending device list update message to %q", destinations)
 	err = t.queues.SendEDU(edu, t.serverName, destinations)
 	return err == nil
 }
@@ -181,6 +184,10 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
+	if len(destinations) == 0 {
+		return true
+	}
+
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   eduserverAPI.MSigningKeyUpdate,
@@ -191,7 +198,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 		return true
 	}
 
-	logger.Infof("Sending cross-signing update message to %q", destinations)
+	logger.Debugf("Sending cross-signing update message to %q", destinations)
 	err = t.queues.SendEDU(edu, t.serverName, destinations)
 	return err == nil
 }

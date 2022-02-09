@@ -134,7 +134,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(ctx context.Context, msg *nats.M
 		return true
 	}
 
-	log.Infof("Sending send-to-device message into %q destination queue", destServerName)
+	log.Debugf("Sending send-to-device message into %q destination queue", destServerName)
 	if err := t.queues.SendEDU(edu, t.ServerName, []gomatrixserverlib.ServerName{destServerName}); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
