@@ -552,12 +552,13 @@ func (r *FederationInternalAPI) PerformInvite(
 
 	inviteRes, err := r.federation.SendInviteV2(ctx, destination, inviteReq)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: %w", err)
+		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
+	logrus.Infof("GOT INVITE RESPONSE %s", string(inviteRes.Event))
 
 	inviteEvent, err := inviteRes.Event.UntrustedEvent(request.RoomVersion)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: %w", err)
+		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
 	}
 	response.Event = inviteEvent.Headered(request.RoomVersion)
 	return nil
