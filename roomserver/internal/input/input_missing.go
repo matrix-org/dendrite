@@ -98,17 +98,15 @@ func (t *missingStateReq) processEventWithMissingState(
 		return nil, nil
 	}
 
-	// At this point we have possibly filled the gap using /g_m_e, but
-	// we still don't actually know if that reconciled the problem with
-	// the event's prev events. It's possible that some of the events we
-	// fetched from /g_m_e didn't have state or were rejected for some
-	// reason. Let's double-check.
+	// Otherwise, if we've reached this point, it's possible that we've
+	// either not closed the gap, or we did but we still don't seem to
+	// know the events before the new event. Start by looking up the
+	// state at the event at the back of the gap and we'll try to roll
+	// forward the state first.
 	backwardsExtremity := newEvents[0]
 	newEvents = newEvents[1:]
 
-	// Retrieve the state at the backward extremity. This may allow us
-	// to roll forward and then re-check if the prev states are known.
-	resolvedState, err := t.lookupState(ctx, backwardsExtremity, roomVersion)
+	resolvedState, err := t.lookupResolvedStateBeforeEvent(ctx, backwardsExtremity, roomVersion)
 	if err != nil {
 		return nil, fmt.Errorf("t.lookupState (backwards extremity): %w", err)
 	}
@@ -148,7 +146,8 @@ func (t *missingStateReq) processEventWithMissingState(
 		return nil
 	}
 
-	// Send outliers first so we can send the new backwards extremity without causing errors
+	// Send outliers first so we can send the state along with the new backwards
+	// extremity without any missing auth events.
 	if err = sendOutliers(resolvedState); err != nil {
 		return nil, fmt.Errorf("sendOutliers: %w", err)
 	}
@@ -194,31 +193,33 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 
 	// Finally, check again if we know everything we need to know in order to
-	// make forward progress. This will be true if rolling forward the fetched
-	// events led to correctly fast-forwarded state. Otherwise we need to /state_ids
-	// again, but this time for the new event.
+	// make forward progress. If the prev state is known then we consider the
+	// rolled forward state to be sufficient — we now know all of the state
+	// before the prev events. If we don't then we need to look up the state
+	// before the new event as well, otherwise we will never make any progress.
 	if t.isPrevStateKnown(ctx, e) {
 		return nil, nil
 	}
 
 	// If we still haven't got the state for the prev events then we'll go and
 	// ask the federation for it if needed.
-	resolvedState, err = t.lookupState(ctx, e, roomVersion)
+	resolvedState, err = t.lookupResolvedStateBeforeEvent(ctx, e, roomVersion)
 	if err != nil {
 		return nil, fmt.Errorf("t.lookupState (new event): %w", err)
 	}
 
-	// Send the outliers.
+	// Send the outliers for the retrieved state.
 	if err = sendOutliers(resolvedState); err != nil {
 		return nil, fmt.Errorf("sendOutliers: %w", err)
 	}
 
 	// Then return the resolved state, for which the caller can replace the
-	// HasState with the event IDs to create a new state snapshot.
+	// HasState with the event IDs to create a new state snapshot when we
+	// process the new event.
 	return resolvedState, nil
 }
 
-func (t *missingStateReq) lookupState(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (*gomatrixserverlib.RespState, error) {
+func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (*gomatrixserverlib.RespState, error) {
 	type respState struct {
 		// A snapshot is considered trustworthy if it came from our own roomserver.
 		// That's because the state will have been through state resolution once
