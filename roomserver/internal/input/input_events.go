@@ -255,9 +255,16 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 			}
-			if err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			if override, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+			} else if override != nil {
+				missingPrev = false
+				input.HasState = true
+				input.StateEventIDs = make([]string, 0, len(override.StateEvents))
+				for _, e := range override.StateEvents {
+					input.StateEventIDs = append(input.StateEventIDs, e.EventID())
+				}
 			} else {
 				missingPrev = false
 			}

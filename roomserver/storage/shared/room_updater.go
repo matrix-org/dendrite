@@ -187,6 +187,12 @@ func (u *RoomUpdater) EventIDs(
 	return u.d.EventsTable.BulkSelectEventID(ctx, u.txn, eventNIDs)
 }
 
+func (u *RoomUpdater) EventNIDs(
+	ctx context.Context, eventIDs []string,
+) (map[string]types.EventNID, error) {
+	return u.d.eventNIDs(ctx, u.txn, eventIDs)
+}
+
 func (u *RoomUpdater) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
