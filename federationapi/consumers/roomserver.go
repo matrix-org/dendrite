@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -112,11 +113,6 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 				}).Panicf("roomserver output log: write room event failure")
 			}
 		}
-
-	case api.OutputTypeNewInviteEvent:
-		log.WithField("type", output.Type).Debug(
-			"received new invite, send device keys",
-		)
 
 	case api.OutputTypeNewInboundPeek:
 		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
