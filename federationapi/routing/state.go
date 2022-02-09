@@ -35,12 +35,15 @@ func GetState(
 		return *err
 	}
 
-	stateEvents, _, err := getState(ctx, request, rsAPI, roomID, eventID)
+	stateEvents, authChain, err := getState(ctx, request, rsAPI, roomID, eventID)
 	if err != nil {
 		return *err
 	}
 
-	return util.JSONResponse{Code: http.StatusOK, JSON: stateEvents}
+	return util.JSONResponse{Code: http.StatusOK, JSON: &gomatrixserverlib.RespState{
+		AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(authChain),
+		StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateEvents),
+	}}
 }
 
 // GetStateIDs returns state event IDs & auth event IDs for the roomID, eventID
