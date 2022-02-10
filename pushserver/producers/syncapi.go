@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/pushserver/storage"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -103,8 +102,4 @@ func (p *SyncAPI) sendNotificationData(userID string, data *eventutil.Notificati
 
 	_, err = p.producer.PublishMsg(m)
 	return err
-}
-
-type MessageSender interface {
-	SendMessage(msg *sarama.ProducerMessage) (partition int32, offset int64, err error)
 }
