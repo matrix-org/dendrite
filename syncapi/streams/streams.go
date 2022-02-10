@@ -12,6 +12,7 @@ import (
 )
 
 type Streams struct {
+<<<<<<< HEAD
 	PDUStreamProvider              types.StreamProvider
 	TypingStreamProvider           types.StreamProvider
 	ReceiptStreamProvider          types.StreamProvider
@@ -20,6 +21,15 @@ type Streams struct {
 	AccountDataStreamProvider      types.StreamProvider
 	NotificationDataStreamProvider types.StreamProvider
 	DeviceListStreamProvider       types.PartitionedStreamProvider
+=======
+	PDUStreamProvider          types.StreamProvider
+	TypingStreamProvider       types.StreamProvider
+	ReceiptStreamProvider      types.StreamProvider
+	InviteStreamProvider       types.StreamProvider
+	SendToDeviceStreamProvider types.StreamProvider
+	AccountDataStreamProvider  types.StreamProvider
+	DeviceListStreamProvider   types.StreamProvider
+>>>>>>> main
 }
 
 func NewSyncStreamProviders(
@@ -52,9 +62,9 @@ func NewSyncStreamProviders(
 			StreamProvider: StreamProvider{DB: d},
 		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
-			PartitionedStreamProvider: PartitionedStreamProvider{DB: d},
-			rsAPI:                     rsAPI,
-			keyAPI:                    keyAPI,
+			StreamProvider: StreamProvider{DB: d},
+			rsAPI:          rsAPI,
+			keyAPI:         keyAPI,
 		},
 	}
 

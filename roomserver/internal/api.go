@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 
-	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
@@ -16,6 +15,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -33,19 +34,22 @@ type RoomserverInternalAPI struct {
 	*perform.Forgetter
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
-	Producer               sarama.SyncProducer
 	Cache                  caching.RoomServerCaches
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
+	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
-	OutputRoomEventTopic   string // Kafka topic for new output room events
+	JetStream              nats.JetStreamContext
+	Durable                string
+	InputRoomEventTopic    string // JetStream topic for new input room events
+	OutputRoomEventTopic   string // JetStream topic for new output room events
 	PerspectiveServerNames []gomatrixserverlib.ServerName
 }
 
 func NewRoomserverAPI(
-	cfg *config.RoomServer, roomserverDB storage.Database, producer sarama.SyncProducer,
-	outputRoomEventTopic string, caches caching.RoomServerCaches,
+	cfg *config.RoomServer, roomserverDB storage.Database, consumer nats.JetStreamContext,
+	inputRoomEventTopic, outputRoomEventTopic string, caches caching.RoomServerCaches,
 	perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
@@ -55,37 +59,41 @@ func NewRoomserverAPI(
 		Cache:                  caches,
 		ServerName:             cfg.Matrix.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
+		InputRoomEventTopic:    inputRoomEventTopic,
+		OutputRoomEventTopic:   outputRoomEventTopic,
+		JetStream:              consumer,
+		Durable:                cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
+		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
 			DB:         roomserverDB,
 			Cache:      caches,
 			ServerName: cfg.Matrix.ServerName,
 			ServerACLs: serverACLs,
 		},
-		Inputer: &input.Inputer{
-			DB:                   roomserverDB,
-			OutputRoomEventTopic: outputRoomEventTopic,
-			Producer:             producer,
-			ServerName:           cfg.Matrix.ServerName,
-			ACLs:                 serverACLs,
-		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}
 	return a
 }
 
-// SetKeyring sets the keyring to a given keyring. This is only useful for the P2P
-// demos and must be called after SetFederationSenderInputAPI.
-func (r *RoomserverInternalAPI) SetKeyring(keyRing *gomatrixserverlib.KeyRing) {
-	r.KeyRing = keyRing
-}
-
 // SetFederationInputAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI) {
+func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
 	r.fsAPI = fsAPI
-	r.SetKeyring(fsAPI.KeyRing())
+	r.KeyRing = keyRing
 
+	r.Inputer = &input.Inputer{
+		DB:                   r.DB,
+		InputRoomEventTopic:  r.InputRoomEventTopic,
+		OutputRoomEventTopic: r.OutputRoomEventTopic,
+		JetStream:            r.JetStream,
+		Durable:              nats.Durable(r.Durable),
+		ServerName:           r.Cfg.Matrix.ServerName,
+		FSAPI:                fsAPI,
+		KeyRing:              keyRing,
+		ACLs:                 r.ServerACLs,
+		Queryer:              r.Queryer,
+	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
 		Cfg:     r.Cfg,
@@ -140,6 +148,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	}
 	r.Forgetter = &perform.Forgetter{
 		DB: r.DB,
+	}
+
+	if err := r.Inputer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
 }
 

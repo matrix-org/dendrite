@@ -23,6 +23,7 @@
 /vendor/bin
 /docker/build
 /logs
+/jetstream
 
 # Architecture specific extensions/prefixes
 *.[568vq]

@@ -18,20 +18,38 @@ package input
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/internal/hooks"
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
-	"go.uber.org/atomic"
+)
+
+type retryAction int
+type commitAction int
+
+const (
+	doNotRetry retryAction = iota
+	retryLater
+)
+
+const (
+	commitTransaction commitAction = iota
+	rollbackTransaction
 )
 
 var keyContentFields = map[string]string{
@@ -42,105 +60,256 @@ var keyContentFields = map[string]string{
 
 type Inputer struct {
 	DB                   storage.Database
-	Producer             sarama.SyncProducer
+	JetStream            nats.JetStreamContext
+	Durable              nats.SubOpt
 	ServerName           gomatrixserverlib.ServerName
+	FSAPI                fedapi.FederationInternalAPI
+	KeyRing              gomatrixserverlib.JSONVerifier
 	ACLs                 *acls.ServerACLs
+	InputRoomEventTopic  string
 	OutputRoomEventTopic string
-	workers              sync.Map // room ID -> *inputWorker
+	workers              sync.Map // room ID -> *phony.Inbox
+
+	Queryer *query.Queryer
 }
 
-type inputTask struct {
-	ctx   context.Context
-	event *api.InputRoomEvent
-	wg    *sync.WaitGroup
-	err   error // written back by worker, only safe to read when all tasks are done
+func (r *Inputer) workerForRoom(roomID string) *phony.Inbox {
+	inbox, _ := r.workers.LoadOrStore(roomID, &phony.Inbox{})
+	return inbox.(*phony.Inbox)
 }
 
-type inputWorker struct {
-	r       *Inputer
-	running atomic.Bool
-	input   *fifoQueue
-}
+// eventsInProgress is an in-memory map to keep a track of which events we have
+// queued up for processing. If we get a redelivery from NATS and we still have
+// the queued up item then we won't do anything with the redelivered message. If
+// we've restarted Dendrite and now this map is empty then it means that we will
+// reload pending work from NATS.
+var eventsInProgress sync.Map
 
-// Guarded by a CAS on w.running
-func (w *inputWorker) start() {
-	defer w.running.Store(false)
-	for {
-		select {
-		case <-w.input.wait():
-			task, ok := w.input.pop()
-			if !ok {
-				continue
+// onMessage is called when a new event arrives in the roomserver input stream.
+func (r *Inputer) Start() error {
+	_, err := r.JetStream.Subscribe(
+		r.InputRoomEventTopic,
+		// We specifically don't use jetstream.WithJetStreamMessage here because we
+		// queue the task off to a room-specific queue and the ACK needs to be sent
+		// later, possibly with an error response to the inputter if synchronous.
+		func(msg *nats.Msg) {
+			roomID := msg.Header.Get("room_id")
+			var inputRoomEvent api.InputRoomEvent
+			if err := json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
+				_ = msg.Term()
+				return
 			}
-			roomserverInputBackpressure.With(prometheus.Labels{
-				"room_id": task.event.Event.RoomID(),
-			}).Dec()
-			hooks.Run(hooks.KindNewEventReceived, task.event.Event)
-			_, task.err = w.r.processRoomEvent(task.ctx, task.event)
-			if task.err == nil {
-				hooks.Run(hooks.KindNewEventPersisted, task.event.Event)
-			} else {
-				sentry.CaptureException(task.err)
+
+			_ = msg.InProgress()
+			index := roomID + "\000" + inputRoomEvent.Event.EventID()
+			if _, ok := eventsInProgress.LoadOrStore(index, struct{}{}); ok {
+				// We're already waiting to deal with this event, so there's no
+				// point in queuing it up again. We've notified NATS that we're
+				// working on the message still, so that will have deferred the
+				// redelivery by a bit.
+				return
 			}
-			task.wg.Done()
-		case <-time.After(time.Second * 5):
-			return
+
+			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
+			r.workerForRoom(roomID).Act(nil, func() {
+				_ = msg.InProgress() // resets the acknowledgement wait timer
+				defer eventsInProgress.Delete(index)
+				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
+				action, err := r.processRoomEventUsingUpdater(context.Background(), roomID, &inputRoomEvent)
+				if err != nil {
+					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+						sentry.CaptureException(err)
+					}
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"room_id":  roomID,
+						"event_id": inputRoomEvent.Event.EventID(),
+						"type":     inputRoomEvent.Event.Type(),
+					}).Warn("Roomserver failed to process async event")
+				}
+				switch action {
+				case retryLater:
+					_ = msg.Nak()
+				case doNotRetry:
+					_ = msg.Ack()
+				}
+			})
+		},
+		// NATS wants to acknowledge automatically by default when the message is
+		// read from the stream, but we want to override that behaviour by making
+		// sure that we only acknowledge when we're happy we've done everything we
+		// can. This ensures we retry things when it makes sense to do so.
+		nats.ManualAck(),
+		// Use a durable named consumer.
+		r.Durable,
+		// If we've missed things in the stream, e.g. we restarted, then replay
+		// all of the queued messages that were waiting for us.
+		nats.DeliverAll(),
+		// Ensure that NATS doesn't try to resend us something that wasn't done
+		// within the period of time that we might still be processing it.
+		nats.AckWait(MaximumMissingProcessingTime+(time.Second*10)),
+	)
+	return err
+}
+
+// processRoomEventUsingUpdater opens up a room updater and tries to
+// process the event. It returns whether or not we should positively
+// or negatively acknowledge the event (i.e. for NATS) and an error
+// if it occurred.
+func (r *Inputer) processRoomEventUsingUpdater(
+	ctx context.Context,
+	roomID string,
+	inputRoomEvent *api.InputRoomEvent,
+) (retryAction, error) {
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
+	if err != nil {
+		return doNotRetry, fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
+	if err != nil {
+		return retryLater, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
+	}
+	action, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
+	switch action {
+	case commitTransaction:
+		if cerr := updater.Commit(); cerr != nil {
+			return retryLater, fmt.Errorf("updater.Commit: %w", cerr)
+		}
+	case rollbackTransaction:
+		if rerr := updater.Rollback(); rerr != nil {
+			return retryLater, fmt.Errorf("updater.Rollback: %w", rerr)
+		}
+	}
+	return doNotRetry, err
+}
+
+// InputRoomEvents implements api.RoomserverInternalAPI
+func (r *Inputer) InputRoomEvents(
+	ctx context.Context,
+	request *api.InputRoomEventsRequest,
+	response *api.InputRoomEventsResponse,
+) {
+	if request.Asynchronous {
+		var err error
+		for _, e := range request.InputRoomEvents {
+			msg := &nats.Msg{
+				Subject: r.InputRoomEventTopic,
+				Header:  nats.Header{},
+			}
+			roomID := e.Event.RoomID()
+			msg.Header.Set("room_id", roomID)
+			msg.Data, err = json.Marshal(e)
+			if err != nil {
+				response.ErrMsg = err.Error()
+				return
+			}
+			if _, err = r.JetStream.PublishMsg(msg); err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"room_id":  roomID,
+					"event_id": e.Event.EventID(),
+				}).Error("Roomserver failed to queue async event")
+				return
+			}
+		}
+	} else {
+		responses := make(chan error, len(request.InputRoomEvents))
+		for _, e := range request.InputRoomEvents {
+			inputRoomEvent := e
+			roomID := inputRoomEvent.Event.RoomID()
+			index := roomID + "\000" + inputRoomEvent.Event.EventID()
+			if _, ok := eventsInProgress.LoadOrStore(index, struct{}{}); ok {
+				// We're already waiting to deal with this event, so there's no
+				// point in queuing it up again. We've notified NATS that we're
+				// working on the message still, so that will have deferred the
+				// redelivery by a bit.
+				return
+			}
+			roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Inc()
+			worker := r.workerForRoom(roomID)
+			worker.Act(nil, func() {
+				defer eventsInProgress.Delete(index)
+				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
+				_, err := r.processRoomEventUsingUpdater(ctx, roomID, &inputRoomEvent)
+				if err != nil {
+					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+						sentry.CaptureException(err)
+					}
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"room_id":  roomID,
+						"event_id": inputRoomEvent.Event.EventID(),
+					}).Warn("Roomserver failed to process sync event")
+				}
+				select {
+				case <-ctx.Done():
+				default:
+					responses <- err
+				}
+			})
+		}
+		for i := 0; i < len(request.InputRoomEvents); i++ {
+			select {
+			case <-ctx.Done():
+				response.ErrMsg = context.DeadlineExceeded.Error()
+				return
+			case err := <-responses:
+				if err != nil {
+					response.ErrMsg = err.Error()
+					return
+				}
+			}
 		}
 	}
 }
 
 // WriteOutputEvents implements OutputRoomEventWriter
 func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
-	messages := make([]*sarama.ProducerMessage, len(updates))
-	for i := range updates {
-		value, err := json.Marshal(updates[i])
+	var err error
+	for _, update := range updates {
+		msg := &nats.Msg{
+			Subject: r.OutputRoomEventTopic,
+			Header:  nats.Header{},
+		}
+		msg.Header.Set(jetstream.RoomID, roomID)
+		msg.Data, err = json.Marshal(update)
 		if err != nil {
 			return err
 		}
 		logger := log.WithFields(log.Fields{
 			"room_id": roomID,
-			"type":    updates[i].Type,
+			"type":    update.Type,
 		})
-		if updates[i].NewRoomEvent != nil {
-			eventType := updates[i].NewRoomEvent.Event.Type()
+		if update.NewRoomEvent != nil {
+			eventType := update.NewRoomEvent.Event.Type()
 			logger = logger.WithFields(log.Fields{
 				"event_type":     eventType,
-				"event_id":       updates[i].NewRoomEvent.Event.EventID(),
-				"adds_state":     len(updates[i].NewRoomEvent.AddsStateEventIDs),
-				"removes_state":  len(updates[i].NewRoomEvent.RemovesStateEventIDs),
-				"send_as_server": updates[i].NewRoomEvent.SendAsServer,
-				"sender":         updates[i].NewRoomEvent.Event.Sender(),
+				"event_id":       update.NewRoomEvent.Event.EventID(),
+				"adds_state":     len(update.NewRoomEvent.AddsStateEventIDs),
+				"removes_state":  len(update.NewRoomEvent.RemovesStateEventIDs),
+				"send_as_server": update.NewRoomEvent.SendAsServer,
+				"sender":         update.NewRoomEvent.Event.Sender(),
 			})
-			if updates[i].NewRoomEvent.Event.StateKey() != nil {
-				logger = logger.WithField("state_key", *updates[i].NewRoomEvent.Event.StateKey())
+			if update.NewRoomEvent.Event.StateKey() != nil {
+				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
 			}
 			contentKey := keyContentFields[eventType]
 			if contentKey != "" {
-				value := gjson.GetBytes(updates[i].NewRoomEvent.Event.Content(), contentKey)
+				value := gjson.GetBytes(update.NewRoomEvent.Event.Content(), contentKey)
 				if value.Exists() {
 					logger = logger.WithField("content_value", value.String())
 				}
 			}
 
-			if eventType == "m.room.server_acl" && updates[i].NewRoomEvent.Event.StateKeyEquals("") {
-				ev := updates[i].NewRoomEvent.Event.Unwrap()
+			if eventType == "m.room.server_acl" && update.NewRoomEvent.Event.StateKeyEquals("") {
+				ev := update.NewRoomEvent.Event.Unwrap()
 				defer r.ACLs.OnServerACLUpdate(ev)
 			}
 		}
-		logger.Infof("Producing to topic '%s'", r.OutputRoomEventTopic)
-		messages[i] = &sarama.ProducerMessage{
-			Topic: r.OutputRoomEventTopic,
-			Key:   sarama.StringEncoder(roomID),
-			Value: sarama.ByteEncoder(value),
+		logger.Tracef("Producing to topic '%s'", r.OutputRoomEventTopic)
+		if _, err := r.JetStream.PublishMsg(msg); err != nil {
+			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.OutputRoomEventTopic, err)
+			return err
 		}
 	}
-	errs := r.Producer.SendMessages(messages)
-	if errs != nil {
-		for _, err := range errs.(sarama.ProducerErrors) {
-			log.WithError(err).WithField("message_bytes", err.Msg.Value.Length()).Error("Write to kafka failed")
-		}
-	}
-	return errs
+	return nil
 }
 
 func init() {
@@ -156,67 +325,3 @@ var roomserverInputBackpressure = prometheus.NewGaugeVec(
 	},
 	[]string{"room_id"},
 )
-
-// InputRoomEvents implements api.RoomserverInternalAPI
-func (r *Inputer) InputRoomEvents(
-	_ context.Context,
-	request *api.InputRoomEventsRequest,
-	response *api.InputRoomEventsResponse,
-) {
-	// Create a wait group. Each task that we dispatch will call Done on
-	// this wait group so that we know when all of our events have been
-	// processed.
-	wg := &sync.WaitGroup{}
-	wg.Add(len(request.InputRoomEvents))
-	tasks := make([]*inputTask, len(request.InputRoomEvents))
-
-	for i, e := range request.InputRoomEvents {
-		// Work out if we are running per-room workers or if we're just doing
-		// it on a global basis (e.g. SQLite).
-		roomID := "global"
-		if r.DB.SupportsConcurrentRoomInputs() {
-			roomID = e.Event.RoomID()
-		}
-
-		// Look up the worker, or create it if it doesn't exist. This channel
-		// is buffered to reduce the chance that we'll be blocked by another
-		// room - the channel will be quite small as it's just pointer types.
-		w, _ := r.workers.LoadOrStore(roomID, &inputWorker{
-			r:     r,
-			input: newFIFOQueue(),
-		})
-		worker := w.(*inputWorker)
-
-		// Create a task. This contains the input event and a reference to
-		// the wait group, so that the worker can notify us when this specific
-		// task has been finished.
-		tasks[i] = &inputTask{
-			ctx:   context.Background(),
-			event: &request.InputRoomEvents[i],
-			wg:    wg,
-		}
-
-		// Send the task to the worker.
-		if worker.running.CAS(false, true) {
-			go worker.start()
-		}
-		worker.input.push(tasks[i])
-		roomserverInputBackpressure.With(prometheus.Labels{
-			"room_id": roomID,
-		}).Inc()
-	}
-
-	// Wait for all of the workers to return results about our tasks.
-	wg.Wait()
-
-	// If any of the tasks returned an error, we should probably report
-	// that back to the caller.
-	for _, task := range tasks {
-		if task.err != nil {
-			response.ErrMsg = task.err.Error()
-			_, rejected := task.err.(*gomatrixserverlib.NotAllowed)
-			response.NotAllowed = rejected
-			return
-		}
-	}
-}

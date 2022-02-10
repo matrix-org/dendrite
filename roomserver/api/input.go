@@ -42,6 +42,19 @@ const (
 	KindOld
 )
 
+func (k Kind) String() string {
+	switch k {
+	case KindOutlier:
+		return "KindOutlier"
+	case KindNew:
+		return "KindNew"
+	case KindOld:
+		return "KindOld"
+	default:
+		return "(unknown)"
+	}
+}
+
 // DoNotSendToOtherServers tells us not to send the event to other matrix
 // servers.
 const DoNotSendToOtherServers = ""
@@ -54,12 +67,8 @@ type InputRoomEvent struct {
 	Kind Kind `json:"kind"`
 	// The event JSON for the event to add.
 	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
-	// List of state event IDs that authenticate this event.
-	// These are likely derived from the "auth_events" JSON key of the event.
-	// But can be different because the "auth_events" key can be incomplete or wrong.
-	// For example many matrix events forget to reference the m.room.create event even though it is needed for auth.
-	// (since synapse allows this to happen we have to allow it as well.)
-	AuthEventIDs []string `json:"auth_event_ids"`
+	// Which server told us about this event.
+	Origin gomatrixserverlib.ServerName `json:"origin"`
 	// Whether the state is supplied as a list of event IDs or whether it
 	// should be derived from the state at the previous events.
 	HasState bool `json:"has_state"`
@@ -86,6 +95,7 @@ type TransactionID struct {
 // InputRoomEventsRequest is a request to InputRoomEvents
 type InputRoomEventsRequest struct {
 	InputRoomEvents []InputRoomEvent `json:"input_room_events"`
+	Asynchronous    bool             `json:"async"`
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents

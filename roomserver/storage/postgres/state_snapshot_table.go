@@ -105,13 +105,14 @@ func (s *stateSnapshotStatements) InsertState(
 }
 
 func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
-	ctx context.Context, stateNIDs []types.StateSnapshotNID,
+	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	nids := make([]int64, len(stateNIDs))
 	for i := range stateNIDs {
 		nids[i] = int64(stateNIDs[i])
 	}
-	rows, err := s.bulkSelectStateBlockNIDsStmt.QueryContext(ctx, pq.Int64Array(nids))
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateBlockNIDsStmt)
+	rows, err := stmt.QueryContext(ctx, pq.Int64Array(nids))
 	if err != nil {
 		return nil, err
 	}

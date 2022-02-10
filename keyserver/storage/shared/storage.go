@@ -135,14 +135,16 @@ func (d *Database) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[st
 	return result, err
 }
 
-func (d *Database) StoreKeyChange(ctx context.Context, partition int32, offset int64, userID string) error {
-	return d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		return d.KeyChangesTable.InsertKeyChange(ctx, partition, offset, userID)
+func (d *Database) StoreKeyChange(ctx context.Context, userID string) (id int64, err error) {
+	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+		id, err = d.KeyChangesTable.InsertKeyChange(ctx, userID)
+		return err
 	})
+	return
 }
 
-func (d *Database) KeyChanges(ctx context.Context, partition int32, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
-	return d.KeyChangesTable.SelectKeyChanges(ctx, partition, fromOffset, toOffset)
+func (d *Database) KeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error) {
+	return d.KeyChangesTable.SelectKeyChanges(ctx, fromOffset, toOffset)
 }
 
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.

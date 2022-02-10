@@ -21,12 +21,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/eduserver/cache"
-	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,10 +39,8 @@ type EDUServerInputAPI struct {
 	OutputSendToDeviceEventTopic string
 	// The kafka topic to output new receipt events to
 	OutputReceiptEventTopic string
-	// The kafka topic to output new key change events to
-	OutputKeyChangeEventTopic string
 	// kafka producer
-	Producer sarama.SyncProducer
+	JetStream nats.JetStreamContext
 	// Internal user query API
 	UserAPI userapi.UserInternalAPI
 	// our server name
@@ -80,36 +77,6 @@ func (t *EDUServerInputAPI) InputSendToDeviceEvent(
 	return t.sendToDeviceEvent(ise)
 }
 
-// InputCrossSigningKeyUpdate implements api.EDUServerInputAPI
-func (t *EDUServerInputAPI) InputCrossSigningKeyUpdate(
-	ctx context.Context,
-	request *api.InputCrossSigningKeyUpdateRequest,
-	response *api.InputCrossSigningKeyUpdateResponse,
-) error {
-	eventJSON, err := json.Marshal(&keyapi.DeviceMessage{
-		Type: keyapi.TypeCrossSigningUpdate,
-		OutputCrossSigningKeyUpdate: &api.OutputCrossSigningKeyUpdate{
-			CrossSigningKeyUpdate: request.CrossSigningKeyUpdate,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"user_id": request.UserID,
-	}).Infof("Producing to topic '%s'", t.OutputKeyChangeEventTopic)
-
-	m := &sarama.ProducerMessage{
-		Topic: string(t.OutputKeyChangeEventTopic),
-		Key:   sarama.StringEncoder(request.UserID),
-		Value: sarama.ByteEncoder(eventJSON),
-	}
-
-	_, _, err = t.Producer.SendMessage(m)
-	return err
-}
-
 func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 	ev := &api.TypingEvent{
 		Type:   gomatrixserverlib.MTyping,
@@ -136,15 +103,13 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 		"room_id": ite.RoomID,
 		"user_id": ite.UserID,
 		"typing":  ite.Typing,
-	}).Infof("Producing to topic '%s'", t.OutputTypingEventTopic)
+	}).Tracef("Producing to topic '%s'", t.OutputTypingEventTopic)
 
-	m := &sarama.ProducerMessage{
-		Topic: string(t.OutputTypingEventTopic),
-		Key:   sarama.StringEncoder(ite.RoomID),
-		Value: sarama.ByteEncoder(eventJSON),
-	}
-
-	_, _, err = t.Producer.SendMessage(m)
+	_, err = t.JetStream.PublishMsg(&nats.Msg{
+		Subject: t.OutputTypingEventTopic,
+		Header:  nats.Header{},
+		Data:    eventJSON,
+	})
 	return err
 }
 
@@ -179,7 +144,7 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 		"user_id":     ise.UserID,
 		"num_devices": len(devices),
 		"type":        ise.Type,
-	}).Infof("Producing to topic '%s'", t.OutputSendToDeviceEventTopic)
+	}).Tracef("Producing to topic '%s'", t.OutputSendToDeviceEventTopic)
 	for _, device := range devices {
 		ote := &api.OutputSendToDeviceEvent{
 			UserID:            ise.UserID,
@@ -193,14 +158,10 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 			return err
 		}
 
-		m := &sarama.ProducerMessage{
-			Topic: string(t.OutputSendToDeviceEventTopic),
-			Key:   sarama.StringEncoder(ote.UserID),
-			Value: sarama.ByteEncoder(eventJSON),
-		}
-
-		_, _, err = t.Producer.SendMessage(m)
-		if err != nil {
+		if _, err = t.JetStream.PublishMsg(&nats.Msg{
+			Subject: t.OutputSendToDeviceEventTopic,
+			Data:    eventJSON,
+		}); err != nil {
 			logrus.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
 			return err
 		}
@@ -216,7 +177,7 @@ func (t *EDUServerInputAPI) InputReceiptEvent(
 	request *api.InputReceiptEventRequest,
 	response *api.InputReceiptEventResponse,
 ) error {
-	logrus.WithFields(logrus.Fields{}).Infof("Producing to topic '%s'", t.OutputReceiptEventTopic)
+	logrus.WithFields(logrus.Fields{}).Tracef("Producing to topic '%s'", t.OutputReceiptEventTopic)
 	output := &api.OutputReceiptEvent{
 		UserID:    request.InputReceiptEvent.UserID,
 		RoomID:    request.InputReceiptEvent.RoomID,
@@ -228,11 +189,10 @@ func (t *EDUServerInputAPI) InputReceiptEvent(
 	if err != nil {
 		return err
 	}
-	m := &sarama.ProducerMessage{
-		Topic: t.OutputReceiptEventTopic,
-		Key:   sarama.StringEncoder(request.InputReceiptEvent.RoomID + ":" + request.InputReceiptEvent.UserID),
-		Value: sarama.ByteEncoder(js),
-	}
-	_, _, err = t.Producer.SendMessage(m)
+
+	_, err = t.JetStream.PublishMsg(&nats.Msg{
+		Subject: t.OutputReceiptEventTopic,
+		Data:    js,
+	})
 	return err
 }

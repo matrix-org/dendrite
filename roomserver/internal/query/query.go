@@ -63,7 +63,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		return nil
 	}
 
-	roomState := state.NewStateResolution(r.DB, *info)
+	roomState := state.NewStateResolution(r.DB, info)
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
@@ -149,7 +149,8 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 	}
 
 	for _, prevEventID := range request.PrevEventIDs {
-		if state, err := r.DB.StateAtEventIDs(ctx, []string{prevEventID}); err != nil || len(state) == 0 {
+		state, err := r.DB.StateAtEventIDs(ctx, []string{prevEventID})
+		if err != nil || len(state) == 0 || (!state[0].IsCreate() && state[0].BeforeStateSnapshotNID == 0) {
 			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
 		}
 	}
@@ -294,7 +295,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 
 		events, err = r.DB.Events(ctx, eventNIDs)
 	} else {
-		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, *info, membershipEventNID)
+		stateEntries, err = helpers.StateBeforeEvent(ctx, r.DB, info, membershipEventNID)
 		if err != nil {
 			logrus.WithField("membership_event_nid", membershipEventNID).WithError(err).Error("failed to load state before event")
 			return err
@@ -377,7 +378,7 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 		return fmt.Errorf("QueryServerAllowedToSeeEvent: no room info for room %s", roomID)
 	}
 	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
-		ctx, r.DB, *info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
+		ctx, r.DB, info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
 	)
 	return
 }
@@ -416,7 +417,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, *info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -457,8 +458,23 @@ func (r *Queryer) QueryStateAndAuthChain(
 	response.RoomExists = true
 	response.RoomVersion = info.RoomVersion
 
+	// handle this entirely separately to the other case so we don't have to pull out
+	// the entire current state of the room
+	// TODO: this probably means it should be a different query operation...
+	if request.OnlyFetchAuthChain {
+		var authEvents []*gomatrixserverlib.Event
+		authEvents, err = GetAuthChain(ctx, r.DB.EventsFromIDs, request.AuthEventIDs)
+		if err != nil {
+			return err
+		}
+		for _, event := range authEvents {
+			response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
+		}
+		return nil
+	}
+
 	var stateEvents []*gomatrixserverlib.Event
-	stateEvents, err = r.loadStateAtEventIDs(ctx, *info, request.PrevEventIDs)
+	stateEvents, err = r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
 	if err != nil {
 		return err
 	}
@@ -497,7 +513,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {

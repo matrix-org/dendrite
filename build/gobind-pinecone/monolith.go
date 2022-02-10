@@ -281,8 +281,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-naffka.db", m.StorageDirectory, prefix))
+	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/%s", m.StorageDirectory, prefix))
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-account.db", m.StorageDirectory, prefix))
 	cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-device.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-mediaapi.db", m.CacheDirectory, prefix))
@@ -310,7 +309,7 @@ func (m *DendriteMonolith) Start() {
 	rsAPI := roomserver.NewInternalAPI(base)
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, true,
+		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
@@ -325,8 +324,7 @@ func (m *DendriteMonolith) Start() {
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsAPI.SetFederationAPI(fsAPI)
-	rsAPI.SetKeyring(keyRing)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

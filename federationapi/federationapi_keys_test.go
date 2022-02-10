@@ -68,13 +68,22 @@ func TestMain(m *testing.M) {
 			panic("can't create cache: " + err.Error())
 		}
 
+		// Create a temporary directory for JetStream.
+		d, err := ioutil.TempDir("./", "jetstream*")
+		if err != nil {
+			panic(err)
+		}
+		defer os.RemoveAll(d)
+
 		// Draw up just enough Dendrite config for the server key
 		// API to work.
 		cfg := &config.Dendrite{}
 		cfg.Defaults(true)
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 		cfg.Global.PrivateKey = testPriv
-		cfg.Global.Kafka.UseNaffka = true
+		cfg.Global.JetStream.InMemory = true
+		cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
+		cfg.Global.JetStream.StoragePath = config.Path(d)
 		cfg.Global.KeyID = serverKeyID
 		cfg.Global.KeyValidityPeriod = s.validity
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
@@ -94,7 +103,7 @@ func TestMain(m *testing.M) {
 
 		// Finally, build the server key APIs.
 		sbase := base.NewBaseDendrite(cfg, "Monolith", base.NoCacheMetrics)
-		s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, true)
+		s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, nil, true)
 	}
 
 	// Now that we have built our server key APIs, start the

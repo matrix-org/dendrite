@@ -18,8 +18,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Shopify/sarama"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	keytypes "github.com/matrix-org/dendrite/keyserver/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -47,8 +47,8 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // be already filled in with join/leave information.
 func DeviceListCatchup(
 	ctx context.Context, keyAPI keyapi.KeyInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
-	userID string, res *types.Response, from, to types.LogPosition,
-) (newPos types.LogPosition, hasNew bool, err error) {
+	userID string, res *types.Response, from, to types.StreamPosition,
+) (newPos types.StreamPosition, hasNew bool, err error) {
 
 	// Track users who we didn't track before but now do by virtue of sharing a room with them, or not.
 	newlyJoinedRooms := joinedRooms(res, userID)
@@ -64,27 +64,18 @@ func DeviceListCatchup(
 	}
 
 	// now also track users who we already share rooms with but who have updated their devices between the two tokens
-
-	var partition int32
-	var offset int64
-	partition = -1
-	offset = sarama.OffsetOldest
-	// Extract partition/offset from sync token
-	// TODO: In a world where keyserver is sharded there will be multiple partitions and hence multiple QueryKeyChanges to make.
-	if !from.IsEmpty() {
-		partition = from.Partition
-		offset = from.Offset
+	offset := keytypes.OffsetOldest
+	toOffset := keytypes.OffsetNewest
+	if to > 0 && to > from {
+		toOffset = int64(to)
 	}
-	var toOffset int64
-	toOffset = sarama.OffsetNewest
-	if toLog := to; toLog.Partition == partition && toLog.Offset > 0 {
-		toOffset = toLog.Offset
+	if from > 0 {
+		offset = int64(from)
 	}
 	var queryRes keyapi.QueryKeyChangesResponse
 	keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
-		Partition: partition,
-		Offset:    offset,
-		ToOffset:  toOffset,
+		Offset:   offset,
+		ToOffset: toOffset,
 	}, &queryRes)
 	if queryRes.Error != nil {
 		// don't fail the catchup because we may have got useful information by tracking membership
@@ -95,8 +86,8 @@ func DeviceListCatchup(
 	var sharedUsersMap map[string]int
 	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, rsAPI, userID, queryRes.UserIDs)
 	util.GetLogger(ctx).Debugf(
-		"QueryKeyChanges request p=%d,off=%d,to=%d response p=%d off=%d uids=%v",
-		partition, offset, toOffset, queryRes.Partition, queryRes.Offset, queryRes.UserIDs,
+		"QueryKeyChanges request off=%d,to=%d response off=%d uids=%v",
+		offset, toOffset, queryRes.Offset, queryRes.UserIDs,
 	)
 	userSet := make(map[string]bool)
 	for _, userID := range res.DeviceLists.Changed {
@@ -125,13 +116,8 @@ func DeviceListCatchup(
 			res.DeviceLists.Left = append(res.DeviceLists.Left, userID)
 		}
 	}
-	// set the new token
-	to = types.LogPosition{
-		Partition: queryRes.Partition,
-		Offset:    queryRes.Offset,
-	}
 
-	return to, hasNew, nil
+	return types.StreamPosition(queryRes.Offset), hasNew, nil
 }
 
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.
@@ -295,6 +281,8 @@ func membershipEvents(res *types.Response) (joinUserIDs, leaveUserIDs []string) 
 		for _, ev := range room.Timeline.Events {
 			if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil {
 				if strings.Contains(string(ev.Content), `"join"`) {
+					joinUserIDs = append(joinUserIDs, *ev.StateKey)
+				} else if strings.Contains(string(ev.Content), `"invite"`) {
 					joinUserIDs = append(joinUserIDs, *ev.StateKey)
 				} else if strings.Contains(string(ev.Content), `"leave"`) {
 					leaveUserIDs = append(leaveUserIDs, *ev.StateKey)

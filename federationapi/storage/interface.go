@@ -19,12 +19,10 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/federationapi/types"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
-	internal.PartitionStorer
 	gomatrixserverlib.KeyDatabase
 
 	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
@@ -32,7 +30,7 @@ type Database interface {
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	// GetJoinedHostsForRooms returns the complete set of servers in the rooms given.
-	GetJoinedHostsForRooms(ctx context.Context, roomIDs []string) ([]gomatrixserverlib.ServerName, error)
+	GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf bool) ([]gomatrixserverlib.ServerName, error)
 	PurgeRoomState(ctx context.Context, roomID string) error
 
 	StoreJSON(ctx context.Context, js string) (*shared.Receipt, error)

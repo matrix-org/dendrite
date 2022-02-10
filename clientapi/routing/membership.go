@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -109,7 +110,9 @@ func sendMembership(ctx context.Context, accountDB accounts.Database, device *us
 		roomserverAPI.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
 		cfg.Matrix.ServerName,
+		cfg.Matrix.ServerName,
 		nil,
+		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
@@ -457,13 +460,7 @@ func SendForget(
 	if membershipRes.IsInRoom {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Forbidden("user is still a member of the room"),
-		}
-	}
-	if !membershipRes.HasBeenInRoom {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Forbidden("user did not belong to room"),
+			JSON: jsonerror.Unknown(fmt.Sprintf("User %s is in room %s", device.UserID, roomID)),
 		}
 	}
 

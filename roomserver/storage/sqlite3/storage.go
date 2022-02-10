@@ -172,23 +172,23 @@ func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
 		return err
 	}
 	d.Database = shared.Database{
-		DB:                         db,
-		Cache:                      cache,
-		Writer:                     sqlutil.NewExclusiveWriter(),
-		EventsTable:                events,
-		EventTypesTable:            eventTypes,
-		EventStateKeysTable:        eventStateKeys,
-		EventJSONTable:             eventJSON,
-		RoomsTable:                 rooms,
-		StateBlockTable:            stateBlock,
-		StateSnapshotTable:         stateSnapshot,
-		PrevEventsTable:            prevEvents,
-		RoomAliasesTable:           roomAliases,
-		InvitesTable:               invites,
-		MembershipTable:            membership,
-		PublishedTable:             published,
-		RedactionsTable:            redactions,
-		GetLatestEventsForUpdateFn: d.GetLatestEventsForUpdate,
+		DB:                  db,
+		Cache:               cache,
+		Writer:              sqlutil.NewExclusiveWriter(),
+		EventsTable:         events,
+		EventTypesTable:     eventTypes,
+		EventStateKeysTable: eventStateKeys,
+		EventJSONTable:      eventJSON,
+		RoomsTable:          rooms,
+		StateBlockTable:     stateBlock,
+		StateSnapshotTable:  stateSnapshot,
+		PrevEventsTable:     prevEvents,
+		RoomAliasesTable:    roomAliases,
+		InvitesTable:        invites,
+		MembershipTable:     membership,
+		PublishedTable:      published,
+		RedactionsTable:     redactions,
+		GetRoomUpdaterFn:    d.GetRoomUpdater,
 	}
 	return nil
 }
@@ -201,16 +201,16 @@ func (d *Database) SupportsConcurrentRoomInputs() bool {
 	return false
 }
 
-func (d *Database) GetLatestEventsForUpdate(
-	ctx context.Context, roomInfo types.RoomInfo,
-) (*shared.LatestEventsUpdater, error) {
+func (d *Database) GetRoomUpdater(
+	ctx context.Context, roomInfo *types.RoomInfo,
+) (*shared.RoomUpdater, error) {
 	// TODO: Do not use transactions. We should be holding open this transaction but we cannot have
 	// multiple write transactions on sqlite. The code will perform additional
 	// write transactions independent of this one which will consistently cause
 	// 'database is locked' errors. As sqlite doesn't support multi-process on the
 	// same DB anyway, and we only execute updates sequentially, the only worries
 	// are for rolling back when things go wrong. (atomicity)
-	return shared.NewLatestEventsUpdater(ctx, &d.Database, nil, roomInfo)
+	return shared.NewRoomUpdater(ctx, &d.Database, nil, roomInfo)
 }
 
 func (d *Database) MembershipUpdater(

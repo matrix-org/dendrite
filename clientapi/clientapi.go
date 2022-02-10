@@ -27,7 +27,7 @@ import (
 	pushserverAPI "github.com/matrix-org/dendrite/pushserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -51,11 +51,11 @@ func AddPublicRoutes(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
-	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
-		Producer: producer,
-		Topic:    cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData),
+		JetStream: js,
+		Topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
 	}
 
 	routing.Setup(

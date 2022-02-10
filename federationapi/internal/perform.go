@@ -196,29 +196,23 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("respMakeJoin.JoinEvent.Build: %w", err)
 	}
 
-	// No longer reuse the request context from this point forward.
-	// We don't want the client timing out to interrupt the join.
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(context.Background())
-
 	// Try to perform a send_join using the newly built event.
 	respSendJoin, err := r.federation.SendJoin(
-		ctx,
+		context.Background(),
 		serverName,
 		event,
-		respMakeJoin.RoomVersion,
 	)
 	if err != nil {
 		r.statistics.ForServer(serverName).Failure()
-		cancel()
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
 	r.statistics.ForServer(serverName).Success()
 
+	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
+
 	// Sanity-check the join response to ensure that it has a create
 	// event, that the room version is known, etc.
-	if err := sanityCheckAuthChain(respSendJoin.AuthEvents); err != nil {
-		cancel()
+	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
 
@@ -227,39 +221,36 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// to complete, but if the client does give up waiting, we'll
 	// still continue to process the join anyway so that we don't
 	// waste the effort.
-	go func() {
-		defer cancel()
+	// TODO: Can we expand Check here to return a list of missing auth
+	// events rather than failing one at a time?
+	var respState *gomatrixserverlib.RespState
+	respState, err = respSendJoin.Check(
+		context.Background(),
+		respMakeJoin.RoomVersion,
+		r.keyRing,
+		event,
+		federatedAuthProvider(ctx, r.federation, r.keyRing, serverName),
+	)
+	if err != nil {
+		return fmt.Errorf("respSendJoin.Check: %w", err)
+	}
 
-		// TODO: Can we expand Check here to return a list of missing auth
-		// events rather than failing one at a time?
-		respState, err := respSendJoin.Check(ctx, r.keyRing, event, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName))
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"room_id": roomID,
-				"user_id": userID,
-			}).WithError(err).Error("Failed to process room join response")
-			return
-		}
+	// If we successfully performed a send_join above then the other
+	// server now thinks we're a part of the room. Send the newly
+	// returned state to the roomserver to update our local view.
+	if err = roomserverAPI.SendEventWithState(
+		context.Background(),
+		r.rsAPI,
+		roomserverAPI.KindNew,
+		respState,
+		event.Headered(respMakeJoin.RoomVersion),
+		serverName,
+		nil,
+		false,
+	); err != nil {
+		return fmt.Errorf("roomserverAPI.SendEventWithState: %w", err)
+	}
 
-		// If we successfully performed a send_join above then the other
-		// server now thinks we're a part of the room. Send the newly
-		// returned state to the roomserver to update our local view.
-		if err = roomserverAPI.SendEventWithState(
-			ctx, r.rsAPI,
-			roomserverAPI.KindNew,
-			respState,
-			event.Headered(respMakeJoin.RoomVersion),
-			nil,
-		); err != nil {
-			logrus.WithFields(logrus.Fields{
-				"room_id": roomID,
-				"user_id": userID,
-			}).WithError(err).Error("Failed to send room join response to roomserver")
-			return
-		}
-	}()
-
-	<-ctx.Done()
 	return nil
 }
 
@@ -403,12 +394,13 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	ctx = context.Background()
 
 	respState := respPeek.ToRespState()
+	authEvents := respState.AuthEvents.UntrustedEvents(respPeek.RoomVersion)
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	if err = sanityCheckAuthChain(respState.AuthEvents); err != nil {
+	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
-	if err = respState.Check(ctx, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName)); err != nil {
+	if err = respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName)); err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
 
@@ -430,7 +422,9 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		roomserverAPI.KindNew,
 		&respState,
 		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
+		serverName,
 		nil,
+		false,
 	); err != nil {
 		return fmt.Errorf("r.producer.SendEventWithState: %w", err)
 	}
@@ -558,10 +552,15 @@ func (r *FederationInternalAPI) PerformInvite(
 
 	inviteRes, err := r.federation.SendInviteV2(ctx, destination, inviteReq)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: %w", err)
+		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
+	logrus.Infof("GOT INVITE RESPONSE %s", string(inviteRes.Event))
 
-	response.Event = inviteRes.Event.Headered(request.RoomVersion)
+	inviteEvent, err := inviteRes.Event.UntrustedEvent(request.RoomVersion)
+	if err != nil {
+		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
+	}
+	response.Event = inviteEvent.Headered(request.RoomVersion)
 	return nil
 }
 

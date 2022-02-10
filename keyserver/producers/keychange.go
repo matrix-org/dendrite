@@ -18,65 +18,59 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
 // KeyChange produces key change events for the sync API and federation sender to consume
 type KeyChange struct {
-	Topic    string
-	Producer sarama.SyncProducer
-	DB       storage.Database
-}
-
-// DefaultPartition returns the default partition this process is sending key changes to.
-// NB: A keyserver MUST send key changes to only 1 partition or else query operations will
-// become inconsistent. Partitions can be sharded (e.g by hash of user ID of key change) but
-// then all keyservers must be queried to calculate the entire set of key changes between
-// two sync tokens.
-func (p *KeyChange) DefaultPartition() int32 {
-	return 0
+	Topic     string
+	JetStream nats.JetStreamContext
+	DB        storage.Database
 }
 
 // ProduceKeyChanges creates new change events for each key
 func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	userToDeviceCount := make(map[string]int)
 	for _, key := range keys {
-		var m sarama.ProducerMessage
-
+		id, err := p.DB.StoreKeyChange(context.Background(), key.UserID)
+		if err != nil {
+			return err
+		}
+		key.DeviceChangeID = id
 		value, err := json.Marshal(key)
 		if err != nil {
 			return err
 		}
 
-		m.Topic = string(p.Topic)
-		m.Key = sarama.StringEncoder(key.UserID)
-		m.Value = sarama.ByteEncoder(value)
+		m := &nats.Msg{
+			Subject: p.Topic,
+			Header:  nats.Header{},
+		}
+		m.Header.Set(jetstream.UserID, key.UserID)
+		m.Data = value
 
-		partition, offset, err := p.Producer.SendMessage(&m)
+		_, err = p.JetStream.PublishMsg(m)
 		if err != nil {
 			return err
 		}
-		err = p.DB.StoreKeyChange(context.Background(), partition, offset, key.UserID)
-		if err != nil {
-			return err
-		}
+
 		userToDeviceCount[key.UserID]++
 	}
 	for userID, count := range userToDeviceCount {
 		logrus.WithFields(logrus.Fields{
 			"user_id":         userID,
 			"num_key_changes": count,
-		}).Infof("Produced to key change topic '%s'", p.Topic)
+		}).Tracef("Produced to key change topic '%s'", p.Topic)
 	}
 	return nil
 }
 
 func (p *KeyChange) ProduceSigningKeyUpdate(key eduapi.CrossSigningKeyUpdate) error {
-	var m sarama.ProducerMessage
 	output := &api.DeviceMessage{
 		Type: api.TypeCrossSigningUpdate,
 		OutputCrossSigningKeyUpdate: &eduapi.OutputCrossSigningKeyUpdate{
@@ -84,26 +78,31 @@ func (p *KeyChange) ProduceSigningKeyUpdate(key eduapi.CrossSigningKeyUpdate) er
 		},
 	}
 
+	id, err := p.DB.StoreKeyChange(context.Background(), key.UserID)
+	if err != nil {
+		return err
+	}
+	output.DeviceChangeID = id
+
 	value, err := json.Marshal(output)
 	if err != nil {
 		return err
 	}
 
-	m.Topic = string(p.Topic)
-	m.Key = sarama.StringEncoder(key.UserID)
-	m.Value = sarama.ByteEncoder(value)
-
-	partition, offset, err := p.Producer.SendMessage(&m)
-	if err != nil {
-		return err
+	m := &nats.Msg{
+		Subject: p.Topic,
+		Header:  nats.Header{},
 	}
-	err = p.DB.StoreKeyChange(context.Background(), partition, offset, key.UserID)
+	m.Header.Set(jetstream.UserID, key.UserID)
+	m.Data = value
+
+	_, err = p.JetStream.PublishMsg(m)
 	if err != nil {
 		return err
 	}
 
 	logrus.WithFields(logrus.Fields{
 		"user_id": key.UserID,
-	}).Infof("Produced to cross-signing update topic '%s'", p.Topic)
+	}).Tracef("Produced to cross-signing update topic '%s'", p.Topic)
 	return nil
 }

@@ -177,6 +177,10 @@ def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
         line = "%s: %s (%d/%d tests)" % (gid_to_name[gid].ljust(25, ' '), pct.rjust(4, ' '), group_passing, group_total)
         subsections.append(line)
         subsection_test_names[line] = test_names_and_marks
+
+    # avoid errors when trying to divide by 0
+    if total_tests == 0:
+        return
     
     pct = "{0:.0f}%".format(total_passing/total_tests * 100)
     print("%s: %s (%d/%d tests)" % (header_name, pct, total_passing, total_tests))

@@ -24,6 +24,8 @@ import (
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
+	LoginTokenInternalAPI
+
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error

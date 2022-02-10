@@ -31,7 +31,7 @@ import (
 // consumers about the invites added or retired by the change in current state.
 func (r *Inputer) updateMemberships(
 	ctx context.Context,
-	updater *shared.LatestEventsUpdater,
+	updater *shared.RoomUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
 	changes := membershipChanges(removed, added)
@@ -48,7 +48,7 @@ func (r *Inputer) updateMemberships(
 	// Load the event JSON so we can look up the "membership" key.
 	// TODO: Maybe add a membership key to the events table so we can load that
 	// key without having to load the entire event JSON?
-	events, err := r.DB.Events(ctx, eventNIDs)
+	events, err := updater.Events(ctx, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (r *Inputer) updateMemberships(
 }
 
 func (r *Inputer) updateMembership(
-	updater *shared.LatestEventsUpdater,
+	updater *shared.RoomUpdater,
 	targetUserNID types.EventStateKeyNID,
 	remove, add *gomatrixserverlib.Event,
 	updates []api.OutputEvent,

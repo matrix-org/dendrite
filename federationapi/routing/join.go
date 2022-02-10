@@ -194,6 +194,12 @@ func SendJoin(
 			JSON: jsonerror.BadJSON("No state key was provided in the join event."),
 		}
 	}
+	if !event.StateKeyEquals(event.Sender()) {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
+		}
+	}
 
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
@@ -318,7 +324,6 @@ func SendJoin(
 				{
 					Kind:          api.KindNew,
 					Event:         event.Headered(stateAndAuthChainResponse.RoomVersion),
-					AuthEventIDs:  event.AuthEventIDs(),
 					SendAsServer:  string(cfg.Matrix.ServerName),
 					TransactionID: nil,
 				},
@@ -346,8 +351,8 @@ func SendJoin(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: gomatrixserverlib.RespSendJoin{
-			StateEvents: gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.StateEvents),
-			AuthEvents:  gomatrixserverlib.UnwrapEventHeaders(stateAndAuthChainResponse.AuthChainEvents),
+			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
+			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
 		},
 	}

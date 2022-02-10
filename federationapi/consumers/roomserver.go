@@ -19,71 +19,70 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/types"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	cfg        *config.FederationAPI
-	rsAPI      api.RoomserverInternalAPI
-	rsConsumer *internal.ContinualConsumer
-	db         storage.Database
-	queues     *queue.OutgoingQueues
+	ctx       context.Context
+	cfg       *config.FederationAPI
+	rsAPI     api.RoomserverInternalAPI
+	jetstream nats.JetStreamContext
+	durable   string
+	db        storage.Database
+	queues    *queue.OutgoingQueues
+	topic     string
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.FederationAPI,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
 	rsAPI api.RoomserverInternalAPI,
 ) *OutputRoomEventConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "federationapi/roomserver",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
+	return &OutputRoomEventConsumer{
+		ctx:       process.Context(),
+		cfg:       cfg,
+		jetstream: js,
+		db:        store,
+		queues:    queues,
+		rsAPI:     rsAPI,
+		durable:   cfg.Matrix.JetStream.Durable("FederationAPIRoomServerConsumer"),
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 	}
-	s := &OutputRoomEventConsumer{
-		cfg:        cfg,
-		rsConsumer: &consumer,
-		db:         store,
-		queues:     queues,
-		rsAPI:      rsAPI,
-	}
-	consumer.ProcessMessage = s.onMessage
-
-	return s
 }
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
-	return s.rsConsumer.Start()
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
 // onMessage is called when the federation server receives a new event from the room server output log.
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	// Parse out the event JSON
 	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return nil
+		return true
 	}
 
 	switch output.Type {
@@ -91,8 +90,9 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		ev := output.NewRoomEvent.Event
 
 		if output.NewRoomEvent.RewritesState {
-			if err := s.db.PurgeRoomState(context.TODO(), ev.RoomID()); err != nil {
-				return fmt.Errorf("s.db.PurgeRoom: %w", err)
+			if err := s.db.PurgeRoomState(s.ctx, ev.RoomID()); err != nil {
+				log.WithError(err).Errorf("roomserver output log: purge room state failure")
+				return false
 			}
 		}
 
@@ -112,24 +112,24 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 					log.ErrorKey: err,
 				}).Panicf("roomserver output log: write room event failure")
 			}
-			return nil
 		}
+
 	case api.OutputTypeNewInboundPeek:
 		if err := s.processInboundPeek(*output.NewInboundPeek); err != nil {
 			log.WithFields(log.Fields{
 				"event":      output.NewInboundPeek,
 				log.ErrorKey: err,
 			}).Panicf("roomserver output log: remote peek event failure")
-			return nil
+			return false
 		}
+
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
 		)
-		return nil
 	}
 
-	return nil
+	return true
 }
 
 // processInboundPeek starts tracking a new federated inbound peek (replacing the existing one if any)
@@ -146,7 +146,7 @@ func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPee
 	//
 	// This is making the tests flakey.
 
-	return s.db.AddInboundPeek(context.TODO(), orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
+	return s.db.AddInboundPeek(s.ctx, orp.ServerName, orp.RoomID, orp.PeekID, orp.RenewalInterval)
 }
 
 // processMessage updates the list of currently joined hosts in the room
@@ -162,7 +162,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	// TODO(#290): handle EventIDMismatchError and recover the current state by
 	// talking to the roomserver
 	oldJoinedHosts, err := s.db.UpdateRoom(
-		context.TODO(),
+		s.ctx,
 		ore.Event.RoomID(),
 		ore.LastSentEventID,
 		ore.Event.EventID(),
@@ -255,7 +255,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	}
 
 	// handle peeking hosts
-	inboundPeeks, err := s.db.GetInboundPeeks(context.TODO(), ore.Event.Event.RoomID())
+	inboundPeeks, err := s.db.GetInboundPeeks(s.ctx, ore.Event.Event.RoomID())
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +373,7 @@ func (s *OutputRoomEventConsumer) lookupStateEvents(
 	// from the roomserver using the query API.
 	eventReq := api.QueryEventsByIDRequest{EventIDs: missing}
 	var eventResp api.QueryEventsByIDResponse
-	if err := s.rsAPI.QueryEventsByID(context.TODO(), &eventReq, &eventResp); err != nil {
+	if err := s.rsAPI.QueryEventsByID(s.ctx, &eventReq, &eventResp); err != nil {
 		return nil, err
 	}
 

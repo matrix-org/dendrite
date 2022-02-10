@@ -242,6 +242,34 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
+		FederationAPILookupMissingEventsPath,
+		httputil.MakeInternalAPI("LookupMissingEvents", func(req *http.Request) util.JSONResponse {
+			var request lookupMissingEvents
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.LookupMissingEvents(req.Context(), request.S, request.RoomID, request.Missing, request.RoomVersion)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			for _, event := range res.Events {
+				js, err := json.Marshal(event)
+				if err != nil {
+					return util.MessageResponse(http.StatusInternalServerError, err.Error())
+				}
+				request.Res.Events = append(request.Res.Events, js)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
 		FederationAPIGetEventPath,
 		httputil.MakeInternalAPI("GetEvent", func(req *http.Request) util.JSONResponse {
 			var request getEvent
@@ -249,6 +277,28 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
 			res, err := intAPI.GetEvent(req.Context(), request.S, request.EventID)
+			if err != nil {
+				ferr, ok := err.(*api.FederationClientError)
+				if ok {
+					request.Err = ferr
+				} else {
+					request.Err = &api.FederationClientError{
+						Err: err.Error(),
+					}
+				}
+			}
+			request.Res = &res
+			return util.JSONResponse{Code: http.StatusOK, JSON: request}
+		}),
+	)
+	internalAPIMux.Handle(
+		FederationAPIGetEventAuthPath,
+		httputil.MakeInternalAPI("GetEventAuth", func(req *http.Request) util.JSONResponse {
+			var request getEventAuth
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			res, err := intAPI.GetEventAuth(req.Context(), request.S, request.RoomVersion, request.RoomID, request.EventID)
 			if err != nil {
 				ferr, ok := err.(*api.FederationClientError)
 				if ok {

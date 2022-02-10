@@ -93,17 +93,13 @@ func main() {
 	}
 
 	fsAPI := federationapi.NewInternalAPI(
-		base, federation, rsAPI, base.Caches, false,
+		base, federation, rsAPI, base.Caches, nil, false,
 	)
 	if base.UseHTTPAPIs {
 		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationAPIHTTPClient()
 	}
 	keyRing := fsAPI.KeyRing()
-
-	// The underlying roomserver implementation needs to be able to call the fedsender.
-	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsImpl.SetFederationAPI(fsAPI)
 
 	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	keyAPI := keyImpl
@@ -136,7 +132,7 @@ func main() {
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
 	// dependency. Other components also need updating after their dependencies are up.
-	rsImpl.SetFederationAPI(fsAPI)
+	rsImpl.SetFederationAPI(fsAPI, keyRing)
 	rsImpl.SetAppserviceAPI(asAPI)
 	keyImpl.SetUserAPI(userAPI)
 

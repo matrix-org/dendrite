@@ -16,7 +16,7 @@ func (f *FederationInternalAPI) QueryJoinedHostServerNamesInRoom(
 	request *api.QueryJoinedHostServerNamesInRoomRequest,
 	response *api.QueryJoinedHostServerNamesInRoomResponse,
 ) (err error) {
-	joinedHosts, err := f.db.GetJoinedHostsForRooms(ctx, []string{request.RoomID})
+	joinedHosts, err := f.db.GetJoinedHostsForRooms(ctx, []string{request.RoomID}, request.ExcludeSelf)
 	if err != nil {
 		return
 	}
@@ -28,7 +28,7 @@ func (f *FederationInternalAPI) QueryJoinedHostServerNamesInRoom(
 func (a *FederationInternalAPI) fetchServerKeysDirectly(ctx context.Context, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
-	ires, err := a.doRequest(serverName, func() (interface{}, error) {
+	ires, err := a.doRequestIfNotBackingOffOrBlacklisted(serverName, func() (interface{}, error) {
 		return a.federation.GetServerKeys(ctx, serverName)
 	})
 	if err != nil {

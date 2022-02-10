@@ -77,15 +77,19 @@ func (r *Backfiller) PerformBackfill(
 	}
 
 	// Scan the event tree for events to send back.
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, *info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
 
-	// Retrieve events from the list that was filled previously.
+	// Retrieve events from the list that was filled previously. If we fail to get
+	// events from the database then attempt once to get them from federation instead.
 	var loadedEvents []*gomatrixserverlib.Event
 	loadedEvents, err = helpers.LoadEvents(ctx, r.DB, resultNIDs)
 	if err != nil {
+		if _, ok := err.(types.MissingEventError); ok {
+			return r.backfillViaFederation(ctx, request, response)
+		}
 		return err
 	}
 
@@ -418,7 +422,7 @@ FindSuccessor:
 		return nil
 	}
 
-	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, *info, NIDs[eventID])
+	stateEntries, err := helpers.StateBeforeEvent(ctx, b.db, info, NIDs[eventID])
 	if err != nil {
 		logrus.WithField("event_id", eventID).WithError(err).Error("ServersAtEvent: failed to load state before event")
 		return nil
@@ -546,6 +550,7 @@ func joinEventsFromHistoryVisibility(
 
 func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (types.RoomNID, map[string]types.Event) {
 	var roomNID types.RoomNID
+	var eventNID types.EventNID
 	backfilledEventMap := make(map[string]types.Event)
 	for j, ev := range events {
 		nidMap, err := db.EventNIDs(ctx, ev.AuthEventIDs())
@@ -559,10 +564,9 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			authNids[i] = nid
 			i++
 		}
-		var stateAtEvent types.StateAtEvent
 		var redactedEventID string
 		var redactionEvent *gomatrixserverlib.Event
-		roomNID, stateAtEvent, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
+		eventNID, roomNID, _, redactionEvent, redactedEventID, err = db.StoreEvent(ctx, ev.Unwrap(), authNids, false)
 		if err != nil {
 			logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to persist event")
 			continue
@@ -581,7 +585,7 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{
-			EventNID: stateAtEvent.StateEntry.EventNID,
+			EventNID: eventNID,
 			Event:    ev.Unwrap(),
 		}
 	}

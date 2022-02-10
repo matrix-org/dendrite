@@ -136,7 +136,7 @@ func (u *MembershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 		}
 
 		// Look up the NID of the new join event
-		nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
+		nIDs, err := u.d.eventNIDs(u.ctx, u.txn, []string{eventID})
 		if err != nil {
 			return fmt.Errorf("u.d.EventNIDs: %w", err)
 		}
@@ -170,7 +170,7 @@ func (u *MembershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 		}
 
 		// Look up the NID of the new leave event
-		nIDs, err := u.d.EventNIDs(u.ctx, []string{eventID})
+		nIDs, err := u.d.eventNIDs(u.ctx, u.txn, []string{eventID})
 		if err != nil {
 			return fmt.Errorf("u.d.EventNIDs: %w", err)
 		}
@@ -196,7 +196,7 @@ func (u *MembershipUpdater) SetToKnock(event *gomatrixserverlib.Event) (bool, er
 		}
 		if u.membership != tables.MembershipStateKnock {
 			// Look up the NID of the new knock event
-			nIDs, err := u.d.EventNIDs(u.ctx, []string{event.EventID()})
+			nIDs, err := u.d.eventNIDs(u.ctx, u.txn, []string{event.EventID()})
 			if err != nil {
 				return fmt.Errorf("u.d.EventNIDs: %w", err)
 			}
