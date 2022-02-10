@@ -18,12 +18,8 @@ import (
 	"context"
 
 	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
-
-<<<<<<< HEAD
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
-=======
->>>>>>> main
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"

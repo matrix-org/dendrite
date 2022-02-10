@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -19,62 +18,66 @@ import (
 	"github.com/matrix-org/dendrite/pushserver/util"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 type OutputRoomEventConsumer struct {
+	ctx          context.Context
 	cfg          *config.PushServer
-	rsAPI        rsapi.RoomserverInternalAPI
 	psAPI        api.PushserverInternalAPI
-	pgClient     pushgateway.Client
-	rsConsumer   *internal.ContinualConsumer
+	rsAPI        rsapi.RoomserverInternalAPI
+	jetstream    nats.JetStreamContext
+	durable      string
 	db           storage.Database
+	queues       *queue.OutgoingQueues
+	topic        string
+	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
 }
 
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.PushServer,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
 	psAPI api.PushserverInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI,
 	syncProducer *producers.SyncAPI,
 ) *OutputRoomEventConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "pushserver/roomserver",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputRoomEvent)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
-	}
-	s := &OutputRoomEventConsumer{
+	return &OutputRoomEventConsumer{
+		ctx:          process.Context(),
 		cfg:          cfg,
-		rsConsumer:   &consumer,
+		jetstream:    js,
 		db:           store,
-		rsAPI:        rsAPI,
-		psAPI:        psAPI,
+		durable:      cfg.Matrix.JetStream.Durable("PushServerClientAPIConsumer"),
+		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
 		pgClient:     pgClient,
+		psAPI:        psAPI,
+		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
 	}
-	consumer.ProcessMessage = s.onMessage
-	return s
 }
 
 func (s *OutputRoomEventConsumer) Start() error {
-	return s.rsConsumer.Start()
+	if err := jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	ctx := context.Background()
-
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	var output rsapi.OutputEvent
-	if err := json.Unmarshal(msg.Value, &output); err != nil {
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		log.WithError(err).Errorf("pushserver consumer: message parse failure")
-		return nil
+		return true
 	}
 
 	log.WithFields(log.Fields{
@@ -104,7 +107,7 @@ func (s *OutputRoomEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
 		// Ignore old events, peeks, so on.
 	}
 
-	return nil
+	return true
 }
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {

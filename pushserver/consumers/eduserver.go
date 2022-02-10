@@ -3,75 +3,75 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/Shopify/sarama"
 	eduapi "github.com/matrix-org/dendrite/eduserver/api"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/pushserver/producers"
 	"github.com/matrix-org/dendrite/pushserver/storage"
 	"github.com/matrix-org/dendrite/pushserver/util"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 type OutputReceiptEventConsumer struct {
+	ctx          context.Context
 	cfg          *config.PushServer
-	rsConsumer   *internal.ContinualConsumer
+	jetstream    nats.JetStreamContext
+	durable      string
 	db           storage.Database
 	pgClient     pushgateway.Client
+	receiptTopic string
 	syncProducer *producers.SyncAPI
 }
 
+// NewOutputReceiptEventConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
 func NewOutputReceiptEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.PushServer,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
 	syncProducer *producers.SyncAPI,
 ) *OutputReceiptEventConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "pushserver/eduserver",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputReceiptEvent)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
-	}
-	s := &OutputReceiptEventConsumer{
+	return &OutputReceiptEventConsumer{
+		ctx:          process.Context(),
 		cfg:          cfg,
-		rsConsumer:   &consumer,
+		jetstream:    js,
 		db:           store,
+		durable:      cfg.Matrix.JetStream.Durable("PushServerEDUServerConsumer"),
+		receiptTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		pgClient:     pgClient,
 		syncProducer: syncProducer,
 	}
-	consumer.ProcessMessage = s.onMessage
-	return s
 }
 
 func (s *OutputReceiptEventConsumer) Start() error {
-	return s.rsConsumer.Start()
+	if err := jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.receiptTopic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	ctx := context.Background()
-
+func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	var event eduapi.OutputReceiptEvent
-	if err := json.Unmarshal(msg.Value, &event); err != nil {
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
 		log.WithError(err).Errorf("pushserver EDU consumer: message parse failure")
-		return nil
+		return true
 	}
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', event.UserID)
 	if err != nil {
-		return err
+		return true
 	}
-
 	if domain != s.cfg.Matrix.ServerName {
-		return fmt.Errorf("pushserver EDU consumer: not a local user: %v", event.UserID)
+		return true
 	}
 
 	log.WithFields(log.Fields{
@@ -91,7 +91,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 			"room_id":   event.RoomID,
 			"event_id":  event.EventID,
 		}).WithError(err).Error("pushserver EDU consumer")
-		return nil
+		return false
 	}
 
 	if updated {
@@ -101,7 +101,7 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 				"room_id":   event.RoomID,
 				"event_id":  event.EventID,
 			}).WithError(err).Error("pushserver EDU consumer: GetAndSendNotificationData failed")
-			return nil
+			return false
 		}
 
 		if err := util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
@@ -110,10 +110,10 @@ func (s *OutputReceiptEventConsumer) onMessage(msg *sarama.ConsumerMessage) erro
 				"room_id":   event.RoomID,
 				"event_id":  event.EventID,
 			}).WithError(err).Error("pushserver EDU consumer: NotifyUserCounts failed")
-			return nil
+			return false
 		}
 
 	}
 
-	return nil
+	return true
 }

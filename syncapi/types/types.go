@@ -95,13 +95,14 @@ const (
 )
 
 type StreamingToken struct {
-	PDUPosition          StreamPosition
-	TypingPosition       StreamPosition
-	ReceiptPosition      StreamPosition
-	SendToDevicePosition StreamPosition
-	InvitePosition       StreamPosition
-	AccountDataPosition  StreamPosition
-	DeviceListPosition   StreamPosition
+	PDUPosition              StreamPosition
+	TypingPosition           StreamPosition
+	ReceiptPosition          StreamPosition
+	SendToDevicePosition     StreamPosition
+	InvitePosition           StreamPosition
+	AccountDataPosition      StreamPosition
+	DeviceListPosition       StreamPosition
+	NotificationDataPosition StreamPosition
 }
 
 // This will be used as a fallback by json.Marshal.
@@ -117,10 +118,11 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
-		t.InvitePosition, t.AccountDataPosition, t.DeviceListPosition,
+		t.InvitePosition, t.AccountDataPosition,
+		t.DeviceListPosition, t.NotificationDataPosition,
 	)
 	return posStr
 }
@@ -142,12 +144,14 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.DeviceListPosition > other.DeviceListPosition:
 		return true
+	case t.NotificationDataPosition > other.NotificationDataPosition:
+		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition == 0
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition == 0
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -184,6 +188,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.DeviceListPosition > t.DeviceListPosition {
 		t.DeviceListPosition = other.DeviceListPosition
+	}
+	if other.NotificationDataPosition > t.NotificationDataPosition {
+		t.NotificationDataPosition = other.NotificationDataPosition
 	}
 }
 

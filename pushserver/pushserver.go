@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/pushserver/storage"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/kafka"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
@@ -32,23 +32,21 @@ func NewInternalAPI(
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	userAPI uapi.UserInternalAPI,
 ) api.PushserverInternalAPI {
-	consumer, _ := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
-
 	db, err := storage.Open(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to push server db")
 	}
 
-	_, producer := kafka.SetupConsumerProducer(&cfg.Matrix.Kafka)
+	js := jetstream.Prepare(&cfg.Matrix.JetStream)
+
 	syncProducer := producers.NewSyncAPI(
-		db,
-		producer,
+		db, js,
 		// TODO: user API should handle syncs for account data. Right now,
 		// it's handled by clientapi, and hence uses its topic. When user
 		// API handles it for all account data, we can remove it from
 		// here.
-		cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData),
-		cfg.Matrix.Kafka.TopicFor(config.TopicOutputNotificationData),
+		cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		cfg.Matrix.JetStream.TopicFor(jetstream.OutputNotificationData),
 	)
 
 	psAPI := internal.NewPushserverAPI(
@@ -56,21 +54,21 @@ func NewInternalAPI(
 	)
 
 	caConsumer := consumers.NewOutputClientDataConsumer(
-		process, cfg, consumer, db, pgClient, userAPI, syncProducer,
+		process, cfg, js, db, pgClient, userAPI, syncProducer,
 	)
 	if err := caConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start push server clientapi consumer")
 	}
 
 	eduConsumer := consumers.NewOutputReceiptEventConsumer(
-		process, cfg, consumer, db, pgClient, syncProducer,
+		process, cfg, js, db, pgClient, syncProducer,
 	)
 	if err := eduConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start push server EDU consumer")
 	}
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		process, cfg, consumer, db, pgClient, psAPI, rsAPI, syncProducer,
+		process, cfg, js, db, pgClient, psAPI, rsAPI, syncProducer,
 	)
 	if err := rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start push server room server consumer")

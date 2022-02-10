@@ -12,24 +12,14 @@ import (
 )
 
 type Streams struct {
-<<<<<<< HEAD
 	PDUStreamProvider              types.StreamProvider
 	TypingStreamProvider           types.StreamProvider
 	ReceiptStreamProvider          types.StreamProvider
 	InviteStreamProvider           types.StreamProvider
 	SendToDeviceStreamProvider     types.StreamProvider
 	AccountDataStreamProvider      types.StreamProvider
+	DeviceListStreamProvider       types.StreamProvider
 	NotificationDataStreamProvider types.StreamProvider
-	DeviceListStreamProvider       types.PartitionedStreamProvider
-=======
-	PDUStreamProvider          types.StreamProvider
-	TypingStreamProvider       types.StreamProvider
-	ReceiptStreamProvider      types.StreamProvider
-	InviteStreamProvider       types.StreamProvider
-	SendToDeviceStreamProvider types.StreamProvider
-	AccountDataStreamProvider  types.StreamProvider
-	DeviceListStreamProvider   types.StreamProvider
->>>>>>> main
 }
 
 func NewSyncStreamProviders(

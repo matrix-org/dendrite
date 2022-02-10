@@ -11,21 +11,21 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/Shopify/sarama v1.31.1
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/getsentry/sentry-go v0.12.0
 	github.com/gologme/log v1.3.0
+	github.com/google/go-cmp v0.5.6
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/testing v0.0.0-20211215003918-77eb13d6cad2 // indirect
-	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -44,6 +44,7 @@ require (
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20220209202448-9805ef634335
 	github.com/matrix-org/pinecone v0.0.0-20220121094951-351265543ddf
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
+	github.com/matryer/is v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nats-io/nats-server/v2 v2.3.2

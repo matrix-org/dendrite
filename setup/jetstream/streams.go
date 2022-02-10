@@ -18,6 +18,7 @@ var (
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
 	OutputTypingEvent       = "OutputTypingEvent"
 	OutputClientData        = "OutputClientData"
+	OutputNotificationData  = "OutputNotificationData"
 	OutputReceiptEvent      = "OutputReceiptEvent"
 )
 
@@ -55,6 +56,11 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      OutputReceiptEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      OutputNotificationData,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

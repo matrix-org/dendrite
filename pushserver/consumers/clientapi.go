@@ -4,25 +4,29 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/Shopify/sarama"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/pushserver/producers"
 	"github.com/matrix-org/dendrite/pushserver/storage"
 	"github.com/matrix-org/dendrite/pushserver/util"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 type OutputClientDataConsumer struct {
+	ctx          context.Context
 	cfg          *config.PushServer
-	rsConsumer   *internal.ContinualConsumer
+	jetstream    nats.JetStreamContext
+	durable      string
 	db           storage.Database
 	pgClient     pushgateway.Client
+	ServerName   gomatrixserverlib.ServerName
+	topic        string
 	userAPI      uapi.UserInternalAPI
 	syncProducer *producers.SyncAPI
 }
@@ -30,49 +34,48 @@ type OutputClientDataConsumer struct {
 func NewOutputClientDataConsumer(
 	process *process.ProcessContext,
 	cfg *config.PushServer,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
 	userAPI uapi.UserInternalAPI,
 	syncProducer *producers.SyncAPI,
 ) *OutputClientDataConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "pushserver/clientapi",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputClientData)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
-	}
-	s := &OutputClientDataConsumer{
+	return &OutputClientDataConsumer{
+		ctx:          process.Context(),
 		cfg:          cfg,
-		rsConsumer:   &consumer,
+		jetstream:    js,
 		db:           store,
+		ServerName:   cfg.Matrix.ServerName,
+		durable:      cfg.Matrix.JetStream.Durable("PushServerClientAPIConsumer"),
+		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
 		pgClient:     pgClient,
 		userAPI:      userAPI,
 		syncProducer: syncProducer,
 	}
-	consumer.ProcessMessage = s.onMessage
-	return s
 }
 
 func (s *OutputClientDataConsumer) Start() error {
-	return s.rsConsumer.Start()
+	if err := jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	ctx := context.Background()
-
+func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	var event eventutil.AccountData
-	if err := json.Unmarshal(msg.Value, &event); err != nil {
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
 		log.WithError(err).Error("pushserver clientapi consumer: message parse failure")
-		return nil
+		return true
 	}
 
 	if event.Type != mFullyRead {
-		return nil
+		return true
 	}
 
-	userID := string(msg.Key)
+	userID := string(msg.Header.Get("user_id"))
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -80,16 +83,16 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 			"room_id":    event.RoomID,
 			"event_type": event.Type,
 		}).WithError(err).Error("pushserver clientapi consumer: SplitID failure")
-		return nil
+		return true
 	}
 
-	if domain != s.cfg.Matrix.ServerName {
+	if domain != s.ServerName {
 		log.WithFields(log.Fields{
 			"user_id":    userID,
 			"room_id":    event.RoomID,
 			"event_type": event.Type,
 		}).Error("pushserver clientapi consumer: not a local user")
-		return nil
+		return true
 	}
 
 	log.WithFields(log.Fields{
@@ -110,7 +113,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 			"room_id":    event.RoomID,
 			"event_type": event.Type,
 		}).WithError(err).Error("pushserver clientapi consumer: failed to query account data")
-		return nil
+		return false
 	}
 	ad, ok := userRes.RoomAccountData[event.RoomID]
 	if !ok {
@@ -118,7 +121,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 			"localpart": localpart,
 			"room_id":   event.RoomID,
 		}).Errorf("pushserver clientapi consumer: room not found in account data response: %#v", userRes.RoomAccountData)
-		return nil
+		return true
 	}
 	bs, ok := ad[mFullyRead]
 	if !ok {
@@ -126,7 +129,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 			"localpart": localpart,
 			"room_id":   event.RoomID,
 		}).Errorf("pushserver clientapi consumer: m.fully_read not found in account data: %#v", ad)
-		return nil
+		return true
 	}
 	var data fullyReadAccountData
 	if err = json.Unmarshal([]byte(bs), &data); err != nil {
@@ -134,7 +137,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 			"localpart": localpart,
 			"room_id":   event.RoomID,
 		}).WithError(err).Error("pushserver clientapi consumer: json.Unmarshal of m.fully_read failed")
-		return nil
+		return true
 	}
 
 	// TODO: we cannot know if this EventID caused a notification, so
@@ -147,7 +150,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 			"room_id":   event.RoomID,
 			"event_id":  data.EventID,
 		}).WithError(err).Errorf("pushserver clientapi consumer: DeleteNotificationsUpTo failed")
-		return nil
+		return false
 	}
 
 	if deleted {
@@ -157,7 +160,7 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 				"room_id":   event.RoomID,
 				"event_id":  data.EventID,
 			}).WithError(err).Error("pushserver clientapi consumer: NotifyUserCounts failed")
-			return nil
+			return false
 		}
 
 		if err := s.syncProducer.GetAndSendNotificationData(ctx, userID, event.RoomID); err != nil {
@@ -166,11 +169,11 @@ func (s *OutputClientDataConsumer) onMessage(msg *sarama.ConsumerMessage) error 
 				"room_id":   event.RoomID,
 				"event_id":  data.EventID,
 			}).WithError(err).Errorf("pushserver clientapi consumer: GetAndSendNotificationData failed")
-			return nil
+			return false
 		}
 	}
 
-	return nil
+	return true
 }
 
 // mFullyRead is the account data type for the marker for the event up

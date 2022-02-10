@@ -7,22 +7,28 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/pushserver/storage"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
+
+type JetStreamPublisher interface {
+	PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error)
+}
 
 // SyncAPI produces messages for the Sync API server to consume.
 type SyncAPI struct {
 	db                    storage.Database
-	producer              MessageSender
+	producer              JetStreamPublisher
 	clientDataTopic       string
 	notificationDataTopic string
 }
 
-func NewSyncAPI(db storage.Database, producer MessageSender, clientDataTopic string, notificationDataTopic string) *SyncAPI {
+func NewSyncAPI(db storage.Database, js JetStreamPublisher, clientDataTopic string, notificationDataTopic string) *SyncAPI {
 	return &SyncAPI{
 		db:                    db,
-		producer:              producer,
+		producer:              js,
 		clientDataTopic:       clientDataTopic,
 		notificationDataTopic: notificationDataTopic,
 	}
@@ -30,27 +36,29 @@ func NewSyncAPI(db storage.Database, producer MessageSender, clientDataTopic str
 
 // SendAccountData sends account data to the Sync API server.
 func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string) error {
-	var m sarama.ProducerMessage
+	m := &nats.Msg{
+		Subject: p.clientDataTopic,
+		Header:  nats.Header{},
+	}
+	m.Header.Set(jetstream.UserID, userID)
 
 	data := eventutil.AccountData{
 		RoomID: roomID,
 		Type:   dataType,
 	}
-	value, err := json.Marshal(data)
+	var err error
+	m.Data, err = json.Marshal(data)
 	if err != nil {
 		return err
 	}
 
-	m.Topic = string(p.clientDataTopic)
-	m.Key = sarama.StringEncoder(userID)
-	m.Value = sarama.ByteEncoder(value)
 	log.WithFields(log.Fields{
 		"user_id":   userID,
 		"room_id":   roomID,
 		"data_type": dataType,
-	}).Infof("Producing to topic %q", m.Topic)
+	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
-	_, _, err = p.producer.SendMessage(&m)
+	_, err = p.producer.PublishMsg(m)
 	return err
 }
 
@@ -76,21 +84,24 @@ func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID
 
 // sendNotificationData sends data about unread notifications to the Sync API server.
 func (p *SyncAPI) sendNotificationData(userID string, data *eventutil.NotificationData) error {
-	value, err := json.Marshal(data)
+	m := &nats.Msg{
+		Subject: p.notificationDataTopic,
+		Header:  nats.Header{},
+	}
+	m.Header.Set(jetstream.UserID, userID)
+
+	var err error
+	m.Data, err = json.Marshal(data)
 	if err != nil {
 		return err
 	}
 
-	var m sarama.ProducerMessage
-	m.Topic = string(p.notificationDataTopic)
-	m.Key = sarama.StringEncoder(userID)
-	m.Value = sarama.ByteEncoder(value)
 	log.WithFields(log.Fields{
 		"user_id": userID,
 		"room_id": data.RoomID,
-	}).Infof("Producing to topic %q", m.Topic)
+	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
-	_, _, err = p.producer.SendMessage(&m)
+	_, err = p.producer.PublishMsg(m)
 	return err
 }
 

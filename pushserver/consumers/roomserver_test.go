@@ -6,7 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Shopify/sarama"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
@@ -17,6 +16,7 @@ import (
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 )
 
 const serverName = gomatrixserverlib.ServerName("example.org")
@@ -124,11 +124,13 @@ func TestOutputRoomEventConsumer(t *testing.T) {
 	}}, pgClient.Reqs); diff != "" {
 		t.Errorf("pgClient.NotifyHTTP Reqs: +got -want:\n%s", diff)
 	}
-	if diff := cmp.Diff([]sarama.ProducerMessage{{
-		Topic: "notificationDataTopic",
-		Key:   sarama.StringEncoder("@alice:example.org"),
-		Value: sarama.ByteEncoder([]byte(`{"room_id":"!jEsUZKDJdhlrceRyVU:example.org","unread_highlight_count":0,"unread_notification_count":1}`)),
-	}}, messageSender.Messages, cmpopts.IgnoreUnexported(sarama.ProducerMessage{})); diff != "" {
+	msg := &nats.Msg{
+		Subject: "notificationDataTopic",
+		Header:  nats.Header{},
+		Data:    []byte(`{"room_id":"!jEsUZKDJdhlrceRyVU:example.org","unread_highlight_count":0,"unread_notification_count":1}`),
+	}
+	msg.Header.Set("user_id", "@alice:example.org")
+	if diff := cmp.Diff([]*nats.Msg{msg}, messageSender.Messages, cmpopts.IgnoreUnexported(nats.Msg{})); diff != "" {
 		t.Errorf("SendMessage Messages: +got -want:\n%s", diff)
 	}
 }
@@ -243,10 +245,10 @@ func mustParseHeaderedEventJSON(s string) *gomatrixserverlib.HeaderedEvent {
 }
 
 type fakeMessageSender struct {
-	Messages []sarama.ProducerMessage
+	Messages []*nats.Msg
 }
 
-func (s *fakeMessageSender) SendMessage(msg *sarama.ProducerMessage) (partition int32, offset int64, err error) {
-	s.Messages = append(s.Messages, *msg)
-	return 0, 0, nil
+func (s *fakeMessageSender) PublishMsg(msg *nats.Msg, opts ...nats.PubOpt) (*nats.PubAck, error) {
+	s.Messages = append(s.Messages, msg)
+	return nil, nil
 }

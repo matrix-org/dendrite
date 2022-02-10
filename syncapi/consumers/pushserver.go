@@ -18,25 +18,28 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/Shopify/sarama"
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
 // OutputNotificationDataConsumer consumes events that originated in
 // the Push server.
 type OutputNotificationDataConsumer struct {
-	consumer *internal.ContinualConsumer
-	db       storage.Database
-	stream   types.StreamProvider
-	notifier *notifier.Notifier
+	ctx       context.Context
+	jetstream nats.JetStreamContext
+	durable   string
+	topic     string
+	db        storage.Database
+	notifier  *notifier.Notifier
+	stream    types.StreamProvider
 }
 
 // NewOutputNotificationDataConsumer creates a new consumer. Call
@@ -44,49 +47,44 @@ type OutputNotificationDataConsumer struct {
 func NewOutputNotificationDataConsumer(
 	process *process.ProcessContext,
 	cfg *config.SyncAPI,
-	kafkaConsumer sarama.Consumer,
+	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 ) *OutputNotificationDataConsumer {
-	consumer := internal.ContinualConsumer{
-		Process:        process,
-		ComponentName:  "syncapi/pushserver",
-		Topic:          string(cfg.Matrix.Kafka.TopicFor(config.TopicOutputNotificationData)),
-		Consumer:       kafkaConsumer,
-		PartitionStore: store,
-	}
 	s := &OutputNotificationDataConsumer{
-		consumer: &consumer,
-		db:       store,
-		notifier: notifier,
-		stream:   stream,
+		ctx:       process.Context(),
+		jetstream: js,
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPINotificationDataConsumer"),
+		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputNotificationData),
+		db:        store,
+		notifier:  notifier,
+		stream:    stream,
 	}
-	consumer.ProcessMessage = s.onMessage
-
 	return s
 }
 
 // Start starts consumption.
 func (s *OutputNotificationDataConsumer) Start() error {
-	return s.consumer.Start()
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
 // onMessage is called when the Sync server receives a new event from
 // the push server. It is not safe for this function to be called from
 // multiple goroutines, or else the sync stream position may race and
 // be incorrectly calculated.
-func (s *OutputNotificationDataConsumer) onMessage(msg *sarama.ConsumerMessage) error {
-	ctx := context.Background()
-
-	userID := string(msg.Key)
+func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	userID := string(msg.Header.Get(jetstream.UserID))
 
 	// Parse out the event JSON
 	var data eventutil.NotificationData
-	if err := json.Unmarshal(msg.Value, &data); err != nil {
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		sentry.CaptureException(err)
 		log.WithField("user_id", userID).WithError(err).Error("push server consumer: message parse failure")
-		return nil
+		return true
 	}
 
 	streamPos, err := s.db.UpsertRoomUnreadNotificationCounts(ctx, userID, data.RoomID, data.UnreadNotificationCount, data.UnreadHighlightCount)
@@ -107,5 +105,5 @@ func (s *OutputNotificationDataConsumer) onMessage(msg *sarama.ConsumerMessage) 
 		"streamPos": streamPos,
 	}).Info("Received data from Push server")
 
-	return nil
+	return true
 }

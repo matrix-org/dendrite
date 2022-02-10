@@ -3,13 +3,11 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/pushserver/api"
 	"github.com/matrix-org/dendrite/pushserver/storage/tables"
 )
 
 type Database interface {
-	internal.PartitionStorer
 	UpsertPusher(ctx context.Context, pusher api.Pusher, localpart string) error
 	GetPushers(ctx context.Context, localpart string) ([]api.Pusher, error)
 	RemovePusher(ctx context.Context, appId, pushkey, localpart string) error
