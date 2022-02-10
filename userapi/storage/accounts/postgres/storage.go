@@ -161,7 +161,7 @@ func (d *Database) SetPassword(
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, sqlutil.ErrUserExists.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart string, plaintextPassword string, appserviceID string, accountType api.AccountType,
+	ctx context.Context, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (acc *api.Account, err error) {
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		// For guest accounts, we create a new numeric local part

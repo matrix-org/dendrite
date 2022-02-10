@@ -176,7 +176,7 @@ func (d *Database) SetPassword(
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, ErrUserExists.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart string, plaintextPassword string, appserviceID string, accountType api.AccountType,
+	ctx context.Context, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (acc *api.Account, err error) {
 	// Create one account at a time else we can get 'database is locked'.
 	d.profilesMu.Lock()
