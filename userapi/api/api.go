@@ -18,8 +18,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // UserInternalAPI is the internal API for information about users and devices.
@@ -415,4 +416,8 @@ const (
 	AccountTypeUser AccountType = 1
 	// AccountTypeGuest indicates this is a guest account
 	AccountTypeGuest AccountType = 2
+	// AccountTypeAdmin indicates this is an admin account
+	AccountTypeAdmin AccountType = 3
+	// AccountTypeAppService indicates this is an appservice account
+	AccountTypeAppService AccountType = 4
 )

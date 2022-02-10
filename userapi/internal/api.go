@@ -21,6 +21,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -29,9 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 type UserInternalAPI struct {
@@ -58,16 +59,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
-	if req.AccountType == api.AccountTypeGuest {
-		acc, err := a.AccountDB.CreateGuestAccount(ctx)
-		if err != nil {
-			return err
-		}
-		res.AccountCreated = true
-		res.Account = acc
-		return nil
-	}
-	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID)
+	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
 			switch req.OnConflict {
@@ -87,6 +79,12 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			ServerName:   a.ServerName,
 			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
 		}
+		return nil
+	}
+
+	if req.AccountType == api.AccountTypeGuest {
+		res.AccountCreated = true
+		res.Account = acc
 		return nil
 	}
 
