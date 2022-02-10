@@ -284,7 +284,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	// s478_0_0_0_0_13.dl-0-2 but we have now removed partitioned stream positions
 	tok = strings.Split(tok, ".")[0]
 	parts := strings.Split(tok[1:], "_")
-	var positions [7]StreamPosition
+	var positions [8]StreamPosition
 	for i, p := range parts {
 		if i > len(positions) {
 			break
@@ -298,13 +298,14 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		positions[i] = StreamPosition(pos)
 	}
 	token = StreamingToken{
-		PDUPosition:          positions[0],
-		TypingPosition:       positions[1],
-		ReceiptPosition:      positions[2],
-		SendToDevicePosition: positions[3],
-		InvitePosition:       positions[4],
-		AccountDataPosition:  positions[5],
-		DeviceListPosition:   positions[6],
+		PDUPosition:              positions[0],
+		TypingPosition:           positions[1],
+		ReceiptPosition:          positions[2],
+		SendToDevicePosition:     positions[3],
+		InvitePosition:           positions[4],
+		AccountDataPosition:      positions[5],
+		DeviceListPosition:       positions[6],
+		NotificationDataPosition: positions[7],
 	}
 	return token, nil
 }
