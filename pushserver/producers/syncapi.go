@@ -41,12 +41,11 @@ func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string)
 	}
 	m.Header.Set(jetstream.UserID, userID)
 
-	data := eventutil.AccountData{
+	var err error
+	m.Data, err = json.Marshal(eventutil.AccountData{
 		RoomID: roomID,
 		Type:   dataType,
-	}
-	var err error
-	m.Data, err = json.Marshal(data)
+	})
 	if err != nil {
 		return err
 	}

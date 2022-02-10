@@ -93,7 +93,8 @@ func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msg *nat
 		log.WithFields(log.Fields{
 			"user_id": userID,
 			"room_id": data.RoomID,
-		}).WithError(err).Panic("Could not save notification counts")
+		}).WithError(err).Error("Could not save notification counts")
+		return false
 	}
 
 	s.stream.Advance(streamPos)
