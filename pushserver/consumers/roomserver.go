@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -33,7 +32,6 @@ type OutputRoomEventConsumer struct {
 	jetstream    nats.JetStreamContext
 	durable      string
 	db           storage.Database
-	queues       *queue.OutgoingQueues
 	topic        string
 	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
@@ -55,7 +53,7 @@ func NewOutputRoomEventConsumer(
 		jetstream:    js,
 		db:           store,
 		durable:      cfg.Matrix.JetStream.Durable("PushServerClientAPIConsumer"),
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		pgClient:     pgClient,
 		psAPI:        psAPI,
 		rsAPI:        rsAPI,
