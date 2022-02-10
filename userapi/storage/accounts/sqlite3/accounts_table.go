@@ -148,10 +148,9 @@ func (s *accountsStatements) selectAccountByLocalpart(
 ) (*api.Account, error) {
 	var appserviceIDPtr sql.NullString
 	var acc api.Account
-	var accType api.AccountType
 
 	stmt := s.selectAccountByLocalpartStmt
-	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr, &accType)
+	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.WithError(err).Error("Unable to retrieve user from the db")
@@ -164,7 +163,6 @@ func (s *accountsStatements) selectAccountByLocalpart(
 
 	acc.UserID = userutil.MakeUserID(localpart, s.serverName)
 	acc.ServerName = s.serverName
-	acc.AccountType = accType
 
 	return &acc, nil
 }

@@ -78,6 +78,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			Localpart:    req.Localpart,
 			ServerName:   a.ServerName,
 			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+			AccountType:  req.AccountType,
 		}
 		return nil
 	}
