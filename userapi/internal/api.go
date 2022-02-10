@@ -373,6 +373,15 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 		}
 		return err
 	}
+	localPart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return err
+	}
+	acc, err := a.AccountDB.GetAccountByLocalpart(ctx, localPart)
+	if err != nil {
+		return err
+	}
+	device.AccountType = acc.AccountType
 	res.Device = device
 	return nil
 }
@@ -399,6 +408,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		// AS dummy device has AS's token.
 		AccessToken:  token,
 		AppserviceID: appService.ID,
+		AccountType:  api.AccountTypeAppService,
 	}
 
 	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
