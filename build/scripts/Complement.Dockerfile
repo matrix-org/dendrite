@@ -2,6 +2,10 @@ FROM golang:1.16-stretch as build
 RUN apt-get update && apt-get install -y sqlite3
 WORKDIR /build
 
+# we will dump the binaries and config file to this location to ensure any local untracked files
+# that come from the COPY . . file don't contaminate the build
+RUN mkdir /dendrite
+
 # Utilise Docker caching when downloading dependencies, this stops us needlessly
 # downloading dependencies every time.
 COPY go.mod .
@@ -9,9 +13,11 @@ COPY go.sum .
 RUN go mod download
 
 COPY . .
-RUN go build ./cmd/dendrite-monolith-server
-RUN go build ./cmd/generate-keys
-RUN go build ./cmd/generate-config
+RUN go build -o /dendrite ./cmd/dendrite-monolith-server
+RUN go build -o /dendrite ./cmd/generate-keys
+RUN go build -o /dendrite ./cmd/generate-config
+
+WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost
