@@ -1,5 +1,24 @@
 # Changelog
 
+## Dendrite 0.6.3 (2022-02-10)
+
+### Features
+
+* Initial support for `m.login.token`
+* A number of regressions from earlier v0.6.x versions should now be corrected
+
+### Fixes
+
+* Missing state is now correctly retrieved in cases where a gap in the timeline was closed but some of those events were missing state snapshots, which should help to unstick slow or broken rooms
+* Fixed a transaction issue where inserting events into the database could deadlock, which should stop rooms from getting stuck
+* Fixed a problem where rejected events could result in rolled back database transactions
+* Avoided a potential race condition on fetching latest events by using the room updater instead
+* Processing events from `/get_missing_events` will no longer result in potential recursion
+* Federation events are now correctly generated for updated self-signing keys and signed devices
+* Rejected events can now be un-rejected if they are reprocessed and all of the correct conditions are met
+* Fetching missing auth events will no longer error as long as all needed events for auth were satisfied
+* Users can now correctly forget rooms if they were not a member of the room
+
 ## Dendrite 0.6.2 (2022-02-04)
 
 ### Fixes
