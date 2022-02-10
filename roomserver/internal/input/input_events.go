@@ -255,13 +255,32 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 			}
-			if err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			if stateSnapshot, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+				// Something went wrong with retrieving the missing state, so we can't
+				// really do anything with the event other than reject it at this point.
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+			} else if stateSnapshot != nil {
+				// We retrieved some state and we ended up having to call /state_ids for
+				// the new event in question (probably because closing the gap by using
+				// /get_missing_events didn't do what we hoped) so we'll instead overwrite
+				// the state snapshot with the newly resolved state.
+				missingPrev = false
+				input.HasState = true
+				input.StateEventIDs = make([]string, 0, len(stateSnapshot.StateEvents))
+				for _, e := range stateSnapshot.StateEvents {
+					input.StateEventIDs = append(input.StateEventIDs, e.EventID())
+				}
 			} else {
+				// We retrieved some state and it would appear that rolling forward the
+				// state did everything we needed it to do, so we can just resolve the
+				// state for the event in the normal way.
 				missingPrev = false
 			}
 		} else {
+			// We're missing prev events or state for the event, but for some reason
+			// we don't know any servers to ask. In this case we can't do anything but
+			// reject the event and hope that it gets unrejected later.
 			isRejected = true
 			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
 		}
@@ -299,7 +318,7 @@ func (r *Inputer) processRoomEvent(
 		return rollbackTransaction, fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
 	}
 
-	if !missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0 {
+	if input.HasState || (!missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0) {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, updater, input, roomInfo, &stateAtEvent, event, isRejected)

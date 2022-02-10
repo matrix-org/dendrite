@@ -150,7 +150,7 @@ func (r *Queryer) QueryMissingAuthPrevEvents(
 
 	for _, prevEventID := range request.PrevEventIDs {
 		state, err := r.DB.StateAtEventIDs(ctx, []string{prevEventID})
-		if err != nil || len(state) == 0 {
+		if err != nil || len(state) == 0 || (!state[0].IsCreate() && state[0].BeforeStateSnapshotNID == 0) {
 			response.MissingPrevEventIDs = append(response.MissingPrevEventIDs, prevEventID)
 		}
 	}
