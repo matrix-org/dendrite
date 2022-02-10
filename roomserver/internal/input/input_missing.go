@@ -124,8 +124,12 @@ func (t *missingStateReq) processEventWithMissingState(
 	t.hadEventsMutex.Unlock()
 
 	sendOutliers := func(resolvedState *parsedRespState) error {
+		outliers, oerr := gomatrixserverlib.OrderAuthAndStateEvents(resolvedState.AuthEvents, resolvedState.StateEvents, roomVersion)
+		if oerr != nil {
+			return fmt.Errorf("gomatrixserverlib.OrderAuthAndStateEvents: %w", oerr)
+		}
 		var outlierRoomEvents []api.InputRoomEvent
-		for _, outlier := range resolvedState.AuthEvents {
+		for _, outlier := range outliers {
 			if hadEvents[outlier.EventID()] {
 				continue
 			}
