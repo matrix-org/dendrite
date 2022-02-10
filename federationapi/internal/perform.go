@@ -201,7 +201,6 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		context.Background(),
 		serverName,
 		event,
-		respMakeJoin.RoomVersion,
 	)
 	if err != nil {
 		r.statistics.ForServer(serverName).Failure()
@@ -209,9 +208,11 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 	r.statistics.ForServer(serverName).Success()
 
+	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
+
 	// Sanity-check the join response to ensure that it has a create
 	// event, that the room version is known, etc.
-	if err = sanityCheckAuthChain(respSendJoin.AuthEvents); err != nil {
+	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
 
@@ -225,6 +226,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	var respState *gomatrixserverlib.RespState
 	respState, err = respSendJoin.Check(
 		context.Background(),
+		respMakeJoin.RoomVersion,
 		r.keyRing,
 		event,
 		federatedAuthProvider(ctx, r.federation, r.keyRing, serverName),
@@ -392,12 +394,13 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	ctx = context.Background()
 
 	respState := respPeek.ToRespState()
+	authEvents := respState.AuthEvents.UntrustedEvents(respPeek.RoomVersion)
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	if err = sanityCheckAuthChain(respState.AuthEvents); err != nil {
+	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
-	if err = respState.Check(ctx, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName)); err != nil {
+	if err = respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName)); err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
 
@@ -549,10 +552,15 @@ func (r *FederationInternalAPI) PerformInvite(
 
 	inviteRes, err := r.federation.SendInviteV2(ctx, destination, inviteReq)
 	if err != nil {
-		return fmt.Errorf("r.federation.SendInviteV2: %w", err)
+		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
+	logrus.Infof("GOT INVITE RESPONSE %s", string(inviteRes.Event))
 
-	response.Event = inviteRes.Event.Headered(request.RoomVersion)
+	inviteEvent, err := inviteRes.Event.UntrustedEvent(request.RoomVersion)
+	if err != nil {
+		return fmt.Errorf("r.federation.SendInviteV2 failed to decode event response: %w", err)
+	}
+	response.Event = inviteEvent.Headered(request.RoomVersion)
 	return nil
 }
 

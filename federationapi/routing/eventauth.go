@@ -65,7 +65,7 @@ func GetEventAuth(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: gomatrixserverlib.RespEventAuth{
-			AuthEvents: gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
+			AuthEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		},
 	}
 }

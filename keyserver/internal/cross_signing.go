@@ -308,8 +308,12 @@ func (a *KeyInternalAPI) PerformUploadDeviceSignatures(ctx context.Context, req 
 
 	// Finally, generate a notification that we updated the signatures.
 	for userID := range req.Signatures {
+		masterKey := queryRes.MasterKeys[userID]
+		selfSigningKey := queryRes.SelfSigningKeys[userID]
 		update := eduserverAPI.CrossSigningKeyUpdate{
-			UserID: userID,
+			UserID:         userID,
+			MasterKey:      &masterKey,
+			SelfSigningKey: &selfSigningKey,
 		}
 		if err := a.Producer.ProduceSigningKeyUpdate(update); err != nil {
 			res.Error = &api.KeyError{
