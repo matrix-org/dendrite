@@ -195,9 +195,26 @@ func (r *Inputer) processRoomEvent(
 	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
 	for _, authEventID := range authEventIDs {
 		if _, ok := knownEvents[authEventID]; !ok {
-			return rollbackTransaction, fmt.Errorf("missing auth event %s", authEventID)
+			// Unknown auth events only really matter if the event actually failed
+			// auth. If it passed auth then we can assume that everything that was
+			// known was sufficient, even if extraneous auth events were specified
+			// but weren't found.
+			if isRejected {
+				if event.StateKey() != nil {
+					return commitTransaction, fmt.Errorf(
+						"missing auth event %s for state event %s (type %q, state key %q)",
+						authEventID, event.EventID(), event.Type(), *event.StateKey(),
+					)
+				} else {
+					return commitTransaction, fmt.Errorf(
+						"missing auth event %s for timeline event %s (type %q)",
+						authEventID, event.EventID(), event.Type(),
+					)
+				}
+			}
+		} else {
+			authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
 		}
-		authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
 	}
 
 	var softfail bool
@@ -238,13 +255,32 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
 			}
-			if err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			if stateSnapshot, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+				// Something went wrong with retrieving the missing state, so we can't
+				// really do anything with the event other than reject it at this point.
 				isRejected = true
 				rejectionErr = fmt.Errorf("missingState.processEventWithMissingState: %w", err)
+			} else if stateSnapshot != nil {
+				// We retrieved some state and we ended up having to call /state_ids for
+				// the new event in question (probably because closing the gap by using
+				// /get_missing_events didn't do what we hoped) so we'll instead overwrite
+				// the state snapshot with the newly resolved state.
+				missingPrev = false
+				input.HasState = true
+				input.StateEventIDs = make([]string, 0, len(stateSnapshot.StateEvents))
+				for _, e := range stateSnapshot.StateEvents {
+					input.StateEventIDs = append(input.StateEventIDs, e.EventID())
+				}
 			} else {
+				// We retrieved some state and it would appear that rolling forward the
+				// state did everything we needed it to do, so we can just resolve the
+				// state for the event in the normal way.
 				missingPrev = false
 			}
 		} else {
+			// We're missing prev events or state for the event, but for some reason
+			// we don't know any servers to ask. In this case we can't do anything but
+			// reject the event and hope that it gets unrejected later.
 			isRejected = true
 			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
 		}
@@ -282,7 +318,7 @@ func (r *Inputer) processRoomEvent(
 		return rollbackTransaction, fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
 	}
 
-	if !missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0 {
+	if input.HasState || (!missingPrev && stateAtEvent.BeforeStateSnapshotNID == 0) {
 		// We haven't calculated a state for this event yet.
 		// Lets calculate one.
 		err = r.calculateAndSetState(ctx, updater, input, roomInfo, &stateAtEvent, event, isRejected)
@@ -297,7 +333,10 @@ func (r *Inputer) processRoomEvent(
 			"soft_fail":    softfail,
 			"missing_prev": missingPrev,
 		}).Warn("Stored rejected event")
-		return commitTransaction, rejectionErr
+		if rejectionErr != nil {
+			return commitTransaction, types.RejectedError(rejectionErr.Error())
+		}
+		return commitTransaction, nil
 	}
 
 	switch input.Kind {
@@ -413,44 +452,42 @@ func (r *Inputer) fetchAuthEvents(
 		return fmt.Errorf("no servers provided event auth for event ID %q, tried servers %v", event.EventID(), servers)
 	}
 
+	// Reuse these to reduce allocations.
+	authEventNIDs := make([]types.EventNID, 0, 5)
+	isRejected := false
+nextAuthEvent:
 	for _, authEvent := range gomatrixserverlib.ReverseTopologicalOrdering(
-		res.AuthEvents,
+		res.AuthEvents.UntrustedEvents(event.RoomVersion),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	) {
 		// If we already know about this event from the database then we don't
 		// need to store it again or do anything further with it, so just skip
 		// over it rather than wasting cycles.
 		if ev, ok := known[authEvent.EventID()]; ok && ev != nil {
-			continue
+			continue nextAuthEvent
 		}
 
 		// Check the signatures of the event. If this fails then we'll simply
 		// skip it, because gomatrixserverlib.Allowed() will notice a problem
 		// if a critical event is missing anyway.
 		if err := authEvent.VerifyEventSignatures(ctx, r.FSAPI.KeyRing()); err != nil {
-			continue
+			continue nextAuthEvent
 		}
 
 		// In order to store the new auth event, we need to know its auth chain
 		// as NIDs for the `auth_event_nids` column. Let's see if we can find those.
-		authEventNIDs := make([]types.EventNID, 0, len(authEvent.AuthEventIDs()))
+		authEventNIDs = authEventNIDs[:0]
 		for _, eventID := range authEvent.AuthEventIDs() {
 			knownEvent, ok := known[eventID]
 			if !ok {
-				return fmt.Errorf("missing auth event %s for %s", eventID, authEvent.EventID())
+				continue nextAuthEvent
 			}
 			authEventNIDs = append(authEventNIDs, knownEvent.EventNID)
 		}
 
-		// Let's take a note of the fact that we now know about this event.
-		if err := auth.AddEvent(authEvent); err != nil {
-			return fmt.Errorf("auth.AddEvent: %w", err)
-		}
-
 		// Check if the auth event should be rejected.
-		isRejected := false
-		if err := gomatrixserverlib.Allowed(authEvent, auth); err != nil {
-			isRejected = true
+		err := gomatrixserverlib.Allowed(authEvent, auth)
+		if isRejected = err != nil; isRejected {
 			logger.WithError(err).Warnf("Auth event %s rejected", authEvent.EventID())
 		}
 
@@ -458,6 +495,14 @@ func (r *Inputer) fetchAuthEvents(
 		eventNID, _, _, _, _, err := updater.StoreEvent(ctx, authEvent, authEventNIDs, isRejected)
 		if err != nil {
 			return fmt.Errorf("updater.StoreEvent: %w", err)
+		}
+
+		// Let's take a note of the fact that we now know about this event for
+		// authenticating future events.
+		if !isRejected {
+			if err := auth.AddEvent(authEvent); err != nil {
+				return fmt.Errorf("auth.AddEvent: %w", err)
+			}
 		}
 
 		// Now we know about this event, it was stored and the signatures were OK.
@@ -483,16 +528,7 @@ func (r *Inputer) calculateAndSetState(
 	roomState := state.NewStateResolution(updater, roomInfo)
 
 	if input.HasState {
-		// Check here if we think we're in the room already.
 		stateAtEvent.Overwrite = true
-		var joinEventNIDs []types.EventNID
-		// Request join memberships only for local users only.
-		if joinEventNIDs, err = updater.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true); err == nil {
-			// If we have no local users that are joined to the room then any state about
-			// the room that we have is quite possibly out of date. Therefore in that case
-			// we should overwrite it rather than merge it.
-			stateAtEvent.Overwrite = len(joinEventNIDs) == 0
-		}
 
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.

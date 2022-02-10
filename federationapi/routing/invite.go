@@ -178,12 +178,12 @@ func processInvite(
 		if isInviteV2 {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: gomatrixserverlib.RespInviteV2{Event: &signedEvent},
+				JSON: gomatrixserverlib.RespInviteV2{Event: signedEvent.JSON()},
 			}
 		} else {
 			return util.JSONResponse{
 				Code: http.StatusOK,
-				JSON: gomatrixserverlib.RespInvite{Event: &signedEvent},
+				JSON: gomatrixserverlib.RespInvite{Event: signedEvent.JSON()},
 			}
 		}
 	default:

@@ -12,10 +12,16 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
+
+type parsedRespState struct {
+	AuthEvents  []*gomatrixserverlib.Event
+	StateEvents []*gomatrixserverlib.Event
+}
 
 type missingStateReq struct {
 	origin          gomatrixserverlib.ServerName
@@ -34,9 +40,10 @@ type missingStateReq struct {
 
 // processEventWithMissingState is the entrypoint for a missingStateReq
 // request, as called from processRoomEvent.
+// nolint:gocyclo
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
-) error {
+) (*parsedRespState, error) {
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -62,100 +69,51 @@ func (t *missingStateReq) processEventWithMissingState(
 	// - fill in the gap completely then process event `e` returning no backwards extremity
 	// - fail to fill in the gap and tell us to terminate the transaction err=not nil
 	// - fail to fill in the gap and tell us to fetch state at the new backwards extremity, and to not terminate the transaction
-	newEvents, isGapFilled, err := t.getMissingEvents(ctx, e, roomVersion)
+	newEvents, isGapFilled, prevStatesKnown, err := t.getMissingEvents(ctx, e, roomVersion)
 	if err != nil {
-		return fmt.Errorf("t.getMissingEvents: %w", err)
+		return nil, fmt.Errorf("t.getMissingEvents: %w", err)
 	}
 	if len(newEvents) == 0 {
-		return fmt.Errorf("expected to find missing events but didn't")
+		return nil, fmt.Errorf("expected to find missing events but didn't")
 	}
 	if isGapFilled {
-		logger.Infof("gap filled by /get_missing_events, injecting %d new events", len(newEvents))
+		logger.Infof("Gap filled by /get_missing_events, injecting %d new events", len(newEvents))
 		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
 			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
-				Kind:         api.KindNew,
+				Kind:         api.KindOld,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
 				SendAsServer: api.DoNotSendToOtherServers,
 			})
 			if err != nil {
-				return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+				if _, ok := err.(types.RejectedError); !ok {
+					return nil, fmt.Errorf("t.inputer.processRoomEvent (filling gap): %w", err)
+				}
 			}
 		}
-		return nil
 	}
 
+	// If we filled the gap *and* we know the state before the prev events
+	// then there's nothing else to do, we have everything we need to deal
+	// with the new event.
+	if isGapFilled && prevStatesKnown {
+		logger.Infof("Gap filled and state found for all prev events")
+		return nil, nil
+	}
+
+	// Otherwise, if we've reached this point, it's possible that we've
+	// either not closed the gap, or we did but we still don't seem to
+	// know the events before the new event. Start by looking up the
+	// state at the event at the back of the gap and we'll try to roll
+	// forward the state first.
 	backwardsExtremity := newEvents[0]
 	newEvents = newEvents[1:]
 
-	type respState struct {
-		// A snapshot is considered trustworthy if it came from our own roomserver.
-		// That's because the state will have been through state resolution once
-		// already in QueryStateAfterEvent.
-		trustworthy bool
-		*gomatrixserverlib.RespState
-	}
-
-	// at this point we know we're going to have a gap: we need to work out the room state at the new backwards extremity.
-	// Therefore, we cannot just query /state_ids with this event to get the state before. Instead, we need to query
-	// the state AFTER all the prev_events for this event, then apply state resolution to that to get the state before the event.
-	var states []*respState
-	for _, prevEventID := range backwardsExtremity.PrevEventIDs() {
-		// Look up what the state is after the backward extremity. This will either
-		// come from the roomserver, if we know all the required events, or it will
-		// come from a remote server via /state_ids if not.
-		prevState, trustworthy, lerr := t.lookupStateAfterEvent(ctx, roomVersion, backwardsExtremity.RoomID(), prevEventID)
-		if lerr != nil {
-			logger.WithError(lerr).Errorf("Failed to lookup state after prev_event: %s", prevEventID)
-			return lerr
-		}
-		// Append the state onto the collected state. We'll run this through the
-		// state resolution next.
-		states = append(states, &respState{trustworthy, prevState})
-	}
-
-	// Now that we have collected all of the state from the prev_events, we'll
-	// run the state through the appropriate state resolution algorithm for the
-	// room if needed. This does a couple of things:
-	// 1. Ensures that the state is deduplicated fully for each state-key tuple
-	// 2. Ensures that we pick the latest events from both sets, in the case that
-	//    one of the prev_events is quite a bit older than the others
-	resolvedState := &gomatrixserverlib.RespState{}
-	switch len(states) {
-	case 0:
-		extremityIsCreate := backwardsExtremity.Type() == gomatrixserverlib.MRoomCreate && backwardsExtremity.StateKeyEquals("")
-		if !extremityIsCreate {
-			// There are no previous states and this isn't the beginning of the
-			// room - this is an error condition!
-			logger.Errorf("Failed to lookup any state after prev_events")
-			return fmt.Errorf("expected %d states but got %d", len(backwardsExtremity.PrevEventIDs()), len(states))
-		}
-	case 1:
-		// There's only one previous state - if it's trustworthy (came from a
-		// local state snapshot which will already have been through state res),
-		// use it as-is. There's no point in resolving it again.
-		if states[0].trustworthy {
-			resolvedState = states[0].RespState
-			break
-		}
-		// Otherwise, if it isn't trustworthy (came from federation), run it through
-		// state resolution anyway for safety, in case there are duplicates.
-		fallthrough
-	default:
-		respStates := make([]*gomatrixserverlib.RespState, len(states))
-		for i := range states {
-			respStates[i] = states[i].RespState
-		}
-		// There's more than one previous state - run them all through state res
-		t.roomsMu.Lock(e.RoomID())
-		resolvedState, err = t.resolveStatesAndCheck(ctx, roomVersion, respStates, backwardsExtremity)
-		t.roomsMu.Unlock(e.RoomID())
-		if err != nil {
-			logger.WithError(err).Errorf("Failed to resolve state conflicts for event %s", backwardsExtremity.EventID())
-			return err
-		}
+	resolvedState, err := t.lookupResolvedStateBeforeEvent(ctx, backwardsExtremity, roomVersion)
+	if err != nil {
+		return nil, fmt.Errorf("t.lookupState (backwards extremity): %w", err)
 	}
 
 	hadEvents := map[string]bool{}
@@ -165,27 +123,37 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	t.hadEventsMutex.Unlock()
 
-	// Send outliers first so we can send the new backwards extremity without causing errors
-	outliers, err := resolvedState.Events()
-	if err != nil {
-		return err
-	}
-	var outlierRoomEvents []api.InputRoomEvent
-	for _, outlier := range outliers {
-		if hadEvents[outlier.EventID()] {
-			continue
+	sendOutliers := func(resolvedState *parsedRespState) error {
+		outliers, oerr := gomatrixserverlib.OrderAuthAndStateEvents(resolvedState.AuthEvents, resolvedState.StateEvents, roomVersion)
+		if oerr != nil {
+			return fmt.Errorf("gomatrixserverlib.OrderAuthAndStateEvents: %w", oerr)
 		}
-		outlierRoomEvents = append(outlierRoomEvents, api.InputRoomEvent{
-			Kind:   api.KindOutlier,
-			Event:  outlier.Headered(roomVersion),
-			Origin: t.origin,
-		})
-	}
-	// TODO: we could do this concurrently?
-	for _, ire := range outlierRoomEvents {
-		if _, err = t.inputer.processRoomEvent(ctx, t.db, &ire); err != nil {
-			return fmt.Errorf("t.inputer.processRoomEvent[outlier]: %w", err)
+		var outlierRoomEvents []api.InputRoomEvent
+		for _, outlier := range outliers {
+			if hadEvents[outlier.EventID()] {
+				continue
+			}
+			outlierRoomEvents = append(outlierRoomEvents, api.InputRoomEvent{
+				Kind:   api.KindOutlier,
+				Event:  outlier.Headered(roomVersion),
+				Origin: t.origin,
+			})
 		}
+		for _, ire := range outlierRoomEvents {
+			_, err = t.inputer.processRoomEvent(ctx, t.db, &ire)
+			if err != nil {
+				if _, ok := err.(types.RejectedError); !ok {
+					return fmt.Errorf("t.inputer.processRoomEvent (outlier): %w", err)
+				}
+			}
+		}
+		return nil
+	}
+
+	// Send outliers first so we can send the state along with the new backwards
+	// extremity without any missing auth events.
+	if err = sendOutliers(resolvedState); err != nil {
+		return nil, fmt.Errorf("sendOutliers: %w", err)
 	}
 
 	// Now send the backward extremity into the roomserver with the
@@ -205,7 +173,9 @@ func (t *missingStateReq) processEventWithMissingState(
 		SendAsServer:  api.DoNotSendToOtherServers,
 	})
 	if err != nil {
-		return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+		if _, ok := err.(types.RejectedError); !ok {
+			return nil, fmt.Errorf("t.inputer.processRoomEvent (backward extremity): %w", err)
+		}
 	}
 
 	// Then send all of the newer backfilled events, of which will all be newer
@@ -220,16 +190,115 @@ func (t *missingStateReq) processEventWithMissingState(
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 		if err != nil {
-			return fmt.Errorf("t.inputer.processRoomEvent: %w", err)
+			if _, ok := err.(types.RejectedError); !ok {
+				return nil, fmt.Errorf("t.inputer.processRoomEvent (fast forward): %w", err)
+			}
 		}
 	}
 
-	return nil
+	// Finally, check again if we know everything we need to know in order to
+	// make forward progress. If the prev state is known then we consider the
+	// rolled forward state to be sufficient — we now know all of the state
+	// before the prev events. If we don't then we need to look up the state
+	// before the new event as well, otherwise we will never make any progress.
+	if t.isPrevStateKnown(ctx, e) {
+		return nil, nil
+	}
+
+	// If we still haven't got the state for the prev events then we'll go and
+	// ask the federation for it if needed.
+	resolvedState, err = t.lookupResolvedStateBeforeEvent(ctx, e, roomVersion)
+	if err != nil {
+		return nil, fmt.Errorf("t.lookupState (new event): %w", err)
+	}
+
+	// Send the outliers for the retrieved state.
+	if err = sendOutliers(resolvedState); err != nil {
+		return nil, fmt.Errorf("sendOutliers: %w", err)
+	}
+
+	// Then return the resolved state, for which the caller can replace the
+	// HasState with the event IDs to create a new state snapshot when we
+	// process the new event.
+	return resolvedState, nil
+}
+
+func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (*parsedRespState, error) {
+	type respState struct {
+		// A snapshot is considered trustworthy if it came from our own roomserver.
+		// That's because the state will have been through state resolution once
+		// already in QueryStateAfterEvent.
+		trustworthy bool
+		*parsedRespState
+	}
+
+	// at this point we know we're going to have a gap: we need to work out the room state at the new backwards extremity.
+	// Therefore, we cannot just query /state_ids with this event to get the state before. Instead, we need to query
+	// the state AFTER all the prev_events for this event, then apply state resolution to that to get the state before the event.
+	var states []*respState
+	for _, prevEventID := range e.PrevEventIDs() {
+		// Look up what the state is after the backward extremity. This will either
+		// come from the roomserver, if we know all the required events, or it will
+		// come from a remote server via /state_ids if not.
+		prevState, trustworthy, err := t.lookupStateAfterEvent(ctx, roomVersion, e.RoomID(), prevEventID)
+		if err != nil {
+			return nil, fmt.Errorf("t.lookupStateAfterEvent: %w", err)
+		}
+		// Append the state onto the collected state. We'll run this through the
+		// state resolution next.
+		states = append(states, &respState{trustworthy, prevState})
+	}
+
+	// Now that we have collected all of the state from the prev_events, we'll
+	// run the state through the appropriate state resolution algorithm for the
+	// room if needed. This does a couple of things:
+	// 1. Ensures that the state is deduplicated fully for each state-key tuple
+	// 2. Ensures that we pick the latest events from both sets, in the case that
+	//    one of the prev_events is quite a bit older than the others
+	resolvedState := &parsedRespState{}
+	switch len(states) {
+	case 0:
+		extremityIsCreate := e.Type() == gomatrixserverlib.MRoomCreate && e.StateKeyEquals("")
+		if !extremityIsCreate {
+			// There are no previous states and this isn't the beginning of the
+			// room - this is an error condition!
+			return nil, fmt.Errorf("expected %d states but got %d", len(e.PrevEventIDs()), len(states))
+		}
+	case 1:
+		// There's only one previous state - if it's trustworthy (came from a
+		// local state snapshot which will already have been through state res),
+		// use it as-is. There's no point in resolving it again. Only trust a
+		// trustworthy state snapshot if it actually contains some state for all
+		// non-create events, otherwise we need to resolve what came from federation.
+		isCreate := e.Type() == gomatrixserverlib.MRoomCreate && e.StateKeyEquals("")
+		if states[0].trustworthy && (isCreate || len(states[0].StateEvents) > 0) {
+			resolvedState = states[0].parsedRespState
+			break
+		}
+		// Otherwise, if it isn't trustworthy (came from federation), run it through
+		// state resolution anyway for safety, in case there are duplicates.
+		fallthrough
+	default:
+		respStates := make([]*parsedRespState, len(states))
+		for i := range states {
+			respStates[i] = states[i].parsedRespState
+		}
+		// There's more than one previous state - run them all through state res
+		var err error
+		t.roomsMu.Lock(e.RoomID())
+		resolvedState, err = t.resolveStatesAndCheck(ctx, roomVersion, respStates, e)
+		t.roomsMu.Unlock(e.RoomID())
+		if err != nil {
+			return nil, fmt.Errorf("t.resolveStatesAndCheck: %w", err)
+		}
+	}
+
+	return resolvedState, nil
 }
 
 // lookupStateAfterEvent returns the room state after `eventID`, which is the state before eventID with the state of `eventID` (if it's a state event)
 // added into the mix.
-func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (*gomatrixserverlib.RespState, bool, error) {
+func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (*parsedRespState, bool, error) {
 	// try doing all this locally before we resort to querying federation
 	respState := t.lookupStateAfterEventLocally(ctx, roomID, eventID)
 	if respState != nil {
@@ -280,7 +349,7 @@ func (t *missingStateReq) cacheAndReturn(ev *gomatrixserverlib.HeaderedEvent) *g
 	return ev
 }
 
-func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, roomID, eventID string) *gomatrixserverlib.RespState {
+func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, roomID, eventID string) *parsedRespState {
 	var res api.QueryStateAfterEventsResponse
 	err := t.queryer.QueryStateAfterEvents(ctx, &api.QueryStateAfterEventsRequest{
 		RoomID:       roomID,
@@ -335,7 +404,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 		queryRes.Events = nil
 	}
 
-	return &gomatrixserverlib.RespState{
+	return &parsedRespState{
 		StateEvents: gomatrixserverlib.UnwrapEventHeaders(stateEvents),
 		AuthEvents:  authEvents,
 	}
@@ -344,13 +413,13 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 // lookuptStateBeforeEvent returns the room state before the event e, which is just /state_ids and/or /state depending on what
 // the server supports.
 func (t *missingStateReq) lookupStateBeforeEvent(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (
-	*gomatrixserverlib.RespState, error) {
+	*parsedRespState, error) {
 
 	// Attempt to fetch the missing state using /state_ids and /events
 	return t.lookupMissingStateViaStateIDs(ctx, roomID, eventID, roomVersion)
 }
 
-func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, states []*gomatrixserverlib.RespState, backwardsExtremity *gomatrixserverlib.Event) (*gomatrixserverlib.RespState, error) {
+func (t *missingStateReq) resolveStatesAndCheck(ctx context.Context, roomVersion gomatrixserverlib.RoomVersion, states []*parsedRespState, backwardsExtremity *gomatrixserverlib.Event) (*parsedRespState, error) {
 	var authEventList []*gomatrixserverlib.Event
 	var stateEventList []*gomatrixserverlib.Event
 	for _, state := range states {
@@ -369,7 +438,7 @@ retryAllowedState:
 			h, err2 := t.lookupEvent(ctx, roomVersion, backwardsExtremity.RoomID(), missing.AuthEventID, true)
 			switch err2.(type) {
 			case verifySigError:
-				return &gomatrixserverlib.RespState{
+				return &parsedRespState{
 					AuthEvents:  authEventList,
 					StateEvents: resolvedStateEvents,
 				}, nil
@@ -385,7 +454,7 @@ retryAllowedState:
 		}
 		return nil, err
 	}
-	return &gomatrixserverlib.RespState{
+	return &parsedRespState{
 		AuthEvents:  authEventList,
 		StateEvents: resolvedStateEvents,
 	}, nil
@@ -393,22 +462,13 @@ retryAllowedState:
 
 // get missing events for `e`. If `isGapFilled`=true then `newEvents` contains all the events to inject,
 // without `e`. If `isGapFilled=false` then `newEvents` contains the response to /get_missing_events
-func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, isGapFilled bool, err error) {
+func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, isGapFilled, prevStateKnown bool, err error) {
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
-	needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{e})
-	// query latest events (our trusted forward extremities)
-	req := api.QueryLatestEventsAndStateRequest{
-		RoomID:       e.RoomID(),
-		StateToFetch: needed.Tuples(),
-	}
-	var res api.QueryLatestEventsAndStateResponse
-	if err = t.queryer.QueryLatestEventsAndState(ctx, &req, &res); err != nil {
-		logger.WithError(err).Warn("Failed to query latest events")
-		return nil, false, err
-	}
-	latestEvents := make([]string, len(res.LatestEvents))
-	for i, ev := range res.LatestEvents {
-		latestEvents[i] = res.LatestEvents[i].EventID
+
+	latest := t.db.LatestEvents()
+	latestEvents := make([]string, len(latest))
+	for i, ev := range latest {
+		latestEvents[i] = ev.EventID
 		t.hadEvent(ev.EventID)
 	}
 
@@ -429,7 +489,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 			if errors.Is(err, context.DeadlineExceeded) {
 				select {
 				case <-ctx.Done(): // the parent request context timed out
-					return nil, false, context.DeadlineExceeded
+					return nil, false, false, context.DeadlineExceeded
 				default: // this request exceed its own timeout
 					continue
 				}
@@ -442,7 +502,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 			"%s pushed us an event but %d server(s) couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
 			t.origin, len(t.servers),
 		)
-		return nil, false, missingPrevEventsError{
+		return nil, false, false, missingPrevEventsError{
 			eventID: e.EventID(),
 			err:     err,
 		}
@@ -451,12 +511,13 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	// Make sure events from the missingResp are using the cache - missing events
 	// will be added and duplicates will be removed.
 	logger.Debugf("get_missing_events returned %d events", len(missingResp.Events))
-	for i, ev := range missingResp.Events {
-		missingResp.Events[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
+	missingEvents := make([]*gomatrixserverlib.Event, 0, len(missingResp.Events))
+	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
+		missingEvents = append(missingEvents, t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap())
 	}
 
 	// topologically sort and sanity check that we are making forward progress
-	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(missingResp.Events, gomatrixserverlib.TopologicalOrderByPrevEvents)
+	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(missingEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
 	shouldHaveSomeEventIDs := e.PrevEventIDs()
 	hasPrevEvent := false
 Event:
@@ -474,52 +535,84 @@ Event:
 			"%s pushed us an event but couldn't give us details about prev_events via /get_missing_events - dropping this event until it can",
 			t.origin,
 		)
-		return nil, false, missingPrevEventsError{
+		return nil, false, false, missingPrevEventsError{
 			eventID: e.EventID(),
 			err:     err,
 		}
 	}
 	if len(newEvents) == 0 {
-		return nil, false, nil // TODO: error instead?
+		return nil, false, false, nil // TODO: error instead?
 	}
 
-	// now check if we can fill the gap. Look to see if we have state snapshot IDs for the earliest event
 	earliestNewEvent := newEvents[0]
-	if state, err := t.db.StateAtEventIDs(ctx, []string{earliestNewEvent.EventID()}); err != nil || len(state) == 0 {
-		if earliestNewEvent.Type() == gomatrixserverlib.MRoomCreate && earliestNewEvent.StateKeyEquals("") {
-			// we got to the beginning of the room so there will be no state! It's all good we can process this
-			return newEvents, true, nil
-		}
-		// we don't have the state at this earliest event from /g_m_e so we won't have state for later events either
-		return newEvents, false, nil
+
+	// If we retrieved back to the beginning of the room then there's nothing else
+	// to do - we closed the gap.
+	if len(earliestNewEvent.PrevEventIDs()) == 0 && earliestNewEvent.Type() == gomatrixserverlib.MRoomCreate && earliestNewEvent.StateKeyEquals("") {
+		return newEvents, true, t.isPrevStateKnown(ctx, e), nil
 	}
-	// StateAtEventIDs returned some kind of state for the earliest event so we can fill in the gap!
-	return newEvents, true, nil
+
+	// If our backward extremity was not a known event to us then we obviously didn't
+	// close the gap.
+	if state, err := t.db.StateAtEventIDs(ctx, []string{earliestNewEvent.EventID()}); err != nil || len(state) == 0 && state[0].BeforeStateSnapshotNID == 0 {
+		return newEvents, false, false, nil
+	}
+
+	// At this point we are satisfied that we know the state both at the earliest
+	// retrieved event and at the prev events of the new event.
+	return newEvents, true, t.isPrevStateKnown(ctx, e), nil
 }
 
-func (t *missingStateReq) lookupMissingStateViaState(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
-	respState *gomatrixserverlib.RespState, err error) {
+func (t *missingStateReq) isPrevStateKnown(ctx context.Context, e *gomatrixserverlib.Event) bool {
+	expected := len(e.PrevEventIDs())
+	state, err := t.db.StateAtEventIDs(ctx, e.PrevEventIDs())
+	if err != nil || len(state) != expected {
+		// We didn't get as many state snapshots as we expected, or there was an error,
+		// so we haven't completely solved the problem for the new event.
+		return false
+	}
+	// Check to see if we have a populated state snapshot for all of the prev events.
+	for _, stateAtEvent := range state {
+		if stateAtEvent.BeforeStateSnapshotNID == 0 {
+			// One of the prev events still has unknown state, so we haven't really
+			// solved the problem.
+			return false
+		}
+	}
+	return true
+}
+
+func (t *missingStateReq) lookupMissingStateViaState(
+	ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
+) (respState *parsedRespState, err error) {
 	state, err := t.federation.LookupState(ctx, t.origin, roomID, eventID, roomVersion)
 	if err != nil {
 		return nil, err
 	}
 	// Check that the returned state is valid.
-	if err := state.Check(ctx, t.keys, nil); err != nil {
+	if err := state.Check(ctx, roomVersion, t.keys, nil); err != nil {
 		return nil, err
+	}
+	parsedState := &parsedRespState{
+		AuthEvents:  make([]*gomatrixserverlib.Event, len(state.AuthEvents)),
+		StateEvents: make([]*gomatrixserverlib.Event, len(state.StateEvents)),
 	}
 	// Cache the results of this state lookup and deduplicate anything we already
 	// have in the cache, freeing up memory.
-	for i, ev := range state.AuthEvents {
-		state.AuthEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
+	// We load these as trusted as we called state.Check before which loaded them as untrusted.
+	for i, evJSON := range state.AuthEvents {
+		ev, _ := gomatrixserverlib.NewEventFromTrustedJSON(evJSON, false, roomVersion)
+		parsedState.AuthEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}
-	for i, ev := range state.StateEvents {
-		state.StateEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
+	for i, evJSON := range state.StateEvents {
+		ev, _ := gomatrixserverlib.NewEventFromTrustedJSON(evJSON, false, roomVersion)
+		parsedState.StateEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}
-	return &state, nil
+	return parsedState, nil
 }
 
 func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
-	*gomatrixserverlib.RespState, error) {
+	*parsedRespState, error) {
 	util.GetLogger(ctx).WithField("room_id", roomID).Infof("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
 	stateIDs, err := t.federation.LookupStateIDs(ctx, t.origin, roomID, eventID)
@@ -651,13 +744,14 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 	return resp, err
 }
 
-func (t *missingStateReq) createRespStateFromStateIDs(stateIDs gomatrixserverlib.RespStateIDs) (
-	*gomatrixserverlib.RespState, error) { // nolint:unparam
+func (t *missingStateReq) createRespStateFromStateIDs(
+	stateIDs gomatrixserverlib.RespStateIDs,
+) (*parsedRespState, error) { // nolint:unparam
 	t.haveEventsMutex.Lock()
 	defer t.haveEventsMutex.Unlock()
 
 	// create a RespState response using the response to /state_ids as a guide
-	respState := gomatrixserverlib.RespState{}
+	respState := parsedRespState{}
 
 	for i := range stateIDs.StateEventIDs {
 		ev, ok := t.haveEvents[stateIDs.StateEventIDs[i]]

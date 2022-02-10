@@ -382,25 +382,41 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case eduserverAPI.MSigningKeyUpdate:
-			var updatePayload eduserverAPI.CrossSigningKeyUpdate
-			if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
-				util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-					"user_id": updatePayload.UserID,
-				}).Debug("Failed to send signing key update to edu server")
-				continue
-			}
-			inputReq := &eduserverAPI.InputCrossSigningKeyUpdateRequest{
-				CrossSigningKeyUpdate: updatePayload,
-			}
-			inputRes := &eduserverAPI.InputCrossSigningKeyUpdateResponse{}
-			if err := t.eduAPI.InputCrossSigningKeyUpdate(ctx, inputReq, inputRes); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal cross-signing update")
-				continue
+			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
+				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
+}
+
+func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
+	var updatePayload eduserverAPI.CrossSigningKeyUpdate
+	if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
+		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+			"user_id": updatePayload.UserID,
+		}).Debug("Failed to unmarshal signing key update")
+		return err
+	}
+
+	keys := gomatrixserverlib.CrossSigningKeys{}
+	if updatePayload.MasterKey != nil {
+		keys.MasterKey = *updatePayload.MasterKey
+	}
+	if updatePayload.SelfSigningKey != nil {
+		keys.SelfSigningKey = *updatePayload.SelfSigningKey
+	}
+	uploadReq := &keyapi.PerformUploadDeviceKeysRequest{
+		CrossSigningKeys: keys,
+		UserID:           updatePayload.UserID,
+	}
+	uploadRes := &keyapi.PerformUploadDeviceKeysResponse{}
+	t.keyAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+	if uploadRes.Error != nil {
+		return uploadRes.Error
+	}
+	return nil
 }
 
 // processReceiptEvent sends receipt events to the edu server

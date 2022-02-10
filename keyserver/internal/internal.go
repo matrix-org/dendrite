@@ -326,8 +326,14 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			if err = json.Unmarshal(key, &deviceKey); err != nil {
 				continue
 			}
+			if deviceKey.Signatures == nil {
+				deviceKey.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+			}
 			for sourceUserID, forSourceUser := range sigMap {
 				for sourceKeyID, sourceSig := range forSourceUser {
+					if _, ok := deviceKey.Signatures[sourceUserID]; !ok {
+						deviceKey.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+					}
 					deviceKey.Signatures[sourceUserID][sourceKeyID] = sourceSig
 				}
 			}
@@ -447,7 +453,6 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	for userID, deviceIDs := range devKeys {
 		if len(deviceIDs) == 0 {
 			userIDsForAllDevices[userID] = struct{}{}
-			delete(devKeys, userID)
 		}
 	}
 	// for cross-signing keys, it's probably easier just to hit /keys/query if we aren't already doing

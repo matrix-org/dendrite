@@ -282,6 +282,8 @@ func membershipEvents(res *types.Response) (joinUserIDs, leaveUserIDs []string) 
 			if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil {
 				if strings.Contains(string(ev.Content), `"join"`) {
 					joinUserIDs = append(joinUserIDs, *ev.StateKey)
+				} else if strings.Contains(string(ev.Content), `"invite"`) {
+					joinUserIDs = append(joinUserIDs, *ev.StateKey)
 				} else if strings.Contains(string(ev.Content), `"leave"`) {
 					leaveUserIDs = append(leaveUserIDs, *ev.StateKey)
 				} else if strings.Contains(string(ev.Content), `"ban"`) {

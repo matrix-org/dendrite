@@ -83,6 +83,10 @@ type StateKeyTuple struct {
 	EventStateKeyNID EventStateKeyNID
 }
 
+func (a StateKeyTuple) IsCreate() bool {
+	return a.EventTypeNID == MRoomCreateNID && a.EventStateKeyNID == EmptyStateKeyNID
+}
+
 // LessThan returns true if this state key is less than the other state key.
 // The ordering is arbitrary and is used to implement binary search and to efficiently deduplicate entries.
 func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
@@ -208,6 +212,12 @@ type StateEntryList struct {
 type MissingEventError string
 
 func (e MissingEventError) Error() string { return string(e) }
+
+// A RejectedError is returned when an event is stored as rejected. The error
+// contains the reason why.
+type RejectedError string
+
+func (e RejectedError) Error() string { return string(e) }
 
 // RoomInfo contains metadata about a room
 type RoomInfo struct {
