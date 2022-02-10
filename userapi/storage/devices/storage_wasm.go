@@ -16,6 +16,7 @@ package devices
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3"
@@ -25,10 +26,11 @@ import (
 func NewDatabase(
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
+	loginTokenLifetime time.Duration,
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName)
+		return sqlite3.NewDatabase(dbProperties, serverName, loginTokenLifetime)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -41,16 +43,26 @@ type LoginTypePassword struct {
 }
 
 func (t *LoginTypePassword) Name() string {
-	return "m.login.password"
+	return authtypes.LoginTypePassword
 }
 
-func (t *LoginTypePassword) Request() interface{} {
-	return &PasswordRequest{}
+func (t *LoginTypePassword) LoginFromJSON(ctx context.Context, reqBytes []byte) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+	var r PasswordRequest
+	if err := httputil.UnmarshalJSON(reqBytes, &r); err != nil {
+		return nil, nil, err
+	}
+
+	login, err := t.Login(ctx, &r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return login, func(context.Context, *util.JSONResponse) {}, nil
 }
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	username := r.Username()
+  username := strings.ToLower(r.Username())
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,

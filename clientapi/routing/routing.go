@@ -62,7 +62,7 @@ func Setup(
 	mscCfg *config.MSCs,
 ) {
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
-	userInteractiveAuth := auth.NewUserInteractive(accountDB.GetAccountByPassword, cfg)
+	userInteractiveAuth := auth.NewUserInteractive(accountDB, cfg)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,

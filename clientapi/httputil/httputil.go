@@ -36,6 +36,10 @@ func UnmarshalJSONRequest(req *http.Request, iface interface{}) *util.JSONRespon
 		return &resp
 	}
 
+	return UnmarshalJSON(body, iface)
+}
+
+func UnmarshalJSON(body []byte, iface interface{}) *util.JSONResponse {
 	if !utf8.Valid(body) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,

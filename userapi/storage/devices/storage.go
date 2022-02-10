@@ -19,6 +19,7 @@ package devices
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/devices/postgres"
@@ -27,13 +28,14 @@ import (
 )
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
-// and sets postgres connection parameters
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
+// and sets postgres connection parameters. loginTokenLifetime determines how long a
+// login token from CreateLoginToken is valid.
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, loginTokenLifetime time.Duration) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName)
+		return sqlite3.NewDatabase(dbProperties, serverName, loginTokenLifetime)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties, serverName)
+		return postgres.NewDatabase(dbProperties, serverName, loginTokenLifetime)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}
