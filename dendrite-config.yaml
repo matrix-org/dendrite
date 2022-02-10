@@ -68,6 +68,17 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
+  # Server notices allows server admins to send messages to all users.
+  server_notices:
+    # The server localpart to be used when sending notices, ensure this is not yet take
+    local_part: "server"
+    # The displayname to be used when sending notices
+    display_name: "Server alerts"
+    # The avatar of this user
+    avatar: ""
+    # The roomname to be used when creating messages
+    room_name: "Server Alerts"
+
   # Configuration for NATS JetStream
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an

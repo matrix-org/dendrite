@@ -57,6 +57,9 @@ type Global struct {
 
 	// DNS caching options for all outbound HTTP requests
 	DNSCache DNSCacheOptions `yaml:"dns_cache"`
+
+	// ServerNotices configuration used for sending server notices
+	ServerNotices ServerNotices `yaml:"server_notices"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -82,6 +85,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.Metrics.Verify(configErrs, isMonolith)
 	c.Sentry.Verify(configErrs, isMonolith)
 	c.DNSCache.Verify(configErrs, isMonolith)
+	c.ServerNotices.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -122,6 +126,29 @@ func (c *Metrics) Defaults(generate bool) {
 
 func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
+
+// ServerNotices defines the configuration used for sending server notices
+type ServerNotices struct {
+	// The localpart to be used when sending notices
+	LocalPart string `yaml:"local_part"`
+	// The displayname to be used when sending notices
+	DisplayName string `yaml:"display_name"`
+	// The avatar of this user
+	Avatar string `yaml:"avatar"`
+	// The roomname to be used when creating messages
+	RoomName string `yaml:"room_name"`
+}
+
+func (c *ServerNotices) Defaults(generate bool) {
+	if generate {
+		c.LocalPart = "server"
+		c.DisplayName = "Server Alert"
+		c.RoomName = "Server Alert"
+		c.Avatar = ""
+	}
+}
+
+func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
 // The configuration to use for Sentry error reporting
 type Sentry struct {
