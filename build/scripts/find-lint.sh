@@ -33,7 +33,7 @@ echo "Looking for lint..."
 # Capture exit code to ensure go.{mod,sum} is restored before exiting
 exit_code=0
 
-golangci-lint run $args || exit_code=1
+PATH="$PATH:${GOPATH:-~/go}/bin" golangci-lint run $args || exit_code=1
 
 # Restore go.{mod,sum}
 mv go.mod.bak go.mod && mv go.sum.bak go.sum

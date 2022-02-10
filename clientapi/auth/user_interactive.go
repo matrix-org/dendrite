@@ -32,21 +32,23 @@ import (
 type Type interface {
 	// Name returns the name of the auth type e.g `m.login.password`
 	Name() string
-	// Request returns a pointer to a new request body struct to unmarshal into.
-	Request() interface{}
 	// Login with the auth type, returning an error response on failure.
 	// Not all types support login, only m.login.password and m.login.token
 	// See https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-login
-	// `req` is guaranteed to be the type returned from Request()
 	// This function will be called when doing login and when doing 'sudo' style
 	// actions e.g deleting devices. The response must be a 401 as per:
 	// "If the homeserver decides that an attempt on a stage was unsuccessful, but the
 	// client may make a second attempt, it returns the same HTTP status 401 response as above,
 	// with the addition of the standard errcode and error fields describing the error."
-	Login(ctx context.Context, req interface{}) (login *Login, errRes *util.JSONResponse)
+	//
+	// The returned cleanup function must be non-nil on success, and will be called after
+	// authorization has been completed. Its argument is the final result of authorization.
+	LoginFromJSON(ctx context.Context, reqBytes []byte) (login *Login, cleanup LoginCleanupFunc, errRes *util.JSONResponse)
 	// TODO: Extend to support Register() flow
 	// Register(ctx context.Context, sessionID string, req interface{})
 }
+
+type LoginCleanupFunc func(context.Context, *util.JSONResponse)
 
 // LoginIdentifier represents identifier types
 // https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
@@ -61,11 +63,8 @@ type LoginIdentifier struct {
 
 // Login represents the shared fields used in all forms of login/sudo endpoints.
 type Login struct {
-	Type       string          `json:"type"`
-	Identifier LoginIdentifier `json:"identifier"`
-	User       string          `json:"user"`    // deprecated in favour of identifier
-	Medium     string          `json:"medium"`  // deprecated in favour of identifier
-	Address    string          `json:"address"` // deprecated in favour of identifier
+	LoginIdentifier                 // Flat fields deprecated in favour of `identifier`.
+	Identifier      LoginIdentifier `json:"identifier"`
 
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two
@@ -111,12 +110,11 @@ type UserInteractive struct {
 	Sessions map[string][]string
 }
 
-func NewUserInteractive(getAccByPass GetAccountByPassword, cfg *config.ClientAPI) *UserInteractive {
+func NewUserInteractive(accountDB AccountDatabase, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
-		GetAccountByPassword: getAccByPass,
+		GetAccountByPassword: accountDB.GetAccountByPassword,
 		Config:               cfg,
 	}
-	// TODO: Add SSO login
 	return &UserInteractive{
 		Completed: []string{},
 		Flows: []userInteractiveFlow{
@@ -236,18 +234,13 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 		}
 	}
 
-	r := loginType.Request()
-	if err := json.Unmarshal([]byte(gjson.GetBytes(bodyBytes, "auth").Raw), r); err != nil {
-		return nil, &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
-		}
+	login, cleanup, resErr := loginType.LoginFromJSON(ctx, []byte(gjson.GetBytes(bodyBytes, "auth").Raw))
+	if resErr != nil {
+		return nil, u.ResponseWithChallenge(sessionID, resErr.JSON)
 	}
-	login, resErr := loginType.Login(ctx, r)
-	if resErr == nil {
-		u.AddCompletedStage(sessionID, authType)
-		// TODO: Check if there's more stages to go and return an error
-		return login, nil
-	}
-	return nil, u.ResponseWithChallenge(sessionID, resErr.JSON)
+
+	u.AddCompletedStage(sessionID, authType)
+	cleanup(ctx, nil)
+	// TODO: Check if there's more stages to go and return an error
+	return login, nil
 }

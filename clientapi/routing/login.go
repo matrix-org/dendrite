@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -65,21 +64,14 @@ func Login(
 			JSON: passwordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		typePassword := auth.LoginTypePassword{
-			GetAccountByPassword: accountDB.GetAccountByPassword,
-			Config:               cfg,
-		}
-		r := typePassword.Request()
-		resErr := httputil.UnmarshalJSONRequest(req, r)
-		if resErr != nil {
-			return *resErr
-		}
-		login, authErr := typePassword.Login(req.Context(), r)
+		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, accountDB, userAPI, cfg)
 		if authErr != nil {
 			return *authErr
 		}
 		// make a device/access token
-		return completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		authErr2 := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		cleanup(req.Context(), &authErr2)
+		return authErr2
 	}
 	return util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,

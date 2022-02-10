@@ -42,6 +42,7 @@ type DeviceDatabase interface {
 type AccountDatabase interface {
 	// Look up the account matching the given localpart.
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
+	GetAccountByPassword(ctx context.Context, localpart, password string) (*api.Account, error)
 }
 
 // VerifyUserFromRequest authenticates the HTTP request,

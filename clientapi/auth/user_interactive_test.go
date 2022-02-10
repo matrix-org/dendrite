@@ -24,7 +24,11 @@ var (
 	}
 )
 
-func getAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error) {
+type fakeAccountDatabase struct {
+	AccountDatabase
+}
+
+func (*fakeAccountDatabase) GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error) {
 	acc, ok := lookup[localpart+" "+plaintextPassword]
 	if !ok {
 		return nil, fmt.Errorf("unknown user/password")
@@ -38,7 +42,7 @@ func setup() *UserInteractive {
 			ServerName: serverName,
 		},
 	}
-	return NewUserInteractive(getAccountByPassword, cfg)
+	return NewUserInteractive(&fakeAccountDatabase{}, cfg)
 }
 
 func TestUserInteractiveChallenge(t *testing.T) {

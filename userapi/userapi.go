@@ -15,6 +15,8 @@
 package userapi
 
 import (
+	"time"
+
 	"github.com/gorilla/mux"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -25,6 +27,13 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/devices"
 	"github.com/sirupsen/logrus"
 )
+
+// defaultLoginTokenLifetime determines how old a valid token may be.
+//
+// NOTSPEC: The current spec says "SHOULD be limited to around five
+// seconds". Since TCP retries are on the order of 3 s, 5 s sounds very low.
+// Synapse uses 2 min (https://github.com/matrix-org/synapse/blob/78d5f91de1a9baf4dbb0a794cb49a799f29f7a38/synapse/handlers/auth.py#L1323-L1325).
+const defaultLoginTokenLifetime = 2 * time.Minute
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
@@ -37,11 +46,21 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 func NewInternalAPI(
 	accountDB accounts.Database, cfg *config.UserAPI, appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 ) api.UserInternalAPI {
-	deviceDB, err := devices.NewDatabase(&cfg.DeviceDatabase, cfg.Matrix.ServerName)
+	deviceDB, err := devices.NewDatabase(&cfg.DeviceDatabase, cfg.Matrix.ServerName, defaultLoginTokenLifetime)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
 	}
 
+	return newInternalAPI(accountDB, deviceDB, cfg, appServices, keyAPI)
+}
+
+func newInternalAPI(
+	accountDB accounts.Database,
+	deviceDB devices.Database,
+	cfg *config.UserAPI,
+	appServices []config.ApplicationService,
+	keyAPI keyapi.KeyInternalAPI,
+) api.UserInternalAPI {
 	return &internal.UserInternalAPI{
 		AccountDB:   accountDB,
 		DeviceDB:    deviceDB,
