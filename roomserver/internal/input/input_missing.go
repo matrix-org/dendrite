@@ -43,7 +43,7 @@ type missingStateReq struct {
 // nolint:gocyclo
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
-) (*gomatrixserverlib.RespState, error) {
+) (*parsedRespState, error) {
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
@@ -123,14 +123,9 @@ func (t *missingStateReq) processEventWithMissingState(
 	}
 	t.hadEventsMutex.Unlock()
 
-	sendOutliers := func(resolvedState *gomatrixserverlib.RespState) error {
-		var outliers []*gomatrixserverlib.Event
-		outliers, err = resolvedState.Events()
-		if err != nil {
-			return fmt.Errorf("resolvedState.Events: %w", err)
-		}
+	sendOutliers := func(resolvedState *parsedRespState) error {
 		var outlierRoomEvents []api.InputRoomEvent
-		for _, outlier := range outliers {
+		for _, outlier := range resolvedState.AuthEvents {
 			if hadEvents[outlier.EventID()] {
 				continue
 			}
@@ -224,7 +219,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	return resolvedState, nil
 }
 
-func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (*gomatrixserverlib.RespState, error) {
+func (t *missingStateReq) lookupResolvedStateBeforeEvent(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (*parsedRespState, error) {
 	type respState struct {
 		// A snapshot is considered trustworthy if it came from our own roomserver.
 		// That's because the state will have been through state resolution once
@@ -513,15 +508,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	// will be added and duplicates will be removed.
 	logger.Debugf("get_missing_events returned %d events", len(missingResp.Events))
 	missingEvents := make([]*gomatrixserverlib.Event, len(missingResp.Events))
-	for i, evJSON := range missingResp.Events {
-		ev, err := gomatrixserverlib.NewEventFromUntrustedJSON(evJSON, roomVersion)
-		if err != nil {
-			logger.WithError(err).WithField("event", string(evJSON)).Warn("NewEventFromUntrustedJSON: failed")
-			return nil, false, missingPrevEventsError{
-				eventID: e.EventID(),
-				err:     err,
-			}
-		}
+	for i, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
 		missingEvents[i] = t.cacheAndReturn(ev.Headered(roomVersion)).Unwrap()
 	}
 
