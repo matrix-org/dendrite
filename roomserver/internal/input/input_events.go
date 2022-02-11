@@ -128,9 +128,17 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// Don't waste time processing the event if the room doesn't exist.
+	// A room entry locally will only be created in response to a create
+	// event.
+	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	if !updater.RoomExists() && !isCreateEvent {
+		return rollbackTransaction, fmt.Errorf("room does not exist")
+	}
+
 	var missingAuth, missingPrev bool
 	serverRes := &fedapi.QueryJoinedHostServerNamesInRoomResponse{}
-	if event.Type() != gomatrixserverlib.MRoomCreate || !event.StateKeyEquals("") {
+	if !isCreateEvent {
 		missingAuthIDs, missingPrevIDs, err := updater.MissingAuthPrevEvents(ctx, event)
 		if err != nil {
 			return rollbackTransaction, fmt.Errorf("updater.MissingAuthPrevEvents: %w", err)

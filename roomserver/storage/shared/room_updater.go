@@ -16,6 +16,7 @@ type RoomUpdater struct {
 	latestEvents            []types.StateAtEventAndReference
 	lastEventIDSent         string
 	currentStateSnapshotNID types.StateSnapshotNID
+	roomExists              bool
 }
 
 func rollback(txn *sql.Tx) {
@@ -33,7 +34,7 @@ func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *typ
 	// succeed, processing a create event which creates the room, or it won't.
 	if roomInfo == nil {
 		return &RoomUpdater{
-			transaction{ctx, txn}, d, nil, nil, "", 0,
+			transaction{ctx, txn}, d, nil, nil, "", 0, false,
 		}, nil
 	}
 
@@ -57,8 +58,13 @@ func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *typ
 		}
 	}
 	return &RoomUpdater{
-		transaction{ctx, txn}, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID,
+		transaction{ctx, txn}, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID, true,
 	}, nil
+}
+
+// RoomExists returns true if the room exists and false otherwise.
+func (u *RoomUpdater) RoomExists() bool {
+	return u.roomExists
 }
 
 // Implements sqlutil.Transaction
