@@ -83,6 +83,14 @@ func SendServerNotice(
 		return *resErr
 	}
 
+	// check that all required fields are set
+	if !r.validate() {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Invalid request"),
+		}
+	}
+
 	// get rooms for specified user
 	allUserRooms := []string{}
 	userRooms := api.QueryRoomsForUserResponse{}
