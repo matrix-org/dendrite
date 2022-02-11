@@ -22,15 +22,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 )
 
 // OutgoingQueues is a collection of queues for sending transactions to other
@@ -182,23 +183,14 @@ func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 	destinationQueueTotal.Dec()
 }
 
-type ErrorFederationDisabled struct {
-	Message string
-}
-
-func (e *ErrorFederationDisabled) Error() string {
-	return e.Message
-}
-
 // SendEvent sends an event to the destinations
 func (oqs *OutgoingQueues) SendEvent(
 	ev *gomatrixserverlib.HeaderedEvent, origin gomatrixserverlib.ServerName,
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if oqs.disabled {
-		return &ErrorFederationDisabled{
-			Message: "Federation disabled",
-		}
+		log.Trace("Federation is disabled, not sending event")
+		return nil
 	}
 	if origin != oqs.origin {
 		// TODO: Support virtual hosting; gh issue #577.
@@ -262,9 +254,8 @@ func (oqs *OutgoingQueues) SendEDU(
 	destinations []gomatrixserverlib.ServerName,
 ) error {
 	if oqs.disabled {
-		return &ErrorFederationDisabled{
-			Message: "Federation disabled",
-		}
+		log.Trace("Federation is disabled, not sending EDU")
+		return nil
 	}
 	if origin != oqs.origin {
 		// TODO: Support virtual hosting; gh issue #577.
