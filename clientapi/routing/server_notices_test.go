@@ -69,8 +69,8 @@ func Test_sendServerNoticeRequest_validate(t *testing.T) {
 				Type:     tt.fields.Type,
 				StateKey: tt.fields.StateKey,
 			}
-			if gotOk := r.validate(); gotOk != tt.wantOk {
-				t.Errorf("validate() = %v, want %v", gotOk, tt.wantOk)
+			if gotOk := r.valid(); gotOk != tt.wantOk {
+				t.Errorf("valid() = %v, want %v", gotOk, tt.wantOk)
 			}
 		})
 	}

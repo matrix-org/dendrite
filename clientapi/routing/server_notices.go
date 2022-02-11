@@ -84,7 +84,7 @@ func SendServerNotice(
 	}
 
 	// check that all required fields are set
-	if !r.validate() {
+	if !r.valid() {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
@@ -139,7 +139,7 @@ func SendServerNotice(
 		roomVersion = gomatrixserverlib.RoomVersionV6
 	)
 
-	adminDevice, err := getSenderDevice(ctx, userAPI, cfgClient)
+	senderDevice, err := getSenderDevice(ctx, userAPI, cfgClient)
 	if err != nil {
 		logrus.WithError(err).Error("unable to get device")
 		return util.ErrorResponse(err)
@@ -169,7 +169,7 @@ func SendServerNotice(
 			PowerLevelContentOverride: pl,
 		}
 
-		roomRes := createRoom(ctx, crReq, adminDevice, cfgClient, accountsDB, rsAPI, asAPI, time.Now())
+		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, accountsDB, rsAPI, asAPI, time.Now())
 
 		switch data := roomRes.JSON.(type) {
 		case createRoomResponse:
@@ -200,7 +200,7 @@ func SendServerNotice(
 		"body":    r.Content.Body,
 		"msgtype": r.Content.MsgType,
 	}
-	e, resErr := generateSendEvent(ctx, request, adminDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
+	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
 		return *resErr
@@ -256,7 +256,7 @@ func SendServerNotice(
 	return res
 }
 
-func (r sendServerNoticeRequest) validate() (ok bool) {
+func (r sendServerNoticeRequest) valid() (ok bool) {
 	if r.UserID == "" {
 		return false
 	}
