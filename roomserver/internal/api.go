@@ -4,6 +4,10 @@ import (
 	"context"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -14,9 +18,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -153,6 +155,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	if err := r.Inputer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
+}
+
+func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+	r.Leaver.UserAPI = userAPI
 }
 
 func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {

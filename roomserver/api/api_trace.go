@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // RoomserverInternalAPITrace wraps a RoomserverInternalAPI and logs the
@@ -23,6 +25,10 @@ func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInte
 
 func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
 	t.Impl.SetAppserviceAPI(asAPI)
+}
+
+func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.UserInternalAPI) {
+	t.Impl.SetUserAPI(userAPI)
 }
 
 func (t *RoomserverInternalAPITrace) InputRoomEvents(
