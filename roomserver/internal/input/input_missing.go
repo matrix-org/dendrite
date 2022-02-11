@@ -27,7 +27,6 @@ type missingStateReq struct {
 	origin          gomatrixserverlib.ServerName
 	db              *shared.RoomUpdater
 	inputer         *Inputer
-	roomInfo        *types.RoomInfo
 	keys            gomatrixserverlib.JSONVerifier
 	federation      fedapi.FederationInternalAPI
 	roomsMu         *internal.MutexByRoom
@@ -383,10 +382,8 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 		t.hadEvent(ev.EventID())
 	}
 
-	stateEvents = nil
-	stateEventNIDs = nil
-	stateEntries = nil
-	stateAtEvents = nil
+	// encourage GC
+	stateEvents, stateEventNIDs, stateEntries, stateAtEvents = nil, nil, nil, nil // nolint:ineffassign
 
 	missingAuthEvents := map[string]bool{}
 	res.AuthEvents = make([]*gomatrixserverlib.Event, 0, len(stateEvents)*3)
@@ -659,7 +656,9 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 			delete(missing, evID)
 		}
 	}
-	events = nil // allow GC
+
+	// encourage GC
+	events = nil // nolint:ineffassign
 
 	concurrentRequests := 8
 	missingCount := len(missing)
