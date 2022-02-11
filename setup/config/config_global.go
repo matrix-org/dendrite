@@ -129,6 +129,7 @@ func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 // ServerNotices defines the configuration used for sending server notices
 type ServerNotices struct {
+	Enabled bool `yaml:"enabled"`
 	// The localpart to be used when sending notices
 	LocalPart string `yaml:"local_part"`
 	// The displayname to be used when sending notices

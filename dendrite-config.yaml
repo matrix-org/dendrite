@@ -70,6 +70,7 @@ global:
 
   # Server notices allows server admins to send messages to all users.
   server_notices:
+    enabled: false
     # The server localpart to be used when sending notices, ensure this is not yet take
     local_part: "server"
     # The displayname to be used when sending notices
