@@ -17,7 +17,7 @@ func UpAddAccountType(tx *sql.Tx) error {
 		return fmt.Errorf("failed to add column: %w", err)
 
 	}
-	_, err = tx.Exec("UPDATE account_accounts SET account_type = 1 WHERE appservice_id = '';")
+	_, err = tx.Exec("UPDATE account_accounts SET account_type = 1 WHERE appservice_id = '' OR appservice_id IS NULL;")
 	if err != nil {
 		return fmt.Errorf("failed to update user accounts: %w", err)
 	}
