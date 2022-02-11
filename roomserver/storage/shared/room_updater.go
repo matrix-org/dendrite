@@ -100,15 +100,6 @@ func (u *RoomUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 func (u *RoomUpdater) MissingAuthPrevEvents(
 	ctx context.Context, e *gomatrixserverlib.Event,
 ) (missingAuth, missingPrev []string, err error) {
-	var info *types.RoomInfo
-	info, err = u.RoomInfo(ctx, e.RoomID())
-	if err != nil {
-		return
-	}
-	if info == nil || !info.IsStub {
-		return
-	}
-
 	for _, authEventID := range e.AuthEventIDs() {
 		if nids, err := u.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
 			missingAuth = append(missingAuth, authEventID)

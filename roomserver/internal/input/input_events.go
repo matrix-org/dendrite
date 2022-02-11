@@ -133,7 +133,7 @@ func (r *Inputer) processRoomEvent(
 	if event.Type() != gomatrixserverlib.MRoomCreate || !event.StateKeyEquals("") {
 		missingAuthIDs, missingPrevIDs, err := updater.MissingAuthPrevEvents(ctx, event)
 		if err != nil {
-			return rollbackTransaction, fmt.Errorf("r.DB.MissingAuthPrevEvents: %w", err)
+			return rollbackTransaction, fmt.Errorf("updater.MissingAuthPrevEvents: %w", err)
 		}
 		missingAuth = len(missingAuthIDs) > 0
 		missingPrev = !input.HasState && len(missingPrevIDs) > 0
