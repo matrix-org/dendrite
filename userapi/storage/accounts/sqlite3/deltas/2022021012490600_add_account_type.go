@@ -18,49 +18,24 @@ func LoadAddAccountType(m *sqlutil.Migrations) {
 }
 
 func UpAddAccountType(tx *sql.Tx) error {
-	_, err := tx.Exec(`
-	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
-CREATE TABLE account_accounts (
-    localpart TEXT NOT NULL PRIMARY KEY,
-    created_ts BIGINT NOT NULL,
-    password_hash TEXT,
-    appservice_id TEXT,
-    is_deactivated BOOLEAN DEFAULT 0,
-	account_type INTEGER DEFAULT 2
-);
-INSERT INTO account_accounts (
-      localpart, created_ts, password_hash, appservice_id 
-    ) SELECT
-        localpart, created_ts, password_hash, appservice_id
-    FROM account_accounts_tmp;
-
-UPDATE account_accounts SET account_type = 4 WHERE appservice_id <> '';
-
-DROP TABLE account_accounts_tmp;`)
+	// initially set every account to useracount, change appserver accounts afterwards
+	_, err := tx.Exec(`ALTER TABLE account_accounts ADD COLUMN account_type INTEGER;`)
 	if err != nil {
-		return fmt.Errorf("failed to execute upgrade: %w", err)
+		return fmt.Errorf("failed to add column: %w", err)
+	}
+	_, err = tx.Exec(`UPDATE account_accounts SET account_type = 1 WHERE appservice_id = ''`)
+	if err != nil {
+		return fmt.Errorf("failed to update user accounts: %w", err)
+	}
+	_, err = tx.Exec(`UPDATE account_accounts SET account_type = 4 WHERE appservice_id <> ''`)
+	if err != nil {
+		return fmt.Errorf("failed to update appservice accounts upgrade: %w", err)
 	}
 	return nil
 }
 
 func DownAddAccountType(tx *sql.Tx) error {
-	_, err := tx.Exec(`
-	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
-CREATE TABLE account_accounts (
-    localpart TEXT NOT NULL PRIMARY KEY,
-    created_ts BIGINT NOT NULL,
-    password_hash TEXT,
-    appservice_id TEXT,
-    is_deactivated BOOLEAN DEFAULT 0
-);
-INSERT
-    INTO account_accounts (
-      localpart, created_ts, password_hash, appservice_id 
-    ) SELECT
-        localpart, created_ts, password_hash, appservice_id
-    FROM account_accounts_tmp
-;
-DROP TABLE account_accounts_tmp;`)
+	_, err := tx.Exec(`ALTER TABLE account_accounts DROP COLUMN account_type;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}

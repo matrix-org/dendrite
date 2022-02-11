@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- If the account is currently active
     is_deactivated BOOLEAN DEFAULT FALSE,
 	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
-	account_type INT DEFAULT 2
+	account_type SMALLINT
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
 );

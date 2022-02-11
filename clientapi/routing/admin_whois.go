@@ -47,7 +47,8 @@ func GetAdminWhois(
 	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
 	userID string,
 ) util.JSONResponse {
-	if device.AccountType != api.AccountTypeAdmin && userID != device.UserID {
+	allowed := device.AccountType == api.AccountTypeAdmin || userID == device.UserID
+	if !allowed {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("userID does not match the current user"),
