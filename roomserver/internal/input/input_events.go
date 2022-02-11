@@ -133,7 +133,7 @@ func (r *Inputer) processRoomEvent(
 	// event.
 	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
 	if !updater.RoomExists() && !isCreateEvent {
-		return rollbackTransaction, fmt.Errorf("room does not exist")
+		return rollbackTransaction, fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
 
 	var missingAuth, missingPrev bool
