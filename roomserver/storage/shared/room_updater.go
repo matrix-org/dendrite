@@ -97,6 +97,34 @@ func (u *RoomUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 	return u.currentStateSnapshotNID
 }
 
+func (u *RoomUpdater) MissingAuthPrevEvents(
+	ctx context.Context, e *gomatrixserverlib.Event,
+) (missingAuth, missingPrev []string, err error) {
+	var info *types.RoomInfo
+	info, err = u.RoomInfo(ctx, e.RoomID())
+	if err != nil {
+		return
+	}
+	if info == nil || !info.IsStub {
+		return
+	}
+
+	for _, authEventID := range e.AuthEventIDs() {
+		if nids, err := u.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
+			missingAuth = append(missingAuth, authEventID)
+		}
+	}
+
+	for _, prevEventID := range e.PrevEventIDs() {
+		state, err := u.StateAtEventIDs(ctx, []string{prevEventID})
+		if err != nil || len(state) == 0 || (!state[0].IsCreate() && state[0].BeforeStateSnapshotNID == 0) {
+			missingPrev = append(missingPrev, prevEventID)
+		}
+	}
+
+	return
+}
+
 // StorePreviousEvents implements types.RoomRecentEventsUpdater - This must be called from a Writer
 func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
