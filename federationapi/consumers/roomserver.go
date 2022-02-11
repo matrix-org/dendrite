@@ -19,6 +19,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -26,9 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -97,21 +98,14 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 		}
 
 		if err := s.processMessage(*output.NewRoomEvent); err != nil {
-			switch err.(type) {
-			case *queue.ErrorFederationDisabled:
-				log.WithField("error", output.Type).Info(
-					err.Error(),
-				)
-			default:
-				// panic rather than continue with an inconsistent database
-				log.WithFields(log.Fields{
-					"event_id":   ev.EventID(),
-					"event":      string(ev.JSON()),
-					"add":        output.NewRoomEvent.AddsStateEventIDs,
-					"del":        output.NewRoomEvent.RemovesStateEventIDs,
-					log.ErrorKey: err,
-				}).Panicf("roomserver output log: write room event failure")
-			}
+			// panic rather than continue with an inconsistent database
+			log.WithFields(log.Fields{
+				"event_id":   ev.EventID(),
+				"event":      string(ev.JSON()),
+				"add":        output.NewRoomEvent.AddsStateEventIDs,
+				"del":        output.NewRoomEvent.RemovesStateEventIDs,
+				log.ErrorKey: err,
+			}).Panicf("roomserver output log: write room event failure")
 		}
 
 	case api.OutputTypeNewInboundPeek:
