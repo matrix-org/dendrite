@@ -208,6 +208,8 @@ func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // If either require_at_registration or send_server_notice_to_guest are true, consent
 // messages will be sent to the users.
 type UserConsentOptions struct {
+	// Randomly generated string to be used to calculate the HMAC
+	FormSecret string
 	// Require consent when user registers for the first time
 	RequireAtRegistration bool `yaml:"require_at_registration"`
 	// The name to be shown to the user
@@ -243,6 +245,7 @@ func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool)
 		checkNotEmpty(configErrors, "template_dir", c.TemplateDir)
 		checkNotEmpty(configErrors, "version", c.Version)
 		checkNotEmpty(configErrors, "policy_name", c.PolicyName)
+		checkNotEmpty(configErrors, "form_secret", c.FormSecret)
 		if len(*configErrors) > 0 {
 			return
 		}
