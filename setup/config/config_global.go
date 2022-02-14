@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"html/template"
 	"math/rand"
+	"path/filepath"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -57,6 +60,9 @@ type Global struct {
 
 	// DNS caching options for all outbound HTTP requests
 	DNSCache DNSCacheOptions `yaml:"dns_cache"`
+
+	// Consent tracking options
+	UserConsentOptions UserConsentOptions `yaml:"user_consent"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -72,6 +78,7 @@ func (c *Global) Defaults(generate bool) {
 	c.Metrics.Defaults(generate)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
+	c.UserConsentOptions.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -82,6 +89,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.Metrics.Verify(configErrs, isMonolith)
 	c.Sentry.Verify(configErrs, isMonolith)
 	c.DNSCache.Verify(configErrs, isMonolith)
+	c.UserConsentOptions.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -194,4 +202,72 @@ func (c *DNSCacheOptions) Defaults() {
 func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
 	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
+}
+
+// Consent tracking configuration
+// If either require_at_registration or send_server_notice_to_guest are true, consent
+// messages will be sent to the users.
+type UserConsentOptions struct {
+	// Require consent when user registers for the first time
+	RequireAtRegistration bool `yaml:"require_at_registration"`
+	// The name to be shown to the user
+	PolicyName string `yaml:"policy_name"`
+	// The directory to search for *.gohtml templates
+	TemplateDir string `yaml:"template_dir"`
+	// The version of the policy. When loading templates, ".gohtml" template is added as a suffix
+	// e.g: ${template_dir}/1.0.gohtml needs to exist, if this is set to 1.0
+	Version string `yaml:"version"`
+	// Send a consent message to guest users
+	SendServerNoticeToGuest bool `yaml:"send_server_notice_to_guest"`
+	// Default message to send to users
+	ServerNoticeContent struct {
+		MsgType string `yaml:"msg_type"`
+		Body    string `yaml:"body"`
+	} `yaml:"server_notice_content"`
+	// The error message to display if the user hasn't given their consent yet
+	BlockEventsError string `yaml:"block_events_error"`
+	// All loaded templates
+	Templates *template.Template `yaml:"-"`
+}
+
+func (c *UserConsentOptions) Defaults() {
+	c.RequireAtRegistration = false
+	c.SendServerNoticeToGuest = false
+	c.PolicyName = "Privacy Policy"
+	c.Version = "1.0"
+	c.TemplateDir = "./templates/privacy"
+}
+
+func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool) {
+	if c.Enabled() {
+		checkNotEmpty(configErrors, "template_dir", c.TemplateDir)
+		checkNotEmpty(configErrors, "version", c.Version)
+		checkNotEmpty(configErrors, "policy_name", c.PolicyName)
+		if len(*configErrors) > 0 {
+			return
+		}
+
+		p, err := filepath.Abs(c.TemplateDir)
+		if err != nil {
+			configErrors.Add("unable to get template directory")
+			return
+		}
+
+		// Read all defined *.gohtml templates
+		t, err := template.ParseGlob(filepath.Join(p, "*.gohtml"))
+		if err != nil || t == nil {
+			configErrors.Add(fmt.Sprintf("unable to read consent templates: %+v", err))
+			return
+		}
+		c.Templates = t
+		// Verify we've got a template for the defined version
+		versionTemplate := c.Templates.Lookup(c.Version + ".gohtml")
+		if versionTemplate == nil {
+			configErrors.Add(fmt.Sprintf("unable to load defined '%s' policy template", c.Version))
+		}
+	}
+}
+
+func (c *UserConsentOptions) Enabled() bool {
+	return c.RequireAtRegistration || c.SendServerNoticeToGuest
 }

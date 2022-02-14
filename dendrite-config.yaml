@@ -68,6 +68,31 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
+  # Consent tracking configuration
+  # If either require_at_registration or send_server_notice_to_guest are true, consent
+  # messages will be sent to the users.
+  user_consent:
+    # Require consent when user registers for the first time
+    require_at_registration: false
+    # The name to be shown to the user
+    policy_name: "Privacy policy"
+    # The directory to search for templates
+    template_dir: "./templates/privacy"
+    # The version of the policy. When loading templates, ".gohtml" template is added as a suffix
+    # e.g: ${template_dir}/1.0.gohtml needs to exist, if this is set to "1.0"
+    version: "1.0"
+    # Send a consent message to guest users
+    send_server_notice_to_guest: false
+    # Default message to send to users
+    server_notice_content:
+      msg_type: "m.text"
+      body: >-
+        Please give your consent to the privacy policy at {{ .ConsentURL }}.
+    # The error message to display if the user hasn't given their consent yet
+    block_events_error: >-
+      You can't send any messages until you consent to the privacy policy at
+      {{ .ConsentURL }}.
+
   # Configuration for NATS JetStream
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an
