@@ -209,7 +209,7 @@ func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // messages will be sent to the users.
 type UserConsentOptions struct {
 	// Randomly generated string to be used to calculate the HMAC
-	FormSecret string
+	FormSecret string `yaml:"form_secret"`
 	// Require consent when user registers for the first time
 	RequireAtRegistration bool `yaml:"require_at_registration"`
 	// The name to be shown to the user
