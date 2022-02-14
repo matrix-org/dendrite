@@ -187,6 +187,7 @@ func SendServerNotice(
 			}
 
 		default:
+			// if we didn't get a createRoomResponse, we probably received an error, so return that.
 			return roomRes
 		}
 
@@ -267,7 +268,7 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 }
 
 // getSenderDevice creates a user account to be used when sending server notices.
-// It returns an userapi.Device, which is used for building the
+// It returns an userapi.Device, which is used for building the event
 func getSenderDevice(ctx context.Context, userAPI userapi.UserInternalAPI, cfg *config.ClientAPI) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse
 	// create account if it doesn't exist
