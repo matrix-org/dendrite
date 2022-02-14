@@ -22,10 +22,10 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/userapi/api"
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
@@ -80,7 +80,8 @@ func main() {
 			ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
 		},
 		cfg.Global.ServerName, bcrypt.DefaultCost,
-		time.Duration(cfg.UserAPI.OpenIDTokenLifetimeMS)*time.Millisecond,
+		cfg.UserAPI.OpenIDTokenLifetimeMS,
+		api.DefaultLoginTokenLifetime,
 	)
 	if err != nil {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())

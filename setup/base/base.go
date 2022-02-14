@@ -278,7 +278,8 @@ func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
 		&b.Cfg.UserAPI.AccountDatabase,
 		b.Cfg.Global.ServerName,
 		b.Cfg.UserAPI.BCryptCost,
-		time.Duration(b.Cfg.UserAPI.OpenIDTokenLifetimeMS)*time.Millisecond,
+		b.Cfg.UserAPI.OpenIDTokenLifetimeMS,
+		userapi.DefaultLoginTokenLifetime,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")

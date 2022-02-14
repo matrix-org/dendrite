@@ -54,7 +54,7 @@ type Database struct {
 	keyBackups            keyBackupStatements
 	serverName            gomatrixserverlib.ServerName
 	bcryptCost            int
-	openIDTokenLifetimeMS time.Duration
+	openIDTokenLifetimeMS int64
 }
 
 const (
@@ -64,7 +64,7 @@ const (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS time.Duration) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
@@ -73,6 +73,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		serverName:            serverName,
 		db:                    db,
 		writer:                sqlutil.NewDummyWriter(),
+		loginTokenLifetime:    loginTokenLifetime,
 		bcryptCost:            bcryptCost,
 		openIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}
@@ -84,7 +85,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadIsActive(m)
-	deltas.LoadLastSeenTSIP(m)
+	//deltas.LoadLastSeenTSIP(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
@@ -380,7 +381,7 @@ func (d *Database) CreateOpenIDToken(
 	ctx context.Context,
 	token, localpart string,
 ) (int64, error) {
-	expiresAtMS := time.Now().Add(d.openIDTokenLifetimeMS).UnixNano() / int64(time.Millisecond)
+	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.openIDTokenLifetimeMS
 	err := sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
 		return d.openIDTokens.insertToken(ctx, txn, token, localpart, expiresAtMS)
 	})

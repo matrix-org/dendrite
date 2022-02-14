@@ -117,6 +117,9 @@ func (s *devicesStatements) execSchema(db *sql.DB) error {
 }
 
 func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
+	if err = s.execSchema(db); err != nil {
+		return
+	}
 	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
 		return
 	}
