@@ -29,7 +29,9 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationapiAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -49,7 +51,9 @@ type BasicAuth struct {
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string, userAPI userapi.UserInternalAPI,
+	metricsName string,
+	userAPI userapi.UserInternalAPI,
+	userConsentCfg config.UserConsentOptions,
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -77,6 +81,30 @@ func MakeAuthAPI(
 				panic(r)
 			}
 		}()
+
+		// check if the user accepted any policy
+		if userConsentCfg.Enabled() {
+			localPart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+			if err != nil {
+				return jsonerror.InternalServerError()
+			}
+			// check which version of the policy the user accepted
+			res := &userapi.QueryPolicyVersionResponse{}
+			err = userAPI.QueryPolicyVersion(req.Context(), &userapi.QueryPolicyVersionRequest{
+				LocalPart: localPart,
+			}, res)
+			if err != nil {
+				return jsonerror.InternalServerError()
+			}
+
+			// user hasn't accepted any policy, block access.
+			if userConsentCfg.Version != res.PolicyVersion {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden(userConsentCfg.BlockEventsError),
+				}
+			}
+		}
 
 		jsonRes := f(req, device)
 		// do not log 4xx as errors as they are client fails, not server fails

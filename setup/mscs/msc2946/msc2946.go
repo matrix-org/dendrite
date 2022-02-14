@@ -71,7 +71,7 @@ func Enable(
 	})
 
 	base.PublicClientAPIMux.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/spaces",
-		httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(db, rsAPI, fsAPI, base.Cfg.Global.ServerName)),
+		httputil.MakeAuthAPI("spaces", userAPI, base.Cfg.Global.UserConsentOptions, spacesHandler(db, rsAPI, fsAPI, base.Cfg.Global.ServerName)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	base.PublicFederationAPIMux.Handle("/unstable/org.matrix.msc2946/spaces/{roomID}", httputil.MakeExternalAPI(

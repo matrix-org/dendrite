@@ -126,7 +126,7 @@ func Enable(
 	})
 
 	base.PublicClientAPIMux.Handle("/unstable/event_relationships",
-		httputil.MakeAuthAPI("eventRelationships", userAPI, eventRelationshipHandler(db, rsAPI, fsAPI)),
+		httputil.MakeAuthAPI("eventRelationships", userAPI, base.Cfg.Global.UserConsentOptions, eventRelationshipHandler(db, rsAPI, fsAPI)),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	base.PublicFederationAPIMux.Handle("/unstable/event_relationships", httputil.MakeExternalAPI(
