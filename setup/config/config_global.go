@@ -135,7 +135,7 @@ type ServerNotices struct {
 	// The displayname to be used when sending notices
 	DisplayName string `yaml:"display_name"`
 	// The avatar of this user
-	Avatar string `yaml:"avatar"`
+	AvatarURL string `yaml:"avatar"`
 	// The roomname to be used when creating messages
 	RoomName string `yaml:"room_name"`
 }
@@ -145,7 +145,7 @@ func (c *ServerNotices) Defaults(generate bool) {
 		c.LocalPart = "server"
 		c.DisplayName = "Server Alert"
 		c.RoomName = "Server Alert"
-		c.Avatar = ""
+		c.AvatarURL = ""
 	}
 }
 

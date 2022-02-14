@@ -71,12 +71,12 @@ global:
   # Server notices allows server admins to send messages to all users.
   server_notices:
     enabled: false
-    # The server localpart to be used when sending notices, ensure this is not yet take
+    # The server localpart to be used when sending notices, ensure this is not yet taken
     local_part: "server"
     # The displayname to be used when sending notices
     display_name: "Server alerts"
-    # The avatar of this user
-    avatar: ""
+    # The mxid of the avatar to use
+    avatar_url: ""
     # The roomname to be used when creating messages
     room_name: "Server Alerts"
 
