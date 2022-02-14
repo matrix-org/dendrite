@@ -553,7 +553,7 @@ func (d *Database) storeEvent(
 		err              error
 	)
 	var txn *sql.Tx
-	if updater != nil {
+	if updater != nil && updater.txn != nil {
 		txn = updater.txn
 	}
 	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
