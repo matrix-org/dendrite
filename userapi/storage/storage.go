@@ -15,27 +15,26 @@
 //go:build !wasm
 // +build !wasm
 
-package devices
+package storage
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/devices/postgres"
-	"github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
-// and sets postgres connection parameters. loginTokenLifetime determines how long a
-// login token from CreateLoginToken is valid.
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, loginTokenLifetime time.Duration) (Database, error) {
+// and sets postgres connection parameters
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS time.Duration) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName, loginTokenLifetime)
+		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties, serverName, loginTokenLifetime)
+		return postgres.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

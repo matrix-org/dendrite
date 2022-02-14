@@ -38,7 +38,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
@@ -447,7 +447,7 @@ func validateApplicationService(
 func Register(
 	req *http.Request,
 	userAPI userapi.UserInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var r registerRequest
@@ -891,7 +891,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.ClientAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 

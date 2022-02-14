@@ -29,7 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -87,7 +87,7 @@ var (
 func CheckAndProcessInvite(
 	ctx context.Context,
 	device *userapi.Device, body *MembershipRequest, cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI, db accounts.Database,
+	rsAPI api.RoomserverInternalAPI, db userdb.Database,
 	roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
@@ -137,7 +137,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db accounts.Database, cfg *config.ClientAPI, device *userapi.Device,
+	db userdb.Database, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -206,7 +206,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db accounts.Database, cfg *config.ClientAPI, device *userapi.Device,
+	db userdb.Database, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name

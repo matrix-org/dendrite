@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package accounts
+package storage
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -26,7 +27,7 @@ func NewDatabase(
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	bcryptCost int,
-	openIDTokenLifetimeMS int64,
+	openIDTokenLifetimeMS time.Duration,
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():

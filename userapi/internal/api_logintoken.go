@@ -34,7 +34,7 @@ func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *ap
 	if domain != a.ServerName {
 		return fmt.Errorf("cannot create a login token for a remote user: got %s want %s", domain, a.ServerName)
 	}
-	tokenMeta, err := a.DeviceDB.CreateLoginToken(ctx, &req.Data)
+	tokenMeta, err := a.DB.CreateLoginToken(ctx, &req.Data)
 	if err != nil {
 		return err
 	}
@@ -45,13 +45,13 @@ func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *ap
 // PerformLoginTokenDeletion ensures the token doesn't exist.
 func (a *UserInternalAPI) PerformLoginTokenDeletion(ctx context.Context, req *api.PerformLoginTokenDeletionRequest, res *api.PerformLoginTokenDeletionResponse) error {
 	util.GetLogger(ctx).Info("PerformLoginTokenDeletion")
-	return a.DeviceDB.RemoveLoginToken(ctx, req.Token)
+	return a.DB.RemoveLoginToken(ctx, req.Token)
 }
 
 // QueryLoginToken returns the data associated with a login token. If
 // the token is not valid, success is returned, but res.Data == nil.
 func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLoginTokenRequest, res *api.QueryLoginTokenResponse) error {
-	tokenData, err := a.DeviceDB.GetLoginTokenDataByToken(ctx, req.Token)
+	tokenData, err := a.DB.GetLoginTokenDataByToken(ctx, req.Token)
 	if err != nil {
 		res.Data = nil
 		if err == sql.ErrNoRows {
@@ -66,7 +66,7 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	if domain != a.ServerName {
 		return fmt.Errorf("cannot return a login token for a remote user: got %s want %s", domain, a.ServerName)
 	}
-	if _, err := a.AccountDB.GetAccountByLocalpart(ctx, localpart); err != nil {
+	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart); err != nil {
 		res.Data = nil
 		if err == sql.ErrNoRows {
 			return nil

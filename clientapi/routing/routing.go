@@ -34,7 +34,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -51,7 +51,7 @@ func Setup(
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
