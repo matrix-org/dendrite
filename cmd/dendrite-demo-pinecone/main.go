@@ -222,6 +222,7 @@ func main() {
 		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
+		base.PublicConsentAPIMux,
 	)
 
 	wsUpgrader := websocket.Upgrader{
