@@ -518,3 +518,21 @@ func (d *Database) UpsertBackupKeys(
 	})
 	return
 }
+
+// GetPrivacyPolicy returns the accepted privacy policy version, if any.
+func (d *Database) GetPrivacyPolicy(ctx context.Context, localpart string) (policyVersion string, err error) {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		policyVersion, err = d.accounts.selectPrivacyPolicy(ctx, txn, localpart)
+		return err
+	})
+	return
+}
+
+// GetOutdatedPolicy queries all users which didn't accept the current policy version
+func (d *Database) GetOutdatedPolicy(ctx context.Context, policyVersion string) (userIDs []string, err error) {
+	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
+		userIDs, err = d.accounts.batchSelectPrivacyPolicy(ctx, txn, policyVersion)
+		return err
+	})
+	return
+}

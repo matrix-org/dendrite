@@ -52,6 +52,8 @@ type Database interface {
 	DeactivateAccount(ctx context.Context, localpart string) (err error)
 	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
 	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
+	GetPrivacyPolicy(ctx context.Context, localpart string) (policyVersion string, err error)
+	GetOutdatedPolicy(ctx context.Context, policyVersion string) (userIDs []string, err error)
 
 	// Key backups
 	CreateKeyBackup(ctx context.Context, userID, algorithm string, authData json.RawMessage) (version string, err error)
