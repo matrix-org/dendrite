@@ -587,3 +587,31 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 	}
 	res.Keys = result
 }
+
+func (a *UserInternalAPI) QueryPolicyVersion(
+	ctx context.Context,
+	req *api.QueryPolicyVersionRequest,
+	res *api.QueryPolicyVersionResponse,
+) error {
+	var err error
+	res.PolicyVersion, err = a.AccountDB.GetPrivacyPolicy(ctx, req.LocalPart)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *UserInternalAPI) GetOutdatedPolicy(
+	ctx context.Context,
+	req *api.QueryOutdatedPolicyUsersRequest,
+	res *api.QueryOutdatedPolicyUsersResponse,
+) error {
+	var err error
+	res.OutdatedUsers, err = a.AccountDB.GetOutdatedPolicy(ctx, req.PolicyVersion)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

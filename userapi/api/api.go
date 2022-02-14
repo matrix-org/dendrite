@@ -44,6 +44,8 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+	QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error
+	GetOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyUsersRequest, res *QueryOutdatedPolicyUsersResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -333,6 +335,26 @@ type QueryOpenIDTokenRequest struct {
 type QueryOpenIDTokenResponse struct {
 	Sub         string // The Matrix User ID that generated the token
 	ExpiresAtMS int64
+}
+
+// QueryPolicyVersionRequest is the response for QueryPolicyVersionRequest
+type QueryPolicyVersionRequest struct {
+	LocalPart string
+}
+
+// QueryPolicyVersionResponsestruct is the response for QueryPolicyVersionResponsestruct
+type QueryPolicyVersionResponse struct {
+	PolicyVersion string
+}
+
+// QueryOutdatedPolicyUsersRequest is the response for QueryOutdatedPolicyUsersRequest
+type QueryOutdatedPolicyUsersRequest struct {
+	PolicyVersion string
+}
+
+// QueryOutdatedPolicyUsersResponse is the response for QueryOutdatedPolicyUsersRequest
+type QueryOutdatedPolicyUsersResponse struct {
+	OutdatedUsers []string
 }
 
 // Device represents a client's device (mobile, web, etc)

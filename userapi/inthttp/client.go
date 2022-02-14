@@ -38,14 +38,16 @@ const (
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
 	PerformKeyBackupPath           = "/userapi/performKeyBackup"
 
-	QueryKeyBackupPath      = "/userapi/queryKeyBackup"
-	QueryProfilePath        = "/userapi/queryProfile"
-	QueryAccessTokenPath    = "/userapi/queryAccessToken"
-	QueryDevicesPath        = "/userapi/queryDevices"
-	QueryAccountDataPath    = "/userapi/queryAccountData"
-	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
-	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
-	QueryOpenIDTokenPath    = "/userapi/queryOpenIDToken"
+	QueryKeyBackupPath       = "/userapi/queryKeyBackup"
+	QueryProfilePath         = "/userapi/queryProfile"
+	QueryAccessTokenPath     = "/userapi/queryAccessToken"
+	QueryDevicesPath         = "/userapi/queryDevices"
+	QueryAccountDataPath     = "/userapi/queryAccountData"
+	QueryDeviceInfosPath     = "/userapi/queryDeviceInfos"
+	QuerySearchProfilesPath  = "/userapi/querySearchProfiles"
+	QueryOpenIDTokenPath     = "/userapi/queryOpenIDToken"
+	QueryPolicyVersion       = "/userapi/queryPolicyVersion"
+	QueryOutdatedPolicyUsers = "/userapi/queryOutdatedPolicy"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -248,4 +250,20 @@ func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.Query
 	if err != nil {
 		res.Error = err.Error()
 	}
+}
+
+func (h *httpUserInternalAPI) QueryPolicyVersion(ctx context.Context, req *api.QueryPolicyVersionRequest, res *api.QueryPolicyVersionResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPolicyVersion
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) GetOutdatedPolicy(ctx context.Context, req *api.QueryOutdatedPolicyUsersRequest, res *api.QueryOutdatedPolicyUsersResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryOutdatedPolicyUsers
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

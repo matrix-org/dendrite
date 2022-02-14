@@ -265,4 +265,32 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(QueryPolicyVersion,
+		httputil.MakeInternalAPI("queryPolicyVersion", func(req *http.Request) util.JSONResponse {
+			request := api.QueryPolicyVersionRequest{}
+			response := api.QueryPolicyVersionResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			err := s.QueryPolicyVersion(req.Context(), &request, &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryOutdatedPolicyUsers,
+		httputil.MakeInternalAPI("queryOutdatedPolicyUsers", func(req *http.Request) util.JSONResponse {
+			request := api.QueryOutdatedPolicyUsersRequest{}
+			response := api.QueryOutdatedPolicyUsersResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			err := s.GetOutdatedPolicy(req.Context(), &request, &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

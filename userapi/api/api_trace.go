@@ -119,6 +119,18 @@ func (t *UserInternalAPITrace) QueryOpenIDToken(ctx context.Context, req *QueryO
 	return err
 }
 
+func (t *UserInternalAPITrace) QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error {
+	err := t.Impl.QueryPolicyVersion(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryPolicyVersion req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) GetOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyUsersRequest, res *QueryOutdatedPolicyUsersResponse) error {
+	err := t.Impl.GetOutdatedPolicy(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryPolicyVersion req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {
