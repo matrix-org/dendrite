@@ -139,7 +139,7 @@ func SendServerNotice(
 		roomVersion = gomatrixserverlib.RoomVersionV6
 	)
 
-	senderDevice, err := getSenderDevice(ctx, userAPI, cfgClient)
+	senderDevice, err := getSenderDevice(ctx, userAPI, accountsDB, cfgClient)
 	if err != nil {
 		logrus.WithError(err).Error("unable to get device")
 		return util.ErrorResponse(err)
@@ -269,7 +269,12 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 
 // getSenderDevice creates a user account to be used when sending server notices.
 // It returns an userapi.Device, which is used for building the event
-func getSenderDevice(ctx context.Context, userAPI userapi.UserInternalAPI, cfg *config.ClientAPI) (*userapi.Device, error) {
+func getSenderDevice(
+	ctx context.Context,
+	userAPI userapi.UserInternalAPI,
+	accountDB accounts.Database,
+	cfg *config.ClientAPI,
+) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse
 	// create account if it doesn't exist
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
@@ -278,6 +283,12 @@ func getSenderDevice(ctx context.Context, userAPI userapi.UserInternalAPI, cfg *
 		OnConflict:  userapi.ConflictUpdate,
 	}, &accRes)
 	if err != nil {
+		return nil, err
+	}
+
+	// set the avatarurl for the user
+	if err = accountDB.SetAvatarURL(ctx, cfg.Matrix.ServerNotices.LocalPart, cfg.Matrix.ServerNotices.AvatarURL); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("accountDB.SetAvatarURL failed")
 		return nil, err
 	}
 
