@@ -45,7 +45,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 func NewInternalAPI(
 	accountDB storage.Database, cfg *config.UserAPI, appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 ) api.UserInternalAPI {
-	db, err := storage.NewDatabase(&cfg.DeviceDatabase, cfg.Matrix.ServerName, cfg.BCryptCost, defaultLoginTokenLifetime)
+	db, err := storage.NewDatabase(&cfg.AccountDatabase, cfg.Matrix.ServerName, cfg.BCryptCost, defaultLoginTokenLifetime)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
 	}
