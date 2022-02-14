@@ -46,6 +46,7 @@ type UserInternalAPI interface {
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error
 	GetOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyUsersRequest, res *QueryOutdatedPolicyUsersResponse) error
+	PerformUpdatePolicyVersion(ctx context.Context, req *UpdatePolicyVersionRequest, res *UpdatePolicyVersionResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -347,7 +348,7 @@ type QueryPolicyVersionResponse struct {
 	PolicyVersion string
 }
 
-// QueryOutdatedPolicyUsersRequest is the response for QueryOutdatedPolicyUsersRequest
+// QueryOutdatedPolicyUsersRequest is the request for QueryOutdatedPolicyUsersRequest
 type QueryOutdatedPolicyUsersRequest struct {
 	PolicyVersion string
 }
@@ -356,6 +357,14 @@ type QueryOutdatedPolicyUsersRequest struct {
 type QueryOutdatedPolicyUsersResponse struct {
 	OutdatedUsers []string
 }
+
+// UpdatePolicyVersionRequest is the request for UpdatePolicyVersionRequest
+type UpdatePolicyVersionRequest struct {
+	PolicyVersion, LocalPart string
+}
+
+// UpdatePolicyVersionResponse is the response for UpdatePolicyVersionRequest
+type UpdatePolicyVersionResponse struct{}
 
 // Device represents a client's device (mobile, web, etc)
 type Device struct {

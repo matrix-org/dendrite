@@ -127,7 +127,13 @@ func (t *UserInternalAPITrace) QueryPolicyVersion(ctx context.Context, req *Quer
 
 func (t *UserInternalAPITrace) GetOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyUsersRequest, res *QueryOutdatedPolicyUsersResponse) error {
 	err := t.Impl.GetOutdatedPolicy(ctx, req, res)
-	util.GetLogger(ctx).Infof("QueryPolicyVersion req=%+v res=%+v", js(req), js(res))
+	util.GetLogger(ctx).Infof("GetOutdatedPolicy req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) PerformUpdatePolicyVersion(ctx context.Context, req *UpdatePolicyVersionRequest, res *UpdatePolicyVersionResponse) error {
+	err := t.Impl.PerformUpdatePolicyVersion(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformUpdatePolicyVersion req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

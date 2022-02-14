@@ -615,3 +615,11 @@ func (a *UserInternalAPI) GetOutdatedPolicy(
 
 	return nil
 }
+
+func (a *UserInternalAPI) PerformUpdatePolicyVersion(
+	ctx context.Context,
+	req *api.UpdatePolicyVersionRequest,
+	res *api.UpdatePolicyVersionResponse,
+) error {
+	return a.AccountDB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.LocalPart)
+}

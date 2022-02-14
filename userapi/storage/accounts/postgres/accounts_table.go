@@ -73,6 +73,9 @@ const selectPrivacyPolicySQL = "" +
 const batchSelectPrivacyPolicySQL = "" +
 	"SELECT localpart FROM account_accounts WHERE policy_version IS NULL or policy_version <> $1"
 
+const updatePolicyVersionSQL = "" +
+	"UPDATE account_accounts SET policy_version = $1 WHERE localpart = $2"
+
 type accountsStatements struct {
 	insertAccountStmt             *sql.Stmt
 	updatePasswordStmt            *sql.Stmt
@@ -82,6 +85,7 @@ type accountsStatements struct {
 	selectNewNumericLocalpartStmt *sql.Stmt
 	selectPrivacyPolicyStmt       *sql.Stmt
 	batchSelectPrivacyPolicyStmt  *sql.Stmt
+	updatePolicyVersionStmt       *sql.Stmt
 	serverName                    gomatrixserverlib.ServerName
 }
 
@@ -101,6 +105,7 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 		{&s.selectNewNumericLocalpartStmt, selectNewNumericLocalpartSQL},
 		{&s.selectPrivacyPolicyStmt, selectPrivacyPolicySQL},
 		{&s.batchSelectPrivacyPolicyStmt, batchSelectPrivacyPolicySQL},
+		{&s.updatePolicyVersionStmt, updatePolicyVersionSQL},
 	}.Prepare(db)
 }
 
@@ -217,4 +222,16 @@ func (s *accountsStatements) batchSelectPrivacyPolicy(
 		userIDs = append(userIDs, userID)
 	}
 	return userIDs, rows.Err()
+}
+
+// updatePolicyVersion sets the policy_version for a specific user
+func (s *accountsStatements) updatePolicyVersion(
+	ctx context.Context, txn *sql.Tx, policyVersion, localpart string,
+) (err error) {
+	stmt := s.updatePolicyVersionStmt
+	if txn != nil {
+		stmt = sqlutil.TxStmt(txn, stmt)
+	}
+	_, err = stmt.ExecContext(ctx, policyVersion, localpart)
+	return err
 }

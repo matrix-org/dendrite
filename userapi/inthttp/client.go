@@ -37,17 +37,18 @@ const (
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
 	PerformKeyBackupPath           = "/userapi/performKeyBackup"
+	PerformUpdatePolicyVersionPath = "/userapi/performUpdatePolicyVersion"
 
-	QueryKeyBackupPath       = "/userapi/queryKeyBackup"
-	QueryProfilePath         = "/userapi/queryProfile"
-	QueryAccessTokenPath     = "/userapi/queryAccessToken"
-	QueryDevicesPath         = "/userapi/queryDevices"
-	QueryAccountDataPath     = "/userapi/queryAccountData"
-	QueryDeviceInfosPath     = "/userapi/queryDeviceInfos"
-	QuerySearchProfilesPath  = "/userapi/querySearchProfiles"
-	QueryOpenIDTokenPath     = "/userapi/queryOpenIDToken"
-	QueryPolicyVersion       = "/userapi/queryPolicyVersion"
-	QueryOutdatedPolicyUsers = "/userapi/queryOutdatedPolicy"
+	QueryKeyBackupPath           = "/userapi/queryKeyBackup"
+	QueryProfilePath             = "/userapi/queryProfile"
+	QueryAccessTokenPath         = "/userapi/queryAccessToken"
+	QueryDevicesPath             = "/userapi/queryDevices"
+	QueryAccountDataPath         = "/userapi/queryAccountData"
+	QueryDeviceInfosPath         = "/userapi/queryDeviceInfos"
+	QuerySearchProfilesPath      = "/userapi/querySearchProfiles"
+	QueryOpenIDTokenPath         = "/userapi/queryOpenIDToken"
+	QueryPolicyVersionPath       = "/userapi/queryPolicyVersion"
+	QueryOutdatedPolicyUsersPath = "/userapi/queryOutdatedPolicy"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -256,7 +257,7 @@ func (h *httpUserInternalAPI) QueryPolicyVersion(ctx context.Context, req *api.Q
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
 	defer span.Finish()
 
-	apiURL := h.apiURL + QueryPolicyVersion
+	apiURL := h.apiURL + QueryPolicyVersionPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
@@ -264,6 +265,14 @@ func (h *httpUserInternalAPI) GetOutdatedPolicy(ctx context.Context, req *api.Qu
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
 	defer span.Finish()
 
-	apiURL := h.apiURL + QueryOutdatedPolicyUsers
+	apiURL := h.apiURL + QueryOutdatedPolicyUsersPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) PerformUpdatePolicyVersion(ctx context.Context, req *api.UpdatePolicyVersionRequest, res *api.UpdatePolicyVersionResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformUpdatePolicyVersionPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
