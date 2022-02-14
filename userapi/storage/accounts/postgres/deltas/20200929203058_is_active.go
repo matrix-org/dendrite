@@ -10,6 +10,7 @@ import (
 
 func LoadFromGoose() {
 	goose.AddMigration(UpIsActive, DownIsActive)
+	goose.AddMigration(UpAddPolicyVersion, DownAddPolicyVersion)
 }
 
 func LoadIsActive(m *sqlutil.Migrations) {

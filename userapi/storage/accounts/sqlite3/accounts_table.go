@@ -66,10 +66,10 @@ const selectNewNumericLocalpartSQL = "" +
 	"SELECT COUNT(localpart) FROM account_accounts"
 
 const selectPrivacyPolicySQL = "" +
-	"SELECT policy_version FROM accounts_accounts WHERE localpart = $1"
+	"SELECT policy_version FROM account_accounts WHERE localpart = $1"
 
 const batchSelectPrivacyPolicySQL = "" +
-	"SELECT localpart FROM accounts_accounts WHERE policy_version IS NULL or policy_version <> $1"
+	"SELECT localpart FROM account_accounts WHERE policy_version IS NULL or policy_version <> $1"
 
 type accountsStatements struct {
 	db                            *sql.DB

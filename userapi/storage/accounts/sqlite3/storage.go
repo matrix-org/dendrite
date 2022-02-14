@@ -77,6 +77,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadIsActive(m)
+	deltas.LoadAddPolicyVersion(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}

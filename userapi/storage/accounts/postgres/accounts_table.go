@@ -68,10 +68,10 @@ const selectNewNumericLocalpartSQL = "" +
 	"SELECT nextval('numeric_username_seq')"
 
 const selectPrivacyPolicySQL = "" +
-	"SELECT policy_version FROM accounts_accounts WHERE localpart = $1"
+	"SELECT policy_version FROM account_accounts WHERE localpart = $1"
 
 const batchSelectPrivacyPolicySQL = "" +
-	"SELECT localpart FROM accounts_accounts WHERE policy_version IS NULL or policy_version <> $1"
+	"SELECT localpart FROM account_accounts WHERE policy_version IS NULL or policy_version <> $1"
 
 type accountsStatements struct {
 	insertAccountStmt             *sql.Stmt
