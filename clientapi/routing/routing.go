@@ -47,7 +47,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
+	publicAPIMux, synapseAdminRouter, consentAPIMux *mux.Router, cfg *config.ClientAPI,
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -116,6 +116,9 @@ func Setup(
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
+
+	// unspecced consent tracking
+	consentAPIMux.HandleFunc("/consent", consent(userAPI, cfg)).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
