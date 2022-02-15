@@ -263,6 +263,21 @@ func loadConfig(
 	return &c, nil
 }
 
+type Terms struct {
+	Policies Policies `json:"policies"`
+}
+type En struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+type PrivacyPolicy struct {
+	En      En     `json:"en"`
+	Version string `json:"version"`
+}
+type Policies struct {
+	PrivacyPolicy PrivacyPolicy `json:"privacy_policy"`
+}
+
 // Derive generates data that is derived from various values provided in
 // the config file.
 func (config *Dendrite) Derive() error {
@@ -273,13 +288,39 @@ func (config *Dendrite) Derive() error {
 	// TODO: Add email auth type
 	// TODO: Add MSISDN auth type
 
+	if config.Global.UserConsentOptions.RequireAtRegistration {
+		uri := config.Global.BaseURL + "/_matrix/consent?v=" + config.Global.UserConsentOptions.Version
+		config.Derived.Registration.Params[authtypes.LoginTypeTerms] = Terms{
+			Policies: Policies{
+				PrivacyPolicy: PrivacyPolicy{
+					En: En{
+						Name: config.Global.UserConsentOptions.PolicyName,
+						URL:  uri,
+					},
+					Version: config.Global.UserConsentOptions.Version,
+				},
+			},
+		}
+	}
 	if config.ClientAPI.RecaptchaEnabled {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
-	} else {
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+	}
+
+	if config.Derived.Registration.Flows == nil {
+		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows, authtypes.Flow{
+			Stages: []authtypes.LoginType{authtypes.LoginTypeDummy},
+		})
+	}
+
+	// prepend each flow with LoginTypeTerms or LoginTypeRecaptcha
+	for i, flow := range config.Derived.Registration.Flows {
+		if config.Global.UserConsentOptions.RequireAtRegistration {
+			flow.Stages = append([]authtypes.LoginType{authtypes.LoginTypeTerms}, flow.Stages...)
+		}
+		if config.ClientAPI.RecaptchaEnabled {
+			flow.Stages = append([]authtypes.LoginType{authtypes.LoginTypeRecaptcha}, flow.Stages...)
+		}
+		config.Derived.Registration.Flows[i] = flow
 	}
 
 	// Load application service configuration files
