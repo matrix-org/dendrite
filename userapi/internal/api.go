@@ -67,7 +67,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		res.Account = acc
 		return nil
 	}
-	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID)
+	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.PolicyVersion)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
 			switch req.OnConflict {

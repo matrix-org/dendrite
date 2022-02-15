@@ -50,7 +50,7 @@ CREATE SEQUENCE IF NOT EXISTS numeric_username_seq START 1;
 `
 
 const insertAccountSQL = "" +
-	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id, policy_version) VALUES ($1, $2, $3, $4, $5)"
 
 const updatePasswordSQL = "" +
 	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
@@ -113,16 +113,16 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
 func (s *accountsStatements) insertAccount(
-	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID, policyVersion string,
 ) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.insertAccountStmt)
 
 	var err error
 	if appserviceID == "" {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil)
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil, "")
 	} else {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, policyVersion)
 	}
 	if err != nil {
 		return nil, err

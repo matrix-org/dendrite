@@ -192,7 +192,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, er
 			return err
 		}
 		localpart := strconv.FormatInt(numLocalpart, 10)
-		acc, err = d.createAccount(ctx, txn, localpart, "", "")
+		acc, err = d.createAccount(ctx, txn, localpart, "", "", "")
 		return err
 	})
 	return acc, err
@@ -202,7 +202,7 @@ func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, er
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, ErrUserExists.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, localpart, plaintextPassword, appserviceID, policyVersion string,
 ) (acc *api.Account, err error) {
 	// Create one account at a time else we can get 'database is locked'.
 	d.profilesMu.Lock()
@@ -212,7 +212,7 @@ func (d *Database) CreateAccount(
 	defer d.accountDatasMu.Unlock()
 	defer d.accountsMu.Unlock()
 	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID, policyVersion)
 		return err
 	})
 	return
@@ -221,7 +221,7 @@ func (d *Database) CreateAccount(
 // WARNING! This function assumes that the relevant mutexes have already
 // been taken out by the caller (e.g. CreateAccount or CreateGuestAccount).
 func (d *Database) createAccount(
-	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID, policyVersion string,
 ) (*api.Account, error) {
 	var err error
 	var account *api.Account
@@ -233,7 +233,7 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID, policyVersion); err != nil {
 		return nil, sqlutil.ErrUserExists
 	}
 	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {

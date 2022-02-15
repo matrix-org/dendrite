@@ -73,7 +73,7 @@ func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
 	userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
-	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "")
+	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", "")
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
@@ -151,7 +151,7 @@ func TestLoginToken(t *testing.T) {
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
 
-		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "")
+		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", "")
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
 		}

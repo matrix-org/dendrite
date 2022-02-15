@@ -32,7 +32,7 @@ type Database interface {
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
 	// account already exists, it will return nil, ErrUserExists.
-	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID string) (*api.Account, error)
+	CreateAccount(ctx context.Context, localpart, plaintextPassword, appserviceID, policyVersion string) (*api.Account, error)
 	CreateGuestAccount(ctx context.Context) (*api.Account, error)
 	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content json.RawMessage) error
 	GetAccountData(ctx context.Context, localpart string) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)

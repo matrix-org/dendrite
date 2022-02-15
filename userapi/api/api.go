@@ -245,12 +245,12 @@ type QuerySearchProfilesResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformAccountCreationRequest struct {
-	AccountType AccountType // Required: whether this is a guest or user account
-	Localpart   string      // Required: The localpart for this account. Ignored if account type is guest.
-
-	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
-	Password     string // optional: if missing then this account will be a passwordless account
-	OnConflict   Conflict
+	AccountType   AccountType // Required: whether this is a guest or user account
+	Localpart     string      // Required: The localpart for this account. Ignored if account type is guest.
+	PolicyVersion string      // optional: the privacy policy this account has accepted
+	AppServiceID  string      // optional: the application service ID (not user ID) creating this account, if any.
+	Password      string      // optional: if missing then this account will be a passwordless account
+	OnConflict    Conflict
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
