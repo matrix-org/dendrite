@@ -150,20 +150,6 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		RoomserverQueryMissingAuthPrevEventsPath,
-		httputil.MakeInternalAPI("queryMissingAuthPrevEvents", func(req *http.Request) util.JSONResponse {
-			var request api.QueryMissingAuthPrevEventsRequest
-			var response api.QueryMissingAuthPrevEventsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.QueryMissingAuthPrevEvents(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
 		RoomserverQueryEventsByIDPath,
 		httputil.MakeInternalAPI("queryEventsByID", func(req *http.Request) util.JSONResponse {
 			var request api.QueryEventsByIDRequest

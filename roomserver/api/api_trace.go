@@ -129,16 +129,6 @@ func (t *RoomserverInternalAPITrace) QueryStateAfterEvents(
 	return err
 }
 
-func (t *RoomserverInternalAPITrace) QueryMissingAuthPrevEvents(
-	ctx context.Context,
-	req *QueryMissingAuthPrevEventsRequest,
-	res *QueryMissingAuthPrevEventsResponse,
-) error {
-	err := t.Impl.QueryMissingAuthPrevEvents(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("QueryMissingAuthPrevEvents req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
 func (t *RoomserverInternalAPITrace) QueryEventsByID(
 	ctx context.Context,
 	req *QueryEventsByIDRequest,

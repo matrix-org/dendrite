@@ -128,20 +128,24 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	missingRes := &api.QueryMissingAuthPrevEventsResponse{}
-	serverRes := &fedapi.QueryJoinedHostServerNamesInRoomResponse{}
-	if event.Type() != gomatrixserverlib.MRoomCreate || !event.StateKeyEquals("") {
-		missingReq := &api.QueryMissingAuthPrevEventsRequest{
-			RoomID:       event.RoomID(),
-			AuthEventIDs: event.AuthEventIDs(),
-			PrevEventIDs: event.PrevEventIDs(),
-		}
-		if err := r.Queryer.QueryMissingAuthPrevEvents(ctx, missingReq, missingRes); err != nil {
-			return rollbackTransaction, fmt.Errorf("r.Queryer.QueryMissingAuthPrevEvents: %w", err)
-		}
+	// Don't waste time processing the event if the room doesn't exist.
+	// A room entry locally will only be created in response to a create
+	// event.
+	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	if !updater.RoomExists() && !isCreateEvent {
+		return rollbackTransaction, fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
-	missingAuth := len(missingRes.MissingAuthEventIDs) > 0
-	missingPrev := !input.HasState && len(missingRes.MissingPrevEventIDs) > 0
+
+	var missingAuth, missingPrev bool
+	serverRes := &fedapi.QueryJoinedHostServerNamesInRoomResponse{}
+	if !isCreateEvent {
+		missingAuthIDs, missingPrevIDs, err := updater.MissingAuthPrevEvents(ctx, event)
+		if err != nil {
+			return rollbackTransaction, fmt.Errorf("updater.MissingAuthPrevEvents: %w", err)
+		}
+		missingAuth = len(missingAuthIDs) > 0
+		missingPrev = !input.HasState && len(missingPrevIDs) > 0
+	}
 
 	if missingAuth || missingPrev {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
@@ -246,14 +250,13 @@ func (r *Inputer) processRoomEvent(
 			missingState := missingStateReq{
 				origin:     input.Origin,
 				inputer:    r,
-				queryer:    r.Queryer,
 				db:         updater,
 				federation: r.FSAPI,
 				keys:       r.KeyRing,
 				roomsMu:    internal.NewMutexByRoom(),
 				servers:    serverRes.ServerNames,
 				hadEvents:  map[string]bool{},
-				haveEvents: map[string]*gomatrixserverlib.HeaderedEvent{},
+				haveEvents: map[string]*gomatrixserverlib.Event{},
 			}
 			if stateSnapshot, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				// Something went wrong with retrieving the missing state, so we can't
