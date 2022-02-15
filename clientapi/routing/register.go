@@ -153,7 +153,7 @@ type authDict struct {
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type userInteractiveResponse struct {
 	Flows     []authtypes.Flow       `json:"flows"`
-	Completed []authtypes.LoginType  `json:"completed"`
+	Completed []authtypes.LoginType  `json:"completed,omitempty"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
 }
@@ -629,6 +629,8 @@ func handleRegistrationFlow(
 	}
 
 	switch r.Auth.Type {
+	case authtypes.LoginTypeTerms:
+		AddCompletedSessionStage(sessionID, authtypes.LoginTypeTerms)
 	case authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
 		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
@@ -696,11 +698,16 @@ func handleApplicationServiceRegistration(
 		return *err
 	}
 
+	policyVersion := ""
+	if cfg.Matrix.UserConsentOptions.Enabled() {
+		policyVersion = cfg.Matrix.UserConsentOptions.Version
+	}
+
 	// If no error, application service was successfully validated.
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(),
+		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), policyVersion,
 		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 	)
 }
@@ -717,9 +724,14 @@ func checkAndCompleteFlow(
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
+		policyVersion := ""
+		if cfg.Matrix.UserConsentOptions.Enabled() {
+			policyVersion = cfg.Matrix.UserConsentOptions.Version
+		}
 		// This flow was completed, registration can continue
+
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(),
+			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), policyVersion,
 			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		)
 	}
@@ -742,7 +754,7 @@ func checkAndCompleteFlow(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.UserInternalAPI,
-	username, password, appserviceID, ipAddr, userAgent string,
+	username, password, appserviceID, ipAddr, userAgent, policyVersion string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 ) util.JSONResponse {
@@ -762,11 +774,12 @@ func completeRegistration(
 
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
-		AppServiceID: appserviceID,
-		Localpart:    username,
-		Password:     password,
-		AccountType:  userapi.AccountTypeUser,
-		OnConflict:   userapi.ConflictAbort,
+		AppServiceID:  appserviceID,
+		Localpart:     username,
+		Password:      password,
+		AccountType:   userapi.AccountTypeUser,
+		OnConflict:    userapi.ConflictAbort,
+		PolicyVersion: policyVersion,
 	}, &accRes)
 	if err != nil {
 		if _, ok := err.(*userapi.ErrorConflict); ok { // user already exists
@@ -963,5 +976,5 @@ func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedS
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID)
 }

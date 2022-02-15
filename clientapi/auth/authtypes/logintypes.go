@@ -11,4 +11,5 @@ const (
 	LoginTypeRecaptcha          = "m.login.recaptcha"
 	LoginTypeApplicationService = "m.login.application_service"
 	LoginTypeToken              = "m.login.token"
+	LoginTypeTerms              = "m.login.terms"
 )
