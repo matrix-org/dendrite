@@ -60,14 +60,14 @@ func Setup(
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
 	}
 
-	uploadHandler := httputil.MakeAuthAPI("upload", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, dev *userapi.Device) util.JSONResponse {
+	uploadHandler := httputil.MakeAuthAPI("upload", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, dev *userapi.Device) util.JSONResponse {
 		if r := rateLimits.Limit(req); r != nil {
 			return *r
 		}
 		return Upload(req, cfg, dev, db, activeThumbnailGeneration)
 	})
 
-	configHandler := httputil.MakeAuthAPI("config", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	configHandler := httputil.MakeAuthAPI("config", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		if r := rateLimits.Limit(req); r != nil {
 			return *r
 		}

@@ -81,7 +81,12 @@ func main() {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}
 
-	_, err = accountDB.CreateAccount(context.Background(), *username, pass, "")
+	policyVersion := ""
+	if cfg.Global.UserConsentOptions.Enabled() {
+		policyVersion = cfg.Global.UserConsentOptions.Version
+	}
+
+	_, err = accountDB.CreateAccount(context.Background(), *username, pass, "", policyVersion)
 	if err != nil {
 		logrus.Fatalln("Failed to create the account:", err.Error())
 	}
