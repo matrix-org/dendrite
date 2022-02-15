@@ -61,6 +61,7 @@ func SendServerNotice(
 	accountsDB accounts.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	device *userapi.Device,
+	senderDevice *userapi.Device,
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
@@ -139,15 +140,10 @@ func SendServerNotice(
 		roomVersion = gomatrixserverlib.RoomVersionV6
 	)
 
-	senderDevice, err := getSenderDevice(ctx, userAPI, accountsDB, cfgClient)
-	if err != nil {
-		logrus.WithError(err).Error("unable to get device")
-		return util.ErrorResponse(err)
-	}
 	// create a new room for the user
 	if len(commonRooms) == 0 {
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
-		powerLevelContent.Users[r.UserID] = -10
+		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
 		pl, err := json.Marshal(powerLevelContent)
 		if err != nil {
 			return util.ErrorResponse(err)
