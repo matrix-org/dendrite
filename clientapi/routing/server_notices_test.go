@@ -36,6 +36,12 @@ func Test_sendServerNoticeRequest_validate(t *testing.T) {
 			name: "msgtype empty",
 			fields: fields{
 				UserID: "@alice:localhost",
+				Content: struct {
+					MsgType string `json:"msgtype,omitempty"`
+					Body    string `json:"body,omitempty"`
+				}{
+					Body: "Hello world!",
+				},
 			},
 		},
 		{
