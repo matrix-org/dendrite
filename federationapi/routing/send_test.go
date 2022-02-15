@@ -93,11 +93,10 @@ func (o *testEDUProducer) InputCrossSigningKeyUpdate(
 
 type testRoomserverAPI struct {
 	api.RoomserverInternalAPITrace
-	inputRoomEvents            []api.InputRoomEvent
-	queryMissingAuthPrevEvents func(*api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse
-	queryStateAfterEvents      func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
-	queryEventsByID            func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
-	queryLatestEventsAndState  func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
+	inputRoomEvents           []api.InputRoomEvent
+	queryStateAfterEvents     func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
+	queryEventsByID           func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse
+	queryLatestEventsAndState func(*api.QueryLatestEventsAndStateRequest) api.QueryLatestEventsAndStateResponse
 }
 
 func (t *testRoomserverAPI) InputRoomEvents(
@@ -137,20 +136,6 @@ func (t *testRoomserverAPI) QueryStateAfterEvents(
 	response.PrevEventsExist = res.PrevEventsExist
 	response.RoomExists = res.RoomExists
 	response.StateEvents = res.StateEvents
-	return nil
-}
-
-// Query the state after a list of events in a room from the room server.
-func (t *testRoomserverAPI) QueryMissingAuthPrevEvents(
-	ctx context.Context,
-	request *api.QueryMissingAuthPrevEventsRequest,
-	response *api.QueryMissingAuthPrevEventsResponse,
-) error {
-	response.RoomVersion = testRoomVersion
-	res := t.queryMissingAuthPrevEvents(request)
-	response.RoomExists = res.RoomExists
-	response.MissingAuthEventIDs = res.MissingAuthEventIDs
-	response.MissingPrevEventIDs = res.MissingPrevEventIDs
 	return nil
 }
 
@@ -312,15 +297,7 @@ func assertInputRoomEvents(t *testing.T, got []api.InputRoomEvent, want []*gomat
 // The purpose of this test is to check that receiving an event over federation for which we have the prev_events works correctly, and passes it on
 // to the roomserver. It's the most basic test possible.
 func TestBasicTransaction(t *testing.T) {
-	rsAPI := &testRoomserverAPI{
-		queryMissingAuthPrevEvents: func(req *api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse {
-			return api.QueryMissingAuthPrevEventsResponse{
-				RoomExists:          true,
-				MissingAuthEventIDs: []string{},
-				MissingPrevEventIDs: []string{},
-			}
-		},
-	}
+	rsAPI := &testRoomserverAPI{}
 	pdus := []json.RawMessage{
 		testData[len(testData)-1], // a message event
 	}
@@ -332,15 +309,7 @@ func TestBasicTransaction(t *testing.T) {
 // The purpose of this test is to check that if the event received fails auth checks the event is still sent to the roomserver
 // as it does the auth check.
 func TestTransactionFailAuthChecks(t *testing.T) {
-	rsAPI := &testRoomserverAPI{
-		queryMissingAuthPrevEvents: func(req *api.QueryMissingAuthPrevEventsRequest) api.QueryMissingAuthPrevEventsResponse {
-			return api.QueryMissingAuthPrevEventsResponse{
-				RoomExists:          true,
-				MissingAuthEventIDs: []string{},
-				MissingPrevEventIDs: []string{},
-			}
-		},
-	}
+	rsAPI := &testRoomserverAPI{}
 	pdus := []json.RawMessage{
 		testData[len(testData)-1], // a message event
 	}
