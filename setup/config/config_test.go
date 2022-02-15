@@ -59,7 +59,7 @@ global:
       username: metrics
       password: metrics
   server_notices:
-    local_part: "server"
+    local_part: "_server"
     display_name: "Server alerts"
     avatar: ""
     room_name: "Server Alerts"	

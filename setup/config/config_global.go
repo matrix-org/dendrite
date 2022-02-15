@@ -142,7 +142,7 @@ type ServerNotices struct {
 
 func (c *ServerNotices) Defaults(generate bool) {
 	if generate {
-		c.LocalPart = "server"
+		c.LocalPart = "_server"
 		c.DisplayName = "Server Alert"
 		c.RoomName = "Server Alert"
 		c.AvatarURL = ""

@@ -98,18 +98,19 @@ func (r *Leaver) performLeaveRoomByID(
 		}, accData); err != nil {
 			return nil, fmt.Errorf("unable to query account data")
 		}
-		roomData := accData.RoomAccountData[req.RoomID]
-		tagData, ok := roomData["m.tag"]
-		if ok {
-			tags := gomatrix.TagContent{}
-			if err = json.Unmarshal(tagData, &tags); err != nil {
-				return nil, fmt.Errorf("unable to unmarshal tag content")
-			}
-			if _, ok = tags.Tags["m.server_notice"]; ok {
-				return nil, fmt.Errorf("Unable to reject server notice invite")
+
+		if roomData, ok := accData.RoomAccountData[req.RoomID]; ok {
+			tagData, ok := roomData["m.tag"]
+			if ok {
+				tags := gomatrix.TagContent{}
+				if err = json.Unmarshal(tagData, &tags); err != nil {
+					return nil, fmt.Errorf("unable to unmarshal tag content")
+				}
+				if _, ok = tags.Tags["m.server_notice"]; ok {
+					return nil, fmt.Errorf("Unable to reject server notice invite")
+				}
 			}
 		}
-
 	}
 
 	// There's no invite pending, so first of all we want to find out

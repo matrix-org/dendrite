@@ -72,7 +72,7 @@ global:
   server_notices:
     enabled: false
     # The server localpart to be used when sending notices, ensure this is not yet taken
-    local_part: "server"
+    local_part: "_server"
     # The displayname to be used when sending notices
     display_name: "Server alerts"
     # The mxid of the avatar to use
