@@ -120,9 +120,9 @@ func (s *accountsStatements) insertAccount(
 
 	var err error
 	if appserviceID == "" {
-		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil, "")
+		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil, policyVersion)
 	} else {
-		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, policyVersion)
+		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, "")
 	}
 	if err != nil {
 		return nil, err
