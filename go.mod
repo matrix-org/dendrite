@@ -11,7 +11,6 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/docker/docker v20.10.12+incompatible
@@ -23,7 +22,6 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/testing v0.0.0-20211215003918-77eb13d6cad2 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/lib/pq v1.10.4
@@ -55,9 +53,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
-	github.com/prometheus/client_golang v1.11.0
-	github.com/prometheus/common v0.32.1 // indirect
-	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tidwall/gjson v1.14.0
 	github.com/tidwall/sjson v1.2.4
