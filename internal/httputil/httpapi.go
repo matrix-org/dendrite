@@ -15,7 +15,11 @@
 package httputil
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,6 +58,7 @@ func MakeAuthAPI(
 	metricsName string,
 	userAPI userapi.UserInternalAPI,
 	userConsentCfg config.UserConsentOptions,
+	requireConsent bool,
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -82,26 +87,12 @@ func MakeAuthAPI(
 			}
 		}()
 
-		// check if the user accepted any policy
-		if userConsentCfg.Enabled() {
-			localPart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
-			if err != nil {
-				return jsonerror.InternalServerError()
-			}
-			// check which version of the policy the user accepted
-			res := &userapi.QueryPolicyVersionResponse{}
-			err = userAPI.QueryPolicyVersion(req.Context(), &userapi.QueryPolicyVersionRequest{
-				LocalPart: localPart,
-			}, res)
-			if err != nil {
-				return jsonerror.InternalServerError()
-			}
-
-			// user hasn't accepted any policy, block access.
-			if userConsentCfg.Version != res.PolicyVersion {
+		if userConsentCfg.Enabled() && requireConsent {
+			consentError := checkConsent(req.Context(), device.UserID, userAPI, userConsentCfg)
+			if consentError != nil {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden(userConsentCfg.BlockEventsError),
+					JSON: consentError,
 				}
 			}
 		}
@@ -115,6 +106,56 @@ func MakeAuthAPI(
 		return jsonRes
 	}
 	return MakeExternalAPI(metricsName, h)
+}
+
+func checkConsent(ctx context.Context, userID string, userAPI userapi.UserInternalAPI, userConsentCfg config.UserConsentOptions) error {
+	localPart, _, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return nil
+	}
+	// check which version of the policy the user accepted
+	res := &userapi.QueryPolicyVersionResponse{}
+	err = userAPI.QueryPolicyVersion(ctx, &userapi.QueryPolicyVersionRequest{
+		LocalPart: localPart,
+	}, res)
+	if err != nil {
+		return nil
+	}
+
+	// user hasn't accepted any policy, block access.
+	if userConsentCfg.Version != res.PolicyVersion {
+		uri, err := getConsentURL(userID, userConsentCfg)
+		if err != nil {
+			return jsonerror.Unknown("unable to get consent URL")
+		}
+		msg := &bytes.Buffer{}
+		c := struct {
+			ConsentURL string
+		}{
+			ConsentURL: uri,
+		}
+		if err = userConsentCfg.BlockEventsTemplate.ExecuteTemplate(msg, "blockEventsError", c); err != nil {
+			logrus.Infof("error consent message: %+v", err)
+			return jsonerror.Unknown("unable to get consent URL")
+		}
+		return jsonerror.ConsentNotGiven(uri, msg.String())
+	}
+	return nil
+}
+
+// getConsentURL constructs the URL shown to users to accept the TOS
+func getConsentURL(username string, config config.UserConsentOptions) (string, error) {
+	mac := hmac.New(sha256.New, []byte(config.FormSecret))
+	_, err := mac.Write([]byte(username))
+	if err != nil {
+		return "", err
+	}
+	hmac := hex.EncodeToString(mac.Sum(nil))
+
+	return fmt.Sprintf(
+		"%s/_matrix/consent?u=%s&h=%s&v=%s",
+		config.BaseURL, username, hmac, config.Version,
+	), nil
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.

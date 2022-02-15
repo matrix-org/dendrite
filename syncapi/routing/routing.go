@@ -42,11 +42,11 @@ func Setup(
 	r0mux := csMux.PathPrefix("/r0").Subrouter()
 
 	// TODO: Add AS support for all handlers below.
-	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	r0mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	r0mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
@@ -55,7 +55,7 @@ func Setup(
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/filter",
-		httputil.MakeAuthAPI("put_filter", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("put_filter", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -65,7 +65,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	r0mux.Handle("/user/{userId}/filter/{filterId}",
-		httputil.MakeAuthAPI("get_filter", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_filter", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -74,7 +74,7 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/keys/changes", httputil.MakeAuthAPI("keys_changes", userAPI, cfg.Matrix.UserConsentOptions, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	r0mux.Handle("/keys/changes", httputil.MakeAuthAPI("keys_changes", userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingKeyChangeRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)
 }

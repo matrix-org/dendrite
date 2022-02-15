@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,89 +23,85 @@ type constentTemplateData struct {
 	PublicVersion bool
 }
 
-func consent(userAPI userapi.UserInternalAPI, cfg *config.ClientAPI) http.HandlerFunc {
+func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.UserInternalAPI, cfg *config.ClientAPI) *util.JSONResponse {
 	consentCfg := cfg.Matrix.UserConsentOptions
-	return func(writer http.ResponseWriter, req *http.Request) {
-		if !consentCfg.Enabled() {
-			writer.WriteHeader(http.StatusBadRequest)
-			_, _ = writer.Write([]byte("consent tracking is disabled"))
-			return
-		}
-		// The data used to populate the /consent request
-		data := constentTemplateData{
-			User:     req.FormValue("u"),
-			Version:  req.FormValue("v"),
-			UserHMAC: req.FormValue("h"),
-		}
-		switch req.Method {
-		case http.MethodGet:
-			// display the privacy policy without a form
-			data.PublicVersion = data.User == "" || data.UserHMAC == "" || data.Version == ""
+	internalError := jsonerror.InternalServerError()
 
-			// let's see if the user already consented to the current version
-			if !data.PublicVersion {
-				res := &userapi.QueryPolicyVersionResponse{}
-				localPart, _, err := gomatrixserverlib.SplitID('@', data.User)
-				if err != nil {
-					logrus.WithError(err).Error("unable to print consent template")
-					return
-				}
-				if err = userAPI.QueryPolicyVersion(req.Context(), &userapi.QueryPolicyVersionRequest{
-					LocalPart: localPart,
-				}, res); err != nil {
-					logrus.WithError(err).Error("unable to print consent template")
-					return
-				}
-				data.HasConsented = res.PolicyVersion == consentCfg.Version
-			}
+	// The data used to populate the /consent request
+	data := constentTemplateData{
+		User:     req.FormValue("u"),
+		Version:  req.FormValue("v"),
+		UserHMAC: req.FormValue("h"),
+	}
+	switch req.Method {
+	case http.MethodGet:
+		// display the privacy policy without a form
+		data.PublicVersion = data.User == "" || data.UserHMAC == "" || data.Version == ""
 
-			err := consentCfg.Templates.ExecuteTemplate(writer, consentCfg.Version+".gohtml", data)
-			if err != nil {
-				logrus.WithError(err).Error("unable to print consent template")
-				return
-			}
-		case http.MethodPost:
+		// let's see if the user already consented to the current version
+		if !data.PublicVersion {
+			res := &userapi.QueryPolicyVersionResponse{}
 			localPart, _, err := gomatrixserverlib.SplitID('@', data.User)
 			if err != nil {
-				logrus.WithError(err).Error("unable to split username")
-				return
-			}
-
-			ok, err := validHMAC(data.User, data.UserHMAC, consentCfg.FormSecret)
-			if err != nil || !ok {
-				writer.WriteHeader(http.StatusBadRequest)
-				_, err = writer.Write([]byte("invalid HMAC provided"))
-				if err != nil {
-					return
-				}
-				return
-			}
-			if err := userAPI.PerformUpdatePolicyVersion(
-				req.Context(),
-				&userapi.UpdatePolicyVersionRequest{
-					PolicyVersion: data.Version,
-					LocalPart:     localPart,
-				},
-				&userapi.UpdatePolicyVersionResponse{},
-			); err != nil {
-				writer.WriteHeader(http.StatusInternalServerError)
-				_, err = writer.Write([]byte("unable to update database"))
-				if err != nil {
-					logrus.WithError(err).Error("unable to write to database")
-				}
-				return
-			}
-			// display the privacy policy without a form
-			data.PublicVersion = false
-			data.HasConsented = true
-
-			err = consentCfg.Templates.ExecuteTemplate(writer, consentCfg.Version+".gohtml", data)
-			if err != nil {
 				logrus.WithError(err).Error("unable to print consent template")
-				return
+				return &internalError
 			}
+			if err = userAPI.QueryPolicyVersion(req.Context(), &userapi.QueryPolicyVersionRequest{
+				LocalPart: localPart,
+			}, res); err != nil {
+				logrus.WithError(err).Error("unable to print consent template")
+				return &internalError
+			}
+			data.HasConsented = res.PolicyVersion == consentCfg.Version
 		}
+
+		err := consentCfg.Templates.ExecuteTemplate(writer, consentCfg.Version+".gohtml", data)
+		if err != nil {
+			logrus.WithError(err).Error("unable to print consent template")
+			return nil
+		}
+		return nil
+	case http.MethodPost:
+		localPart, _, err := gomatrixserverlib.SplitID('@', data.User)
+		if err != nil {
+			logrus.WithError(err).Error("unable to split username")
+			return &internalError
+		}
+
+		ok, err := validHMAC(data.User, data.UserHMAC, consentCfg.FormSecret)
+		if err != nil || !ok {
+			_, err = writer.Write([]byte("invalid HMAC provided"))
+			if err != nil {
+				return &internalError
+			}
+			return &internalError
+		}
+		if err := userAPI.PerformUpdatePolicyVersion(
+			req.Context(),
+			&userapi.UpdatePolicyVersionRequest{
+				PolicyVersion: data.Version,
+				LocalPart:     localPart,
+			},
+			&userapi.UpdatePolicyVersionResponse{},
+		); err != nil {
+			_, err = writer.Write([]byte("unable to update database"))
+			if err != nil {
+				logrus.WithError(err).Error("unable to write to database")
+			}
+			return &internalError
+		}
+		// display the privacy policy without a form
+		data.PublicVersion = false
+		data.HasConsented = true
+
+		err = consentCfg.Templates.ExecuteTemplate(writer, consentCfg.Version+".gohtml", data)
+		if err != nil {
+			logrus.WithError(err).Error("unable to print consent template")
+			return &internalError
+		}
+		return nil
 	}
+	return &util.JSONResponse{Code: http.StatusOK}
 }
 
 func validHMAC(username, userHMAC, secret string) (bool, error) {

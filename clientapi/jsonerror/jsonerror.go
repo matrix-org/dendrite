@@ -29,6 +29,13 @@ type MatrixError struct {
 	Err     string `json:"error"`
 }
 
+// ConsentError is an error returned to users, who didn't accept  the
+// TOS of this server yet.
+type ConsentError struct {
+	MatrixError
+	ConsentURI string `json:"consent_uri"`
+}
+
 func (e MatrixError) Error() string {
 	return fmt.Sprintf("%s: %s", e.ErrCode, e.Err)
 }
@@ -191,5 +198,17 @@ func NotTrusted(serverName string) *MatrixError {
 	return &MatrixError{
 		ErrCode: "M_SERVER_NOT_TRUSTED",
 		Err:     fmt.Sprintf("Untrusted server '%s'", serverName),
+	}
+}
+
+// ConsentNotGiven is an error returned to users, who didn't accept the
+// TOS of this server yet.
+func ConsentNotGiven(consentURI string, msg string) *ConsentError {
+	return &ConsentError{
+		MatrixError: MatrixError{
+			ErrCode: "M_CONSENT_NOT_GIVEN",
+			Err:     msg,
+		},
+		ConsentURI: consentURI,
 	}
 }
