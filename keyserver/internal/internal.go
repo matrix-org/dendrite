@@ -198,7 +198,7 @@ func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOne
 }
 
 func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.QueryDeviceMessagesRequest, res *api.QueryDeviceMessagesResponse) {
-	msgs, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil)
+	msgs, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil, false)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to query DB for device keys: %s", err),
@@ -244,7 +244,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		domain := string(serverName)
 		// query local devices
 		if serverName == a.ThisServer {
-			deviceKeys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs)
+			deviceKeys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 			if err != nil {
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("failed to query local device keys: %s", err),
@@ -520,7 +520,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
 	ctx context.Context, res *api.QueryKeysResponse, userID string, deviceIDs []string,
 ) error {
-	keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs)
+	keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 	// if we can't query the db or there are fewer keys than requested, fetch from remote.
 	if err != nil {
 		return fmt.Errorf("DeviceKeysForUser %s %v failed: %w", userID, deviceIDs, err)
@@ -564,19 +564,23 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 		return
 	}
+	existingDeviceMap := make(map[string]struct{}, len(uapidevices.Devices))
+	for _, key := range uapidevices.Devices {
+		existingDeviceMap[key.ID] = struct{}{}
+	}
+
+	logrus.WithField("user_id", req.UserID).Infof("XXX: Existing devices: %+v", existingDeviceMap)
 
 	// Get all of the user existing device keys so we can check for changes.
-	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil)
+	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil, true)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to query existing device keys: %s", err.Error()),
 		}
 		return
 	}
-	existingDeviceMap := make(map[string]struct{}, len(existingKeys))
-	for _, key := range uapidevices.Devices {
-		existingDeviceMap[key.ID] = struct{}{}
-	}
+
+	logrus.WithField("user_id", req.UserID).Infof("XXX: Existing keys: %+v", existingKeys)
 
 	// Work out whether we have device keys in the keyserver for devices that
 	// no longer exist in the user API. This is mostly an exercise to ensure
@@ -587,13 +591,18 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 			toClean = append(toClean, gomatrixserverlib.KeyID(k.DeviceID))
 		}
 	}
+
+	logrus.WithField("user_id", req.UserID).Infof("XXX: Clean keys: %+v", toClean)
+
 	if len(toClean) > 0 {
+		logrus.WithField("user_id", req.UserID).Infof("Cleaning up %d stale device keys for user", len(toClean))
 		if err = a.DB.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
 			res.Error = &api.KeyError{
 				Err: fmt.Sprintf("failed to clean device keys: %s", err.Error()),
 			}
 			return
 		}
+		logrus.WithField("user_id", req.UserID).Infof("Cleaned up %d stale device keys for user", len(toClean))
 	}
 
 	var keysToStore []api.DeviceMessage

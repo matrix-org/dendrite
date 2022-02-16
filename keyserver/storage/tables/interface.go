@@ -38,7 +38,7 @@ type DeviceKeys interface {
 	InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error
 	SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error)
 	CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error)
-	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error)
+	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error)
 	DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 	DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error
 }
