@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/inthttp"
@@ -34,7 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
@@ -121,7 +122,7 @@ func generateAppServiceAccount(
 ) error {
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{
-		AccountType:  userapi.AccountTypeUser,
+		AccountType:  userapi.AccountTypeAppService,
 		Localpart:    as.SenderLocalpart,
 		AppServiceID: as.ID,
 		OnConflict:   userapi.ConflictUpdate,

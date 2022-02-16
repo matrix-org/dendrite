@@ -23,13 +23,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts/postgres/deltas"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/bcrypt"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -73,6 +74,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadIsActive(m)
+	deltas.LoadAddAccountType(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
@@ -155,37 +157,32 @@ func (d *Database) SetPassword(
 	return d.accounts.updatePassword(ctx, localpart, hash)
 }
 
-// CreateGuestAccount makes a new guest account and creates an empty profile
-// for this account.
-func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, err error) {
-	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
-		var numLocalpart int64
-		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
-		if err != nil {
-			return err
-		}
-		localpart := strconv.FormatInt(numLocalpart, 10)
-		acc, err = d.createAccount(ctx, txn, localpart, "", "")
-		return err
-	})
-	return acc, err
-}
-
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, sqlutil.ErrUserExists.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (acc *api.Account, err error) {
 	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
-		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		// For guest accounts, we create a new numeric local part
+		if accountType == api.AccountTypeGuest {
+			var numLocalpart int64
+			numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
+			if err != nil {
+				return err
+			}
+			localpart = strconv.FormatInt(numLocalpart, 10)
+			plaintextPassword = ""
+			appserviceID = ""
+		}
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID, accountType)
 		return err
 	})
 	return
 }
 
 func (d *Database) createAccount(
-	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (*api.Account, error) {
 	var account *api.Account
 	var err error
@@ -197,7 +194,7 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID, accountType); err != nil {
 		if sqlutil.IsUniqueConstraintViolationErr(err) {
 			return nil, sqlutil.ErrUserExists
 		}

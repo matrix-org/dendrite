@@ -24,13 +24,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3/deltas"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Database represents an account database
@@ -77,6 +78,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadIsActive(m)
+	deltas.LoadAddAccountType(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
@@ -170,38 +172,11 @@ func (d *Database) SetPassword(
 	})
 }
 
-// CreateGuestAccount makes a new guest account and creates an empty profile
-// for this account.
-func (d *Database) CreateGuestAccount(ctx context.Context) (acc *api.Account, err error) {
-	// We need to lock so we sequentially create numeric localparts. If we don't, two calls to
-	// this function will cause the same number to be selected and one will fail with 'database is locked'
-	// when the first txn upgrades to a write txn. We also need to lock the account creation else we can
-	// race with CreateAccount
-	// We know we'll be the only process since this is sqlite ;) so a lock here will be all that is needed.
-	d.profilesMu.Lock()
-	d.accountDatasMu.Lock()
-	d.accountsMu.Lock()
-	defer d.profilesMu.Unlock()
-	defer d.accountDatasMu.Unlock()
-	defer d.accountsMu.Unlock()
-	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		var numLocalpart int64
-		numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
-		if err != nil {
-			return err
-		}
-		localpart := strconv.FormatInt(numLocalpart, 10)
-		acc, err = d.createAccount(ctx, txn, localpart, "", "")
-		return err
-	})
-	return acc, err
-}
-
 // CreateAccount makes a new account with the given login name and password, and creates an empty profile
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, ErrUserExists.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (acc *api.Account, err error) {
 	// Create one account at a time else we can get 'database is locked'.
 	d.profilesMu.Lock()
@@ -211,7 +186,18 @@ func (d *Database) CreateAccount(
 	defer d.accountDatasMu.Unlock()
 	defer d.accountsMu.Unlock()
 	err = d.writer.Do(d.db, nil, func(txn *sql.Tx) error {
-		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID)
+		// For guest accounts, we create a new numeric local part
+		if accountType == api.AccountTypeGuest {
+			var numLocalpart int64
+			numLocalpart, err = d.accounts.selectNewNumericLocalpart(ctx, txn)
+			if err != nil {
+				return err
+			}
+			localpart = strconv.FormatInt(numLocalpart, 10)
+			plaintextPassword = ""
+			appserviceID = ""
+		}
+		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID, accountType)
 		return err
 	})
 	return
@@ -220,7 +206,7 @@ func (d *Database) CreateAccount(
 // WARNING! This function assumes that the relevant mutexes have already
 // been taken out by the caller (e.g. CreateAccount or CreateGuestAccount).
 func (d *Database) createAccount(
-	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (*api.Account, error) {
 	var err error
 	var account *api.Account
@@ -232,7 +218,7 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID); err != nil {
+	if account, err = d.accounts.insertAccount(ctx, txn, localpart, hash, appserviceID, accountType); err != nil {
 		return nil, sqlutil.ErrUserExists
 	}
 	if err = d.profiles.insertProfile(ctx, txn, localpart); err != nil {
