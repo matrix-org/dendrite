@@ -558,6 +558,12 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 		return
 	}
+	if !uapidevices.UserExists {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("user %q does not exist", req.UserID),
+		}
+		return
+	}
 
 	// Get all of the user existing device keys so we can check for changes.
 	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil)
@@ -568,8 +574,8 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		return
 	}
 	existingDeviceMap := make(map[string]struct{}, len(existingKeys))
-	for _, k := range existingKeys {
-		existingDeviceMap[k.DeviceID] = struct{}{}
+	for _, key := range uapidevices.Devices {
+		existingDeviceMap[key.ID] = struct{}{}
 	}
 
 	// Work out whether we have device keys in the keyserver for devices that
@@ -577,13 +583,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 	// that we keep some integrity between the two.
 	var toClean []gomatrixserverlib.KeyID
 	for _, k := range existingKeys {
-		found := false
-		for _, d := range uapidevices.Devices {
-			if k.UserID == d.UserID && k.DeviceID == d.ID {
-				found = true
-			}
-		}
-		if !found {
+		if _, ok := existingDeviceMap[k.DeviceID]; !ok {
 			toClean = append(toClean, gomatrixserverlib.KeyID(k.DeviceID))
 		}
 	}
@@ -613,13 +613,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 		// check that the device in question actually exists in the user
 		// API before we try and store a key for it
-		foundDevice := false
-		for _, d := range uapidevices.Devices {
-			if d.ID == key.DeviceID {
-				foundDevice = true
-			}
-		}
-		if !foundDevice {
+		if _, ok := existingDeviceMap[key.DeviceID]; !ok {
 			continue
 		}
 		gotUserID := gjson.GetBytes(key.KeyJSON, "user_id").Str

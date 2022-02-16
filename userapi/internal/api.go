@@ -315,6 +315,7 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 	if err != nil {
 		return err
 	}
+	res.UserExists = true
 	res.Devices = devs
 	return nil
 }
