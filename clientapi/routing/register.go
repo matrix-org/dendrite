@@ -702,7 +702,7 @@ func handleApplicationServiceRegistration(
 	// application service registration is entirely separate.
 	return completeRegistration(
 		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(),
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
 	)
 }
 
@@ -721,7 +721,7 @@ func checkAndCompleteFlow(
 		// This flow was completed, registration can continue
 		return completeRegistration(
 			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(),
-			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
 		)
 	}
 
@@ -746,6 +746,7 @@ func completeRegistration(
 	username, password, appserviceID, ipAddr, userAgent string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
+	accType userapi.AccountType,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -759,10 +760,6 @@ func completeRegistration(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("missing password"),
 		}
-	}
-	accType := userapi.AccountTypeUser
-	if appserviceID != "" {
-		accType = userapi.AccountTypeAppService
 	}
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
@@ -967,5 +964,10 @@ func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedS
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
+
+	accType := userapi.AccountTypeUser
+	if ssrr.Admin {
+		accType = userapi.AccountTypeAdmin
+	}
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID, accType)
 }
