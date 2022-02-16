@@ -559,10 +559,48 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		return
 	}
 
+	// Get all of the user existing device keys so we can check for changes.
+	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil)
+	if err != nil {
+		res.Error = &api.KeyError{
+			Err: fmt.Sprintf("failed to query existing device keys: %s", err.Error()),
+		}
+		return
+	}
+	existingDeviceMap := make(map[string]struct{}, len(existingKeys))
+	for _, k := range existingKeys {
+		existingDeviceMap[k.DeviceID] = struct{}{}
+	}
+
+	// Work out whether we have device keys in the keyserver for devices that
+	// no longer exist in the user API. This is mostly an exercise to ensure
+	// that we keep some integrity between the two.
+	var toClean []gomatrixserverlib.KeyID
+	for _, k := range existingKeys {
+		found := false
+		for _, d := range uapidevices.Devices {
+			if k.UserID == d.UserID && k.DeviceID == d.ID {
+				found = true
+			}
+		}
+		if !found {
+			toClean = append(toClean, gomatrixserverlib.KeyID(k.DeviceID))
+		}
+	}
+	if len(toClean) > 0 {
+		if err = a.DB.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
+			res.Error = &api.KeyError{
+				Err: fmt.Sprintf("failed to clean device keys: %s", err.Error()),
+			}
+			return
+		}
+	}
+
 	var keysToStore []api.DeviceMessage
 	// assert that the user ID / device ID are not lying for each key
 	for _, key := range req.DeviceKeys {
-		_, serverName, err := gomatrixserverlib.SplitID('@', key.UserID)
+		var serverName gomatrixserverlib.ServerName
+		_, serverName, err = gomatrixserverlib.SplitID('@', key.UserID)
 		if err != nil {
 			continue // ignore invalid users
 		}
@@ -597,39 +635,6 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 				gotUserID, key.UserID, gotDeviceID, key.DeviceID,
 			),
 		})
-	}
-
-	// Get all of the user existing device keys so we can check for changes.
-	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil)
-	if err != nil {
-		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("failed to query existing device keys: %s", err.Error()),
-		}
-		return
-	}
-
-	// Work out whether we have device keys in the keyserver for devices that
-	// no longer exist in the user API. This is mostly an exercise to ensure
-	// that we keep some integrity between the two.
-	var toClean []gomatrixserverlib.KeyID
-	for _, k := range existingKeys {
-		found := false
-		for _, d := range uapidevices.Devices {
-			if k.UserID == d.UserID && k.DeviceID == d.ID {
-				found = true
-			}
-		}
-		if !found {
-			toClean = append(toClean, gomatrixserverlib.KeyID(k.DeviceID))
-		}
-	}
-	if len(toClean) > 0 {
-		if err = a.DB.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
-			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("failed to clean device keys: %s", err.Error()),
-			}
-			return
-		}
 	}
 
 	if req.OnlyDisplayNameUpdates {
