@@ -569,8 +569,6 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		existingDeviceMap[key.ID] = struct{}{}
 	}
 
-	logrus.WithField("user_id", req.UserID).Infof("XXX: Existing devices: %+v", existingDeviceMap)
-
 	// Get all of the user existing device keys so we can check for changes.
 	existingKeys, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil, true)
 	if err != nil {
@@ -579,8 +577,6 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 		return
 	}
-
-	logrus.WithField("user_id", req.UserID).Infof("XXX: Existing keys: %+v", existingKeys)
 
 	// Work out whether we have device keys in the keyserver for devices that
 	// no longer exist in the user API. This is mostly an exercise to ensure
@@ -592,17 +588,14 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 	}
 
-	logrus.WithField("user_id", req.UserID).Infof("XXX: Clean keys: %+v", toClean)
-
 	if len(toClean) > 0 {
-		logrus.WithField("user_id", req.UserID).Infof("Cleaning up %d stale device keys for user", len(toClean))
 		if err = a.DB.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
 			res.Error = &api.KeyError{
 				Err: fmt.Sprintf("failed to clean device keys: %s", err.Error()),
 			}
 			return
 		}
-		logrus.WithField("user_id", req.UserID).Infof("Cleaned up %d stale device keys for user", len(toClean))
+		logrus.WithField("user_id", req.UserID).Infof("Cleaned up %d stale keyserver device key entries", len(toClean))
 	}
 
 	var keysToStore []api.DeviceMessage
