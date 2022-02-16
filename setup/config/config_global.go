@@ -213,6 +213,8 @@ func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // If either require_at_registration or send_server_notice_to_guest are true, consent
 // messages will be sent to the users.
 type UserConsentOptions struct {
+	// If consent tracking is enabled or not
+	Enabled bool `yaml:"enabled"`
 	// Randomly generated string to be used to calculate the HMAC
 	FormSecret string `yaml:"form_secret"`
 	// Require consent when user registers for the first time
@@ -241,6 +243,7 @@ type UserConsentOptions struct {
 }
 
 func (c *UserConsentOptions) Defaults(baseURL string) {
+	c.Enabled = false
 	c.RequireAtRegistration = false
 	c.SendServerNoticeToGuest = false
 	c.PolicyName = "Privacy Policy"
@@ -250,7 +253,7 @@ func (c *UserConsentOptions) Defaults(baseURL string) {
 }
 
 func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool) {
-	if c.Enabled() {
+	if c.Enabled {
 		checkNotEmpty(configErrors, "template_dir", c.TemplateDir)
 		checkNotEmpty(configErrors, "version", c.Version)
 		checkNotEmpty(configErrors, "policy_name", c.PolicyName)
@@ -280,8 +283,4 @@ func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool)
 			configErrors.Add(fmt.Sprintf("unable to load defined '%s' policy template", c.Version))
 		}
 	}
-}
-
-func (c *UserConsentOptions) Enabled() bool {
-	return c.RequireAtRegistration || c.SendServerNoticeToGuest
 }

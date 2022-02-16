@@ -69,9 +69,9 @@ global:
   disable_federation: false
 
   # Consent tracking configuration
-  # If either require_at_registration or send_server_notice_to_guest are true, consent
-  # messages will be sent to the users.
   user_consent:
+    # If the user consent tracking is enabled or not
+    enabled: false
     # Randomly generated string to be used to calculate the HMAC
     form_secret: "superSecretRandomlyGeneratedSecret"
     # Require consent when user registers for the first time

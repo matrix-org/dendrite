@@ -82,7 +82,7 @@ func main() {
 	}
 
 	policyVersion := ""
-	if cfg.Global.UserConsentOptions.Enabled() {
+	if cfg.Global.UserConsentOptions.Enabled {
 		policyVersion = cfg.Global.UserConsentOptions.Version
 	}
 

@@ -87,7 +87,7 @@ func MakeAuthAPI(
 			}
 		}()
 
-		if userConsentCfg.Enabled() && requireConsent {
+		if userConsentCfg.Enabled && requireConsent {
 			consentError := checkConsent(req.Context(), device.UserID, userAPI, userConsentCfg)
 			if consentError != nil {
 				return util.JSONResponse{

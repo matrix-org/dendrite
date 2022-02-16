@@ -118,7 +118,7 @@ func Setup(
 	}
 
 	// unspecced consent tracking
-	if cfg.Matrix.UserConsentOptions.Enabled() {
+	if cfg.Matrix.UserConsentOptions.Enabled {
 		consentAPIMux.Handle("/consent",
 			httputil.MakeHTMLAPI("consent", func(writer http.ResponseWriter, request *http.Request) *util.JSONResponse {
 				return consent(writer, request, userAPI, cfg)

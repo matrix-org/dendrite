@@ -699,7 +699,7 @@ func handleApplicationServiceRegistration(
 	}
 
 	policyVersion := ""
-	if cfg.Matrix.UserConsentOptions.Enabled() {
+	if cfg.Matrix.UserConsentOptions.Enabled {
 		policyVersion = cfg.Matrix.UserConsentOptions.Version
 	}
 
@@ -725,7 +725,7 @@ func checkAndCompleteFlow(
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		policyVersion := ""
-		if cfg.Matrix.UserConsentOptions.Enabled() {
+		if cfg.Matrix.UserConsentOptions.Enabled {
 			policyVersion = cfg.Matrix.UserConsentOptions.Version
 		}
 		// This flow was completed, registration can continue
