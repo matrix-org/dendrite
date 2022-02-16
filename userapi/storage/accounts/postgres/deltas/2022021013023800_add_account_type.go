@@ -12,18 +12,15 @@ func LoadAddAccountType(m *sqlutil.Migrations) {
 }
 
 func UpAddAccountType(tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER TABLE account_accounts ADD COLUMN IF NOT EXISTS account_type SMALLINT;")
+	// initially set every account to useraccount, change appservice and guest accounts afterwards
+	// (user = 1, guest = 2, admin = 3, appservice = 4)
+	_, err := tx.Exec(`ALTER TABLE account_accounts ADD COLUMN IF NOT EXISTS account_type SMALLINT NOT NULL DEFAULT 1;
+UPDATE account_accounts SET account_type = 4 WHERE appservice_id <> '';
+UPDATE account_accounts SET account_type = 2 WHERE localpart ~ '^[0-9]+$';
+ALTER TABLE account_accounts ALTER COLUMN account_type DROP DEFAULT;`,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to add column: %w", err)
-
-	}
-	_, err = tx.Exec("UPDATE account_accounts SET account_type = 1 WHERE appservice_id = '' OR appservice_id IS NULL;")
-	if err != nil {
-		return fmt.Errorf("failed to update user accounts: %w", err)
-	}
-	_, err = tx.Exec("UPDATE account_accounts SET account_type = 4 WHERE appservice_id <> '';")
-	if err != nil {
-		return fmt.Errorf("failed to update appservice accounts upgrade: %w", err)
+		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
 	return nil
 }

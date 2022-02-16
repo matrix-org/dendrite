@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- If the account is currently active
     is_deactivated BOOLEAN DEFAULT 0,
 	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
-	account_type INTEGER
+	account_type INTEGER NOT NULL
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
 );

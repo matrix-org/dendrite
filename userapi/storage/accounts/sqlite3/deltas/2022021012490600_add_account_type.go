@@ -18,18 +18,29 @@ func LoadAddAccountType(m *sqlutil.Migrations) {
 }
 
 func UpAddAccountType(tx *sql.Tx) error {
-	// initially set every account to useracount, change appserver accounts afterwards
-	_, err := tx.Exec(`ALTER TABLE account_accounts ADD COLUMN account_type INTEGER;`)
+	// initially set every account to useraccount, change appservice and guest accounts afterwards
+	// (user = 1, guest = 2, admin = 3, appservice = 4)
+	_, err := tx.Exec(`ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
+CREATE TABLE account_accounts (
+    localpart TEXT NOT NULL PRIMARY KEY,
+    created_ts BIGINT NOT NULL,
+    password_hash TEXT,
+    appservice_id TEXT,
+    is_deactivated BOOLEAN DEFAULT 0,
+    account_type INTEGER NOT NULL
+);
+INSERT
+    INTO account_accounts (
+      localpart, created_ts, password_hash, appservice_id, account_type
+    ) SELECT
+        localpart, created_ts, password_hash, appservice_id, 1
+    FROM account_accounts_tmp
+;
+UPDATE account_accounts SET account_type = 4 WHERE appservice_id <> '';
+UPDATE account_accounts SET account_type = 2 WHERE localpart GLOB '[0-9]*';
+DROP TABLE account_accounts_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to add column: %w", err)
-	}
-	_, err = tx.Exec(`UPDATE account_accounts SET account_type = 1 WHERE appservice_id = '' OR appservice_id IS NULL`)
-	if err != nil {
-		return fmt.Errorf("failed to update user accounts: %w", err)
-	}
-	_, err = tx.Exec(`UPDATE account_accounts SET account_type = 4 WHERE appservice_id <> ''`)
-	if err != nil {
-		return fmt.Errorf("failed to update appservice accounts upgrade: %w", err)
 	}
 	return nil
 }
