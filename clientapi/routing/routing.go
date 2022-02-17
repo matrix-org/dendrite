@@ -1111,4 +1111,18 @@ func Setup(
 			return SetReceipt(req, eduAPI, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	r0mux.Handle("/rooms/{roomId}/context/{eventId}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, cfg.Matrix.UserConsentOptions, false, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Context(
+				req, device,
+				rsAPI, userAPI,
+				vars["roomId"], vars["eventId"],
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
