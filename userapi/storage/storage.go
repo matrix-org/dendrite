@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)

@@ -513,6 +513,11 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 		// drop the error as it's already a failure at this point
 		_ = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, dkeys)
 	}
+
+	// Sytest expects no failures, if we still could retrieve keys, e.g. from local cache
+	if len(res.DeviceKeys) > 0 {
+		delete(res.Failures, serverName)
+	}
 	respMu.Unlock()
 
 }

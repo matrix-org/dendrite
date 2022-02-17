@@ -23,14 +23,15 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -68,7 +69,7 @@ func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
 	userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
-	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "")
+	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", api.AccountTypeUser)
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
@@ -146,7 +147,7 @@ func TestLoginToken(t *testing.T) {
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
 
-		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "")
+		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", api.AccountTypeUser)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
 		}

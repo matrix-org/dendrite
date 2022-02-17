@@ -21,6 +21,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -28,9 +32,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 type UserInternalAPI struct {
@@ -56,16 +57,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
-	if req.AccountType == api.AccountTypeGuest {
-		acc, err := a.DB.CreateGuestAccount(ctx)
-		if err != nil {
-			return err
-		}
-		res.AccountCreated = true
-		res.Account = acc
-		return nil
-	}
-	acc, err := a.DB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID)
+	acc, err := a.DB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
 			switch req.OnConflict {
@@ -84,7 +76,14 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			Localpart:    req.Localpart,
 			ServerName:   a.ServerName,
 			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+			AccountType:  req.AccountType,
 		}
+		return nil
+	}
+
+	if req.AccountType == api.AccountTypeGuest {
+		res.AccountCreated = true
+		res.Account = acc
 		return nil
 	}
 
@@ -374,6 +373,15 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 		}
 		return err
 	}
+	localPart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		return err
+	}
+	acc, err := a.DB.GetAccountByLocalpart(ctx, localPart)
+	if err != nil {
+		return err
+	}
+	device.AccountType = acc.AccountType
 	res.Device = device
 	return nil
 }
@@ -400,6 +408,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		// AS dummy device has AS's token.
 		AccessToken:  token,
 		AppserviceID: appService.ID,
+		AccountType:  api.AccountTypeAppService,
 	}
 
 	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
