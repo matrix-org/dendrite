@@ -137,7 +137,7 @@ func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEvent
 func (u *RoomUpdater) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	return u.d.events(ctx, u.txn, eventNIDs)
+	return u.d.events(ctx, u.txn, eventNIDs, false)
 }
 
 func (u *RoomUpdater) SnapshotNIDFromEventID(
@@ -231,7 +231,11 @@ func (u *RoomUpdater) StateEntriesForEventIDs(
 }
 
 func (u *RoomUpdater) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	return u.d.eventsFromIDs(ctx, u.txn, eventIDs)
+	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, false)
+}
+
+func (u *RoomUpdater) UnsentEventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
+	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, true)
 }
 
 func (u *RoomUpdater) GetMembershipEventNIDsForRoom(

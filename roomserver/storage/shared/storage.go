@@ -281,10 +281,10 @@ func (d *Database) EventIDs(
 }
 
 func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	return d.eventsFromIDs(ctx, nil, eventIDs)
+	return d.eventsFromIDs(ctx, nil, eventIDs, false)
 }
 
-func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.Event, error) {
+func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) ([]types.Event, error) {
 	nidMap, err := d.eventNIDs(ctx, txn, eventIDs)
 	if err != nil {
 		return nil, err
@@ -295,7 +295,7 @@ func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []st
 		nids = append(nids, nid)
 	}
 
-	return d.events(ctx, txn, nids)
+	return d.events(ctx, txn, nids, onlyUnsent)
 }
 
 func (d *Database) LatestEventIDs(
@@ -437,12 +437,21 @@ func (d *Database) GetInvitesForUser(
 func (d *Database) Events(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) ([]types.Event, error) {
-	return d.events(ctx, nil, eventNIDs)
+	return d.events(ctx, nil, eventNIDs, false)
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID, onlyUnsent bool,
 ) ([]types.Event, error) {
+	if onlyUnsent {
+		// Reduce the list down to event NIDs that haven't already been sent to
+		// output before, so that we don't send duplicates again.
+		var err error
+		eventNIDs, err = d.EventsTable.BulkSelectEventsFilteredBySentToOutput(ctx, txn, eventNIDs, false)
+		if err != nil {
+			return nil, err
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err

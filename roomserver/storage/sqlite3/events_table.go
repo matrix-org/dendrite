@@ -80,6 +80,9 @@ const updateEventStateSQL = "" +
 const selectEventSentToOutputSQL = "" +
 	"SELECT sent_to_output FROM roomserver_events WHERE event_nid = $1"
 
+const bulkSelectEventFilteredBySentToOutputSQL = "" +
+	"SELECT event_nid FROM roomserver_events WHERE sent_to_output = $1 AND event_nid IN ($2)"
+
 const updateEventSentToOutputSQL = "" +
 	"UPDATE roomserver_events SET sent_to_output = TRUE WHERE event_nid = $1"
 
@@ -119,7 +122,8 @@ type eventStatements struct {
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
-	//selectRoomNIDsForEventNIDsStmt           *sql.Stmt
+	//selectRoomNIDsForEventNIDsStmt            *sql.Stmt
+	//bulkSelectEventFilteredBySentToOutputStmt *sql.Stmt
 }
 
 func createEventsTable(db *sql.DB) error {
@@ -146,6 +150,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
+		//{&s.bulkSelectEventFilteredBySentToOutputStmt, bulkSelectEventFilteredBySentToOutputSQL},
 	}.Prepare(db)
 }
 
@@ -355,6 +360,36 @@ func (s *eventStatements) SelectEventSentToOutput(
 ) (sentToOutput bool, err error) {
 	selectStmt := sqlutil.TxStmt(txn, s.selectEventSentToOutputStmt)
 	err = selectStmt.QueryRowContext(ctx, int64(eventNID)).Scan(&sentToOutput)
+	return
+}
+
+func (s *eventStatements) BulkSelectEventsFilteredBySentToOutput(
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID, sent bool,
+) (results []types.EventNID, err error) {
+	params := make([]interface{}, 0, 1+len(eventNIDs))
+	params = append(params, sent)
+	for _, v := range eventNIDs {
+		params = append(params, v)
+	}
+	selectOrig := strings.Replace(bulkSelectEventFilteredBySentToOutputSQL, "($2)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
+	selectStmt, err := s.db.Prepare(selectOrig)
+	if err != nil {
+		return nil, err
+	}
+	stmt := sqlutil.TxStmt(txn, selectStmt)
+	rows, err := stmt.QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventFilteredBySentToOutputStmt: rows.close() failed")
+	results = make([]types.EventNID, 0, len(eventNIDs))
+	for i := 0; rows.Next(); i++ {
+		var eventNID types.EventNID
+		if err = rows.Scan(&eventNID); err != nil {
+			return nil, err
+		}
+		results = append(results, eventNID)
+	}
 	return
 }
 

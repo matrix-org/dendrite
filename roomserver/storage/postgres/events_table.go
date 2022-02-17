@@ -108,6 +108,9 @@ const updateEventStateSQL = "" +
 const selectEventSentToOutputSQL = "" +
 	"SELECT sent_to_output FROM roomserver_events WHERE event_nid = $1"
 
+const bulkSelectEventFilteredBySentToOutputSQL = "" +
+	"SELECT event_nid FROM roomserver_events WHERE event_nid = ANY($1) AND sent_to_output = $2"
+
 const updateEventSentToOutputSQL = "" +
 	"UPDATE roomserver_events SET sent_to_output = TRUE WHERE event_nid = $1"
 
@@ -134,21 +137,22 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid = ANY($1)"
 
 type eventStatements struct {
-	insertEventStmt                        *sql.Stmt
-	selectEventStmt                        *sql.Stmt
-	bulkSelectStateEventByIDStmt           *sql.Stmt
-	bulkSelectStateEventByNIDStmt          *sql.Stmt
-	bulkSelectStateAtEventByIDStmt         *sql.Stmt
-	updateEventStateStmt                   *sql.Stmt
-	selectEventSentToOutputStmt            *sql.Stmt
-	updateEventSentToOutputStmt            *sql.Stmt
-	selectEventIDStmt                      *sql.Stmt
-	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
-	bulkSelectEventReferenceStmt           *sql.Stmt
-	bulkSelectEventIDStmt                  *sql.Stmt
-	bulkSelectEventNIDStmt                 *sql.Stmt
-	selectMaxEventDepthStmt                *sql.Stmt
-	selectRoomNIDsForEventNIDsStmt         *sql.Stmt
+	insertEventStmt                           *sql.Stmt
+	selectEventStmt                           *sql.Stmt
+	bulkSelectStateEventByIDStmt              *sql.Stmt
+	bulkSelectStateEventByNIDStmt             *sql.Stmt
+	bulkSelectStateAtEventByIDStmt            *sql.Stmt
+	updateEventStateStmt                      *sql.Stmt
+	selectEventSentToOutputStmt               *sql.Stmt
+	bulkSelectEventFilteredBySentToOutputStmt *sql.Stmt
+	updateEventSentToOutputStmt               *sql.Stmt
+	selectEventIDStmt                         *sql.Stmt
+	bulkSelectStateAtEventAndReferenceStmt    *sql.Stmt
+	bulkSelectEventReferenceStmt              *sql.Stmt
+	bulkSelectEventIDStmt                     *sql.Stmt
+	bulkSelectEventNIDStmt                    *sql.Stmt
+	selectMaxEventDepthStmt                   *sql.Stmt
+	selectRoomNIDsForEventNIDsStmt            *sql.Stmt
 }
 
 func createEventsTable(db *sql.DB) error {
@@ -168,6 +172,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.updateEventStateStmt, updateEventStateSQL},
 		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
 		{&s.selectEventSentToOutputStmt, selectEventSentToOutputSQL},
+		{&s.bulkSelectEventFilteredBySentToOutputStmt, bulkSelectEventFilteredBySentToOutputSQL},
 		{&s.selectEventIDStmt, selectEventIDSQL},
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
@@ -340,6 +345,26 @@ func (s *eventStatements) UpdateEventState(
 	stmt := sqlutil.TxStmt(txn, s.updateEventStateStmt)
 	_, err := stmt.ExecContext(ctx, int64(eventNID), int64(stateNID))
 	return err
+}
+
+func (s *eventStatements) BulkSelectEventsFilteredBySentToOutput(
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID, sent bool,
+) (results []types.EventNID, err error) {
+	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventFilteredBySentToOutputStmt)
+	rows, err := stmt.QueryContext(ctx, pq.Array(eventNIDs), sent)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventFilteredBySentToOutputStmt: rows.close() failed")
+	results = make([]types.EventNID, 0, len(eventNIDs))
+	for i := 0; rows.Next(); i++ {
+		var eventNID types.EventNID
+		if err = rows.Scan(&eventNID); err != nil {
+			return nil, err
+		}
+		results = append(results, eventNID)
+	}
+	return
 }
 
 func (s *eventStatements) SelectEventSentToOutput(
