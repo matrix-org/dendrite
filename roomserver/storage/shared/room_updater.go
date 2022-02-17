@@ -215,7 +215,13 @@ func (u *RoomUpdater) EventIDs(
 func (u *RoomUpdater) EventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (map[string]types.EventNID, error) {
-	return u.d.eventNIDs(ctx, u.txn, eventIDs)
+	return u.d.eventNIDs(ctx, u.txn, eventIDs, NoFilter)
+}
+
+func (u *RoomUpdater) UnsentEventNIDs(
+	ctx context.Context, eventIDs []string,
+) (map[string]types.EventNID, error) {
+	return u.d.eventNIDs(ctx, u.txn, eventIDs, FilterUnsentOnly)
 }
 
 func (u *RoomUpdater) StateAtEventIDs(
@@ -231,7 +237,11 @@ func (u *RoomUpdater) StateEntriesForEventIDs(
 }
 
 func (u *RoomUpdater) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	return u.d.eventsFromIDs(ctx, u.txn, eventIDs)
+	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, false)
+}
+
+func (u *RoomUpdater) UnsentEventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
+	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, true)
 }
 
 func (u *RoomUpdater) GetMembershipEventNIDsForRoom(

@@ -405,7 +405,7 @@ func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.Ro
 	if len(extraEventIDs) == 0 {
 		return nil, nil
 	}
-	extraEvents, err := u.updater.EventsFromIDs(u.ctx, extraEventIDs)
+	extraEvents, err := u.updater.UnsentEventsFromIDs(u.ctx, extraEventIDs)
 	if err != nil {
 		return nil, err
 	}
