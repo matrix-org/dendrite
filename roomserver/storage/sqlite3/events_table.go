@@ -499,9 +499,22 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 	return results, nil
 }
 
+// BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
+// If an event ID is not in the database then it is omitted from the map.
+func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+	return s.bulkSelectEventNID(ctx, txn, eventIDs, false)
+}
+
+// BulkSelectEventNIDs returns a map from string event ID to numeric event ID
+// only for events that haven't already been sent to the roomserver output.
+// If an event ID is not in the database then it is omitted from the map.
+func (s *eventStatements) BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+	return s.bulkSelectEventNID(ctx, txn, eventIDs, true)
+}
+
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventNID, error) {
+func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventNID, error) {
 	///////////////
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for k, v := range eventIDs {

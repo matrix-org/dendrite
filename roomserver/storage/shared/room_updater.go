@@ -215,13 +215,13 @@ func (u *RoomUpdater) EventIDs(
 func (u *RoomUpdater) EventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (map[string]types.EventNID, error) {
-	return u.d.eventNIDs(ctx, u.txn, eventIDs, false)
+	return u.d.eventNIDs(ctx, u.txn, eventIDs, NoFilter)
 }
 
 func (u *RoomUpdater) UnsentEventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (map[string]types.EventNID, error) {
-	return u.d.eventNIDs(ctx, u.txn, eventIDs, true)
+	return u.d.eventNIDs(ctx, u.txn, eventIDs, FilterUnsentOnly)
 }
 
 func (u *RoomUpdater) StateAtEventIDs(
