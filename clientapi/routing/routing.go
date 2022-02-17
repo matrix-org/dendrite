@@ -117,6 +117,11 @@ func Setup(
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
 
+	// You can't just do PathPrefix("/(r0|v3)") because regexps only apply when inside named path variables.
+	// So make a named path variable called 'version' (which we will never read in handlers) and then do
+	// (r0|v3) - BUT this is a captured group, which makes no sense because you cannot extract this group
+	// from a match (gorilla/mux exposes no way to do this) so it demands you make it a non-capturing group
+	// using ?: so the final regexp becomes what is below.
 	v3mux := publicAPIMux.PathPrefix("/{version:(?:r0|v3)}/").Subrouter()
 
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
