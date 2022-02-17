@@ -32,6 +32,12 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/tokens"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -39,11 +45,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/tokens"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -701,7 +702,7 @@ func handleApplicationServiceRegistration(
 	// application service registration is entirely separate.
 	return completeRegistration(
 		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(),
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
 	)
 }
 
@@ -720,7 +721,7 @@ func checkAndCompleteFlow(
 		// This flow was completed, registration can continue
 		return completeRegistration(
 			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(),
-			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
 		)
 	}
 
@@ -745,6 +746,7 @@ func completeRegistration(
 	username, password, appserviceID, ipAddr, userAgent string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
+	accType userapi.AccountType,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -759,13 +761,12 @@ func completeRegistration(
 			JSON: jsonerror.BadJSON("missing password"),
 		}
 	}
-
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AppServiceID: appserviceID,
 		Localpart:    username,
 		Password:     password,
-		AccountType:  userapi.AccountTypeUser,
+		AccountType:  accType,
 		OnConflict:   userapi.ConflictAbort,
 	}, &accRes)
 	if err != nil {
@@ -963,5 +964,10 @@ func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedS
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID)
+
+	accType := userapi.AccountTypeUser
+	if ssrr.Admin {
+		accType = userapi.AccountTypeAdmin
+	}
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), false, &ssrr.User, &deviceID, accType)
 }

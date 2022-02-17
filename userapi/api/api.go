@@ -18,8 +18,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // UserInternalAPI is the internal API for information about users and devices.
@@ -353,6 +354,7 @@ type Device struct {
 	// If the device is for an appservice user,
 	// this is the appservice ID.
 	AppserviceID string
+	AccountType  AccountType
 }
 
 // Account represents a Matrix account on this home server.
@@ -361,7 +363,7 @@ type Account struct {
 	Localpart    string
 	ServerName   gomatrixserverlib.ServerName
 	AppServiceID string
-	// TODO: Other flags like IsAdmin, IsGuest
+	AccountType  AccountType
 	// TODO: Associations (e.g. with application services)
 }
 
@@ -417,4 +419,8 @@ const (
 	AccountTypeUser AccountType = 1
 	// AccountTypeGuest indicates this is a guest account
 	AccountTypeGuest AccountType = 2
+	// AccountTypeAdmin indicates this is an admin account
+	AccountTypeAdmin AccountType = 3
+	// AccountTypeAppService indicates this is an appservice account
+	AccountTypeAppService AccountType = 4
 )

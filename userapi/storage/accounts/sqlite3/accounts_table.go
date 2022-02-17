@@ -19,10 +19,11 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -39,14 +40,16 @@ CREATE TABLE IF NOT EXISTS account_accounts (
     -- Identifies which application service this account belongs to, if any.
     appservice_id TEXT,
     -- If the account is currently active
-    is_deactivated BOOLEAN DEFAULT 0
+    is_deactivated BOOLEAN DEFAULT 0,
+	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
+	account_type INTEGER NOT NULL
     -- TODO:
-    -- is_guest, is_admin, upgraded_ts, devices, any email reset stuff?
+    -- upgraded_ts, devices, any email reset stuff?
 );
 `
 
 const insertAccountSQL = "" +
-	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id, account_type) VALUES ($1, $2, $3, $4, $5)"
 
 const updatePasswordSQL = "" +
 	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
@@ -55,7 +58,7 @@ const deactivateAccountSQL = "" +
 	"UPDATE account_accounts SET is_deactivated = 1 WHERE localpart = $1"
 
 const selectAccountByLocalpartSQL = "" +
-	"SELECT localpart, appservice_id FROM account_accounts WHERE localpart = $1"
+	"SELECT localpart, appservice_id, account_type FROM account_accounts WHERE localpart = $1"
 
 const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
@@ -96,16 +99,16 @@ func (s *accountsStatements) prepare(db *sql.DB, server gomatrixserverlib.Server
 // this account will be passwordless. Returns an error if this account already exists. Returns the account
 // on success.
 func (s *accountsStatements) insertAccount(
-	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string,
+	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string, accountType api.AccountType,
 ) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := s.insertAccountStmt
 
 	var err error
-	if appserviceID == "" {
-		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil)
+	if accountType != api.AccountTypeAppService {
+		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, nil, accountType)
 	} else {
-		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID)
+		_, err = sqlutil.TxStmt(txn, stmt).ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, accountType)
 	}
 	if err != nil {
 		return nil, err
@@ -147,7 +150,7 @@ func (s *accountsStatements) selectAccountByLocalpart(
 	var acc api.Account
 
 	stmt := s.selectAccountByLocalpartStmt
-	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr)
+	err := stmt.QueryRowContext(ctx, localpart).Scan(&acc.Localpart, &appserviceIDPtr, &acc.AccountType)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.WithError(err).Error("Unable to retrieve user from the db")
