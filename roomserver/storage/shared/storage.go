@@ -731,9 +731,6 @@ func (d *Database) assignEventTypeNID(
 			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
 		}
 	}
-	if err == nil {
-		d.Cache.StoreRoomServerEventTypeNID(eventType, eventTypeNID)
-	}
 	return eventTypeNID, err
 }
 
@@ -752,9 +749,6 @@ func (d *Database) assignStateKeyNID(
 			// We raced with another insert so run the select again.
 			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
-	}
-	if err == nil {
-		d.Cache.StoreRoomServerStateKeyNID(eventStateKey, eventStateKeyNID)
 	}
 	return eventStateKeyNID, err
 }
