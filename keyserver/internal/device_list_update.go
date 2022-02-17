@@ -367,6 +367,9 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 					waitTime = fcerr.RetryAfter
 				} else if fcerr.Blacklisted {
 					waitTime = time.Hour * 8
+				} else {
+					// For all other errors (DNS resolution, network etc.) wait 1 hour.
+					waitTime = time.Hour
 				}
 			} else {
 				waitTime = time.Hour
