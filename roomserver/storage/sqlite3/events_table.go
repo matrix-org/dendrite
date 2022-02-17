@@ -80,9 +80,6 @@ const updateEventStateSQL = "" +
 const selectEventSentToOutputSQL = "" +
 	"SELECT sent_to_output FROM roomserver_events WHERE event_nid = $1"
 
-const bulkSelectEventFilteredBySentToOutputSQL = "" +
-	"SELECT event_nid FROM roomserver_events WHERE sent_to_output = $1 AND event_nid IN ($2)"
-
 const updateEventSentToOutputSQL = "" +
 	"UPDATE roomserver_events SET sent_to_output = TRUE WHERE event_nid = $1"
 
@@ -101,6 +98,9 @@ const bulkSelectEventIDSQL = "" +
 
 const bulkSelectEventNIDSQL = "" +
 	"SELECT event_id, event_nid FROM roomserver_events WHERE event_id IN ($1)"
+
+const bulkSelectUnsentEventNIDSQL = "" +
+	"SELECT event_id, event_nid FROM roomserver_events WHERE sent_to_output = 0 AND event_id IN ($1)"
 
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
@@ -121,9 +121,9 @@ type eventStatements struct {
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
-	bulkSelectEventNIDStmt                 *sql.Stmt
-	//selectRoomNIDsForEventNIDsStmt            *sql.Stmt
-	//bulkSelectEventFilteredBySentToOutputStmt *sql.Stmt
+	//bulkSelectEventNIDStmt               *sql.Stmt
+	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
+	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
 }
 
 func createEventsTable(db *sql.DB) error {
@@ -148,9 +148,9 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
-		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		//{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
-		//{&s.bulkSelectEventFilteredBySentToOutputStmt, bulkSelectEventFilteredBySentToOutputSQL},
 	}.Prepare(db)
 }
 
@@ -363,36 +363,6 @@ func (s *eventStatements) SelectEventSentToOutput(
 	return
 }
 
-func (s *eventStatements) BulkSelectEventsFilteredBySentToOutput(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID, sent bool,
-) (results []types.EventNID, err error) {
-	params := make([]interface{}, 0, 1+len(eventNIDs))
-	params = append(params, sent)
-	for _, v := range eventNIDs {
-		params = append(params, v)
-	}
-	selectOrig := strings.Replace(bulkSelectEventFilteredBySentToOutputSQL, "($2)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
-	if err != nil {
-		return nil, err
-	}
-	stmt := sqlutil.TxStmt(txn, selectStmt)
-	rows, err := stmt.QueryContext(ctx, params...)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventFilteredBySentToOutputStmt: rows.close() failed")
-	results = make([]types.EventNID, 0, len(eventNIDs))
-	for i := 0; rows.Next(); i++ {
-		var eventNID types.EventNID
-		if err = rows.Scan(&eventNID); err != nil {
-			return nil, err
-		}
-		results = append(results, eventNID)
-	}
-	return
-}
-
 func (s *eventStatements) UpdateEventSentToOutput(ctx context.Context, txn *sql.Tx, eventNID types.EventNID) error {
 	updateStmt := sqlutil.TxStmt(txn, s.updateEventSentToOutputStmt)
 	_, err := updateStmt.ExecContext(ctx, int64(eventNID))
@@ -531,13 +501,18 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventNID, error) {
 	///////////////
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	var selectOrig string
+	if onlyUnsent {
+		selectOrig = strings.Replace(bulkSelectUnsentEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	} else {
+		selectOrig = strings.Replace(bulkSelectEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	}
 	selectStmt, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
