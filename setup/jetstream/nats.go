@@ -24,13 +24,12 @@ func Prepare(cfg *config.JetStream) natsclient.JetStreamContext {
 	if natsServer == nil {
 		var err error
 		natsServer, err = natsserver.NewServer(&natsserver.Options{
-			ServerName:       "monolith",
-			DontListen:       true,
-			JetStream:        true,
-			StoreDir:         string(cfg.StoragePath),
-			NoSystemAccount:  true,
-			AllowNewAccounts: false,
-			MaxPayload:       16 * 1024 * 1024,
+			ServerName:      "monolith",
+			DontListen:      true,
+			JetStream:       true,
+			StoreDir:        string(cfg.StoragePath),
+			NoSystemAccount: true,
+			MaxPayload:      16 * 1024 * 1024,
 		})
 		if err != nil {
 			panic(err)
