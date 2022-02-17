@@ -122,7 +122,8 @@ func Setup(
 	// (r0|v3) - BUT this is a captured group, which makes no sense because you cannot extract this group
 	// from a match (gorilla/mux exposes no way to do this) so it demands you make it a non-capturing group
 	// using ?: so the final regexp becomes what is below. We also need a trailing slash to stop 'v33333' matching.
-	v3mux := publicAPIMux.PathPrefix("/{version:(?:r0|v3)}/").Subrouter()
+	// Note that 'apiversion' is chosen because it must not collide with a variable used in any of the routing!
+	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
