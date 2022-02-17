@@ -204,13 +204,6 @@ federation_api:
   # enable this option in production as it presents a security risk!
   disable_tls_validation: false
 
-  # Use the following proxy server for outbound federation traffic.
-  proxy_outbound:
-    enabled: false
-    protocol: http
-    host: localhost
-    port: 8080
-
   # Perspective keyservers to use as a backup when direct key fetches fail. This may
   # be required to satisfy key requests for servers that are no longer online when
   # joining some rooms.

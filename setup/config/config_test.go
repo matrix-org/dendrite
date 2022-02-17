@@ -118,11 +118,6 @@ federation_sender:
     conn_max_lifetime: -1
   send_max_retries: 16
   disable_tls_validation: false
-  proxy_outbound:
-    enabled: false
-    protocol: http
-    host: localhost
-    port: 8080
 key_server:
   internal_api:
     listen: http://localhost:7779

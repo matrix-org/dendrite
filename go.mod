@@ -1,6 +1,6 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.3.3-0.20220104162330-c76d5fd70423
+replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.7.2-0.20220217100407-087330ed46ad
 
 replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.11.1-0.20220104162523-f4ddebe1061c
 
@@ -11,7 +11,6 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/docker/docker v20.10.12+incompatible
@@ -24,7 +23,6 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/testing v0.0.0-20211215003918-77eb13d6cad2 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/lib/pq v1.10.4
@@ -42,14 +40,14 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210709140738-b0d1ba599a6d
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220209202448-9805ef634335
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220214133635-20632dd262ed
 	github.com/matrix-org/pinecone v0.0.0-20220121094951-351265543ddf
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/matryer/is v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nats-io/nats-server/v2 v2.3.2
-	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
+	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20211220175533-9d16fdc47b31
@@ -57,9 +55,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose v2.7.0+incompatible
-	github.com/prometheus/client_golang v1.11.0
-	github.com/prometheus/common v0.32.1 // indirect
-	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/tidwall/gjson v1.14.0
 	github.com/tidwall/sjson v1.2.4
