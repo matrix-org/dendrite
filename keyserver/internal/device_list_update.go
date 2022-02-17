@@ -373,7 +373,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 				}
 			} else {
 				waitTime = time.Hour
-				logger.WithError(err).Warn("GetUserDevices returned unknown error type")
+				logger.WithError(err).WithField("user_id", userID).Warn("GetUserDevices returned unknown error type")
 			}
 			continue
 		}
