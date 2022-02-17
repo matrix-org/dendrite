@@ -29,8 +29,6 @@ type FederationAPI struct {
 	// on remote federation endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
-	Proxy Proxy `yaml:"proxy_outbound"`
-
 	// Perspective keyservers, to use as a backup when direct key fetch
 	// requests don't succeed
 	KeyPerspectives KeyPerspectives `yaml:"key_perspectives"`
@@ -50,8 +48,6 @@ func (c *FederationAPI) Defaults(generate bool) {
 
 	c.FederationMaxRetries = 16
 	c.DisableTLSValidation = false
-
-	c.Proxy.Defaults()
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {

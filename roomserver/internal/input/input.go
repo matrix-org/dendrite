@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,6 +60,7 @@ var keyContentFields = map[string]string{
 }
 
 type Inputer struct {
+	ProcessContext       *process.ProcessContext
 	DB                   storage.Database
 	JetStream            nats.JetStreamContext
 	Durable              nats.SubOpt
@@ -115,7 +117,7 @@ func (r *Inputer) Start() error {
 				_ = msg.InProgress() // resets the acknowledgement wait timer
 				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				action, err := r.processRoomEventUsingUpdater(context.Background(), roomID, &inputRoomEvent)
+				action, err := r.processRoomEventUsingUpdater(r.ProcessContext.Context(), roomID, &inputRoomEvent)
 				if err != nil {
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
