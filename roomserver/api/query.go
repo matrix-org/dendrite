@@ -101,6 +101,17 @@ type QueryEventsByIDResponse struct {
 	Events []*gomatrixserverlib.HeaderedEvent `json:"events"`
 }
 
+// QueryEventsByIDRequest is a request to QueryEventsByID
+type QueryEventsAfterEventIDRequest struct {
+	// The event IDs to look up.
+	EventIDs string `json:"event_id"`
+}
+
+// QueryEventsByIDResponse is a response to QueryEventsByID
+type QueryEventsAfterEventIDesponse struct {
+	Events []*gomatrixserverlib.ClientEvent `json:"events"`
+}
+
 // QueryMembershipForUserRequest is a request to QueryMembership
 type QueryMembershipForUserRequest struct {
 	// ID of the room to fetch membership from

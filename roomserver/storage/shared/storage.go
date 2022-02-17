@@ -1173,6 +1173,10 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 	})
 }
 
+func (d *Database) SelectPreviousEventNIDs(ctx context.Context, eventID string) ([]types.EventNID, error) {
+	return d.PrevEventsTable.SelectPreviousEventNIDs(ctx, nil, eventID)
+}
+
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops
 // it should live in this package!
 

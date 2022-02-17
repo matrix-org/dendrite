@@ -64,6 +64,7 @@ type Database interface {
 	// Look up the Events for a list of numeric event IDs.
 	// Returns a sorted list of events.
 	Events(ctx context.Context, eventNIDs []types.EventNID) ([]types.Event, error)
+	SelectPreviousEventNIDs(ctx context.Context, eventID string) ([]types.EventNID, error)
 	// Look up snapshot NID for an event ID string
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.

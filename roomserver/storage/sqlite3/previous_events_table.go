@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -53,7 +54,7 @@ const insertPreviousEventSQL = `
 
 const selectPreviousEventNIDsSQL = `
 	SELECT event_nids FROM roomserver_previous_events
-	  WHERE previous_event_id = $1 AND previous_reference_sha256 = $2
+	  WHERE previous_event_id = $1
 `
 
 // Check if the event is referenced by another event in the table.
@@ -128,4 +129,25 @@ func (s *previousEventStatements) SelectPreviousEventExists(
 	var ok int64
 	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
+}
+
+// SelectPreviousEventNIDs returns all eventNIDs for a given eventID
+func (s *previousEventStatements) SelectPreviousEventNIDs(ctx context.Context, txn *sql.Tx, eventID string) ([]types.EventNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventNIDsStmt)
+	row := stmt.QueryRowContext(ctx, eventID)
+	var eventNIDs string
+	if err := row.Scan(&eventNIDs); err != nil {
+		return nil, err
+	}
+	result := []types.EventNID{}
+	nids := strings.Split(eventNIDs, ",")
+	for _, nid := range nids {
+		i, err := strconv.Atoi(nid)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, types.EventNID(i))
+	}
+
+	return result, nil
 }

@@ -59,9 +59,14 @@ const selectPreviousEventExistsSQL = "" +
 	"SELECT 1 FROM roomserver_previous_events" +
 	" WHERE previous_event_id = $1 AND previous_reference_sha256 = $2"
 
+const selectPreviousEventNIDsSQL = "" +
+	"SELECT event_nids FROM roomserver_previous_events" +
+	" WHERE previous_event_id = $1"
+
 type previousEventStatements struct {
 	insertPreviousEventStmt       *sql.Stmt
 	selectPreviousEventExistsStmt *sql.Stmt
+	selectPreviousEventNIDsStmt   *sql.Stmt
 }
 
 func createPrevEventsTable(db *sql.DB) error {
@@ -75,6 +80,7 @@ func preparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
 	return s, sqlutil.StatementList{
 		{&s.insertPreviousEventStmt, insertPreviousEventSQL},
 		{&s.selectPreviousEventExistsStmt, selectPreviousEventExistsSQL},
+		{&s.selectPreviousEventNIDsStmt, selectPreviousEventNIDsSQL},
 	}.Prepare(db)
 }
 
@@ -100,4 +106,19 @@ func (s *previousEventStatements) SelectPreviousEventExists(
 	var ok int64
 	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
+}
+
+// SelectPreviousEventNIDs returns all eventNIDs for a given eventID
+func (s *previousEventStatements) SelectPreviousEventNIDs(ctx context.Context, txn *sql.Tx, eventID string) ([]types.EventNID, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventNIDsStmt)
+	row := stmt.QueryRowContext(ctx, eventID)
+	var eventNIDs []uint8
+	if err := row.Scan(&eventNIDs); err != nil {
+		return nil, err
+	}
+	result := []types.EventNID{}
+	for _, nid := range eventNIDs {
+		result = append(result, types.EventNID(nid))
+	}
+	return result, nil
 }
