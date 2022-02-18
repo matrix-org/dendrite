@@ -238,13 +238,27 @@ func (d *Database) addState(
 func (d *Database) EventNIDs(
 	ctx context.Context, eventIDs []string,
 ) (map[string]types.EventNID, error) {
-	return d.eventNIDs(ctx, nil, eventIDs)
+	return d.eventNIDs(ctx, nil, eventIDs, NoFilter)
 }
 
+type UnsentFilter bool
+
+const (
+	NoFilter         UnsentFilter = false
+	FilterUnsentOnly UnsentFilter = true
+)
+
 func (d *Database) eventNIDs(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, filter UnsentFilter,
 ) (map[string]types.EventNID, error) {
-	return d.EventsTable.BulkSelectEventNID(ctx, txn, eventIDs)
+	switch filter {
+	case FilterUnsentOnly:
+		return d.EventsTable.BulkSelectUnsentEventNID(ctx, txn, eventIDs)
+	case NoFilter:
+		return d.EventsTable.BulkSelectEventNID(ctx, txn, eventIDs)
+	default:
+		panic("impossible case")
+	}
 }
 
 func (d *Database) SetState(
@@ -281,11 +295,11 @@ func (d *Database) EventIDs(
 }
 
 func (d *Database) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	return d.eventsFromIDs(ctx, nil, eventIDs)
+	return d.eventsFromIDs(ctx, nil, eventIDs, NoFilter)
 }
 
-func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.Event, error) {
-	nidMap, err := d.eventNIDs(ctx, txn, eventIDs)
+func (d *Database) eventsFromIDs(ctx context.Context, txn *sql.Tx, eventIDs []string, filter UnsentFilter) ([]types.Event, error) {
+	nidMap, err := d.eventNIDs(ctx, txn, eventIDs, filter)
 	if err != nil {
 		return nil, err
 	}
