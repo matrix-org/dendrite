@@ -720,15 +720,17 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 		// Legacy Dendrite users will have completely empty push rules, so we should
 		// detect that situation and set some defaults.
 		var rules struct {
-			Content   []json.RawMessage `json:"content"`
-			Override  []json.RawMessage `json:"override"`
-			Room      []json.RawMessage `json:"room"`
-			Sender    []json.RawMessage `json:"sender"`
-			Underride []json.RawMessage `json:"underride"`
+			G struct {
+				Content   []json.RawMessage `json:"content"`
+				Override  []json.RawMessage `json:"override"`
+				Room      []json.RawMessage `json:"room"`
+				Sender    []json.RawMessage `json:"sender"`
+				Underride []json.RawMessage `json:"underride"`
+			} `json:"global"`
 		}
 		if err := json.Unmarshal([]byte(bs), &rules); err == nil {
-			count := len(rules.Content) + len(rules.Override) +
-				len(rules.Room) + len(rules.Sender) + len(rules.Underride)
+			count := len(rules.G.Content) + len(rules.G.Override) +
+				len(rules.G.Room) + len(rules.G.Sender) + len(rules.G.Underride)
 			ok = count > 0
 		}
 	}
