@@ -144,7 +144,7 @@ client_api:
 
   # Prevents new guest accounts from being created. Guest registration is also
   # disabled implicitly by setting 'registration_disabled' above.
-  guests_disabled: false
+  guests_disabled: true
 
   # If set, allows registration by anyone who knows the shared secret, regardless of
   # whether registration is otherwise disabled.
