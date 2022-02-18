@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -36,7 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 )
 
 // Unspecced server notice request
@@ -58,7 +58,7 @@ func SendServerNotice(
 	cfgClient *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
-	accountsDB accounts.Database,
+	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
@@ -108,6 +108,14 @@ func SendServerNotice(
 	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
 		UserID:         r.UserID,
 		WantMembership: "invite",
+	}, &userRooms); err != nil {
+		return util.ErrorResponse(err)
+	}
+	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
+	// get left rooms for specified user
+	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
+		UserID:         r.UserID,
+		WantMembership: "leave",
 	}, &userRooms); err != nil {
 		return util.ErrorResponse(err)
 	}
@@ -180,7 +188,7 @@ func SendServerNotice(
 				},
 			}}
 			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
+				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
 				return jsonerror.InternalServerError()
 			}
 
@@ -190,7 +198,13 @@ func SendServerNotice(
 		}
 
 	} else {
+		// we've found a room in common, check the membership
 		roomID = commonRooms[0]
+		// re-invite the user
+		res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+		if err != nil {
+			return res
+		}
 	}
 
 	startedGeneratingEvent := time.Now()
@@ -231,7 +245,7 @@ func SendServerNotice(
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
-	util.GetLogger(req.Context()).WithFields(logrus.Fields{
+	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
 		"room_id":      roomID,
 		"room_version": roomVersion,
@@ -270,7 +284,7 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 func getSenderDevice(
 	ctx context.Context,
 	userAPI userapi.UserInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse

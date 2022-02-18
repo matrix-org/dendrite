@@ -95,8 +95,8 @@ type PerformLeaveRequest struct {
 }
 
 type PerformLeaveResponse struct {
-	Code    int    `json:"code,omitempty"`
-	Message string `json:"message,omitempty"`
+	Code    int         `json:"code,omitempty"`
+	Message interface{} `json:"message,omitempty"`
 }
 
 type PerformInviteRequest struct {
