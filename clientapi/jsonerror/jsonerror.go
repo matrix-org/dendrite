@@ -149,6 +149,15 @@ func MissingParam(msg string) *MatrixError {
 	return &MatrixError{"M_MISSING_PARAM", msg}
 }
 
+// LeaveServerNoticeError is an error returned when trying to reject an invite
+// for a server notice room.
+func LeaveServerNoticeError() *MatrixError {
+	return &MatrixError{
+		ErrCode: "M_CANNOT_LEAVE_SERVER_NOTICE_ROOM",
+		Err:     "You cannot reject this invite",
+	}
+}
+
 type IncompatibleRoomVersionError struct {
 	RoomVersion string `json:"room_version"`
 	Error       string `json:"error"`

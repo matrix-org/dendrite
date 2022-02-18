@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -140,33 +141,14 @@ func CreateRoom(
 	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
-	// TODO (#267): Check room ID doesn't clash with an existing one, and we
-	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
-	return createRoom(req, device, cfg, roomID, accountDB, rsAPI, asAPI)
-}
-
-// createRoom implements /createRoom
-// nolint: gocyclo
-func createRoom(
-	req *http.Request, device *api.Device,
-	cfg *config.ClientAPI, roomID string,
-	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
-) util.JSONResponse {
-	logger := util.GetLogger(req.Context())
-	userID := device.UserID
 	var r createRoomRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
-	// TODO: apply rate-limit
-
 	if resErr = r.Validate(); resErr != nil {
 		return *resErr
 	}
-
 	evTime, err := httputil.ParseTSParam(req)
 	if err != nil {
 		return util.JSONResponse{
@@ -174,6 +156,25 @@ func createRoom(
 			JSON: jsonerror.InvalidArgumentValue(err.Error()),
 		}
 	}
+	return createRoom(req.Context(), r, device, cfg, accountDB, rsAPI, asAPI, evTime)
+}
+
+// createRoom implements /createRoom
+// nolint: gocyclo
+func createRoom(
+	ctx context.Context,
+	r createRoomRequest, device *api.Device,
+	cfg *config.ClientAPI,
+	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI,
+	evTime time.Time,
+) util.JSONResponse {
+	// TODO (#267): Check room ID doesn't clash with an existing one, and we
+	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
+	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+
+	logger := util.GetLogger(ctx)
+	userID := device.UserID
 
 	// Clobber keys: creator, room_version
 
@@ -200,16 +201,16 @@ func createRoom(
 		"roomVersion": roomVersion,
 	}).Info("Creating new room")
 
-	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
+		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return jsonerror.InternalServerError()
 	}
 
 	createContent := map[string]interface{}{}
 	if len(r.CreationContent) > 0 {
 		if err = json.Unmarshal(r.CreationContent, &createContent); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal for creation_content failed")
+			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for creation_content failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("invalid create content"),
@@ -230,7 +231,7 @@ func createRoom(
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
 		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
+			util.GetLogger(ctx).WithError(err).Error("json.Unmarshal for power_level_content_override failed")
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.BadJSON("malformed power_level_content_override"),
@@ -319,9 +320,9 @@ func createRoom(
 		}
 
 		var aliasResp roomserverAPI.GetRoomIDForAliasResponse
-		err = rsAPI.GetRoomIDForAlias(req.Context(), &hasAliasReq, &aliasResp)
+		err = rsAPI.GetRoomIDForAlias(ctx, &hasAliasReq, &aliasResp)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
+			util.GetLogger(ctx).WithError(err).Error("aliasAPI.GetRoomIDForAlias failed")
 			return jsonerror.InternalServerError()
 		}
 		if aliasResp.RoomID != "" {
@@ -426,7 +427,7 @@ func createRoom(
 		}
 		err = builder.SetContent(e.Content)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+			util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
 			return jsonerror.InternalServerError()
 		}
 		if i > 0 {
@@ -435,12 +436,12 @@ func createRoom(
 		var ev *gomatrixserverlib.Event
 		ev, err = buildEvent(&builder, &authEvents, cfg, evTime, roomVersion)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("buildEvent failed")
+			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()
 		}
 
 		if err = gomatrixserverlib.Allowed(ev, &authEvents); err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.Allowed failed")
+			util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.Allowed failed")
 			return jsonerror.InternalServerError()
 		}
 
@@ -448,7 +449,7 @@ func createRoom(
 		builtEvents = append(builtEvents, ev.Headered(roomVersion))
 		err = authEvents.AddEvent(ev)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("authEvents.AddEvent failed")
+			util.GetLogger(ctx).WithError(err).Error("authEvents.AddEvent failed")
 			return jsonerror.InternalServerError()
 		}
 	}
@@ -462,8 +463,8 @@ func createRoom(
 			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
-	if err = roomserverAPI.SendInputRoomEvents(req.Context(), rsAPI, inputs, false); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
+	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, inputs, false); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -478,9 +479,9 @@ func createRoom(
 		}
 
 		var aliasResp roomserverAPI.SetRoomAliasResponse
-		err = rsAPI.SetRoomAlias(req.Context(), &aliasReq, &aliasResp)
+		err = rsAPI.SetRoomAlias(ctx, &aliasReq, &aliasResp)
 		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("aliasAPI.SetRoomAlias failed")
+			util.GetLogger(ctx).WithError(err).Error("aliasAPI.SetRoomAlias failed")
 			return jsonerror.InternalServerError()
 		}
 
@@ -519,11 +520,11 @@ func createRoom(
 		for _, invitee := range r.Invite {
 			// Build the invite event.
 			inviteEvent, err := buildMembershipEvent(
-				req.Context(), invitee, "", accountDB, device, gomatrixserverlib.Invite,
+				ctx, invitee, "", accountDB, device, gomatrixserverlib.Invite,
 				roomID, true, cfg, evTime, rsAPI, asAPI,
 			)
 			if err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
+				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
 				continue
 			}
 			inviteStrippedState := append(
@@ -532,7 +533,7 @@ func createRoom(
 			)
 			// Send the invite event to the roomserver.
 			err = roomserverAPI.SendInvite(
-				req.Context(),
+				ctx,
 				rsAPI,
 				inviteEvent.Headered(roomVersion),
 				inviteStrippedState,   // invite room state
@@ -544,7 +545,7 @@ func createRoom(
 				return e.JSONResponse()
 			case nil:
 			default:
-				util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInvite failed")
+				util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInvite failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: jsonerror.InternalServerError(),
@@ -556,13 +557,13 @@ func createRoom(
 	if r.Visibility == "public" {
 		// expose this room in the published room list
 		var pubRes roomserverAPI.PerformPublishResponse
-		rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+		rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
 			RoomID:     roomID,
 			Visibility: "public",
 		}, &pubRes)
 		if pubRes.Error != nil {
 			// treat as non-fatal since the room is already made by this point
-			util.GetLogger(req.Context()).WithError(pubRes.Error).Error("failed to visibility:public")
+			util.GetLogger(ctx).WithError(pubRes.Error).Error("failed to visibility:public")
 		}
 	}
 

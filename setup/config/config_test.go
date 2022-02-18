@@ -58,6 +58,11 @@ global:
     basic_auth:
       username: metrics
       password: metrics
+  server_notices:
+    local_part: "_server"
+    display_name: "Server alerts"
+    avatar: ""
+    room_name: "Server Alerts"	
 app_service_api:
   internal_api:
     listen: http://localhost:7777

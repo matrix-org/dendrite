@@ -11,6 +11,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
@@ -88,6 +90,10 @@ func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.Federation
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
 func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+}
+
+// SetUserAPI no-ops in HTTP client mode as there is no chicken/egg scenario
+func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
