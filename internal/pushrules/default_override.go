@@ -152,6 +152,10 @@ func mRuleInviteForMeDefinition(userID string) *Rule {
 				Tweak: SoundTweak,
 				Value: "default",
 			},
+			{
+				Kind:  SetTweakAction,
+				Tweak: HighlightTweak,
+			},
 		},
 	}
 }

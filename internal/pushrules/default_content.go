@@ -25,8 +25,7 @@ func mRuleContainsUserNameDefinition(localpart string) *Rule {
 			},
 			{
 				Kind:  SetTweakAction,
-				Tweak: SoundTweak,
-				Value: "default",
+				Tweak: HighlightTweak,
 			},
 		},
 	}
