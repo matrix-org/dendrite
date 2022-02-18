@@ -6,6 +6,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
@@ -22,33 +23,35 @@ CREATE TABLE IF NOT EXISTS open_id_tokens (
 );
 `
 
-const insertTokenSQL = "" +
+const insertOpenIDTokenSQL = "" +
 	"INSERT INTO open_id_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
 
-const selectTokenSQL = "" +
+const selectOpenIDTokenSQL = "" +
 	"SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
 
-type tokenStatements struct {
+type openIDTokenStatements struct {
 	insertTokenStmt *sql.Stmt
 	selectTokenStmt *sql.Stmt
 	serverName      gomatrixserverlib.ServerName
 }
 
-func (s *tokenStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
-	_, err = db.Exec(openIDTokenSchema)
-	if err != nil {
-		return
+func NewPostgresOpenIDTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.OpenIDTable, error) {
+	s := &openIDTokenStatements{
+		serverName: serverName,
 	}
-	s.serverName = server
-	return sqlutil.StatementList{
-		{&s.insertTokenStmt, insertTokenSQL},
-		{&s.selectTokenStmt, selectTokenSQL},
+	_, err := db.Exec(openIDTokenSchema)
+	if err != nil {
+		return nil, err
+	}
+	return s, sqlutil.StatementList{
+		{&s.insertTokenStmt, insertOpenIDTokenSQL},
+		{&s.selectTokenStmt, selectOpenIDTokenSQL},
 	}.Prepare(db)
 }
 
 // insertToken inserts a new OpenID Connect token to the DB.
 // Returns new token, otherwise returns error if the token already exists.
-func (s *tokenStatements) insertToken(
+func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
 	txn *sql.Tx,
 	token, localpart string,
@@ -61,7 +64,7 @@ func (s *tokenStatements) insertToken(
 
 // selectOpenIDTokenAtrributes gets the attributes associated with an OpenID token from the DB
 // Returns the existing token's attributes, or err if no token is found
-func (s *tokenStatements) selectOpenIDTokenAtrributes(
+func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	ctx context.Context,
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {

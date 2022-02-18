@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
 const keyBackupVersionTableSchema = `
@@ -69,12 +70,13 @@ type keyBackupVersionStatements struct {
 	updateKeyBackupETagStmt     *sql.Stmt
 }
 
-func (s *keyBackupVersionStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(keyBackupVersionTableSchema)
+func NewPostgresKeyBackupVersionTable(db *sql.DB) (tables.KeyBackupVersionTable, error) {
+	s := &keyBackupVersionStatements{}
+	_, err := db.Exec(keyBackupVersionTableSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return sqlutil.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertKeyBackupStmt, insertKeyBackupSQL},
 		{&s.updateKeyBackupAuthDataStmt, updateKeyBackupAuthDataSQL},
 		{&s.deleteKeyBackupStmt, deleteKeyBackupSQL},
@@ -84,7 +86,7 @@ func (s *keyBackupVersionStatements) prepare(db *sql.DB) (err error) {
 	}.Prepare(db)
 }
 
-func (s *keyBackupVersionStatements) insertKeyBackup(
+func (s *keyBackupVersionStatements) InsertKeyBackup(
 	ctx context.Context, txn *sql.Tx, userID, algorithm string, authData json.RawMessage, etag string,
 ) (version string, err error) {
 	var versionInt int64
@@ -92,7 +94,7 @@ func (s *keyBackupVersionStatements) insertKeyBackup(
 	return strconv.FormatInt(versionInt, 10), err
 }
 
-func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
+func (s *keyBackupVersionStatements) UpdateKeyBackupAuthData(
 	ctx context.Context, txn *sql.Tx, userID, version string, authData json.RawMessage,
 ) error {
 	versionInt, err := strconv.ParseInt(version, 10, 64)
@@ -103,7 +105,7 @@ func (s *keyBackupVersionStatements) updateKeyBackupAuthData(
 	return err
 }
 
-func (s *keyBackupVersionStatements) updateKeyBackupETag(
+func (s *keyBackupVersionStatements) UpdateKeyBackupETag(
 	ctx context.Context, txn *sql.Tx, userID, version, etag string,
 ) error {
 	versionInt, err := strconv.ParseInt(version, 10, 64)
@@ -114,7 +116,7 @@ func (s *keyBackupVersionStatements) updateKeyBackupETag(
 	return err
 }
 
-func (s *keyBackupVersionStatements) deleteKeyBackup(
+func (s *keyBackupVersionStatements) DeleteKeyBackup(
 	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (bool, error) {
 	versionInt, err := strconv.ParseInt(version, 10, 64)
@@ -132,7 +134,7 @@ func (s *keyBackupVersionStatements) deleteKeyBackup(
 	return ra == 1, nil
 }
 
-func (s *keyBackupVersionStatements) selectKeyBackup(
+func (s *keyBackupVersionStatements) SelectKeyBackup(
 	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (versionResult, algorithm string, authData json.RawMessage, etag string, deleted bool, err error) {
 	var versionInt int64
