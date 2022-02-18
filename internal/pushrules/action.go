@@ -28,10 +28,14 @@ func (a *Action) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("only set_tweak actions may have a value, but got kind %q", a.Kind)
 	}
 
-	return json.Marshal(map[string]interface{}{
+	m := map[string]interface{}{
 		string(a.Kind): a.Tweak,
-		"value":        a.Value,
-	})
+	}
+	if a.Value != nil {
+		m["value"] = a.Value
+	}
+
+	return json.Marshal(m)
 }
 
 func (a *Action) UnmarshalJSON(bs []byte) error {
@@ -51,7 +55,9 @@ func (a *Action) UnmarshalJSON(bs []byte) error {
 	}
 	a.Kind = SetTweakAction
 	a.Tweak = raw.SetTweak
-	a.Value = raw.Value
+	if raw.Value != nil {
+		a.Value = raw.Value
+	}
 
 	return nil
 }
