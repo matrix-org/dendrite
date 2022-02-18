@@ -22,8 +22,9 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
+
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -37,6 +38,11 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 
 	m := sqlutil.NewMigrations()
+	if _, err = db.Exec(accountsSchema); err != nil {
+		// do this so that the migration can and we don't fail on
+		// preparing statements for columns that don't exist yet
+		return nil, err
+	}
 	deltas.LoadIsActive(m)
 	//deltas.LoadLastSeenTSIP(m)
 	deltas.LoadAddAccountType(m)
