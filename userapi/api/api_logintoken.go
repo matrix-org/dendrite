@@ -19,6 +19,13 @@ import (
 	"time"
 )
 
+// DefaultLoginTokenLifetime determines how old a valid token may be.
+//
+// NOTSPEC: The current spec says "SHOULD be limited to around five
+// seconds". Since TCP retries are on the order of 3 s, 5 s sounds very low.
+// Synapse uses 2 min (https://github.com/matrix-org/synapse/blob/78d5f91de1a9baf4dbb0a794cb49a799f29f7a38/synapse/handlers/auth.py#L1323-L1325).
+const DefaultLoginTokenLifetime = 2 * time.Minute
+
 type LoginTokenInternalAPI interface {
 	// PerformLoginTokenCreation creates a new login token and associates it with the provided data.
 	PerformLoginTokenCreation(ctx context.Context, req *PerformLoginTokenCreationRequest, res *PerformLoginTokenCreationResponse) error

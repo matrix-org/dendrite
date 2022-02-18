@@ -12,27 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package accounts
+//go:build !wasm
+// +build !wasm
+
+package storage
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3"
-	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 )
 
-func NewDatabase(
-	dbProperties *config.DatabaseOptions,
-	serverName gomatrixserverlib.ServerName,
-	bcryptCost int,
-	openIDTokenLifetimeMS int64,
-) (Database, error) {
+// NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
+// and sets postgres connection parameters
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS)
+		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime)
 	case dbProperties.ConnectionString.IsPostgres():
-		return nil, fmt.Errorf("can't use Postgres implementation")
+		return postgres.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

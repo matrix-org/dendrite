@@ -5,12 +5,7 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
-
-func LoadFromGoose() {
-	goose.AddMigration(UpLastSeenTSIP, DownLastSeenTSIP)
-}
 
 func LoadLastSeenTSIP(m *sqlutil.Migrations) {
 	m.AddMigration(UpLastSeenTSIP, DownLastSeenTSIP)

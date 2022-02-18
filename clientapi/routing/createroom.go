@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -137,7 +137,7 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
-	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
+	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
@@ -151,7 +151,7 @@ func CreateRoom(
 func createRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI, roomID string,
-	accountDB accounts.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
+	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	logger := util.GetLogger(req.Context())

@@ -12,48 +12,63 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sqlite3
+package postgres
 
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
 
+	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
-
-	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const devicesSchema = `
 -- This sequence is used for automatic allocation of session_id.
--- CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
 
 -- Stores data about devices.
 CREATE TABLE IF NOT EXISTS device_devices (
-    access_token TEXT PRIMARY KEY,
-    session_id INTEGER,
-    device_id TEXT ,
-    localpart TEXT ,
-    created_ts BIGINT,
+    -- The access token granted to this device. This has to be the primary key
+    -- so we can distinguish which device is making a given request.
+    access_token TEXT NOT NULL PRIMARY KEY,
+    -- The auto-allocated unique ID of the session identified by the access token.
+    -- This can be used as a secure substitution of the access token in situations
+    -- where data is associated with access tokens (e.g. transaction storage),
+    -- so we don't have to store users' access tokens everywhere.
+    session_id BIGINT NOT NULL DEFAULT nextval('device_session_id_seq'),
+    -- The device identifier. This only needs to uniquely identify a device for a given user, not globally.
+    -- access_tokens will be clobbered based on the device ID for a user.
+    device_id TEXT NOT NULL,
+    -- The Matrix user ID localpart for this device. This is preferable to storing the full user_id
+    -- as it is smaller, makes it clearer that we only manage devices for our own users, and may make
+    -- migration to different domain names easier.
+    localpart TEXT NOT NULL,
+    -- When this devices was first recognised on the network, as a unix timestamp (ms resolution).
+    created_ts BIGINT NOT NULL,
+    -- The display name, human friendlier than device_id and updatable
     display_name TEXT,
-    last_seen_ts BIGINT,
-    ip TEXT,
-    user_agent TEXT,
-
-		UNIQUE (localpart, device_id)
+	-- The time the device was last used, as a unix timestamp (ms resolution).
+	last_seen_ts BIGINT NOT NULL,
+	-- The last seen IP address of this device
+	ip TEXT,
+	-- User agent of this device
+	user_agent TEXT
+                                          
+    -- TODO: device keys, device display names, token restrictions (if 3rd-party OAuth app)
 );
+
+-- Device IDs must be unique for a given user.
+CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(localpart, device_id);
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
-
-const selectDevicesCountSQL = "" +
-	"SELECT COUNT(access_token) FROM device_devices"
+	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
+	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
 	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
@@ -74,27 +89,25 @@ const deleteDevicesByLocalpartSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1 AND device_id != $2"
 
 const deleteDevicesSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1 AND device_id IN ($2)"
+	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
 
 const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id IN ($1)"
+	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id = ANY($1)"
 
 const updateDeviceLastSeen = "" +
 	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
 
 type devicesStatements struct {
-	db                           *sql.DB
-	writer                       sqlutil.Writer
 	insertDeviceStmt             *sql.Stmt
-	selectDevicesCountStmt       *sql.Stmt
 	selectDeviceByTokenStmt      *sql.Stmt
 	selectDeviceByIDStmt         *sql.Stmt
-	selectDevicesByIDStmt        *sql.Stmt
 	selectDevicesByLocalpartStmt *sql.Stmt
+	selectDevicesByIDStmt        *sql.Stmt
 	updateDeviceNameStmt         *sql.Stmt
 	updateDeviceLastSeenStmt     *sql.Stmt
 	deleteDeviceStmt             *sql.Stmt
 	deleteDevicesByLocalpartStmt *sql.Stmt
+	deleteDevicesStmt            *sql.Stmt
 	serverName                   gomatrixserverlib.ServerName
 }
 
@@ -103,13 +116,11 @@ func (s *devicesStatements) execSchema(db *sql.DB) error {
 	return err
 }
 
-func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server gomatrixserverlib.ServerName) (err error) {
-	s.db = db
-	s.writer = writer
-	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
+func (s *devicesStatements) prepare(db *sql.DB, server gomatrixserverlib.ServerName) (err error) {
+	if err = s.execSchema(db); err != nil {
 		return
 	}
-	if s.selectDevicesCountStmt, err = db.Prepare(selectDevicesCountSQL); err != nil {
+	if s.insertDeviceStmt, err = db.Prepare(insertDeviceSQL); err != nil {
 		return
 	}
 	if s.selectDeviceByTokenStmt, err = db.Prepare(selectDeviceByTokenSQL); err != nil {
@@ -128,6 +139,9 @@ func (s *devicesStatements) prepare(db *sql.DB, writer sqlutil.Writer, server go
 		return
 	}
 	if s.deleteDevicesByLocalpartStmt, err = db.Prepare(deleteDevicesByLocalpartSQL); err != nil {
+		return
+	}
+	if s.deleteDevicesStmt, err = db.Prepare(deleteDevicesSQL); err != nil {
 		return
 	}
 	if s.selectDevicesByIDStmt, err = db.Prepare(selectDevicesByIDSQL); err != nil {
@@ -149,13 +163,8 @@ func (s *devicesStatements) insertDevice(
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
-	countStmt := sqlutil.TxStmt(txn, s.selectDevicesCountStmt)
-	insertStmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-	if err := countStmt.QueryRowContext(ctx).Scan(&sessionID); err != nil {
-		return nil, err
-	}
-	sessionID++
-	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
+	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
+	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
 		return nil, err
 	}
 	return &api.Device{
@@ -169,6 +178,7 @@ func (s *devicesStatements) insertDevice(
 	}, nil
 }
 
+// deleteDevice removes a single device by id and user localpart.
 func (s *devicesStatements) deleteDevice(
 	ctx context.Context, txn *sql.Tx, id, localpart string,
 ) error {
@@ -177,24 +187,18 @@ func (s *devicesStatements) deleteDevice(
 	return err
 }
 
+// deleteDevices removes a single or multiple devices by ids and user localpart.
+// Returns an error if the execution failed.
 func (s *devicesStatements) deleteDevices(
 	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
 ) error {
-	orig := strings.Replace(deleteDevicesSQL, "($2)", sqlutil.QueryVariadicOffset(len(devices), 1), 1)
-	prep, err := s.db.Prepare(orig)
-	if err != nil {
-		return err
-	}
-	stmt := sqlutil.TxStmt(txn, prep)
-	params := make([]interface{}, len(devices)+1)
-	params[0] = localpart
-	for i, v := range devices {
-		params[i+1] = v
-	}
-	_, err = stmt.ExecContext(ctx, params...)
+	stmt := sqlutil.TxStmt(txn, s.deleteDevicesStmt)
+	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
 	return err
 }
 
+// deleteDevicesByLocalpart removes all devices for the
+// given user localpart.
 func (s *devicesStatements) deleteDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
 ) error {
@@ -244,6 +248,29 @@ func (s *devicesStatements) selectDeviceByID(
 	return &dev, err
 }
 
+func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
+	rows, err := s.selectDevicesByIDStmt.QueryContext(ctx, pq.StringArray(deviceIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
+	var devices []api.Device
+	for rows.Next() {
+		var dev api.Device
+		var localpart string
+		var displayName sql.NullString
+		if err := rows.Scan(&dev.ID, &localpart, &displayName); err != nil {
+			return nil, err
+		}
+		if displayName.Valid {
+			dev.DisplayName = displayName.String
+		}
+		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
+		devices = append(devices, dev)
+	}
+	return devices, rows.Err()
+}
+
 func (s *devicesStatements) selectDevicesByLocalpart(
 	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
 ) ([]api.Device, error) {
@@ -253,6 +280,7 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 	if err != nil {
 		return devices, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
 
 	for rows.Next() {
 		var dev api.Device
@@ -282,35 +310,6 @@ func (s *devicesStatements) selectDevicesByLocalpart(
 		devices = append(devices, dev)
 	}
 
-	return devices, nil
-}
-
-func (s *devicesStatements) selectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
-	sqlQuery := strings.Replace(selectDevicesByIDSQL, "($1)", sqlutil.QueryVariadic(len(deviceIDs)), 1)
-	iDeviceIDs := make([]interface{}, len(deviceIDs))
-	for i := range deviceIDs {
-		iDeviceIDs[i] = deviceIDs[i]
-	}
-
-	rows, err := s.db.QueryContext(ctx, sqlQuery, iDeviceIDs...)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
-	var devices []api.Device
-	for rows.Next() {
-		var dev api.Device
-		var localpart string
-		var displayName sql.NullString
-		if err := rows.Scan(&dev.ID, &localpart, &displayName); err != nil {
-			return nil, err
-		}
-		if displayName.Valid {
-			dev.DisplayName = displayName.String
-		}
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
-		devices = append(devices, dev)
-	}
 	return devices, rows.Err()
 }
 

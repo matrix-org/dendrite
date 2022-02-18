@@ -32,7 +32,6 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
-		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(*dbURI)
 	}
 	cfg.Global.TrustedIDServers = []string{
 		"matrix.org",

@@ -16,7 +16,9 @@ package postgres
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,7 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts/postgres/deltas"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -47,14 +49,23 @@ type Database struct {
 	threepids             threepidStatements
 	openIDTokens          tokenStatements
 	keyBackupVersions     keyBackupVersionStatements
+	devices               devicesStatements
+	loginTokens           loginTokenStatements
+	loginTokenLifetime    time.Duration
 	keyBackups            keyBackupStatements
 	serverName            gomatrixserverlib.ServerName
 	bcryptCost            int
 	openIDTokenLifetimeMS int64
 }
 
+const (
+	// The length of generated device IDs
+	deviceIDByteLength   = 6
+	loginTokenByteLength = 32
+)
+
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64) (*Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration) (*Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
@@ -63,6 +74,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		serverName:            serverName,
 		db:                    db,
 		writer:                sqlutil.NewDummyWriter(),
+		loginTokenLifetime:    loginTokenLifetime,
 		bcryptCost:            bcryptCost,
 		openIDTokenLifetimeMS: openIDTokenLifetimeMS,
 	}
@@ -74,6 +86,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadIsActive(m)
+	//deltas.LoadLastSeenTSIP(m)
 	deltas.LoadAddAccountType(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
@@ -101,6 +114,12 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, err
 	}
 	if err = d.keyBackups.prepare(db); err != nil {
+		return nil, err
+	}
+	if err = d.devices.prepare(db, serverName); err != nil {
+		return nil, err
+	}
+	if err = d.loginTokens.prepare(db); err != nil {
 		return nil, err
 	}
 
@@ -514,4 +533,197 @@ func (d *Database) UpsertBackupKeys(
 		return nil
 	})
 	return
+}
+
+// GetDeviceByAccessToken returns the device matching the given access token.
+// Returns sql.ErrNoRows if no matching device was found.
+func (d *Database) GetDeviceByAccessToken(
+	ctx context.Context, token string,
+) (*api.Device, error) {
+	return d.devices.selectDeviceByToken(ctx, token)
+}
+
+// GetDeviceByID returns the device matching the given ID.
+// Returns sql.ErrNoRows if no matching device was found.
+func (d *Database) GetDeviceByID(
+	ctx context.Context, localpart, deviceID string,
+) (*api.Device, error) {
+	return d.devices.selectDeviceByID(ctx, localpart, deviceID)
+}
+
+// GetDevicesByLocalpart returns the devices matching the given localpart.
+func (d *Database) GetDevicesByLocalpart(
+	ctx context.Context, localpart string,
+) ([]api.Device, error) {
+	return d.devices.selectDevicesByLocalpart(ctx, nil, localpart, "")
+}
+
+func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
+	return d.devices.selectDevicesByID(ctx, deviceIDs)
+}
+
+// CreateDevice makes a new device associated with the given user ID localpart.
+// If there is already a device with the same device ID for this user, that access token will be revoked
+// and replaced with the given accessToken. If the given accessToken is already in use for another device,
+// an error will be returned.
+// If no device ID is given one is generated.
+// Returns the device on success.
+func (d *Database) CreateDevice(
+	ctx context.Context, localpart string, deviceID *string, accessToken string,
+	displayName *string, ipAddr, userAgent string,
+) (dev *api.Device, returnErr error) {
+	if deviceID != nil {
+		returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+			var err error
+			// Revoke existing tokens for this device
+			if err = d.devices.deleteDevice(ctx, txn, *deviceID, localpart); err != nil {
+				return err
+			}
+
+			dev, err = d.devices.insertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName, ipAddr, userAgent)
+			return err
+		})
+	} else {
+		// We generate device IDs in a loop in case its already taken.
+		// We cap this at going round 5 times to ensure we don't spin forever
+		var newDeviceID string
+		for i := 1; i <= 5; i++ {
+			newDeviceID, returnErr = generateDeviceID()
+			if returnErr != nil {
+				return
+			}
+
+			returnErr = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+				var err error
+				dev, err = d.devices.insertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName, ipAddr, userAgent)
+				return err
+			})
+			if returnErr == nil {
+				return
+			}
+		}
+	}
+	return
+}
+
+// generateDeviceID creates a new device id. Returns an error if failed to generate
+// random bytes.
+func generateDeviceID() (string, error) {
+	b := make([]byte, deviceIDByteLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	// url-safe no padding
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// UpdateDevice updates the given device with the display name.
+// Returns SQL error if there are problems and nil on success.
+func (d *Database) UpdateDevice(
+	ctx context.Context, localpart, deviceID string, displayName *string,
+) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.devices.updateDeviceName(ctx, txn, localpart, deviceID, displayName)
+	})
+}
+
+// RemoveDevice revokes a device by deleting the entry in the database
+// matching with the given device ID and user ID localpart.
+// If the device doesn't exist, it will not return an error
+// If something went wrong during the deletion, it will return the SQL error.
+func (d *Database) RemoveDevice(
+	ctx context.Context, deviceID, localpart string,
+) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if err := d.devices.deleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
+			return err
+		}
+		return nil
+	})
+}
+
+// RemoveDevices revokes one or more devices by deleting the entry in the database
+// matching with the given device IDs and user ID localpart.
+// If the devices don't exist, it will not return an error
+// If something went wrong during the deletion, it will return the SQL error.
+func (d *Database) RemoveDevices(
+	ctx context.Context, localpart string, devices []string,
+) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		if err := d.devices.deleteDevices(ctx, txn, localpart, devices); err != sql.ErrNoRows {
+			return err
+		}
+		return nil
+	})
+}
+
+// RemoveAllDevices revokes devices by deleting the entry in the
+// database matching the given user ID localpart.
+// If something went wrong during the deletion, it will return the SQL error.
+func (d *Database) RemoveAllDevices(
+	ctx context.Context, localpart, exceptDeviceID string,
+) (devices []api.Device, err error) {
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		devices, err = d.devices.selectDevicesByLocalpart(ctx, txn, localpart, exceptDeviceID)
+		if err != nil {
+			return err
+		}
+		if err := d.devices.deleteDevicesByLocalpart(ctx, txn, localpart, exceptDeviceID); err != sql.ErrNoRows {
+			return err
+		}
+		return nil
+	})
+	return
+}
+
+// UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.devices.updateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
+	})
+}
+
+// CreateLoginToken generates a token, stores and returns it. The lifetime is
+// determined by the loginTokenLifetime given to the Database constructor.
+func (d *Database) CreateLoginToken(ctx context.Context, data *api.LoginTokenData) (*api.LoginTokenMetadata, error) {
+	tok, err := generateLoginToken()
+	if err != nil {
+		return nil, err
+	}
+	meta := &api.LoginTokenMetadata{
+		Token:      tok,
+		Expiration: time.Now().Add(d.loginTokenLifetime),
+	}
+
+	err = sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.loginTokens.insert(ctx, txn, meta, data)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+}
+
+func generateLoginToken() (string, error) {
+	b := make([]byte, loginTokenByteLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// RemoveLoginToken removes the named token (and may clean up other expired tokens).
+func (d *Database) RemoveLoginToken(ctx context.Context, token string) error {
+	return sqlutil.WithTransaction(d.db, func(txn *sql.Tx) error {
+		return d.loginTokens.deleteByToken(ctx, txn, token)
+	})
+}
+
+// GetLoginTokenDataByToken returns the data associated with the given token.
+// May return sql.ErrNoRows.
+func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
+	return d.loginTokens.selectByToken(ctx, token)
 }

@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -54,7 +54,7 @@ func passwordLogin() flows {
 
 // Login implements GET and POST /login
 func Login(
-	req *http.Request, accountDB accounts.Database, userAPI userapi.UserInternalAPI,
+	req *http.Request, accountDB userdb.Database, userAPI userapi.UserInternalAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
