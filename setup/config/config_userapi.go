@@ -13,6 +13,9 @@ type UserAPI struct {
 	// The length of time an OpenID token is condidered valid in milliseconds
 	OpenIDTokenLifetimeMS int64 `yaml:"openid_token_lifetime_ms"`
 
+	// Disable TLS validation on HTTPS calls to push gatways. NOT RECOMMENDED!
+	PushGatewayDisableTLSValidation bool `yaml:"push_gateway_disable_tls_validation"`
+
 	// The Account database stores the login details and account information
 	// for local users. It is accessed by the UserAPI.
 	AccountDatabase DatabaseOptions `yaml:"account_database"`

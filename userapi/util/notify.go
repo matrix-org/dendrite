@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/pushserver/storage"
-	"github.com/matrix-org/dendrite/pushserver/storage/tables"
+	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/keyserver"
-	"github.com/matrix-org/dendrite/pushserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
@@ -68,7 +67,6 @@ func main() {
 		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.RoomServer.InternalAPI.Connect = httpAPIAddr
 		cfg.SyncAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.PushServer.InternalAPI.Connect = httpAPIAddr
 		cfg.UserAPI.InternalAPI.Connect = httpAPIAddr
 		options = append(options, basepkg.UseHTTPAPIs)
 	}
@@ -108,7 +106,8 @@ func main() {
 		keyAPI = base.KeyServerHTTPClient()
 	}
 
-	userImpl := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	pgClient := base.PushGatewayHTTPClient()
+	userImpl := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
 	userAPI := userImpl
 	if base.UseHTTPAPIs {
 		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
@@ -144,13 +143,6 @@ func main() {
 		eduInputAPI = base.EDUServerClient()
 	}
 
-	pgClient := base.PushGatewayHTTPClient()
-	psAPI := pushserver.NewInternalAPI(&base.Cfg.PushServer, base.ProcessContext, pgClient, rsAPI, userAPI)
-	if base.UseHTTPAPIs {
-		pushserver.AddInternalRoutes(base.InternalAPIMux, psAPI)
-		psAPI = base.PushServerHTTPClient()
-	}
-
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -164,7 +156,6 @@ func main() {
 		RoomserverAPI:  rsAPI,
 		UserAPI:        userAPI,
 		KeyAPI:         keyAPI,
-		PushserverAPI:  psAPI,
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,

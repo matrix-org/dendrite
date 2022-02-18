@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
 type Database interface {
@@ -89,6 +90,18 @@ type Database interface {
 	// GetLoginTokenDataByToken returns the data associated with the given token.
 	// May return sql.ErrNoRows.
 	GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
+
+	InsertNotification(ctx context.Context, localpart, eventID string, tweaks map[string]interface{}, n *api.Notification) error
+	DeleteNotificationsUpTo(ctx context.Context, localpart, roomID, upToEventID string) (affected bool, err error)
+	SetNotificationsRead(ctx context.Context, localpart, roomID, upToEventID string, b bool) (affected bool, err error)
+	GetNotifications(ctx context.Context, localpart string, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error)
+	GetNotificationCount(ctx context.Context, localpart string, filter tables.NotificationFilter) (int64, error)
+	GetRoomNotificationCounts(ctx context.Context, localpart, roomID string) (total int64, highlight int64, _ error)
+
+	UpsertPusher(ctx context.Context, p api.Pusher, localpart string) error
+	GetPushers(ctx context.Context, localpart string) ([]api.Pusher, error)
+	RemovePusher(ctx context.Context, appid, pushkey, localpart string) error
+	RemovePushers(ctx context.Context, appid, pushkey string) error
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

@@ -30,7 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
-	pushserverAPI "github.com/matrix-org/dendrite/pushserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -58,7 +57,6 @@ func Setup(
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.FederationInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
-	psAPI pushserverAPI.PushserverInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
@@ -486,7 +484,7 @@ func Setup(
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
-			return Password(req, psAPI, userAPI, accountDB, device, cfg)
+			return Password(req, userAPI, accountDB, device, cfg)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -530,7 +528,7 @@ func Setup(
 
 	v3mux.Handle("/pushrules/",
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetAllPushRules(req.Context(), device, psAPI)
+			return GetAllPushRules(req.Context(), device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -549,7 +547,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPushRulesByScope(req.Context(), vars["scope"], device, psAPI)
+			return GetPushRulesByScope(req.Context(), vars["scope"], device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -577,7 +575,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPushRulesByKind(req.Context(), vars["scope"], vars["kind"], device, psAPI)
+			return GetPushRulesByKind(req.Context(), vars["scope"], vars["kind"], device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -605,7 +603,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPushRuleByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], device, psAPI)
+			return GetPushRuleByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -619,7 +617,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			query := req.URL.Query()
-			return PutPushRuleByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], query.Get("after"), query.Get("before"), req.Body, device, psAPI)
+			return PutPushRuleByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], query.Get("after"), query.Get("before"), req.Body, device, userAPI)
 		}),
 	).Methods(http.MethodPut)
 
@@ -629,7 +627,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return DeletePushRuleByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], device, psAPI)
+			return DeletePushRuleByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], device, userAPI)
 		}),
 	).Methods(http.MethodDelete)
 
@@ -639,7 +637,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetPushRuleAttrByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], vars["attr"], device, psAPI)
+			return GetPushRuleAttrByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], vars["attr"], device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -649,7 +647,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return PutPushRuleAttrByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], vars["attr"], req.Body, device, psAPI)
+			return PutPushRuleAttrByRuleID(req.Context(), vars["scope"], vars["kind"], vars["ruleID"], vars["attr"], req.Body, device, userAPI)
 		}),
 	).Methods(http.MethodPut)
 
@@ -960,13 +958,13 @@ func Setup(
 
 	unstableMux.Handle("/notifications",
 		httputil.MakeAuthAPI("get_notifications", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetNotifications(req, device, psAPI)
+			return GetNotifications(req, device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushers",
 		httputil.MakeAuthAPI("get_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return GetPushers(req, device, psAPI)
+			return GetPushers(req, device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -975,7 +973,7 @@ func Setup(
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
-			return SetPusher(req, device, psAPI)
+			return SetPusher(req, device, userAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

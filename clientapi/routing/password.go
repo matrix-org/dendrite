@@ -7,7 +7,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	pushserverapi "github.com/matrix-org/dendrite/pushserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
@@ -30,7 +29,6 @@ type newPasswordAuth struct {
 
 func Password(
 	req *http.Request,
-	psAPI pushserverapi.PushserverInternalAPI,
 	userAPI api.UserInternalAPI,
 	accountDB userdb.Database,
 	device *api.Device,
@@ -125,11 +123,11 @@ func Password(
 			return jsonerror.InternalServerError()
 		}
 
-		pushersReq := &pushserverapi.PerformPusherDeletionRequest{
+		pushersReq := &api.PerformPusherDeletionRequest{
 			Localpart: localpart,
 			SessionID: device.SessionID,
 		}
-		if err := psAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
+		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
 			return jsonerror.InternalServerError()
 		}

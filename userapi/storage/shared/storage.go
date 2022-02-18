@@ -48,6 +48,8 @@ type Database struct {
 	KeyBackupVersions     tables.KeyBackupVersionTable
 	Devices               tables.DevicesTable
 	LoginTokens           tables.LoginTokenTable
+	Notifications         tables.NotificationTable
+	Pushers               tables.PusherTable
 	LoginTokenLifetime    time.Duration
 	ServerName            gomatrixserverlib.ServerName
 	BcryptCost            int
@@ -667,4 +669,95 @@ func (d *Database) RemoveLoginToken(ctx context.Context, token string) error {
 // May return sql.ErrNoRows.
 func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
 	return d.LoginTokens.SelectLoginToken(ctx, token)
+}
+
+func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, tweaks map[string]interface{}, n *api.Notification) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Notifications.Insert(ctx, txn, localpart, eventID, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
+	})
+}
+
+func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID, upToEventID string) (affected bool, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		affected, err = d.Notifications.DeleteUpTo(ctx, txn, localpart, roomID, upToEventID)
+		return err
+	})
+	return
+}
+
+func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID, upToEventID string, b bool) (affected bool, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		affected, err = d.Notifications.UpdateRead(ctx, txn, localpart, roomID, upToEventID, b)
+		return err
+	})
+	return
+}
+
+func (d *Database) GetNotifications(ctx context.Context, localpart string, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error) {
+	return d.Notifications.Select(ctx, nil, localpart, fromID, limit, filter)
+}
+
+func (d *Database) GetNotificationCount(ctx context.Context, localpart string, filter tables.NotificationFilter) (int64, error) {
+	return d.Notifications.SelectCount(ctx, nil, localpart, filter)
+}
+
+func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roomID string) (total int64, highlight int64, _ error) {
+	return d.Notifications.SelectRoomCounts(ctx, nil, localpart, roomID)
+}
+
+func (d *Database) UpsertPusher(
+	ctx context.Context, p api.Pusher, localpart string,
+) error {
+	data, err := json.Marshal(p.Data)
+	if err != nil {
+		return err
+	}
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Pushers.InsertPusher(
+			ctx, txn,
+			p.SessionID,
+			p.PushKey,
+			p.PushKeyTS,
+			p.Kind,
+			p.AppID,
+			p.AppDisplayName,
+			p.DeviceDisplayName,
+			p.ProfileTag,
+			p.Language,
+			string(data),
+			localpart)
+	})
+}
+
+// GetPushers returns the pushers matching the given localpart.
+func (d *Database) GetPushers(
+	ctx context.Context, localpart string,
+) ([]api.Pusher, error) {
+	return d.Pushers.SelectPushers(ctx, nil, localpart)
+}
+
+// RemovePusher deletes one pusher
+// Invoked when `append` is true and `kind` is null in
+// https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-pushers-set
+func (d *Database) RemovePusher(
+	ctx context.Context, appid, pushkey, localpart string,
+) error {
+	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart)
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return err
+	})
+}
+
+// RemovePushers deletes all pushers that match given App Id and Push Key pair.
+// Invoked when `append` parameter is false in
+// https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-pushers-set
+func (d *Database) RemovePushers(
+	ctx context.Context, appid, pushkey string,
+) error {
+	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+		return d.Pushers.DeletePushers(ctx, txn, appid, pushkey)
+	})
 }

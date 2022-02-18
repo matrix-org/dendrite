@@ -19,7 +19,6 @@ import (
 	"strconv"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	pushserverapi "github.com/matrix-org/dendrite/pushserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -28,7 +27,7 @@ import (
 // GetNotifications handles /_matrix/client/r0/notifications
 func GetNotifications(
 	req *http.Request, device *userapi.Device,
-	psAPI pushserverapi.PushserverInternalAPI,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	var limit int64
 	if limitStr := req.URL.Query().Get("limit"); limitStr != "" {
@@ -40,13 +39,13 @@ func GetNotifications(
 		}
 	}
 
-	var queryRes pushserverapi.QueryNotificationsResponse
+	var queryRes userapi.QueryNotificationsResponse
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return jsonerror.InternalServerError()
 	}
-	err = psAPI.QueryNotifications(req.Context(), &pushserverapi.QueryNotificationsRequest{
+	err = userAPI.QueryNotifications(req.Context(), &userapi.QueryNotificationsRequest{
 		Localpart: localpart,
 		From:      req.URL.Query().Get("from"),
 		Limit:     int(limit),

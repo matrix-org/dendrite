@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/pushserver/api"
-	"github.com/matrix-org/dendrite/pushserver/storage"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage"
 	log "github.com/sirupsen/logrus"
 )
 

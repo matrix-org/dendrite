@@ -6,13 +6,13 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/pushserver/producers"
-	"github.com/matrix-org/dendrite/pushserver/storage"
-	"github.com/matrix-org/dendrite/pushserver/util"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/producers"
+	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/util"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ import (
 
 type OutputClientDataConsumer struct {
 	ctx          context.Context
-	cfg          *config.PushServer
+	cfg          *config.UserAPI
 	jetstream    nats.JetStreamContext
 	durable      string
 	db           storage.Database
@@ -33,7 +33,7 @@ type OutputClientDataConsumer struct {
 
 func NewOutputClientDataConsumer(
 	process *process.ProcessContext,
-	cfg *config.PushServer,
+	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
@@ -46,7 +46,7 @@ func NewOutputClientDataConsumer(
 		jetstream:    js,
 		db:           store,
 		ServerName:   cfg.Matrix.ServerName,
-		durable:      cfg.Matrix.JetStream.Durable("PushServerClientAPIConsumer"),
+		durable:      cfg.Matrix.JetStream.Durable("UserAPIClientAPIConsumer"),
 		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
 		pgClient:     pgClient,
 		userAPI:      userAPI,

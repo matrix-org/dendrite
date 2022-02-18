@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	pushserverapi "github.com/matrix-org/dendrite/pushserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -29,15 +28,15 @@ import (
 // GetPushers handles /_matrix/client/r0/pushers
 func GetPushers(
 	req *http.Request, device *userapi.Device,
-	psAPI pushserverapi.PushserverInternalAPI,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
-	var queryRes pushserverapi.QueryPushersResponse
+	var queryRes userapi.QueryPushersResponse
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return jsonerror.InternalServerError()
 	}
-	err = psAPI.QueryPushers(req.Context(), &pushserverapi.QueryPushersRequest{
+	err = userAPI.QueryPushers(req.Context(), &userapi.QueryPushersRequest{
 		Localpart: localpart,
 	}, &queryRes)
 	if err != nil {
@@ -58,14 +57,14 @@ func GetPushers(
 // The behaviour of this endpoint varies depending on the values in the JSON body.
 func SetPusher(
 	req *http.Request, device *userapi.Device,
-	psAPI pushserverapi.PushserverInternalAPI,
+	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return jsonerror.InternalServerError()
 	}
-	body := pushserverapi.PerformPusherSetRequest{}
+	body := userapi.PerformPusherSetRequest{}
 	if resErr := httputil.UnmarshalJSONRequest(req, &body); resErr != nil {
 		return *resErr
 	}
@@ -95,7 +94,7 @@ func SetPusher(
 	}
 	body.Localpart = localpart
 	body.SessionID = device.SessionID
-	err = psAPI.PerformPusherSet(req.Context(), &body, &struct{}{})
+	err = userAPI.PerformPusherSet(req.Context(), &body, &struct{}{})
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("PerformPusherSet failed")
 		return jsonerror.InternalServerError()

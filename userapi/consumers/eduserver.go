@@ -6,12 +6,12 @@ import (
 
 	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/pushserver/producers"
-	"github.com/matrix-org/dendrite/pushserver/storage"
-	"github.com/matrix-org/dendrite/pushserver/util"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/userapi/producers"
+	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/util"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -19,7 +19,7 @@ import (
 
 type OutputReceiptEventConsumer struct {
 	ctx          context.Context
-	cfg          *config.PushServer
+	cfg          *config.UserAPI
 	jetstream    nats.JetStreamContext
 	durable      string
 	db           storage.Database
@@ -31,7 +31,7 @@ type OutputReceiptEventConsumer struct {
 // NewOutputReceiptEventConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
 func NewOutputReceiptEventConsumer(
 	process *process.ProcessContext,
-	cfg *config.PushServer,
+	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
@@ -42,7 +42,7 @@ func NewOutputReceiptEventConsumer(
 		cfg:          cfg,
 		jetstream:    js,
 		db:           store,
-		durable:      cfg.Matrix.JetStream.Durable("PushServerEDUServerConsumer"),
+		durable:      cfg.Matrix.JetStream.Durable("UserAPIEDUServerConsumer"),
 		receiptTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		pgClient:     pgClient,
 		syncProducer: syncProducer,

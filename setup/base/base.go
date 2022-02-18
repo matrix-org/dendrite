@@ -51,8 +51,6 @@ import (
 	federationIntHTTP "github.com/matrix-org/dendrite/federationapi/inthttp"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	keyinthttp "github.com/matrix-org/dendrite/keyserver/inthttp"
-	pushserverAPI "github.com/matrix-org/dendrite/pushserver/api"
-	psinthttp "github.com/matrix-org/dendrite/pushserver/inthttp"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -274,18 +272,9 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 	return f
 }
 
-// PushServerHTTPClient returns PushserverInternalAPI for hitting the push server over HTTP
-func (b *BaseDendrite) PushServerHTTPClient() pushserverAPI.PushserverInternalAPI {
-	f, err := psinthttp.NewPushserverClient(b.Cfg.PushServerURL(), b.apiHttpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("PushServerHTTPClient failed", b.apiHttpClient)
-	}
-	return f
-}
-
 // PushGatewayHTTPClient returns a new client for interacting with (external) Push Gateways.
 func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
-	return pushgateway.NewHTTPClient(b.Cfg.PushServer.DisableTLSValidation)
+	return pushgateway.NewHTTPClient(b.Cfg.UserAPI.PushGatewayDisableTLSValidation)
 }
 
 // CreateAccountsDB creates a new instance of the accounts database. Should only

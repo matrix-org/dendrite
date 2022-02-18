@@ -24,7 +24,6 @@ import (
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
-	pushserverAPI "github.com/matrix-org/dendrite/pushserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -47,7 +46,6 @@ func AddPublicRoutes(
 	fsAPI federationAPI.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
-	psAPI pushserverAPI.PushserverInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
@@ -62,6 +60,6 @@ func AddPublicRoutes(
 		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
-		psAPI, extRoomsProvider, mscCfg,
+		extRoomsProvider, mscCfg,
 	)
 }

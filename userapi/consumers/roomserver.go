@@ -10,15 +10,15 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/pushrules"
-	"github.com/matrix-org/dendrite/pushserver/api"
-	"github.com/matrix-org/dendrite/pushserver/producers"
-	"github.com/matrix-org/dendrite/pushserver/storage"
-	"github.com/matrix-org/dendrite/pushserver/storage/tables"
-	"github.com/matrix-org/dendrite/pushserver/util"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/producers"
+	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/dendrite/userapi/util"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -26,8 +26,8 @@ import (
 
 type OutputRoomEventConsumer struct {
 	ctx          context.Context
-	cfg          *config.PushServer
-	psAPI        api.PushserverInternalAPI
+	cfg          *config.UserAPI
+	userAPI      api.UserInternalAPI
 	rsAPI        rsapi.RoomserverInternalAPI
 	jetstream    nats.JetStreamContext
 	durable      string
@@ -39,11 +39,11 @@ type OutputRoomEventConsumer struct {
 
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
-	cfg *config.PushServer,
+	cfg *config.UserAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
-	psAPI api.PushserverInternalAPI,
+	userAPI api.UserInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI,
 	syncProducer *producers.SyncAPI,
 ) *OutputRoomEventConsumer {
@@ -52,10 +52,10 @@ func NewOutputRoomEventConsumer(
 		cfg:          cfg,
 		jetstream:    js,
 		db:           store,
-		durable:      cfg.Matrix.JetStream.Durable("PushServerClientAPIConsumer"),
+		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
 		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		pgClient:     pgClient,
-		psAPI:        psAPI,
+		userAPI:      userAPI,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
 	}
@@ -155,7 +155,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 		if err := s.notifyLocal(ctx, event, mem, roomSize, roomName); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": mem.Localpart,
-			}).WithError(err).Errorf("Unable to push to local user")
+			}).WithError(err).Debugf("Unable to push to local user")
 			continue
 		}
 	}
@@ -417,7 +417,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 	}
 
 	var res api.QueryPushRulesResponse
-	if err := s.psAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
+	if err := s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
 		return nil, err
 	}
 
