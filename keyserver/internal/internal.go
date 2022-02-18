@@ -595,12 +595,10 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 
 	if len(toClean) > 0 {
 		if err = a.DB.DeleteDeviceKeys(ctx, req.UserID, toClean); err != nil {
-			res.Error = &api.KeyError{
-				Err: fmt.Sprintf("failed to clean device keys: %s", err.Error()),
-			}
-			return
+			logrus.WithField("user_id", req.UserID).WithError(err).Errorf("Failed to clean up %d stale keyserver device key entries", len(toClean))
+		} else {
+			logrus.WithField("user_id", req.UserID).Debugf("Cleaned up %d stale keyserver device key entries", len(toClean))
 		}
-		logrus.WithField("user_id", req.UserID).Infof("Cleaned up %d stale keyserver device key entries", len(toClean))
 	}
 
 	var keysToStore []api.DeviceMessage
