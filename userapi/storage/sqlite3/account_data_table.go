@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
 const accountDataSchema = `
@@ -56,27 +57,29 @@ type accountDataStatements struct {
 	selectAccountDataByTypeStmt *sql.Stmt
 }
 
-func (s *accountDataStatements) prepare(db *sql.DB) (err error) {
-	s.db = db
-	_, err = db.Exec(accountDataSchema)
-	if err != nil {
-		return
+func NewSQLiteAccountDataTable(db *sql.DB) (tables.AccountDataTable, error) {
+	s := &accountDataStatements{
+		db: db,
 	}
-	return sqlutil.StatementList{
+	_, err := db.Exec(accountDataSchema)
+	if err != nil {
+		return nil, err
+	}
+	return s, sqlutil.StatementList{
 		{&s.insertAccountDataStmt, insertAccountDataSQL},
 		{&s.selectAccountDataStmt, selectAccountDataSQL},
 		{&s.selectAccountDataByTypeStmt, selectAccountDataByTypeSQL},
 	}.Prepare(db)
 }
 
-func (s *accountDataStatements) insertAccountData(
+func (s *accountDataStatements) InsertAccountData(
 	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
 	return err
 }
 
-func (s *accountDataStatements) selectAccountData(
+func (s *accountDataStatements) SelectAccountData(
 	ctx context.Context, localpart string,
 ) (
 	/* global */ map[string]json.RawMessage,
@@ -113,7 +116,7 @@ func (s *accountDataStatements) selectAccountData(
 	return global, rooms, nil
 }
 
-func (s *accountDataStatements) selectAccountDataByType(
+func (s *accountDataStatements) SelectAccountDataByType(
 	ctx context.Context, localpart, roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	var bytes []byte

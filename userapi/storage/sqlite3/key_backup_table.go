@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
 const keyBackupTableSchema = `
@@ -72,12 +73,13 @@ type keyBackupStatements struct {
 	selectKeysByRoomIDAndSessionIDStmt *sql.Stmt
 }
 
-func (s *keyBackupStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(keyBackupTableSchema)
+func NewSQLiteKeyBackupTable(db *sql.DB) (tables.KeyBackupTable, error) {
+	s := &keyBackupStatements{}
+	_, err := db.Exec(keyBackupTableSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return sqlutil.StatementList{
+	return s, sqlutil.StatementList{
 		{&s.insertBackupKeyStmt, insertBackupKeySQL},
 		{&s.updateBackupKeyStmt, updateBackupKeySQL},
 		{&s.countKeysStmt, countKeysSQL},
@@ -87,14 +89,14 @@ func (s *keyBackupStatements) prepare(db *sql.DB) (err error) {
 	}.Prepare(db)
 }
 
-func (s keyBackupStatements) countKeys(
+func (s keyBackupStatements) CountKeys(
 	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (count int64, err error) {
 	err = txn.Stmt(s.countKeysStmt).QueryRowContext(ctx, userID, version).Scan(&count)
 	return
 }
 
-func (s *keyBackupStatements) insertBackupKey(
+func (s *keyBackupStatements) InsertBackupKey(
 	ctx context.Context, txn *sql.Tx, userID, version string, key api.InternalKeyBackupSession,
 ) (err error) {
 	_, err = txn.Stmt(s.insertBackupKeyStmt).ExecContext(
@@ -103,7 +105,7 @@ func (s *keyBackupStatements) insertBackupKey(
 	return
 }
 
-func (s *keyBackupStatements) updateBackupKey(
+func (s *keyBackupStatements) UpdateBackupKey(
 	ctx context.Context, txn *sql.Tx, userID, version string, key api.InternalKeyBackupSession,
 ) (err error) {
 	_, err = txn.Stmt(s.updateBackupKeyStmt).ExecContext(
@@ -112,7 +114,7 @@ func (s *keyBackupStatements) updateBackupKey(
 	return
 }
 
-func (s *keyBackupStatements) selectKeys(
+func (s *keyBackupStatements) SelectKeys(
 	ctx context.Context, txn *sql.Tx, userID, version string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
 	rows, err := txn.Stmt(s.selectKeysStmt).QueryContext(ctx, userID, version)
@@ -122,7 +124,7 @@ func (s *keyBackupStatements) selectKeys(
 	return unpackKeys(ctx, rows)
 }
 
-func (s *keyBackupStatements) selectKeysByRoomID(
+func (s *keyBackupStatements) SelectKeysByRoomID(
 	ctx context.Context, txn *sql.Tx, userID, version, roomID string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
 	rows, err := txn.Stmt(s.selectKeysByRoomIDStmt).QueryContext(ctx, userID, version, roomID)
@@ -132,7 +134,7 @@ func (s *keyBackupStatements) selectKeysByRoomID(
 	return unpackKeys(ctx, rows)
 }
 
-func (s *keyBackupStatements) selectKeysByRoomIDAndSessionID(
+func (s *keyBackupStatements) SelectKeysByRoomIDAndSessionID(
 	ctx context.Context, txn *sql.Tx, userID, version, roomID, sessionID string,
 ) (map[string]map[string]api.KeyBackupSession, error) {
 	rows, err := txn.Stmt(s.selectKeysByRoomIDAndSessionIDStmt).QueryContext(ctx, userID, version, roomID, sessionID)

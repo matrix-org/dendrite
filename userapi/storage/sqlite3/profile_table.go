@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
 const profilesSchema = `
@@ -60,13 +61,15 @@ type profilesStatements struct {
 	selectProfilesBySearchStmt   *sql.Stmt
 }
 
-func (s *profilesStatements) prepare(db *sql.DB) (err error) {
-	s.db = db
-	_, err = db.Exec(profilesSchema)
-	if err != nil {
-		return
+func NewSQLiteProfilesTable(db *sql.DB) (tables.ProfileTable, error) {
+	s := &profilesStatements{
+		db: db,
 	}
-	return sqlutil.StatementList{
+	_, err := db.Exec(profilesSchema)
+	if err != nil {
+		return nil, err
+	}
+	return s, sqlutil.StatementList{
 		{&s.insertProfileStmt, insertProfileSQL},
 		{&s.selectProfileByLocalpartStmt, selectProfileByLocalpartSQL},
 		{&s.setAvatarURLStmt, setAvatarURLSQL},
@@ -75,14 +78,14 @@ func (s *profilesStatements) prepare(db *sql.DB) (err error) {
 	}.Prepare(db)
 }
 
-func (s *profilesStatements) insertProfile(
+func (s *profilesStatements) InsertProfile(
 	ctx context.Context, txn *sql.Tx, localpart string,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
 	return err
 }
 
-func (s *profilesStatements) selectProfileByLocalpart(
+func (s *profilesStatements) SelectProfileByLocalpart(
 	ctx context.Context, localpart string,
 ) (*authtypes.Profile, error) {
 	var profile authtypes.Profile
@@ -95,7 +98,7 @@ func (s *profilesStatements) selectProfileByLocalpart(
 	return &profile, nil
 }
 
-func (s *profilesStatements) setAvatarURL(
+func (s *profilesStatements) SetAvatarURL(
 	ctx context.Context, txn *sql.Tx, localpart string, avatarURL string,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.setAvatarURLStmt)
@@ -103,7 +106,7 @@ func (s *profilesStatements) setAvatarURL(
 	return
 }
 
-func (s *profilesStatements) setDisplayName(
+func (s *profilesStatements) SetDisplayName(
 	ctx context.Context, txn *sql.Tx, localpart string, displayName string,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.setDisplayNameStmt)
@@ -111,7 +114,7 @@ func (s *profilesStatements) setDisplayName(
 	return
 }
 
-func (s *profilesStatements) selectProfilesBySearch(
+func (s *profilesStatements) SelectProfilesBySearch(
 	ctx context.Context, searchString string, limit int,
 ) ([]authtypes.Profile, error) {
 	var profiles []authtypes.Profile
