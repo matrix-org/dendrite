@@ -23,7 +23,7 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -85,7 +85,7 @@ func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
 	asAPI AppServiceQueryAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 ) (*authtypes.Profile, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

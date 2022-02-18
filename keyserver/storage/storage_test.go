@@ -173,7 +173,7 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	}
 
 	// Querying for device keys returns the latest stream IDs
-	msgs, err = db.DeviceKeysForUser(ctx, alice, []string{"AAA", "another_device"})
+	msgs, err = db.DeviceKeysForUser(ctx, alice, []string{"AAA", "another_device"}, false)
 	if err != nil {
 		t.Fatalf("DeviceKeysForUser returned error: %s", err)
 	}

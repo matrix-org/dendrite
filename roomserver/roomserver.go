@@ -53,7 +53,7 @@ func NewInternalAPI(
 	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	return internal.NewRoomserverAPI(
-		cfg, roomserverDB, js,
+		base.ProcessContext, cfg, roomserverDB, js,
 		cfg.Matrix.JetStream.TopicFor(jetstream.InputRoomEvent),
 		cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
 		base.Caches, perspectiveServerNames,

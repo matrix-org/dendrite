@@ -142,6 +142,10 @@ client_api:
   # using the registration shared secret below.
   registration_disabled: false
 
+  # Prevents new guest accounts from being created. Guest registration is also
+  # disabled implicitly by setting 'registration_disabled' above.
+  guests_disabled: true
+
   # If set, allows registration by anyone who knows the shared secret, regardless of
   # whether registration is otherwise disabled.
   registration_shared_secret: ""
@@ -203,13 +207,6 @@ federation_api:
   # Disable the validation of TLS certificates of remote federated homeservers. Do not
   # enable this option in production as it presents a security risk!
   disable_tls_validation: false
-
-  # Use the following proxy server for outbound federation traffic.
-  proxy_outbound:
-    enabled: false
-    protocol: http
-    host: localhost
-    port: 8080
 
   # Perspective keyservers to use as a backup when direct key fetches fail. This may
   # be required to satisfy key requests for servers that are no longer online when

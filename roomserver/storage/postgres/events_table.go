@@ -127,6 +127,9 @@ const bulkSelectEventIDSQL = "" +
 const bulkSelectEventNIDSQL = "" +
 	"SELECT event_id, event_nid FROM roomserver_events WHERE event_id = ANY($1)"
 
+const bulkSelectUnsentEventNIDSQL = "" +
+	"SELECT event_id, event_nid FROM roomserver_events WHERE event_id = ANY($1) AND sent_to_output = FALSE"
+
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid = ANY($1)"
 
@@ -147,6 +150,7 @@ type eventStatements struct {
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
 	bulkSelectEventNIDStmt                 *sql.Stmt
+	bulkSelectUnsentEventNIDStmt           *sql.Stmt
 	selectMaxEventDepthStmt                *sql.Stmt
 	selectRoomNIDsForEventNIDsStmt         *sql.Stmt
 }
@@ -173,6 +177,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
 		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
 	}.Prepare(db)
@@ -458,10 +463,28 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 	return results, nil
 }
 
-// bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
+// BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
 func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectEventNIDStmt)
+	return s.bulkSelectEventNID(ctx, txn, eventIDs, false)
+}
+
+// BulkSelectEventNIDs returns a map from string event ID to numeric event ID
+// only for events that haven't already been sent to the roomserver output.
+// If an event ID is not in the database then it is omitted from the map.
+func (s *eventStatements) BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+	return s.bulkSelectEventNID(ctx, txn, eventIDs, true)
+}
+
+// bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
+// If an event ID is not in the database then it is omitted from the map.
+func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventNID, error) {
+	var stmt *sql.Stmt
+	if onlyUnsent {
+		stmt = sqlutil.TxStmt(txn, s.bulkSelectUnsentEventNIDStmt)
+	} else {
+		stmt = sqlutil.TxStmt(txn, s.bulkSelectEventNIDStmt)
+	}
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
