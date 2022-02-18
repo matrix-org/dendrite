@@ -41,7 +41,7 @@ func LeaveRoomByID(
 		if leaveRes.Code != 0 {
 			return util.JSONResponse{
 				Code: leaveRes.Code,
-				JSON: jsonerror.Forbidden(leaveRes.Message),
+				JSON: jsonerror.LeaveServerNoticeError(),
 			}
 		}
 		return util.JSONResponse{
