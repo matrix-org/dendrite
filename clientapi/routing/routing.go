@@ -129,6 +129,7 @@ func Setup(
 
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
+		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, accountDB, cfg)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
@@ -169,8 +170,6 @@ func Setup(
 			}),
 		).Methods(http.MethodPost, http.MethodOptions)
 	}
-
-
 
 	v3mux.Handle("/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {

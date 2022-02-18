@@ -75,6 +75,7 @@ func (c *Global) Defaults(generate bool) {
 	c.Metrics.Defaults(generate)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
+	c.ServerNotices.Defaults(generate)
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -142,6 +143,7 @@ type ServerNotices struct {
 
 func (c *ServerNotices) Defaults(generate bool) {
 	if generate {
+		c.Enabled = true
 		c.LocalPart = "_server"
 		c.DisplayName = "Server Alert"
 		c.RoomName = "Server Alert"

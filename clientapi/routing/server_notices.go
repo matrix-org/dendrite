@@ -65,9 +65,11 @@ func SendServerNotice(
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
-	// TODO: Only allow admins to send notices
-	if !cfgNotices.Enabled {
-		return util.MessageResponse(http.StatusBadRequest, "Server notices are not enabled on this server.")
+	if device.AccountType != userapi.AccountTypeAdmin {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("This API can only be used by admin users."),
+		}
 	}
 
 	if txnID != nil {

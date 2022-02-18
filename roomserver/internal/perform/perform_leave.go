@@ -107,7 +107,10 @@ func (r *Leaver) performLeaveRoomByID(
 					return nil, fmt.Errorf("unable to unmarshal tag content")
 				}
 				if _, ok = tags.Tags["m.server_notice"]; ok {
-					return nil, fmt.Errorf("Unable to reject server notice invite")
+					// mimic the returned values from Synapse
+					res.Message = "You cannot reject this invite"
+					res.Code = 403
+					return nil, fmt.Errorf("You cannot reject this invite")
 				}
 			}
 		}
