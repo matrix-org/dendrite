@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 const usage = `Usage: %s
@@ -77,9 +77,14 @@ func main() {
 
 	pass := getPassword(password, pwdFile, pwdStdin, askPass, os.Stdin)
 
-	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
-		ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
-	}, cfg.Global.ServerName, bcrypt.DefaultCost, cfg.UserAPI.OpenIDTokenLifetimeMS)
+	accountDB, err := userdb.NewDatabase(
+		&config.DatabaseOptions{
+			ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
+		},
+		cfg.Global.ServerName, bcrypt.DefaultCost,
+		cfg.UserAPI.OpenIDTokenLifetimeMS,
+		api.DefaultLoginTokenLifetime,
+	)
 	if err != nil {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}

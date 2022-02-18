@@ -28,24 +28,6 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
-	roomServerStateKeyNIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerStateKeyNIDsCacheName,
-		RoomServerStateKeyNIDsCacheMutable,
-		RoomServerStateKeyNIDsCacheMaxEntries,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	roomServerEventTypeNIDs, err := NewInMemoryLRUCachePartition(
-		RoomServerEventTypeNIDsCacheName,
-		RoomServerEventTypeNIDsCacheMutable,
-		RoomServerEventTypeNIDsCacheMaxEntries,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
 	roomServerRoomIDs, err := NewInMemoryLRUCachePartition(
 		RoomServerRoomIDsCacheName,
 		RoomServerRoomIDsCacheMutable,
@@ -74,18 +56,15 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		return nil, err
 	}
 	go cacheCleaner(
-		roomVersions, serverKeys, roomServerStateKeyNIDs,
-		roomServerEventTypeNIDs, roomServerRoomIDs,
+		roomVersions, serverKeys, roomServerRoomIDs,
 		roomInfos, federationEvents,
 	)
 	return &Caches{
-		RoomVersions:            roomVersions,
-		ServerKeys:              serverKeys,
-		RoomServerStateKeyNIDs:  roomServerStateKeyNIDs,
-		RoomServerEventTypeNIDs: roomServerEventTypeNIDs,
-		RoomServerRoomIDs:       roomServerRoomIDs,
-		RoomInfos:               roomInfos,
-		FederationEvents:        federationEvents,
+		RoomVersions:      roomVersions,
+		ServerKeys:        serverKeys,
+		RoomServerRoomIDs: roomServerRoomIDs,
+		RoomInfos:         roomInfos,
+		FederationEvents:  federationEvents,
 	}, nil
 }
 

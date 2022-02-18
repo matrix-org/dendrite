@@ -44,7 +44,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 var (
@@ -448,7 +448,7 @@ func validateApplicationService(
 func Register(
 	req *http.Request,
 	userAPI userapi.UserInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var r registerRequest
@@ -532,6 +532,13 @@ func handleGuestRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
+	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Guest registration is disabled"),
+		}
+	}
+
 	var res userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeGuest,
@@ -892,7 +899,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.ClientAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 

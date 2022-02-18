@@ -10,7 +10,7 @@ import (
 	pushserverapi "github.com/matrix-org/dendrite/pushserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -32,7 +32,7 @@ func Password(
 	req *http.Request,
 	psAPI pushserverapi.PushserverInternalAPI,
 	userAPI api.UserInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	device *api.Device,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {

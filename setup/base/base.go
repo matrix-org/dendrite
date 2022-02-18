@@ -39,7 +39,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 
 	"github.com/gorilla/mux"
 
@@ -290,8 +290,14 @@ func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
 
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
-func (b *BaseDendrite) CreateAccountsDB() accounts.Database {
-	db, err := accounts.NewDatabase(&b.Cfg.UserAPI.AccountDatabase, b.Cfg.Global.ServerName, b.Cfg.UserAPI.BCryptCost, b.Cfg.UserAPI.OpenIDTokenLifetimeMS)
+func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
+	db, err := userdb.NewDatabase(
+		&b.Cfg.UserAPI.AccountDatabase,
+		b.Cfg.Global.ServerName,
+		b.Cfg.UserAPI.BCryptCost,
+		b.Cfg.UserAPI.OpenIDTokenLifetimeMS,
+		userapi.DefaultLoginTokenLifetime,
+	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
 	}

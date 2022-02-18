@@ -31,8 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage"
 )
 
 const (
@@ -43,22 +42,18 @@ type apiTestOpts struct {
 	loginTokenLifetime time.Duration
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, accounts.Database) {
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, storage.Database) {
 	if opts.loginTokenLifetime == 0 {
-		opts.loginTokenLifetime = defaultLoginTokenLifetime
+		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
 	dbopts := &config.DatabaseOptions{
 		ConnectionString:   "file::memory:",
 		MaxOpenConnections: 1,
 		MaxIdleConnections: 1,
 	}
-	accountDB, err := accounts.NewDatabase(dbopts, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS)
+	accountDB, err := storage.NewDatabase(dbopts, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime)
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
-	}
-	deviceDB, err := devices.NewDatabase(dbopts, serverName, opts.loginTokenLifetime)
-	if err != nil {
-		t.Fatalf("failed to create device DB: %s", err)
 	}
 
 	cfg := &config.UserAPI{
@@ -67,7 +62,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, a
 		},
 	}
 
-	return newInternalAPI(accountDB, deviceDB, cfg, nil, nil), accountDB
+	return newInternalAPI(accountDB, cfg, nil, nil), accountDB
 }
 
 func TestQueryProfile(t *testing.T) {
