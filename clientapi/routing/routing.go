@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -114,6 +115,50 @@ func Setup(
 				}
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+	}
+
+	// server notifications
+	if cfg.Matrix.ServerNotices.Enabled {
+		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
+		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, accountDB, cfg)
+		if err != nil {
+			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+		}
+
+		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
+			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+				// not specced, but ensure we're rate limiting requests to this endpoint
+				if r := rateLimits.Limit(req); r != nil {
+					return *r
+				}
+				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+				if err != nil {
+					return util.ErrorResponse(err)
+				}
+				txnID := vars["txnID"]
+				return SendServerNotice(
+					req, &cfg.Matrix.ServerNotices,
+					cfg, userAPI, rsAPI, accountDB, asAPI,
+					device, serverNotificationSender,
+					&txnID, transactionsCache,
+				)
+			}),
+		).Methods(http.MethodPut, http.MethodOptions)
+
+		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
+			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+				// not specced, but ensure we're rate limiting requests to this endpoint
+				if r := rateLimits.Limit(req); r != nil {
+					return *r
+				}
+				return SendServerNotice(
+					req, &cfg.Matrix.ServerNotices,
+					cfg, userAPI, rsAPI, accountDB, asAPI,
+					device, serverNotificationSender,
+					nil, transactionsCache,
+				)
+			}),
+		).Methods(http.MethodPost, http.MethodOptions)
 	}
 
 	// You can't just do PathPrefix("/(r0|v3)") because regexps only apply when inside named path variables.

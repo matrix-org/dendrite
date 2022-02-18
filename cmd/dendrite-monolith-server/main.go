@@ -133,6 +133,7 @@ func main() {
 	// dependency. Other components also need updating after their dependencies are up.
 	rsImpl.SetFederationAPI(fsAPI, keyRing)
 	rsImpl.SetAppserviceAPI(asAPI)
+	rsImpl.SetUserAPI(userAPI)
 	keyImpl.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(

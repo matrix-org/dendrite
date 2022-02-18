@@ -3,9 +3,11 @@ package api
 import (
 	"context"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // RoomserverInputAPI is used to write events to the room server.
@@ -14,6 +16,7 @@ type RoomserverInternalAPI interface {
 	// interdependencies between the roomserver and other input APIs
 	SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing)
 	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
+	SetUserAPI(userAPI userapi.UserInternalAPI)
 
 	InputRoomEvents(
 		ctx context.Context,
