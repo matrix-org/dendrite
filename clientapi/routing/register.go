@@ -532,6 +532,13 @@ func handleGuestRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
+	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Guest registration is disabled"),
+		}
+	}
+
 	var res userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeGuest,
