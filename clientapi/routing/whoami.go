@@ -21,7 +21,9 @@ import (
 
 // whoamiResponse represents an response for a `whoami` request
 type whoamiResponse struct {
-	UserID string `json:"user_id"`
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+	IsGuest  bool   `json:"is_guest"`
 }
 
 // Whoami implements `/account/whoami` which enables client to query their account user id.
@@ -29,6 +31,10 @@ type whoamiResponse struct {
 func Whoami(req *http.Request, device *api.Device) util.JSONResponse {
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: whoamiResponse{UserID: device.UserID},
+		JSON: whoamiResponse{
+			UserID:   device.UserID,
+			DeviceID: device.ID,
+			IsGuest:  device.AccountType == api.AccountTypeGuest,
+		},
 	}
 }
