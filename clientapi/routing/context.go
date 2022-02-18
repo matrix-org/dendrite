@@ -61,63 +61,29 @@ func Context(
 	}
 	ctx := req.Context()
 
-	membershipRes := roomserver.QueryMembershipForUserResponse{}
-	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: device.UserID, RoomID: roomID}
-	if err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
+	state, userAllowed, err := getCurrentState(ctx, rsAPI, roomID, device.UserID)
+	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-
-	_ = filter
-
-	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
-	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
-	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
-	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
-	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
-	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
-	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
-
-	currentState := &roomserver.QueryCurrentStateResponse{}
-	if err := rsAPI.QueryCurrentState(ctx, &roomserver.QueryCurrentStateRequest{
-		RoomID: roomID,
-		StateTuples: []gomatrixserverlib.StateKeyTuple{
-			avatarTuple, nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple,
-		},
-	}, currentState); err != nil {
-		logrus.WithField("roomID", roomID).WithError(err).Error("unable to fetch current state")
-		return jsonerror.InternalServerError()
-	}
-
-	state := []gomatrixserverlib.ClientEvent{}
-	for tuple, event := range currentState.StateEvents {
-		// check that the user is allowed to view the context
-		if tuple == visibilityTuple {
-			hisVis, err := event.HistoryVisibility()
-			if err != nil {
-				return jsonerror.InternalServerError()
-			}
-			allowed := hisVis != "world_readable" && membershipRes.Membership == "join"
-			if !allowed {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-				}
-			}
+	if !userAllowed {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("User is not allowed to query contenxt"),
 		}
-		state = append(state, gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll))
 	}
 
-	requestEvent := &roomserver.QueryEventsByIDResponse{}
+	requestedEvent := &roomserver.QueryEventsByIDResponse{}
 	if err := rsAPI.QueryEventsByID(ctx, &roomserver.QueryEventsByIDRequest{
 		EventIDs: []string{eventID},
-	}, requestEvent); err != nil {
+	}, requestedEvent); err != nil {
 		return jsonerror.InternalServerError()
 	}
-	if requestEvent.Events == nil || len(requestEvent.Events) == 0 {
+	if requestedEvent.Events == nil || len(requestedEvent.Events) == 0 {
 		logrus.WithField("eventID", eventID).Error("unable to find requested event")
 		return jsonerror.InternalServerError()
 	}
 	// this should be safe now
-	event := requestEvent.Events[0]
+	event := requestedEvent.Events[0]
 
 	eventsBefore, err := queryEventsBefore(rsAPI, ctx, event.PrevEventIDs(), limit)
 	if err != nil && err != sql.ErrNoRows {
@@ -130,6 +96,8 @@ func Context(
 		logrus.WithError(err).Error("unable to fetch after events")
 		return jsonerror.InternalServerError()
 	}
+
+	state = applyLazyLoadMembers(filter, eventsAfter, eventsBefore, state)
 
 	response := ContextRespsonse{
 		End:          "end",
@@ -144,6 +112,98 @@ func Context(
 		Code: http.StatusOK,
 		JSON: response,
 	}
+}
+
+func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter, eventsBefore []gomatrixserverlib.ClientEvent, state []gomatrixserverlib.ClientEvent) []gomatrixserverlib.ClientEvent {
+	if filter == nil || !filter.LazyLoadMembers {
+		return state
+	}
+	allEvents := append(eventsAfter, eventsBefore...)
+	x := make(map[string]bool)
+	// get members who actually send an event
+	for _, e := range allEvents {
+		if filter.LazyLoadMembers {
+			x[e.Sender] = true
+		}
+	}
+	// apply lazy_load_members
+	if filter.LazyLoadMembers {
+		newState := []gomatrixserverlib.ClientEvent{}
+
+		for _, event := range state {
+			if event.Type != gomatrixserverlib.MRoomMember {
+				newState = append(newState, event)
+			} else {
+				// did the user send an event?
+				if x[event.Sender] {
+					newState = append(newState, event)
+				}
+			}
+		}
+		return newState
+	}
+	return state
+}
+
+// getCurrentState returns the current state of the requested room
+func getCurrentState(ctx context.Context, rsAPI roomserver.RoomserverInternalAPI, roomID, userID string) (events []gomatrixserverlib.ClientEvent, userAllowed bool, err error) {
+
+	avatarTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.avatar", StateKey: ""}
+	nameTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.name", StateKey: ""}
+	canonicalTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: ""}
+	topicTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.topic", StateKey: ""}
+	guestTuple := gomatrixserverlib.StateKeyTuple{EventType: "m.room.guest_access", StateKey: ""}
+	visibilityTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""}
+	joinRuleTuple := gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}
+
+	// get the current state
+	currentState := &roomserver.QueryCurrentStateResponse{}
+	if err := rsAPI.QueryCurrentState(ctx, &roomserver.QueryCurrentStateRequest{
+		RoomID: roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{
+			avatarTuple, nameTuple, canonicalTuple, topicTuple, guestTuple, visibilityTuple, joinRuleTuple,
+		},
+	}, currentState); err != nil {
+		logrus.WithField("roomID", roomID).WithError(err).Error("unable to fetch current state")
+		return nil, true, err
+	}
+
+	// get all room members
+	roomMembers := roomserver.QueryMembershipsForRoomResponse{}
+	if err := rsAPI.QueryMembershipsForRoom(ctx, &roomserver.QueryMembershipsForRoomRequest{
+		RoomID: roomID,
+		Sender: userID,
+	}, &roomMembers); err != nil {
+		logrus.WithField("roomID", roomID).WithError(err).Error("unable to fetch room members")
+		return nil, true, err
+	}
+
+	state := []gomatrixserverlib.ClientEvent{}
+	for _, ev := range roomMembers.JoinEvents {
+		state = append(state, ev)
+	}
+
+	membershipRes := roomserver.QueryMembershipForUserResponse{}
+	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: userID, RoomID: roomID}
+	if err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
+		return nil, true, err
+	}
+
+	for tuple, event := range currentState.StateEvents {
+		// check that the user is allowed to view the context
+		if tuple == visibilityTuple {
+			hisVis, err := event.HistoryVisibility()
+			if err != nil {
+				return nil, true, err
+			}
+			allowed := hisVis != "world_readable" && membershipRes.Membership == "join"
+			if !allowed {
+				return nil, false, nil
+			}
+		}
+		state = append(state, gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll))
+	}
+	return state, true, nil
 }
 
 // queryEventsAfter retrieves events that happened after a list of events.
