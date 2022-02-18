@@ -9,7 +9,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -29,7 +29,7 @@ type newPasswordAuth struct {
 func Password(
 	req *http.Request,
 	userAPI api.UserInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	device *api.Device,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {

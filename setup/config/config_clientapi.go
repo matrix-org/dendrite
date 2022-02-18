@@ -18,6 +18,10 @@ type ClientAPI struct {
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
 	RegistrationSharedSecret string `yaml:"registration_shared_secret"`
+	// If set, prevents guest accounts from being created. Only takes
+	// effect if registration is enabled, otherwise guests registration
+	// is forbidden either way.
+	GuestsDisabled bool `yaml:"guests_disabled"`
 
 	// Boolean stating whether catpcha registration is enabled
 	// and required

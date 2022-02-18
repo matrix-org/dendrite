@@ -15,7 +15,6 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -35,7 +34,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -52,7 +51,7 @@ func Setup(
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
@@ -125,57 +124,11 @@ func Setup(
 	// using ?: so the final regexp becomes what is below. We also need a trailing slash to stop 'v33333' matching.
 	// Note that 'apiversion' is chosen because it must not collide with a variable used in any of the routing!
 	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
+
 	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
-
-	// server notifications
-	if cfg.Matrix.ServerNotices.Enabled {
-		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, accountDB, cfg)
-		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-		}
-
-		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
-			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				// not specced, but ensure we're rate limiting requests to this endpoint
-				if r := rateLimits.Limit(req); r != nil {
-					return *r
-				}
-				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-				if err != nil {
-					return util.ErrorResponse(err)
-				}
-				txnID := vars["txnID"]
-				return SendServerNotice(
-					req, &cfg.Matrix.ServerNotices,
-					cfg, userAPI, rsAPI, accountDB, asAPI,
-					device, serverNotificationSender,
-					&txnID, transactionsCache,
-				)
-			}),
-		).Methods(http.MethodPut, http.MethodOptions)
-
-		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
-			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				// not specced, but ensure we're rate limiting requests to this endpoint
-				if r := rateLimits.Limit(req); r != nil {
-					return *r
-				}
-				return SendServerNotice(
-					req, &cfg.Matrix.ServerNotices,
-					cfg, userAPI, rsAPI, accountDB, asAPI,
-					device, serverNotificationSender,
-					nil, transactionsCache,
-				)
-			}),
-		).Methods(http.MethodPost, http.MethodOptions)
-	}
 
 	v3mux.Handle("/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
-				return *r
-			}
 			return CreateRoom(req, device, cfg, accountDB, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postgres
+package sqlite3
 
 import (
 	"context"
@@ -51,6 +51,9 @@ CREATE INDEX IF NOT EXISTS login_tokens_expiration_idx ON login_tokens(token_exp
 
 // prepare runs statement preparation.
 func (s *loginTokenStatements) prepare(db *sql.DB) error {
+	if err := s.execSchema(db); err != nil {
+		return err
+	}
 	return sqlutil.StatementList{
 		{&s.insertStmt, "INSERT INTO login_tokens(token, token_expires_at, user_id) VALUES ($1, $2, $3)"},
 		{&s.deleteStmt, "DELETE FROM login_tokens WHERE token = $1 OR token_expires_at <= $2"},
