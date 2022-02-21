@@ -966,7 +966,3 @@ func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID 
 func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
-
-func (s *Database) SelectEventIDsAfter(ctx context.Context, roomID string, id int) ([]string, error) {
-	return s.OutputEvents.SelectEventIDsAfter(ctx, roomID, id)
-}

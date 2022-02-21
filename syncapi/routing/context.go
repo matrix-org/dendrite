@@ -82,6 +82,7 @@ func Context(
 		ContainsURL:             filter.ContainsURL,
 	}
 
+	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
 	state, _ := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
 	// verify the user is allowed to see the context for this room/event
 	for _, x := range state {
@@ -173,7 +174,7 @@ func parseContextParams(req *http.Request) (*gomatrixserverlib.RoomEventFilter, 
 		if err != nil {
 			return nil, err
 		}
-		// not in the spec, but feels like a good idea to have an upper bound limit
+		// NOTSPEC: feels like a good idea to have an upper bound limit
 		if limit > 100 {
 			limit = 100
 		}

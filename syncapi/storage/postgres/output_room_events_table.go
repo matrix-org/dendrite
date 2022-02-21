@@ -149,9 +149,6 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
-const selectEventIDsAfterSQL = "" +
-	"SELECT event_id FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
-
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -165,7 +162,6 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
-	selectEventIDsAfterStmt       *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -187,7 +183,6 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-		{&s.selectEventIDsAfterStmt, selectEventIDsAfterSQL},
 	}.Prepare(db)
 }
 
@@ -525,23 +520,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	}
 
 	return lastID, evts, rows.Err()
-}
-
-func (s *outputRoomEventsStatements) SelectEventIDsAfter(ctx context.Context, roomID string, id int) (eventIDs []string, err error) {
-	rows, err := s.selectEventIDsAfterStmt.QueryContext(ctx, roomID, id)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var eventID string
-		if err = rows.Scan(&eventID); err != nil {
-			return nil, err
-		}
-		eventIDs = append(eventIDs, eventID)
-	}
-	return eventIDs, rows.Err()
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {

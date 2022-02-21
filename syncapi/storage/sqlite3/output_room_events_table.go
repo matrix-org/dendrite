@@ -62,19 +62,16 @@ const selectEventsSQL = "" +
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3"
-
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE"
-
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3"
-
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectMaxEventIDSQL = "" +
@@ -88,7 +85,6 @@ const selectStateInRangeSQL = "" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" +
 	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
-
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const deleteEventsForRoomSQL = "" +
@@ -99,12 +95,11 @@ const selectContextEventSQL = "" +
 
 const selectContextBeforeEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2"
+// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectContextAfterEventSQL = "" +
 	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
-
-const selectEventIDsAfterSQL = "" +
-	"SELECT event_id FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
+// WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
@@ -117,7 +112,6 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt       *sql.Stmt
 	selectContextBeforeEventStmt *sql.Stmt
 	selectContextAfterEventStmt  *sql.Stmt
-	selectEventIDsAfterStmt      *sql.Stmt
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Events, error) {
@@ -138,7 +132,6 @@ func NewSqliteEventsTable(db *sql.DB, streamID *streamIDStatements) (tables.Even
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-		{&s.selectEventIDsAfterStmt, selectEventIDsAfterSQL},
 	}.Prepare(db)
 }
 
@@ -561,23 +554,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		evts = append(evts, evt)
 	}
 	return lastID, evts, rows.Err()
-}
-
-func (s *outputRoomEventsStatements) SelectEventIDsAfter(ctx context.Context, roomID string, id int) (eventIDs []string, err error) {
-	rows, err := s.selectEventIDsAfterStmt.QueryContext(ctx, roomID, id)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var eventID string
-		if err = rows.Scan(&eventID); err != nil {
-			return nil, err
-		}
-		eventIDs = append(eventIDs, eventID)
-	}
-	return eventIDs, rows.Err()
 }
 
 func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs []string, err error) {
