@@ -4,14 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/pressly/goose"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
-
-func init() {
-	goose.AddMigration(UpAddAccountType, DownAddAccountType)
-}
 
 func LoadAddAccountType(m *sqlutil.Migrations) {
 	m.AddMigration(UpAddAccountType, DownAddAccountType)

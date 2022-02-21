@@ -45,6 +45,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	deltas.LoadIsActive(m)
 	//deltas.LoadLastSeenTSIP(m)
 	deltas.LoadAddAccountType(m)
+	deltas.LoadAddPolicyVersion(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
