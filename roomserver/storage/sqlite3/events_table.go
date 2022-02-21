@@ -49,7 +49,8 @@ const eventsSchema = `
 const insertEventSQL = `
 	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	  ON CONFLICT DO NOTHING
+	  ON CONFLICT DO UPDATE
+	  SET is_rejected = $8 WHERE is_rejected = 0
 	  RETURNING event_nid, state_snapshot_nid;
 `
 
@@ -98,6 +99,9 @@ const bulkSelectEventIDSQL = "" +
 const bulkSelectEventNIDSQL = "" +
 	"SELECT event_id, event_nid FROM roomserver_events WHERE event_id IN ($1)"
 
+const bulkSelectUnsentEventNIDSQL = "" +
+	"SELECT event_id, event_nid FROM roomserver_events WHERE sent_to_output = 0 AND event_id IN ($1)"
+
 const selectMaxEventDepthSQL = "" +
 	"SELECT COALESCE(MAX(depth) + 1, 0) FROM roomserver_events WHERE event_nid IN ($1)"
 
@@ -117,8 +121,9 @@ type eventStatements struct {
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
-	bulkSelectEventNIDStmt                 *sql.Stmt
-	//selectRoomNIDsForEventNIDsStmt           *sql.Stmt
+	//bulkSelectEventNIDStmt               *sql.Stmt
+	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
+	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
 }
 
 func createEventsTable(db *sql.DB) error {
@@ -143,7 +148,8 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectStateAtEventAndReferenceStmt, bulkSelectStateAtEventAndReferenceSQL},
 		{&s.bulkSelectEventReferenceStmt, bulkSelectEventReferenceSQL},
 		{&s.bulkSelectEventIDStmt, bulkSelectEventIDSQL},
-		{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		//{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
+		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
 	}.Prepare(db)
 }
@@ -184,7 +190,7 @@ func (s *eventStatements) SelectEvent(
 // bulkSelectStateEventByID lookups a list of state events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
 func (s *eventStatements) BulkSelectStateEventByID(
-	ctx context.Context, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StateEntry, error) {
 	///////////////
 	iEventIDs := make([]interface{}, len(eventIDs))
@@ -196,6 +202,7 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	if err != nil {
 		return nil, err
 	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
 	///////////////
 
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
@@ -235,7 +242,7 @@ func (s *eventStatements) BulkSelectStateEventByID(
 // bulkSelectStateEventByID lookups a list of state events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
 func (s *eventStatements) BulkSelectStateEventByNID(
-	ctx context.Context, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
 	tuples := stateKeyTupleSorter(stateKeyTuples)
@@ -263,6 +270,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	if err != nil {
 		return nil, fmt.Errorf("s.db.Prepare: %w", err)
 	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
 	rows, err := selectStmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, fmt.Errorf("selectStmt.QueryContext: %w", err)
@@ -291,7 +299,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 // If any of the requested events are missing from the database it returns a types.MissingEventError.
 // If we do not have the state for any of the requested events it returns a types.MissingEventError.
 func (s *eventStatements) BulkSelectStateAtEventByID(
-	ctx context.Context, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
 	///////////////
 	iEventIDs := make([]interface{}, len(eventIDs))
@@ -303,6 +311,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 	if err != nil {
 		return nil, err
 	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
 	///////////////
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
@@ -381,6 +390,7 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 	if err != nil {
 		return nil, err
 	}
+	selectPrep = sqlutil.TxStmt(txn, selectPrep)
 	//////////////
 
 	rows, err := sqlutil.TxStmt(txn, selectPrep).QueryContext(ctx, iEventNIDs...)
@@ -454,7 +464,7 @@ func (s *eventStatements) BulkSelectEventReference(
 }
 
 // bulkSelectEventID returns a map from numeric event ID to string event ID.
-func (s *eventStatements) BulkSelectEventID(ctx context.Context, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
+func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (map[types.EventNID]string, error) {
 	///////////////
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for k, v := range eventNIDs {
@@ -465,6 +475,7 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, eventNIDs []typ
 	if err != nil {
 		return nil, err
 	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
 	///////////////
 
 	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
@@ -488,19 +499,38 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, eventNIDs []typ
 	return results, nil
 }
 
+// BulkSelectEventNIDs returns a map from string event ID to numeric event ID.
+// If an event ID is not in the database then it is omitted from the map.
+func (s *eventStatements) BulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+	return s.bulkSelectEventNID(ctx, txn, eventIDs, false)
+}
+
+// BulkSelectEventNIDs returns a map from string event ID to numeric event ID
+// only for events that haven't already been sent to the roomserver output.
+// If an event ID is not in the database then it is omitted from the map.
+func (s *eventStatements) BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error) {
+	return s.bulkSelectEventNID(ctx, txn, eventIDs, true)
+}
+
 // bulkSelectEventNIDs returns a map from string event ID to numeric event ID.
 // If an event ID is not in the database then it is omitted from the map.
-func (s *eventStatements) BulkSelectEventNID(ctx context.Context, eventIDs []string) (map[string]types.EventNID, error) {
+func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string, onlyUnsent bool) (map[string]types.EventNID, error) {
 	///////////////
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	var selectOrig string
+	if onlyUnsent {
+		selectOrig = strings.Replace(bulkSelectUnsentEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	} else {
+		selectOrig = strings.Replace(bulkSelectEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	}
 	selectStmt, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
+	selectStmt = sqlutil.TxStmt(txn, selectStmt)
 	///////////////
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
@@ -538,13 +568,14 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 }
 
 func (s *eventStatements) SelectRoomNIDsForEventNIDs(
-	ctx context.Context, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 ) (map[types.EventNID]types.RoomNID, error) {
 	sqlStr := strings.Replace(selectRoomNIDsForEventNIDsSQL, "($1)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
 	sqlPrep, err := s.db.Prepare(sqlStr)
 	if err != nil {
 		return nil, err
 	}
+	sqlPrep = sqlutil.TxStmt(txn, sqlPrep)
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for i, v := range eventNIDs {
 		iEventNIDs[i] = v

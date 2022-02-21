@@ -83,27 +83,6 @@ type QueryStateAfterEventsResponse struct {
 	StateEvents []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
 }
 
-type QueryMissingAuthPrevEventsRequest struct {
-	// The room ID to query the state in.
-	RoomID string `json:"room_id"`
-	// The list of auth events to check the existence of.
-	AuthEventIDs []string `json:"auth_event_ids"`
-	// The list of previous events to check the existence of.
-	PrevEventIDs []string `json:"prev_event_ids"`
-}
-
-type QueryMissingAuthPrevEventsResponse struct {
-	// Does the room exist on this roomserver?
-	// If the room doesn't exist all other fields will be empty.
-	RoomExists bool `json:"room_exists"`
-	// The room version of the room.
-	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
-	// The event IDs of the auth events that we don't know locally.
-	MissingAuthEventIDs []string `json:"missing_auth_event_ids"`
-	// The event IDs of the previous events that we don't know locally.
-	MissingPrevEventIDs []string `json:"missing_prev_event_ids"`
-}
-
 // QueryEventsByIDRequest is a request to QueryEventsByID
 type QueryEventsByIDRequest struct {
 	// The event IDs to look up.

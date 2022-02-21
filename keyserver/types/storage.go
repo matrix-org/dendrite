@@ -14,7 +14,18 @@
 
 package types
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"math"
+
+	"github.com/matrix-org/gomatrixserverlib"
+)
+
+const (
+	// OffsetNewest tells e.g. the database to get the most current data
+	OffsetNewest int64 = math.MaxInt64
+	// OffsetOldest tells e.g. the database to get the oldest data
+	OffsetOldest int64 = 0
+)
 
 // KeyTypePurposeToInt maps a purpose to an integer, which is used in the
 // database to reduce the amount of space taken up by this column.

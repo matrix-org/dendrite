@@ -51,8 +51,15 @@ func (r *Joiner) PerformJoin(
 	req *rsAPI.PerformJoinRequest,
 	res *rsAPI.PerformJoinResponse,
 ) {
-	roomID, joinedVia, err := r.performJoin(ctx, req)
+	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
+		"room_id": req.RoomIDOrAlias,
+		"user_id": req.UserID,
+		"servers": req.ServerNames,
+	})
+	logger.Info("User requested to room join")
+	roomID, joinedVia, err := r.performJoin(context.Background(), req)
 	if err != nil {
+		logger.WithError(err).Error("Failed to join room")
 		sentry.CaptureException(err)
 		perr, ok := err.(*rsAPI.PerformError)
 		if ok {
@@ -62,7 +69,9 @@ func (r *Joiner) PerformJoin(
 				Msg: err.Error(),
 			}
 		}
+		return
 	}
+	logger.Info("User joined room successfully")
 	res.RoomID = roomID
 	res.JoinedVia = joinedVia
 }

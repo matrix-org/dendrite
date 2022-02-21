@@ -64,14 +64,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	/*
-		ygg.SetMulticastEnabled(true)
-		if instancePeer != nil && *instancePeer != "" {
-			if err = ygg.SetStaticPeer(*instancePeer); err != nil {
-				logrus.WithError(err).Error("Failed to set static peer")
-			}
-		}
-	*/
 
 	// iterate through the cli args and check if the config flag was set
 	configFlagSet := false
@@ -89,16 +81,14 @@ func main() {
 		cfg = setup.ParseFlags(true)
 	} else {
 		cfg.Defaults(true)
-  	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
+		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-device.db", *instanceName))
 		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
 		cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-		cfg.Global.Kafka.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-naffka.db", *instanceName))
 		cfg.MSCs.MSCs = []string{"msc2836"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
 		if err = cfg.Derive(); err != nil {

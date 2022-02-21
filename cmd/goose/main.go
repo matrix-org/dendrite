@@ -8,11 +8,10 @@ import (
 	"log"
 	"os"
 
-	pgaccounts "github.com/matrix-org/dendrite/userapi/storage/accounts/postgres/deltas"
-	slaccounts "github.com/matrix-org/dendrite/userapi/storage/accounts/sqlite3/deltas"
-	pgdevices "github.com/matrix-org/dendrite/userapi/storage/devices/postgres/deltas"
-	sldevices "github.com/matrix-org/dendrite/userapi/storage/devices/sqlite3/deltas"
 	"github.com/pressly/goose"
+
+	pgusers "github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
+	slusers "github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -26,8 +25,7 @@ const (
 	RoomServer       = "roomserver"
 	SigningKeyServer = "signingkeyserver"
 	SyncAPI          = "syncapi"
-	UserAPIAccounts  = "userapi_accounts"
-	UserAPIDevices   = "userapi_devices"
+	UserAPI          = "userapi"
 )
 
 var (
@@ -35,7 +33,7 @@ var (
 	flags     = flag.NewFlagSet("goose", flag.ExitOnError)
 	component = flags.String("component", "", "dendrite component name")
 	knownDBs  = []string{
-		AppService, FederationSender, KeyServer, MediaAPI, RoomServer, SigningKeyServer, SyncAPI, UserAPIAccounts, UserAPIDevices,
+		AppService, FederationSender, KeyServer, MediaAPI, RoomServer, SigningKeyServer, SyncAPI, UserAPI,
 	}
 )
 
@@ -143,18 +141,14 @@ Commands:
 
 func loadSQLiteDeltas(component string) {
 	switch component {
-	case UserAPIAccounts:
-		slaccounts.LoadFromGoose()
-	case UserAPIDevices:
-		sldevices.LoadFromGoose()
+	case UserAPI:
+		slusers.LoadFromGoose()
 	}
 }
 
 func loadPostgresDeltas(component string) {
 	switch component {
-	case UserAPIAccounts:
-		pgaccounts.LoadFromGoose()
-	case UserAPIDevices:
-		pgdevices.LoadFromGoose()
+	case UserAPI:
+		pgusers.LoadFromGoose()
 	}
 }

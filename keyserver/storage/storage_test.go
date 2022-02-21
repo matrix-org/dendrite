@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Shopify/sarama"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -50,7 +50,7 @@ func TestKeyChanges(t *testing.T) {
 	MustNotError(t, err)
 	deviceChangeIDC, err := db.StoreKeyChange(ctx, "@charlie:localhost")
 	MustNotError(t, err)
-	userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDB, sarama.OffsetNewest)
+	userIDs, latest, err := db.KeyChanges(ctx, deviceChangeIDB, types.OffsetNewest)
 	if err != nil {
 		t.Fatalf("Failed to KeyChanges: %s", err)
 	}
@@ -74,7 +74,7 @@ func TestKeyChangesNoDupes(t *testing.T) {
 	}
 	deviceChangeID, err := db.StoreKeyChange(ctx, "@alice:localhost")
 	MustNotError(t, err)
-	userIDs, latest, err := db.KeyChanges(ctx, 0, sarama.OffsetNewest)
+	userIDs, latest, err := db.KeyChanges(ctx, 0, types.OffsetNewest)
 	if err != nil {
 		t.Fatalf("Failed to KeyChanges: %s", err)
 	}
@@ -173,7 +173,7 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	}
 
 	// Querying for device keys returns the latest stream IDs
-	msgs, err = db.DeviceKeysForUser(ctx, alice, []string{"AAA", "another_device"})
+	msgs, err = db.DeviceKeysForUser(ctx, alice, []string{"AAA", "another_device"}, false)
 	if err != nil {
 		t.Fatalf("DeviceKeysForUser returned error: %s", err)
 	}

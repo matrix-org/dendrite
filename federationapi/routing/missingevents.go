@@ -62,7 +62,7 @@ func GetMissingEvents(
 	eventsResponse.Events = filterEvents(eventsResponse.Events, roomID)
 
 	resp := gomatrixserverlib.RespMissingEvents{
-		Events: gomatrixserverlib.UnwrapEventHeaders(eventsResponse.Events),
+		Events: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(eventsResponse.Events),
 	}
 
 	return util.JSONResponse{

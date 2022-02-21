@@ -32,7 +32,6 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
-		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(*dbURI)
 	}
 	cfg.Global.TrustedIDServers = []string{
 		"matrix.org",
@@ -83,7 +82,7 @@ func main() {
 	if *defaultsForCI {
 		cfg.AppServiceAPI.DisableTLSValidation = true
 		cfg.ClientAPI.RateLimiting.Enabled = false
-		cfg.FederationAPI.DisableTLSValidation = true
+		cfg.FederationAPI.DisableTLSValidation = false
 		// don't hit matrix.org when running tests!!!
 		cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}
@@ -91,6 +90,7 @@ func main() {
 		cfg.Logging[0].Type = "std"
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 		cfg.Global.JetStream.InMemory = true
+		cfg.ClientAPI.RegistrationSharedSecret = "complement"
 	}
 
 	j, err := yaml.Marshal(cfg)

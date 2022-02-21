@@ -108,8 +108,8 @@ func (d *Database) StoreLocalDeviceKeys(ctx context.Context, keys []api.DeviceMe
 	})
 }
 
-func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error) {
-	return d.DeviceKeysTable.SelectBatchDeviceKeys(ctx, userID, deviceIDs)
+func (d *Database) DeviceKeysForUser(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error) {
+	return d.DeviceKeysTable.SelectBatchDeviceKeys(ctx, userID, deviceIDs, includeEmpty)
 }
 
 func (d *Database) ClaimKeys(ctx context.Context, userToDeviceToAlgorithm map[string]map[string]string) ([]api.OneTimeKeys, error) {
@@ -170,6 +170,9 @@ func (d *Database) DeleteDeviceKeys(ctx context.Context, userID string, deviceID
 			}
 			if err := d.DeviceKeysTable.DeleteDeviceKeys(ctx, txn, userID, string(deviceID)); err != nil && err != sql.ErrNoRows {
 				return fmt.Errorf("d.DeviceKeysTable.DeleteDeviceKeys: %w", err)
+			}
+			if err := d.OneTimeKeysTable.DeleteOneTimeKeys(ctx, txn, userID, string(deviceID)); err != nil && err != sql.ErrNoRows {
+				return fmt.Errorf("d.OneTimeKeysTable.DeleteOneTimeKeys: %w", err)
 			}
 		}
 		return nil

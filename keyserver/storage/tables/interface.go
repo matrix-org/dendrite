@@ -31,6 +31,7 @@ type OneTimeKeys interface {
 	// SelectAndDeleteOneTimeKey selects a single one time key matching the user/device/algorithm specified and returns the algo:key_id => JSON.
 	// Returns an empty map if the key does not exist.
 	SelectAndDeleteOneTimeKey(ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string) (map[string]json.RawMessage, error)
+	DeleteOneTimeKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 }
 
 type DeviceKeys interface {
@@ -38,7 +39,7 @@ type DeviceKeys interface {
 	InsertDeviceKeys(ctx context.Context, txn *sql.Tx, keys []api.DeviceMessage) error
 	SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error)
 	CountStreamIDsForUser(ctx context.Context, userID string, streamIDs []int64) (int, error)
-	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string) ([]api.DeviceMessage, error)
+	SelectBatchDeviceKeys(ctx context.Context, userID string, deviceIDs []string, includeEmpty bool) ([]api.DeviceMessage, error)
 	DeleteDeviceKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 	DeleteAllDeviceKeys(ctx context.Context, txn *sql.Tx, userID string) error
 }
@@ -46,7 +47,7 @@ type DeviceKeys interface {
 type KeyChanges interface {
 	InsertKeyChange(ctx context.Context, userID string) (int64, error)
 	// SelectKeyChanges returns the set (de-duplicated) of users who have changed their keys between the two offsets.
-	// Results are exclusive of fromOffset and inclusive of toOffset. A toOffset of sarama.OffsetNewest means no upper offset.
+	// Results are exclusive of fromOffset and inclusive of toOffset. A toOffset of types.OffsetNewest means no upper offset.
 	SelectKeyChanges(ctx context.Context, fromOffset, toOffset int64) (userIDs []string, latestOffset int64, err error)
 
 	Prepare() error

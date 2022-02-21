@@ -15,9 +15,15 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -26,10 +32,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // http://matrix.org/docs/spec/client_server/r0.2.0.html#put-matrix-client-r0-rooms-roomid-send-eventtype-txnid
@@ -97,7 +99,22 @@ func SendEvent(
 	defer mutex.(*sync.Mutex).Unlock()
 
 	startedGeneratingEvent := time.Now()
-	e, resErr := generateSendEvent(req, device, roomID, eventType, stateKey, cfg, rsAPI)
+
+	var r map[string]interface{} // must be a JSON object
+	resErr := httputil.UnmarshalJSONRequest(req, &r)
+	if resErr != nil {
+		return *resErr
+	}
+
+	evTime, err := httputil.ParseTSParam(req)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
+		}
+	}
+
+	e, resErr := generateSendEvent(req.Context(), r, device, roomID, eventType, stateKey, cfg, rsAPI, evTime)
 	if resErr != nil {
 		return *resErr
 	}
@@ -153,27 +170,16 @@ func SendEvent(
 }
 
 func generateSendEvent(
-	req *http.Request,
+	ctx context.Context,
+	r map[string]interface{},
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.ClientAPI,
 	rsAPI api.RoomserverInternalAPI,
+	evTime time.Time,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request
 	userID := device.UserID
-	var r map[string]interface{} // must be a JSON object
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
-	if resErr != nil {
-		return nil, resErr
-	}
-
-	evTime, err := httputil.ParseTSParam(req)
-	if err != nil {
-		return nil, &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
-		}
-	}
 
 	// create the new event and set all the fields we can
 	builder := gomatrixserverlib.EventBuilder{
@@ -182,15 +188,15 @@ func generateSendEvent(
 		Type:     eventType,
 		StateKey: stateKey,
 	}
-	err = builder.SetContent(r)
+	err := builder.SetContent(r)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("builder.SetContent failed")
+		util.GetLogger(ctx).WithError(err).Error("builder.SetContent failed")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
 
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -213,7 +219,7 @@ func generateSendEvent(
 			JSON: jsonerror.BadJSON(e.Error()),
 		}
 	} else if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("eventutil.BuildEvent failed")
+		util.GetLogger(ctx).WithError(err).Error("eventutil.BuildEvent failed")
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}

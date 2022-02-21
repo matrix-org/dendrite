@@ -1,5 +1,79 @@
 # Changelog
 
+## Dendrite 0.6.3 (2022-02-10)
+
+### Features
+
+* Initial support for `m.login.token`
+* A number of regressions from earlier v0.6.x versions should now be corrected
+
+### Fixes
+
+* Missing state is now correctly retrieved in cases where a gap in the timeline was closed but some of those events were missing state snapshots, which should help to unstick slow or broken rooms
+* Fixed a transaction issue where inserting events into the database could deadlock, which should stop rooms from getting stuck
+* Fixed a problem where rejected events could result in rolled back database transactions
+* Avoided a potential race condition on fetching latest events by using the room updater instead
+* Processing events from `/get_missing_events` will no longer result in potential recursion
+* Federation events are now correctly generated for updated self-signing keys and signed devices
+* Rejected events can now be un-rejected if they are reprocessed and all of the correct conditions are met
+* Fetching missing auth events will no longer error as long as all needed events for auth were satisfied
+* Users can now correctly forget rooms if they were not a member of the room
+
+## Dendrite 0.6.2 (2022-02-04)
+
+### Fixes
+
+* Resolves an issue where the key change consumer in the keyserver could consume extreme amounts of CPU
+
+## Dendrite 0.6.1 (2022-02-04)
+
+### Features
+
+* Roomserver inputs now take place with full transactional isolation in PostgreSQL deployments
+* Pull consumers are now used instead of push consumers when retrieving messages from NATS to better guarantee ordering and to reduce redelivery of duplicate messages
+* Further logging tweaks, particularly when joining rooms
+* Improved calculation of servers in the room, when checking for missing auth/prev events or state
+* Dendrite will now skip dead servers more quickly when federating by reducing the TCP dial timeout
+* The key change consumers have now been converted to use native NATS code rather than a wrapper
+* Go 1.16 is now the minimum supported version for Dendrite
+
+### Fixes
+
+* Local clients should now be notified correctly of invites
+* The roomserver input API now has more time to process events, particularly when fetching missing events or state, which should fix a number of errors from expired contexts
+* Fixed a panic that could happen due to a closed channel in the roomserver input API
+* Logging in with uppercase usernames from old installations is now supported again (contributed by [hoernschen](https://github.com/hoernschen))
+* Federated room joins now have more time to complete and should not fail due to expired contexts
+* Events that were sent to the roomserver along with a complete state snapshot are now persisted with the correct state, even if they were rejected or soft-failed
+
+## Dendrite 0.6.0 (2022-01-28)
+
+### Features
+
+* NATS JetStream is now used instead of Kafka and Naffka
+  * For monolith deployments, a built-in NATS Server is embedded into Dendrite or a standalone NATS Server deployment can be optionally used instead
+  * For polylith deployments, a standalone NATS Server deployment is required
+  * Requires the version 2 configuration file — please see the new `dendrite-config.yaml` sample config file
+  * Kafka and Naffka are no longer supported as of this release
+* The roomserver is now responsible for fetching missing events and state instead of the federation API
+  * Removes a number of race conditions between the federation API and roomserver, which reduces duplicate work and overall lowers CPU usage
+* The roomserver input API is now strictly ordered with support for asynchronous requests, smoothing out incoming federation significantly
+* Consolidated the federation API, federation sender and signing key server into a single component
+  * If multiple databases are used, tables for the federation sender and signing key server should be merged into the federation API database (table names have not changed)
+* Device list synchronisation is now database-backed rather than using the now-removed Kafka logs
+
+### Fixes
+
+* The code for fetching missing events and state now correctly identifies when gaps in history have been closed, so federation traffic will consume less CPU and memory than before
+* The stream position is now correctly advanced when typing notifications time out in the sync API
+* Event NIDs are now correctly returned when persisting events in the roomserver in SQLite mode
+  * The built-in SQLite was updated to version 3.37.0 as a result
+* The `/event_auth` endpoint now strictly returns the auth chain for the requested event without loading the room state, which should reduce spikes in memory usage
+* Filters are now correctly sent when using federated public room directories (contributed by [S7evinK](https://github.com/S7evinK))
+* Login usernames are now squashed to lower-case (contributed by [BernardZhao](https://github.com/BernardZhao))
+* The logs should no longer be flooded with `Failed to get server ACLs for room` warnings at startup
+* Backfilling will now attempt federation as a last resort when trying to retrieve missing events from the database fails
+
 ## Dendrite 0.5.1 (2021-11-16)
 
 ### Features

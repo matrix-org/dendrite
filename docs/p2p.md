@@ -6,7 +6,7 @@ These are the instructions for setting up P2P Dendrite, current as of May 2020. 
 
 #### Build
 
-- The `master` branch has a WASM-only binary for dendrite: `./cmd/dendritejs`.
+- The `main` branch has a WASM-only binary for dendrite: `./cmd/dendritejs`.
 - Build it and copy assets to riot-web.
 ```
 $ ./build-dendritejs.sh

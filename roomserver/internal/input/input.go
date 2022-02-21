@@ -19,23 +19,38 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+)
+
+type retryAction int
+type commitAction int
+
+const (
+	doNotRetry retryAction = iota
+	retryLater
+)
+
+const (
+	commitTransaction commitAction = iota
+	rollbackTransaction
 )
 
 var keyContentFields = map[string]string{
@@ -45,6 +60,7 @@ var keyContentFields = map[string]string{
 }
 
 type Inputer struct {
+	ProcessContext       *process.ProcessContext
 	DB                   storage.Database
 	JetStream            nats.JetStreamContext
 	Durable              nats.SubOpt
@@ -101,14 +117,23 @@ func (r *Inputer) Start() error {
 				_ = msg.InProgress() // resets the acknowledgement wait timer
 				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				if err := r.processRoomEvent(context.Background(), &inputRoomEvent); err != nil {
+				action, err := r.processRoomEventUsingUpdater(r.ProcessContext.Context(), roomID, &inputRoomEvent)
+				if err != nil {
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
 					}
-				} else {
-					go hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"room_id":  roomID,
+						"event_id": inputRoomEvent.Event.EventID(),
+						"type":     inputRoomEvent.Event.Type(),
+					}).Warn("Roomserver failed to process async event")
 				}
-				_ = msg.Ack()
+				switch action {
+				case retryLater:
+					_ = msg.Nak()
+				case doNotRetry:
+					_ = msg.Ack()
+				}
 			})
 		},
 		// NATS wants to acknowledge automatically by default when the message is
@@ -123,9 +148,40 @@ func (r *Inputer) Start() error {
 		nats.DeliverAll(),
 		// Ensure that NATS doesn't try to resend us something that wasn't done
 		// within the period of time that we might still be processing it.
-		nats.AckWait(MaximumProcessingTime+(time.Second*10)),
+		nats.AckWait(MaximumMissingProcessingTime+(time.Second*10)),
 	)
 	return err
+}
+
+// processRoomEventUsingUpdater opens up a room updater and tries to
+// process the event. It returns whether or not we should positively
+// or negatively acknowledge the event (i.e. for NATS) and an error
+// if it occurred.
+func (r *Inputer) processRoomEventUsingUpdater(
+	ctx context.Context,
+	roomID string,
+	inputRoomEvent *api.InputRoomEvent,
+) (retryAction, error) {
+	roomInfo, err := r.DB.RoomInfo(ctx, roomID)
+	if err != nil {
+		return doNotRetry, fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
+	if err != nil {
+		return retryLater, fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
+	}
+	action, err := r.processRoomEvent(ctx, updater, inputRoomEvent)
+	switch action {
+	case commitTransaction:
+		if cerr := updater.Commit(); cerr != nil {
+			return retryLater, fmt.Errorf("updater.Commit: %w", cerr)
+		}
+	case rollbackTransaction:
+		if rerr := updater.Rollback(); rerr != nil {
+			return retryLater, fmt.Errorf("updater.Rollback: %w", rerr)
+		}
+	}
+	return doNotRetry, err
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
@@ -149,12 +205,15 @@ func (r *Inputer) InputRoomEvents(
 				return
 			}
 			if _, err = r.JetStream.PublishMsg(msg); err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"room_id":  roomID,
+					"event_id": e.Event.EventID(),
+				}).Error("Roomserver failed to queue async event")
 				return
 			}
 		}
 	} else {
 		responses := make(chan error, len(request.InputRoomEvents))
-		defer close(responses)
 		for _, e := range request.InputRoomEvents {
 			inputRoomEvent := e
 			roomID := inputRoomEvent.Event.RoomID()
@@ -171,13 +230,15 @@ func (r *Inputer) InputRoomEvents(
 			worker.Act(nil, func() {
 				defer eventsInProgress.Delete(index)
 				defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": roomID}).Dec()
-				err := r.processRoomEvent(ctx, &inputRoomEvent)
+				_, err := r.processRoomEventUsingUpdater(ctx, roomID, &inputRoomEvent)
 				if err != nil {
 					if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 						sentry.CaptureException(err)
 					}
-				} else {
-					go hooks.Run(hooks.KindNewEventPersisted, inputRoomEvent.Event)
+					logrus.WithError(err).WithFields(logrus.Fields{
+						"room_id":  roomID,
+						"event_id": inputRoomEvent.Event.EventID(),
+					}).Warn("Roomserver failed to process sync event")
 				}
 				select {
 				case <-ctx.Done():

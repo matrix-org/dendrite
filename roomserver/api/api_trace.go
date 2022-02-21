@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	asAPI "github.com/matrix-org/dendrite/appservice/api"
-	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	asAPI "github.com/matrix-org/dendrite/appservice/api"
+	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // RoomserverInternalAPITrace wraps a RoomserverInternalAPI and logs the
@@ -23,6 +25,10 @@ func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInte
 
 func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
 	t.Impl.SetAppserviceAPI(asAPI)
+}
+
+func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.UserInternalAPI) {
+	t.Impl.SetUserAPI(userAPI)
 }
 
 func (t *RoomserverInternalAPITrace) InputRoomEvents(
@@ -126,16 +132,6 @@ func (t *RoomserverInternalAPITrace) QueryStateAfterEvents(
 ) error {
 	err := t.Impl.QueryStateAfterEvents(ctx, req, res)
 	util.GetLogger(ctx).WithError(err).Infof("QueryStateAfterEvents req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
-func (t *RoomserverInternalAPITrace) QueryMissingAuthPrevEvents(
-	ctx context.Context,
-	req *QueryMissingAuthPrevEventsRequest,
-	res *QueryMissingAuthPrevEventsResponse,
-) error {
-	err := t.Impl.QueryMissingAuthPrevEvents(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("QueryMissingAuthPrevEvents req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

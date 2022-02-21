@@ -88,8 +88,8 @@ func Peek(
 	}
 
 	respPeek := gomatrixserverlib.RespPeek{
-		StateEvents:     gomatrixserverlib.UnwrapEventHeaders(response.StateEvents),
-		AuthEvents:      gomatrixserverlib.UnwrapEventHeaders(response.AuthChainEvents),
+		StateEvents:     gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.StateEvents),
+		AuthEvents:      gomatrixserverlib.NewEventJSONsFromHeaderedEvents(response.AuthChainEvents),
 		RoomVersion:     response.RoomVersion,
 		LatestEvent:     response.LatestEvent.Unwrap(),
 		RenewalInterval: renewalInterval,

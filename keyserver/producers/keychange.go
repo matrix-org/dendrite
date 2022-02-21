@@ -65,7 +65,7 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 		logrus.WithFields(logrus.Fields{
 			"user_id":         userID,
 			"num_key_changes": count,
-		}).Infof("Produced to key change topic '%s'", p.Topic)
+		}).Tracef("Produced to key change topic '%s'", p.Topic)
 	}
 	return nil
 }
@@ -103,6 +103,6 @@ func (p *KeyChange) ProduceSigningKeyUpdate(key eduapi.CrossSigningKeyUpdate) er
 
 	logrus.WithFields(logrus.Fields{
 		"user_id": key.UserID,
-	}).Infof("Produced to cross-signing update topic '%s'", p.Topic)
+	}).Tracef("Produced to cross-signing update topic '%s'", p.Topic)
 	return nil
 }

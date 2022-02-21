@@ -16,9 +16,12 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -40,17 +43,26 @@ type LoginTypePassword struct {
 }
 
 func (t *LoginTypePassword) Name() string {
-	return "m.login.password"
+	return authtypes.LoginTypePassword
 }
 
-func (t *LoginTypePassword) Request() interface{} {
-	return &PasswordRequest{}
+func (t *LoginTypePassword) LoginFromJSON(ctx context.Context, reqBytes []byte) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+	var r PasswordRequest
+	if err := httputil.UnmarshalJSON(reqBytes, &r); err != nil {
+		return nil, nil, err
+	}
+
+	login, err := t.Login(ctx, &r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return login, func(context.Context, *util.JSONResponse) {}, nil
 }
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	// Squash username to all lowercase letters
-	username := strings.ToLower(r.Username())
+  username := strings.ToLower(r.Username())
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -64,8 +76,15 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.InvalidUsername(err.Error()),
 		}
 	}
-	_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
+	// Squash username to all lowercase letters
+	_, err = t.GetAccountByPassword(ctx, strings.ToLower(localpart), r.Password)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			_, err = t.GetAccountByPassword(ctx, localpart, r.Password)
+			if err == nil {
+				return &r.Login, nil
+			}
+		}
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
 		return nil, &util.JSONResponse{

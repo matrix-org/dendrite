@@ -36,7 +36,7 @@ import (
 type OutputSendToDeviceEventConsumer struct {
 	ctx        context.Context
 	jetstream  nats.JetStreamContext
-	durable    nats.SubOpt
+	durable    string
 	topic      string
 	db         storage.Database
 	serverName gomatrixserverlib.ServerName // our server name
@@ -68,52 +68,52 @@ func NewOutputSendToDeviceEventConsumer(
 
 // Start consuming from EDU api
 func (s *OutputSendToDeviceEventConsumer) Start() error {
-	_, err := s.jetstream.Subscribe(s.topic, s.onMessage, s.durable)
-	return err
+	return jetstream.JetStreamConsumer(
+		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
+		nats.DeliverAll(), nats.ManualAck(),
+	)
 }
 
-func (s *OutputSendToDeviceEventConsumer) onMessage(msg *nats.Msg) {
-	jetstream.WithJetStreamMessage(msg, func(msg *nats.Msg) bool {
-		var output api.OutputSendToDeviceEvent
-		if err := json.Unmarshal(msg.Data, &output); err != nil {
-			// If the message was invalid, log it and move on to the next message in the stream
-			log.WithError(err).Errorf("EDU server output log: message parse failure")
-			sentry.CaptureException(err)
-			return true
-		}
-
-		_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
-		if err != nil {
-			sentry.CaptureException(err)
-			return true
-		}
-		if domain != s.serverName {
-			return true
-		}
-
-		util.GetLogger(context.TODO()).WithFields(log.Fields{
-			"sender":     output.Sender,
-			"user_id":    output.UserID,
-			"device_id":  output.DeviceID,
-			"event_type": output.Type,
-		}).Info("sync API received send-to-device event from EDU server")
-
-		streamPos, err := s.db.StoreNewSendForDeviceMessage(
-			s.ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,
-		)
-		if err != nil {
-			sentry.CaptureException(err)
-			log.WithError(err).Errorf("failed to store send-to-device message")
-			return false
-		}
-
-		s.stream.Advance(streamPos)
-		s.notifier.OnNewSendToDevice(
-			output.UserID,
-			[]string{output.DeviceID},
-			types.StreamingToken{SendToDevicePosition: streamPos},
-		)
-
+func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	var output api.OutputSendToDeviceEvent
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return true
-	})
+	}
+
+	_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
+	if err != nil {
+		sentry.CaptureException(err)
+		return true
+	}
+	if domain != s.serverName {
+		return true
+	}
+
+	util.GetLogger(context.TODO()).WithFields(log.Fields{
+		"sender":     output.Sender,
+		"user_id":    output.UserID,
+		"device_id":  output.DeviceID,
+		"event_type": output.Type,
+	}).Info("sync API received send-to-device event from EDU server")
+
+	streamPos, err := s.db.StoreNewSendForDeviceMessage(
+		s.ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,
+	)
+	if err != nil {
+		sentry.CaptureException(err)
+		log.WithError(err).Errorf("failed to store send-to-device message")
+		return false
+	}
+
+	s.stream.Advance(streamPos)
+	s.notifier.OnNewSendToDevice(
+		output.UserID,
+		[]string{output.DeviceID},
+		types.StreamingToken{SendToDevicePosition: streamPos},
+	)
+
+	return true
 }

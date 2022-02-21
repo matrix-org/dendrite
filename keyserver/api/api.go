@@ -228,7 +228,7 @@ type QueryKeyChangesRequest struct {
 	// The offset of the last received key event, or sarama.OffsetOldest if this is from the beginning
 	Offset int64
 	// The inclusive offset where to track key changes up to. Messages with this offset are included in the response.
-	// Use sarama.OffsetNewest if the offset is unknown (then check the response Offset to avoid racing).
+	// Use types.OffsetNewest if the offset is unknown (then check the response Offset to avoid racing).
 	ToOffset int64
 }
 

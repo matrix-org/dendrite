@@ -42,7 +42,7 @@ func NewInternalAPI(
 ) api.EDUServerInputAPI {
 	cfg := &base.Cfg.EDUServer
 
-	js, _, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,
@@ -51,7 +51,6 @@ func NewInternalAPI(
 		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
-		OutputKeyChangeEventTopic:    cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }

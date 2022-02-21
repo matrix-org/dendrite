@@ -15,14 +15,15 @@
 package userapi
 
 import (
+	"time"
+
 	"github.com/gorilla/mux"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
+	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,16 +36,24 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	accountDB accounts.Database, cfg *config.UserAPI, appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
+	accountDB storage.Database, cfg *config.UserAPI, appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 ) api.UserInternalAPI {
-	deviceDB, err := devices.NewDatabase(&cfg.DeviceDatabase, cfg.Matrix.ServerName)
+	db, err := storage.NewDatabase(&cfg.AccountDatabase, cfg.Matrix.ServerName, cfg.BCryptCost, int64(api.DefaultLoginTokenLifetime*time.Millisecond), api.DefaultLoginTokenLifetime)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to device db")
 	}
 
+	return newInternalAPI(db, cfg, appServices, keyAPI)
+}
+
+func newInternalAPI(
+	db storage.Database,
+	cfg *config.UserAPI,
+	appServices []config.ApplicationService,
+	keyAPI keyapi.KeyInternalAPI,
+) api.UserInternalAPI {
 	return &internal.UserInternalAPI{
-		AccountDB:   accountDB,
-		DeviceDB:    deviceDB,
+		DB:          db,
 		ServerName:  cfg.Matrix.ServerName,
 		AppServices: appServices,
 		KeyAPI:      keyAPI,

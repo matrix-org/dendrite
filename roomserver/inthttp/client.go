@@ -11,6 +11,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
@@ -40,7 +42,6 @@ const (
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
 	RoomserverQueryStateAfterEventsPath        = "/roomserver/queryStateAfterEvents"
-	RoomserverQueryMissingAuthPrevEventsPath   = "/roomserver/queryMissingAuthPrevEvents"
 	RoomserverQueryEventsByIDPath              = "/roomserver/queryEventsByID"
 	RoomserverQueryMembershipForUserPath       = "/roomserver/queryMembershipForUser"
 	RoomserverQueryMembershipsForRoomPath      = "/roomserver/queryMembershipsForRoom"
@@ -89,6 +90,10 @@ func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.Federation
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
 func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+}
+
+// SetUserAPI no-ops in HTTP client mode as there is no chicken/egg scenario
+func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
@@ -299,19 +304,6 @@ func (h *httpRoomserverInternalAPI) QueryStateAfterEvents(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// QueryStateAfterEvents implements RoomserverQueryAPI
-func (h *httpRoomserverInternalAPI) QueryMissingAuthPrevEvents(
-	ctx context.Context,
-	request *api.QueryMissingAuthPrevEventsRequest,
-	response *api.QueryMissingAuthPrevEventsResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMissingAuthPrevEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMissingAuthPrevEventsPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -32,7 +32,7 @@ func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	roomIDOrAlias string,
 ) util.JSONResponse {
 	// Prepare to ask the roomserver to perform the room join.

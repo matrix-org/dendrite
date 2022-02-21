@@ -279,7 +279,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	parts := strings.Split(tok[1:], "_")
 	var positions [7]StreamPosition
 	for i, p := range parts {
-		if i > len(positions) {
+		if i >= len(positions) {
 			break
 		}
 		var pos int
