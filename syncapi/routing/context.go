@@ -64,7 +64,7 @@ func Context(
 	ctx := req.Context()
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
 	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: device.UserID, RoomID: roomID}
-	if err := rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
+	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to fo membership")
 		return jsonerror.InternalServerError()
 	}
@@ -86,11 +86,12 @@ func Context(
 	state, _ := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
 	// verify the user is allowed to see the context for this room/event
 	for _, x := range state {
-		hisVis, err := x.HistoryVisibility()
+		var hisVis string
+		hisVis, err = x.HistoryVisibility()
 		if err != nil {
 			continue
 		}
-		allowed := hisVis != "world_readable" && membershipRes.Membership == "join"
+		allowed := hisVis == gomatrixserverlib.WorldReadable || membershipRes.Membership == gomatrixserverlib.Join
 		if !allowed {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
