@@ -6,10 +6,10 @@
 
 * All Client-Server API endpoints are now available under the `/v3` namespace
 * The `/whoami` response format now matches the latest Matrix spec version
-* Support added for the `/context` endpoint, which should help clients to render quote-replies properly\
+* Support added for the `/context` endpoint, which should help clients to render quote-replies correctly
 * Accounts now have an optional account type field, allowing admin accounts to be created
 * Server notices are now supported
-* Refactored the user API storage to deduplictae a significant amount of code, as well as merging both user API databases into a single database
+* Refactored the user API storage to deduplicate a significant amount of code, as well as merging both user API databases into a single database
   * The account database is now used for all user API storage and the device database is now obsolete
   * For some installations that have separate account and device databases, this may result in access tokens being revoked and client sessions being logged out — users may need to log in again
   * The above can be avoided by moving the `device_devices` table into the account database manually
