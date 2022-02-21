@@ -63,3 +63,4 @@ func AddPublicRoutes(
 		syncProducer, transactionsCache, fsAPI, keyAPI, extRoomsProvider, mscCfg,
 	)
 }
+

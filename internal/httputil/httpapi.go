@@ -53,12 +53,19 @@ type BasicAuth struct {
 	Password string `yaml:"password"`
 }
 
+type Consent bool
+
+const (
+	ConsentRequired    Consent = true
+	ConsentNotRequired Consent = false
+)
+
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
 	metricsName string,
 	userAPI userapi.UserInternalAPI,
 	userConsentCfg config.UserConsentOptions,
-	requireConsent bool,
+	requireConsent Consent,
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -87,7 +94,7 @@ func MakeAuthAPI(
 			}
 		}()
 
-		if userConsentCfg.Enabled && requireConsent {
+		if userConsentCfg.Enabled && requireConsent == ConsentRequired {
 			consentError := checkConsent(req.Context(), device.UserID, userAPI, userConsentCfg)
 			if consentError != nil {
 				return util.JSONResponse{
