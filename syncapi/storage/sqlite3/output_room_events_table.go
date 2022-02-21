@@ -29,7 +29,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -532,7 +531,6 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
-	logrus.Debugf("getting events after: %+v", filter)
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectContextAfterEventSQL,
 		[]interface{}{
@@ -542,8 +540,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		filter.Types, filter.NotTypes,
 		nil, filter.Limit, FilterOrderAsc,
 	)
-
-	logrus.Debugf("params, %+v", params)
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -564,7 +560,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		}
 		evts = append(evts, evt)
 	}
-	logrus.Debugf("returning events: %+v", evts)
 	return lastID, evts, rows.Err()
 }
 
