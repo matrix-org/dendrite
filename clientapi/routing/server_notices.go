@@ -266,32 +266,14 @@ func sendServerNotice(
 }
 
 func getAllUserRooms(ctx context.Context, rsAPI api.RoomserverInternalAPI, userID string) ([]string, error) {
-	allUserRooms := []string{}
 	userRooms := api.QueryRoomsForUserResponse{}
 	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
 		UserID:         userID,
-		WantMembership: "join",
+		WantMembership: "all",
 	}, &userRooms); err != nil {
 		return nil, err
 	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	// get invites for specified user
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         userID,
-		WantMembership: "invite",
-	}, &userRooms); err != nil {
-		return nil, err
-	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	// get left rooms for specified user
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         userID,
-		WantMembership: "leave",
-	}, &userRooms); err != nil {
-		return nil, err
-	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	return allUserRooms, nil
+	return userRooms.RoomIDs, nil
 }
 
 func (r sendServerNoticeRequest) valid() (ok bool) {

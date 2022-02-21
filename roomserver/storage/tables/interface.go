@@ -113,6 +113,7 @@ type Invites interface {
 type MembershipState int64
 
 const (
+	MemberShipStateAll        MembershipState = 0
 	MembershipStateLeaveOrBan MembershipState = 1
 	MembershipStateInvite     MembershipState = 2
 	MembershipStateJoin       MembershipState = 3

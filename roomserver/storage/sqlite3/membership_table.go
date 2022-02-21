@@ -90,6 +90,9 @@ const updateMembershipForgetRoom = "" +
 const selectRoomsWithMembershipSQL = "" +
 	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
 
+const selectRoomsForUserSQL = "" +
+	"SELECT room_nid FROM roomserver_membership WHERE target_nid = $1 and forgotten = false"
+
 // selectKnownUsersSQL uses a sub-select statement here to find rooms that the user is
 // joined to. Since this information is used to populate the user directory, we will
 // only return users that the user would ordinarily be able to see anyway.
@@ -133,6 +136,7 @@ type membershipStatements struct {
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 	selectLocalServerInRoomStmt                     *sql.Stmt
 	selectServerInRoomStmt                          *sql.Stmt
+	selectRoomsForUserStmt                          *sql.Stmt
 }
 
 func createMembershipTable(db *sql.DB) error {
@@ -159,6 +163,7 @@ func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 		{&s.selectLocalServerInRoomStmt, selectLocalServerInRoomSQL},
 		{&s.selectServerInRoomStmt, selectServerInRoomSQL},
+		{&s.selectRoomsForUserStmt, selectRoomsForUserSQL},
 	}.Prepare(db)
 }
 
@@ -263,8 +268,19 @@ func (s *membershipStatements) UpdateMembership(
 func (s *membershipStatements) SelectRoomsWithMembership(
 	ctx context.Context, txn *sql.Tx, userID types.EventStateKeyNID, membershipState tables.MembershipState,
 ) ([]types.RoomNID, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, membershipState, userID)
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	if membershipState == tables.MemberShipStateAll {
+		stmt := sqlutil.TxStmt(txn, s.selectRoomsForUserStmt)
+		rows, err = stmt.QueryContext(ctx, userID)
+	} else {
+		stmt := sqlutil.TxStmt(txn, s.selectMembershipsFromRoomStmt)
+		rows, err = stmt.QueryContext(ctx, membershipState, userID)
+	}
+
 	if err != nil {
 		return nil, err
 	}
