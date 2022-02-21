@@ -42,12 +42,12 @@ type Rule struct {
 
 	// Conditions provide the rule's conditions for OverrideKind and
 	// UnderrideKind. Not allowed for other kinds.
-	Conditions []*Condition `json:"conditions,omitempty"`
+	Conditions []*Condition `json:"conditions"`
 
 	// Pattern is the body pattern to match for ContentKind. Required
 	// for that kind. The interpretation is the same as that of
 	// Condition.Pattern.
-	Pattern string `json:"pattern,omitempty"`
+	Pattern string `json:"pattern"`
 }
 
 // Scope only has one valid value. See also AccountRuleSets.

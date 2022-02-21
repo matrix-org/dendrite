@@ -749,6 +749,8 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 		if err := a.DB.SaveAccountData(ctx, localpart, "", pushRulesAccountDataType, json.RawMessage(prbs)); err != nil {
 			return fmt.Errorf("failed to save default push rules: %w", err)
 		}
+		res.RuleSets = pushRuleSets
+		return nil
 	}
 	var data pushrules.AccountRuleSets
 	if err := json.Unmarshal([]byte(bs), &data); err != nil {

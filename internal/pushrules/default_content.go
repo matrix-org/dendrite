@@ -26,6 +26,7 @@ func mRuleContainsUserNameDefinition(localpart string) *Rule {
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
+				Value: true,
 			},
 		},
 	}

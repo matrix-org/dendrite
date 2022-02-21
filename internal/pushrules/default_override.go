@@ -71,6 +71,7 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
+				Value: true,
 			},
 		},
 	}
@@ -95,6 +96,7 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
+				Value: false,
 			},
 		},
 	}
@@ -118,6 +120,7 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
+				Value: false,
 			},
 		},
 	}
@@ -155,6 +158,7 @@ func mRuleInviteForMeDefinition(userID string) *Rule {
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
+				Value: false,
 			},
 		},
 	}

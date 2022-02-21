@@ -16,7 +16,7 @@ type Action struct {
 	Tweak TweakKey `json:"-"`
 
 	// Value is some value interpreted according to Kind and Tweak.
-	Value interface{} `json:"value,omitempty"`
+	Value interface{} `json:"value"`
 }
 
 func (a *Action) MarshalJSON() ([]byte, error) {
