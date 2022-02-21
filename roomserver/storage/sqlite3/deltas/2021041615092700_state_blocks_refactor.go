@@ -179,7 +179,17 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		return fmt.Errorf("assertion query failed: %s", err)
 	}
 	if count > 0 {
-		return fmt.Errorf("%d events exist in roomserver_events which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
+		var res sql.Result
+		var c int64
+		res, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, oldMaxSnapshotID)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("failed to reset invalid state snapshots: %w", err)
+		}
+		if c, err = res.RowsAffected(); err != nil {
+			return fmt.Errorf("failed to get row count for invalid state snapshots updated: %w", err)
+		} else if c != count {
+			return fmt.Errorf("expected to reset %d event(s) but only updated %d event(s)", count, c)
+		}
 	}
 	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, oldMaxSnapshotID).Scan(&count); err != nil {
 		return fmt.Errorf("assertion query failed: %s", err)
