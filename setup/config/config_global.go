@@ -266,9 +266,9 @@ type UserConsentOptions struct {
 	// The error message to display if the user hasn't given their consent yet
 	BlockEventsError string `yaml:"block_events_error"`
 	// All loaded templates
-	Templates           *template.Template     `yaml:"-"`
-	BlockEventsTemplate *textTemplate.Template `yaml:"-"`
-	//
+	Templates     *template.Template     `yaml:"-"`
+	TextTemplates *textTemplate.Template `yaml:"-"`
+	// The BaseURL, used for building the consent URL
 	BaseURL string `yaml:"-"`
 }
 
@@ -298,7 +298,8 @@ func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool)
 			return
 		}
 
-		c.BlockEventsTemplate = textTemplate.Must(textTemplate.New("blockEventsError").Parse(c.BlockEventsError))
+		c.TextTemplates = textTemplate.Must(textTemplate.New("blockEventsError").Parse(c.BlockEventsError))
+		c.TextTemplates = textTemplate.Must(c.TextTemplates.New("serverNoticeTemplate").Parse(c.ServerNoticeContent.Body))
 
 		// Read all defined *.gohtml templates
 		t, err := template.ParseGlob(filepath.Join(p, "*.gohtml"))

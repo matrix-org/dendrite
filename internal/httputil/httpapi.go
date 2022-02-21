@@ -134,7 +134,7 @@ func checkConsent(ctx context.Context, userID string, userAPI userapi.UserIntern
 		}{
 			ConsentURL: uri,
 		}
-		if err = userConsentCfg.BlockEventsTemplate.ExecuteTemplate(msg, "blockEventsError", c); err != nil {
+		if err = userConsentCfg.TextTemplates.ExecuteTemplate(msg, "blockEventsError", c); err != nil {
 			logrus.Infof("error consent message: %+v", err)
 			return jsonerror.Unknown("unable to get consent URL")
 		}

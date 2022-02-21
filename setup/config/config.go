@@ -288,7 +288,7 @@ func (config *Dendrite) Derive() error {
 	// TODO: Add email auth type
 	// TODO: Add MSISDN auth type
 
-	if config.Global.UserConsentOptions.RequireAtRegistration {
+	if config.Global.UserConsentOptions.Enabled && config.Global.UserConsentOptions.RequireAtRegistration {
 		uri := config.Global.BaseURL + "/_matrix/consent?v=" + config.Global.UserConsentOptions.Version
 		config.Derived.Registration.Params[authtypes.LoginTypeTerms] = Terms{
 			Policies: Policies{
@@ -314,7 +314,7 @@ func (config *Dendrite) Derive() error {
 
 	// prepend each flow with LoginTypeTerms or LoginTypeRecaptcha
 	for i, flow := range config.Derived.Registration.Flows {
-		if config.Global.UserConsentOptions.RequireAtRegistration {
+		if config.Global.UserConsentOptions.Enabled && config.Global.UserConsentOptions.RequireAtRegistration {
 			flow.Stages = append([]authtypes.LoginType{authtypes.LoginTypeTerms}, flow.Stages...)
 		}
 		if config.ClientAPI.RecaptchaEnabled {
