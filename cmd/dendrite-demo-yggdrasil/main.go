@@ -21,7 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
@@ -42,8 +45,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/userapi"
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -63,33 +64,42 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	/*
-		ygg.SetMulticastEnabled(true)
-		if instancePeer != nil && *instancePeer != "" {
-			if err = ygg.SetStaticPeer(*instancePeer); err != nil {
-				logrus.WithError(err).Error("Failed to set static peer")
-			}
+
+	// iterate through the cli args and check if the config flag was set
+	configFlagSet := false
+	for _, arg := range os.Args {
+		if arg == "--config" || arg == "-config" {
+			configFlagSet = true
+			break
 		}
-	*/
+	}
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+
+	// use custom config if config flag is set
+	if configFlagSet {
+		cfg = setup.ParseFlags(true)
+	} else {
+		cfg.Defaults(true)
+		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
+		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
+		cfg.MSCs.MSCs = []string{"msc2836"}
+		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
+		if err = cfg.Derive(); err != nil {
+			panic(err)
+		}
+	}
+
+	// always override ServerName, PrivateKey and KeyID
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Global.PrivateKey = ygg.PrivateKey()
-	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
-	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.MSCs.MSCs = []string{"msc2836"}
-	cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
-	if err = cfg.Derive(); err != nil {
-		panic(err)
-	}
+	cfg.Global.KeyID = signing.KeyID
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
