@@ -101,7 +101,7 @@ var (
 				Pattern: "m.room.message",
 			},
 		},
-		Actions: []*Action{{Kind: DontNotifyAction}},
+		Actions: []*Action{{Kind: NotifyAction}},
 	}
 	mRuleEncryptedDefinition = Rule{
 		RuleID:  MRuleEncrypted,
@@ -114,6 +114,6 @@ var (
 				Pattern: "m.room.encrypted",
 			},
 		},
-		Actions: []*Action{{Kind: DontNotifyAction}},
+		Actions: []*Action{{Kind: NotifyAction}},
 	}
 )

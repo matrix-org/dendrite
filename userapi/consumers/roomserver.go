@@ -115,7 +115,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
 	if err != nil {
-		return err
+		return fmt.Errorf("s.localRoomMembers: %w", err)
 	}
 
 	if event.Type() == gomatrixserverlib.MRoomMember {
@@ -123,7 +123,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
 		if err != nil {
-			return err
+			return fmt.Errorf("newLocalMembership: %w", err)
 		}
 		if member.Membership == gomatrixserverlib.Invite && member.Domain == s.cfg.Matrix.ServerName {
 			// localRoomMembers only adds joined members. An invite
@@ -135,7 +135,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 	// TODO: run in parallel with localRoomMembers.
 	roomName, err := s.roomName(ctx, event)
 	if err != nil {
-		return err
+		return fmt.Errorf("s.roomName: %w", err)
 	}
 
 	log.WithFields(log.Fields{
@@ -251,7 +251,7 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixs
 	var res rsapi.QueryCurrentStateResponse
 
 	if err := s.rsAPI.QueryCurrentState(ctx, req, &res); err != nil {
-		return "", err
+		return "", nil
 	}
 
 	if eventS := res.StateEvents[roomNameTuple]; eventS != nil {
@@ -269,7 +269,7 @@ func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixs
 		}
 	}
 
-	if event := res.StateEvents[canonicalAliasTuple]; event != nil {
+	if event = res.StateEvents[canonicalAliasTuple]; event != nil {
 		return unmarshalCanonicalAlias(event)
 	}
 
@@ -465,7 +465,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 	req := &rsapi.QueryLatestEventsAndStateRequest{
 		RoomID: rse.roomID,
 		StateToFetch: []gomatrixserverlib.StateKeyTuple{
-			{EventType: "m.room.power_levels"},
+			{EventType: gomatrixserverlib.MRoomPowerLevels},
 		},
 	}
 	var res rsapi.QueryLatestEventsAndStateResponse
@@ -513,6 +513,13 @@ func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpar
 
 // notifyHTTP performs a notificatation to a Push Gateway.
 func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
+	logger := log.WithFields(log.Fields{
+		"event_id":    event.EventID(),
+		"url":         url,
+		"localpart":   localpart,
+		"num_devices": len(devices),
+	})
+
 	var req pushgateway.NotifyRequest
 	switch format {
 	case "event_id_only":
@@ -549,26 +556,12 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatri
 		}
 	}
 
-	log.WithFields(log.Fields{
-		"event_id":    event.EventID(),
-		"url":         url,
-		"localpart":   localpart,
-		"app_id0":     devices[0].AppID,
-		"pushkey":     devices[0].PushKey,
-		"num_devices": len(devices),
-	}).Debugf("Notifying HTTP push gateway")
-
+	logger.Debugf("Notifying HTTP push gateway")
 	var res pushgateway.NotifyResponse
 	if err := s.pgClient.Notify(ctx, url, &req, &res); err != nil {
 		return nil, err
 	}
-
-	log.WithFields(log.Fields{
-		"event_id":     event.EventID(),
-		"url":          url,
-		"localpart":    localpart,
-		"num_rejected": len(res.Rejected),
-	}).Tracef("HTTP push gateway result")
+	logger.WithField("num_rejected", len(res.Rejected)).Tracef("HTTP push gateway result")
 
 	if len(res.Rejected) == 0 {
 		return nil, nil
