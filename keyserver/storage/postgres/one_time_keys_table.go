@@ -59,6 +59,9 @@ const deleteOneTimeKeySQL = "" +
 const selectKeyByAlgorithmSQL = "" +
 	"SELECT key_id, key_json FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 LIMIT 1"
 
+const deleteOneTimeKeysSQL = "" +
+	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2"
+
 type oneTimeKeysStatements struct {
 	db                       *sql.DB
 	upsertKeysStmt           *sql.Stmt
@@ -66,6 +69,7 @@ type oneTimeKeysStatements struct {
 	selectKeysCountStmt      *sql.Stmt
 	selectKeyByAlgorithmStmt *sql.Stmt
 	deleteOneTimeKeyStmt     *sql.Stmt
+	deleteOneTimeKeysStmt    *sql.Stmt
 }
 
 func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
@@ -89,6 +93,9 @@ func NewPostgresOneTimeKeysTable(db *sql.DB) (tables.OneTimeKeys, error) {
 		return nil, err
 	}
 	if s.deleteOneTimeKeyStmt, err = db.Prepare(deleteOneTimeKeySQL); err != nil {
+		return nil, err
+	}
+	if s.deleteOneTimeKeysStmt, err = db.Prepare(deleteOneTimeKeysSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -186,4 +193,9 @@ func (s *oneTimeKeysStatements) SelectAndDeleteOneTimeKey(
 	return map[string]json.RawMessage{
 		algorithm + ":" + keyID: json.RawMessage(keyJSON),
 	}, err
+}
+
+func (s *oneTimeKeysStatements) DeleteOneTimeKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error {
+	_, err := sqlutil.TxStmt(txn, s.deleteOneTimeKeysStmt).ExecContext(ctx, userID, deviceID)
+	return err
 }
