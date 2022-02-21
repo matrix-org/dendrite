@@ -1,16 +1,16 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <title>Matrix.org Privacy policy</title>
+    <title>Privacy policy</title>
 </head>
 <body>
 {{ if .HasConsented }}
     <p>
-        Your base already belong to us.
+        You have already given your consent.
     </p>
 {{ else }}
     <p>
-        All your base are belong to us.
+        Please give your consent to keep using this homeserver.
     </p>
     {{ if not .PublicVersion }}
         <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->

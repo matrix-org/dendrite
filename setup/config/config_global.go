@@ -16,9 +16,6 @@ type Global struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 
-	// The base URL this homeserver will server clients on, e.g. https://matrix.org
-	BaseURL string `yaml:"base_url"`
-
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
 
@@ -75,7 +72,6 @@ type Global struct {
 func (c *Global) Defaults(generate bool) {
 	if generate {
 		c.ServerName = "localhost"
-		c.BaseURL = "http://localhost"
 		c.PrivateKeyPath = "matrix_key.pem"
 		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 		c.KeyID = "ed25519:auto"
@@ -86,7 +82,7 @@ func (c *Global) Defaults(generate bool) {
 	c.Metrics.Defaults(generate)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
-	c.UserConsentOptions.Defaults(c.BaseURL)
+	c.UserConsentOptions.Defaults()
 	c.ServerNotices.Defaults(generate)
 }
 
@@ -268,18 +264,18 @@ type UserConsentOptions struct {
 	// All loaded templates
 	Templates     *template.Template     `yaml:"-"`
 	TextTemplates *textTemplate.Template `yaml:"-"`
-	// The BaseURL, used for building the consent URL
-	BaseURL string `yaml:"-"`
+	// The base URL this homeserver will serve clients on, e.g. https://matrix.org
+	BaseURL string `yaml:"base_url"`
 }
 
-func (c *UserConsentOptions) Defaults(baseURL string) {
+func (c *UserConsentOptions) Defaults() {
 	c.Enabled = false
 	c.RequireAtRegistration = false
 	c.SendServerNoticeToGuest = false
 	c.PolicyName = "Privacy Policy"
 	c.Version = "1.0"
 	c.TemplateDir = "./templates/privacy"
-	c.BaseURL = baseURL
+	c.BaseURL = "http://localhost"
 }
 
 func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool) {

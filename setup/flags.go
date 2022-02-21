@@ -43,8 +43,6 @@ func ParseFlags(monolith bool) *config.Dendrite {
 	}
 
 	cfg, err := config.Load(*configPath, monolith)
-	// TODO: just for testing
-	cfg.Global.UserConsentOptions.BaseURL = cfg.Global.BaseURL
 	if err != nil {
 		logrus.Fatalf("Invalid config file: %s", err)
 	}
