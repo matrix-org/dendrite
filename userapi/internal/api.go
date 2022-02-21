@@ -57,17 +57,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
-	acc, err := a.DB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.AccountType)
-	if req.AccountType == api.AccountTypeGuest {
-		acc, err := a.AccountDB.CreateGuestAccount(ctx)
-		if err != nil {
-			return err
-		}
-		res.AccountCreated = true
-		res.Account = acc
-		return nil
-	}
-	acc, err := a.AccountDB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.PolicyVersion)
+	acc, err := a.DB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.PolicyVersion, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
 			switch req.OnConflict {
@@ -612,7 +602,7 @@ func (a *UserInternalAPI) QueryPolicyVersion(
 	res *api.QueryPolicyVersionResponse,
 ) error {
 	var err error
-	res.PolicyVersion, err = a.AccountDB.GetPrivacyPolicy(ctx, req.LocalPart)
+	res.PolicyVersion, err = a.DB.GetPrivacyPolicy(ctx, req.LocalPart)
 	if err != nil {
 		return err
 	}
@@ -626,7 +616,7 @@ func (a *UserInternalAPI) GetOutdatedPolicy(
 	res *api.QueryOutdatedPolicyUsersResponse,
 ) error {
 	var err error
-	res.OutdatedUsers, err = a.AccountDB.GetOutdatedPolicy(ctx, req.PolicyVersion)
+	res.OutdatedUsers, err = a.DB.GetOutdatedPolicy(ctx, req.PolicyVersion)
 	if err != nil {
 		return err
 	}
@@ -639,5 +629,5 @@ func (a *UserInternalAPI) PerformUpdatePolicyVersion(
 	req *api.UpdatePolicyVersionRequest,
 	res *api.UpdatePolicyVersionResponse,
 ) error {
-	return a.AccountDB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.LocalPart)
+	return a.DB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.LocalPart)
 }

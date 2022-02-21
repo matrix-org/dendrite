@@ -199,7 +199,7 @@ func (s *accountsStatements) SelectNewNumericLocalpart(
 
 // selectPrivacyPolicy gets the current privacy policy a specific user accepted
 
-func (s *accountsStatements) selectPrivacyPolicy(
+func (s *accountsStatements) SelectPrivacyPolicy(
 	ctx context.Context, txn *sql.Tx, localPart string,
 ) (policy string, err error) {
 	stmt := s.selectPrivacyPolicyStmt
@@ -211,7 +211,7 @@ func (s *accountsStatements) selectPrivacyPolicy(
 }
 
 // batchSelectPrivacyPolicy queries all users which didn't accept the current policy version
-func (s *accountsStatements) batchSelectPrivacyPolicy(
+func (s *accountsStatements) BatchSelectPrivacyPolicy(
 	ctx context.Context, txn *sql.Tx, policyVersion string,
 ) (userIDs []string, err error) {
 	stmt := s.batchSelectPrivacyPolicyStmt
@@ -231,7 +231,7 @@ func (s *accountsStatements) batchSelectPrivacyPolicy(
 }
 
 // updatePolicyVersion sets the policy_version for a specific user
-func (s *accountsStatements) updatePolicyVersion(
+func (s *accountsStatements) UpdatePolicyVersion(
 	ctx context.Context, txn *sql.Tx, policyVersion, localpart string,
 ) (err error) {
 	stmt := s.updatePolicyVersionStmt

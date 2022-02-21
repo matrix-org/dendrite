@@ -30,12 +30,16 @@ type AccountDataTable interface {
 }
 
 type AccountsTable interface {
-	InsertAccount(ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string, accountType api.AccountType) (*api.Account, error)
+	InsertAccount(ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID, policyVersion string, accountType api.AccountType) (*api.Account, error)
 	UpdatePassword(ctx context.Context, localpart, passwordHash string) (err error)
 	DeactivateAccount(ctx context.Context, localpart string) (err error)
 	SelectPasswordHash(ctx context.Context, localpart string) (hash string, err error)
 	SelectAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 	SelectNewNumericLocalpart(ctx context.Context, txn *sql.Tx) (id int64, err error)
+
+	SelectPrivacyPolicy(ctx context.Context, txn *sql.Tx, localPart string) (policy string, err error)
+	BatchSelectPrivacyPolicy(ctx context.Context, txn *sql.Tx, policyVersion string) (userIDs []string, err error)
+	UpdatePolicyVersion(ctx context.Context, txn *sql.Tx, policyVersion, localpart string) (err error)
 }
 
 type DevicesTable interface {
