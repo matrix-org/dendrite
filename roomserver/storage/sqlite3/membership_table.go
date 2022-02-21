@@ -277,7 +277,7 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 		stmt := sqlutil.TxStmt(txn, s.selectRoomsForUserStmt)
 		rows, err = stmt.QueryContext(ctx, userID)
 	} else {
-		stmt := sqlutil.TxStmt(txn, s.selectMembershipsFromRoomStmt)
+		stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
 		rows, err = stmt.QueryContext(ctx, membershipState, userID)
 	}
 
