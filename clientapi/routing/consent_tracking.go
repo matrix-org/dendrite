@@ -1,14 +1,20 @@
 package routing
 
 import (
+	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 
+	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -102,6 +108,86 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 		return nil
 	}
 	return &util.JSONResponse{Code: http.StatusOK}
+}
+
+func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.RoomserverInternalAPI,
+	cfgNotices *config.ServerNotices,
+	cfgClient *config.ClientAPI,
+	senderDevice *userapi.Device,
+	accountsDB userdb.Database,
+	asAPI appserviceAPI.AppServiceQueryAPI,
+) {
+	logrus.Infof("Sending server notice to users who have not yet accepted the policy")
+	res := &userapi.QueryOutdatedPolicyUsersResponse{}
+	if err := userAPI.GetOutdatedPolicy(context.Background(), &userapi.QueryOutdatedPolicyUsersRequest{
+		PolicyVersion: cfgClient.Matrix.UserConsentOptions.Version,
+	}, res); err != nil {
+		logrus.WithError(err).Error("unable to fetch users with outdated consent policy")
+		return
+	}
+
+	consentOpts := cfgClient.Matrix.UserConsentOptions
+	data := make(map[string]string)
+	var err error
+	sentMessages := 0
+	for _, userID := range res.OutdatedUsers {
+		if userID == cfgClient.Matrix.ServerNotices.LocalPart {
+			continue
+		}
+		userID = fmt.Sprintf("@%s:%s", userID, cfgClient.Matrix.ServerName)
+		data["ConsentURL"], err = buildConsentURI(cfgClient, userID)
+		if err != nil {
+			logrus.WithError(err).WithField("userID", userID).Error("unable to construct consentURI")
+			continue
+		}
+		logrus.Debugf("sending message to %s", userID)
+		msgBody := &bytes.Buffer{}
+
+		if err = consentOpts.TextTemplates.ExecuteTemplate(msgBody, "serverNoticeTemplate", data); err != nil {
+			logrus.WithError(err).WithField("userID", userID).Error("unable to execute serverNoticeTemplate")
+			continue
+		}
+
+		req := sendServerNoticeRequest{
+			UserID: userID,
+			Content: struct {
+				MsgType string `json:"msgtype,omitempty"`
+				Body    string `json:"body,omitempty"`
+			}{
+				MsgType: consentOpts.ServerNoticeContent.MsgType,
+				Body:    msgBody.String(),
+			},
+		}
+		_, err = sendServerNotice(context.Background(), req, rsAPI, cfgNotices, cfgClient, senderDevice, accountsDB, asAPI, userAPI, nil, nil, nil)
+		if err != nil {
+			logrus.WithError(err).WithField("userID", userID).Error("failed to send server notice for consent to user")
+			continue
+		}
+		sentMessages++
+		res := &userapi.UpdatePolicyVersionResponse{}
+		if err = userAPI.PerformUpdatePolicyVersion(context.Background(), &userapi.UpdatePolicyVersionRequest{
+			PolicyVersion:      consentOpts.Version,
+			LocalPart:          userID,
+			ServerNoticeUpdate: true,
+		}, res); err != nil {
+			logrus.WithError(err).WithField("userID", userID).Error("failed to update policy version")
+			continue
+		}
+	}
+	logrus.Infof("Send messages to %d users", sentMessages)
+}
+
+func buildConsentURI(cfgClient *config.ClientAPI, userID string) (string, error) {
+	consentOpts := cfgClient.Matrix.UserConsentOptions
+
+	mac := hmac.New(sha256.New, []byte(consentOpts.FormSecret))
+	_, err := mac.Write([]byte(userID))
+	if err != nil {
+		return "", err
+	}
+	userMAC := mac.Sum(nil)
+
+	return fmt.Sprintf("%s/_matrix/consent?u=%s&h=%s&v=%s", consentOpts.BaseURL, userID, userMAC, consentOpts.Version), nil
 }
 
 func validHMAC(username, userHMAC, secret string) (bool, error) {

@@ -119,9 +119,13 @@ func Setup(
 	}
 
 	// server notifications
+	var (
+		serverNotificationSender *userapi.Device
+		err                      error
+	)
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, accountDB, cfg)
+		serverNotificationSender, err = getSenderDevice(context.Background(), userAPI, accountDB, cfg)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
 		}
@@ -172,6 +176,12 @@ func Setup(
 
 	// unspecced consent tracking
 	if cfg.Matrix.UserConsentOptions.Enabled {
+		if !cfg.Matrix.ServerNotices.Enabled {
+			logrus.Warnf("Consent tracking is enabled, but server notes are not. No server notice will be sent to users")
+		} else {
+			// start a new go routine to send messages about consent
+			go sendServerNoticeForConsent(userAPI, rsAPI, &cfg.Matrix.ServerNotices, cfg, serverNotificationSender, accountDB, asAPI)
+		}
 		consentAPIMux.Handle("/consent",
 			httputil.MakeHTMLAPI("consent", func(writer http.ResponseWriter, request *http.Request) *util.JSONResponse {
 				return consent(writer, request, userAPI, cfg)

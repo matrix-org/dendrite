@@ -85,41 +85,38 @@ func SendServerNotice(
 	if resErr != nil {
 		return *resErr
 	}
+	res, _ := sendServerNotice(ctx, r, rsAPI, cfgNotices, cfgClient, senderDevice, accountsDB, asAPI, userAPI, txnID, device, txnCache)
+	return res
+}
+
+func sendServerNotice(
+	ctx context.Context,
+	serverNoticeRequest sendServerNoticeRequest,
+	rsAPI api.RoomserverInternalAPI,
+	cfgNotices *config.ServerNotices,
+	cfgClient *config.ClientAPI,
+	senderDevice *userapi.Device,
+	accountsDB userdb.Database,
+	asAPI appserviceAPI.AppServiceQueryAPI,
+	userAPI userapi.UserInternalAPI,
+	txnID *string,
+	device *userapi.Device,
+	txnCache *transactions.Cache,
+) (util.JSONResponse, error) {
 
 	// check that all required fields are set
-	if !r.valid() {
+	if !serverNoticeRequest.valid() {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
-		}
+		}, nil
 	}
 
 	// get rooms for specified user
-	allUserRooms := []string{}
-	userRooms := api.QueryRoomsForUserResponse{}
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         r.UserID,
-		WantMembership: "join",
-	}, &userRooms); err != nil {
-		return util.ErrorResponse(err)
+	allUserRooms, err := getAllUserRooms(ctx, rsAPI, serverNoticeRequest.UserID)
+	if err != nil {
+		return util.ErrorResponse(err), nil
 	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	// get invites for specified user
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         r.UserID,
-		WantMembership: "invite",
-	}, &userRooms); err != nil {
-		return util.ErrorResponse(err)
-	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	// get left rooms for specified user
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         r.UserID,
-		WantMembership: "leave",
-	}, &userRooms); err != nil {
-		return util.ErrorResponse(err)
-	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
 
 	// get rooms of the sender
 	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
@@ -128,7 +125,7 @@ func SendServerNotice(
 		UserID:         senderUserID,
 		WantMembership: "join",
 	}, &senderRooms); err != nil {
-		return util.ErrorResponse(err)
+		return util.ErrorResponse(err), nil
 	}
 
 	// check if we have rooms in common
@@ -142,7 +139,7 @@ func SendServerNotice(
 	}
 
 	if len(commonRooms) > 1 {
-		return util.ErrorResponse(fmt.Errorf("expected to find one room, but got %d", len(commonRooms)))
+		return util.ErrorResponse(fmt.Errorf("expected to find one room, but got %d", len(commonRooms))), nil
 	}
 
 	var (
@@ -153,19 +150,19 @@ func SendServerNotice(
 	// create a new room for the user
 	if len(commonRooms) == 0 {
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
-		powerLevelContent.Users[r.UserID] = -10 // taken from Synapse
+		powerLevelContent.Users[serverNoticeRequest.UserID] = -10 // taken from Synapse
 		pl, err := json.Marshal(powerLevelContent)
 		if err != nil {
-			return util.ErrorResponse(err)
+			return util.ErrorResponse(err), nil
 		}
 		createContent := map[string]interface{}{}
 		createContent["m.federate"] = false
 		cc, err := json.Marshal(createContent)
 		if err != nil {
-			return util.ErrorResponse(err)
+			return util.ErrorResponse(err), nil
 		}
 		crReq := createRoomRequest{
-			Invite:                    []string{r.UserID},
+			Invite:                    []string{serverNoticeRequest.UserID},
 			Name:                      cfgNotices.RoomName,
 			Visibility:                "private",
 			Preset:                    presetPrivateChat,
@@ -187,36 +184,35 @@ func SendServerNotice(
 					Order: 1.0,
 				},
 			}}
-			if err = saveTagData(req, r.UserID, roomID, userAPI, serverAlertTag); err != nil {
+			if err = saveTagData(ctx, serverNoticeRequest.UserID, roomID, userAPI, serverAlertTag); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
-				return jsonerror.InternalServerError()
+				return jsonerror.InternalServerError(), nil
 			}
 
 		default:
 			// if we didn't get a createRoomResponse, we probably received an error, so return that.
-			return roomRes
+			return roomRes, nil
 		}
 
 	} else {
-		// we've found a room in common, check the membership
 		roomID = commonRooms[0]
 		// re-invite the user
-		res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+		res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
 		if err != nil {
-			return res
+			return res, nil
 		}
 	}
 
 	startedGeneratingEvent := time.Now()
 
 	request := map[string]interface{}{
-		"body":    r.Content.Body,
-		"msgtype": r.Content.MsgType,
+		"body":    serverNoticeRequest.Content.Body,
+		"msgtype": serverNoticeRequest.Content.MsgType,
 	}
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
-		return *resErr
+		return *resErr, nil
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
 
@@ -243,7 +239,7 @@ func SendServerNotice(
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+		return jsonerror.InternalServerError(), nil
 	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
@@ -266,7 +262,36 @@ func SendServerNotice(
 	sendEventDuration.With(prometheus.Labels{"action": "build"}).Observe(float64(timeToGenerateEvent.Milliseconds()))
 	sendEventDuration.With(prometheus.Labels{"action": "submit"}).Observe(float64(timeToSubmitEvent.Milliseconds()))
 
-	return res
+	return res, nil
+}
+
+func getAllUserRooms(ctx context.Context, rsAPI api.RoomserverInternalAPI, userID string) ([]string, error) {
+	allUserRooms := []string{}
+	userRooms := api.QueryRoomsForUserResponse{}
+	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
+		UserID:         userID,
+		WantMembership: "join",
+	}, &userRooms); err != nil {
+		return nil, err
+	}
+	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
+	// get invites for specified user
+	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
+		UserID:         userID,
+		WantMembership: "invite",
+	}, &userRooms); err != nil {
+		return nil, err
+	}
+	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
+	// get left rooms for specified user
+	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
+		UserID:         userID,
+		WantMembership: "leave",
+	}, &userRooms); err != nil {
+		return nil, err
+	}
+	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
+	return allUserRooms, nil
 }
 
 func (r sendServerNoticeRequest) valid() (ok bool) {

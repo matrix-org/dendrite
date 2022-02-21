@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -93,7 +94,7 @@ func PutTag(
 	}
 	tagContent.Tags[tag] = properties
 
-	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
+	if err = saveTagData(req.Context(), userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return jsonerror.InternalServerError()
 	}
@@ -145,7 +146,7 @@ func DeleteTag(
 		}
 	}
 
-	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
+	if err = saveTagData(req.Context(), userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return jsonerror.InternalServerError()
 	}
@@ -191,7 +192,7 @@ func obtainSavedTags(
 
 // saveTagData saves the provided tag data into the database
 func saveTagData(
-	req *http.Request,
+	context context.Context,
 	userID string,
 	roomID string,
 	userAPI api.UserInternalAPI,
@@ -208,5 +209,5 @@ func saveTagData(
 		AccountData: json.RawMessage(newTagData),
 	}
 	dataRes := api.InputAccountDataResponse{}
-	return userAPI.InputAccountData(req.Context(), &dataReq, &dataRes)
+	return userAPI.InputAccountData(context, &dataReq, &dataRes)
 }
