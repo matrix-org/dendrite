@@ -139,7 +139,7 @@ type Database interface {
 	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error)
 
 	SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
-	SelectContextBeforeEvent(ctx context.Context, id int, roomID string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error)
-	SelectContextAfterEvent(ctx context.Context, id int, roomID string, limit int) (int, []*gomatrixserverlib.HeaderedEvent, error)
+	SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
 	SelectEventIDsAfter(ctx context.Context, roomID string, id int) ([]string, error)
 }

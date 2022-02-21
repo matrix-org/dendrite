@@ -30,11 +30,11 @@ import (
 )
 
 type ContextRespsonse struct {
-	End          string                          `json:"end,omitempty"`
+	End          string                          `json:"end"`
 	Event        gomatrixserverlib.ClientEvent   `json:"event"`
 	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after,omitempty"`
 	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before,omitempty"`
-	Start        string                          `json:"start,omitempty"`
+	Start        string                          `json:"start"`
 	State        []gomatrixserverlib.ClientEvent `json:"state"`
 }
 
@@ -70,7 +70,7 @@ func Context(
 	}
 
 	stateFilter := gomatrixserverlib.StateFilter{
-		Limit:                   filter.Limit,
+		Limit:                   100,
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,
@@ -104,13 +104,13 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, roomID, filter.Limit/2)
+	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch before events")
 		return jsonerror.InternalServerError()
 	}
 
-	_, eventsAfter, err := syncDB.SelectContextAfterEvent(ctx, id, roomID, filter.Limit/2)
+	_, eventsAfter, err := syncDB.SelectContextAfterEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch after events")
 		return jsonerror.InternalServerError()
@@ -121,12 +121,14 @@ func Context(
 	newState := applyLazyLoadMembers(filter, eventsAfterClient, eventsBeforeClient, state)
 
 	response := ContextRespsonse{
-		End:          "end",
 		Event:        gomatrixserverlib.HeaderedToClientEvent(&requestedEvent, gomatrixserverlib.FormatAll),
 		EventsAfter:  eventsAfterClient,
 		EventsBefore: eventsBeforeClient,
-		Start:        "start",
 		State:        gomatrixserverlib.HeaderedToClientEvents(newState, gomatrixserverlib.FormatAll),
+	}
+
+	if len(response.State) > filter.Limit {
+		response.State = response.State[len(response.State)-filter.Limit:]
 	}
 
 	return util.JSONResponse{
@@ -139,7 +141,7 @@ func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter
 	if filter == nil || !filter.LazyLoadMembers {
 		return state
 	}
-	allEvents := append(eventsAfter, eventsBefore...)
+	allEvents := append(eventsBefore, eventsAfter...)
 	x := make(map[string]bool)
 	// get members who actually send an event
 	for _, e := range allEvents {

@@ -65,8 +65,8 @@ type Events interface {
 	DeleteEventsForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 
 	SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
-	SelectContextAfterEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, limit int) (int, []*gomatrixserverlib.HeaderedEvent, error)
-	SelectContextBeforeEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error)
+	SelectContextBeforeEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	SelectContextAfterEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
 	SelectEventIDsAfter(ctx context.Context, roomID string, id int) ([]string, error)
 }
 

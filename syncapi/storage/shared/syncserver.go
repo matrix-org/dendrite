@@ -960,11 +960,11 @@ func (s *Database) SelectContextEvent(ctx context.Context, roomID, eventID strin
 	return s.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
 }
 
-func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, limit int) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, limit)
+func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
 }
-func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, limit int) (int, []*gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, limit)
+func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
 
 func (s *Database) SelectEventIDsAfter(ctx context.Context, roomID string, id int) ([]string, error) {

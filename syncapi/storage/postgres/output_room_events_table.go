@@ -134,10 +134,20 @@ const selectContextEventSQL = "" +
 	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND event_id = $2"
 
 const selectContextBeforeEventSQL = "" +
-	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2 ORDER BY id DESC LIMIT $3"
+	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2" +
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" ORDER BY id DESC LIMIT $3"
 
 const selectContextAfterEventSQL = "" +
-	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3"
+	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2" +
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" ORDER BY id ASC LIMIT $3"
 
 const selectEventIDsAfterSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
@@ -454,9 +464,15 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 }
 
 func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
-	ctx context.Context, txn *sql.Tx, id int, roomID string, limit int,
+	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (evts []*gomatrixserverlib.HeaderedEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(ctx, roomID, id, limit)
+	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(
+		ctx, roomID, id, filter.Limit,
+		pq.StringArray(filter.Senders),
+		pq.StringArray(filter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
+	)
 	if err != nil {
 		return
 	}
@@ -480,9 +496,15 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 }
 
 func (s *outputRoomEventsStatements) SelectContextAfterEvent(
-	ctx context.Context, txn *sql.Tx, id int, roomID string, limit int,
+	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(ctx, roomID, id, limit)
+	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(
+		ctx, roomID, id, filter.Limit,
+		pq.StringArray(filter.Senders),
+		pq.StringArray(filter.NotSenders),
+		pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
+		pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
+	)
 	if err != nil {
 		return
 	}

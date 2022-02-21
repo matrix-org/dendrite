@@ -29,6 +29,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -98,10 +99,10 @@ const selectContextEventSQL = "" +
 	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND event_id = $2"
 
 const selectContextBeforeEventSQL = "" +
-	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2 ORDER BY id DESC LIMIT $3"
+	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2"
 
 const selectContextAfterEventSQL = "" +
-	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3"
+	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
 
 const selectEventIDsAfterSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
@@ -493,9 +494,19 @@ func (s *outputRoomEventsStatements) SelectContextEvent(
 }
 
 func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
-	ctx context.Context, txn *sql.Tx, id int, roomID string, limit int,
+	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (evts []*gomatrixserverlib.HeaderedEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(ctx, roomID, id, limit)
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, selectContextBeforeEventSQL,
+		[]interface{}{
+			roomID, id,
+		},
+		filter.Senders, filter.NotSenders,
+		filter.Types, filter.NotTypes,
+		nil, filter.Limit, FilterOrderDesc,
+	)
+
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return
 	}
@@ -519,9 +530,22 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 }
 
 func (s *outputRoomEventsStatements) SelectContextAfterEvent(
-	ctx context.Context, txn *sql.Tx, id int, roomID string, limit int,
+	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(ctx, roomID, id, limit)
+	logrus.Debugf("getting events after: %+v", filter)
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, selectContextAfterEventSQL,
+		[]interface{}{
+			roomID, id,
+		},
+		filter.Senders, filter.NotSenders,
+		filter.Types, filter.NotTypes,
+		nil, filter.Limit, FilterOrderAsc,
+	)
+
+	logrus.Debugf("params, %+v", params)
+
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return
 	}
@@ -540,7 +564,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		}
 		evts = append(evts, evt)
 	}
-
+	logrus.Debugf("returning events: %+v", evts)
 	return lastID, evts, rows.Err()
 }
 
