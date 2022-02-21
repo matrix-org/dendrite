@@ -256,23 +256,17 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 		return fmt.Errorf("assertion query failed: %s", err)
 	}
 	if count > 0 {
-		var debugEventID, debugRoomID string
-		var debugEventTypeNID, debugStateKeyNID, debugSnapNID, debugDepth int64
-		err = tx.QueryRow(
-			`SELECT event_id, event_type_nid, event_state_key_nid, roomserver_events.state_snapshot_nid, depth, room_id FROM roomserver_events
-				JOIN roomserver_rooms ON roomserver_rooms.room_nid = roomserver_events.room_nid WHERE roomserver_events.state_snapshot_nid < $1 AND roomserver_events.state_snapshot_nid != 0`, maxsnapshotid,
-		).Scan(&debugEventID, &debugEventTypeNID, &debugStateKeyNID, &debugSnapNID, &debugDepth, &debugRoomID)
-		if err != nil {
-			logrus.Errorf("cannot extract debug info: %v", err)
-		} else {
-			logrus.Errorf(
-				"Affected row: event_id=%v room_id=%v type=%v state_key=%v snapshot=%v depth=%v",
-				debugEventID, debugRoomID, debugEventTypeNID, debugStateKeyNID, debugSnapNID, debugDepth,
-			)
-			logrus.Errorf("To fix this manually, run this query first then retry the migration: "+
-				"UPDATE roomserver_events SET state_snapshot_nid=0 WHERE event_id='%v'", debugEventID)
+		var res sql.Result
+		var c int64
+		res, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("failed to reset invalid state snapshots: %w", err)
 		}
-		return fmt.Errorf("%d events exist in roomserver_events which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
+		if c, err = res.RowsAffected(); err != nil {
+			return fmt.Errorf("failed to get row count for invalid state snapshots updated: %w", err)
+		} else if c != count {
+			return fmt.Errorf("expected to reset %d event(s) but only updated %d event(s)", count, c)
+		}
 	}
 	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
 		return fmt.Errorf("assertion query failed: %s", err)
