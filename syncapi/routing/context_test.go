@@ -19,30 +19,28 @@ func Test_parseContextParams(t *testing.T) {
 	tests := []struct {
 		name       string
 		req        *http.Request
-		wantLimit  int
 		wantFilter *gomatrixserverlib.RoomEventFilter
 		wantErr    bool
 	}{
 		{
-			name:      "no params set",
-			req:       noParamsReq,
-			wantLimit: 10,
+			name:       "no params set",
+			req:        noParamsReq,
+			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 10},
 		},
 		{
-			name:      "limit 2 param set",
-			req:       limit2Req,
-			wantLimit: 2,
+			name:       "limit 2 param set",
+			req:        limit2Req,
+			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 2},
 		},
 		{
-			name:      "limit 10000 param set",
-			req:       limit10000Req,
-			wantLimit: 100,
+			name:       "limit 10000 param set",
+			req:        limit10000Req,
+			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 100},
 		},
 		{
 			name:       "filter lazy_load_members param set",
 			req:        lazyLoadReq,
-			wantLimit:  2,
-			wantFilter: &gomatrixserverlib.RoomEventFilter{LazyLoadMembers: true},
+			wantFilter: &gomatrixserverlib.RoomEventFilter{Limit: 2, LazyLoadMembers: true},
 		},
 		{
 			name:    "invalid limit req",
@@ -57,13 +55,10 @@ func Test_parseContextParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLimit, gotFilter, err := parseContextParams(tt.req)
+			gotFilter, err := parseContextParams(tt.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseContextParams() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if gotLimit != tt.wantLimit {
-				t.Errorf("parseContextParams() gotLimit = %v, want %v", gotLimit, tt.wantLimit)
 			}
 			if !reflect.DeepEqual(gotFilter, tt.wantFilter) {
 				t.Errorf("parseContextParams() gotFilter = %v, want %v", gotFilter, tt.wantFilter)
