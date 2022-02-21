@@ -130,6 +130,18 @@ const selectStateInRangeSQL = "" +
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
 
+const selectContextEventSQL = "" +
+	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND event_id = $2"
+
+const selectContextBeforeEventSQL = "" +
+	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2 ORDER BY id DESC LIMIT $3"
+
+const selectContextAfterEventSQL = "" +
+	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3"
+
+const selectEventIDsAfterSQL = "" +
+	"SELECT event_id FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
+
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -140,6 +152,10 @@ type outputRoomEventsStatements struct {
 	selectStateInRangeStmt        *sql.Stmt
 	updateEventJSONStmt           *sql.Stmt
 	deleteEventsForRoomStmt       *sql.Stmt
+	selectContextEventStmt        *sql.Stmt
+	selectContextBeforeEventStmt  *sql.Stmt
+	selectContextAfterEventStmt   *sql.Stmt
+	selectEventIDsAfterStmt       *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -148,34 +164,21 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventsStmt, err = db.Prepare(selectEventsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxEventIDStmt, err = db.Prepare(selectMaxEventIDSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRecentEventsStmt, err = db.Prepare(selectRecentEventsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRecentEventsForSyncStmt, err = db.Prepare(selectRecentEventsForSyncSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEarlyEventsStmt, err = db.Prepare(selectEarlyEventsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStateInRangeStmt, err = db.Prepare(selectStateInRangeSQL); err != nil {
-		return nil, err
-	}
-	if s.updateEventJSONStmt, err = db.Prepare(updateEventJSONSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteEventsForRoomStmt, err = db.Prepare(deleteEventsForRoomSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertEventStmt, insertEventSQL},
+		{&s.selectEventsStmt, selectEventsSQL},
+		{&s.selectMaxEventIDStmt, selectMaxEventIDSQL},
+		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
+		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
+		{&s.selectEarlyEventsStmt, selectEarlyEventsSQL},
+		{&s.selectStateInRangeStmt, selectStateInRangeSQL},
+		{&s.updateEventJSONStmt, updateEventJSONSQL},
+		{&s.deleteEventsForRoomStmt, deleteEventsForRoomSQL},
+		{&s.selectContextEventStmt, selectContextEventSQL},
+		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
+		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.selectEventIDsAfterStmt, selectEventIDsAfterSQL},
+	}.Prepare(db)
 }
 
 func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
@@ -434,6 +437,89 @@ func (s *outputRoomEventsStatements) DeleteEventsForRoom(
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.deleteEventsForRoomStmt).ExecContext(ctx, roomID)
 	return err
+}
+
+func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (id int, evt gomatrixserverlib.HeaderedEvent, err error) {
+	row := sqlutil.TxStmt(txn, s.selectContextEventStmt).QueryRowContext(ctx, roomID, eventID)
+
+	var eventAsString string
+	if err = row.Scan(&id, &eventAsString); err != nil {
+		return 0, evt, err
+	}
+
+	if err = json.Unmarshal([]byte(eventAsString), &evt); err != nil {
+		return 0, evt, err
+	}
+	return id, evt, nil
+}
+
+func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
+	ctx context.Context, txn *sql.Tx, id int, roomID string, limit int,
+) (evts []*gomatrixserverlib.HeaderedEvent, err error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(ctx, roomID, id, limit)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			eventBytes []byte
+			evt        *gomatrixserverlib.HeaderedEvent
+		)
+		if err = rows.Scan(&eventBytes); err != nil {
+			return evts, err
+		}
+		if err = json.Unmarshal(eventBytes, &evt); err != nil {
+			return evts, err
+		}
+		evts = append(evts, evt)
+	}
+
+	return evts, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) SelectContextAfterEvent(
+	ctx context.Context, txn *sql.Tx, id int, roomID string, limit int,
+) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(ctx, roomID, id, limit)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			eventBytes []byte
+			evt        *gomatrixserverlib.HeaderedEvent
+		)
+		if err = rows.Scan(&lastID, &eventBytes); err != nil {
+			return 0, evts, err
+		}
+		if err = json.Unmarshal(eventBytes, &evt); err != nil {
+			return 0, evts, err
+		}
+		evts = append(evts, evt)
+	}
+
+	return lastID, evts, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) SelectEventIDsAfter(ctx context.Context, roomID string, id int) (eventIDs []string, err error) {
+	rows, err := s.selectEventIDsAfterStmt.QueryContext(ctx, roomID, id)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var eventID string
+		if err = rows.Scan(&eventID); err != nil {
+			return nil, err
+		}
+		eventIDs = append(eventIDs, eventID)
+	}
+	return eventIDs, rows.Err()
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
