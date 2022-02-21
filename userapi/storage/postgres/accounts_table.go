@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS account_accounts (
 	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
 	account_type SMALLINT NOT NULL,
 	-- The policy version this user has accepted
-	policy_version TEXT
+	policy_version TEXT,
+   -- The policy version the user received from the server notices room
+	policy_version_sent TEXT
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
 );
@@ -75,22 +77,26 @@ const selectPrivacyPolicySQL = "" +
 	"SELECT policy_version FROM account_accounts WHERE localpart = $1"
 
 const batchSelectPrivacyPolicySQL = "" +
-	"SELECT localpart FROM account_accounts WHERE policy_version IS NULL or policy_version <> $1"
+	"SELECT localpart FROM account_accounts WHERE (policy_version IS NULL OR policy_version <> $1) AND (policy_version_sent IS NULL OR policy_version_sent <> $1)"
 
 const updatePolicyVersionSQL = "" +
 	"UPDATE account_accounts SET policy_version = $1 WHERE localpart = $2"
 
+const updatePolicyVersionServerNoticeSQL = "" +
+	"UPDATE account_accounts SET policy_version_sent = $1 WHERE localpart = $2"
+
 type accountsStatements struct {
-	insertAccountStmt             *sql.Stmt
-	updatePasswordStmt            *sql.Stmt
-	deactivateAccountStmt         *sql.Stmt
-	selectAccountByLocalpartStmt  *sql.Stmt
-	selectPasswordHashStmt        *sql.Stmt
-	selectNewNumericLocalpartStmt *sql.Stmt
-	selectPrivacyPolicyStmt       *sql.Stmt
-	batchSelectPrivacyPolicyStmt  *sql.Stmt
-	updatePolicyVersionStmt       *sql.Stmt
-	serverName                    gomatrixserverlib.ServerName
+	insertAccountStmt                   *sql.Stmt
+	updatePasswordStmt                  *sql.Stmt
+	deactivateAccountStmt               *sql.Stmt
+	selectAccountByLocalpartStmt        *sql.Stmt
+	selectPasswordHashStmt              *sql.Stmt
+	selectNewNumericLocalpartStmt       *sql.Stmt
+	selectPrivacyPolicyStmt             *sql.Stmt
+	batchSelectPrivacyPolicyStmt        *sql.Stmt
+	updatePolicyVersionStmt             *sql.Stmt
+	updatePolicyVersionServerNoticeStmt *sql.Stmt
+	serverName                          gomatrixserverlib.ServerName
 }
 
 func NewPostgresAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.AccountsTable, error) {
@@ -111,6 +117,7 @@ func NewPostgresAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerNam
 		{&s.selectPrivacyPolicyStmt, selectPrivacyPolicySQL},
 		{&s.batchSelectPrivacyPolicyStmt, batchSelectPrivacyPolicySQL},
 		{&s.updatePolicyVersionStmt, updatePolicyVersionSQL},
+		{&s.updatePolicyVersionServerNoticeStmt, updatePolicyVersionServerNoticeSQL},
 	}.Prepare(db)
 }
 
@@ -232,9 +239,12 @@ func (s *accountsStatements) BatchSelectPrivacyPolicy(
 
 // updatePolicyVersion sets the policy_version for a specific user
 func (s *accountsStatements) UpdatePolicyVersion(
-	ctx context.Context, txn *sql.Tx, policyVersion, localpart string,
+	ctx context.Context, txn *sql.Tx, policyVersion, localpart string, serverNotice bool,
 ) (err error) {
 	stmt := s.updatePolicyVersionStmt
+	if serverNotice {
+		stmt = s.updatePolicyVersionServerNoticeStmt
+	}
 	if txn != nil {
 		stmt = sqlutil.TxStmt(txn, stmt)
 	}

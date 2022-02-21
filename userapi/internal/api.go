@@ -629,5 +629,5 @@ func (a *UserInternalAPI) PerformUpdatePolicyVersion(
 	req *api.UpdatePolicyVersionRequest,
 	res *api.UpdatePolicyVersionResponse,
 ) error {
-	return a.DB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.LocalPart)
+	return a.DB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.LocalPart, req.ServerNoticeUpdate)
 }

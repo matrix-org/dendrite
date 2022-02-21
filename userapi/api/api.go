@@ -362,6 +362,7 @@ type QueryOutdatedPolicyUsersResponse struct {
 // UpdatePolicyVersionRequest is the request for UpdatePolicyVersionRequest
 type UpdatePolicyVersionRequest struct {
 	PolicyVersion, LocalPart string
+	ServerNoticeUpdate       bool
 }
 
 // UpdatePolicyVersionResponse is the response for UpdatePolicyVersionRequest

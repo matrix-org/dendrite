@@ -53,7 +53,7 @@ type Database interface {
 	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 	GetPrivacyPolicy(ctx context.Context, localpart string) (policyVersion string, err error)
 	GetOutdatedPolicy(ctx context.Context, policyVersion string) (userIDs []string, err error)
-	UpdatePolicyVersion(ctx context.Context, policyVersion, localpart string) error
+	UpdatePolicyVersion(ctx context.Context, policyVersion, localpart string, serverNotice bool) error
 
 	// Key backups
 	CreateKeyBackup(ctx context.Context, userID, algorithm string, authData json.RawMessage) (version string, err error)

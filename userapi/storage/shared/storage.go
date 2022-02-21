@@ -690,9 +690,9 @@ func (d *Database) GetOutdatedPolicy(ctx context.Context, policyVersion string) 
 }
 
 // UpdatePolicyVersion sets the accepted policy_version for a user.
-func (d *Database) UpdatePolicyVersion(ctx context.Context, policyVersion, localpart string) (err error) {
+func (d *Database) UpdatePolicyVersion(ctx context.Context, policyVersion, localpart string, serverNotice bool) (err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Accounts.UpdatePolicyVersion(ctx, txn, policyVersion, localpart)
+		return d.Accounts.UpdatePolicyVersion(ctx, txn, policyVersion, localpart, serverNotice)
 	})
 	return
 }
