@@ -117,7 +117,6 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) {
-	logrus.Infof("Sending server notice to users who have not yet accepted the policy")
 	res := &userapi.QueryOutdatedPolicyUsersResponse{}
 	if err := userAPI.GetOutdatedPolicy(context.Background(), &userapi.QueryOutdatedPolicyUsersRequest{
 		PolicyVersion: cfgClient.Matrix.UserConsentOptions.Version,
@@ -126,10 +125,17 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 		return
 	}
 
-	consentOpts := cfgClient.Matrix.UserConsentOptions
-	data := make(map[string]string)
-	var err error
-	sentMessages := 0
+	var (
+		consentOpts  = cfgClient.Matrix.UserConsentOptions
+		data         = make(map[string]string)
+		err          error
+		sentMessages int
+	)
+
+	if len(res.OutdatedUsers) > 0 {
+		logrus.WithField("count", len(res.OutdatedUsers)).Infof("Sending server notice to users who have not yet accepted the policy")
+	}
+
 	for _, userID := range res.OutdatedUsers {
 		if userID == cfgClient.Matrix.ServerNotices.LocalPart {
 			continue
@@ -140,7 +146,6 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 			logrus.WithError(err).WithField("userID", userID).Error("unable to construct consentURI")
 			continue
 		}
-		logrus.Debugf("sending message to %s", userID)
 		msgBody := &bytes.Buffer{}
 
 		if err = consentOpts.TextTemplates.ExecuteTemplate(msgBody, "serverNoticeTemplate", data); err != nil {
@@ -174,7 +179,9 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 			continue
 		}
 	}
-	logrus.Infof("Send messages to %d users", sentMessages)
+	if sentMessages > 0 {
+		logrus.Infof("Sent messages to %d users", sentMessages)
+	}
 }
 
 func buildConsentURI(cfgClient *config.ClientAPI, userID string) (string, error) {
