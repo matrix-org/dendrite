@@ -95,6 +95,8 @@ type PerformLeaveRequest struct {
 }
 
 type PerformLeaveResponse struct {
+	Code    int         `json:"code,omitempty"`
+	Message interface{} `json:"message,omitempty"`
 }
 
 type PerformInviteRequest struct {

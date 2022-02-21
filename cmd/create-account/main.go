@@ -23,12 +23,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
+
+	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/userapi/api"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 const usage = `Usage: %s
@@ -57,6 +59,7 @@ var (
 	pwdFile  = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
 	pwdStdin = flag.Bool("passwordstdin", false, "Reads the password from stdin")
 	askPass  = flag.Bool("ask-pass", false, "Ask for the password to use")
+	isAdmin  = flag.Bool("admin", false, "Create an admin account")
 )
 
 func main() {
@@ -74,19 +77,28 @@ func main() {
 
 	pass := getPassword(password, pwdFile, pwdStdin, askPass, os.Stdin)
 
-	accountDB, err := accounts.NewDatabase(&config.DatabaseOptions{
-		ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
-	}, cfg.Global.ServerName, bcrypt.DefaultCost, cfg.UserAPI.OpenIDTokenLifetimeMS)
+	accountDB, err := userdb.NewDatabase(
+		&config.DatabaseOptions{
+			ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
+		},
+		cfg.Global.ServerName, bcrypt.DefaultCost,
+		cfg.UserAPI.OpenIDTokenLifetimeMS,
+		api.DefaultLoginTokenLifetime,
+	)
 	if err != nil {
 		logrus.Fatalln("Failed to connect to the database:", err.Error())
 	}
 
+	accType := api.AccountTypeUser
+	if *isAdmin {
+		accType = api.AccountTypeAdmin
+	}
 	policyVersion := ""
 	if cfg.Global.UserConsentOptions.Enabled {
 		policyVersion = cfg.Global.UserConsentOptions.Version
 	}
 
-	_, err = accountDB.CreateAccount(context.Background(), *username, pass, "", policyVersion)
+	_, err = accountDB.CreateAccount(context.Background(), *username, pass, "", policyVersion, accType)
 	if err != nil {
 		logrus.Fatalln("Failed to create the account:", err.Error())
 	}

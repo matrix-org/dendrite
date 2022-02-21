@@ -16,8 +16,14 @@ package perform
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -25,16 +31,14 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type Leaver struct {
-	Cfg   *config.RoomServer
-	DB    storage.Database
-	FSAPI fsAPI.FederationInternalAPI
-
+	Cfg     *config.RoomServer
+	DB      storage.Database
+	FSAPI   fsAPI.FederationInternalAPI
+	UserAPI userapi.UserInternalAPI
 	Inputer *input.Inputer
 }
 
@@ -84,6 +88,31 @@ func (r *Leaver) performLeaveRoomByID(
 		}
 		if host != r.Cfg.Matrix.ServerName {
 			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
+		}
+		// check that this is not a "server notice room"
+		accData := &userapi.QueryAccountDataResponse{}
+		if err := r.UserAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
+			UserID:   req.UserID,
+			RoomID:   req.RoomID,
+			DataType: "m.tag",
+		}, accData); err != nil {
+			return nil, fmt.Errorf("unable to query account data")
+		}
+
+		if roomData, ok := accData.RoomAccountData[req.RoomID]; ok {
+			tagData, ok := roomData["m.tag"]
+			if ok {
+				tags := gomatrix.TagContent{}
+				if err = json.Unmarshal(tagData, &tags); err != nil {
+					return nil, fmt.Errorf("unable to unmarshal tag content")
+				}
+				if _, ok = tags.Tags["m.server_notice"]; ok {
+					// mimic the returned values from Synapse
+					res.Message = "You cannot reject this invite"
+					res.Code = 403
+					return nil, fmt.Errorf("You cannot reject this invite")
+				}
+			}
 		}
 	}
 

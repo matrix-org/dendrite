@@ -23,15 +23,15 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/dendrite/userapi/storage/devices"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/matrix-org/dendrite/userapi/storage"
 )
 
 const (
@@ -42,22 +42,18 @@ type apiTestOpts struct {
 	loginTokenLifetime time.Duration
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, accounts.Database) {
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, storage.Database) {
 	if opts.loginTokenLifetime == 0 {
-		opts.loginTokenLifetime = defaultLoginTokenLifetime
+		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
 	dbopts := &config.DatabaseOptions{
 		ConnectionString:   "file::memory:",
 		MaxOpenConnections: 1,
 		MaxIdleConnections: 1,
 	}
-	accountDB, err := accounts.NewDatabase(dbopts, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS)
+	accountDB, err := storage.NewDatabase(dbopts, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime)
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
-	}
-	deviceDB, err := devices.NewDatabase(dbopts, serverName, opts.loginTokenLifetime)
-	if err != nil {
-		t.Fatalf("failed to create device DB: %s", err)
 	}
 
 	cfg := &config.UserAPI{
@@ -66,14 +62,14 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, a
 		},
 	}
 
-	return newInternalAPI(accountDB, deviceDB, cfg, nil, nil), accountDB
+	return newInternalAPI(accountDB, cfg, nil, nil), accountDB
 }
 
 func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
 	userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
-	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", "")
+	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", "", api.AccountTypeUser)
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
@@ -151,7 +147,7 @@ func TestLoginToken(t *testing.T) {
 	t.Run("tokenLoginFlow", func(t *testing.T) {
 		userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
 
-		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", "")
+		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", "", api.AccountTypeUser)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
 		}

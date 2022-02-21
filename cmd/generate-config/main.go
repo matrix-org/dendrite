@@ -32,7 +32,6 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
-		cfg.UserAPI.DeviceDatabase.ConnectionString = config.DataSource(*dbURI)
 	}
 	cfg.Global.TrustedIDServers = []string{
 		"matrix.org",
@@ -91,6 +90,7 @@ func main() {
 		cfg.Logging[0].Type = "std"
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 		cfg.Global.JetStream.InMemory = true
+		cfg.ClientAPI.RegistrationSharedSecret = "complement"
 	}
 
 	j, err := yaml.Marshal(cfg)

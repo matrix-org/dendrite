@@ -58,6 +58,11 @@ global:
     basic_auth:
       username: metrics
       password: metrics
+  server_notices:
+    local_part: "_server"
+    display_name: "Server alerts"
+    avatar: ""
+    room_name: "Server Alerts"	
 app_service_api:
   internal_api:
     listen: http://localhost:7777
@@ -118,11 +123,6 @@ federation_sender:
     conn_max_lifetime: -1
   send_max_retries: 16
   disable_tls_validation: false
-  proxy_outbound:
-    enabled: false
-    protocol: http
-    host: localhost
-    port: 8080
 key_server:
   internal_api:
     listen: http://localhost:7779

@@ -30,7 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -38,7 +38,7 @@ import (
 // all components of Dendrite, for use in monolith mode.
 type Monolith struct {
 	Config    *config.Dendrite
-	AccountDB accounts.Database
+	AccountDB userdb.Database
 	KeyRing   *gomatrixserverlib.KeyRing
 	Client    *gomatrixserverlib.Client
 	FedClient *gomatrixserverlib.FederationClient

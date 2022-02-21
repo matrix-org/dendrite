@@ -14,6 +14,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -32,6 +34,7 @@ type RoomserverInternalAPI struct {
 	*perform.Publisher
 	*perform.Backfiller
 	*perform.Forgetter
+	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
 	Cache                  caching.RoomServerCaches
@@ -48,12 +51,13 @@ type RoomserverInternalAPI struct {
 }
 
 func NewRoomserverAPI(
-	cfg *config.RoomServer, roomserverDB storage.Database, consumer nats.JetStreamContext,
-	inputRoomEventTopic, outputRoomEventTopic string, caches caching.RoomServerCaches,
-	perspectiveServerNames []gomatrixserverlib.ServerName,
+	processCtx *process.ProcessContext, cfg *config.RoomServer, roomserverDB storage.Database,
+	consumer nats.JetStreamContext, inputRoomEventTopic, outputRoomEventTopic string,
+	caches caching.RoomServerCaches, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
 	a := &RoomserverInternalAPI{
+		ProcessContext:         processCtx,
 		DB:                     roomserverDB,
 		Cfg:                    cfg,
 		Cache:                  caches,
@@ -83,6 +87,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	r.KeyRing = keyRing
 
 	r.Inputer = &input.Inputer{
+		ProcessContext:       r.ProcessContext,
 		DB:                   r.DB,
 		InputRoomEventTopic:  r.InputRoomEventTopic,
 		OutputRoomEventTopic: r.OutputRoomEventTopic,
@@ -153,6 +158,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	if err := r.Inputer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
+}
+
+func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+	r.Leaver.UserAPI = userAPI
 }
 
 func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {

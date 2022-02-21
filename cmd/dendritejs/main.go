@@ -167,7 +167,6 @@ func main() {
 	cfg.Defaults(true)
 	cfg.UserAPI.AccountDatabase.ConnectionString = "file:/idb/dendritejs_account.db"
 	cfg.AppServiceAPI.Database.ConnectionString = "file:/idb/dendritejs_appservice.db"
-	cfg.UserAPI.DeviceDatabase.ConnectionString = "file:/idb/dendritejs_device.db"
 	cfg.FederationAPI.Database.ConnectionString = "file:/idb/dendritejs_fedsender.db"
 	cfg.MediaAPI.Database.ConnectionString = "file:/idb/dendritejs_mediaapi.db"
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"

@@ -32,18 +32,19 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/gomatrixserverlib/tokens"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage/accounts"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/gomatrixserverlib/tokens"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 var (
@@ -153,7 +154,7 @@ type authDict struct {
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
 type userInteractiveResponse struct {
 	Flows     []authtypes.Flow       `json:"flows"`
-	Completed []authtypes.LoginType  `json:"completed,omitempty"`
+	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
 	Session   string                 `json:"session"`
 }
@@ -447,7 +448,7 @@ func validateApplicationService(
 func Register(
 	req *http.Request,
 	userAPI userapi.UserInternalAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var r registerRequest
@@ -531,6 +532,13 @@ func handleGuestRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 ) util.JSONResponse {
+	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Guest registration is disabled"),
+		}
+	}
+
 	var res userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeGuest,
@@ -708,7 +716,7 @@ func handleApplicationServiceRegistration(
 	// application service registration is entirely separate.
 	return completeRegistration(
 		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), policyVersion,
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
 	)
 }
 
@@ -732,7 +740,7 @@ func checkAndCompleteFlow(
 
 		return completeRegistration(
 			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), policyVersion,
-			r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
 		)
 	}
 
@@ -757,6 +765,7 @@ func completeRegistration(
 	username, password, appserviceID, ipAddr, userAgent, policyVersion string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
+	accType userapi.AccountType,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -771,13 +780,12 @@ func completeRegistration(
 			JSON: jsonerror.BadJSON("missing password"),
 		}
 	}
-
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AppServiceID:  appserviceID,
 		Localpart:     username,
 		Password:      password,
-		AccountType:   userapi.AccountTypeUser,
+		AccountType:   accType,
 		OnConflict:    userapi.ConflictAbort,
 		PolicyVersion: policyVersion,
 	}, &accRes)
@@ -904,7 +912,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.ClientAPI,
-	accountDB accounts.Database,
+	accountDB userdb.Database,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 
@@ -976,5 +984,10 @@ func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedS
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID)
+
+	accType := userapi.AccountTypeUser
+	if ssrr.Admin {
+		accType = userapi.AccountTypeAdmin
+	}
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
 }
