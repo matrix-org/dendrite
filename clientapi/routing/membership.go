@@ -226,27 +226,42 @@ func SendInvite(
 		}
 	}
 
+	// We already received the return value, so no need to check for an error here.
+	response, _ := sendInvite(req.Context(), accountDB, device, roomID, body.UserID, body.Reason, cfg, rsAPI, asAPI, evTime)
+	return response
+}
+
+// sendInvite sends an invitation to a user. Returns a JSONResponse and an error
+func sendInvite(
+	ctx context.Context,
+	accountDB userdb.Database,
+	device *userapi.Device,
+	roomID, userID, reason string,
+	cfg *config.ClientAPI,
+	rsAPI roomserverAPI.RoomserverInternalAPI,
+	asAPI appserviceAPI.AppServiceQueryAPI, evTime time.Time,
+) (util.JSONResponse, error) {
 	event, err := buildMembershipEvent(
-		req.Context(), body.UserID, body.Reason, accountDB, device, "invite",
+		ctx, userID, reason, accountDB, device, "invite",
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(err.Error()),
-		}
+		}, err
 	} else if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound(err.Error()),
-		}
+		}, err
 	} else if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvent failed")
-		return jsonerror.InternalServerError()
+		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
+		return jsonerror.InternalServerError(), err
 	}
 
 	err = roomserverAPI.SendInvite(
-		req.Context(), rsAPI,
+		ctx, rsAPI,
 		event,
 		nil, // ask the roomserver to draw up invite room state for us
 		cfg.Matrix.ServerName,
@@ -254,18 +269,18 @@ func SendInvite(
 	)
 	switch e := err.(type) {
 	case *roomserverAPI.PerformError:
-		return e.JSONResponse()
+		return e.JSONResponse(), err
 	case nil:
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
-		}
+		}, nil
 	default:
-		util.GetLogger(req.Context()).WithError(err).Error("roomserverAPI.SendInvite failed")
+		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
-		}
+		}, err
 	}
 }
 
