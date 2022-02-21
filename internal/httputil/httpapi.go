@@ -160,7 +160,7 @@ func getConsentURL(username string, config config.UserConsentOptions) (string, e
 	hmac := hex.EncodeToString(mac.Sum(nil))
 
 	return fmt.Sprintf(
-		"%s/_matrix/consent?u=%s&h=%s&v=%s",
+		"%s/_matrix/client/consent?u=%s&h=%s&v=%s",
 		config.BaseURL, username, hmac, config.Version,
 	), nil
 }

@@ -36,7 +36,6 @@ import (
 func AddPublicRoutes(
 	router *mux.Router,
 	synapseAdminRouter *mux.Router,
-	consentAPIMux *mux.Router,
 	cfg *config.ClientAPI,
 	accountsDB userdb.Database,
 	federation *gomatrixserverlib.FederationClient,
@@ -58,7 +57,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, synapseAdminRouter, consentAPIMux, cfg, eduInputAPI, rsAPI, asAPI,
+		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
 		accountsDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI, extRoomsProvider, mscCfg,
 	)

@@ -235,7 +235,6 @@ func main() {
 		base.PublicKeyAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
-		base.PublicConsentAPIMux,
 	)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()

@@ -289,7 +289,7 @@ func (config *Dendrite) Derive() error {
 	// TODO: Add MSISDN auth type
 
 	if config.Global.UserConsentOptions.Enabled && config.Global.UserConsentOptions.RequireAtRegistration {
-		uri := config.Global.UserConsentOptions.BaseURL + "/_matrix/consent?v=" + config.Global.UserConsentOptions.Version
+		uri := config.Global.UserConsentOptions.BaseURL + "/_matrix/client/consent?v=" + config.Global.UserConsentOptions.Version
 		config.Derived.Registration.Params[authtypes.LoginTypeTerms] = Terms{
 			Policies: Policies{
 				PrivacyPolicy: PrivacyPolicy{

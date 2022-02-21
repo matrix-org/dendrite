@@ -208,7 +208,7 @@ func buildConsentURI(cfgClient *config.ClientAPI, userID string) (string, error)
 	}
 	userMAC := mac.Sum(nil)
 
-	return fmt.Sprintf("%s/_matrix/consent?u=%s&h=%s&v=%s", cfgClient.Matrix.UserConsentOptions.BaseURL, userID, userMAC, consentOpts.Version), nil
+	return fmt.Sprintf("%s/_matrix/client/consent?u=%s&h=%s&v=%s", cfgClient.Matrix.UserConsentOptions.BaseURL, userID, userMAC, consentOpts.Version), nil
 }
 
 func validHMAC(username, userHMAC, secret string) (bool, error) {

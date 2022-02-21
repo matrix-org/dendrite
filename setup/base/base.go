@@ -73,7 +73,6 @@ type BaseDendrite struct {
 	PublicKeyAPIMux        *mux.Router
 	PublicMediaAPIMux      *mux.Router
 	PublicWellKnownAPIMux  *mux.Router
-	PublicConsentAPIMux    *mux.Router
 	InternalAPIMux         *mux.Router
 	SynapseAdminMux        *mux.Router
 	UseHTTPAPIs            bool
@@ -205,7 +204,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
-		PublicConsentAPIMux:    mux.NewRouter().SkipClean(true).PathPrefix("/_matrix").Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix("/_synapse/").Subrouter().UseEncodedPath(),
 		apiHttpClient:          &apiClient,
@@ -395,7 +393,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix("/_synapse/").Handler(b.SynapseAdminMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
-	externalRouter.PathPrefix("/_matrix").Handler(b.PublicConsentAPIMux)
 
 	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {

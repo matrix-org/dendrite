@@ -48,7 +48,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, synapseAdminRouter, consentAPIMux *mux.Router, cfg *config.ClientAPI,
+	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
 	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -174,7 +174,7 @@ func Setup(
 	// Note that 'apiversion' is chosen because it must not collide with a variable used in any of the routing!
 	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
-	// unspecced consent tracking
+	// NOTSPEC: consent tracking
 	if cfg.Matrix.UserConsentOptions.Enabled {
 		if !cfg.Matrix.ServerNotices.Enabled {
 			logrus.Warnf("Consent tracking is enabled, but server notes are not. No server notice will be sent to users")
@@ -182,7 +182,7 @@ func Setup(
 			// start a new go routine to send messages about consent
 			go sendServerNoticeForConsent(userAPI, rsAPI, &cfg.Matrix.ServerNotices, cfg, serverNotificationSender, accountDB, asAPI)
 		}
-		consentAPIMux.Handle("/consent",
+		publicAPIMux.Handle("/consent",
 			httputil.MakeHTMLAPI("consent", func(writer http.ResponseWriter, request *http.Request) *util.JSONResponse {
 				return consent(writer, request, userAPI, cfg)
 			}),
