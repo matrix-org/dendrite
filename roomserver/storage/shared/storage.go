@@ -1100,9 +1100,6 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 	if err != nil {
 		return nil, err
 	}
-	if len(nidToUserID) != len(userNIDToCount) {
-		return nil, fmt.Errorf("found %d users but only have state key nids for %d of them", len(userNIDToCount), len(nidToUserID))
-	}
 	result := make(map[string]int, len(userNIDToCount))
 	for nid, count := range userNIDToCount {
 		result[nidToUserID[nid]] = count
