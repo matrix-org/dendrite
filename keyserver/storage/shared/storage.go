@@ -171,6 +171,9 @@ func (d *Database) DeleteDeviceKeys(ctx context.Context, userID string, deviceID
 			if err := d.DeviceKeysTable.DeleteDeviceKeys(ctx, txn, userID, string(deviceID)); err != nil && err != sql.ErrNoRows {
 				return fmt.Errorf("d.DeviceKeysTable.DeleteDeviceKeys: %w", err)
 			}
+			if err := d.OneTimeKeysTable.DeleteOneTimeKeys(ctx, txn, userID, string(deviceID)); err != nil && err != sql.ErrNoRows {
+				return fmt.Errorf("d.OneTimeKeysTable.DeleteOneTimeKeys: %w", err)
+			}
 		}
 		return nil
 	})

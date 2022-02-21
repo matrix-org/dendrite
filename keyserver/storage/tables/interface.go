@@ -31,6 +31,7 @@ type OneTimeKeys interface {
 	// SelectAndDeleteOneTimeKey selects a single one time key matching the user/device/algorithm specified and returns the algo:key_id => JSON.
 	// Returns an empty map if the key does not exist.
 	SelectAndDeleteOneTimeKey(ctx context.Context, txn *sql.Tx, userID, deviceID, algorithm string) (map[string]json.RawMessage, error)
+	DeleteOneTimeKeys(ctx context.Context, txn *sql.Tx, userID, deviceID string) error
 }
 
 type DeviceKeys interface {
