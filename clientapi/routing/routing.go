@@ -1001,7 +1001,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	unstableMux.Handle("/notifications",
+	v3mux.Handle("/notifications",
 		httputil.MakeAuthAPI("get_notifications", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetNotifications(req, device, userAPI)
 		}),
