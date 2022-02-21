@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -367,7 +368,15 @@ func buildEvent(
 		StateToFetch: eventsNeeded.Tuples(),
 	}, &queryRes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
+		switch err.(type) {
+		case types.MissingStateError:
+			// We know something about the room but the state seems to be
+			// insufficient to actually build a new event, so in effect we
+			// had might as well treat the room as if it doesn't exist.
+			return nil, nil, eventutil.ErrRoomNoExists
+		default:
+			return nil, nil, fmt.Errorf("QueryLatestEventsAndState: %w", err)
+		}
 	}
 
 	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
