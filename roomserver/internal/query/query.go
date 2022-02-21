@@ -724,23 +724,3 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	res.AuthChain = hchain
 	return nil
 }
-
-func (r *Queryer) QueryEventsAfter(
-	ctx context.Context,
-	req *api.QueryEventsAfterEventIDRequest,
-	res *api.QueryEventsAfterEventIDesponse,
-) error {
-	eventNIDs, err := r.DB.SelectPreviousEventNIDs(ctx, req.EventIDs)
-	if err != nil {
-		return err
-	}
-	events, err := r.DB.Events(ctx, eventNIDs)
-	if err != nil {
-		return err
-	}
-	for _, event := range events {
-		ev := gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll)
-		res.Events = append(res.Events, &ev)
-	}
-	return nil
-}

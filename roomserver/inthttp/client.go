@@ -57,7 +57,6 @@ const (
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
-	RoomserverQueryEventsAfterPath             = "/roomserver/queryEventsAfter"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -535,12 +534,5 @@ func (h *httpRoomserverInternalAPI) PerformForget(ctx context.Context, req *api.
 
 	apiURL := h.roomserverURL + RoomserverPerformForgetPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-}
 
-func (h *httpRoomserverInternalAPI) QueryEventsAfter(ctx context.Context, req *api.QueryEventsAfterEventIDRequest, res *api.QueryEventsAfterEventIDesponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryEventsAfter")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryEventsAfterPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }

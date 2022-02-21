@@ -17,11 +17,6 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
-func (t *RoomserverInternalAPITrace) QueryEventsAfter(ctx context.Context, req *QueryEventsAfterEventIDRequest, res *QueryEventsAfterEventIDesponse) error {
-	util.GetLogger(ctx).Infof("QueryEventsAfter req=%+v res=%+v", js(req), js(res))
-	return t.Impl.QueryEventsAfter(ctx, req, res)
-}
-
 func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
 	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }

@@ -202,11 +202,3 @@ func (r *RoomserverInternalAPI) PerformForget(
 ) error {
 	return r.Forgetter.PerformForget(ctx, req, resp)
 }
-
-func (r *RoomserverInternalAPI) QueryEventsAfter(
-	ctx context.Context,
-	req *api.QueryEventsAfterEventIDRequest,
-	res *api.QueryEventsAfterEventIDesponse,
-) error {
-	return r.Queryer.QueryEventsAfter(ctx, req, res)
-}

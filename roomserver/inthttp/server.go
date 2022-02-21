@@ -464,17 +464,4 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(RoomserverQueryEventsAfterPath,
-		httputil.MakeInternalAPI("queryEventsAfterPath", func(req *http.Request) util.JSONResponse {
-			request := api.QueryEventsAfterEventIDRequest{}
-			response := api.QueryEventsAfterEventIDesponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := r.QueryEventsAfter(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 }

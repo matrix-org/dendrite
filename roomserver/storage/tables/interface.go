@@ -101,7 +101,6 @@ type PreviousEvents interface {
 	// Check if the event reference exists
 	// Returns sql.ErrNoRows if the event reference doesn't exist.
 	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
-	SelectPreviousEventNIDs(ctx context.Context, txn *sql.Tx, eventID string) ([]types.EventNID, error)
 }
 
 type Invites interface {

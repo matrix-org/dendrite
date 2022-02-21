@@ -166,11 +166,6 @@ type RoomserverInternalAPI interface {
 
 	// PerformForget forgets a rooms history for a specific user
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
-	QueryEventsAfter(
-		ctx context.Context,
-		req *QueryEventsAfterEventIDRequest,
-		res *QueryEventsAfterEventIDesponse,
-	) error
 
 	// Asks for the default room version as preferred by the server.
 	QueryRoomVersionCapabilities(
