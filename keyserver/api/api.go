@@ -15,8 +15,10 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -71,6 +73,22 @@ type DeviceMessage struct {
 	// A monotonically increasing number which represents device changes for this user.
 	StreamID       int
 	DeviceChangeID int64
+}
+
+func (m1 *DeviceMessage) DeviceKeysEqual(m2 *DeviceMessage) (bool, error) {
+	if m1.DeviceKeys == nil || m2.DeviceKeys == nil {
+		return false, fmt.Errorf("not device keys")
+	}
+	if m1.UserID != m2.UserID || m1.DeviceID != m2.DeviceID {
+		return false, fmt.Errorf("different user ID or device ID")
+	}
+	if len(m1.KeyJSON) == 0 || len(m2.KeyJSON) == 0 {
+		return false, nil
+	}
+	if m1.DisplayName != m2.DisplayName {
+		return false, nil
+	}
+	return bytes.Equal(m1.KeyJSON, m2.KeyJSON), nil
 }
 
 // DeviceKeys represents a set of device keys for a single device
