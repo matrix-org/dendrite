@@ -227,6 +227,13 @@ func createRoom(
 		HistoryVisibility: historyVisibilityShared,
 	}
 
+	// NOTSPEC: The powerlevel for invite should be set to 50, according to the spec, but synapse sets it to 0 for invite.
+	// https://github.com/matrix-org/synapse/blob/6d14b3dabfe38c6ae487d0f663e294056b6cc056/synapse/handlers/room.py#L120-L133
+	isPrivateChat := r.Preset == presetPrivateChat || r.Preset == presetTrustedPrivateChat
+	if r.PowerLevelContentOverride == nil && isPrivateChat {
+		r.PowerLevelContentOverride = []byte(`{ "invite": 0 }`)
+	}
+
 	if r.PowerLevelContentOverride != nil {
 		// Merge powerLevelContentOverride fields by unmarshalling it atop the defaults
 		err = json.Unmarshal(r.PowerLevelContentOverride, &powerLevelContent)

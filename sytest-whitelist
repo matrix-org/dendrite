@@ -601,3 +601,4 @@ Can query remote device keys using POST after notification
 Device deletion propagates over federation
 Get left notifs in sync and /keys/changes when other user leaves
 Remote banned user is kicked and may not rejoin until unbanned
+If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
