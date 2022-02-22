@@ -68,7 +68,8 @@ const selectRoomIDsWithMembershipSQL = "" +
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1"
-	// WHEN, ORDER BY and LIMIT will be added by prepareWithFilter
+
+// WHEN, ORDER BY and LIMIT will be added by prepareWithFilter
 
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
