@@ -711,6 +711,9 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 }
 
 func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage) error {
+	logrus.Warnf("XXX: Existing: %+v", existing)
+	logrus.Warnf("XXX: New: %+v", new)
+
 	// find keys in new that are not in existing
 	var keysAdded []api.DeviceMessage
 	for _, newKey := range new {
