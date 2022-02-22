@@ -242,9 +242,8 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 			},
 		}
 
-		// DeviceKeysJSON will side-effect modify this, so we create it
-		// separately to above os that DeviceKeys isn't pointer'd to the
-		// same place in both "keys" and "existingKeys"
+		// DeviceKeysJSON will side-effect modify this, so it needs
+		// to be a copy, not sharing any pointers with the above.
 		deviceKeysCopy := *keys[0].DeviceKeys
 		existingKeys := []api.DeviceMessage{
 			{
