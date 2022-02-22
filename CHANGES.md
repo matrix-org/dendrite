@@ -25,6 +25,7 @@
 * Dendrite will no longer panic if trying to retire an invite event that has not been seen yet
 * The device list updater will now wait for longer after a connection issue, rather than flooding the logs with errors
 * The device list updater will no longer produce unnecessary output events for federated key updates with no changes, which should help to reduce CPU usage
+* Local device name changes will now generate key change events correctly
 * The sync API will now try to share device list update notifications even if all state key NIDs cannot be fetched
 * An off-by-one error in the sync stream token handling which could result in a crash has been fixed
 * State events will no longer be re-sent unnecessary by the roomserver to other components if they have already been sent, which should help to reduce the NATS message sizes on the roomserver output topic in some cases
