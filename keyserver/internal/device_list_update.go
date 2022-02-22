@@ -267,7 +267,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 			return false, fmt.Errorf("failed to store remote device keys for %s (%s): %w", event.UserID, event.DeviceID, err)
 		}
 
-		if err = emitDeviceKeyChanges(u.producer, existingKeys, keys); err != nil {
+		if err = emitDeviceKeyChanges(u.producer, existingKeys, keys, false); err != nil {
 			return false, fmt.Errorf("failed to produce device key changes for %s (%s): %w", event.UserID, event.DeviceID, err)
 		}
 		return false, nil
