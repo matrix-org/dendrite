@@ -86,7 +86,7 @@ func (m1 *DeviceMessage) DeviceKeysEqual(m2 *DeviceMessage) (bool, error) {
 		return false, nil // different display names
 	}
 	if len(m1.KeyJSON) == 0 || len(m2.KeyJSON) == 0 {
-		return false, nil // both are empty
+		return false, nil // either is empty
 	}
 	return bytes.Equal(m1.KeyJSON, m2.KeyJSON), nil
 }
