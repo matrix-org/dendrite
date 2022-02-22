@@ -77,4 +77,19 @@ func Setup(
 	v3mux.Handle("/keys/changes", httputil.MakeAuthAPI("keys_changes", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingKeyChangeRequest(req, device)
 	})).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomId}/context/{eventId}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Context(
+				req, device,
+				rsAPI, syncDB,
+				vars["roomId"], vars["eventId"],
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }

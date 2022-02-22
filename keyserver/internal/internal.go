@@ -648,7 +648,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		}
 		return
 	}
-	err = emitDeviceKeyChanges(a.Producer, existingKeys, keysToStore)
+	err = emitDeviceKeyChanges(a.Producer, existingKeys, keysToStore, req.OnlyDisplayNameUpdates)
 	if err != nil {
 		util.GetLogger(ctx).Errorf("Failed to emitDeviceKeyChanges: %s", err)
 	}
@@ -710,7 +710,11 @@ func (a *KeyInternalAPI) uploadOneTimeKeys(ctx context.Context, req *api.Perform
 
 }
 
-func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage) error {
+func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.DeviceMessage, onlyUpdateDisplayName bool) error {
+	// if we only want to update the display names, we can skip the checks below
+	if onlyUpdateDisplayName {
+		return producer.ProduceKeyChanges(new)
+	}
 	// find keys in new that are not in existing
 	var keysAdded []api.DeviceMessage
 	for _, newKey := range new {
@@ -718,7 +722,7 @@ func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.Device
 		for _, existingKey := range existing {
 			// Do not treat the absence of keys as equal, or else we will not emit key changes
 			// when users delete devices which never had a key to begin with as both KeyJSONs are nil.
-			if bytes.Equal(existingKey.KeyJSON, newKey.KeyJSON) && len(existingKey.KeyJSON) > 0 {
+			if existingKey.DeviceKeysEqual(&newKey) {
 				exists = true
 				break
 			}

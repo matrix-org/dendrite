@@ -213,6 +213,12 @@ type MissingEventError string
 
 func (e MissingEventError) Error() string { return string(e) }
 
+// A MissingStateError is an error that happened because the roomserver was
+// missing requested state snapshots from its databases.
+type MissingStateError string
+
+func (e MissingStateError) Error() string { return string(e) }
+
 // A RejectedError is returned when an event is stored as rejected. The error
 // contains the reason why.
 type RejectedError string

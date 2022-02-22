@@ -976,3 +976,14 @@ func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userI
 func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
 	return d.NotificationData.SelectUserUnreadCounts(ctx, userID, from, to)
 }
+
+func (s *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
+}
+
+func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
+}
+func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
+}

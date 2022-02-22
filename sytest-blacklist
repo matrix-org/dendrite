@@ -24,11 +24,8 @@ Local device key changes get to remote servers with correct prev_id
 
 # Flakey
 Local device key changes appear in /keys/changes
-Device list doesn't change if remote server is down
 
 # we don't support groups
 Remove group category
 Remove group role
 
-# See https://github.com/matrix-org/sytest/pull/1142
-Device list doesn't change if remote server is down

@@ -134,7 +134,7 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 		return nil, err
 	}
 	if i != len(stateNIDs) {
-		return nil, fmt.Errorf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs))
+		return nil, types.MissingStateError(fmt.Sprintf("storage: state NIDs missing from the database (%d != %d)", i, len(stateNIDs)))
 	}
 	return results, nil
 }

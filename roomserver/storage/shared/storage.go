@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -1101,7 +1102,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 		return nil, err
 	}
 	if len(nidToUserID) != len(userNIDToCount) {
-		return nil, fmt.Errorf("found %d users but only have state key nids for %d of them", len(userNIDToCount), len(nidToUserID))
+		logrus.Warnf("SelectJoinedUsersSetForRooms found %d users but BulkSelectEventStateKey only returned state key NIDs for %d of them", len(userNIDToCount), len(nidToUserID))
 	}
 	result := make(map[string]int, len(userNIDToCount))
 	for nid, count := range userNIDToCount {
