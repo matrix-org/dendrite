@@ -224,7 +224,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 	}).Info("DeviceListUpdater.Update")
 
 	// if we haven't missed anything update the database and notify users
-	if exists {
+	if exists || event.Deleted {
 		k := event.Keys
 		if event.Deleted {
 			k = nil
@@ -454,7 +454,7 @@ func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevi
 	if err != nil {
 		return fmt.Errorf("failed to mark device list as fresh: %w", err)
 	}
-	err = emitDeviceKeyChanges(u.producer, existingKeys, keys)
+	err = emitDeviceKeyChanges(u.producer, existingKeys, keys, false)
 	if err != nil {
 		return fmt.Errorf("failed to emit key changes for fresh device list: %w", err)
 	}
