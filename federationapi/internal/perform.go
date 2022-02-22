@@ -554,7 +554,6 @@ func (r *FederationInternalAPI) PerformInvite(
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
-	logrus.Infof("GOT INVITE RESPONSE %s", string(inviteRes.Event))
 
 	inviteEvent, err := inviteRes.Event.UntrustedEvent(request.RoomVersion)
 	if err != nil {

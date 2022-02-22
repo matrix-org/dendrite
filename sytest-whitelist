@@ -597,3 +597,4 @@ Device list doesn't change if remote server is down
 /context/ on non world readable room does not work
 /context/ returns correct number of events
 /context/ with lazy_load_members filter works
+Remote banned user is kicked and may not rejoin until unbanned
