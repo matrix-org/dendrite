@@ -82,11 +82,14 @@ func (m1 *DeviceMessage) DeviceKeysEqual(m2 *DeviceMessage) (bool, error) {
 	if m1.UserID != m2.UserID || m1.DeviceID != m2.DeviceID {
 		return false, fmt.Errorf("different user ID or device ID")
 	}
-	if len(m1.KeyJSON) == 0 || len(m2.KeyJSON) == 0 {
-		return false, nil
-	}
 	if m1.DisplayName != m2.DisplayName {
-		return false, nil
+		return false, nil // different display names
+	}
+	if len(m1.KeyJSON) == 0 && len(m2.KeyJSON) == 0 {
+		return true, nil // both are empty
+	}
+	if len(m1.KeyJSON) == 0 || len(m2.KeyJSON) == 0 {
+		return false, nil // only one is empty
 	}
 	return bytes.Equal(m1.KeyJSON, m2.KeyJSON), nil
 }
