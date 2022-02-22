@@ -718,8 +718,8 @@ func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.Device
 		for _, existingKey := range existing {
 			// Do not treat the absence of keys as equal, or else we will not emit key changes
 			// when users delete devices which never had a key to begin with as both KeyJSONs are nil.
-			// if bytes.Equal(existingKey.KeyJSON, newKey.KeyJSON) && len(existingKey.KeyJSON) > 0 {
 			if equal, err := existingKey.DeviceKeysEqual(&newKey); err != nil {
+				// One of the keys was not a DeviceKeys or the user ID/device ID did not match.
 				continue
 			} else if equal {
 				exists = true

@@ -88,10 +88,7 @@ func (m1 *DeviceMessage) DeviceKeysEqual(m2 *DeviceMessage) (bool, error) {
 	if len(m1.KeyJSON) == 0 && len(m2.KeyJSON) == 0 {
 		return true, nil // both are empty
 	}
-	if len(m1.KeyJSON) == 0 || len(m2.KeyJSON) == 0 {
-		return false, nil // only one is empty
-	}
-	return bytes.Equal(m1.KeyJSON, m2.KeyJSON), nil
+	return bytes.Equal(m1.KeyJSON, m2.KeyJSON) && len(m1.KeyJSON) > 0, nil
 }
 
 // DeviceKeys represents a set of device keys for a single device
