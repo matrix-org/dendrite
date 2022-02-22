@@ -598,4 +598,4 @@ Device list doesn't change if remote server is down
 /context/ returns correct number of events
 /context/ with lazy_load_members filter works
 GET /rooms/:room_id/messages lazy loads members correctly
-
+Remote banned user is kicked and may not rejoin until unbanned
