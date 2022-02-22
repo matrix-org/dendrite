@@ -1,5 +1,39 @@
 # Changelog
 
+## Dendrite 0.6.4 (2022-02-21)
+
+### Features
+
+* All Client-Server API endpoints are now available under the `/v3` namespace
+* The `/whoami` response format now matches the latest Matrix spec version
+* Support added for the `/context` endpoint, which should help clients to render quote-replies correctly
+* Accounts now have an optional account type field, allowing admin accounts to be created
+* Server notices are now supported
+* Refactored the user API storage to deduplicate a significant amount of code, as well as merging both user API databases into a single database
+  * The account database is now used for all user API storage and the device database is now obsolete
+  * For some installations that have separate account and device databases, this may result in access tokens being revoked and client sessions being logged out — users may need to log in again
+  * The above can be avoided by moving the `device_devices` table into the account database manually
+* Guest registration can now be separately disabled with the new `client_api.guests_disabled` configuration option
+* Outbound connections now obey proxy settings from the environment, deprecating the `federation_api.proxy_outbound` configuration options
+
+### Fixes
+
+* The roomserver input API will now strictly consume only one database transaction per room, which should prevent situations where the roomserver can deadlock waiting for database connections to become available
+* Room joins will now fall back to federation if the local room state is insufficient to create a membership event
+* Create events are now correctly filtered from federation `/send` transactions
+* Excessive logging when federation is disabled should now be fixed
+* Dendrite will no longer panic if trying to retire an invite event that has not been seen yet
+* The device list updater will now wait for longer after a connection issue, rather than flooding the logs with errors
+* The device list updater will no longer produce unnecessary output events for federated key updates with no changes, which should help to reduce CPU usage
+* Local device name changes will now generate key change events correctly
+* The sync API will now try to share device list update notifications even if all state key NIDs cannot be fetched
+* An off-by-one error in the sync stream token handling which could result in a crash has been fixed
+* State events will no longer be re-sent unnecessary by the roomserver to other components if they have already been sent, which should help to reduce the NATS message sizes on the roomserver output topic in some cases
+* The roomserver input API now uses the process context and should handle graceful shutdowns better
+* Guest registration is now correctly disabled when the `client_api.registration_disabled` configuration option is set
+* One-time encryption keys are now cleaned up correctly when a device is logged out or removed
+* Invalid state snapshots in the state storage refactoring migration are now reset rather than causing a panic at startup
+
 ## Dendrite 0.6.3 (2022-02-10)
 
 ### Features
