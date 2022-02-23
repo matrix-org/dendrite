@@ -17,6 +17,7 @@ package routing
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -140,7 +141,7 @@ func TestFlowCheckingExtraneousIncorrectInput(t *testing.T) {
 func TestEmptyCompletedFlows(t *testing.T) {
 	fakeEmptySessions := newSessionsDict()
 	fakeSessionID := "aRandomSessionIDWhichDoesNotExist"
-	ret := fakeEmptySessions.GetCompletedStages(fakeSessionID)
+	ret := fakeEmptySessions.getCompletedStages(fakeSessionID)
 
 	// check for []
 	if ret == nil || len(ret) != 0 {
@@ -207,4 +208,31 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	if resp == nil || asID == fakeID {
 		t.Errorf("user_id should not have been valid: @_something_else:localhost")
 	}
+}
+
+func TestSessionCleanUp(t *testing.T) {
+	s := newSessionsDict()
+
+	t.Run("session is cleaned up after a while", func(t *testing.T) {
+		dummySession := "helloWorld"
+		s.Lock()
+		// manually added, as s.addParams() would start the timer with the default timeout
+		s.params[dummySession] = registerRequest{Username: "Testing"}
+		s.Unlock()
+		s.startTimer(time.Millisecond, dummySession)
+		time.Sleep(time.Millisecond * 10)
+		if data, ok := s.getParams(dummySession); ok {
+			t.Errorf("expected session to be deleted: %+v", data)
+		}
+	})
+
+	t.Run("session is deleted, once the registration completed", func(t *testing.T) {
+		dummySession := "helloWorld2"
+		s.startTimer(time.Minute, dummySession)
+		s.deleteSession(dummySession)
+		if data, ok := s.getParams(dummySession); ok {
+			t.Errorf("expected session to be deleted: %+v", data)
+		}
+	})
+
 }
