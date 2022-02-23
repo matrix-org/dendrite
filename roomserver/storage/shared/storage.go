@@ -677,8 +677,12 @@ func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
 func (d *Database) MissingAuthPrevEvents(
 	ctx context.Context, e *gomatrixserverlib.Event,
 ) (missingAuth, missingPrev []string, err error) {
+	authEventNIDs, err := d.EventNIDs(ctx, e.AuthEventIDs())
+	if err != nil {
+		return nil, nil, fmt.Errorf("d.EventNIDs: %w", err)
+	}
 	for _, authEventID := range e.AuthEventIDs() {
-		if nids, err := d.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
+		if _, ok := authEventNIDs[authEventID]; !ok {
 			missingAuth = append(missingAuth, authEventID)
 		}
 	}
