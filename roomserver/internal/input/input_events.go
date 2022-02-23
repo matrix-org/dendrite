@@ -565,5 +565,6 @@ func (r *Inputer) calculateAndSetState(
 	if err != nil {
 		return fmt.Errorf("r.DB.SetState: %w", err)
 	}
+	succeeded = true
 	return nil
 }
