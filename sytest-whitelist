@@ -601,3 +601,8 @@ Can query remote device keys using POST after notification
 Device deletion propagates over federation
 Get left notifs in sync and /keys/changes when other user leaves
 Remote banned user is kicked and may not rejoin until unbanned
+AS can make room aliases
+AS-ghosted users can use rooms via AS
+AS-ghosted users can use rooms themselves
+Accesing an AS-hosted room alias asks the AS server
+Events in rooms with AS-hosted room aliases are sent to AS server
