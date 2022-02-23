@@ -35,6 +35,11 @@ type Database interface {
 		stateBlockNIDs []types.StateBlockNID,
 		state []types.StateEntry,
 	) (types.StateSnapshotNID, error)
+
+	MissingAuthPrevEvents(
+		ctx context.Context, e *gomatrixserverlib.Event,
+	) (missingAuth, missingPrev []string, err error)
+
 	// Look up the state of a room at each event for a list of string event IDs.
 	// Returns an error if there is an error talking to the database.
 	// The length of []types.StateAtEvent is guaranteed to equal the length of eventIDs if no error is returned.
