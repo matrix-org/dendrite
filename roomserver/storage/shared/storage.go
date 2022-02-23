@@ -674,6 +674,29 @@ func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
 	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
 }
 
+func (d *Database) MissingAuthPrevEvents(
+	ctx context.Context, e *gomatrixserverlib.Event,
+) (missingAuth, missingPrev []string, err error) {
+	authEventNIDs, err := d.EventNIDs(ctx, e.AuthEventIDs())
+	if err != nil {
+		return nil, nil, fmt.Errorf("d.EventNIDs: %w", err)
+	}
+	for _, authEventID := range e.AuthEventIDs() {
+		if _, ok := authEventNIDs[authEventID]; !ok {
+			missingAuth = append(missingAuth, authEventID)
+		}
+	}
+
+	for _, prevEventID := range e.PrevEventIDs() {
+		state, err := d.StateAtEventIDs(ctx, []string{prevEventID})
+		if err != nil || len(state) == 0 || (!state[0].IsCreate() && state[0].BeforeStateSnapshotNID == 0) {
+			missingPrev = append(missingPrev, prevEventID)
+		}
+	}
+
+	return
+}
+
 func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
