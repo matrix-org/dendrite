@@ -117,8 +117,12 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	delete(d.sessions, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
-		// trying to drain the channel results in a deadlock?
-		t.Stop()
+		if !t.Stop() {
+			select {
+			case <-t.C:
+			default:
+			}
+		}
 		delete(d.timer, sessionID)
 	}
 }
