@@ -880,11 +880,12 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// This function works out if an event exists in all of the auth sets.
 	isInAllAuthLists := func(event *gomatrixserverlib.Event) bool {
-		found := true
 		for k := range authSets {
-			found = found && isInAuthList(k, event)
+			if !isInAuthList(k, event) {
+				return false
+			}
 		}
-		return found
+		return true
 	}
 
 	// Look through all of the auth events that we've been given and work out if
