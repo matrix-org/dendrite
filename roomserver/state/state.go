@@ -851,15 +851,20 @@ func (v *StateResolution) resolveConflictsV2(
 		if err != nil {
 			return nil, err
 		}
+
+		// Only add auth events into the authEvents slice once, otherwise the
+		// check for the auth difference can become expensive and produce
+		// duplicate entries, which just waste memory and CPU time.
 		for _, event := range authSets[key] {
 			if _, ok := gotAuthEvents[event.EventID()]; !ok {
-				authEvents = append(authEvents, authSets[key]...)
+				authEvents = append(authEvents, event)
 				gotAuthEvents[event.EventID()] = struct{}{}
 			}
 		}
 	}
 
-	// Let the GC get to this.
+	// Kill the reference to this so that the GC may pick it up, since we no
+	// longer need this after this point.
 	gotAuthEvents = nil // nolint:ineffassign
 
 	// This function helps us to work out whether an event exists in one of the
