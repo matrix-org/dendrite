@@ -78,8 +78,8 @@ type sessionsDict struct {
 	timer    map[string]*time.Timer
 }
 
-// defaultTimeout is the timeout used to
-const defaultTimeOut = time.Minute * 10
+// defaultTimeout is the timeout used to clean up sessions
+const defaultTimeOut = time.Minute * 5
 
 // getCompletedStages returns the completed stages for a session.
 func (d *sessionsDict) getCompletedStages(sessionID string) []authtypes.LoginType {
@@ -95,9 +95,9 @@ func (d *sessionsDict) getCompletedStages(sessionID string) []authtypes.LoginTyp
 
 // addParams adds a registerRequest to a sessionID and starts a timer to delete that registerRequest
 func (d *sessionsDict) addParams(sessionID string, r registerRequest) {
-	d.Lock()
-	d.Unlock()
 	d.startTimer(defaultTimeOut, sessionID)
+	d.Lock()
+	defer d.Unlock()
 	d.params[sessionID] = r
 }
 
@@ -117,6 +117,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	delete(d.sessions, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
+		// trying to drain the channel results in a deadlock?
 		t.Stop()
 		delete(d.timer, sessionID)
 	}
@@ -131,20 +132,19 @@ func newSessionsDict() *sessionsDict {
 }
 
 func (d *sessionsDict) startTimer(duration time.Duration, sessionID string) {
-	d.RLock()
-	defer d.RUnlock()
-	if _, ok := d.timer[sessionID]; !ok {
-		go func() {
-			timer := time.NewTimer(duration)
-			d.Lock()
-			d.timer[sessionID] = timer
-			d.Unlock()
-			select {
-			case <-timer.C:
-				d.deleteSession(sessionID)
-			}
-		}()
+	d.Lock()
+	defer d.Unlock()
+	t, ok := d.timer[sessionID]
+	if ok {
+		if !t.Stop() {
+			<-t.C
+		}
+		t.Reset(duration)
+		return
 	}
+	d.timer[sessionID] = time.AfterFunc(duration, func() {
+		d.deleteSession(sessionID)
+	})
 }
 
 // addCompletedSessionStage records that a session has completed an auth stage
