@@ -814,6 +814,7 @@ func (v *StateResolution) resolveConflictsV2(
 	// events may be duplicated across these sets but that's OK.
 	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
 	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
+	gotAuthEvents := make(map[string]struct{}, estimate*3)
 	authDifference := make([]*gomatrixserverlib.Event, 0, estimate)
 
 	// For each conflicted event, let's try and get the needed auth events.
@@ -850,8 +851,16 @@ func (v *StateResolution) resolveConflictsV2(
 		if err != nil {
 			return nil, err
 		}
-		authEvents = append(authEvents, authSets[key]...)
+		for _, event := range authSets[key] {
+			if _, ok := gotAuthEvents[event.EventID()]; !ok {
+				authEvents = append(authEvents, authSets[key]...)
+				gotAuthEvents[event.EventID()] = struct{}{}
+			}
+		}
 	}
+
+	// Let the GC get to this.
+	gotAuthEvents = nil // nolint:ineffassign
 
 	// This function helps us to work out whether an event exists in one of the
 	// auth sets.
