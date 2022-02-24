@@ -235,7 +235,7 @@ func OnIncomingStateTypeRequest(
 		}
 		// If the user has never been in the room then stop at this point.
 		// We won't tell the user about a room they have never joined.
-		if !membershipRes.HasBeenInRoom {
+		if !membershipRes.HasBeenInRoom || membershipRes.Membership == gomatrixserverlib.Ban {
 			return util.JSONResponse{
 				Code: http.StatusForbidden,
 				JSON: jsonerror.Forbidden(fmt.Sprintf("Unknown room %q or user %q has never joined this room", roomID, device.UserID)),
