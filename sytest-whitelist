@@ -601,3 +601,7 @@ Can query remote device keys using POST after notification
 Device deletion propagates over federation
 Get left notifs in sync and /keys/changes when other user leaves
 Remote banned user is kicked and may not rejoin until unbanned
+registration remembers parameters
+registration accepts non-ascii passwords
+registration with inhibit_login inhibits login
+
