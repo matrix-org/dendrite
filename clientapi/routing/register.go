@@ -73,9 +73,10 @@ func init() {
 // It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {
 	sync.RWMutex
-	sessions map[string][]authtypes.LoginType
-	params   map[string]registerRequest
-	timer    map[string]*time.Timer
+	sessions        map[string][]authtypes.LoginType
+	params          map[string]registerRequest
+	timer           map[string]*time.Timer
+	sessionToDevice map[string]string
 }
 
 // defaultTimeout is the timeout used to clean up sessions
@@ -115,6 +116,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	defer d.Unlock()
 	delete(d.params, sessionID)
 	delete(d.sessions, sessionID)
+	delete(d.sessionToDevice, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
 		if !t.Stop() {
@@ -129,9 +131,10 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
-		sessions: make(map[string][]authtypes.LoginType),
-		params:   make(map[string]registerRequest),
-		timer:    make(map[string]*time.Timer),
+		sessions:        make(map[string][]authtypes.LoginType),
+		params:          make(map[string]registerRequest),
+		timer:           make(map[string]*time.Timer),
+		sessionToDevice: make(map[string]string),
 	}
 }
 
@@ -163,6 +166,20 @@ func (d *sessionsDict) addCompletedSessionStage(sessionID string, stage authtype
 		}
 	}
 	d.sessions[sessionID] = append(sessions.sessions[sessionID], stage)
+}
+
+func (d *sessionsDict) addDeviceToDelete(sessionID, deviceID string) {
+	d.startTimer(defaultTimeOut, sessionID)
+	d.Lock()
+	defer d.Unlock()
+	d.sessionToDevice[sessionID] = deviceID
+}
+
+func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
+	d.RLock()
+	defer d.RUnlock()
+	deviceID, ok := d.sessionToDevice[sessionID]
+	return deviceID, ok
 }
 
 var (
