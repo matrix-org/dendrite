@@ -30,7 +30,6 @@ import (
 
 // https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-devices
 type deviceJSON struct {
-	UserID      string `json:"user_id"`
 	DeviceID    string `json:"device_id"`
 	DisplayName string `json:"display_name"`
 	LastSeenIP  string `json:"last_seen_ip"`
@@ -79,7 +78,6 @@ func GetDeviceByID(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: deviceJSON{
-			UserID:      targetDevice.UserID,
 			DeviceID:    targetDevice.ID,
 			DisplayName: targetDevice.DisplayName,
 			LastSeenIP:  stripIPPort(targetDevice.LastSeenIP),
@@ -105,7 +103,6 @@ func GetDevicesByLocalpart(
 
 	for _, dev := range queryRes.Devices {
 		res.Devices = append(res.Devices, deviceJSON{
-			UserID:      dev.UserID,
 			DeviceID:    dev.ID,
 			DisplayName: dev.DisplayName,
 			LastSeenIP:  stripIPPort(dev.LastSeenIP),
