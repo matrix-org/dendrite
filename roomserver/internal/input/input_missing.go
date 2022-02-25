@@ -35,7 +35,7 @@ func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
 	for _, event := range eventsByID {
 		allEvents = append(allEvents, event)
 	}
-	return allEvents
+	return gomatrixserverlib.ReverseTopologicalOrdering(allEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
 }
 
 type missingStateReq struct {
