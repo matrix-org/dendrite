@@ -74,7 +74,7 @@ func Password(
 	if _, authErr := typePassword.Login(req.Context(), &r.Auth.PasswordRequest); authErr != nil {
 		return *authErr
 	}
-	AddCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
+	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	// Check the new password strength.
 	if resErr = validatePassword(r.NewPassword); resErr != nil {

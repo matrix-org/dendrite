@@ -162,7 +162,7 @@ func AuthFallback(
 			}
 
 			// Success. Add recaptcha as a completed login flow
-			AddCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
+			sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
 
 			serveSuccess()
 			return nil
