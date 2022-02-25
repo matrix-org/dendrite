@@ -56,8 +56,6 @@ func SendEventWithState(
 		return err
 	}
 
-	outliers = gomatrixserverlib.ReverseTopologicalOrdering(outliers, gomatrixserverlib.TopologicalOrderByAuthEvents)
-
 	var ires []InputRoomEvent
 	for _, outlier := range outliers {
 		if haveEventIDs[outlier.EventID()] {
