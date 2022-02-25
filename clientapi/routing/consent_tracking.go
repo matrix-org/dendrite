@@ -131,8 +131,8 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) {
-	res := &userapi.QueryOutdatedPolicyUsersResponse{}
-	if err := userAPI.GetOutdatedPolicy(context.Background(), &userapi.QueryOutdatedPolicyUsersRequest{
+	res := &userapi.QueryOutdatedPolicyResponse{}
+	if err := userAPI.QueryOutdatedPolicy(context.Background(), &userapi.QueryOutdatedPolicyRequest{
 		PolicyVersion: cfgClient.Matrix.UserConsentOptions.Version,
 	}, res); err != nil {
 		logrus.WithError(err).Error("unable to fetch users with outdated consent policy")

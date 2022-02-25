@@ -46,7 +46,7 @@ type UserInternalAPI interface {
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error
-	GetOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyUsersRequest, res *QueryOutdatedPolicyUsersResponse) error
+	QueryOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyRequest, res *QueryOutdatedPolicyResponse) error
 	PerformUpdatePolicyVersion(ctx context.Context, req *UpdatePolicyVersionRequest, res *UpdatePolicyVersionResponse) error
 }
 
@@ -349,13 +349,13 @@ type QueryPolicyVersionResponse struct {
 	PolicyVersion string
 }
 
-// QueryOutdatedPolicyUsersRequest is the request for QueryOutdatedPolicyUsersRequest
-type QueryOutdatedPolicyUsersRequest struct {
+// QueryOutdatedPolicyRequest is the request for QueryOutdatedPolicyRequest
+type QueryOutdatedPolicyRequest struct {
 	PolicyVersion string
 }
 
-// QueryOutdatedPolicyUsersResponse is the response for QueryOutdatedPolicyUsersRequest
-type QueryOutdatedPolicyUsersResponse struct {
+// QueryOutdatedPolicyResponse is the response for QueryOutdatedPolicyRequest
+type QueryOutdatedPolicyResponse struct {
 	OutdatedUsers []string
 }
 

@@ -254,15 +254,15 @@ func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.Query
 }
 
 func (h *httpUserInternalAPI) QueryPolicyVersion(ctx context.Context, req *api.QueryPolicyVersionRequest, res *api.QueryPolicyVersionResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPolicyVersion")
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryPolicyVersionPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
-func (h *httpUserInternalAPI) GetOutdatedPolicy(ctx context.Context, req *api.QueryOutdatedPolicyUsersRequest, res *api.QueryOutdatedPolicyUsersResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+func (h *httpUserInternalAPI) QueryOutdatedPolicy(ctx context.Context, req *api.QueryOutdatedPolicyRequest, res *api.QueryOutdatedPolicyResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryOutdatedPolicy")
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryOutdatedPolicyUsersPath
@@ -270,7 +270,7 @@ func (h *httpUserInternalAPI) GetOutdatedPolicy(ctx context.Context, req *api.Qu
 }
 
 func (h *httpUserInternalAPI) PerformUpdatePolicyVersion(ctx context.Context, req *api.UpdatePolicyVersionRequest, res *api.UpdatePolicyVersionResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyBackup")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUpdatePolicyVersion")
 	defer span.Finish()
 
 	apiURL := h.apiURL + PerformUpdatePolicyVersionPath

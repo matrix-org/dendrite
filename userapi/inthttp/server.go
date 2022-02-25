@@ -281,12 +281,12 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	)
 	internalAPIMux.Handle(QueryOutdatedPolicyUsersPath,
 		httputil.MakeInternalAPI("queryOutdatedPolicyUsers", func(req *http.Request) util.JSONResponse {
-			request := api.QueryOutdatedPolicyUsersRequest{}
-			response := api.QueryOutdatedPolicyUsersResponse{}
+			request := api.QueryOutdatedPolicyRequest{}
+			response := api.QueryOutdatedPolicyResponse{}
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
-			err := s.GetOutdatedPolicy(req.Context(), &request, &response)
+			err := s.QueryOutdatedPolicy(req.Context(), &request, &response)
 			if err != nil {
 				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
 			}

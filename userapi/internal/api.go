@@ -610,10 +610,10 @@ func (a *UserInternalAPI) QueryPolicyVersion(
 	return nil
 }
 
-func (a *UserInternalAPI) GetOutdatedPolicy(
+func (a *UserInternalAPI) QueryOutdatedPolicy(
 	ctx context.Context,
-	req *api.QueryOutdatedPolicyUsersRequest,
-	res *api.QueryOutdatedPolicyUsersResponse,
+	req *api.QueryOutdatedPolicyRequest,
+	res *api.QueryOutdatedPolicyResponse,
 ) error {
 	var err error
 	res.OutdatedUsers, err = a.DB.GetOutdatedPolicy(ctx, req.PolicyVersion)
