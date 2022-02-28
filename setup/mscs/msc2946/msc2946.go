@@ -125,11 +125,7 @@ func federatedSpacesHandler(
 		fsAPI:              fsAPI,
 		inMemoryBatchCache: inMemoryBatchCache,
 	}
-	res := w.walk()
-	return util.JSONResponse{
-		Code: 200,
-		JSON: res,
-	}
+	return w.walk()
 }
 
 func spacesHandler(
@@ -158,11 +154,7 @@ func spacesHandler(
 			fsAPI:              fsAPI,
 			inMemoryBatchCache: inMemoryBatchCache,
 		}
-		res := w.walk()
-		return util.JSONResponse{
-			Code: 200,
-			JSON: res,
-		}
+		return w.walk()
 	}
 }
 
