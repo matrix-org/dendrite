@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -219,7 +220,7 @@ func (w *walker) walk() util.JSONResponse {
 	}}
 	processed := make(set)
 	for len(unvisited) > 0 {
-		if len(discoveredRooms) > w.limit {
+		if len(discoveredRooms) >= w.limit {
 			break
 		}
 
@@ -290,22 +291,21 @@ func (w *walker) walk() util.JSONResponse {
 			continue
 		}
 
-		uniqueRooms := make(map[string][]string)
-		for _, ev := range discoveredChildEvents {
+		// For each referenced room ID in the child events being returned to the caller
+		// add the room ID to the queue of unvisited rooms. Loop from the beginning.
+		// We need to invert the order here because the child events are lo->hi on the timestamp,
+		// so we need to ensure we pop in the same lo->hi order, which won't be the case if we
+		// insert the highest timestamp last in a stack.
+		for i := len(discoveredChildEvents) - 1; i >= 0; i-- {
 			spaceContent := struct {
 				Via []string `json:"via"`
 			}{}
+			ev := discoveredChildEvents[i]
 			_ = json.Unmarshal(ev.Content, &spaceContent)
-			uniqueRooms[ev.StateKey] = spaceContent.Via
-		}
-
-		// For each referenced room ID in the child events being returned to the caller
-		// add the room ID to the queue of unvisited rooms. Loop from the beginning.
-		for roomID, vias := range uniqueRooms {
 			unvisited = append(unvisited, roomVisit{
-				roomID: roomID,
+				roomID: ev.StateKey,
 				depth:  rv.depth + 1,
-				vias:   vias,
+				vias:   spaceContent.Via,
 			})
 		}
 	}
@@ -540,6 +540,11 @@ func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946Stri
 			el = append(el, *strip)
 		}
 	}
+	// sort by origin_server_ts as per MSC2946
+	sort.Slice(el, func(i, j int) bool {
+		return el[i].OriginServerTS < el[j].OriginServerTS
+	})
+
 	return el, nil
 }
 
@@ -550,11 +555,12 @@ func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEve
 		return nil
 	}
 	return &gomatrixserverlib.MSC2946StrippedEvent{
-		Type:     ev.Type(),
-		StateKey: *ev.StateKey(),
-		Content:  ev.Content(),
-		Sender:   ev.Sender(),
-		RoomID:   ev.RoomID(),
+		Type:           ev.Type(),
+		StateKey:       *ev.StateKey(),
+		Content:        ev.Content(),
+		Sender:         ev.Sender(),
+		RoomID:         ev.RoomID(),
+		OriginServerTS: ev.OriginServerTS(),
 	}
 }
 
