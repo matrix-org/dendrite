@@ -102,7 +102,10 @@ func main() {
 		if err != nil {
 			logrus.Fatalf("Failed to update password for user %s: %s", *username, err.Error())
 		}
-		logrus.Infoln("Updated password for user", *username)
+		if _, err = accountDB.RemoveAllDevices(context.Background(), *username, ""); err != nil {
+			logrus.Fatalf("Failed to remove all devices: %s", err.Error())
+		}
+		logrus.Infof("Updated password for user %s and invalidated all logins\n", *username)
 		return
 	}
 
