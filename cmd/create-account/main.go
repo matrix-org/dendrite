@@ -68,7 +68,7 @@ var (
 func main() {
 	name := os.Args[0]
 	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name)
+		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name, name)
 		flag.PrintDefaults()
 	}
 	cfg := setup.ParseFlags(true)
