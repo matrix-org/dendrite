@@ -48,7 +48,7 @@ const (
 
 type MSC2946ClientResponse struct {
 	Rooms     []gomatrixserverlib.MSC2946Room `json:"rooms"`
-	NextBatch string                          `json:"next_batch"`
+	NextBatch string                          `json:"next_batch,omitempty"`
 }
 
 // Enable this MSC
@@ -260,8 +260,8 @@ func (w *walker) walk() util.JSONResponse {
 		if processed.isSet(rv.roomID) || rv.roomID == "" || (w.maxDepth > 0 && rv.depth > w.maxDepth) {
 			continue
 		}
-		// Mark this room as processed.
 
+		// Mark this room as processed.
 		processed.set(rv.roomID)
 
 		// if this room is not a space room, skip.
@@ -304,6 +304,13 @@ func (w *walker) walk() util.JSONResponse {
 			if fedRes != nil {
 				discoveredChildEvents = fedRes.Room.ChildrenState
 				discoveredRooms = append(discoveredRooms, fedRes.Room)
+				if len(fedRes.Children) > 0 {
+					discoveredRooms = append(discoveredRooms, fedRes.Children...)
+				}
+				// mark this room as a space room as the federated server responded.
+				// we need to do this so we add the children of this room to the unvisited stack
+				// as these children may be rooms we do know about.
+				roomType = ConstCreateEventContentValueSpace
 			}
 		}
 
@@ -407,7 +414,7 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) (*gomatrixserve
 	if w.caller == nil {
 		return nil, nil
 	}
-	util.GetLogger(w.ctx).Infof("Querying federatedRoomInfo via %+v", vias)
+	util.GetLogger(w.ctx).Infof("Querying %s via %+v", roomID, vias)
 	ctx := context.Background()
 	// query more of the spaces graph using these servers
 	for _, serverName := range vias {
