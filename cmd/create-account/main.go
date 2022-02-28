@@ -48,18 +48,21 @@ Example:
 	# read password from stdin
 	%s --config dendrite.yaml -username alice -passwordstdin < my.pass
 	cat my.pass | %s --config dendrite.yaml -username alice -passwordstdin
+	# reset password for a user, can be used with a combination above to read the password
+	%s --config dendrite.yaml -reset-password -username alice -password foobarbaz
 
 Arguments:
 
 `
 
 var (
-	username = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
-	password = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
-	pwdFile  = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
-	pwdStdin = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	askPass  = flag.Bool("ask-pass", false, "Ask for the password to use")
-	isAdmin  = flag.Bool("admin", false, "Create an admin account")
+	username      = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	password      = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
+	pwdFile       = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
+	pwdStdin      = flag.Bool("passwordstdin", false, "Reads the password from stdin")
+	askPass       = flag.Bool("ask-pass", false, "Ask for the password to use")
+	isAdmin       = flag.Bool("admin", false, "Create an admin account")
+	resetPassword = flag.Bool("reset-password", false, "Resets the password for the given username")
 )
 
 func main() {
@@ -93,6 +96,16 @@ func main() {
 	if *isAdmin {
 		accType = api.AccountTypeAdmin
 	}
+
+	if *resetPassword {
+		err = accountDB.SetPassword(context.Background(), *username, pass)
+		if err != nil {
+			logrus.Fatalf("Failed to update password for user %s: %s", *username, err.Error())
+		}
+		logrus.Infoln("Updated password for user", *username)
+		return
+	}
+
 	_, err = accountDB.CreateAccount(context.Background(), *username, pass, "", accType)
 	if err != nil {
 		logrus.Fatalln("Failed to create the account:", err.Error())
