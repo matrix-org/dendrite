@@ -20,12 +20,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
-	chttputil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/hooks"
@@ -44,10 +45,9 @@ const (
 	ConstSpaceParentEventType  = "m.space.parent"
 )
 
-// Defaults sets the request defaults
-func Defaults(r *gomatrixserverlib.MSC2946SpacesRequest) {
-	r.Limit = 2000
-	r.MaxRoomsPerSpace = -1
+type MSC2946ClientResponse struct {
+	Rooms     []gomatrixserverlib.MSC2946Room `json:"rooms"`
+	NextBatch string                          `json:"next_batch"`
 }
 
 // Enable this MSC
@@ -69,12 +69,11 @@ func Enable(
 			)
 		}
 	})
+	clientAPI := httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(db, rsAPI, fsAPI, base.Cfg.Global.ServerName))
+	base.PublicClientAPIMux.Handle("/v1/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
+	base.PublicClientAPIMux.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
 
-	base.PublicClientAPIMux.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/spaces",
-		httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(db, rsAPI, fsAPI, base.Cfg.Global.ServerName)),
-	).Methods(http.MethodPost, http.MethodOptions)
-
-	base.PublicFederationAPIMux.Handle("/unstable/org.matrix.msc2946/spaces/{roomID}", httputil.MakeExternalAPI(
+	fedAPI := httputil.MakeExternalAPI(
 		"msc2946_fed_spaces", func(req *http.Request) util.JSONResponse {
 			fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
 				req, time.Now(), base.Cfg.Global.ServerName, keyRing,
@@ -90,7 +89,9 @@ func Enable(
 			roomID := params["roomID"]
 			return federatedSpacesHandler(req.Context(), fedReq, roomID, db, rsAPI, fsAPI, base.Cfg.Global.ServerName)
 		},
-	)).Methods(http.MethodPost, http.MethodOptions)
+	)
+	base.PublicFederationAPIMux.Handle("/unstable/org.matrix.msc2946/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
+	base.PublicFederationAPIMux.Handle("/v1/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
 	return nil
 }
 
@@ -100,20 +101,24 @@ func federatedSpacesHandler(
 	thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	inMemoryBatchCache := make(map[string]set)
-	var r gomatrixserverlib.MSC2946SpacesRequest
-	Defaults(&r)
-	if err := json.Unmarshal(fedReq.Content(), &r); err != nil {
+	u, err := url.Parse(fedReq.RequestURI())
+	if err != nil {
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			Code: 400,
+			JSON: jsonerror.InvalidParam("bad request uri"),
 		}
 	}
+
 	w := walker{
-		req:        &r,
-		rootRoomID: roomID,
-		serverName: fedReq.Origin(),
-		thisServer: thisServer,
-		ctx:        ctx,
+		rootRoomID:    roomID,
+		serverName:    fedReq.Origin(),
+		thisServer:    thisServer,
+		ctx:           ctx,
+		suggestedOnly: u.Query().Get("suggested_only") == "true",
+		limit:         1000,
+		// The main difference is that it does not recurse into spaces and does not support pagination.
+		// This is somewhat equivalent to a Client-Server request with a max_depth=1.
+		maxDepth: 1,
 
 		db:                 db,
 		rsAPI:              rsAPI,
@@ -139,17 +144,14 @@ func spacesHandler(
 			return util.ErrorResponse(err)
 		}
 		roomID := params["roomID"]
-		var r gomatrixserverlib.MSC2946SpacesRequest
-		Defaults(&r)
-		if resErr := chttputil.UnmarshalJSONRequest(req, &r); resErr != nil {
-			return *resErr
-		}
 		w := walker{
-			req:        &r,
-			rootRoomID: roomID,
-			caller:     device,
-			thisServer: thisServer,
-			ctx:        req.Context(),
+			suggestedOnly: req.URL.Query().Get("suggested_only") == "true",
+			limit:         parseInt(req.URL.Query().Get("limit"), 1000),
+			maxDepth:      parseInt(req.URL.Query().Get("max_depth"), -1),
+			rootRoomID:    roomID,
+			caller:        device,
+			thisServer:    thisServer,
+			ctx:           req.Context(),
 
 			db:                 db,
 			rsAPI:              rsAPI,
@@ -165,28 +167,21 @@ func spacesHandler(
 }
 
 type walker struct {
-	req        *gomatrixserverlib.MSC2946SpacesRequest
-	rootRoomID string
-	caller     *userapi.Device
-	serverName gomatrixserverlib.ServerName
-	thisServer gomatrixserverlib.ServerName
-	db         Database
-	rsAPI      roomserver.RoomserverInternalAPI
-	fsAPI      fs.FederationInternalAPI
-	ctx        context.Context
+	rootRoomID    string
+	caller        *userapi.Device
+	serverName    gomatrixserverlib.ServerName
+	thisServer    gomatrixserverlib.ServerName
+	db            Database
+	rsAPI         roomserver.RoomserverInternalAPI
+	fsAPI         fs.FederationInternalAPI
+	ctx           context.Context
+	suggestedOnly bool
+	limit         int
+	maxDepth      int
 
 	// user ID|device ID|batch_num => event/room IDs sent to client
 	inMemoryBatchCache map[string]set
 	mu                 sync.Mutex
-}
-
-func (w *walker) roomIsExcluded(roomID string) bool {
-	for _, exclRoom := range w.req.ExcludeRooms {
-		if exclRoom == roomID {
-			return true
-		}
-	}
-	return false
 }
 
 func (w *walker) callerID() string {
@@ -217,123 +212,139 @@ func (w *walker) markSent(id string) {
 	w.inMemoryBatchCache[w.callerID()] = m
 }
 
-func (w *walker) walk() *gomatrixserverlib.MSC2946SpacesResponse {
-	var res gomatrixserverlib.MSC2946SpacesResponse
+type roomVisit struct {
+	roomID string
+	depth  int
+}
+
+func (w *walker) walk() util.JSONResponse {
+	if !w.authorised(w.rootRoomID) {
+		if w.caller != nil {
+			// CS API format
+			return util.JSONResponse{
+				Code: 403,
+				JSON: jsonerror.Forbidden("room is unknown/forbidden"),
+			}
+		} else {
+			// SS API format
+			return util.JSONResponse{
+				Code: 404,
+				JSON: jsonerror.NotFound("room is unknown/forbidden"),
+			}
+		}
+	}
+
+	var discoveredRooms []gomatrixserverlib.MSC2946Room
+
 	// Begin walking the graph starting with the room ID in the request in a queue of unvisited rooms
-	unvisited := []string{w.rootRoomID}
+	// Depth first -> stack data structure
+	unvisited := []roomVisit{roomVisit{
+		roomID: w.rootRoomID,
+		depth:  0,
+	}}
 	processed := make(set)
 	for len(unvisited) > 0 {
-		roomID := unvisited[0]
-		unvisited = unvisited[1:]
-		// If this room has already been processed, skip. NB: do not remember this between calls
-		if processed[roomID] || roomID == "" {
+		if len(discoveredRooms) > w.limit {
+			break
+		}
+
+		// pop the stack
+		rv := unvisited[len(unvisited)-1]
+		unvisited = unvisited[:len(unvisited)-1]
+		// If this room has already been processed, skip.
+		// If this room exceeds the specified depth, skip.
+		if processed[rv.roomID] || rv.roomID == "" || (w.maxDepth > 0 && rv.depth > w.maxDepth) {
 			continue
 		}
 		// Mark this room as processed.
-		processed[roomID] = true
+		processed[rv.roomID] = true
 
 		// Collect rooms/events to send back (either locally or fetched via federation)
-		var discoveredRooms []gomatrixserverlib.MSC2946Room
-		var discoveredEvents []gomatrixserverlib.MSC2946StrippedEvent
+		var discoveredChildEvents []gomatrixserverlib.MSC2946StrippedEvent
 
 		// If we know about this room and the caller is authorised (joined/world_readable) then pull
 		// events locally
-		if w.roomExists(roomID) && w.authorised(roomID) {
-			// Get all `m.space.child` and `m.space.parent` state events for the room. *In addition*, get
-			// all `m.space.child` and `m.space.parent` state events which *point to* (via `state_key` or `content.room_id`)
-			// this room. This requires servers to store reverse lookups.
-			events, err := w.references(roomID)
+		if w.roomExists(rv.roomID) && w.authorised(rv.roomID) {
+			// Get all `m.space.child` state events for this room
+			events, err := w.childReferences(rv.roomID)
 			if err != nil {
-				util.GetLogger(w.ctx).WithError(err).WithField("room_id", roomID).Error("failed to extract references for room")
+				util.GetLogger(w.ctx).WithError(err).WithField("room_id", rv.roomID).Error("failed to extract references for room")
 				continue
 			}
-			discoveredEvents = events
+			discoveredChildEvents = events
 
-			pubRoom := w.publicRoomsChunk(roomID)
+			pubRoom := w.publicRoomsChunk(rv.roomID)
 			roomType := ""
-			create := w.stateEvent(roomID, gomatrixserverlib.MRoomCreate, "")
+			create := w.stateEvent(rv.roomID, gomatrixserverlib.MRoomCreate, "")
 			if create != nil {
 				// escape the `.`s so gjson doesn't think it's nested
 				roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 			}
 
-			// Add the total number of events to `PublicRoomsChunk` under `num_refs`. Add `PublicRoomsChunk` to `rooms`.
 			discoveredRooms = append(discoveredRooms, gomatrixserverlib.MSC2946Room{
-				PublicRoom: *pubRoom,
-				NumRefs:    len(discoveredEvents),
-				RoomType:   roomType,
+				PublicRoom:    *pubRoom,
+				RoomType:      roomType,
+				ChildrenState: events,
 			})
 		} else {
 			// attempt to query this room over federation, as either we've never heard of it before
 			// or we've left it and hence are not authorised (but info may be exposed regardless)
-			fedRes, err := w.federatedRoomInfo(roomID)
+			fedRes, err := w.federatedRoomInfo(rv.roomID)
 			if err != nil {
-				util.GetLogger(w.ctx).WithError(err).WithField("room_id", roomID).Errorf("failed to query federated spaces")
+				util.GetLogger(w.ctx).WithError(err).WithField("room_id", rv.roomID).Errorf("failed to query federated spaces")
 				continue
 			}
 			if fedRes != nil {
-				discoveredRooms = fedRes.Rooms
-				discoveredEvents = fedRes.Events
+				discoveredChildEvents = fedRes.Room.ChildrenState
+				discoveredRooms = append(discoveredRooms, fedRes.Room)
 			}
 		}
 
-		// If this room has not ever been in `rooms` (across multiple requests), send it now
+		// mark processed rooms for pagination purposes
 		for _, room := range discoveredRooms {
-			if !w.alreadySent(room.RoomID) && !w.roomIsExcluded(room.RoomID) {
-				res.Rooms = append(res.Rooms, room)
+			if !w.alreadySent(room.RoomID) {
 				w.markSent(room.RoomID)
 			}
 		}
 
 		uniqueRooms := make(set)
-
-		// If this is the root room from the original request, insert all these events into `events` if
-		// they haven't been added before (across multiple requests).
-		if w.rootRoomID == roomID {
-			for _, ev := range discoveredEvents {
-				if !w.alreadySent(eventKey(&ev)) {
-					res.Events = append(res.Events, ev)
-					uniqueRooms[ev.RoomID] = true
-					uniqueRooms[spaceTargetStripped(&ev)] = true
-					w.markSent(eventKey(&ev))
-				}
-			}
-		} else {
-			// Else add them to `events` honouring the `limit` and `max_rooms_per_space` values. If either
-			// are exceeded, stop adding events. If the event has already been added, do not add it again.
-			numAdded := 0
-			for _, ev := range discoveredEvents {
-				if w.req.Limit > 0 && len(res.Events) >= w.req.Limit {
-					break
-				}
-				if w.req.MaxRoomsPerSpace > 0 && numAdded >= w.req.MaxRoomsPerSpace {
-					break
-				}
-				if w.alreadySent(eventKey(&ev)) {
-					continue
-				}
-				// Skip the room if it's part of exclude_rooms but ONLY IF the source matches, as we still
-				// want to catch arrows which point to excluded rooms.
-				if w.roomIsExcluded(ev.RoomID) {
-					continue
-				}
-				res.Events = append(res.Events, ev)
-				uniqueRooms[ev.RoomID] = true
-				uniqueRooms[spaceTargetStripped(&ev)] = true
-				w.markSent(eventKey(&ev))
-				// we don't distinguish between child state events and parent state events for the purposes of
-				// max_rooms_per_space, maybe we should?
-				numAdded++
-			}
+		for _, ev := range discoveredChildEvents {
+			uniqueRooms[ev.StateKey] = true
 		}
 
-		// For each referenced room ID in the events being returned to the caller (both parent and child)
+		// For each referenced room ID in the child events being returned to the caller
 		// add the room ID to the queue of unvisited rooms. Loop from the beginning.
 		for roomID := range uniqueRooms {
-			unvisited = append(unvisited, roomID)
+			unvisited = append(unvisited, roomVisit{
+				roomID: roomID,
+				depth:  rv.depth + 1,
+			})
 		}
 	}
-	return &res
+	if w.caller != nil {
+		// return CS API format
+		return util.JSONResponse{
+			Code: 200,
+			JSON: MSC2946ClientResponse{
+				Rooms: discoveredRooms,
+			},
+		}
+	}
+	// return SS API format
+	// the first discovered room will be the room asked for, and subsequent ones the depth=1 children
+	if len(discoveredRooms) == 0 {
+		return util.JSONResponse{
+			Code: 404,
+			JSON: jsonerror.NotFound("room is unknown/forbidden"),
+		}
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: gomatrixserverlib.MSC2946SpacesResponse{
+			Room:     discoveredRooms[0],
+			Children: discoveredRooms[1:],
+		},
+	}
 }
 
 func (w *walker) stateEvent(roomID, evType, stateKey string) *gomatrixserverlib.HeaderedEvent {
@@ -398,10 +409,7 @@ func (w *walker) federatedRoomInfo(roomID string) (*gomatrixserverlib.MSC2946Spa
 		if serverName == string(w.thisServer) {
 			continue
 		}
-		res, err := w.fsAPI.MSC2946Spaces(ctx, gomatrixserverlib.ServerName(serverName), roomID, gomatrixserverlib.MSC2946SpacesRequest{
-			Limit:            w.req.Limit,
-			MaxRoomsPerSpace: w.req.MaxRoomsPerSpace,
-		})
+		res, err := w.fsAPI.MSC2946Spaces(ctx, gomatrixserverlib.ServerName(serverName), roomID, w.suggestedOnly)
 		if err != nil {
 			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call MSC2946Spaces on server %s", serverName)
 			continue
@@ -514,14 +522,17 @@ func (w *walker) authorisedUser(roomID string) bool {
 	return false
 }
 
-// references returns all references pointing to or from this room.
-func (w *walker) references(roomID string) ([]gomatrixserverlib.MSC2946StrippedEvent, error) {
+// references returns all child references pointing to or from this room.
+func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946StrippedEvent, error) {
 	events, err := w.db.References(w.ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
 	el := make([]gomatrixserverlib.MSC2946StrippedEvent, 0, len(events))
 	for _, ev := range events {
+		if ev.Type() != ConstSpaceChildEventType {
+			continue
+		}
 		// only return events that have a `via` key as per MSC1772
 		// else we'll incorrectly walk redacted events (as the link
 		// is in the state_key)
@@ -566,4 +577,12 @@ func spaceTargetStripped(event *gomatrixserverlib.MSC2946StrippedEvent) string {
 		return event.StateKey
 	}
 	return ""
+}
+
+func parseInt(intstr string, defaultVal int) int {
+	i, err := strconv.ParseInt(intstr, 10, 32)
+	if err != nil {
+		return defaultVal
+	}
+	return int(i)
 }
