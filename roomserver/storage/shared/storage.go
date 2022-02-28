@@ -979,6 +979,62 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	return nil, nil
 }
 
+// Same as GetStateEvent but returns all matching state events with this event type. Returns no error
+// if there are no events with this event type.
+func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	roomInfo, err := d.RoomInfo(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	if roomInfo == nil {
+		return nil, fmt.Errorf("room %s doesn't exist", roomID)
+	}
+	// e.g invited rooms
+	if roomInfo.IsStub {
+		return nil, nil
+	}
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	if err == sql.ErrNoRows {
+		// No rooms have an event of this type, otherwise we'd have an event type NID
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	if err != nil {
+		return nil, err
+	}
+	var eventNIDs []types.EventNID
+	for _, e := range entries {
+		if e.EventTypeNID == eventTypeNID {
+			eventNIDs = append(eventNIDs, e.EventNID)
+		}
+	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
+	// return the events requested
+	eventPairs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(eventPairs) == 0 {
+		return nil, nil
+	}
+	var result []*gomatrixserverlib.HeaderedEvent
+	for _, pair := range eventPairs {
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[pair.EventNID], pair.EventJSON, false, roomInfo.RoomVersion)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ev.Headered(roomInfo.RoomVersion))
+	}
+
+	return result, nil
+}
+
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
 func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
 	var membershipState tables.MembershipState
