@@ -514,7 +514,7 @@ func (w *walker) authorisedUser(roomID string) bool {
 	hisVisEv := queryRes.StateEvents[hisVisTuple]
 	if memberEv != nil {
 		membership, _ := memberEv.Membership()
-		if membership == gomatrixserverlib.Join {
+		if membership == gomatrixserverlib.Join || membership == gomatrixserverlib.Invite {
 			return true
 		}
 	}
