@@ -40,9 +40,10 @@ import (
 )
 
 const (
-	ConstCreateEventContentKey = "type"
-	ConstSpaceChildEventType   = "m.space.child"
-	ConstSpaceParentEventType  = "m.space.parent"
+	ConstCreateEventContentKey        = "type"
+	ConstCreateEventContentValueSpace = "m.space"
+	ConstSpaceChildEventType          = "m.space.child"
+	ConstSpaceParentEventType         = "m.space.parent"
 )
 
 type MSC2946ClientResponse struct {
@@ -230,7 +231,7 @@ func (w *walker) walk() util.JSONResponse {
 
 	// Begin walking the graph starting with the room ID in the request in a queue of unvisited rooms
 	// Depth first -> stack data structure
-	unvisited := []roomVisit{roomVisit{
+	unvisited := []roomVisit{{
 		roomID: w.rootRoomID,
 		depth:  0,
 	}}
@@ -251,6 +252,14 @@ func (w *walker) walk() util.JSONResponse {
 		// Mark this room as processed.
 		processed[rv.roomID] = true
 
+		// if this room is not a space room, skip.
+		var roomType string
+		create := w.stateEvent(rv.roomID, gomatrixserverlib.MRoomCreate, "")
+		if create != nil {
+			// escape the `.`s so gjson doesn't think it's nested
+			roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
+		}
+
 		// Collect rooms/events to send back (either locally or fetched via federation)
 		var discoveredChildEvents []gomatrixserverlib.MSC2946StrippedEvent
 
@@ -266,12 +275,6 @@ func (w *walker) walk() util.JSONResponse {
 			discoveredChildEvents = events
 
 			pubRoom := w.publicRoomsChunk(rv.roomID)
-			roomType := ""
-			create := w.stateEvent(rv.roomID, gomatrixserverlib.MRoomCreate, "")
-			if create != nil {
-				// escape the `.`s so gjson doesn't think it's nested
-				roomType = gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
-			}
 
 			discoveredRooms = append(discoveredRooms, gomatrixserverlib.MSC2946Room{
 				PublicRoom:    *pubRoom,
@@ -297,6 +300,12 @@ func (w *walker) walk() util.JSONResponse {
 			if !w.alreadySent(room.RoomID) {
 				w.markSent(room.RoomID)
 			}
+		}
+
+		// don't walk the children
+		// if the parent is not a space room
+		if roomType != ConstCreateEventContentValueSpace {
+			continue
 		}
 
 		uniqueRooms := make(set)
@@ -375,9 +384,9 @@ func (w *walker) federatedRoomInfo(roomID string) (*gomatrixserverlib.MSC2946Spa
 		return nil, nil
 	}
 	// extract events which point to this room ID and extract their vias
-	events, err := w.db.References(w.ctx, roomID)
+	events, err := w.db.ChildReferences(w.ctx, roomID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get References events: %w", err)
+		return nil, fmt.Errorf("failed to get ChildReferences events: %w", err)
 	}
 	vias := make(set)
 	for _, ev := range events {
@@ -516,15 +525,22 @@ func (w *walker) authorisedUser(roomID string) bool {
 
 // references returns all child references pointing to or from this room.
 func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946StrippedEvent, error) {
-	events, err := w.db.References(w.ctx, roomID)
+	// don't return any child refs if the room is not a space room
+	create := w.stateEvent(roomID, gomatrixserverlib.MRoomCreate, "")
+	if create != nil {
+		// escape the `.`s so gjson doesn't think it's nested
+		roomType := gjson.GetBytes(create.Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
+		if roomType != ConstCreateEventContentValueSpace {
+			return nil, nil
+		}
+	}
+
+	events, err := w.db.ChildReferences(w.ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
 	el := make([]gomatrixserverlib.MSC2946StrippedEvent, 0, len(events))
 	for _, ev := range events {
-		if ev.Type() != ConstSpaceChildEventType {
-			continue
-		}
 		// only return events that have a `via` key as per MSC1772
 		// else we'll incorrectly walk redacted events (as the link
 		// is in the state_key)

@@ -34,15 +34,15 @@ var (
 type Database interface {
 	// StoreReference persists a child or parent space mapping.
 	StoreReference(ctx context.Context, he *gomatrixserverlib.HeaderedEvent) error
-	// References returns all events which have the given roomID as a parent or child space.
-	References(ctx context.Context, roomID string) ([]*gomatrixserverlib.HeaderedEvent, error)
+	// ChildReferences returns all space child events in the given room.
+	ChildReferences(ctx context.Context, roomID string) ([]*gomatrixserverlib.HeaderedEvent, error)
 }
 
 type DB struct {
-	db              *sql.DB
-	writer          sqlutil.Writer
-	insertEdgeStmt  *sql.Stmt
-	selectEdgesStmt *sql.Stmt
+	db                    *sql.DB
+	writer                sqlutil.Writer
+	insertEdgeStmt        *sql.Stmt
+	selectEdgesOfTypeStmt *sql.Stmt
 }
 
 // NewDatabase loads the database for msc2836
@@ -84,9 +84,9 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	`); err != nil {
 		return nil, err
 	}
-	if d.selectEdgesStmt, err = d.db.Prepare(`
+	if d.selectEdgesOfTypeStmt, err = d.db.Prepare(`
 		SELECT room_version, event_json FROM msc2946_edges
-		WHERE source_room_id = $1 OR dest_room_id = $2
+		WHERE source_room_id = $1 AND rel_type = $2
 	`); err != nil {
 		return nil, err
 	}
@@ -124,9 +124,9 @@ func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	`); err != nil {
 		return nil, err
 	}
-	if d.selectEdgesStmt, err = d.db.Prepare(`
+	if d.selectEdgesOfTypeStmt, err = d.db.Prepare(`
 		SELECT room_version, event_json FROM msc2946_edges
-		WHERE source_room_id = $1 OR dest_room_id = $2
+		WHERE source_room_id = $1 AND rel_type = $2
 	`); err != nil {
 		return nil, err
 	}
@@ -143,8 +143,8 @@ func (d *DB) StoreReference(ctx context.Context, he *gomatrixserverlib.HeaderedE
 	return err
 }
 
-func (d *DB) References(ctx context.Context, roomID string) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	rows, err := d.selectEdgesStmt.QueryContext(ctx, roomID, roomID)
+func (d *DB) ChildReferences(ctx context.Context, roomID string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := d.selectEdgesOfTypeStmt.QueryContext(ctx, roomID, relTypes[ConstSpaceChildEventType])
 	if err != nil {
 		return nil, err
 	}
