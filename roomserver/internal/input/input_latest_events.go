@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -47,7 +48,6 @@ import (
 // Can only be called once at a time
 func (r *Inputer) updateLatestEvents(
 	ctx context.Context,
-	updater *shared.RoomUpdater,
 	roomInfo *types.RoomInfo,
 	stateAtEvent types.StateAtEvent,
 	event *gomatrixserverlib.Event,
@@ -55,6 +55,14 @@ func (r *Inputer) updateLatestEvents(
 	transactionID *api.TransactionID,
 	rewritesState bool,
 ) (err error) {
+	var succeeded bool
+	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
+	if err != nil {
+		return fmt.Errorf("r.DB.GetRoomUpdater: %w", err)
+	}
+
+	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
+
 	u := latestEventsUpdater{
 		ctx:           ctx,
 		api:           r,
@@ -71,6 +79,7 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
+	succeeded = true
 	return
 }
 

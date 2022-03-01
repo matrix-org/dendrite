@@ -24,6 +24,7 @@ Local device key changes get to remote servers with correct prev_id
 
 # Flakey
 Local device key changes appear in /keys/changes
+/context/ with lazy_load_members filter works
 
 # we don't support groups
 Remove group category

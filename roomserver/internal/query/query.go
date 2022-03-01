@@ -621,12 +621,25 @@ func (r *Queryer) QueryPublishedRooms(
 func (r *Queryer) QueryCurrentState(ctx context.Context, req *api.QueryCurrentStateRequest, res *api.QueryCurrentStateResponse) error {
 	res.StateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
 	for _, tuple := range req.StateTuples {
-		ev, err := r.DB.GetStateEvent(ctx, req.RoomID, tuple.EventType, tuple.StateKey)
-		if err != nil {
-			return err
-		}
-		if ev != nil {
-			res.StateEvents[tuple] = ev
+		if tuple.StateKey == "*" && req.AllowWildcards {
+			events, err := r.DB.GetStateEventsWithEventType(ctx, req.RoomID, tuple.EventType)
+			if err != nil {
+				return err
+			}
+			for _, e := range events {
+				res.StateEvents[gomatrixserverlib.StateKeyTuple{
+					EventType: e.Type(),
+					StateKey:  *e.StateKey(),
+				}] = e
+			}
+		} else {
+			ev, err := r.DB.GetStateEvent(ctx, req.RoomID, tuple.EventType, tuple.StateKey)
+			if err != nil {
+				return err
+			}
+			if ev != nil {
+				res.StateEvents[tuple] = ev
+			}
 		}
 	}
 	return nil
@@ -696,7 +709,7 @@ func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUser
 	}
 	roomIDs = roomIDs[:j]
 
-	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs)
+	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs)
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ Group=dendrite
 WorkingDirectory=/opt/dendrite/
 ExecStart=/opt/dendrite/bin/dendrite-monolith-server
 Restart=always
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target

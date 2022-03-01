@@ -35,6 +35,11 @@ type Database interface {
 		stateBlockNIDs []types.StateBlockNID,
 		state []types.StateEntry,
 	) (types.StateSnapshotNID, error)
+
+	MissingAuthPrevEvents(
+		ctx context.Context, e *gomatrixserverlib.Event,
+	) (missingAuth, missingPrev []string, err error)
+
 	// Look up the state of a room at each event for a list of string event IDs.
 	// Returns an error if there is an error talking to the database.
 	// The length of []types.StateAtEvent is guaranteed to equal the length of eventIDs if no error is returned.
@@ -141,13 +146,14 @@ type Database interface {
 	// If no event could be found, returns nil
 	// If there was an issue during the retrieval, returns an error
 	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	// GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
 	GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error)
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
-	// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
-	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
+	// JoinedUsersSetInRooms returns how many times each of the given users appears across the given rooms.
+	JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string) (map[string]int, error)
 	// GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
 	GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error)
 	// GetServerInRoom returns true if we think a server is in a given room or false otherwise.

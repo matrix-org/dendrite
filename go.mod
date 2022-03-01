@@ -19,6 +19,7 @@ require (
 	github.com/getsentry/sentry-go v0.12.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.6
+	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.3 // indirect
@@ -40,10 +41,9 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210709140738-b0d1ba599a6d
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220214133635-20632dd262ed
-	github.com/matrix-org/pinecone v0.0.0-20220121094951-351265543ddf
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220301141554-e124bd7d7902
+	github.com/matrix-org/pinecone v0.0.0-20220223104432-0f0afd1a46aa
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
-	github.com/matryer/is v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nats-io/nats-server/v2 v2.3.2
@@ -63,11 +63,11 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.2
 	go.uber.org/atomic v1.9.0
-	golang.org/x/crypto v0.0.0-20220209195652-db638375bc3a
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 	golang.org/x/mobile v0.0.0-20220112015953-858099ff7816
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/sys v0.0.0-20220207234003-57398862261d // indirect
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gopkg.in/h2non/bimg.v1 v1.1.5
 	gopkg.in/yaml.v2 v2.4.0

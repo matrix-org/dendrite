@@ -103,25 +103,6 @@ func (u *RoomUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
 	return u.currentStateSnapshotNID
 }
 
-func (u *RoomUpdater) MissingAuthPrevEvents(
-	ctx context.Context, e *gomatrixserverlib.Event,
-) (missingAuth, missingPrev []string, err error) {
-	for _, authEventID := range e.AuthEventIDs() {
-		if nids, err := u.EventNIDs(ctx, []string{authEventID}); err != nil || len(nids) == 0 {
-			missingAuth = append(missingAuth, authEventID)
-		}
-	}
-
-	for _, prevEventID := range e.PrevEventIDs() {
-		state, err := u.StateAtEventIDs(ctx, []string{prevEventID})
-		if err != nil || len(state) == 0 || (!state[0].IsCreate() && state[0].BeforeStateSnapshotNID == 0) {
-			missingPrev = append(missingPrev, prevEventID)
-		}
-	}
-
-	return
-}
-
 // StorePreviousEvents implements types.RoomRecentEventsUpdater - This must be called from a Writer
 func (u *RoomUpdater) StorePreviousEvents(eventNID types.EventNID, previousEventReferences []gomatrixserverlib.EventReference) error {
 	return u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
@@ -144,13 +125,6 @@ func (u *RoomUpdater) SnapshotNIDFromEventID(
 	ctx context.Context, eventID string,
 ) (types.StateSnapshotNID, error) {
 	return u.d.snapshotNIDFromEventID(ctx, u.txn, eventID)
-}
-
-func (u *RoomUpdater) StoreEvent(
-	ctx context.Context, event *gomatrixserverlib.Event,
-	authEventNIDs []types.EventNID, isRejected bool,
-) (types.EventNID, types.RoomNID, types.StateAtEvent, *gomatrixserverlib.Event, string, error) {
-	return u.d.storeEvent(ctx, u, event, authEventNIDs, isRejected)
 }
 
 func (u *RoomUpdater) StateBlockNIDs(
@@ -212,42 +186,14 @@ func (u *RoomUpdater) EventIDs(
 	return u.d.EventsTable.BulkSelectEventID(ctx, u.txn, eventNIDs)
 }
 
-func (u *RoomUpdater) EventNIDs(
-	ctx context.Context, eventIDs []string,
-) (map[string]types.EventNID, error) {
-	return u.d.eventNIDs(ctx, u.txn, eventIDs, NoFilter)
-}
-
-func (u *RoomUpdater) UnsentEventNIDs(
-	ctx context.Context, eventIDs []string,
-) (map[string]types.EventNID, error) {
-	return u.d.eventNIDs(ctx, u.txn, eventIDs, FilterUnsentOnly)
-}
-
 func (u *RoomUpdater) StateAtEventIDs(
 	ctx context.Context, eventIDs []string,
 ) ([]types.StateAtEvent, error) {
 	return u.d.EventsTable.BulkSelectStateAtEventByID(ctx, u.txn, eventIDs)
 }
 
-func (u *RoomUpdater) StateEntriesForEventIDs(
-	ctx context.Context, eventIDs []string,
-) ([]types.StateEntry, error) {
-	return u.d.EventsTable.BulkSelectStateEventByID(ctx, u.txn, eventIDs)
-}
-
-func (u *RoomUpdater) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
-	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, false)
-}
-
 func (u *RoomUpdater) UnsentEventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
 	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, true)
-}
-
-func (u *RoomUpdater) GetMembershipEventNIDsForRoom(
-	ctx context.Context, roomNID types.RoomNID, joinOnly bool, localOnly bool,
-) ([]types.EventNID, error) {
-	return u.d.getMembershipEventNIDsForRoom(ctx, u.txn, roomNID, joinOnly, localOnly)
 }
 
 // IsReferenced implements types.RoomRecentEventsUpdater

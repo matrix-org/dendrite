@@ -20,22 +20,17 @@ import (
 	"sort"
 
 	"github.com/matrix-org/dendrite/roomserver/state"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
-
-type checkForAuthAndSoftFailStorage interface {
-	state.StateResolutionStorage
-	StateEntriesForEventIDs(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
-	RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error)
-}
 
 // CheckForSoftFail returns true if the event should be soft-failed
 // and false otherwise. The return error value should be checked before
 // the soft-fail bool.
 func CheckForSoftFail(
 	ctx context.Context,
-	db checkForAuthAndSoftFailStorage,
+	db storage.Database,
 	event *gomatrixserverlib.HeaderedEvent,
 	stateEventIDs []string,
 ) (bool, error) {
@@ -97,7 +92,7 @@ func CheckForSoftFail(
 // Returns the numeric IDs for the auth events.
 func CheckAuthEvents(
 	ctx context.Context,
-	db checkForAuthAndSoftFailStorage,
+	db storage.Database,
 	event *gomatrixserverlib.HeaderedEvent,
 	authEventIDs []string,
 ) ([]types.EventNID, error) {

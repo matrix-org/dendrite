@@ -63,7 +63,6 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
 			jr = existing
 		}
-		var ok bool
 
 		ev := gomatrixserverlib.ClientEvent{
 			Type:   gomatrixserverlib.MReceipt,
@@ -71,8 +70,8 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 		content := make(map[string]eduAPI.ReceiptMRead)
 		for _, receipt := range receipts {
-			var read eduAPI.ReceiptMRead
-			if read, ok = content[receipt.EventID]; !ok {
+			read, ok := content[receipt.EventID]
+			if !ok {
 				read = eduAPI.ReceiptMRead{
 					User: make(map[string]eduAPI.ReceiptTS),
 				}

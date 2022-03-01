@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
-	"github.com/matrix-org/dendrite/pushserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -173,13 +172,7 @@ func main() {
 	cfg.RoomServer.Database.ConnectionString = "file:/idb/dendritejs_roomserver.db"
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
-<<<<<<< HEAD
-	cfg.PushServer.Database.ConnectionString = "file:/idb/dendritejs_pushserver.db"
-	cfg.Global.Kafka.UseNaffka = true
-	cfg.Global.Kafka.Database.ConnectionString = "file:/idb/dendritejs_naffka.db"
-=======
 	cfg.Global.JetStream.StoragePath = "file:/idb/dendritejs/"
->>>>>>> main
 	cfg.Global.TrustedIDServers = []string{
 		"matrix.org", "vector.im",
 	}
