@@ -83,12 +83,15 @@ func DeviceListCatchup(
 		return to, hasNew, nil
 	}
 
+	// Work out which user IDs we care about — that includes those in the original request,
+	// the response from QueryKeyChanges (which includes ALL users who have changed keys)
+	// as well as every user who has a join or leave event in the current sync response. We
+	// will request information about which rooms these users are joined to, so that we can
+	// see if we still share any rooms with them.
 	joinUserIDs, leaveUserIDs := membershipEvents(res)
 	queryRes.UserIDs = append(queryRes.UserIDs, joinUserIDs...)
 	queryRes.UserIDs = append(queryRes.UserIDs, leaveUserIDs...)
 	queryRes.UserIDs = util.UniqueStrings(queryRes.UserIDs)
-
-	// QueryKeyChanges gets ALL users who have changed keys, we want the ones who share rooms with the user.
 	var sharedUsersMap map[string]int
 	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, rsAPI, userID, queryRes.UserIDs)
 	util.GetLogger(ctx).Debugf(
@@ -106,7 +109,7 @@ func DeviceListCatchup(
 			userSet[userID] = true
 		}
 	}
-	// if the response has any join/leave events, add them now.
+	// Finally, add in users who have joined or left.
 	// TODO: This is sub-optimal because we will add users to `changed` even if we already shared a room with them.
 	for _, userID := range joinUserIDs {
 		if !userSet[userID] {
