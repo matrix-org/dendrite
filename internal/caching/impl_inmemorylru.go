@@ -153,6 +153,7 @@ func (c *InMemoryLRUCachePartition) Get(key string) (value interface{}, ok bool)
 		return nil, false
 	}
 	if c.maxAge > 0 && time.Since(entry.created) > c.maxAge {
+		c.lru.Remove(key)
 		return nil, false
 	}
 	return entry.value, true
