@@ -192,13 +192,20 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 
 	// Check if anything actually changed compared to what we have in the database.
 	changed := false
-	for purpose, keydata := range toStore {
-		if _, ok := existingKeys[purpose]; !ok {
-			// A new key purpose has been specified that we didn't know before.
+	for _, purpose := range []gomatrixserverlib.CrossSigningKeyPurpose{
+		gomatrixserverlib.CrossSigningKeyPurposeMaster,
+		gomatrixserverlib.CrossSigningKeyPurposeSelfSigning,
+		gomatrixserverlib.CrossSigningKeyPurposeUserSigning,
+	} {
+		old, gotOld := existingKeys[purpose]
+		new, gotNew := toStore[purpose]
+		if gotOld != gotNew {
+			// A new key purpose has been specified that we didn't know before,
+			// or one has been removed.
 			changed = true
 			break
 		}
-		if !bytes.Equal(existingKeys[purpose], keydata) {
+		if !bytes.Equal(old, new) {
 			// One of the existing keys for a purpose we already knew about has
 			// changed.
 			changed = true
