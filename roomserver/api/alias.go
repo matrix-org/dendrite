@@ -95,18 +95,11 @@ type AliasEvent struct {
 var validateAliasRegex = regexp.MustCompile("^#.*:.+$")
 
 func (a AliasEvent) Valid() bool {
-	// alias is set to be removed
-	if a.Alias == "" {
-		return true
-	}
-	if !validateAliasRegex.MatchString(a.Alias) {
-		return false
-	}
 	for _, alias := range a.AltAliases {
 		if !validateAliasRegex.MatchString(alias) {
 			return false
 		}
 	}
-	return true
+	return a.Alias == "" || validateAliasRegex.MatchString(a.Alias)
 }
 
