@@ -93,3 +93,5 @@ type ThreePIDTable interface {
 	InsertThreePID(ctx context.Context, txn *sql.Tx, threepid, medium, localpart string) (err error)
 	DeleteThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error)
 }
+
+type Stats interface{}
