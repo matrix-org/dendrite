@@ -126,8 +126,10 @@ func NewInMemoryLRUCachePartition(name string, mutable bool, maxEntries int, max
 
 func (c *InMemoryLRUCachePartition) Set(key string, value interface{}) {
 	if !c.mutable {
-		if peek, ok := c.lru.Peek(key); ok && peek != value {
-			panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
+		if peek, ok := c.lru.Peek(key); ok {
+			if entry, ok := peek.(*inMemoryLRUCacheEntry); ok && entry.value != value {
+				panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
+			}
 		}
 	}
 	c.lru.Add(key, &inMemoryLRUCacheEntry{
@@ -149,12 +151,15 @@ func (c *InMemoryLRUCachePartition) Get(key string) (value interface{}, ok bool)
 		return nil, false
 	}
 	entry, ok := v.(*inMemoryLRUCacheEntry)
-	if !ok {
-		return nil, false
-	}
-	if c.maxAge > 0 && time.Since(entry.created) > c.maxAge {
+	switch {
+	case ok && c.maxAge == CacheNoMaxAge:
+		return entry.value, ok // There's no maximum age policy
+	case ok && time.Since(entry.created) < c.maxAge:
+		return entry.value, ok // The value for the key isn't stale
+	default:
+		// Either the key was found and it was stale, or the key
+		// wasn't found at all
 		c.lru.Remove(key)
 		return nil, false
 	}
-	return entry.value, true
 }
