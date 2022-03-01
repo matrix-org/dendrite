@@ -82,6 +82,12 @@ func DeviceListCatchup(
 		util.GetLogger(ctx).WithError(queryRes.Error).Error("QueryKeyChanges failed")
 		return to, hasNew, nil
 	}
+
+	joinUserIDs, leaveUserIDs := membershipEvents(res)
+	queryRes.UserIDs = append(queryRes.UserIDs, joinUserIDs...)
+	queryRes.UserIDs = append(queryRes.UserIDs, leaveUserIDs...)
+	queryRes.UserIDs = util.UniqueStrings(queryRes.UserIDs)
+
 	// QueryKeyChanges gets ALL users who have changed keys, we want the ones who share rooms with the user.
 	var sharedUsersMap map[string]int
 	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, rsAPI, userID, queryRes.UserIDs)
@@ -102,7 +108,6 @@ func DeviceListCatchup(
 	}
 	// if the response has any join/leave events, add them now.
 	// TODO: This is sub-optimal because we will add users to `changed` even if we already shared a room with them.
-	joinUserIDs, leaveUserIDs := membershipEvents(res)
 	for _, userID := range joinUserIDs {
 		if !userSet[userID] {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
@@ -213,7 +218,8 @@ func filterSharedUsers(
 	var result []string
 	var sharedUsersRes roomserverAPI.QuerySharedUsersResponse
 	err := rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID: userID,
+		UserID:       userID,
+		OtherUserIDs: usersWithChangedKeys,
 	}, &sharedUsersRes)
 	if err != nil {
 		// default to all users so we do needless queries rather than miss some important device update
