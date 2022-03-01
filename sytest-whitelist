@@ -605,4 +605,6 @@ Remote banned user is kicked and may not rejoin until unbanned
 registration remembers parameters
 registration accepts non-ascii passwords
 registration with inhibit_login inhibits login
+The operation must be consistent through an interactive authentication session
+Multiple calls to /sync should not cause 500 errors
 
