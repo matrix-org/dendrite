@@ -269,6 +269,7 @@ type QueryAuthChainResponse struct {
 
 type QuerySharedUsersRequest struct {
 	UserID         string
+	OtherUserIDs   []string
 	ExcludeRoomIDs []string
 	IncludeRoomIDs []string
 }
