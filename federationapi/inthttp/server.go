@@ -378,7 +378,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}
-			res, err := intAPI.MSC2946Spaces(req.Context(), request.S, request.RoomID, request.Req)
+			res, err := intAPI.MSC2946Spaces(req.Context(), request.S, request.RoomID, request.SuggestedOnly)
 			if err != nil {
 				ferr, ok := err.(*api.FederationClientError)
 				if ok {
