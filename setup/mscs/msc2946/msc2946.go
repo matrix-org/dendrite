@@ -572,7 +572,7 @@ func (w *walker) childReferences(roomID string) ([]gomatrixserverlib.MSC2946Stri
 		// escape the `.`s so gjson doesn't think it's nested
 		roomType := gjson.GetBytes(res.StateEvents[createTuple].Content(), strings.ReplaceAll(ConstCreateEventContentKey, ".", `\.`)).Str
 		if roomType != ConstCreateEventContentValueSpace {
-			return nil, nil
+			return []gomatrixserverlib.MSC2946StrippedEvent{}, nil
 		}
 	}
 	delete(res.StateEvents, createTuple)
