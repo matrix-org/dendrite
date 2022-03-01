@@ -10,6 +10,7 @@ const (
 	ServerKeyCacheName       = "server_key"
 	ServerKeyCacheMaxEntries = 4096
 	ServerKeyCacheMutable    = true
+	ServerKeyCacheMaxAge     = CacheNoMaxAge
 )
 
 // ServerKeyCache contains the subset of functions needed for

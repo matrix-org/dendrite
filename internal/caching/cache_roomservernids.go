@@ -10,6 +10,7 @@ const (
 	RoomServerRoomIDsCacheName       = "roomserver_room_ids"
 	RoomServerRoomIDsCacheMaxEntries = 1024
 	RoomServerRoomIDsCacheMutable    = false
+	RoomServerRoomIDsCacheMaxAge     = CacheNoMaxAge
 )
 
 type RoomServerCaches interface {
