@@ -1,5 +1,7 @@
 package caching
 
+import "time"
+
 // Caches contains a set of references to caches. They may be
 // different implementations as long as they satisfy the Cache
 // interface.
@@ -19,3 +21,5 @@ type Cache interface {
 	Set(key string, value interface{})
 	Unset(key string)
 }
+
+const CacheNoMaxAge = time.Duration(0)
