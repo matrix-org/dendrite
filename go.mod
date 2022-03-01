@@ -18,7 +18,7 @@ require (
 	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/getsentry/sentry-go v0.12.0
 	github.com/gologme/log v1.3.0
-	github.com/google/uuid v1.2.0 // indirect
+	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/h2non/filetype v1.1.3 // indirect
@@ -40,7 +40,7 @@ require (
 	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20210709140738-b0d1ba599a6d
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220228124130-5585f65cec09
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220301125114-e6012a13a6e6
 	github.com/matrix-org/pinecone v0.0.0-20220223104432-0f0afd1a46aa
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.10
