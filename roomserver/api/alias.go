@@ -14,6 +14,8 @@
 
 package api
 
+import "regexp"
+
 // SetRoomAliasRequest is a request to SetRoomAlias
 type SetRoomAliasRequest struct {
 	// ID of the user setting the alias
@@ -84,3 +86,27 @@ type RemoveRoomAliasResponse struct {
 	// Did we remove it?
 	Removed bool `json:"removed"`
 }
+
+type AliasEvent struct {
+	Alias      string   `json:"alias"`
+	AltAliases []string `json:"alt_aliases"`
+}
+
+var validateAliasRegex = regexp.MustCompile("^#.*:.+$")
+
+func (a AliasEvent) Valid() bool {
+	// alias is set to be removed
+	if a.Alias == "" {
+		return true
+	}
+	if !validateAliasRegex.MatchString(a.Alias) {
+		return false
+	}
+	for _, alias := range a.AltAliases {
+		if !validateAliasRegex.MatchString(alias) {
+			return false
+		}
+	}
+	return true
+}
+

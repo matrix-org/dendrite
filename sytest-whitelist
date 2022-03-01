@@ -604,4 +604,7 @@ Remote banned user is kicked and may not rejoin until unbanned
 registration remembers parameters
 registration accepts non-ascii passwords
 registration with inhibit_login inhibits login
-
+Canonical alias can be set
+Canonical alias can include alt_aliases
+Can delete canonical alias
+Multiple calls to /sync should not cause 500 errors

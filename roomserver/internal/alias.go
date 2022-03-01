@@ -16,12 +16,15 @@ package internal
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
+	"time"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // RoomserverInternalAPIDatabase has the storage APIs needed to implement the alias API.
@@ -180,6 +183,65 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 		if pls.UserLevel(request.UserID) < pls.EventLevel(gomatrixserverlib.MRoomCanonicalAlias, true) {
 			response.Removed = false
 			return nil
+		}
+	}
+
+	ev, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomCanonicalAlias, "")
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	stateAlias := gjson.GetBytes(ev.Content(), "alias").Str
+	// the alias to remove is currently set as the canonical alias, remove it
+	if stateAlias == request.Alias {
+		res, err := sjson.DeleteBytes(ev.Content(), "alias")
+		if err != nil {
+			return err
+		}
+
+		stateRes := &api.QueryLatestEventsAndStateResponse{}
+
+		if err = r.QueryLatestEventsAndState(ctx, &api.QueryLatestEventsAndStateRequest{RoomID: roomID}, stateRes); err != nil {
+			return err
+		}
+
+		stateEventIDs := make([]string, len(stateRes.StateEvents))
+		for i, ev := range stateRes.StateEvents {
+			stateEventIDs[i] = ev.EventID()
+		}
+
+		sender := request.UserID
+		if request.UserID != ev.Sender() {
+			sender = ev.Sender()
+		}
+		builder := &gomatrixserverlib.EventBuilder{
+			Sender:     sender,
+			RoomID:     ev.RoomID(),
+			Type:       ev.Type(),
+			StateKey:   ev.StateKey(),
+			PrevEvents: []string{ev.EventID()},
+			AuthEvents: stateEventIDs,
+			Content:    res,
+		}
+
+		newEvent, err := builder.Build(time.Now(), r.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey, ev.RoomVersion)
+		if err != nil {
+			return err
+		}
+
+		inputEvent := api.InputRoomEvent{
+			Kind:          api.KindNew,
+			Event:         newEvent.Headered(ev.RoomVersion),
+			Origin:        r.ServerName,
+			StateEventIDs: stateEventIDs,
+			HasState:      true,
+			SendAsServer:  string(r.ServerName),
+		}
+
+		respInput := &api.InputRoomEventsResponse{}
+		r.InputRoomEvents(ctx, &api.InputRoomEventsRequest{InputRoomEvents: []api.InputRoomEvent{inputEvent}}, respInput)
+		if respInput.NotAllowed || respInput.ErrMsg != "" {
+			return fmt.Errorf(respInput.ErrMsg)
 		}
 	}
 
