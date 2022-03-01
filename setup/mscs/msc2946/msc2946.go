@@ -30,6 +30,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	fs "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -54,9 +55,9 @@ type MSC2946ClientResponse struct {
 // Enable this MSC
 func Enable(
 	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, userAPI userapi.UserInternalAPI,
-	fsAPI fs.FederationInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
+	fsAPI fs.FederationInternalAPI, keyRing gomatrixserverlib.JSONVerifier, cache caching.SpaceSummaryRoomsCache,
 ) error {
-	clientAPI := httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(rsAPI, fsAPI, base.Cfg.Global.ServerName))
+	clientAPI := httputil.MakeAuthAPI("spaces", userAPI, spacesHandler(rsAPI, fsAPI, cache, base.Cfg.Global.ServerName))
 	base.PublicClientAPIMux.Handle("/v1/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
 	base.PublicClientAPIMux.Handle("/unstable/org.matrix.msc2946/rooms/{roomID}/hierarchy", clientAPI).Methods(http.MethodGet, http.MethodOptions)
 
@@ -74,7 +75,7 @@ func Enable(
 				return util.ErrorResponse(err)
 			}
 			roomID := params["roomID"]
-			return federatedSpacesHandler(req.Context(), fedReq, roomID, rsAPI, fsAPI, base.Cfg.Global.ServerName)
+			return federatedSpacesHandler(req.Context(), fedReq, roomID, cache, rsAPI, fsAPI, base.Cfg.Global.ServerName)
 		},
 	)
 	base.PublicFederationAPIMux.Handle("/unstable/org.matrix.msc2946/hierarchy/{roomID}", fedAPI).Methods(http.MethodGet)
@@ -84,6 +85,7 @@ func Enable(
 
 func federatedSpacesHandler(
 	ctx context.Context, fedReq *gomatrixserverlib.FederationRequest, roomID string,
+	cache caching.SpaceSummaryRoomsCache,
 	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	thisServer gomatrixserverlib.ServerName,
 ) util.JSONResponse {
@@ -100,6 +102,7 @@ func federatedSpacesHandler(
 		serverName:    fedReq.Origin(),
 		thisServer:    thisServer,
 		ctx:           ctx,
+		cache:         cache,
 		suggestedOnly: u.Query().Get("suggested_only") == "true",
 		limit:         1000,
 		// The main difference is that it does not recurse into spaces and does not support pagination.
@@ -115,7 +118,9 @@ func federatedSpacesHandler(
 }
 
 func spacesHandler(
-	rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
+	rsAPI roomserver.RoomserverInternalAPI,
+	fsAPI fs.FederationInternalAPI,
+	cache caching.SpaceSummaryRoomsCache,
 	thisServer gomatrixserverlib.ServerName,
 ) func(*http.Request, *userapi.Device) util.JSONResponse {
 	// declared outside the returned handler so it persists between calls
@@ -138,6 +143,7 @@ func spacesHandler(
 			caller:          device,
 			thisServer:      thisServer,
 			ctx:             req.Context(),
+			cache:           cache,
 
 			rsAPI:           rsAPI,
 			fsAPI:           fsAPI,
@@ -160,6 +166,7 @@ type walker struct {
 	rsAPI           roomserver.RoomserverInternalAPI
 	fsAPI           fs.FederationInternalAPI
 	ctx             context.Context
+	cache           caching.SpaceSummaryRoomsCache
 	suggestedOnly   bool
 	limit           int
 	maxDepth        int
@@ -167,13 +174,6 @@ type walker struct {
 
 	paginationCache map[string]paginationInfo
 	mu              sync.Mutex
-}
-
-func (w *walker) callerID() string {
-	if w.caller != nil {
-		return w.caller.UserID + "|" + w.caller.ID
-	}
-	return string(w.serverName)
 }
 
 func (w *walker) newPaginationCache() (string, paginationInfo) {
@@ -414,7 +414,12 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) (*gomatrixserve
 	if w.caller == nil {
 		return nil, nil
 	}
-	util.GetLogger(w.ctx).Infof("Querying %s via %+v", roomID, vias)
+	resp, ok := w.cache.GetSpaceSummary(roomID)
+	if ok {
+		util.GetLogger(w.ctx).Debugf("Returning cached response for %s", roomID)
+		return &resp, nil
+	}
+	util.GetLogger(w.ctx).Debugf("Querying %s via %+v", roomID, vias)
 	ctx := context.Background()
 	// query more of the spaces graph using these servers
 	for _, serverName := range vias {
@@ -437,6 +442,7 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) (*gomatrixserve
 			}
 			res.Children[i] = child
 		}
+		w.cache.StoreSpaceSummary(roomID, res)
 
 		return &res, nil
 	}

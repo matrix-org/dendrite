@@ -55,9 +55,18 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 	if err != nil {
 		return nil, err
 	}
+	spaceRooms, err := NewInMemoryLRUCachePartition(
+		SpaceSummaryRoomsCacheName,
+		SpaceSummaryRoomsCacheMutable,
+		SpaceSummaryRoomsCacheMaxEntries,
+		enablePrometheus,
+	)
+	if err != nil {
+		return nil, err
+	}
 	go cacheCleaner(
 		roomVersions, serverKeys, roomServerRoomIDs,
-		roomInfos, federationEvents,
+		roomInfos, federationEvents, spaceRooms,
 	)
 	return &Caches{
 		RoomVersions:      roomVersions,
@@ -65,6 +74,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		RoomServerRoomIDs: roomServerRoomIDs,
 		RoomInfos:         roomInfos,
 		FederationEvents:  federationEvents,
+		SpaceSummaryRooms: spaceRooms,
 	}, nil
 }
 
