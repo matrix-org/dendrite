@@ -151,8 +151,8 @@ type Database interface {
 	// GetBulkStateContent returns all state events which match a given room ID and a given state key tuple. Both must be satisfied for a match.
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
-	// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
-	JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error)
+	// JoinedUsersSetInRooms returns how many times each of the given users appears across the given rooms.
+	JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string) (map[string]int, error)
 	// GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
 	GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error)
 	// GetServerInRoom returns true if we think a server is in a given room or false otherwise.
