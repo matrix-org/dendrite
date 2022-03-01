@@ -48,13 +48,19 @@ type mockDeviceListUpdaterDatabase struct {
 	staleUsers   map[string]bool
 	prevIDsExist func(string, []int) bool
 	storedKeys   []api.DeviceMessage
+	mu           sync.Mutex // protect staleUsers
 }
 
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 // If no domains are given, all user IDs with stale device lists are returned.
 func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var result []string
-	for userID := range d.staleUsers {
+	for userID, isStale := range d.staleUsers {
+		if !isStale {
+			continue
+		}
 		_, remoteServer, err := gomatrixserverlib.SplitID('@', userID)
 		if err != nil {
 			return nil, err
@@ -75,6 +81,8 @@ func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, do
 
 // MarkDeviceListStale sets the stale bit for this user to isStale.
 func (d *mockDeviceListUpdaterDatabase) MarkDeviceListStale(ctx context.Context, userID string, isStale bool) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.staleUsers[userID] = isStale
 	return nil
 }
