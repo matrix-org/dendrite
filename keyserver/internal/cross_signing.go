@@ -166,26 +166,53 @@ func (a *KeyInternalAPI) PerformUploadDeviceKeys(ctx context.Context, req *api.P
 	}
 
 	// We can't have a self-signing or user-signing key without a master
-	// key, so make sure we have one of those.
-	if !hasMasterKey {
-		existingKeys, err := a.DB.CrossSigningKeysDataForUser(ctx, req.UserID)
-		if err != nil {
-			res.Error = &api.KeyError{
-				Err: "Retrieving cross-signing keys from database failed: " + err.Error(),
-			}
-			return
+	// key, so make sure we have one of those. We will also only actually do
+	// something if any of the specified keys in the request are different
+	// to what we've got in the database, to avoid generating key change
+	// notifications unnecessarily.
+	existingKeys, err := a.DB.CrossSigningKeysDataForUser(ctx, req.UserID)
+	if err != nil {
+		res.Error = &api.KeyError{
+			Err: "Retrieving cross-signing keys from database failed: " + err.Error(),
 		}
-
-		_, hasMasterKey = existingKeys[gomatrixserverlib.CrossSigningKeyPurposeMaster]
+		return
 	}
 
 	// If we still can't find a master key for the user then stop the upload.
 	// This satisfies the "Fails to upload self-signing key without master key" test.
 	if !hasMasterKey {
-		res.Error = &api.KeyError{
-			Err:            "No master key was found",
-			IsMissingParam: true,
+		if _, hasMasterKey = existingKeys[gomatrixserverlib.CrossSigningKeyPurposeMaster]; !hasMasterKey {
+			res.Error = &api.KeyError{
+				Err:            "No master key was found",
+				IsMissingParam: true,
+			}
+			return
 		}
+	}
+
+	// Check if anything actually changed compared to what we have in the database.
+	changed := false
+	for _, purpose := range []gomatrixserverlib.CrossSigningKeyPurpose{
+		gomatrixserverlib.CrossSigningKeyPurposeMaster,
+		gomatrixserverlib.CrossSigningKeyPurposeSelfSigning,
+		gomatrixserverlib.CrossSigningKeyPurposeUserSigning,
+	} {
+		old, gotOld := existingKeys[purpose]
+		new, gotNew := toStore[purpose]
+		if gotOld != gotNew {
+			// A new key purpose has been specified that we didn't know before,
+			// or one has been removed.
+			changed = true
+			break
+		}
+		if !bytes.Equal(old, new) {
+			// One of the existing keys for a purpose we already knew about has
+			// changed.
+			changed = true
+			break
+		}
+	}
+	if !changed {
 		return
 	}
 
