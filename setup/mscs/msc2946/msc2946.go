@@ -426,6 +426,18 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) (*gomatrixserve
 			util.GetLogger(w.ctx).WithError(err).Warnf("failed to call MSC2946Spaces on server %s", serverName)
 			continue
 		}
+		// ensure nil slices are empty as we send this to the client sometimes
+		if res.Room.ChildrenState == nil {
+			res.Room.ChildrenState = []gomatrixserverlib.MSC2946StrippedEvent{}
+		}
+		for i := 0; i < len(res.Children); i++ {
+			child := res.Children[i]
+			if child.ChildrenState == nil {
+				child.ChildrenState = []gomatrixserverlib.MSC2946StrippedEvent{}
+			}
+			res.Children[i] = child
+		}
+
 		return &res, nil
 	}
 	return nil, nil
