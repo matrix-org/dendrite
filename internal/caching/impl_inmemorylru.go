@@ -64,6 +64,7 @@ func NewInMemoryLRUCache(enablePrometheus bool) (*Caches, error) {
 		SpaceSummaryRoomsCacheName,
 		SpaceSummaryRoomsCacheMutable,
 		SpaceSummaryRoomsCacheMaxEntries,
+		SpaceSummaryRoomsCacheMaxAge,
 		enablePrometheus,
 	)
 	if err != nil {
