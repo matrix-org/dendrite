@@ -70,7 +70,7 @@ func UploadCrossSigningDeviceKeys(
 	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {
 		return *authErr
 	}
-	AddCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
+	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	uploadReq.UserID = device.UserID
 	keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes)

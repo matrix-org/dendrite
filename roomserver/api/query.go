@@ -269,6 +269,7 @@ type QueryAuthChainResponse struct {
 
 type QuerySharedUsersRequest struct {
 	UserID         string
+	OtherUserIDs   []string
 	ExcludeRoomIDs []string
 	IncludeRoomIDs []string
 }
@@ -312,7 +313,10 @@ type QueryBulkStateContentResponse struct {
 }
 
 type QueryCurrentStateRequest struct {
-	RoomID      string
+	RoomID         string
+	AllowWildcards bool
+	// State key tuples. If a state_key has '*' and AllowWidlcards is true, returns all matching
+	// state events with that event type.
 	StateTuples []gomatrixserverlib.StateKeyTuple
 }
 

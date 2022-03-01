@@ -526,23 +526,23 @@ func (h *httpFederationInternalAPI) MSC2836EventRelationships(
 }
 
 type spacesReq struct {
-	S      gomatrixserverlib.ServerName
-	Req    gomatrixserverlib.MSC2946SpacesRequest
-	RoomID string
-	Res    gomatrixserverlib.MSC2946SpacesResponse
-	Err    *api.FederationClientError
+	S             gomatrixserverlib.ServerName
+	SuggestedOnly bool
+	RoomID        string
+	Res           gomatrixserverlib.MSC2946SpacesResponse
+	Err           *api.FederationClientError
 }
 
 func (h *httpFederationInternalAPI) MSC2946Spaces(
-	ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest,
+	ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool,
 ) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "MSC2946Spaces")
 	defer span.Finish()
 
 	request := spacesReq{
-		S:      dst,
-		Req:    r,
-		RoomID: roomID,
+		S:             dst,
+		SuggestedOnly: suggestedOnly,
+		RoomID:        roomID,
 	}
 	var response spacesReq
 	apiURL := h.federationAPIURL + FederationAPISpacesSummaryPath

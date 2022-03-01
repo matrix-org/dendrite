@@ -674,6 +674,29 @@ func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
 	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
 }
 
+func (d *Database) MissingAuthPrevEvents(
+	ctx context.Context, e *gomatrixserverlib.Event,
+) (missingAuth, missingPrev []string, err error) {
+	authEventNIDs, err := d.EventNIDs(ctx, e.AuthEventIDs())
+	if err != nil {
+		return nil, nil, fmt.Errorf("d.EventNIDs: %w", err)
+	}
+	for _, authEventID := range e.AuthEventIDs() {
+		if _, ok := authEventNIDs[authEventID]; !ok {
+			missingAuth = append(missingAuth, authEventID)
+		}
+	}
+
+	for _, prevEventID := range e.PrevEventIDs() {
+		state, err := d.StateAtEventIDs(ctx, []string{prevEventID})
+		if err != nil || len(state) == 0 || (!state[0].IsCreate() && state[0].BeforeStateSnapshotNID == 0) {
+			missingPrev = append(missingPrev, prevEventID)
+		}
+	}
+
+	return
+}
+
 func (d *Database) assignRoomNID(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
@@ -956,6 +979,62 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	return nil, nil
 }
 
+// Same as GetStateEvent but returns all matching state events with this event type. Returns no error
+// if there are no events with this event type.
+func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evType string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	roomInfo, err := d.RoomInfo(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	if roomInfo == nil {
+		return nil, fmt.Errorf("room %s doesn't exist", roomID)
+	}
+	// e.g invited rooms
+	if roomInfo.IsStub {
+		return nil, nil
+	}
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
+	if err == sql.ErrNoRows {
+		// No rooms have an event of this type, otherwise we'd have an event type NID
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	if err != nil {
+		return nil, err
+	}
+	var eventNIDs []types.EventNID
+	for _, e := range entries {
+		if e.EventTypeNID == eventTypeNID {
+			eventNIDs = append(eventNIDs, e.EventNID)
+		}
+	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
+	// return the events requested
+	eventPairs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, eventNIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(eventPairs) == 0 {
+		return nil, nil
+	}
+	var result []*gomatrixserverlib.HeaderedEvent
+	for _, pair := range eventPairs {
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[pair.EventNID], pair.EventJSON, false, roomInfo.RoomVersion)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ev.Headered(roomInfo.RoomVersion))
+	}
+
+	return result, nil
+}
+
 // GetRoomsByMembership returns a list of room IDs matching the provided membership and user ID (as state_key).
 func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership string) ([]string, error) {
 	var membershipState tables.MembershipState
@@ -1081,13 +1160,23 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	return result, nil
 }
 
-// JoinedUsersSetInRooms returns all joined users in the rooms given, along with the count of how many times they appear.
-func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) (map[string]int, error) {
+// JoinedUsersSetInRooms returns a map of how many times the given users appear in the specified rooms.
+func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string) (map[string]int, error) {
 	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, nil, roomIDs)
 	if err != nil {
 		return nil, err
 	}
-	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, nil, roomNIDs)
+	userNIDsMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	userNIDs := make([]types.EventStateKeyNID, 0, len(userNIDsMap))
+	nidToUserID := make(map[types.EventStateKeyNID]string, len(userNIDsMap))
+	for id, nid := range userNIDsMap {
+		userNIDs = append(userNIDs, nid)
+		nidToUserID[nid] = id
+	}
+	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, nil, roomNIDs, userNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -1096,10 +1185,6 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs []string) 
 	for nid := range userNIDToCount {
 		stateKeyNIDs[i] = nid
 		i++
-	}
-	nidToUserID, err := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, stateKeyNIDs)
-	if err != nil {
-		return nil, err
 	}
 	if len(nidToUserID) != len(userNIDToCount) {
 		logrus.Warnf("SelectJoinedUsersSetForRooms found %d users but BulkSelectEventStateKey only returned state key NIDs for %d of them", len(userNIDToCount), len(nidToUserID))

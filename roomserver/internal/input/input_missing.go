@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -23,9 +23,25 @@ type parsedRespState struct {
 	StateEvents []*gomatrixserverlib.Event
 }
 
+func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
+	eventsByID := make(map[string]*gomatrixserverlib.Event, len(p.AuthEvents)+len(p.StateEvents))
+	for i, event := range p.AuthEvents {
+		eventsByID[event.EventID()] = p.AuthEvents[i]
+	}
+	for i, event := range p.StateEvents {
+		eventsByID[event.EventID()] = p.StateEvents[i]
+	}
+	allEvents := make([]*gomatrixserverlib.Event, 0, len(eventsByID))
+	for _, event := range eventsByID {
+		allEvents = append(allEvents, event)
+	}
+	return gomatrixserverlib.ReverseTopologicalOrdering(allEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
+}
+
 type missingStateReq struct {
 	origin          gomatrixserverlib.ServerName
-	db              *shared.RoomUpdater
+	db              storage.Database
+	roomInfo        *types.RoomInfo
 	inputer         *Inputer
 	keys            gomatrixserverlib.JSONVerifier
 	federation      fedapi.FederationInternalAPI
@@ -80,7 +96,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
-			_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
+			err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 				Kind:         api.KindOld,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
@@ -123,11 +139,8 @@ func (t *missingStateReq) processEventWithMissingState(
 	t.hadEventsMutex.Unlock()
 
 	sendOutliers := func(resolvedState *parsedRespState) error {
-		outliers, oerr := gomatrixserverlib.OrderAuthAndStateEvents(resolvedState.AuthEvents, resolvedState.StateEvents, roomVersion)
-		if oerr != nil {
-			return fmt.Errorf("gomatrixserverlib.OrderAuthAndStateEvents: %w", oerr)
-		}
-		var outlierRoomEvents []api.InputRoomEvent
+		outliers := resolvedState.Events()
+		outlierRoomEvents := make([]api.InputRoomEvent, 0, len(outliers))
 		for _, outlier := range outliers {
 			if hadEvents[outlier.EventID()] {
 				continue
@@ -139,8 +152,7 @@ func (t *missingStateReq) processEventWithMissingState(
 			})
 		}
 		for _, ire := range outlierRoomEvents {
-			_, err = t.inputer.processRoomEvent(ctx, t.db, &ire)
-			if err != nil {
+			if err = t.inputer.processRoomEvent(ctx, &ire); err != nil {
 				if _, ok := err.(types.RejectedError); !ok {
 					return fmt.Errorf("t.inputer.processRoomEvent (outlier): %w", err)
 				}
@@ -163,7 +175,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		stateIDs = append(stateIDs, event.EventID())
 	}
 
-	_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
+	err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 		Kind:          api.KindOld,
 		Event:         backwardsExtremity.Headered(roomVersion),
 		Origin:        t.origin,
@@ -182,7 +194,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// they will automatically fast-forward based on the room state at the
 	// extremity in the last step.
 	for _, newEvent := range newEvents {
-		_, err = t.inputer.processRoomEvent(ctx, t.db, &api.InputRoomEvent{
+		err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 			Kind:         api.KindOld,
 			Event:        newEvent.Headered(roomVersion),
 			Origin:       t.origin,
@@ -473,8 +485,10 @@ retryAllowedState:
 // without `e`. If `isGapFilled=false` then `newEvents` contains the response to /get_missing_events
 func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion) (newEvents []*gomatrixserverlib.Event, isGapFilled, prevStateKnown bool, err error) {
 	logger := util.GetLogger(ctx).WithField("event_id", e.EventID()).WithField("room_id", e.RoomID())
-
-	latest := t.db.LatestEvents()
+	latest, _, _, err := t.db.LatestEventIDs(ctx, t.roomInfo.RoomNID)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("t.DB.LatestEventIDs: %w", err)
+	}
 	latestEvents := make([]string, len(latest))
 	for i, ev := range latest {
 		latestEvents[i] = ev.EventID
