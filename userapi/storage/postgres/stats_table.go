@@ -41,9 +41,9 @@ CREATE INDEX IF NOT EXISTS localpart_timestamp_idx ON user_daily_visits(localpar
 
 const countUsersLastSeenAfterSQL = "" +
 	"SELECT COUNT(*) FROM (" +
-	" SELECT user_id FROM device_devices WHERE last_seen > $1 " +
-	" GROUP BY user_id" +
-	" )"
+	" SELECT localpart FROM device_devices WHERE last_seen_ts > $1 " +
+	" GROUP BY localpart" +
+	" ) u"
 
 const countR30UsersSQL = `
 SELECT platform, COUNT(*) FROM (
@@ -66,7 +66,7 @@ SELECT platform, COUNT(*) FROM (
 	ON users.localpart = uip.localpart
 	AND users.account_type <> 4
 	AND users.created_ts < $1
-	AND uip.last_seen_ts > $1,
+	AND uip.last_seen_ts > $1
 	AND (uip.last_seen_ts) - users.created_ts > $2
 	GROUP BY users.localpart, platform, users.created_ts
 	) u GROUP BY PLATFORM
@@ -79,7 +79,7 @@ SELECT
 FROM 
 	(
     	SELECT
-        	user_id,
+        	localpart,
             CASE
             	WHEN
                 LOWER(user_agent) LIKE '%%riot%%' OR
@@ -95,7 +95,7 @@ FROM
 			END as client_type
 		FROM user_daily_visits
 		WHERE timestamp > $1 AND timestamp < $2
-		GROUP BY user_id, client_type
+		GROUP BY localpart, client_type
 		HAVING max(timestamp) - min(timestamp) > $3
 	) AS temp
 GROUP BY client_type
