@@ -242,12 +242,22 @@ func TestSessionCleanUp(t *testing.T) {
 		s.addParams(dummySession, registerRequest{Username: "Testing"})
 		s.addCompletedSessionStage(dummySession, authtypes.LoginTypeRecaptcha)
 		s.addCompletedSessionStage(dummySession, authtypes.LoginTypeDummy)
+		s.addDeviceToDelete(dummySession, "dummyDevice")
 		s.getCompletedStages(dummySession)
 		// reset the timer with a lower timeout
 		s.startTimer(time.Millisecond, dummySession)
 		time.Sleep(time.Millisecond * 2)
 		if data, ok := s.getParams(dummySession); ok {
 			t.Errorf("expected session to be deleted: %+v", data)
+		}
+		if _, ok := s.timer[dummySession]; ok {
+			t.Error("expected timer to be delete")
+		}
+		if _, ok := s.sessions[dummySession]; ok {
+			t.Error("expected session to be delete")
+		}
+		if _, ok := s.getDeviceToDelete(dummySession); ok {
+			t.Error("expected session to device to be delete")
 		}
 	})
 }

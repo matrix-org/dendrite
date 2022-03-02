@@ -69,7 +69,7 @@ func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 	return types.StreamingToken{
 		PDUPosition:          s.PDUStreamProvider.LatestPosition(ctx),
 		TypingPosition:       s.TypingStreamProvider.LatestPosition(ctx),
-		ReceiptPosition:      s.PDUStreamProvider.LatestPosition(ctx),
+		ReceiptPosition:      s.ReceiptStreamProvider.LatestPosition(ctx),
 		InvitePosition:       s.InviteStreamProvider.LatestPosition(ctx),
 		SendToDevicePosition: s.SendToDeviceStreamProvider.LatestPosition(ctx),
 		AccountDataPosition:  s.AccountDataStreamProvider.LatestPosition(ctx),

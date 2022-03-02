@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 `
 
 var selectJoinedUsersSetForRoomsSQL = "" +
-	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership WHERE room_nid = ANY($1) AND" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
+	" WHERE room_nid = ANY($1) AND target_nid = ANY($2) AND" +
 	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
 	" GROUP BY target_nid"
 
@@ -306,13 +307,10 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 func (s *membershipStatements) SelectJoinedUsersSetForRooms(
 	ctx context.Context, txn *sql.Tx,
 	roomNIDs []types.RoomNID,
+	userNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]int, error) {
-	roomIDarray := make([]int64, len(roomNIDs))
-	for i := range roomNIDs {
-		roomIDarray[i] = int64(roomNIDs[i])
-	}
 	stmt := sqlutil.TxStmt(txn, s.selectJoinedUsersSetForRoomsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Int64Array(roomIDarray))
+	rows, err := stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(userNIDs))
 	if err != nil {
 		return nil, err
 	}
