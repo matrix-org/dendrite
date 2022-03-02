@@ -53,8 +53,7 @@ func Setup(
 ) {
 	rateLimits := httputil.NewRateLimits(rateLimit)
 
-	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
-	v1mux := publicAPIMux.PathPrefix("/v1").Subrouter()
+	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v1|v3)}/").Subrouter()
 
 	activeThumbnailGeneration := &types.ActiveThumbnailGeneration{
 		PathToResult: map[string]*types.ThumbnailGenerationResult{},
@@ -80,21 +79,18 @@ func Setup(
 		}
 	})
 
-	r0mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
-	r0mux.Handle("/config", configHandler).Methods(http.MethodGet, http.MethodOptions)
-	v1mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
+	v3mux.Handle("/upload", uploadHandler).Methods(http.MethodPost, http.MethodOptions)
+	v3mux.Handle("/config", configHandler).Methods(http.MethodGet, http.MethodOptions)
 
 	activeRemoteRequests := &types.ActiveRemoteRequests{
 		MXCToResult: map[string]*types.RemoteRequestResult{},
 	}
 
 	downloadHandler := makeDownloadAPI("download", cfg, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration)
-	r0mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
-	r0mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
-	v1mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)                // TODO: remove when synapse is fixed
-	v1mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions) // TODO: remove when synapse is fixed
+	v3mux.Handle("/download/{serverName}/{mediaId}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
+	v3mux.Handle("/download/{serverName}/{mediaId}/{downloadName}", downloadHandler).Methods(http.MethodGet, http.MethodOptions)
 
-	r0mux.Handle("/thumbnail/{serverName}/{mediaId}",
+	v3mux.Handle("/thumbnail/{serverName}/{mediaId}",
 		makeDownloadAPI("thumbnail", cfg, rateLimits, db, client, activeRemoteRequests, activeThumbnailGeneration),
 	).Methods(http.MethodGet, http.MethodOptions)
 }
