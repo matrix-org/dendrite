@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -101,8 +103,25 @@ FROM
 GROUP BY client_type
 `
 
+const countUserByAccountTypeSQL = `
+SELECT COUNT(*) FROM account_accounts WHERE account_type IN $1
+`
+
+const countRegisteredUserByTypeStmt = `
+SELECT user_type, COUNT(*) AS count FROM (
+	SELECT
+    CASE
+    	WHEN account_type<>2 AND appservice_id IS NULL THEN 'native'
+        WHEN account_type=2 AND appservice_id IS NULL THEN 'guest'
+        WHEN account_type<>2 AND appservice_id IS NOT NULL THEN 'bridged'
+	END AS user_type
+    FROM account_accounts
+    WHERE created_ts > $1
+) AS t GROUP BY user_type
+`
+
 // account_type 1 = users; 3 = admins
-const updateUserDailyVists = `
+const updateUserDailyVisitsSQL = `
 INSERT INTO user_daily_visits(localpart, device_id, timestamp, user_agent)
 	SELECT u.localpart, u.device_id, $1, MAX(u.user_agent)
 	FROM device_devices AS u
@@ -121,12 +140,14 @@ ON CONFLICT (localpart, device_id, timestamp) DO NOTHING
 `
 
 type statsStatements struct {
-	serverName                  gomatrixserverlib.ServerName
-	lastUpdate                  time.Time
-	countUsersLastSeenAfterStmt *sql.Stmt
-	countR30UsersStmt           *sql.Stmt
-	countR30UsersV2Stmt         *sql.Stmt
-	updateUserDailyVisits       *sql.Stmt
+	serverName                    gomatrixserverlib.ServerName
+	lastUpdate                    time.Time
+	countUsersLastSeenAfterStmt   *sql.Stmt
+	countR30UsersStmt             *sql.Stmt
+	countR30UsersV2Stmt           *sql.Stmt
+	updateUserDailyVisitsStmt     *sql.Stmt
+	countUserByAccountTypeStmt    *sql.Stmt
+	countRegisteredUserByTypeStmt *sql.Stmt
 }
 
 func NewPostgresStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.StatsTable, error) {
@@ -139,11 +160,14 @@ func NewPostgresStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) 
 	if err != nil {
 		return nil, err
 	}
+	go s.startTimers()
 	return s, sqlutil.StatementList{
 		{&s.countUsersLastSeenAfterStmt, countUsersLastSeenAfterSQL},
 		{&s.countR30UsersStmt, countR30UsersSQL},
 		{&s.countR30UsersV2Stmt, countR30UsersV2SQL},
-		{&s.updateUserDailyVisits, updateUserDailyVists},
+		{&s.updateUserDailyVisitsStmt, updateUserDailyVisitsSQL},
+		{&s.countUserByAccountTypeStmt, countUserByAccountTypeSQL},
+		{&s.countRegisteredUserByTypeStmt, countRegisteredUserByTypeStmt},
 	}.Prepare(db)
 }
 
@@ -151,7 +175,7 @@ func (s *statsStatements) startTimers() {
 	// initial run
 	time.AfterFunc(time.Minute*5, func() {
 		logrus.Infof("Executing UpdateUserDailyVisits")
-		if err := s.UpdateUserDailyVisits(context.Background(), nil); err != nil {
+		if err := s.updateUserDailyVisits(context.Background(), nil); err != nil {
 			logrus.WithError(err).Error("failed to update daily user visits")
 		}
 	})
@@ -161,11 +185,51 @@ func (s *statsStatements) startTimers() {
 		select {
 		case <-ticker.C:
 			logrus.Infof("Executing UpdateUserDailyVisits")
-			if err := s.UpdateUserDailyVisits(context.Background(), nil); err != nil {
+			if err := s.updateUserDailyVisits(context.Background(), nil); err != nil {
 				logrus.WithError(err).Error("failed to update daily user visits")
 			}
 		}
 	}
+}
+
+func (s *statsStatements) AllUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
+	stmt := sqlutil.TxStmt(txn, s.countUserByAccountTypeStmt)
+	err = stmt.QueryRowContext(ctx,
+		pq.Int64Array{1, 2, 3, 4},
+	).Scan(&result)
+	return
+}
+
+func (s *statsStatements) NonBridgedUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
+	stmt := sqlutil.TxStmt(txn, s.countUserByAccountTypeStmt)
+	err = stmt.QueryRowContext(ctx,
+		pq.Int64Array{1, 2, 3},
+	).Scan(&result)
+	return
+}
+
+func (s *statsStatements) RegisteredUserByType(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
+	stmt := sqlutil.TxStmt(txn, s.countRegisteredUserByTypeStmt)
+	registeredAfter := time.Now().AddDate(0, 0, -1)
+
+	rows, err := stmt.QueryContext(ctx,
+		gomatrixserverlib.AsTimestamp(registeredAfter),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var userType string
+	var count int64
+	var result = make(map[string]int64)
+	for rows.Next() {
+		if err = rows.Scan(&userType, &count); err != nil {
+			return nil, err
+		}
+		result[userType] = count
+	}
+
+	return result, rows.Err()
 }
 
 func (s *statsStatements) DailyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
@@ -208,7 +272,7 @@ func (s *statsStatements) R30Users(ctx context.Context, txn *sql.Tx) (map[string
 	var count int64
 	var result = make(map[string]int64)
 	for rows.Next() {
-		if err := rows.Scan(&platform, &count); err != nil {
+		if err = rows.Scan(&platform, &count); err != nil {
 			return nil, err
 		}
 		result["all"] += count
@@ -250,7 +314,7 @@ func (s *statsStatements) R30UsersV2(ctx context.Context, txn *sql.Tx) (map[stri
 		"all":      0,
 	}
 	for rows.Next() {
-		if err := rows.Scan(&platform, &count); err != nil {
+		if err = rows.Scan(&platform, &count); err != nil {
 			return nil, err
 		}
 		result["all"] += count
@@ -263,11 +327,10 @@ func (s *statsStatements) R30UsersV2(ctx context.Context, txn *sql.Tx) (map[stri
 	return result, rows.Err()
 }
 
-func (s *statsStatements) UpdateUserDailyVisits(ctx context.Context, txn *sql.Tx) error {
-	stmt := sqlutil.TxStmt(txn, s.updateUserDailyVisits)
+func (s *statsStatements) updateUserDailyVisits(ctx context.Context, txn *sql.Tx) error {
+	stmt := sqlutil.TxStmt(txn, s.updateUserDailyVisitsStmt)
 	_ = stmt
 	todayStart := time.Now().Truncate(time.Hour * 24)
-	lastUpdate := s.lastUpdate
 
 	// edge case
 	if todayStart.After(s.lastUpdate) {
@@ -275,7 +338,7 @@ func (s *statsStatements) UpdateUserDailyVisits(ctx context.Context, txn *sql.Tx
 	}
 	_, err := stmt.ExecContext(ctx,
 		gomatrixserverlib.AsTimestamp(todayStart),
-		gomatrixserverlib.AsTimestamp(lastUpdate),
+		gomatrixserverlib.AsTimestamp(s.lastUpdate),
 		gomatrixserverlib.AsTimestamp(time.Now()),
 	)
 	if err == nil {

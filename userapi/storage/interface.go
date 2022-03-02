@@ -89,6 +89,14 @@ type Database interface {
 	// GetLoginTokenDataByToken returns the data associated with the given token.
 	// May return sql.ErrNoRows.
 	GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
+
+	AllUsers(ctx context.Context) (result int64, err error)
+	NonBridgedUsers(ctx context.Context) (result int64, err error)
+	RegisteredUserByType(ctx context.Context) (map[string]int64, error)
+	DailyUsers(ctx context.Context) (result int64, err error)
+	MonthlyUsers(ctx context.Context) (result int64, err error)
+	R30Users(ctx context.Context) (map[string]int64, error)
+	R30UsersV2(ctx context.Context) (map[string]int64, error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

@@ -94,4 +94,12 @@ type ThreePIDTable interface {
 	DeleteThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error)
 }
 
-type StatsTable interface{}
+type StatsTable interface {
+	AllUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
+	NonBridgedUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
+	RegisteredUserByType(ctx context.Context, txn *sql.Tx) (map[string]int64, error)
+	DailyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
+	MonthlyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
+	R30Users(ctx context.Context, txn *sql.Tx) (map[string]int64, error)
+	R30UsersV2(ctx context.Context, txn *sql.Tx) (map[string]int64, error)
+}

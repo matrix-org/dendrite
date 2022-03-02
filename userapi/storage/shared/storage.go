@@ -671,3 +671,25 @@ func (d *Database) RemoveLoginToken(ctx context.Context, token string) error {
 func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error) {
 	return d.LoginTokens.SelectLoginToken(ctx, token)
 }
+
+func (d *Database) AllUsers(ctx context.Context) (result int64, err error) {
+	return d.Stats.AllUsers(ctx, nil)
+}
+func (d *Database) NonBridgedUsers(ctx context.Context) (result int64, err error) {
+	return d.Stats.NonBridgedUsers(ctx, nil)
+}
+func (d *Database) RegisteredUserByType(ctx context.Context) (map[string]int64, error) {
+	return d.Stats.RegisteredUserByType(ctx, nil)
+}
+func (d *Database) DailyUsers(ctx context.Context) (result int64, err error) {
+	return d.Stats.DailyUsers(ctx, nil)
+}
+func (d *Database) MonthlyUsers(ctx context.Context) (result int64, err error) {
+	return d.Stats.MonthlyUsers(ctx, nil)
+}
+func (d *Database) R30Users(ctx context.Context) (map[string]int64, error) {
+	return d.Stats.R30Users(ctx, nil)
+}
+func (d *Database) R30UsersV2(ctx context.Context) (map[string]int64, error) {
+	return d.Stats.R30UsersV2(ctx, nil)
+}
