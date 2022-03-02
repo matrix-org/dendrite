@@ -48,7 +48,7 @@ type DevicesTable interface {
 	SelectDeviceByID(ctx context.Context, localpart, deviceID string) (*api.Device, error)
 	SelectDevicesByLocalpart(ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string) ([]api.Device, error)
 	SelectDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error)
-	UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr string) error
+	UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr, userAgent string) error
 }
 
 type KeyBackupTable interface {
@@ -94,4 +94,6 @@ type ThreePIDTable interface {
 	DeleteThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error)
 }
 
-type Stats interface{}
+type StatsTable interface {
+	InsertUserDailyVisits(ctx context.Context, txn *sql.Tx, localpart, deviceID string, timestamp int64, userAgent string, ) error
+}

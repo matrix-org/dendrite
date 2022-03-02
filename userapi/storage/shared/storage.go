@@ -47,6 +47,7 @@ type Database struct {
 	KeyBackupVersions     tables.KeyBackupVersionTable
 	Devices               tables.DevicesTable
 	LoginTokens           tables.LoginTokenTable
+	Stats                 tables.StatsTable
 	LoginTokenLifetime    time.Duration
 	ServerName            gomatrixserverlib.ServerName
 	BcryptCost            int
@@ -620,10 +621,18 @@ func (d *Database) RemoveAllDevices(
 	return
 }
 
-// UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
-func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
+// UpdateDeviceLastSeen updates a last seen timestamp and the ip address.
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error {
+	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr, userAgent)
+	})
+	if err != nil {
+		return err
+	}
+	// calculate start of the day
+	timestamp := time.Now().UTC().Truncate(time.Hour*24).UnixNano() / 1000000
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
+		return d.Stats.InsertUserDailyVisits(ctx, txn, localpart, deviceID, timestamp, userAgent)
 	})
 }
 

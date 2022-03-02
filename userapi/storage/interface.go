@@ -73,7 +73,7 @@ type Database interface {
 	// Returns the device on success.
 	CreateDevice(ctx context.Context, localpart string, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
 	UpdateDevice(ctx context.Context, localpart, deviceID string, displayName *string) error
-	UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error
+	UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error
 	RemoveDevice(ctx context.Context, deviceID, localpart string) error
 	RemoveDevices(ctx context.Context, localpart string, devices []string) error
 	// RemoveAllDevices deleted all devices for this user. Returns the devices deleted.

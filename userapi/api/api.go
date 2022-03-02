@@ -274,6 +274,7 @@ type PerformLastSeenUpdateRequest struct {
 	UserID     string
 	DeviceID   string
 	RemoteAddr string
+	UserAgent  string
 }
 
 // PerformLastSeenUpdateResponse is the response for PerformLastSeenUpdate.
