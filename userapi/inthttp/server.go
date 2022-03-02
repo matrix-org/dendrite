@@ -265,4 +265,74 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(StatsAllUsers,
+		httputil.MakeInternalAPI("statsAllUsers", func(req *http.Request) util.JSONResponse {
+			response := api.IntegerResponse{}
+			err := s.AllUsers(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(StatsNonBridgedUsers,
+		httputil.MakeInternalAPI("statsNonBridgedUsers", func(req *http.Request) util.JSONResponse {
+			response := api.IntegerResponse{}
+			err := s.NonBridgedUsers(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(StatsDailyUsers,
+		httputil.MakeInternalAPI("statsDailyUsers", func(req *http.Request) util.JSONResponse {
+			response := api.IntegerResponse{}
+			err := s.DailyUsers(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(StatsMonthlyUsers,
+		httputil.MakeInternalAPI("statsMonthlyUsers", func(req *http.Request) util.JSONResponse {
+			response := api.IntegerResponse{}
+			err := s.MonthlyUsers(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(StatsRegisteredUserByType,
+		httputil.MakeInternalAPI("statsRegisteredUserByType", func(req *http.Request) util.JSONResponse {
+			response := api.MapResponse{}
+			err := s.RegisteredUserByType(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(StatsR30Users,
+		httputil.MakeInternalAPI("statsR30Users", func(req *http.Request) util.JSONResponse {
+			response := api.MapResponse{}
+			err := s.R30Users(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(StatsR30UsersV2,
+		httputil.MakeInternalAPI("statsR30UsersV2", func(req *http.Request) util.JSONResponse {
+			response := api.MapResponse{}
+			err := s.R30Users(req.Context(), &response)
+			if err != nil {
+				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 }

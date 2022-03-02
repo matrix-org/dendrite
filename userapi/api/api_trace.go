@@ -119,6 +119,41 @@ func (t *UserInternalAPITrace) QueryOpenIDToken(ctx context.Context, req *QueryO
 	return err
 }
 
+func (t *UserInternalAPITrace) AllUsers(ctx context.Context, res *IntegerResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *UserInternalAPITrace) NonBridgedUsers(ctx context.Context, res *IntegerResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *UserInternalAPITrace) RegisteredUserByType(ctx context.Context, res *MapResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *UserInternalAPITrace) DailyUsers(ctx context.Context, res *IntegerResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *UserInternalAPITrace) MonthlyUsers(ctx context.Context, res *IntegerResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *UserInternalAPITrace) R30Users(ctx context.Context, res *MapResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *UserInternalAPITrace) R30UsersV2(ctx context.Context, res *MapResponse) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {

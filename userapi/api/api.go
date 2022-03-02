@@ -45,6 +45,22 @@ type UserInternalAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+
+	AllUsers(ctx context.Context, res *IntegerResponse) error
+	NonBridgedUsers(ctx context.Context, res *IntegerResponse) error
+	RegisteredUserByType(ctx context.Context, res *MapResponse) error
+	DailyUsers(ctx context.Context, res *IntegerResponse) error
+	MonthlyUsers(ctx context.Context, res *IntegerResponse) error
+	R30Users(ctx context.Context, res *MapResponse) error
+	R30UsersV2(ctx context.Context, res *MapResponse) error
+}
+
+type IntegerResponse struct {
+	Count int64
+}
+
+type MapResponse struct {
+	Result map[string]int64
 }
 
 type PerformKeyBackupRequest struct {

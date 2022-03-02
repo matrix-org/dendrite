@@ -46,6 +46,14 @@ const (
 	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
 	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
 	QueryOpenIDTokenPath    = "/userapi/queryOpenIDToken"
+
+	StatsAllUsers             = "/userapi/stats/allUsers"
+	StatsNonBridgedUsers      = "/userapi/stats/nonBridgedUsers"
+	StatsRegisteredUserByType = "/userapi/stats/registeredUserByType"
+	StatsDailyUsers           = "/userapi/stats/dailyUsers"
+	StatsMonthlyUsers         = "/userapi/stats/monthlyUsers"
+	StatsR30Users             = "/userapi/stats/r30Users"
+	StatsR30UsersV2           = "/userapi/stats/r30UsersV2"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -248,4 +256,60 @@ func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.Query
 	if err != nil {
 		res.Error = err.Error()
 	}
+}
+
+func (h *httpUserInternalAPI) AllUsers(ctx context.Context, res *api.IntegerResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "AllUsers")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsAllUsers
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+}
+
+func (h *httpUserInternalAPI) NonBridgedUsers(ctx context.Context, res *api.IntegerResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "NonBridgedUsers")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsNonBridgedUsers
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+}
+
+func (h *httpUserInternalAPI) RegisteredUserByType(ctx context.Context, res *api.MapResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "RegisteredUserByType")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsRegisteredUserByType
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+}
+
+func (h *httpUserInternalAPI) DailyUsers(ctx context.Context, res *api.IntegerResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "DailyUsers")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsDailyUsers
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+}
+
+func (h *httpUserInternalAPI) MonthlyUsers(ctx context.Context, res *api.IntegerResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "MonthlyUsers")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsMonthlyUsers
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+}
+
+func (h *httpUserInternalAPI) R30Users(ctx context.Context, res *api.MapResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "R30Users")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsR30Users
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+}
+
+func (h *httpUserInternalAPI) R30UsersV2(ctx context.Context, res *api.MapResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "R30UsersV2")
+	defer span.Finish()
+
+	apiURL := h.apiURL + StatsR30UsersV2
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
 }
