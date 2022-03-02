@@ -94,6 +94,4 @@ type ThreePIDTable interface {
 	DeleteThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error)
 }
 
-type StatsTable interface {
-	InsertUserDailyVisits(ctx context.Context, txn *sql.Tx, localpart, deviceID string, timestamp int64, userAgent string, ) error
-}
+type StatsTable interface{}

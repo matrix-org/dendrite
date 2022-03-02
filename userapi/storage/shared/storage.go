@@ -623,16 +623,8 @@ func (d *Database) RemoveAllDevices(
 
 // UpdateDeviceLastSeen updates a last seen timestamp and the ip address.
 func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error {
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr, userAgent)
-	})
-	if err != nil {
-		return err
-	}
-	// calculate start of the day
-	timestamp := time.Now().UTC().Truncate(time.Hour*24).UnixNano() / 1000000
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Stats.InsertUserDailyVisits(ctx, txn, localpart, deviceID, timestamp, userAgent)
+		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr, userAgent)
 	})
 }
 
