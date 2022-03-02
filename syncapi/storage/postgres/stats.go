@@ -85,8 +85,8 @@ func (s *statsStatements) DailyMessages(ctx context.Context, txn *sql.Tx, prevID
 func (s *statsStatements) DailySentMessages(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error) {
 	stmt := sqlutil.TxStmt(txn, s.countTypesStmt)
 	err = stmt.QueryRowContext(ctx,
-		prevID,
 		"m.room.message",
+		prevID,
 		fmt.Sprintf("%%:%s", s.serverName),
 	).Scan(&result)
 	return

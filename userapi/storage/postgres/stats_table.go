@@ -104,7 +104,7 @@ GROUP BY client_type
 `
 
 const countUserByAccountTypeSQL = `
-SELECT COUNT(*) FROM account_accounts WHERE account_type IN $1
+SELECT COUNT(*) FROM account_accounts WHERE account_type = $1
 `
 
 const countRegisteredUserByTypeStmt = `
