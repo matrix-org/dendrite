@@ -21,29 +21,35 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const countEventTypesSQL = ""+
-	"SELECT COUNT(*) FROM syncapi_output_room_events"+
+const countEventTypesSQL = "" +
+	"SELECT COUNT(*) FROM syncapi_output_room_events" +
 	" WHERE type = $1 AND id > $2 AND sender like $3"
 
-const countActiveRoomsSQL = ""+
-	"SELECT COUNT(DISTINCT room_id) FROM syncapi_output_room_events"+
+const countActiveRoomsSQL = "" +
+	"SELECT COUNT(DISTINCT room_id) FROM syncapi_output_room_events" +
 	" WHERE type = $1 AND id > $2"
 
+const countTotalRoomsSQL = "" +
+	"SELECT COUNT(DISTINCT room_id) FROM syncapi_output_room_events"
+
 type statsStatements struct {
-	serverName string
-	countTypesStmt *sql.Stmt
+	serverName           gomatrixserverlib.ServerName
+	countTypesStmt       *sql.Stmt
 	countActiveRoomsStmt *sql.Stmt
+	countTotalRoomsStmt  *sql.Stmt
 }
 
-func PrepareStats(db *sql.DB, serverName string) (tables.Stats, error) {
+func PrepareStats(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.Stats, error) {
 	s := &statsStatements{
 		serverName: serverName,
 	}
 	return s, sqlutil.StatementList{
 		{&s.countTypesStmt, countEventTypesSQL},
 		{&s.countActiveRoomsStmt, countActiveRoomsSQL},
+		{&s.countTotalRoomsStmt, countTotalRoomsSQL},
 	}.Prepare(db)
 }
 
@@ -101,5 +107,11 @@ func (s *statsStatements) DailyActiveRooms(ctx context.Context, txn *sql.Tx, pre
 		"m.room.message",
 		prevID,
 	).Scan(&result)
+	return
+}
+
+func (s *statsStatements) TotalRooms(ctx context.Context, txn *sql.Tx) (result int64, err error) {
+	stmt := sqlutil.TxStmt(txn, s.countTotalRoomsStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&result)
 	return
 }

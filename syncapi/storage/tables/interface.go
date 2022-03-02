@@ -173,4 +173,11 @@ type Memberships interface {
 }
 
 type Stats interface {
+	DailyE2EEMessages(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error)
+	DailySentE2EEMessages(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error)
+	DailyMessages(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error)
+	DailySentMessages(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error)
+	DailyActiveE2EERooms(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error)
+	DailyActiveRooms(ctx context.Context, txn *sql.Tx, prevID int64) (result int64, err error)
+	TotalRooms(ctx context.Context, txn *sql.Tx) (result int64, err error)
 }

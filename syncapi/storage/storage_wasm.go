@@ -19,13 +19,14 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func NewSyncServerDatasource(dbProperties *config.DatabaseOptions) (Database, error) {
+func NewSyncServerDatasource(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties)
+		return sqlite3.NewDatabase(dbProperties, serverName)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:
