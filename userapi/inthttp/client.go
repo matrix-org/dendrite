@@ -263,7 +263,7 @@ func (h *httpUserInternalAPI) AllUsers(ctx context.Context, res *api.IntegerResp
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsAllUsers
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }
 
 func (h *httpUserInternalAPI) NonBridgedUsers(ctx context.Context, res *api.IntegerResponse) error {
@@ -271,7 +271,7 @@ func (h *httpUserInternalAPI) NonBridgedUsers(ctx context.Context, res *api.Inte
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsNonBridgedUsers
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }
 
 func (h *httpUserInternalAPI) RegisteredUserByType(ctx context.Context, res *api.MapResponse) error {
@@ -279,7 +279,7 @@ func (h *httpUserInternalAPI) RegisteredUserByType(ctx context.Context, res *api
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsRegisteredUserByType
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }
 
 func (h *httpUserInternalAPI) DailyUsers(ctx context.Context, res *api.IntegerResponse) error {
@@ -287,7 +287,7 @@ func (h *httpUserInternalAPI) DailyUsers(ctx context.Context, res *api.IntegerRe
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsDailyUsers
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }
 
 func (h *httpUserInternalAPI) MonthlyUsers(ctx context.Context, res *api.IntegerResponse) error {
@@ -295,7 +295,7 @@ func (h *httpUserInternalAPI) MonthlyUsers(ctx context.Context, res *api.Integer
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsMonthlyUsers
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }
 
 func (h *httpUserInternalAPI) R30Users(ctx context.Context, res *api.MapResponse) error {
@@ -303,7 +303,7 @@ func (h *httpUserInternalAPI) R30Users(ctx context.Context, res *api.MapResponse
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsR30Users
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }
 
 func (h *httpUserInternalAPI) R30UsersV2(ctx context.Context, res *api.MapResponse) error {
@@ -311,5 +311,5 @@ func (h *httpUserInternalAPI) R30UsersV2(ctx context.Context, res *api.MapRespon
 	defer span.Finish()
 
 	apiURL := h.apiURL + StatsR30UsersV2
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, nil, res)
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, api.EmptyRequest{}, res)
 }

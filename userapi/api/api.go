@@ -55,6 +55,8 @@ type UserInternalAPI interface {
 	R30UsersV2(ctx context.Context, res *MapResponse) error
 }
 
+type EmptyRequest struct{}
+
 type IntegerResponse struct {
 	Count int64
 }
