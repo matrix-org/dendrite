@@ -72,5 +72,6 @@ func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ss
 	syncapi.AddPublicRoutes(
 		process, csMux, m.UserAPI, m.RoomserverAPI,
 		m.KeyAPI, m.FedClient, &m.Config.SyncAPI, m.Config,
+		true,
 	)
 }

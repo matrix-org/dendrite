@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/sirupsen/logrus"
 
@@ -55,6 +56,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 	baseCfg *config.Dendrite,
+	isMonolith bool,
 ) {
 	startTime := time.Now()
 	js := jetstream.Prepare(&cfg.Matrix.JetStream)
@@ -119,7 +121,7 @@ func AddPublicRoutes(
 	}
 
 	// TODO: add config
-	go startPhoneHomeCollector(startTime, baseCfg, syncDB, userAPI)
+	go startPhoneHomeCollector(startTime, baseCfg, syncDB, userAPI, isMonolith)
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }
@@ -132,6 +134,7 @@ type phoneHomeStats struct {
 	startTime  time.Time
 	cfg        *config.Dendrite
 	db         storage.Database
+	isMonolith bool
 }
 
 type timestampToRUUsage struct {
@@ -139,7 +142,7 @@ type timestampToRUUsage struct {
 	usage     syscall.Rusage
 }
 
-func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB storage.Database, userAPI userapi.UserInternalAPI) {
+func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB storage.Database, userAPI userapi.UserInternalAPI, isMonolith bool) {
 
 	p := phoneHomeStats{
 		stats:      make(map[string]interface{}),
@@ -148,6 +151,7 @@ func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB s
 		cfg:        cfg,
 		db:         syncDB,
 		userAPI:    userAPI,
+		isMonolith: isMonolith,
 	}
 
 	// start initial run after 5min
@@ -169,6 +173,8 @@ func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB s
 func (p *phoneHomeStats) collect() {
 	p.stats = make(map[string]interface{})
 	p.stats["servername"] = p.serverName
+	p.stats["monolith"] = p.isMonolith
+	p.stats["version"] = internal.VersionString()
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*1)
 	defer cancel()
