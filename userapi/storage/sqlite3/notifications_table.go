@@ -103,8 +103,8 @@ func NewSQLiteNotificationTable(db *sql.DB) (tables.NotificationTable, error) {
 func (s *notificationsStatements) Clean(ctx context.Context, txn *sql.Tx) error {
 	_, err := sqlutil.TxStmt(txn, s.cleanNotificationsStmt).ExecContext(
 		ctx,
-		time.Now().AddDate(0, 0, -1).UnixMilli(), // keep non-highlights for a day
-		time.Now().AddDate(0, -1, 0).UnixMilli(), // keep highlights for a month
+		time.Now().AddDate(0, 0, -1).UnixNano()/int64(time.Millisecond), // keep non-highlights for a day
+		time.Now().AddDate(0, -1, 0).UnixNano()/int64(time.Millisecond), // keep highlights for a month
 	)
 	return err
 }
