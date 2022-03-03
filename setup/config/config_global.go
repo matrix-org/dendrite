@@ -63,6 +63,9 @@ type Global struct {
 
 	// ReportStats configures anonymous usage stats of the server
 	ReportStats bool `yaml:"report_stats"`
+
+	// ReportStatsEndpoint configuration
+	ReportStatsEndpoint string `yaml:"report_stats_endpoint"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -74,6 +77,7 @@ func (c *Global) Defaults(generate bool) {
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 	c.ReportStats = false
+	c.ReportStatsEndpoint = "https://matrix.org/report-usage-stats/push"
 
 	c.JetStream.Defaults(generate)
 	c.Metrics.Defaults(generate)

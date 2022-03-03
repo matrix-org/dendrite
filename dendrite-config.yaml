@@ -71,6 +71,11 @@ global:
   # Whether this instance sends anonymous usage stats
   report_stats: false
 
+  # The endpoint to report the anonymized homeserver usage statistics to.
+  # Defaults to https://matrix.org/report-usage-stats/push
+  #
+  #report_stats_endpoint: https://example.com/report-usage-stats/push
+
   # Server notices allows server admins to send messages to all users.
   server_notices:
     enabled: false

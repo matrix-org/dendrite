@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"net/http"
 	"runtime"
 	"syscall"
 	"time"
@@ -136,6 +137,7 @@ type phoneHomeStats struct {
 	cfg        *config.Dendrite
 	db         storage.Database
 	isMonolith bool
+	client     *http.Client
 }
 
 type timestampToRUUsage struct {
@@ -152,10 +154,13 @@ func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB s
 		db:         syncDB,
 		userAPI:    userAPI,
 		isMonolith: isMonolith,
+		client: &http.Client{
+			Timeout: time.Second * 30,
+		},
 	}
 
 	// start initial run after 5min
-	time.AfterFunc(time.Second*10, func() {
+	time.AfterFunc(time.Second*1, func() {
 		p.collect()
 	})
 
@@ -173,11 +178,15 @@ func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB s
 func (p *phoneHomeStats) collect() {
 	p.stats = make(map[string]interface{})
 	// general information
-	p.stats["servername"] = p.serverName
+	p.stats["homeserver"] = p.serverName
 	p.stats["monolith"] = p.isMonolith
 	p.stats["version"] = internal.VersionString()
 	p.stats["timestamp"] = time.Now().Unix()
 	p.stats["go_version"] = runtime.Version()
+	p.stats["go_arch"] = runtime.GOARCH
+	p.stats["go_os"] = runtime.GOOS
+	p.stats["num_cpu"] = runtime.NumCPU()
+	p.stats["num_go_routine"] = runtime.NumGoroutine()
 	p.stats["uptime_seconds"] = math.Floor(time.Now().Sub(p.startTime).Seconds())
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*1)
@@ -321,5 +330,18 @@ func (p *phoneHomeStats) collect() {
 		return
 	}
 
-	logrus.Infof("Collected data: %s", output.String())
+	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStatsEndpoint, output.String())
+
+	request, err := http.NewRequest("POST", p.cfg.Global.ReportStatsEndpoint, &output)
+	if err != nil {
+		logrus.WithError(err).Error("unable to create phone home stats request")
+		return
+	}
+	request.Header.Set("User-Agent", "Dendrite/"+internal.VersionString())
+
+	_, err = p.client.Do(request)
+	if err != nil {
+		logrus.WithError(err).Error("unable to send phone home stats")
+		return
+	}
 }
