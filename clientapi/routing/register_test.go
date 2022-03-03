@@ -219,7 +219,7 @@ func TestSessionCleanUp(t *testing.T) {
 		// manually added, as s.addParams() would start the timer with the default timeout
 		s.params[dummySession] = registerRequest{Username: "Testing"}
 		s.startTimer(time.Millisecond, dummySession)
-		time.Sleep(time.Millisecond * 2)
+		time.Sleep(time.Millisecond * 50)
 		if data, ok := s.getParams(dummySession); ok {
 			t.Errorf("expected session to be deleted: %+v", data)
 		}
@@ -246,7 +246,7 @@ func TestSessionCleanUp(t *testing.T) {
 		s.getCompletedStages(dummySession)
 		// reset the timer with a lower timeout
 		s.startTimer(time.Millisecond, dummySession)
-		time.Sleep(time.Millisecond * 2)
+		time.Sleep(time.Millisecond * 50)
 		if data, ok := s.getParams(dummySession); ok {
 			t.Errorf("expected session to be deleted: %+v", data)
 		}
