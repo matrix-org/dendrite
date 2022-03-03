@@ -15,6 +15,8 @@
 package userapi
 
 import (
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
