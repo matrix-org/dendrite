@@ -78,7 +78,7 @@ Room creation reports m.room.member to myself
 Outbound federation rejects send_join responses with no m.room.create event
 Outbound federation rejects m.room.create events with an unknown room version
 Invited user can see room metadata
-# Blacklisted because these tests call /r0/events which we don't implement
+# Blacklisted because these tests call /v3/events which we don't implement
 # New room members see their own join event
 # Existing members see new members' join events
 setting 'm.room.power_levels' respects room powerlevel
@@ -257,7 +257,7 @@ Guest non-joined users cannot send messages to guest_access rooms if not joined
 Real non-joined users cannot room initalSync for non-world_readable rooms
 Push rules come down in an initial /sync
 Regular users can add and delete aliases in the default room configuration
-GET /r0/capabilities is not public
+GET /v3/capabilities is not public
 GET /joined_rooms lists newly-created room
 /joined_rooms returns only joined rooms
 Message history can be paginated over federation
@@ -366,8 +366,8 @@ Outbound federation will ignore a missing event with bad JSON for room version 6
 Server correctly handles transactions that break edu limits
 Server rejects invalid JSON in a version 6 room
 Can download without a file name over federation
-POST /media/r0/upload can create an upload
-GET /media/r0/download can fetch the value again
+POST /media/v3/upload can create an upload
+GET /media/v3/download can fetch the value again
 Remote users can join room by alias
 Alias creators can delete alias with no ops
 Alias creators can delete canonical alias with no ops
