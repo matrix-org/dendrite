@@ -234,6 +234,11 @@ func (p *phoneHomeStats) collect() {
 	p.stats["database_server_version"] = dbVersion
 
 	// message and room stats
+	rooms, err := p.db.TotalRooms(ctx)
+	if err != nil {
+		logrus.WithError(err).Error("unable to query TotalRooms")
+	}
+	p.stats["total_room_count"] = rooms
 	messages, err := p.db.DailyMessages(ctx, 0)
 	if err != nil {
 		logrus.WithError(err).Error("unable to query DailyMessages")
