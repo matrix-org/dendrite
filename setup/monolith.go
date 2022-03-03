@@ -71,7 +71,6 @@ func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ss
 	mediaapi.AddPublicRoutes(mediaMux, &m.Config.MediaAPI, &m.Config.ClientAPI.RateLimiting, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(
 		process, csMux, m.UserAPI, m.RoomserverAPI,
-		m.KeyAPI, m.FedClient, m.Config,
-		true,
+		m.KeyAPI, m.FedClient, &m.Config.SyncAPI,
 	)
 }

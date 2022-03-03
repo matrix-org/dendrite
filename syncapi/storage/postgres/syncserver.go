@@ -92,10 +92,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, err
 	}
-	stats, err := PrepareStats(d.db, d.serverName)
-	if err != nil {
-		return nil, err
-	}
+	
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -116,7 +113,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
 		Memberships:         memberships,
-		Stats:               stats,
 	}
 	return &d, nil
 }

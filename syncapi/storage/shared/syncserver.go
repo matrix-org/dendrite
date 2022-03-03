@@ -48,7 +48,6 @@ type Database struct {
 	Filter              tables.Filter
 	Receipts            tables.Receipts
 	Memberships         tables.Memberships
-	Stats               tables.Stats
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -966,26 +965,4 @@ func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID 
 }
 func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
-}
-
-func (s *Database) DailyE2EEMessages(ctx context.Context, prevID int64) (result int64, err error) {
-	return s.Stats.DailyE2EEMessages(ctx, nil, prevID)
-}
-func (s *Database) DailySentE2EEMessages(ctx context.Context, prevID int64) (result int64, err error) {
-	return s.Stats.DailySentE2EEMessages(ctx, nil, prevID)
-}
-func (s *Database) DailyMessages(ctx context.Context, prevID int64) (result int64, err error) {
-	return s.Stats.DailyMessages(ctx, nil, prevID)
-}
-func (s *Database) DailySentMessages(ctx context.Context, prevID int64) (result int64, err error) {
-	return s.Stats.DailySentMessages(ctx, nil, prevID)
-}
-func (s *Database) DailyActiveE2EERooms(ctx context.Context, prevID int64) (result int64, err error) {
-	return s.Stats.DailyActiveE2EERooms(ctx, nil, prevID)
-}
-func (s *Database) DailyActiveRooms(ctx context.Context, prevID int64) (result int64, err error) {
-	return s.Stats.DailyActiveRooms(ctx, nil, prevID)
-}
-func (s *Database) TotalRooms(ctx context.Context) (result int64, err error) {
-	return s.Stats.TotalRooms(ctx, nil)
 }

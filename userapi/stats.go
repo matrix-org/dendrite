@@ -15,7 +15,7 @@
 //go:build !wasm
 // +build !wasm
 
-package syncapi
+package userapi
 
 import (
 	"math"

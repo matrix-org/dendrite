@@ -103,10 +103,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		return err
 	}
 
-	stats, err := PrepareStats(d.db, d.serverName)
-	if err != nil {
-		return err
-	}
 
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
@@ -128,7 +124,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
 		Memberships:         memberships,
-		Stats:               stats,
 	}
 	return nil
 }

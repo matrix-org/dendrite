@@ -141,12 +141,4 @@ type Database interface {
 	SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
 	SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
 	SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
-
-	DailyE2EEMessages(ctx context.Context, prevID int64) (result int64, err error)
-	DailySentE2EEMessages(ctx context.Context, prevID int64) (result int64, err error)
-	DailyMessages(ctx context.Context, prevID int64) (result int64, err error)
-	DailySentMessages(ctx context.Context, prevID int64) (result int64, err error)
-	DailyActiveE2EERooms(ctx context.Context, prevID int64) (result int64, err error)
-	DailyActiveRooms(ctx context.Context, prevID int64) (result int64, err error)
-	TotalRooms(ctx context.Context) (result int64, err error)
 }
