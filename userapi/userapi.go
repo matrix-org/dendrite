@@ -15,6 +15,7 @@
 package userapi
 
 import (
+	"context"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -85,6 +86,16 @@ func NewInternalAPI(
 	if err := eventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
+
+	var cleanOldNotifs func()
+	cleanOldNotifs = func() {
+		logrus.Infof("Cleaning old notifications")
+		if err := db.DeleteOldNotifications(context.Background()); err != nil {
+			logrus.WithError(err).Error("Failed to clean old notifications")
+		}
+		time.AfterFunc(time.Hour, cleanOldNotifs)
+	}
+	time.AfterFunc(time.Minute, cleanOldNotifs)
 
 	return userAPI
 }
