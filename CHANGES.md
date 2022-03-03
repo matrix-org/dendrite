@@ -1,5 +1,28 @@
 # Changelog
 
+## Dendrite 0.6.5 (2022-03-03)
+
+### Features
+
+* Early support for push notifications has been added, with support for push rules, pushers, HTTP push gateways and the `/notifications` endpoint
+* Spaces Summary (MSC2946) is now correctly supported (when `msc2946` is enabled in the config)
+* All media API endpoints are now available under the `/v3` namespace
+* State resolution v2 has been optimised further to considerably reduce the number of memory allocations
+* State resolution v2 will no longer duplicate events unnecessarily when calculating the auth difference
+* The `create-account` tool now has a `-reset-password` option for resetting the passwords of existing accounts
+* The `/sync` endpoint now calculates device list changes much more quickly with less RAM used
+* The `/messages` endpoint now lazy-loads members correctly
+* NATS Server has been updated to v2.7.3
+
+### Fixes
+
+* Read receipts now work correctly by correcting bugs in the stream positions and receipt coalescing
+* Topological sorting of state and join responses has been corrected, which should help to reduce the number of auth problems when joining new federated rooms
+* The roomserver no longer holds transactions for as long when processing input events
+* Uploading device keys and cross-signing keys will now correctly no-op if there were no changes
+* Parameters are now remembered correctly during registration
+* Devices can now only be deleted within the appropriate UIA flow
+
 ## Dendrite 0.6.4 (2022-02-21)
 
 ### Features
@@ -210,9 +233,9 @@
 
 ### Fixes
 
-- **SECURITY:** A bug in SQLite mode which could cause the registration flow to complete unexpectedly for existing accounts has been fixed (PostgreSQL deployments are not affected)
-- A panic in the federation sender has been fixed when shutting down destination queues
-- The `/keys/upload` endpoint now correctly returns the number of one-time keys in response to an empty upload request
+* **SECURITY:** A bug in SQLite mode which could cause the registration flow to complete unexpectedly for existing accounts has been fixed (PostgreSQL deployments are not affected)
+* A panic in the federation sender has been fixed when shutting down destination queues
+* The `/keys/upload` endpoint now correctly returns the number of one-time keys in response to an empty upload request
 
 ## Dendrite 0.3.10 (2021-02-17)
 
