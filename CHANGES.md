@@ -7,6 +7,7 @@
 * Early support for push notifications has been added, with support for push rules, pushers, HTTP push gateways and the `/notifications` endpoint
 * Spaces Summary (MSC2946) is now correctly supported (when `msc2946` is enabled in the config)
 * All media API endpoints are now available under the `/v3` namespace
+* Profile updates (display name and avatar) are now sent asynchronously so they shouldn't block the client for a very long time
 * State resolution v2 has been optimised further to considerably reduce the number of memory allocations
 * State resolution v2 will no longer duplicate events unnecessarily when calculating the auth difference
 * The `create-account` tool now has a `-reset-password` option for resetting the passwords of existing accounts
@@ -22,6 +23,7 @@
 * Uploading device keys and cross-signing keys will now correctly no-op if there were no changes
 * Parameters are now remembered correctly during registration
 * Devices can now only be deleted within the appropriate UIA flow
+* The `/context` endpoint now returns 404 instead of 500 if the event was not found
 
 ## Dendrite 0.6.4 (2022-02-21)
 
