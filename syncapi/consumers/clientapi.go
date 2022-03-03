@@ -16,6 +16,7 @@ package consumers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -138,12 +139,12 @@ func (s *OutputClientDataConsumer) sendReadUpdate(ctx context.Context, userID st
 	var readPos types.StreamPosition
 	var fullyReadPos types.StreamPosition
 	if output.ReadMarker.Read != "" {
-		if _, readPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.Read); err != nil {
+		if _, readPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.Read); err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("s.db.PositionInTopology (Read): %w", err)
 		}
 	}
 	if output.ReadMarker.FullyRead != "" {
-		if _, fullyReadPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.FullyRead); err != nil {
+		if _, fullyReadPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.FullyRead); err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("s.db.PositionInTopology (FullyRead): %w", err)
 		}
 	}

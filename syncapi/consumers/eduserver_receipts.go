@@ -16,6 +16,7 @@ package consumers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -129,7 +130,7 @@ func (s *OutputReceiptEventConsumer) sendReadUpdate(ctx context.Context, output 
 	}
 	var readPos types.StreamPosition
 	if output.EventID != "" {
-		if _, readPos, err = s.db.PositionInTopology(ctx, output.EventID); err != nil {
+		if _, readPos, err = s.db.PositionInTopology(ctx, output.EventID); err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("s.db.PositionInTopology (Read): %w", err)
 		}
 	}
