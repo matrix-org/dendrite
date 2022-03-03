@@ -15,8 +15,6 @@
 package userapi
 
 import (
-	"time"
-
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -46,11 +44,6 @@ func NewInternalAPI(
 	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
-	db, err := storage.NewDatabase(&cfg.AccountDatabase, cfg.Matrix.ServerName, cfg.BCryptCost, int64(api.DefaultLoginTokenLifetime*time.Millisecond), api.DefaultLoginTokenLifetime)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to device db")
-	}
-
 	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncProducer := producers.NewSyncAPI(
