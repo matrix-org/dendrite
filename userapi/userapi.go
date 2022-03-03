@@ -15,7 +15,6 @@
 package userapi
 
 import (
-	"context"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -90,7 +89,7 @@ func NewInternalAPI(
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
 		logrus.Infof("Cleaning old notifications")
-		if err := db.DeleteOldNotifications(context.Background()); err != nil {
+		if err := db.DeleteOldNotifications(base.Context()); err != nil {
 			logrus.WithError(err).Error("Failed to clean old notifications")
 		}
 		time.AfterFunc(time.Hour, cleanOldNotifs)
