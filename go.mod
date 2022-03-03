@@ -1,6 +1,6 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.7.2-0.20220217100407-087330ed46ad
+replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.7.4-0.20220302103432-6b04b9f12740
 
 replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.11.1-0.20220104162523-f4ddebe1061c
 
@@ -24,7 +24,6 @@ require (
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/juju/testing v0.0.0-20211215003918-77eb13d6cad2 // indirect
-	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-circuit v0.4.0
@@ -45,7 +44,7 @@ require (
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/nats-io/nats-server/v2 v2.3.2
+	github.com/nats-io/nats-server/v2 v2.7.3
 	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
