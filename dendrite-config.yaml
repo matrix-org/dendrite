@@ -6,7 +6,7 @@
 #
 # At a minimum, to get started, you will need to update the settings in the
 # "global" section for your deployment, and you will need to check that the
-# database "connection_string" line in each component section is correct. 
+# database "connection_string" line in each component section is correct.
 #
 # Each component with a "database" section can accept the following formats
 # for "connection_string":
@@ -21,13 +21,13 @@
 # small number of users and likely will perform worse still with a higher volume
 # of users.
 #
-# The "max_open_conns" and "max_idle_conns" settings configure the maximum 
+# The "max_open_conns" and "max_idle_conns" settings configure the maximum
 # number of open/idle database connections. The value 0 will use the database
 # engine default, and a negative value will use unlimited connections. The
 # "conn_max_lifetime" option controls the maximum length of time a database
 # connection can be idle in seconds - a negative value is unlimited.
 
-# The version of the configuration file. 
+# The version of the configuration file.
 version: 2
 
 # Global Matrix configuration. This configuration applies to all components.
@@ -61,8 +61,8 @@ global:
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
   trusted_third_party_id_servers:
-  - matrix.org
-  - vector.im
+    - matrix.org
+    - vector.im
 
   # Disables federation. Dendrite will not be able to make any outbound HTTP requests
   # to other servers and the federation API will not be exposed.
@@ -87,14 +87,14 @@ global:
     # in monolith mode. It is required to specify the address of at least one
     # NATS Server node if running in polylith mode.
     addresses:
-      # - localhost:4222
+    # - localhost:4222
 
     # Keep all NATS streams in memory, rather than persisting it to the storage
     # path below. This option is present primarily for integration testing and
     # should not be used on a real world Dendrite deployment.
     in_memory: false
 
-    # Persistent directory to store JetStream streams in. This directory 
+    # Persistent directory to store JetStream streams in. This directory
     # should be preserved across Dendrite restarts.
     storage_path: ./
 
@@ -126,7 +126,7 @@ global:
 # Configuration for the Appservice API.
 app_service_api:
   internal_api:
-    listen: http://localhost:7777  # Only used in polylith deployments
+    listen: http://localhost:7777 # Only used in polylith deployments
     connect: http://localhost:7777 # Only used in polylith deployments
   database:
     connection_string: file:appservice.db
@@ -145,7 +145,7 @@ app_service_api:
 # Configuration for the Client API.
 client_api:
   internal_api:
-    listen: http://localhost:7771  # Only used in polylith deployments
+    listen: http://localhost:7771 # Only used in polylith deployments
     connect: http://localhost:7771 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8071
@@ -165,13 +165,13 @@ client_api:
   # Whether to require reCAPTCHA for registration.
   enable_registration_captcha: false
 
-  # Settings for ReCAPTCHA. 
+  # Settings for ReCAPTCHA.
   recaptcha_public_key: ""
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
 
-  # TURN server information that this homeserver should send to clients. 
+  # TURN server information that this homeserver should send to clients.
   turn:
     turn_user_lifetime: ""
     turn_uris: []
@@ -180,7 +180,7 @@ client_api:
     turn_password: ""
 
   # Settings for rate-limited endpoints. Rate limiting will kick in after the
-  # threshold number of "slots" have been taken by requests from a specific 
+  # threshold number of "slots" have been taken by requests from a specific
   # host. Each "slot" will be released after the cooloff time in milliseconds.
   rate_limiting:
     enabled: true
@@ -190,13 +190,13 @@ client_api:
 # Configuration for the EDU server.
 edu_server:
   internal_api:
-    listen: http://localhost:7778  # Only used in polylith deployments
+    listen: http://localhost:7778 # Only used in polylith deployments
     connect: http://localhost:7778 # Only used in polylith deployments
 
 # Configuration for the Federation API.
 federation_api:
   internal_api:
-    listen: http://localhost:7772  # Only used in polylith deployments
+    listen: http://localhost:7772 # Only used in polylith deployments
     connect: http://localhost:7772 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8072
@@ -224,12 +224,12 @@ federation_api:
   # be required to satisfy key requests for servers that are no longer online when
   # joining some rooms.
   key_perspectives:
-  - server_name: matrix.org
-    keys:
-    - key_id: ed25519:auto
-      public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
-    - key_id: ed25519:a_RXGa
-      public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+    - server_name: matrix.org
+      keys:
+        - key_id: ed25519:auto
+          public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+        - key_id: ed25519:a_RXGa
+          public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 
   # This option will control whether Dendrite will prefer to look up keys directly
   # or whether it should try perspective servers first, using direct fetches as a
@@ -239,7 +239,7 @@ federation_api:
 # Configuration for the Key Server (for end-to-end encryption).
 key_server:
   internal_api:
-    listen: http://localhost:7779  # Only used in polylith deployments
+    listen: http://localhost:7779 # Only used in polylith deployments
     connect: http://localhost:7779 # Only used in polylith deployments
   database:
     connection_string: file:keyserver.db
@@ -250,7 +250,7 @@ key_server:
 # Configuration for the Media API.
 media_api:
   internal_api:
-    listen: http://localhost:7774  # Only used in polylith deployments
+    listen: http://localhost:7774 # Only used in polylith deployments
     connect: http://localhost:7774 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8074
@@ -276,15 +276,15 @@ media_api:
 
   # A list of thumbnail sizes to be generated for media content.
   thumbnail_sizes:
-  - width: 32
-    height: 32
-    method: crop
-  - width: 96
-    height: 96
-    method: crop
-  - width: 640
-    height: 480
-    method: scale
+    - width: 32
+      height: 32
+      method: crop
+    - width: 96
+      height: 96
+      method: crop
+    - width: 640
+      height: 480
+      method: scale
 
 # Configuration for experimental MSC's
 mscs:
@@ -302,7 +302,7 @@ mscs:
 # Configuration for the Room Server.
 room_server:
   internal_api:
-    listen: http://localhost:7770  # Only used in polylith deployments
+    listen: http://localhost:7770 # Only used in polylith deployments
     connect: http://localhost:7770 # Only used in polylith deployments
   database:
     connection_string: file:roomserver.db
@@ -313,7 +313,7 @@ room_server:
 # Configuration for the Sync API.
 sync_api:
   internal_api:
-    listen: http://localhost:7773  # Only used in polylith deployments
+    listen: http://localhost:7773 # Only used in polylith deployments
     connect: http://localhost:7773 # Only used in polylith deployments
   external_api:
     listen: http://[::]:8073
@@ -338,16 +338,16 @@ user_api:
   # This value can be low if performing tests or on embedded Dendrite instances (e.g WASM builds)
   # bcrypt_cost: 10
   internal_api:
-    listen: http://localhost:7781  # Only used in polylith deployments
+    listen: http://localhost:7781 # Only used in polylith deployments
     connect: http://localhost:7781 # Only used in polylith deployments
   account_database:
     connection_string: file:userapi_accounts.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
-  # The length of time that a token issued for a relying party from 
+  # The length of time that a token issued for a relying party from
   # /_matrix/client/r0/user/{userId}/openid/request_token endpoint
-  # is considered to be valid in milliseconds. 
+  # is considered to be valid in milliseconds.
   # The default lifetime is 3600000ms (60 minutes).
   # openid_token_lifetime_ms: 3600000
 
@@ -369,10 +369,10 @@ tracing:
 
 # Logging configuration
 logging:
-- type: std
-  level: info
-- type: file
-  # The logging level, must be one of debug, info, warn, error, fatal, panic.
-  level: info
-  params:
-    path: ./logs
+  - type: std
+    level: info
+  - type: file
+    # The logging level, must be one of debug, info, warn, error, fatal, panic.
+    level: info
+    params:
+      path: ./logs

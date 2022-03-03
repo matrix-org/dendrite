@@ -30,6 +30,7 @@ import (
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
@@ -269,6 +270,11 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 		logrus.WithError(err).Panic("KeyServerHTTPClient failed", b.apiHttpClient)
 	}
 	return f
+}
+
+// PushGatewayHTTPClient returns a new client for interacting with (external) Push Gateways.
+func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
+	return pushgateway.NewHTTPClient(b.Cfg.UserAPI.PushGatewayDisableTLSValidation)
 }
 
 // CreateAccountsDB creates a new instance of the accounts database. Should only

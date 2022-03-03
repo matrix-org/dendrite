@@ -30,3 +30,9 @@ Local device key changes appear in /keys/changes
 Remove group category
 Remove group role
 
+# Flakey
+AS-ghosted users can use rooms themselves
+
+# Flakey, need additional investigation
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
