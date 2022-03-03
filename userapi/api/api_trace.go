@@ -120,38 +120,45 @@ func (t *UserInternalAPITrace) QueryOpenIDToken(ctx context.Context, req *QueryO
 }
 
 func (t *UserInternalAPITrace) AllUsers(ctx context.Context, res *IntegerResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.AllUsers(ctx, res)
+	util.GetLogger(ctx).Infof("QueryOpenIDToken res=%+v", js(res))
+	return err
 }
 
 func (t *UserInternalAPITrace) NonBridgedUsers(ctx context.Context, res *IntegerResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.NonBridgedUsers(ctx, res)
+	util.GetLogger(ctx).Infof("NonBridgedUsers res=%+v", js(res))
+	return err
 }
 
 func (t *UserInternalAPITrace) RegisteredUserByType(ctx context.Context, res *MapResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.RegisteredUserByType(ctx, res)
+	util.GetLogger(ctx).Infof("RegisteredUserByType res=%+v", js(res))
+	return err
 }
 
 func (t *UserInternalAPITrace) DailyUsers(ctx context.Context, res *IntegerResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.DailyUsers(ctx, res)
+	util.GetLogger(ctx).Infof("DailyUsers res=%+v", js(res))
+	return err
 }
 
 func (t *UserInternalAPITrace) MonthlyUsers(ctx context.Context, res *IntegerResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.MonthlyUsers(ctx, res)
+	util.GetLogger(ctx).Infof("MonthlyUsers res=%+v", js(res))
+	return err
 }
 
 func (t *UserInternalAPITrace) R30Users(ctx context.Context, res *MapResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.R30Users(ctx, res)
+	util.GetLogger(ctx).Infof("R30Users res=%+v", js(res))
+	return err
 }
 
 func (t *UserInternalAPITrace) R30UsersV2(ctx context.Context, res *MapResponse) error {
-	//TODO implement me
-	panic("implement me")
+	err := t.Impl.R30UsersV2(ctx, res)
+	util.GetLogger(ctx).Infof("R30UsersV2 res=%+v", js(res))
+	return err
 }
 
 func js(thing interface{}) string {
