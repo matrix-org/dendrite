@@ -60,6 +60,9 @@ type Global struct {
 
 	// ServerNotices configuration used for sending server notices
 	ServerNotices ServerNotices `yaml:"server_notices"`
+
+	// ReportStats configures anonymous usage stats of the server
+	ReportStats bool `yaml:"report_stats"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -70,6 +73,7 @@ func (c *Global) Defaults(generate bool) {
 		c.KeyID = "ed25519:auto"
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
+	c.ReportStats = false
 
 	c.JetStream.Defaults(generate)
 	c.Metrics.Defaults(generate)
