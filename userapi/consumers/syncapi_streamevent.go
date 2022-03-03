@@ -139,6 +139,9 @@ func (s *OutputStreamEventConsumer) processMessage(ctx context.Context, event *g
 	// removing it means we can send all notifications to
 	// e.g. Element's Push gateway in one go.
 	for _, mem := range members {
+		if p, err := s.db.GetPushers(ctx, mem.Localpart); err != nil || len(p) == 0 {
+			continue
+		}
 		if err := s.notifyLocal(ctx, event, pos, mem, roomSize, roomName); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": mem.Localpart,
