@@ -214,19 +214,19 @@ func TestSessionCleanUp(t *testing.T) {
 	s := newSessionsDict()
 
 	t.Run("session is cleaned up after a while", func(t *testing.T) {
-		t.Parallel()
+		// t.Parallel()
 		dummySession := "helloWorld"
 		// manually added, as s.addParams() would start the timer with the default timeout
 		s.params[dummySession] = registerRequest{Username: "Testing"}
 		s.startTimer(time.Millisecond, dummySession)
-		time.Sleep(time.Millisecond * 2)
+		time.Sleep(time.Millisecond * 50)
 		if data, ok := s.getParams(dummySession); ok {
 			t.Errorf("expected session to be deleted: %+v", data)
 		}
 	})
 
 	t.Run("session is deleted, once the registration completed", func(t *testing.T) {
-		t.Parallel()
+		// t.Parallel()
 		dummySession := "helloWorld2"
 		s.startTimer(time.Minute, dummySession)
 		s.deleteSession(dummySession)
@@ -236,7 +236,7 @@ func TestSessionCleanUp(t *testing.T) {
 	})
 
 	t.Run("session timer is restarted after second call", func(t *testing.T) {
-		t.Parallel()
+		// t.Parallel()
 		dummySession := "helloWorld3"
 		// the following will start a timer with the default timeout of 5min
 		s.addParams(dummySession, registerRequest{Username: "Testing"})
@@ -246,7 +246,7 @@ func TestSessionCleanUp(t *testing.T) {
 		s.getCompletedStages(dummySession)
 		// reset the timer with a lower timeout
 		s.startTimer(time.Millisecond, dummySession)
-		time.Sleep(time.Millisecond * 2)
+		time.Sleep(time.Millisecond * 50)
 		if data, ok := s.getParams(dummySession); ok {
 			t.Errorf("expected session to be deleted: %+v", data)
 		}

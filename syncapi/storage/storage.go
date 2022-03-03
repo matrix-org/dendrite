@@ -30,9 +30,9 @@ import (
 func NewSyncServerDatasource(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName)
+		return sqlite3.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties, serverName)
+		return postgres.NewDatabase(dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

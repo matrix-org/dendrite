@@ -54,7 +54,7 @@ dendrite.yaml
 *.db
 
 # Log files
-*.log* 
+*.log*
 
 # Generated code
 cmd/dendrite-demo-yggdrasil/embed/fs*.go
@@ -62,5 +62,7 @@ cmd/dendrite-demo-yggdrasil/embed/fs*.go
 # Test dependencies
 test/wasm/node_modules
 
-media_store/
+# Ignore complement folder when running locally
+complement/
 
+media_store/

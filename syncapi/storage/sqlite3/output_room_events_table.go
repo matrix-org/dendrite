@@ -62,16 +62,19 @@ const selectEventsSQL = "" +
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3"
+
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectRecentEventsForSyncSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE"
+
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3"
+
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectMaxEventIDSQL = "" +
@@ -85,6 +88,7 @@ const selectStateInRangeSQL = "" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" +
 	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
+
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const deleteEventsForRoomSQL = "" +
@@ -95,10 +99,12 @@ const selectContextEventSQL = "" +
 
 const selectContextBeforeEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2"
+
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 const selectContextAfterEventSQL = "" +
 	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2"
+
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
 type outputRoomEventsStatements struct {

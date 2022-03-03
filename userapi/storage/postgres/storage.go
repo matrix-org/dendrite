@@ -85,6 +85,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresThreePIDTable: %w", err)
 	}
+	pusherTable, err := NewPostgresPusherTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresPusherTable: %w", err)
+	}
+	notificationsTable, err := NewPostgresNotificationTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
+	}
 	statsTable, err := NewPostgresStatsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresStatsTable: %w", err)
@@ -99,6 +107,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		OpenIDTokens:          openIDTable,
 		Profiles:              profilesTable,
 		ThreePIDs:             threePIDTable,
+		Pushers:               pusherTable,
+		Notifications:         notificationsTable,
 		Stats:                 statsTable,
 		ServerName:            serverName,
 		DB:                    db,

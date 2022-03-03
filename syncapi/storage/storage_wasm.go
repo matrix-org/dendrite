@@ -26,7 +26,7 @@ import (
 func NewSyncServerDatasource(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName)
+		return sqlite3.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

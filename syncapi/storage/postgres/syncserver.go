@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -34,12 +33,11 @@ type SyncServerDatasource struct {
 	db     *sql.DB
 	writer sqlutil.Writer
 	sqlutil.PartitionOffsetStatements
-	serverName gomatrixserverlib.ServerName
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (*SyncServerDatasource, error) {
-	d := SyncServerDatasource{serverName: serverName}
+func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+	d := SyncServerDatasource{}
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err
@@ -92,7 +90,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, err
 	}
-	
+	notificationData, err := NewPostgresNotificationDataTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -113,6 +114,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
 		Memberships:         memberships,
+		NotificationData:    notificationData,
 	}
 	return &d, nil
 }
