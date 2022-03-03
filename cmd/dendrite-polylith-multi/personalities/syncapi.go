@@ -30,7 +30,7 @@ func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 		base.ProcessContext,
 		base.PublicClientAPIMux, userAPI, rsAPI,
 		base.KeyServerHTTPClient(),
-		federation, &cfg.SyncAPI, cfg,
+		federation, cfg,
 		false,
 	)
 

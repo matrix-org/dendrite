@@ -54,10 +54,10 @@ func AddPublicRoutes(
 	rsAPI api.RoomserverInternalAPI,
 	keyAPI keyapi.KeyInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	cfg *config.SyncAPI,
 	baseCfg *config.Dendrite,
 	isMonolith bool,
 ) {
+	cfg := &baseCfg.SyncAPI
 	startTime := time.Now()
 	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
@@ -120,8 +120,9 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
-	// TODO: add config
-	go startPhoneHomeCollector(startTime, baseCfg, syncDB, userAPI, isMonolith)
+	if baseCfg.Global.ReportStats {
+		go startPhoneHomeCollector(startTime, baseCfg, syncDB, userAPI, isMonolith)
+	}
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }
@@ -145,7 +146,6 @@ type timestampToRUUsage struct {
 func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB storage.Database, userAPI userapi.UserInternalAPI, isMonolith bool) {
 
 	p := phoneHomeStats{
-		stats:      make(map[string]interface{}),
 		startTime:  startTime,
 		serverName: cfg.Global.ServerName,
 		cfg:        cfg,
@@ -172,41 +172,39 @@ func startPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, syncDB s
 
 func (p *phoneHomeStats) collect() {
 	p.stats = make(map[string]interface{})
+	// general information
 	p.stats["servername"] = p.serverName
 	p.stats["monolith"] = p.isMonolith
 	p.stats["version"] = internal.VersionString()
+	p.stats["timestamp"] = time.Now().Unix()
+	p.stats["go_version"] = runtime.Version()
+	p.stats["uptime_seconds"] = math.Floor(time.Now().Sub(p.startTime).Seconds())
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*1)
 	defer cancel()
 
-	oldUsage := p.prevData
-	newUsage := syscall.Rusage{}
-	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &newUsage); err != nil {
-		logrus.WithError(err).Error("unable to get usage")
+	// cpu and memory usage information
+	err := getMemoryStats(p)
+	if err != nil {
+		logrus.WithError(err).Error("unable to get memory/cpu stats")
 		return
 	}
-	newData := timestampToRUUsage{timestamp: time.Now().Unix(), usage: newUsage}
-	p.prevData = newData
 
-	usedCPUTime := (newUsage.Utime.Sec + newUsage.Stime.Sec) - (oldUsage.usage.Utime.Sec + oldUsage.usage.Stime.Sec)
-
-	if usedCPUTime == 0 || newData.timestamp == oldUsage.timestamp {
-		logrus.Info("setting cpu average to 0")
-		p.stats["cpu_average"] = 0
-	} else {
-		p.stats["cpu_average"] = math.Floor(float64(usedCPUTime / (newData.timestamp - oldUsage.timestamp) * 100))
+	// configuration information
+	p.stats["federation_disabled"] = p.cfg.Global.DisableFederation
+	p.stats["nats_embedded"] = true
+	p.stats["nats_in_memory"] = p.cfg.Global.JetStream.InMemory
+	if len(p.cfg.Global.JetStream.Addresses) > 0 {
+		p.stats["nats_embedded"] = false
+		p.stats["nats_in_memory"] = false // probably
 	}
-
-	p.stats["uptime_seconds"] = math.Floor(time.Now().Sub(p.startTime).Seconds())
-	p.stats["timestamp"] = time.Now().Unix()
-	p.stats["go_version"] = runtime.Version()
-	p.stats["memory_rss"] = newUsage.Maxrss
 	if len(p.cfg.Logging) > 0 {
 		p.stats["log_level"] = p.cfg.Logging[0].Level
 	} else {
 		p.stats["log_level"] = "info"
 	}
 
+	// database configuration
 	db, err := sqlutil.Open(&p.cfg.SyncAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Error("unable to database")
@@ -235,6 +233,7 @@ func (p *phoneHomeStats) collect() {
 	p.stats["database_engine"] = dbEngine
 	p.stats["database_server_version"] = dbVersion
 
+	// message and room stats
 	messages, err := p.db.DailyMessages(ctx, 0)
 	if err != nil {
 		logrus.WithError(err).Error("unable to query DailyMessages")
