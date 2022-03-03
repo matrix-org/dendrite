@@ -17,6 +17,7 @@ package routing
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -102,6 +103,12 @@ func Context(
 
 	id, requestedEvent, err := syncDB.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound(fmt.Sprintf("Event %s not found", eventID)),
+			}
+		}
 		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
 		return jsonerror.InternalServerError()
 	}
