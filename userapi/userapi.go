@@ -46,11 +46,6 @@ func NewInternalAPI(
 	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
-	db, err := storage.NewDatabase(&cfg.AccountDatabase, cfg.Matrix.ServerName, cfg.BCryptCost, int64(api.DefaultLoginTokenLifetime*time.Millisecond), api.DefaultLoginTokenLifetime)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to device db")
-	}
-
 	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncProducer := producers.NewSyncAPI(
@@ -85,6 +80,16 @@ func NewInternalAPI(
 	if err := eventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
+
+	var cleanOldNotifs func()
+	cleanOldNotifs = func() {
+		logrus.Infof("Cleaning old notifications")
+		if err := db.DeleteOldNotifications(base.Context()); err != nil {
+			logrus.WithError(err).Error("Failed to clean old notifications")
+		}
+		time.AfterFunc(time.Hour, cleanOldNotifs)
+	}
+	time.AfterFunc(time.Minute, cleanOldNotifs)
 
 	return userAPI
 }

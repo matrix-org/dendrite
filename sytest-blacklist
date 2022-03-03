@@ -35,3 +35,4 @@ AS-ghosted users can use rooms themselves
 # Flakey, need additional investigation
 Messages that notify from another user increment notification_count
 Messages that highlight from another user increment unread highlight count
+Notifications can be viewed with GET /notifications
