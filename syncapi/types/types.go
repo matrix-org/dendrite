@@ -474,3 +474,16 @@ type Peek struct {
 	New     bool
 	Deleted bool
 }
+
+type ReadUpdate struct {
+	UserID    string         `json:"user_id"`
+	RoomID    string         `json:"room_id"`
+	Read      StreamPosition `json:"read,omitempty"`
+	FullyRead StreamPosition `json:"fully_read,omitempty"`
+}
+
+// StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
+type StreamedEvent struct {
+	Event          *gomatrixserverlib.HeaderedEvent `json:"event"`
+	StreamPosition StreamPosition                   `json:"stream_position"`
+}

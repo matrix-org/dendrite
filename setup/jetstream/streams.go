@@ -20,6 +20,8 @@ var (
 	OutputClientData        = "OutputClientData"
 	OutputNotificationData  = "OutputNotificationData"
 	OutputReceiptEvent      = "OutputReceiptEvent"
+	OutputStreamEvent       = "OutputStreamEvent"
+	OutputReadUpdate        = "OutputReadUpdate"
 )
 
 var streams = []*nats.StreamConfig{
@@ -61,6 +63,16 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      OutputNotificationData,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      OutputStreamEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      OutputReadUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

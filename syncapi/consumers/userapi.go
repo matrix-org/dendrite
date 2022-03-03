@@ -83,7 +83,7 @@ func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msg *nat
 	var data eventutil.NotificationData
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		sentry.CaptureException(err)
-		log.WithField("user_id", userID).WithError(err).Error("push server consumer: message parse failure")
+		log.WithField("user_id", userID).WithError(err).Error("user API consumer: message parse failure")
 		return true
 	}
 
@@ -104,7 +104,7 @@ func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msg *nat
 		"user_id":   userID,
 		"room_id":   data.RoomID,
 		"streamPos": streamPos,
-	}).Info("Received data from Push server")
+	}).Trace("Received notification data from user API")
 
 	return true
 }

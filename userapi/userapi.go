@@ -72,25 +72,18 @@ func NewInternalAPI(
 		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
 	}
 
-	caConsumer := consumers.NewOutputClientDataConsumer(
+	readConsumer := consumers.NewOutputReadUpdateConsumer(
 		base.ProcessContext, cfg, js, db, pgClient, userAPI, syncProducer,
 	)
-	if err := caConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start user API clientapi consumer")
+	if err := readConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start user API read update consumer")
 	}
 
-	eduConsumer := consumers.NewOutputReceiptEventConsumer(
-		base.ProcessContext, cfg, js, db, pgClient, syncProducer,
-	)
-	if err := eduConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start user API EDU consumer")
-	}
-
-	rsConsumer := consumers.NewOutputRoomEventConsumer(
+	eventConsumer := consumers.NewOutputStreamEventConsumer(
 		base.ProcessContext, cfg, js, db, pgClient, userAPI, rsAPI, syncProducer,
 	)
-	if err := rsConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start user API room server consumer")
+	if err := eventConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
 	return userAPI

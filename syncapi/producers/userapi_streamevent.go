@@ -17,30 +17,30 @@ package producers
 import (
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
 
-// SyncAPIProducer produces events for the sync API server to consume
-type SyncAPIProducer struct {
+// UserAPIProducer produces events for the user API server to consume
+type UserAPIStreamEventProducer struct {
 	Topic     string
 	JetStream nats.JetStreamContext
 }
 
-// SendData sends account data to the sync API server
-func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string, readMarker *eventutil.ReadMarkerJSON) error {
+// SendData sends account data to the user API server
+func (p *UserAPIStreamEventProducer) SendStreamEvent(roomID string, event *gomatrixserverlib.HeaderedEvent, pos types.StreamPosition) error {
 	m := &nats.Msg{
 		Subject: p.Topic,
 		Header:  nats.Header{},
 	}
-	m.Header.Set(jetstream.UserID, userID)
+	m.Header.Set(jetstream.RoomID, roomID)
 
-	data := eventutil.AccountData{
-		RoomID:     roomID,
-		Type:       dataType,
-		ReadMarker: readMarker,
+	data := types.StreamedEvent{
+		Event:          event,
+		StreamPosition: pos,
 	}
 	var err error
 	m.Data, err = json.Marshal(data)
@@ -49,9 +49,10 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 	}
 
 	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   roomID,
-		"data_type": dataType,
+		"room_id":    roomID,
+		"event_id":   event.EventID(),
+		"event_type": event.Type(),
+		"stream_pos": pos,
 	}).Tracef("Producing to topic '%s'", p.Topic)
 
 	_, err = p.JetStream.PublishMsg(m)

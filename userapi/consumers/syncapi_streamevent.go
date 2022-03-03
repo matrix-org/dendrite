@@ -14,6 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -24,7 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type OutputRoomEventConsumer struct {
+type OutputStreamEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.UserAPI
 	userAPI      api.UserInternalAPI
@@ -37,7 +38,7 @@ type OutputRoomEventConsumer struct {
 	syncProducer *producers.SyncAPI
 }
 
-func NewOutputRoomEventConsumer(
+func NewOutputStreamEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.UserAPI,
 	js nats.JetStreamContext,
@@ -46,14 +47,14 @@ func NewOutputRoomEventConsumer(
 	userAPI api.UserInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI,
 	syncProducer *producers.SyncAPI,
-) *OutputRoomEventConsumer {
-	return &OutputRoomEventConsumer{
+) *OutputStreamEventConsumer {
+	return &OutputStreamEventConsumer{
 		ctx:          process.Context(),
 		cfg:          cfg,
 		jetstream:    js,
 		db:           store,
-		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		durable:      cfg.Matrix.JetStream.Durable("UserAPISyncAPIStreamEventConsumer"),
+		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputStreamEvent),
 		pgClient:     pgClient,
 		userAPI:      userAPI,
 		rsAPI:        rsAPI,
@@ -61,7 +62,7 @@ func NewOutputRoomEventConsumer(
 	}
 }
 
-func (s *OutputRoomEventConsumer) Start() error {
+func (s *OutputStreamEventConsumer) Start() error {
 	if err := jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
 		nats.DeliverAll(), nats.ManualAck(),
@@ -71,48 +72,34 @@ func (s *OutputRoomEventConsumer) Start() error {
 	return nil
 }
 
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
-	var output rsapi.OutputEvent
+func (s *OutputStreamEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+	var output types.StreamedEvent
+	output.Event = &gomatrixserverlib.HeaderedEvent{}
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		log.WithError(err).Errorf("pushserver consumer: message parse failure")
+		log.WithError(err).Errorf("userapi consumer: message parse failure")
+		return true
+	}
+	if output.Event.Event == nil {
+		log.Errorf("userapi consumer: expected event")
 		return true
 	}
 
 	log.WithFields(log.Fields{
-		"event_type": output.Type,
-	}).Tracef("Received message from room server: %#v", output)
+		"event_id":   output.Event.EventID(),
+		"event_type": output.Event.Type(),
+		"stream_pos": output.StreamPosition,
+	}).Tracef("Received message from sync API: %#v", output)
 
-	switch output.Type {
-	case rsapi.OutputTypeNewRoomEvent:
-		ev := output.NewRoomEvent.Event
-		if err := s.processMessage(ctx, output.NewRoomEvent.Event); err != nil {
-			log.WithFields(log.Fields{
-				"event_id": ev.EventID(),
-				"event":    string(ev.JSON()),
-			}).WithError(err).Errorf("pushserver consumer: process room event failure")
-		}
-
-	case rsapi.OutputTypeNewInviteEvent:
-		ev := output.NewInviteEvent.Event
-		if err := s.processMessage(ctx, output.NewInviteEvent.Event); err != nil {
-			log.WithFields(log.Fields{
-				"event_id": ev.EventID(),
-				"event":    string(ev.JSON()),
-			}).WithError(err).Errorf("pushserver consumer: process invite event failure")
-		}
-
-	default:
-		// Ignore old events, peeks, so on.
+	if err := s.processMessage(ctx, output.Event, int64(output.StreamPosition)); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": output.Event.EventID(),
+		}).WithError(err).Errorf("userapi consumer: process room event failure")
 	}
 
 	return true
 }
 
-func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
-	log.WithFields(log.Fields{
-		"event_type": event.Type(),
-	}).Tracef("Received event from room server: %#v", event)
-
+func (s *OutputStreamEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, pos int64) error {
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
@@ -152,7 +139,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 	// removing it means we can send all notifications to
 	// e.g. Element's Push gateway in one go.
 	for _, mem := range members {
-		if err := s.notifyLocal(ctx, event, mem, roomSize, roomName); err != nil {
+		if err := s.notifyLocal(ctx, event, pos, mem, roomSize, roomName); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": mem.Localpart,
 			}).WithError(err).Debugf("Unable to push to local user")
@@ -193,7 +180,7 @@ func newLocalMembership(event *gomatrixserverlib.ClientEvent) (*localMembership,
 
 // localRoomMembers fetches the current local members of a room, and
 // the total number of members.
-func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
+func (s *OutputStreamEventConsumer) localRoomMembers(ctx context.Context, roomID string) ([]*localMembership, int, error) {
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
@@ -232,7 +219,7 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 // looks it up in roomserver. If there is no name,
 // m.room.canonical_alias is consulted. Returns an empty string if the
 // room has no name.
-func (s *OutputRoomEventConsumer) roomName(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) (string, error) {
+func (s *OutputStreamEventConsumer) roomName(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) (string, error) {
 	if event.Type() == gomatrixserverlib.MRoomName {
 		name, err := unmarshalRoomName(event)
 		if err != nil {
@@ -300,7 +287,7 @@ func unmarshalCanonicalAlias(event *gomatrixserverlib.HeaderedEvent) (string, er
 }
 
 // notifyLocal finds the right push actions for a local user, given an event.
-func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int, roomName string) error {
+func (s *OutputStreamEventConsumer) notifyLocal(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, pos int64, mem *localMembership, roomSize int, roomName string) error {
 	actions, err := s.evaluatePushRules(ctx, event, mem, roomSize)
 	if err != nil {
 		return err
@@ -338,7 +325,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		RoomID:     event.RoomID(),
 		TS:         gomatrixserverlib.AsTimestamp(time.Now()),
 	}
-	if err = s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), tweaks, n); err != nil {
+	if err = s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), pos, tweaks, n); err != nil {
 		return err
 	}
 
@@ -409,7 +396,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
-func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
+func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
 	if event.Sender() == mem.UserID {
 		// SPEC: Homeservers MUST NOT notify the Push Gateway for
 		// events that the user has sent themselves.
@@ -488,7 +475,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 
 // localPushDevices pushes to the configured devices of a local
 // user. The map keys are [url][format].
-func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpart string, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
+func (s *OutputStreamEventConsumer) localPushDevices(ctx context.Context, localpart string, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
 	pusherDevices, err := util.GetPushDevices(ctx, localpart, tweaks, s.db)
 	if err != nil {
 		return nil, "", err
@@ -512,7 +499,7 @@ func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpar
 }
 
 // notifyHTTP performs a notificatation to a Push Gateway.
-func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
+func (s *OutputStreamEventConsumer) notifyHTTP(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, url, format string, devices []*pushgateway.Device, localpart, roomName string, userNumUnreadNotifs int) ([]*pushgateway.Device, error) {
 	logger := log.WithFields(log.Fields{
 		"event_id":    event.EventID(),
 		"url":         url,
@@ -556,12 +543,13 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatri
 		}
 	}
 
-	logger.Debugf("Notifying HTTP push gateway")
+	logger.Debugf("Notifying push gateway %s", url)
 	var res pushgateway.NotifyResponse
 	if err := s.pgClient.Notify(ctx, url, &req, &res); err != nil {
+		logger.WithError(err).Errorf("Failed to notify push gateway %s", url)
 		return nil, err
 	}
-	logger.WithField("num_rejected", len(res.Rejected)).Tracef("HTTP push gateway result")
+	logger.WithField("num_rejected", len(res.Rejected)).Tracef("Push gateway result")
 
 	if len(res.Rejected) == 0 {
 		return nil, nil
@@ -583,12 +571,12 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatri
 }
 
 // deleteRejectedPushers deletes the pushers associated with the given devices.
-func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string) {
+func (s *OutputStreamEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string) {
 	log.WithFields(log.Fields{
 		"localpart":   localpart,
 		"app_id0":     devices[0].AppID,
 		"num_devices": len(devices),
-	}).Infof("Deleting pushers rejected by the HTTP push gateway")
+	}).Warnf("Deleting pushers rejected by the HTTP push gateway")
 
 	for _, d := range devices {
 		if err := s.db.RemovePusher(ctx, d.AppID, d.PushKey, localpart); err != nil {

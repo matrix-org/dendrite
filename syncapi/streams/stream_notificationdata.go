@@ -33,7 +33,7 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	// We want counts for all possible rooms, so always start from zero.
-	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, 0, to)
+	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, from, to)
 	if err != nil {
 		req.Log.WithError(err).Error("GetUserUnreadNotificationCounts failed")
 		return from

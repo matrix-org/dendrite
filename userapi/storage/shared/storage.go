@@ -671,23 +671,23 @@ func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (
 	return d.LoginTokens.SelectLoginToken(ctx, token)
 }
 
-func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, tweaks map[string]interface{}, n *api.Notification) error {
+func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, pos int64, tweaks map[string]interface{}, n *api.Notification) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Notifications.Insert(ctx, txn, localpart, eventID, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
+		return d.Notifications.Insert(ctx, txn, localpart, eventID, pos, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
 	})
 }
 
-func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID, upToEventID string) (affected bool, err error) {
+func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID string, pos int64) (affected bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		affected, err = d.Notifications.DeleteUpTo(ctx, txn, localpart, roomID, upToEventID)
+		affected, err = d.Notifications.DeleteUpTo(ctx, txn, localpart, roomID, pos)
 		return err
 	})
 	return
 }
 
-func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID, upToEventID string, b bool) (affected bool, err error) {
+func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID string, pos int64, b bool) (affected bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		affected, err = d.Notifications.UpdateRead(ctx, txn, localpart, roomID, upToEventID, b)
+		affected, err = d.Notifications.UpdateRead(ctx, txn, localpart, roomID, pos, b)
 		return err
 	})
 	return
