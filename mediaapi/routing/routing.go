@@ -120,13 +120,16 @@ func makeDownloadAPI(
 		w.Header().Set("Content-Type", "application/json")
 
 		// Ratelimit requests
-		if r := rateLimits.Limit(req); r != nil {
-			if err := json.NewEncoder(w).Encode(r); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+		// NOTSPEC: The spec says everything at /media/ should be rate limited, but this causes issues with thumbnails (#2243)
+		if name != "thumbnail" {
+			if r := rateLimits.Limit(req); r != nil {
+				if err := json.NewEncoder(w).Encode(r); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusTooManyRequests)
 				return
 			}
-			w.WriteHeader(http.StatusTooManyRequests)
-			return
 		}
 
 		vars, _ := httputil.URLDecodeMapValues(mux.Vars(req))
