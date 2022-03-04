@@ -17,10 +17,12 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -204,32 +206,33 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				sender = ev.Sender()
 			}
 
+			builder := &gomatrixserverlib.EventBuilder{
+				Sender:   sender,
+				RoomID:   ev.RoomID(),
+				Type:     ev.Type(),
+				StateKey: ev.StateKey(),
+				Content:  res,
+			}
+
+			eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+			if err != nil {
+				return fmt.Errorf("gomatrixserverlib.StateNeededForEventBuilder: %w", err)
+			}
+			if len(eventsNeeded.Tuples()) == 0 {
+				return errors.New("expecting state tuples for event builder, got none")
+			}
+
 			stateRes := &api.QueryLatestEventsAndStateResponse{}
-			if err := helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID}, stateRes); err != nil {
+			if err := helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
 				return err
 			}
 
-			authEvents := make([]string, len(stateRes.StateEvents))
-			for i := range stateRes.StateEvents {
-				authEvents[i] = stateRes.StateEvents[i].EventID()
-			}
-
-			builder := &gomatrixserverlib.EventBuilder{
-				Sender:     sender,
-				RoomID:     ev.RoomID(),
-				Type:       ev.Type(),
-				StateKey:   ev.StateKey(),
-				PrevEvents: []string{ev.EventID()},
-				AuthEvents: authEvents,
-				Content:    res,
-			}
-
-			newEvent, err := builder.Build(time.Now(), r.ServerName, r.Cfg.Matrix.KeyID, r.Cfg.Matrix.PrivateKey, ev.RoomVersion)
+			newEvent, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}
 
-			err = api.SendEvents(ctx, r.RSAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent.Headered(ev.RoomVersion)}, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r.RSAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}
