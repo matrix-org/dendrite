@@ -86,6 +86,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteThreePIDTable: %w", err)
 	}
+	pusherTable, err := NewSQLitePusherTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresPusherTable: %w", err)
+	}
+	notificationsTable, err := NewSQLiteNotificationTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
+	}
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
 		Accounts:              accountsTable,
@@ -96,6 +104,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		OpenIDTokens:          openIDTable,
 		Profiles:              profilesTable,
 		ThreePIDs:             threePIDTable,
+		Pushers:               pusherTable,
+		Notifications:         notificationsTable,
 		ServerName:            serverName,
 		DB:                    db,
 		Writer:                sqlutil.NewExclusiveWriter(),

@@ -144,12 +144,14 @@ func main() {
 	accountDB := base.Base.CreateAccountsDB()
 	federation := createFederationClient(base)
 	keyAPI := keyserver.NewInternalAPI(&base.Base, &base.Base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
 
 	rsAPI := roomserver.NewInternalAPI(
 		&base.Base,
 	)
+
+	userAPI := userapi.NewInternalAPI(&base.Base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.Base.PushGatewayHTTPClient())
+	keyAPI.SetUserAPI(userAPI)
+
 	eduInputAPI := eduserver.NewInternalAPI(
 		&base.Base, cache.New(), userAPI,
 	)

@@ -116,7 +116,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI)
+	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
 	eduInputAPI := eduserver.NewInternalAPI(

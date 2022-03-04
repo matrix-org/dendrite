@@ -166,12 +166,12 @@ func (a *FederationInternalAPI) MSC2836EventRelationships(
 }
 
 func (a *FederationInternalAPI) MSC2946Spaces(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, r gomatrixserverlib.MSC2946SpacesRequest,
+	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, suggestedOnly bool,
 ) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
-		return a.federation.MSC2946Spaces(ctx, s, roomID, r)
+		return a.federation.MSC2946Spaces(ctx, s, roomID, suggestedOnly)
 	})
 	if err != nil {
 		return res, err

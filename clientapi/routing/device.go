@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 )
 
 // https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-devices
@@ -163,6 +164,15 @@ func DeleteDeviceById(
 	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.UserInternalAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
+	var (
+		deleteOK  bool
+		sessionID string
+	)
+	defer func() {
+		if deleteOK {
+			sessions.deleteSession(sessionID)
+		}
+	}()
 	ctx := req.Context()
 	defer req.Body.Close() // nolint:errcheck
 	bodyBytes, err := ioutil.ReadAll(req.Body)
@@ -172,8 +182,29 @@ func DeleteDeviceById(
 			JSON: jsonerror.BadJSON("The request body could not be read: " + err.Error()),
 		}
 	}
+
+	// check that we know this session, and it matches with the device to delete
+	s := gjson.GetBytes(bodyBytes, "auth.session").Str
+	if dev, ok := sessions.getDeviceToDelete(s); ok {
+		if dev != deviceID {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("session & device mismatch"),
+			}
+		}
+	}
+
+	if s != "" {
+		sessionID = s
+	}
+
 	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
 	if errRes != nil {
+		switch data := errRes.JSON.(type) {
+		case auth.Challenge:
+			sessions.addDeviceToDelete(data.Session, deviceID)
+		default:
+		}
 		return *errRes
 	}
 
@@ -200,6 +231,8 @@ func DeleteDeviceById(
 		util.GetLogger(ctx).WithError(err).Error("userAPI.PerformDeviceDeletion failed")
 		return jsonerror.InternalServerError()
 	}
+
+	deleteOK = true
 
 	return util.JSONResponse{
 		Code: http.StatusOK,

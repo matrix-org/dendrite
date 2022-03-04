@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 
@@ -127,7 +128,7 @@ func SaveAccountData(
 	}
 
 	// TODO: user API should do this since it's account data
-	if err := syncProducer.SendData(userID, roomID, dataType); err != nil {
+	if err := syncProducer.SendData(userID, roomID, dataType, nil); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
 		return jsonerror.InternalServerError()
 	}
@@ -136,11 +137,6 @@ func SaveAccountData(
 		Code: http.StatusOK,
 		JSON: struct{}{},
 	}
-}
-
-type readMarkerJSON struct {
-	FullyRead string `json:"m.fully_read"`
-	Read      string `json:"m.read"`
 }
 
 type fullyReadEvent struct {
@@ -159,7 +155,7 @@ func SaveReadMarker(
 		return *resErr
 	}
 
-	var r readMarkerJSON
+	var r eventutil.ReadMarkerJSON
 	resErr = httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
@@ -189,7 +185,7 @@ func SaveReadMarker(
 		return util.ErrorResponse(err)
 	}
 
-	if err := syncProducer.SendData(device.UserID, roomID, "m.fully_read"); err != nil {
+	if err := syncProducer.SendData(device.UserID, roomID, "m.fully_read", &r); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
 		return jsonerror.InternalServerError()
 	}

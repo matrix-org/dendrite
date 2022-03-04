@@ -79,6 +79,21 @@ func (t *UserInternalAPITrace) PerformKeyBackup(ctx context.Context, req *Perfor
 	util.GetLogger(ctx).Infof("PerformKeyBackup req=%+v res=%+v", js(req), js(res))
 	return err
 }
+func (t *UserInternalAPITrace) PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error {
+	err := t.Impl.PerformPusherSet(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformPusherSet req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *struct{}) error {
+	err := t.Impl.PerformPusherDeletion(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformPusherDeletion req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error {
+	err := t.Impl.PerformPushRulesPut(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformPushRulesPut req=%+v res=%+v", js(req), js(res))
+	return err
+}
 func (t *UserInternalAPITrace) QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) {
 	t.Impl.QueryKeyBackup(ctx, req, res)
 	util.GetLogger(ctx).Infof("QueryKeyBackup req=%+v res=%+v", js(req), js(res))
@@ -116,6 +131,21 @@ func (t *UserInternalAPITrace) QuerySearchProfiles(ctx context.Context, req *Que
 func (t *UserInternalAPITrace) QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error {
 	err := t.Impl.QueryOpenIDToken(ctx, req, res)
 	util.GetLogger(ctx).Infof("QueryOpenIDToken req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error {
+	err := t.Impl.QueryPushers(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryPushers req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error {
+	err := t.Impl.QueryPushRules(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryPushRules req=%+v res=%+v", js(req), js(res))
+	return err
+}
+func (t *UserInternalAPITrace) QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error {
+	err := t.Impl.QueryNotifications(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryNotifications req=%+v res=%+v", js(req), js(res))
 	return err
 }
 
