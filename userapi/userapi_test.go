@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/internal"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage"
 )
@@ -62,7 +63,10 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, s
 		},
 	}
 
-	return newInternalAPI(accountDB, cfg, nil, nil), accountDB
+	return &internal.UserInternalAPI{
+		DB:         accountDB,
+		ServerName: cfg.Matrix.ServerName,
+	}, accountDB
 }
 
 func TestQueryProfile(t *testing.T) {

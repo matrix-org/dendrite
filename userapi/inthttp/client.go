@@ -37,16 +37,22 @@ const (
 	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
 	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
 	PerformKeyBackupPath           = "/userapi/performKeyBackup"
+	PerformPusherSetPath           = "/pushserver/performPusherSet"
+	PerformPusherDeletionPath      = "/pushserver/performPusherDeletion"
+	PerformPushRulesPutPath        = "/pushserver/performPushRulesPut"
 	PerformUpdatePolicyVersionPath = "/userapi/performUpdatePolicyVersion"
 
-	QueryKeyBackupPath           = "/userapi/queryKeyBackup"
-	QueryProfilePath             = "/userapi/queryProfile"
-	QueryAccessTokenPath         = "/userapi/queryAccessToken"
-	QueryDevicesPath             = "/userapi/queryDevices"
-	QueryAccountDataPath         = "/userapi/queryAccountData"
-	QueryDeviceInfosPath         = "/userapi/queryDeviceInfos"
-	QuerySearchProfilesPath      = "/userapi/querySearchProfiles"
-	QueryOpenIDTokenPath         = "/userapi/queryOpenIDToken"
+	QueryKeyBackupPath      = "/userapi/queryKeyBackup"
+	QueryProfilePath        = "/userapi/queryProfile"
+	QueryAccessTokenPath    = "/userapi/queryAccessToken"
+	QueryDevicesPath        = "/userapi/queryDevices"
+	QueryAccountDataPath    = "/userapi/queryAccountData"
+	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
+	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
+	QueryOpenIDTokenPath    = "/userapi/queryOpenIDToken"
+	QueryPushersPath        = "/pushserver/queryPushers"
+	QueryPushRulesPath      = "/pushserver/queryPushRules"
+	QueryNotificationsPath  = "/pushserver/queryNotifications"
 	QueryPolicyVersionPath       = "/userapi/queryPolicyVersion"
 	QueryOutdatedPolicyUsersPath = "/userapi/queryOutdatedPolicy"
 )
@@ -251,6 +257,61 @@ func (h *httpUserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.Query
 	if err != nil {
 		res.Error = err.Error()
 	}
+}
+
+func (h *httpUserInternalAPI) QueryNotifications(ctx context.Context, req *api.QueryNotificationsRequest, res *api.QueryNotificationsResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryNotifications")
+	defer span.Finish()
+
+	return httputil.PostJSON(ctx, span, h.httpClient, h.apiURL+QueryNotificationsPath, req, res)
+}
+
+func (h *httpUserInternalAPI) PerformPusherSet(
+	ctx context.Context,
+	request *api.PerformPusherSetRequest,
+	response *struct{},
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPusherSet")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformPusherSetPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.PerformPusherDeletionRequest, res *struct{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPusherDeletion")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformPusherDeletionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryPushers(ctx context.Context, req *api.QueryPushersRequest, res *api.QueryPushersResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPushers")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPushersPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) PerformPushRulesPut(
+	ctx context.Context,
+	request *api.PerformPushRulesPutRequest,
+	response *struct{},
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPushRulesPut")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformPushRulesPutPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+}
+
+func (h *httpUserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPushRules")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPushRulesPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
 func (h *httpUserInternalAPI) QueryPolicyVersion(ctx context.Context, req *api.QueryPolicyVersionRequest, res *api.QueryPolicyVersionResponse) error {

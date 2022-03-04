@@ -23,7 +23,11 @@ import (
 func UserAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	accountDB := base.CreateAccountsDB()
 
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, base.KeyServerHTTPClient())
+	userAPI := userapi.NewInternalAPI(
+		base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices,
+		base.KeyServerHTTPClient(), base.RoomserverHTTPClient(),
+		base.PushGatewayHTTPClient(),
+	)
 
 	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
 

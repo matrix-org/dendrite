@@ -17,6 +17,7 @@ package routing
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -44,7 +45,7 @@ func Context(
 	syncDB storage.Database,
 	roomID, eventID string,
 ) util.JSONResponse {
-	filter, err := parseContextParams(req)
+	filter, err := parseRoomEventFilter(req)
 	if err != nil {
 		errMsg := ""
 		switch err.(type) {
@@ -102,6 +103,12 @@ func Context(
 
 	id, requestedEvent, err := syncDB.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound(fmt.Sprintf("Event %s not found", eventID)),
+			}
+		}
 		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
 		return jsonerror.InternalServerError()
 	}
@@ -164,7 +171,7 @@ func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter
 	return newState
 }
 
-func parseContextParams(req *http.Request) (*gomatrixserverlib.RoomEventFilter, error) {
+func parseRoomEventFilter(req *http.Request) (*gomatrixserverlib.RoomEventFilter, error) {
 	// Default room filter
 	filter := &gomatrixserverlib.RoomEventFilter{Limit: 10}
 

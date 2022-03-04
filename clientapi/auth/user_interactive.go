@@ -144,21 +144,23 @@ func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 	delete(u.Sessions, sessionID)
 }
 
+type Challenge struct {
+	Completed []string              `json:"completed"`
+	Flows     []userInteractiveFlow `json:"flows"`
+	Session   string                `json:"session"`
+	// TODO: Return any additional `params`
+	Params map[string]interface{} `json:"params"`
+}
+
 // Challenge returns an HTTP 401 with the supported flows for authenticating
 func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 	return &util.JSONResponse{
 		Code: 401,
-		JSON: struct {
-			Completed []string              `json:"completed"`
-			Flows     []userInteractiveFlow `json:"flows"`
-			Session   string                `json:"session"`
-			// TODO: Return any additional `params`
-			Params map[string]interface{} `json:"params"`
-		}{
-			u.Completed,
-			u.Flows,
-			sessionID,
-			make(map[string]interface{}),
+		JSON: Challenge{
+			Completed: u.Completed,
+			Flows:     u.Flows,
+			Session:   sessionID,
+			Params:    make(map[string]interface{}),
 		},
 	}
 }

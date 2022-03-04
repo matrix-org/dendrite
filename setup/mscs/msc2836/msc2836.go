@@ -654,11 +654,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 		AuthEvents:  res.AuthChain,
 		StateEvents: stateEvents,
 	}
-	eventsInOrder, err := respState.Events(rc.roomVersion)
-	if err != nil {
-		util.GetLogger(rc.ctx).WithError(err).Error("failed to calculate order to send events in MSC2836EventRelationshipsResponse")
-		return
-	}
+	eventsInOrder := respState.Events(rc.roomVersion)
 	// everything gets sent as an outlier because auth chain events may be disjoint from the DAG
 	// as may the threaded events.
 	var ires []roomserver.InputRoomEvent
@@ -669,7 +665,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 		})
 	}
 	// we've got the data by this point so use a background context
-	err = roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, ires, false)
+	err := roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, ires, false)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
 	}

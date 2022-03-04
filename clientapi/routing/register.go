@@ -76,6 +76,10 @@ type sessionsDict struct {
 	sessions map[string][]authtypes.LoginType
 	params   map[string]registerRequest
 	timer    map[string]*time.Timer
+	// deleteSessionToDeviceID protects requests to DELETE /devices/{deviceID} from being abused.
+	// If a UIA session is started by trying to delete device1, and then UIA is completed by deleting device2,
+	// the delete request will fail for device2 since the UIA was initiated by trying to delete device1.
+	deleteSessionToDeviceID map[string]string
 }
 
 // defaultTimeout is the timeout used to clean up sessions
@@ -115,6 +119,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	defer d.Unlock()
 	delete(d.params, sessionID)
 	delete(d.sessions, sessionID)
+	delete(d.deleteSessionToDeviceID, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
 		if !t.Stop() {
@@ -129,9 +134,10 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
-		sessions: make(map[string][]authtypes.LoginType),
-		params:   make(map[string]registerRequest),
-		timer:    make(map[string]*time.Timer),
+		sessions:                make(map[string][]authtypes.LoginType),
+		params:                  make(map[string]registerRequest),
+		timer:                   make(map[string]*time.Timer),
+		deleteSessionToDeviceID: make(map[string]string),
 	}
 }
 
@@ -163,6 +169,20 @@ func (d *sessionsDict) addCompletedSessionStage(sessionID string, stage authtype
 		}
 	}
 	d.sessions[sessionID] = append(sessions.sessions[sessionID], stage)
+}
+
+func (d *sessionsDict) addDeviceToDelete(sessionID, deviceID string) {
+	d.startTimer(defaultTimeOut, sessionID)
+	d.Lock()
+	defer d.Unlock()
+	d.deleteSessionToDeviceID[sessionID] = deviceID
+}
+
+func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
+	d.RLock()
+	defer d.RUnlock()
+	deviceID, ok := d.deleteSessionToDeviceID[sessionID]
+	return deviceID, ok
 }
 
 var (

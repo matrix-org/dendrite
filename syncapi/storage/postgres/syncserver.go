@@ -90,6 +90,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	notificationData, err := NewPostgresNotificationDataTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -110,6 +114,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		SendToDevice:        sendToDevice,
 		Receipts:            receipts,
 		Memberships:         memberships,
+		NotificationData:    notificationData,
 	}
 	return &d, nil
 }
