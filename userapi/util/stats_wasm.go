@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package userapi
+package util
 
 // stub, since WASM doesn't support syscall.Getrusage
 func getMemoryStats(p *phoneHomeStats) error {

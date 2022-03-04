@@ -31,7 +31,7 @@ import (
 type entrypoint func(base *base.BaseDendrite, cfg *config.Dendrite)
 
 func main() {
-	cfg := setup.ParseFlags(true)
+	cfg := setup.ParseFlags(false)
 
 	component := ""
 	if flag.NFlag() > 0 {

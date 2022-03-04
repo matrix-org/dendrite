@@ -15,7 +15,7 @@
 //go:build !wasm
 // +build !wasm
 
-package userapi
+package util
 
 import (
 	"math"
@@ -38,7 +38,6 @@ func getMemoryStats(p *phoneHomeStats) error {
 	usedCPUTime := (newUsage.Utime.Sec + newUsage.Stime.Sec) - (oldUsage.usage.Utime.Sec + oldUsage.usage.Stime.Sec)
 
 	if usedCPUTime == 0 || newData.timestamp == oldUsage.timestamp {
-		logrus.Info("setting cpu average to 0")
 		p.stats["cpu_average"] = 0
 	} else {
 		p.stats["cpu_average"] = math.Floor(float64(usedCPUTime / (newData.timestamp - oldUsage.timestamp) * 100))
