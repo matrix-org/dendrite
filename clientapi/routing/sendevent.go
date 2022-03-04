@@ -123,7 +123,7 @@ func SendEvent(
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
 
 	// validate that the aliases exists
-	if eventType == gomatrixserverlib.MRoomCanonicalAlias {
+	if eventType == gomatrixserverlib.MRoomCanonicalAlias && stateKey != nil && *stateKey == "" {
 		aliasReq := api.AliasEvent{}
 		if err = json.Unmarshal(e.Content(), &aliasReq); err != nil {
 			return util.ErrorResponse(fmt.Errorf("unable to parse alias event: %w", err))
