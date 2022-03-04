@@ -37,7 +37,7 @@ type SyncServerDatasource struct {
 
 // NewDatabase creates a new sync server database
 func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
-	d := SyncServerDatasource{}
+	var d SyncServerDatasource
 	var err error
 	if d.db, err = sqlutil.Open(dbProperties); err != nil {
 		return nil, err

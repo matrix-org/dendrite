@@ -51,7 +51,7 @@ func AddPublicRoutes(
 ) {
 	js := jetstream.Prepare(&cfg.Matrix.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database, cfg.Matrix.ServerName)
+	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -133,4 +133,3 @@ func AddPublicRoutes(
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
 }
-

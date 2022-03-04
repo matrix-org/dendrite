@@ -23,11 +23,10 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // NewSyncServerDatasource opens a database connection.
-func NewSyncServerDatasource(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName) (Database, error) {
+func NewSyncServerDatasource(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties)
