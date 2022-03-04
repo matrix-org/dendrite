@@ -212,6 +212,8 @@ func main() {
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
 	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
 
+	psAPI := pushserver.NewInternalAPI(base)
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -225,6 +227,7 @@ func main() {
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,
 		KeyAPI:              keyAPI,
+		PushserverAPI:       psAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: p2pPublicRoomProvider,
 	}

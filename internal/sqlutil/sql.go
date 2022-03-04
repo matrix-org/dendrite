@@ -163,6 +163,7 @@ type StatementList []struct {
 func (s StatementList) Prepare(db *sql.DB) (err error) {
 	for _, statement := range s {
 		if *statement.Statement, err = db.Prepare(statement.SQL); err != nil {
+			err = fmt.Errorf("Error %q while preparing statement: %s", err, statement.SQL)
 			return
 		}
 	}

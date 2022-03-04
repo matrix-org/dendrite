@@ -42,7 +42,8 @@ const membershipSchema = `
 `
 
 var selectJoinedUsersSetForRoomsSQL = "" +
-	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership WHERE room_nid IN ($1) AND" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
+	" WHERE room_nid IN ($1) AND target_nid IN ($2) AND" +
 	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
 	" GROUP BY target_nid"
 
@@ -280,18 +281,22 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 	return roomNIDs, nil
 }
 
-func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) (map[types.EventStateKeyNID]int, error) {
-	iRoomNIDs := make([]interface{}, len(roomNIDs))
-	for i, v := range roomNIDs {
-		iRoomNIDs[i] = v
+func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID, userNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]int, error) {
+	params := make([]interface{}, 0, len(roomNIDs)+len(userNIDs))
+	for _, v := range roomNIDs {
+		params = append(params, v)
 	}
-	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomNIDs)), 1)
+	for _, v := range userNIDs {
+		params = append(params, v)
+	}
+	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
+	query = strings.Replace(query, "($2)", sqlutil.QueryVariadicOffset(len(userNIDs), len(roomNIDs)), 1)
 	var rows *sql.Rows
 	var err error
 	if txn != nil {
-		rows, err = txn.QueryContext(ctx, query, iRoomNIDs...)
+		rows, err = txn.QueryContext(ctx, query, params...)
 	} else {
-		rows, err = s.db.QueryContext(ctx, query, iRoomNIDs...)
+		rows, err = s.db.QueryContext(ctx, query, params...)
 	}
 	if err != nil {
 		return nil, err

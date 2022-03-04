@@ -1,6 +1,8 @@
 package caching
 
 import (
+	"time"
+
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -16,6 +18,7 @@ const (
 	RoomInfoCacheName       = "roominfo"
 	RoomInfoCacheMaxEntries = 1024
 	RoomInfoCacheMutable    = true
+	RoomInfoCacheMaxAge     = time.Minute * 5
 )
 
 // RoomInfosCache contains the subset of functions needed for

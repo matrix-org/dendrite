@@ -96,7 +96,7 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 }
 
 func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []api.OutputReceiptEvent, error) {
-	lastPos := streamPos
+	var lastPos types.StreamPosition
 	rows, err := r.selectRoomReceipts.QueryContext(ctx, pq.Array(roomIDs), streamPos)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)

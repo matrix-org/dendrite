@@ -101,7 +101,7 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
 func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []api.OutputReceiptEvent, error) {
 	selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
-	lastPos := streamPos
+	var lastPos types.StreamPosition
 	params := make([]interface{}, len(roomIDs)+1)
 	params[0] = streamPos
 	for k, v := range roomIDs {
