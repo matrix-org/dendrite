@@ -172,6 +172,7 @@ func Setup(
 	// using ?: so the final regexp becomes what is below. We also need a trailing slash to stop 'v33333' matching.
 	// Note that 'apiversion' is chosen because it must not collide with a variable used in any of the routing!
 	v3mux := publicAPIMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
+	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
 	// NOTSPEC: consent tracking
 	if cfg.Matrix.UserConsentOptions.Enabled {
@@ -187,9 +188,6 @@ func Setup(
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
-
-	r0mux := publicAPIMux.PathPrefix("/r0").Subrouter()
-	unstableMux := publicAPIMux.PathPrefix("/unstable").Subrouter()
 
 	v3mux.Handle("/createRoom",
 		httputil.MakeAuthAPI("createRoom", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -1307,7 +1305,7 @@ func Setup(
 			return ClaimKeys(req, keyAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
-	r0mux.Handle("/rooms/{roomId}/receipt/{receiptType}/{eventId}",
+	v3mux.Handle("/rooms/{roomId}/receipt/{receiptType}/{eventId}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
