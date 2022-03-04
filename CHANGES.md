@@ -1,6 +1,6 @@
 # Changelog
 
-## Dendrite 0.6.5 (2022-03-03)
+## Dendrite 0.6.5 (2022-03-04)
 
 ### Features
 
