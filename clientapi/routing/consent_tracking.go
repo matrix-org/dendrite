@@ -36,11 +36,11 @@ import (
 
 // The data used to populate the /consent request
 type constentTemplateData struct {
-	User          string
-	Version       string
-	UserHMAC      string
-	HasConsented  bool
-	PublicVersion bool
+	UserID       string
+	Version      string
+	UserHMAC     string
+	HasConsented bool
+	ReadOnly     bool
 }
 
 func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.UserInternalAPI, cfg *config.ClientAPI) *util.JSONResponse {
@@ -49,27 +49,27 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 
 	// The data used to populate the /consent request
 	data := constentTemplateData{
-		User:     req.FormValue("u"),
+		UserID:   req.FormValue("u"),
 		Version:  req.FormValue("v"),
 		UserHMAC: req.FormValue("h"),
 	}
 	switch req.Method {
 	case http.MethodGet:
 		// display the privacy policy without a form
-		data.PublicVersion = data.User == "" || data.UserHMAC == "" || data.Version == ""
+		data.ReadOnly = data.UserID == "" || data.UserHMAC == "" || data.Version == ""
 
 		// let's see if the user already consented to the current version
-		if !data.PublicVersion {
+		if !data.ReadOnly {
 			res := &userapi.QueryPolicyVersionResponse{}
-			localPart, _, err := gomatrixserverlib.SplitID('@', data.User)
+			localpart, _, err := gomatrixserverlib.SplitID('@', data.UserID)
 			if err != nil {
-				logrus.WithError(err).Error("unable to print consent template")
+				logrus.WithError(err).Error("unable to split username")
 				return &internalError
 			}
 			if err = userAPI.QueryPolicyVersion(req.Context(), &userapi.QueryPolicyVersionRequest{
-				LocalPart: localPart,
+				Localpart: localpart,
 			}, res); err != nil {
-				logrus.WithError(err).Error("unable to print consent template")
+				logrus.WithError(err).Error("unable query policy version")
 				return &internalError
 			}
 			data.HasConsented = res.PolicyVersion == consentCfg.Version
@@ -77,18 +77,18 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 
 		err := consentCfg.Templates.ExecuteTemplate(writer, consentCfg.Version+".gohtml", data)
 		if err != nil {
-			logrus.WithError(err).Error("unable to print consent template")
+			logrus.WithError(err).Error("unable to execute consent template")
 			return nil
 		}
 		return nil
 	case http.MethodPost:
-		localPart, _, err := gomatrixserverlib.SplitID('@', data.User)
+		localpart, _, err := gomatrixserverlib.SplitID('@', data.UserID)
 		if err != nil {
 			logrus.WithError(err).Error("unable to split username")
 			return &internalError
 		}
 
-		ok, err := validHMAC(data.User, data.UserHMAC, consentCfg.FormSecret)
+		ok, err := validHMAC(data.UserID, data.UserHMAC, consentCfg.FormSecret)
 		if err != nil || !ok {
 			_, err = writer.Write([]byte("invalid HMAC provided"))
 			if err != nil {
@@ -100,7 +100,7 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 			req.Context(),
 			&userapi.UpdatePolicyVersionRequest{
 				PolicyVersion: data.Version,
-				LocalPart:     localPart,
+				Localpart:     localpart,
 			},
 			&userapi.UpdatePolicyVersionResponse{},
 		); err != nil {
@@ -111,7 +111,7 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 			return &internalError
 		}
 		// display the privacy policy without a form
-		data.PublicVersion = false
+		data.ReadOnly = false
 		data.HasConsented = true
 
 		err = consentCfg.Templates.ExecuteTemplate(writer, consentCfg.Version+".gohtml", data)
@@ -146,15 +146,17 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 		sentMessages int
 	)
 
-	if len(res.OutdatedUsers) > 0 {
-		logrus.WithField("count", len(res.OutdatedUsers)).Infof("Sending server notice to users who have not yet accepted the policy")
+	if len(res.UserLocalparts) == 0 {
+		return
 	}
 
-	for _, userID := range res.OutdatedUsers {
-		if userID == cfgClient.Matrix.ServerNotices.LocalPart {
+	logrus.WithField("count", len(res.UserLocalparts)).Infof("Sending server notice to users who have not yet accepted the policy")
+
+	for _, localpart := range res.UserLocalparts {
+		if localpart == cfgClient.Matrix.ServerNotices.LocalPart {
 			continue
 		}
-		userID = fmt.Sprintf("@%s:%s", userID, cfgClient.Matrix.ServerName)
+		userID := fmt.Sprintf("@%s:%s", localpart, cfgClient.Matrix.ServerName)
 		data["ConsentURL"], err = buildConsentURI(cfgClient, userID)
 		if err != nil {
 			logrus.WithError(err).WithField("userID", userID).Error("unable to construct consentURI")
@@ -186,7 +188,7 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 		res := &userapi.UpdatePolicyVersionResponse{}
 		if err = userAPI.PerformUpdatePolicyVersion(context.Background(), &userapi.UpdatePolicyVersionRequest{
 			PolicyVersion:      consentOpts.Version,
-			LocalPart:          userID,
+			Localpart:          userID,
 			ServerNoticeUpdate: true,
 		}, res); err != nil {
 			logrus.WithError(err).WithField("userID", userID).Error("failed to update policy version")

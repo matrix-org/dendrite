@@ -130,7 +130,7 @@ func Setup(
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
-			httputil.MakeAuthAPI("send_server_notice", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req); r != nil {
 					return *r
@@ -150,7 +150,7 @@ func Setup(
 		).Methods(http.MethodPut, http.MethodOptions)
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
-			httputil.MakeAuthAPI("send_server_notice", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req); r != nil {
 					return *r
@@ -189,13 +189,16 @@ func Setup(
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
 
+	consentRequiredCheck := httputil.WithConsentCheck(cfg.Matrix.UserConsentOptions, userAPI)
+
 	v3mux.Handle("/createRoom",
-		httputil.MakeAuthAPI("createRoom", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+
+		httputil.MakeAuthAPI("createRoom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return CreateRoom(req, device, cfg, accountDB, rsAPI, asAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/join/{roomIDOrAlias}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -211,7 +214,7 @@ func Setup(
 
 	if mscCfg.Enabled("msc2753") {
 		v3mux.Handle("/peek/{roomIDOrAlias}",
-			httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				if r := rateLimits.Limit(req); r != nil {
 					return *r
 				}
@@ -222,16 +225,16 @@ func Setup(
 				return PeekRoomByIDOrAlias(
 					req, device, rsAPI, accountDB, vars["roomIDOrAlias"],
 				)
-			}),
+			}, consentRequiredCheck),
 		).Methods(http.MethodPost, http.MethodOptions)
 	}
 	v3mux.Handle("/joined_rooms",
-		httputil.MakeAuthAPI("joined_rooms", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("joined_rooms", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetJoinedRooms(req, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/join",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -245,7 +248,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/leave",
-		httputil.MakeAuthAPI("membership", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -259,7 +262,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/unpeek",
-		httputil.MakeAuthAPI("unpeek", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("unpeek", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -267,19 +270,19 @@ func Setup(
 			return UnpeekRoomByID(
 				req, device, rsAPI, accountDB, vars["roomID"],
 			)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/ban",
-		httputil.MakeAuthAPI("membership", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return SendBan(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/invite",
-		httputil.MakeAuthAPI("membership", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -288,28 +291,28 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return SendInvite(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/kick",
-		httputil.MakeAuthAPI("membership", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return SendKick(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/unban",
-		httputil.MakeAuthAPI("membership", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return SendUnban(req, accountDB, device, vars["roomID"], cfg, rsAPI, asAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}",
-		httputil.MakeAuthAPI("send_message", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -318,7 +321,7 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
-		httputil.MakeAuthAPI("send_message", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -326,35 +329,35 @@ func Setup(
 			txnID := vars["txnID"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], &txnID,
 				nil, cfg, rsAPI, transactionsCache)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/event/{eventID}",
-		httputil.MakeAuthAPI("rooms_get_event", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	v3mux.Handle("/rooms/{roomID}/state", httputil.MakeAuthAPI("room_state", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	v3mux.Handle("/rooms/{roomID}/state", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		return OnIncomingStateRequest(req.Context(), device, rsAPI, vars["roomID"])
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, consentRequiredCheck)).Methods(http.MethodGet, http.MethodOptions)
 
-	v3mux.Handle("/rooms/{roomID}/aliases", httputil.MakeAuthAPI("aliases", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	v3mux.Handle("/rooms/{roomID}/aliases", httputil.MakeAuthAPI("aliases", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		return GetAliases(req, rsAPI, device, vars["roomID"])
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, consentRequiredCheck)).Methods(http.MethodGet, http.MethodOptions)
 
-	v3mux.Handle("/rooms/{roomID}/state/{type:[^/]+/?}", httputil.MakeAuthAPI("room_state", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	v3mux.Handle("/rooms/{roomID}/state/{type:[^/]+/?}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
@@ -363,19 +366,19 @@ func Setup(
 		eventType := strings.TrimSuffix(vars["type"], "/")
 		eventFormat := req.URL.Query().Get("format") == "event"
 		return OnIncomingStateTypeRequest(req.Context(), device, rsAPI, vars["roomID"], eventType, "", eventFormat)
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, consentRequiredCheck)).Methods(http.MethodGet, http.MethodOptions)
 
-	v3mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", httputil.MakeAuthAPI("room_state", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	v3mux.Handle("/rooms/{roomID}/state/{type}/{stateKey}", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		eventFormat := req.URL.Query().Get("format") == "event"
 		return OnIncomingStateTypeRequest(req.Context(), device, rsAPI, vars["roomID"], vars["type"], vars["stateKey"], eventFormat)
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, consentRequiredCheck)).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/state/{eventType:[^/]+/?}",
-		httputil.MakeAuthAPI("send_message", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -383,18 +386,18 @@ func Setup(
 			emptyString := ""
 			eventType := strings.TrimSuffix(vars["eventType"], "/")
 			return SendEvent(req, device, vars["roomID"], eventType, nil, &emptyString, cfg, rsAPI, nil)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/state/{eventType}/{stateKey}",
-		httputil.MakeAuthAPI("send_message", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			stateKey := vars["stateKey"]
 			return SendEvent(req, device, vars["roomID"], vars["eventType"], nil, &stateKey, cfg, rsAPI, nil)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
@@ -422,7 +425,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/directory/room/{roomAlias}",
-		httputil.MakeAuthAPI("directory_room", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("directory_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -432,7 +435,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/directory/room/{roomAlias}",
-		httputil.MakeAuthAPI("directory_room", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("directory_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -451,7 +454,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 	// TODO: Add AS support
 	v3mux.Handle("/directory/list/room/{roomID}",
-		httputil.MakeAuthAPI("directory_list", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -466,19 +469,19 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/logout",
-		httputil.MakeAuthAPI("logout", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return Logout(req, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/logout/all",
-		httputil.MakeAuthAPI("logout", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("logout", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return LogoutAll(req, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/typing/{userID}",
-		httputil.MakeAuthAPI("rooms_typing", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_typing", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -490,16 +493,16 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/redact/{eventID}",
-		httputil.MakeAuthAPI("rooms_redact", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_redact", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/redact/{eventID}/{txnId}",
-		httputil.MakeAuthAPI("rooms_redact", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_redact", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -509,41 +512,41 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/sendToDevice/{eventType}/{txnID}",
-		httputil.MakeAuthAPI("send_to_device", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("send_to_device", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
 			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	// This is only here because sytest refers to /unstable for this endpoint
 	// rather than r0. It's an exact duplicate of the above handler.
 	// TODO: Remove this if/when sytest is fixed!
 	unstableMux.Handle("/sendToDevice/{eventType}/{txnID}",
-		httputil.MakeAuthAPI("send_to_device", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("send_to_device", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
 			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/account/whoami",
-		httputil.MakeAuthAPI("whoami", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("whoami", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
 			return Whoami(req, device)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/account/password",
-		httputil.MakeAuthAPI("password", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -552,7 +555,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/account/deactivate",
-		httputil.MakeAuthAPI("deactivate", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("deactivate", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -581,7 +584,7 @@ func Setup(
 	// Push rules
 
 	v3mux.Handle("/pushrules",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue("missing trailing slash"),
@@ -590,13 +593,13 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetAllPushRules(req.Context(), device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue("scope, kind and rule ID must be specified"),
@@ -605,7 +608,7 @@ func Setup(
 	).Methods(http.MethodPut)
 
 	v3mux.Handle("/pushrules/{scope}/",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -615,7 +618,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/{scope}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after scope"),
@@ -624,7 +627,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/{scope:[^/]+/?}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue("kind and rule ID must be specified"),
@@ -633,7 +636,7 @@ func Setup(
 	).Methods(http.MethodPut)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -643,7 +646,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue("missing trailing slash after kind"),
@@ -652,7 +655,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/{scope}/{kind:[^/]+/?}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidArgumentValue("rule ID must be specified"),
@@ -661,7 +664,7 @@ func Setup(
 	).Methods(http.MethodPut)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/{ruleID}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -671,7 +674,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/{ruleID}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -685,7 +688,7 @@ func Setup(
 	).Methods(http.MethodPut)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/{ruleID}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -695,7 +698,7 @@ func Setup(
 	).Methods(http.MethodDelete)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/{ruleID}/{attr}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -705,7 +708,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/{ruleID}/{attr}",
-		httputil.MakeAuthAPI("push_rules", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -737,7 +740,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/profile/{userID}/avatar_url",
-		httputil.MakeAuthAPI("profile_avatar_url", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("profile_avatar_url", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -746,7 +749,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return SetAvatarURL(req, accountDB, device, vars["userID"], cfg, rsAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
@@ -762,7 +765,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/profile/{userID}/displayname",
-		httputil.MakeAuthAPI("profile_displayname", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("profile_displayname", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -771,27 +774,27 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return SetDisplayName(req, accountDB, device, vars["userID"], cfg, rsAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 	// Browsers use the OPTIONS HTTP method to check if the CORS policy allows
 	// PUT requests, so we need to allow this method
 
 	v3mux.Handle("/account/3pid",
-		httputil.MakeAuthAPI("account_3pid", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetAssociated3PIDs(req, accountDB, device)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/account/3pid",
-		httputil.MakeAuthAPI("account_3pid", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return CheckAndSave3PIDAssociation(req, accountDB, device, cfg)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	unstableMux.Handle("/account/3pid/delete",
-		httputil.MakeAuthAPI("account_3pid", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("account_3pid", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return Forget3PID(req, accountDB)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/{path:(?:account/3pid|register)}/email/requestToken",
@@ -815,12 +818,12 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/voip/turnServer",
-		httputil.MakeAuthAPI("turn_server", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
 			return RequestTurnServer(req, device, cfg)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/thirdparty/protocols",
@@ -844,7 +847,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/user/{userID}/account_data/{type}",
-		httputil.MakeAuthAPI("user_account_data", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -854,7 +857,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
-		httputil.MakeAuthAPI("user_account_data", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -864,7 +867,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/user/{userID}/account_data/{type}",
-		httputil.MakeAuthAPI("user_account_data", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -874,7 +877,7 @@ func Setup(
 	).Methods(http.MethodGet)
 
 	v3mux.Handle("/user/{userID}/rooms/{roomID}/account_data/{type}",
-		httputil.MakeAuthAPI("user_account_data", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("user_account_data", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -884,17 +887,17 @@ func Setup(
 	).Methods(http.MethodGet)
 
 	v3mux.Handle("/admin/whois/{userID}",
-		httputil.MakeAuthAPI("admin_whois", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("admin_whois", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return GetAdminWhois(req, userAPI, device, vars["userID"])
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodGet)
 
 	v3mux.Handle("/user/{userID}/openid/request_token",
-		httputil.MakeAuthAPI("openid_request_token", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("openid_request_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -903,11 +906,11 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return CreateOpenIDToken(req, userAPI, device, vars["userID"], cfg)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/user_directory/search",
-		httputil.MakeAuthAPI("userdirectory_search", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -928,11 +931,11 @@ func Setup(
 				postContent.SearchString,
 				postContent.Limit,
 			)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/members",
-		httputil.MakeAuthAPI("rooms_members", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -942,7 +945,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/joined_members",
-		httputil.MakeAuthAPI("rooms_members", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -952,7 +955,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/read_markers",
-		httputil.MakeAuthAPI("rooms_read_markers", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_read_markers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -965,7 +968,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/forget",
-		httputil.MakeAuthAPI("rooms_forget", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("rooms_forget", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -974,17 +977,17 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return SendForget(req, device, vars["roomID"], rsAPI)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/devices",
-		httputil.MakeAuthAPI("get_devices", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetDevicesByLocalpart(req, userAPI, device)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/devices/{deviceID}",
-		httputil.MakeAuthAPI("get_device", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_device", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -994,7 +997,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/devices/{deviceID}",
-		httputil.MakeAuthAPI("device_data", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("device_data", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -1004,7 +1007,7 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/devices/{deviceID}",
-		httputil.MakeAuthAPI("delete_device", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("delete_device", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -1014,25 +1017,25 @@ func Setup(
 	).Methods(http.MethodDelete, http.MethodOptions)
 
 	v3mux.Handle("/delete_devices",
-		httputil.MakeAuthAPI("delete_devices", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("delete_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return DeleteDevices(req, userAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/notifications",
-		httputil.MakeAuthAPI("get_notifications", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_notifications", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetNotifications(req, device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushers",
-		httputil.MakeAuthAPI("get_pushers", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetPushers(req, device, userAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/pushers/set",
-		httputil.MakeAuthAPI("set_pushers", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("set_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -1060,7 +1063,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/user/{userId}/rooms/{roomId}/tags",
-		httputil.MakeAuthAPI("get_tags", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("get_tags", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
@@ -1070,27 +1073,27 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		httputil.MakeAuthAPI("put_tag", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("put_tag", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return PutTag(req, userAPI, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/user/{userId}/rooms/{roomId}/tags/{tag}",
-		httputil.MakeAuthAPI("delete_tag", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("delete_tag", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
 			return DeleteTag(req, userAPI, device, vars["userId"], vars["roomId"], vars["tag"], syncProducer)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodDelete, http.MethodOptions)
 
 	v3mux.Handle("/capabilities",
-		httputil.MakeAuthAPI("capabilities", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("capabilities", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -1100,27 +1103,27 @@ func Setup(
 
 	// Key Backup Versions (Metadata)
 
-	getBackupKeysVersion := httputil.MakeAuthAPI("get_backup_keys_version", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	getBackupKeysVersion := httputil.MakeAuthAPI("get_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		return KeyBackupVersion(req, userAPI, device, vars["version"])
-	})
+	}, consentRequiredCheck)
 
-	getLatestBackupKeysVersion := httputil.MakeAuthAPI("get_latest_backup_keys_version", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	getLatestBackupKeysVersion := httputil.MakeAuthAPI("get_latest_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return KeyBackupVersion(req, userAPI, device, "")
-	})
+	}, consentRequiredCheck)
 
-	putBackupKeysVersion := httputil.MakeAuthAPI("put_backup_keys_version", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	putBackupKeysVersion := httputil.MakeAuthAPI("put_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		return ModifyKeyBackupVersionAuthData(req, userAPI, device, vars["version"])
-	})
+	}, consentRequiredCheck)
 
-	deleteBackupKeysVersion := httputil.MakeAuthAPI("delete_backup_keys_version", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	deleteBackupKeysVersion := httputil.MakeAuthAPI("delete_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
@@ -1128,9 +1131,9 @@ func Setup(
 		return DeleteKeyBackupVersion(req, userAPI, device, vars["version"])
 	})
 
-	postNewBackupKeysVersion := httputil.MakeAuthAPI("post_new_backup_keys_version", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	postNewBackupKeysVersion := httputil.MakeAuthAPI("post_new_backup_keys_version", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return CreateKeyBackupVersion(req, userAPI, device)
-	})
+	}, consentRequiredCheck)
 
 	v3mux.Handle("/room_keys/version/{version}", getBackupKeysVersion).Methods(http.MethodGet, http.MethodOptions)
 	v3mux.Handle("/room_keys/version", getLatestBackupKeysVersion).Methods(http.MethodGet, http.MethodOptions)
@@ -1147,7 +1150,7 @@ func Setup(
 	// Inserting E2E Backup Keys
 
 	// Bulk room and session
-	putBackupKeys := httputil.MakeAuthAPI("put_backup_keys", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	putBackupKeys := httputil.MakeAuthAPI("put_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		version := req.URL.Query().Get("version")
 		if version == "" {
 			return util.JSONResponse{
@@ -1161,10 +1164,10 @@ func Setup(
 			return *resErr
 		}
 		return UploadBackupKeys(req, userAPI, device, version, &reqBody)
-	})
+	}, consentRequiredCheck)
 
 	// Single room bulk session
-	putBackupKeysRoom := httputil.MakeAuthAPI("put_backup_keys_room", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	putBackupKeysRoom := httputil.MakeAuthAPI("put_backup_keys_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
@@ -1193,10 +1196,10 @@ func Setup(
 		}
 		reqBody.Rooms[roomID] = body
 		return UploadBackupKeys(req, userAPI, device, version, &reqBody)
-	})
+	}, consentRequiredCheck)
 
 	// Single room, single session
-	putBackupKeysRoomSession := httputil.MakeAuthAPI("put_backup_keys_room_session", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	putBackupKeysRoomSession := httputil.MakeAuthAPI("put_backup_keys_room_session", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
@@ -1226,7 +1229,7 @@ func Setup(
 		}
 		keyReq.Rooms[roomID].Sessions[sessionID] = reqBody
 		return UploadBackupKeys(req, userAPI, device, version, &keyReq)
-	})
+	}, consentRequiredCheck)
 
 	v3mux.Handle("/room_keys/keys", putBackupKeys).Methods(http.MethodPut)
 	v3mux.Handle("/room_keys/keys/{roomID}", putBackupKeysRoom).Methods(http.MethodPut)
@@ -1238,11 +1241,11 @@ func Setup(
 
 	// Querying E2E Backup Keys
 
-	getBackupKeys := httputil.MakeAuthAPI("get_backup_keys", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	getBackupKeys := httputil.MakeAuthAPI("get_backup_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), "", "")
-	})
+	}, consentRequiredCheck)
 
-	getBackupKeysRoom := httputil.MakeAuthAPI("get_backup_keys_room", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	getBackupKeysRoom := httputil.MakeAuthAPI("get_backup_keys_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
@@ -1250,13 +1253,13 @@ func Setup(
 		return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), vars["roomID"], "")
 	})
 
-	getBackupKeysRoomSession := httputil.MakeAuthAPI("get_backup_keys_room_session", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	getBackupKeysRoomSession := httputil.MakeAuthAPI("get_backup_keys_room_session", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
 		return GetBackupKeys(req, userAPI, device, req.URL.Query().Get("version"), vars["roomID"], vars["sessionID"])
-	})
+	}, consentRequiredCheck)
 
 	v3mux.Handle("/room_keys/keys", getBackupKeys).Methods(http.MethodGet, http.MethodOptions)
 	v3mux.Handle("/room_keys/keys/{roomID}", getBackupKeysRoom).Methods(http.MethodGet, http.MethodOptions)
@@ -1270,13 +1273,13 @@ func Setup(
 
 	// Cross-signing device keys
 
-	postDeviceSigningKeys := httputil.MakeAuthAPI("post_device_signing_keys", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	postDeviceSigningKeys := httputil.MakeAuthAPI("post_device_signing_keys", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return UploadCrossSigningDeviceKeys(req, userInteractiveAuth, keyAPI, device, accountDB, cfg)
-	})
+	}, consentRequiredCheck)
 
-	postDeviceSigningSignatures := httputil.MakeAuthAPI("post_device_signing_signatures", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	postDeviceSigningSignatures := httputil.MakeAuthAPI("post_device_signing_signatures", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return UploadCrossSigningDeviceSignatures(req, keyAPI, device)
-	})
+	}, consentRequiredCheck)
 
 	v3mux.Handle("/keys/device_signing/upload", postDeviceSigningKeys).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/keys/signatures/upload", postDeviceSigningSignatures).Methods(http.MethodPost, http.MethodOptions)
@@ -1286,27 +1289,27 @@ func Setup(
 
 	// Supplying a device ID is deprecated.
 	v3mux.Handle("/keys/upload/{deviceID}",
-		httputil.MakeAuthAPI("keys_upload", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return UploadKeys(req, keyAPI, device)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/keys/upload",
-		httputil.MakeAuthAPI("keys_upload", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("keys_upload", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return UploadKeys(req, keyAPI, device)
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/keys/query",
-		httputil.MakeAuthAPI("keys_query", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("keys_query", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return QueryKeys(req, keyAPI, device)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/keys/claim",
-		httputil.MakeAuthAPI("keys_claim", userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentNotRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("keys_claim", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return ClaimKeys(req, keyAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomId}/receipt/{receiptType}/{eventId}",
-		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, cfg.Matrix.UserConsentOptions, httputil.ConsentRequired, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
 				return *r
 			}
@@ -1316,6 +1319,6 @@ func Setup(
 			}
 
 			return SetReceipt(req, eduAPI, device, vars["roomId"], vars["receiptType"], vars["eventId"])
-		}),
+		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 }

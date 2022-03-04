@@ -53,20 +53,25 @@ type BasicAuth struct {
 	Password string `yaml:"password"`
 }
 
-type Consent bool
+// AuthAPICheck is an option to MakeAuthAPI to add additional checks (e.g. WithConsentCheck) to verify
+// the user is allowed to do specific things.
+type AuthAPICheck func(ctx context.Context, device *userapi.Device) *util.JSONResponse
 
-const (
-	ConsentRequired    Consent = true
-	ConsentNotRequired Consent = false
-)
+// WithConsentCheck checks that a user has given his consent.
+func WithConsentCheck(options config.UserConsentOptions, api userapi.UserInternalAPI) AuthAPICheck {
+	return func(ctx context.Context, device *userapi.Device) *util.JSONResponse {
+		if !options.Enabled {
+			return nil
+		}
+		return checkConsent(ctx, device.UserID, api, options)
+	}
+}
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
 	metricsName string,
 	userAPI userapi.UserInternalAPI,
-	userConsentCfg config.UserConsentOptions,
-	requireConsent Consent,
-	f func(*http.Request, *userapi.Device) util.JSONResponse,
+	f func(*http.Request, *userapi.Device) util.JSONResponse, checks ...AuthAPICheck,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
 		logger := util.GetLogger(req.Context())
@@ -94,13 +99,11 @@ func MakeAuthAPI(
 			}
 		}()
 
-		if userConsentCfg.Enabled && requireConsent == ConsentRequired {
-			consentError := checkConsent(req.Context(), device.UserID, userAPI, userConsentCfg)
-			if consentError != nil {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: consentError,
-				}
+		// apply additional checks, if any
+		for _, opt := range checks {
+			resp := opt(req.Context(), device)
+			if resp != nil {
+				return *resp
 			}
 		}
 
@@ -115,7 +118,7 @@ func MakeAuthAPI(
 	return MakeExternalAPI(metricsName, h)
 }
 
-func checkConsent(ctx context.Context, userID string, userAPI userapi.UserInternalAPI, userConsentCfg config.UserConsentOptions) error {
+func checkConsent(ctx context.Context, userID string, userAPI userapi.UserInternalAPI, userConsentCfg config.UserConsentOptions) *util.JSONResponse {
 	localPart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil
@@ -123,17 +126,23 @@ func checkConsent(ctx context.Context, userID string, userAPI userapi.UserIntern
 	// check which version of the policy the user accepted
 	res := &userapi.QueryPolicyVersionResponse{}
 	err = userAPI.QueryPolicyVersion(ctx, &userapi.QueryPolicyVersionRequest{
-		LocalPart: localPart,
+		Localpart: localPart,
 	}, res)
 	if err != nil {
-		return nil
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.Unknown("unable to get policy version"),
+		}
 	}
 
 	// user hasn't accepted any policy, block access.
 	if userConsentCfg.Version != res.PolicyVersion {
 		uri, err := getConsentURL(userID, userConsentCfg)
 		if err != nil {
-			return jsonerror.Unknown("unable to get consent URL")
+			return &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("unable to get consent URL"),
+			}
 		}
 		msg := &bytes.Buffer{}
 		c := struct {
@@ -143,9 +152,15 @@ func checkConsent(ctx context.Context, userID string, userAPI userapi.UserIntern
 		}
 		if err = userConsentCfg.TextTemplates.ExecuteTemplate(msg, "blockEventsError", c); err != nil {
 			logrus.Infof("error consent message: %+v", err)
-			return jsonerror.Unknown("unable to get consent URL")
+			return &util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("unable to execute template"),
+			}
 		}
-		return jsonerror.ConsentNotGiven(uri, msg.String())
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.ConsentNotGiven(uri, msg.String()),
+		}
 	}
 	return nil
 }
