@@ -103,6 +103,7 @@ type PusherTable interface {
 }
 
 type NotificationTable interface {
+	Clean(ctx context.Context, txn *sql.Tx) error
 	Insert(ctx context.Context, txn *sql.Tx, localpart, eventID string, pos int64, highlight bool, n *api.Notification) error
 	DeleteUpTo(ctx context.Context, txn *sql.Tx, localpart, roomID string, pos int64) (affected bool, _ error)
 	UpdateRead(ctx context.Context, txn *sql.Tx, localpart, roomID string, pos int64, v bool) (affected bool, _ error)

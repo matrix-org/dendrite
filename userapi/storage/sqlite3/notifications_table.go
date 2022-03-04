@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -28,12 +29,13 @@ import (
 )
 
 type notificationsStatements struct {
-	insertStmt           *sql.Stmt
-	deleteUpToStmt       *sql.Stmt
-	updateReadStmt       *sql.Stmt
-	selectStmt           *sql.Stmt
-	selectCountStmt      *sql.Stmt
-	selectRoomCountsStmt *sql.Stmt
+	insertStmt             *sql.Stmt
+	deleteUpToStmt         *sql.Stmt
+	updateReadStmt         *sql.Stmt
+	selectStmt             *sql.Stmt
+	selectCountStmt        *sql.Stmt
+	selectRoomCountsStmt   *sql.Stmt
+	cleanNotificationsStmt *sql.Stmt
 }
 
 const notificationSchema = `
@@ -77,6 +79,10 @@ const selectRoomNotificationCountsSQL = "" +
 	"SELECT COUNT(*), COUNT(*) FILTER (WHERE highlight) FROM userapi_notifications " +
 	"WHERE localpart = $1 AND room_id = $2 AND NOT read"
 
+const cleanNotificationsSQL = "" +
+	"DELETE FROM userapi_notifications WHERE" +
+	" (highlight = FALSE AND ts_ms < $1) OR (highlight = TRUE AND ts_ms < $2)"
+
 func NewSQLiteNotificationTable(db *sql.DB) (tables.NotificationTable, error) {
 	s := &notificationsStatements{}
 	_, err := db.Exec(notificationSchema)
@@ -90,7 +96,17 @@ func NewSQLiteNotificationTable(db *sql.DB) (tables.NotificationTable, error) {
 		{&s.selectStmt, selectNotificationSQL},
 		{&s.selectCountStmt, selectNotificationCountSQL},
 		{&s.selectRoomCountsStmt, selectRoomNotificationCountsSQL},
+		{&s.cleanNotificationsStmt, cleanNotificationsSQL},
 	}.Prepare(db)
+}
+
+func (s *notificationsStatements) Clean(ctx context.Context, txn *sql.Tx) error {
+	_, err := sqlutil.TxStmt(txn, s.cleanNotificationsStmt).ExecContext(
+		ctx,
+		time.Now().AddDate(0, 0, -1).UnixNano()/int64(time.Millisecond), // keep non-highlights for a day
+		time.Now().AddDate(0, -1, 0).UnixNano()/int64(time.Millisecond), // keep highlights for a month
+	)
+	return err
 }
 
 // Insert inserts a notification into the database.

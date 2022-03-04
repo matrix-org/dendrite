@@ -638,7 +638,6 @@ Rooms with many users are correctly pushed
 Don't get pushed for rooms you've muted
 Rejected events are not pushed
 Test that rejected pushers are removed.
-Notifications can be viewed with GET /notifications
 Trying to add push rule with no scope fails with 400
 Trying to add push rule with invalid scope fails with 400
 Forward extremities remain so even after the next events are populated as outliers
