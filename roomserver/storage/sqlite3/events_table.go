@@ -198,11 +198,12 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		iEventIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	///////////////
 
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
@@ -266,11 +267,12 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 		}
 	}
 	selectOrig += " ORDER BY event_type_nid, event_state_key_nid ASC"
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, fmt.Errorf("s.db.Prepare: %w", err)
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, fmt.Errorf("selectStmt.QueryContext: %w", err)
@@ -307,11 +309,12 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		iEventIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateAtEventByIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	///////////////
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
@@ -390,10 +393,11 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 	if err != nil {
 		return nil, err
 	}
-	selectPrep = sqlutil.TxStmt(txn, selectPrep)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	//////////////
 
-	rows, err := sqlutil.TxStmt(txn, selectPrep).QueryContext(ctx, iEventNIDs...)
+	rows, err := sqlutil.TxStmt(txn, selectStmt).QueryContext(ctx, iEventNIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("sqlutil.TxStmt.QueryContext: %w", err)
 	}
@@ -441,6 +445,7 @@ func (s *eventStatements) BulkSelectEventReference(
 	if err != nil {
 		return nil, err
 	}
+	defer selectPrep.Close() // nolint:errcheck
 	///////////////
 
 	selectStmt := sqlutil.TxStmt(txn, selectPrep)
@@ -471,11 +476,12 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 		iEventNIDs[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectEventIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventNIDs)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	///////////////
 
 	rows, err := selectStmt.QueryContext(ctx, iEventNIDs...)
@@ -526,11 +532,12 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 	} else {
 		selectOrig = strings.Replace(bulkSelectEventNIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
 	}
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	///////////////
 	rows, err := selectStmt.QueryContext(ctx, iEventIDs...)
 	if err != nil {
@@ -560,6 +567,7 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 	if err != nil {
 		return 0, err
 	}
+	defer sqlPrep.Close()
 	err = sqlutil.TxStmt(txn, sqlPrep).QueryRowContext(ctx, iEventIDs...).Scan(&result)
 	if err != nil {
 		return 0, fmt.Errorf("sqlutil.TxStmt.QueryRowContext: %w", err)
@@ -575,12 +583,13 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 	if err != nil {
 		return nil, err
 	}
-	sqlPrep = sqlutil.TxStmt(txn, sqlPrep)
+	defer sqlPrep.Close()
+	sqlStmt := sqlutil.TxStmt(txn, sqlPrep)
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for i, v := range eventNIDs {
 		iEventNIDs[i] = v
 	}
-	rows, err := sqlPrep.QueryContext(ctx, iEventNIDs...)
+	rows, err := sqlStmt.QueryContext(ctx, iEventNIDs...)
 	if err != nil {
 		return nil, err
 	}

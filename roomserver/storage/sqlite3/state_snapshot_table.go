@@ -113,11 +113,12 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 		nids[k] = v
 	}
 	selectOrig := strings.Replace(bulkSelectStateBlockNIDsSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 
 	rows, err := selectStmt.QueryContext(ctx, nids...)
 	if err != nil {

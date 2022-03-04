@@ -233,12 +233,13 @@ func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
 	if err != nil {
 		return nil, err
 	}
-	sqlPrep = sqlutil.TxStmt(txn, sqlPrep)
+	defer sqlPrep.Close() // nolint:errcheck
+	sqlStmt := sqlutil.TxStmt(txn, sqlPrep)
 	iRoomNIDs := make([]interface{}, len(roomNIDs))
 	for i, v := range roomNIDs {
 		iRoomNIDs[i] = v
 	}
-	rows, err := sqlPrep.QueryContext(ctx, iRoomNIDs...)
+	rows, err := sqlStmt.QueryContext(ctx, iRoomNIDs...)
 	if err != nil {
 		return nil, err
 	}
