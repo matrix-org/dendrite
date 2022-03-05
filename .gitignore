@@ -64,3 +64,5 @@ test/wasm/node_modules
 
 media_store/
 
+# Debug
+**/__debug_bin
