@@ -167,6 +167,18 @@ func (t *UserInternalAPITrace) PerformUpdatePolicyVersion(ctx context.Context, r
 	return err
 }
 
+func (t *UserInternalAPITrace) SelectServerNoticeRoomID(ctx context.Context, req *QueryServerNoticeRoomRequest, res *QueryServerNoticeRoomResponse) error {
+	err := t.Impl.SelectServerNoticeRoomID(ctx, req, res)
+	util.GetLogger(ctx).Infof("SelectServerNoticeRoomID req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) UpdateServerNoticeRoomID(ctx context.Context, req *UpdateServerNoticeRoomRequest, res *UpdateServerNoticeRoomResponse) error {
+	err := t.Impl.UpdateServerNoticeRoomID(ctx, req, res)
+	util.GetLogger(ctx).Infof("UpdateServerNoticeRoomID req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {

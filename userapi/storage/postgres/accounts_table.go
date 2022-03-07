@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS account_accounts (
 	-- The policy version this user has accepted
 	policy_version TEXT,
    -- The policy version the user received from the server notices room
-	policy_version_sent TEXT
+	policy_version_sent TEXT,
+	server_notice_room_id TEXT
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
 );
@@ -85,6 +86,12 @@ const updatePolicyVersionSQL = "" +
 const updatePolicyVersionServerNoticeSQL = "" +
 	"UPDATE account_accounts SET policy_version_sent = $1 WHERE localpart = $2"
 
+const selectServerNoticeRoomSQL = "" +
+	"SELECT server_notice_room_id FROM account_accounts WHERE localpart = $1"
+
+const updateServerNoticeRoomSQL = "" +
+	"UPDATE account_accounts SET server_notice_room_id = $1 WHERE localpart = $2"
+
 type accountsStatements struct {
 	insertAccountStmt                   *sql.Stmt
 	updatePasswordStmt                  *sql.Stmt
@@ -96,6 +103,8 @@ type accountsStatements struct {
 	batchSelectPrivacyPolicyStmt        *sql.Stmt
 	updatePolicyVersionStmt             *sql.Stmt
 	updatePolicyVersionServerNoticeStmt *sql.Stmt
+	selectServerNoticeRoomStmt          *sql.Stmt
+	updateServerNoticeRoomStmt          *sql.Stmt
 	serverName                          gomatrixserverlib.ServerName
 }
 
@@ -118,6 +127,8 @@ func NewPostgresAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerNam
 		{&s.batchSelectPrivacyPolicyStmt, batchSelectPrivacyPolicySQL},
 		{&s.updatePolicyVersionStmt, updatePolicyVersionSQL},
 		{&s.updatePolicyVersionServerNoticeStmt, updatePolicyVersionServerNoticeSQL},
+		{&s.selectServerNoticeRoomStmt, selectServerNoticeRoomSQL},
+		{&s.updateServerNoticeRoomStmt, updateServerNoticeRoomSQL},
 	}.Prepare(db)
 }
 
@@ -130,12 +141,7 @@ func (s *accountsStatements) InsertAccount(
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.insertAccountStmt)
 
-	var err error
-	if accountType != api.AccountTypeAppService {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil, accountType, policyVersion)
-	} else {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, accountType, "")
-	}
+	_, err := stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil, accountType, policyVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -250,4 +256,37 @@ func (s *accountsStatements) UpdatePolicyVersion(
 	}
 	_, err = stmt.ExecContext(ctx, policyVersion, localpart)
 	return err
+}
+
+// SelectServerNoticeRoomID queries the server notice room ID.
+func (s *accountsStatements) SelectServerNoticeRoomID(
+	ctx context.Context, txn *sql.Tx, localpart string,
+) (roomID string, err error) {
+	stmt := s.selectServerNoticeRoomStmt
+	if txn != nil {
+		stmt = sqlutil.TxStmt(txn, stmt)
+	}
+
+	roomIDNull := sql.NullString{}
+	row := stmt.QueryRowContext(ctx, localpart)
+	err = row.Scan(&roomIDNull)
+	if err != nil {
+		return "", err
+	}
+	if roomIDNull.Valid {
+		return roomIDNull.String, nil
+	}
+	return "", nil
+}
+
+// UpdateServerNoticeRoomID sets the server notice room ID.
+func (s *accountsStatements) UpdateServerNoticeRoomID(
+	ctx context.Context, txn *sql.Tx, localpart, roomID string,
+) (err error) {
+	stmt := s.updateServerNoticeRoomStmt
+	if txn != nil {
+		stmt = sqlutil.TxStmt(txn, stmt)
+	}
+	_, err = stmt.ExecContext(ctx, roomID, localpart)
+	return
 }

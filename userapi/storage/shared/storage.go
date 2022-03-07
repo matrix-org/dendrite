@@ -791,3 +791,16 @@ func (d *Database) UpdatePolicyVersion(ctx context.Context, policyVersion, local
 	})
 	return
 }
+
+// SelectServerNoticeRoomID returns the server notice room, if one is set.
+func (d *Database) SelectServerNoticeRoomID(ctx context.Context, localpart string) (roomID string, err error) {
+	return d.Accounts.SelectServerNoticeRoomID(ctx, nil, localpart)
+}
+
+// UpdateServerNoticeRoomID updates the server notice room
+func (d *Database) UpdateServerNoticeRoomID(ctx context.Context, localpart, roomID string) (err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Accounts.UpdateServerNoticeRoomID(ctx, txn, localpart, roomID)
+	})
+	return
+}

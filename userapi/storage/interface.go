@@ -55,6 +55,8 @@ type Database interface {
 	GetPrivacyPolicy(ctx context.Context, localpart string) (policyVersion string, err error)
 	GetOutdatedPolicy(ctx context.Context, policyVersion string) (userIDs []string, err error)
 	UpdatePolicyVersion(ctx context.Context, policyVersion, localpart string, serverNotice bool) error
+	SelectServerNoticeRoomID(ctx context.Context, localpart string) (roomID string, err error)
+	UpdateServerNoticeRoomID(ctx context.Context, localpart, roomID string) (err error)
 
 	// Key backups
 	CreateKeyBackup(ctx context.Context, userID, algorithm string, authData json.RawMessage) (version string, err error)

@@ -769,7 +769,7 @@ func (a *UserInternalAPI) QueryPolicyVersion(
 	res *api.QueryPolicyVersionResponse,
 ) error {
 	var err error
-	res.PolicyVersion, err = a.DB.GetPrivacyPolicy(ctx, req.LocalPart)
+	res.PolicyVersion, err = a.DB.GetPrivacyPolicy(ctx, req.Localpart)
 	if err != nil {
 		return err
 	}
@@ -783,7 +783,7 @@ func (a *UserInternalAPI) QueryOutdatedPolicy(
 	res *api.QueryOutdatedPolicyResponse,
 ) error {
 	var err error
-	res.OutdatedUsers, err = a.DB.GetOutdatedPolicy(ctx, req.PolicyVersion)
+	res.UserLocalparts, err = a.DB.GetOutdatedPolicy(ctx, req.PolicyVersion)
 	if err != nil {
 		return err
 	}
@@ -796,5 +796,26 @@ func (a *UserInternalAPI) PerformUpdatePolicyVersion(
 	req *api.UpdatePolicyVersionRequest,
 	res *api.UpdatePolicyVersionResponse,
 ) error {
-	return a.DB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.LocalPart, req.ServerNoticeUpdate)
+	return a.DB.UpdatePolicyVersion(ctx, req.PolicyVersion, req.Localpart, req.ServerNoticeUpdate)
+}
+
+func (a *UserInternalAPI) SelectServerNoticeRoomID(
+	ctx context.Context,
+	req *api.QueryServerNoticeRoomRequest,
+	res *api.QueryServerNoticeRoomResponse,
+) (err error) {
+	roomID, err := a.DB.SelectServerNoticeRoomID(ctx, req.Localpart)
+	if err != nil {
+		return err
+	}
+	res.RoomID = roomID
+	return nil
+}
+
+func (a *UserInternalAPI) UpdateServerNoticeRoomID(
+	ctx context.Context,
+	req *api.UpdateServerNoticeRoomRequest,
+	res *api.UpdateServerNoticeRoomResponse,
+) (err error) {
+	return a.DB.UpdateServerNoticeRoomID(ctx, req.Localpart, req.RoomID)
 }

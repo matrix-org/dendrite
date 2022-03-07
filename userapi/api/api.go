@@ -57,6 +57,8 @@ type UserInternalAPI interface {
 	QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error
 	QueryOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyRequest, res *QueryOutdatedPolicyResponse) error
 	PerformUpdatePolicyVersion(ctx context.Context, req *UpdatePolicyVersionRequest, res *UpdatePolicyVersionResponse) error
+	SelectServerNoticeRoomID(ctx context.Context, req *QueryServerNoticeRoomRequest, res *QueryServerNoticeRoomResponse) (err error)
+	UpdateServerNoticeRoomID(ctx context.Context, req *UpdateServerNoticeRoomRequest, res *UpdateServerNoticeRoomResponse) (err error)
 }
 
 type PerformKeyBackupRequest struct {
@@ -348,12 +350,12 @@ type QueryOpenIDTokenResponse struct {
 	ExpiresAtMS int64
 }
 
-// QueryPolicyVersionRequest is the response for QueryPolicyVersionRequest
+// QueryPolicyVersionRequest is the request for QueryPolicyVersionRequest
 type QueryPolicyVersionRequest struct {
-	LocalPart string
+	Localpart string
 }
 
-// QueryPolicyVersionResponsestruct is the response for QueryPolicyVersionResponsestruct
+// QueryPolicyVersionResponse is the response for QueryPolicyVersionRequest
 type QueryPolicyVersionResponse struct {
 	PolicyVersion string
 }
@@ -365,17 +367,35 @@ type QueryOutdatedPolicyRequest struct {
 
 // QueryOutdatedPolicyResponse is the response for QueryOutdatedPolicyRequest
 type QueryOutdatedPolicyResponse struct {
-	OutdatedUsers []string
+	UserLocalparts []string
 }
 
 // UpdatePolicyVersionRequest is the request for UpdatePolicyVersionRequest
 type UpdatePolicyVersionRequest struct {
-	PolicyVersion, LocalPart string
+	PolicyVersion, Localpart string
 	ServerNoticeUpdate       bool
 }
 
 // UpdatePolicyVersionResponse is the response for UpdatePolicyVersionRequest
 type UpdatePolicyVersionResponse struct{}
+
+// QueryServerNoticeRoomRequest is the request for QueryServerNoticeRoomRequest
+type QueryServerNoticeRoomRequest struct {
+	Localpart string
+}
+
+// QueryServerNoticeRoomResponse is the response for QueryServerNoticeRoomRequest
+type QueryServerNoticeRoomResponse struct {
+	RoomID string
+}
+
+// UpdateServerNoticeRoomRequest is the request for UpdateServerNoticeRoomRequest
+type UpdateServerNoticeRoomRequest struct {
+	Localpart, RoomID string
+}
+
+// UpdateServerNoticeRoomResponse is the response for UpdateServerNoticeRoomRequest
+type UpdateServerNoticeRoomResponse struct{}
 
 // Device represents a client's device (mobile, web, etc)
 type Device struct {

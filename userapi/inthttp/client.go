@@ -28,33 +28,35 @@ import (
 const (
 	InputAccountDataPath = "/userapi/inputAccountData"
 
-	PerformDeviceCreationPath      = "/userapi/performDeviceCreation"
-	PerformAccountCreationPath     = "/userapi/performAccountCreation"
-	PerformPasswordUpdatePath      = "/userapi/performPasswordUpdate"
-	PerformDeviceDeletionPath      = "/userapi/performDeviceDeletion"
-	PerformLastSeenUpdatePath      = "/userapi/performLastSeenUpdate"
-	PerformDeviceUpdatePath        = "/userapi/performDeviceUpdate"
-	PerformAccountDeactivationPath = "/userapi/performAccountDeactivation"
-	PerformOpenIDTokenCreationPath = "/userapi/performOpenIDTokenCreation"
-	PerformKeyBackupPath           = "/userapi/performKeyBackup"
-	PerformPusherSetPath           = "/pushserver/performPusherSet"
-	PerformPusherDeletionPath      = "/pushserver/performPusherDeletion"
-	PerformPushRulesPutPath        = "/pushserver/performPushRulesPut"
-	PerformUpdatePolicyVersionPath = "/userapi/performUpdatePolicyVersion"
+	PerformDeviceCreationPath         = "/userapi/performDeviceCreation"
+	PerformAccountCreationPath        = "/userapi/performAccountCreation"
+	PerformPasswordUpdatePath         = "/userapi/performPasswordUpdate"
+	PerformDeviceDeletionPath         = "/userapi/performDeviceDeletion"
+	PerformLastSeenUpdatePath         = "/userapi/performLastSeenUpdate"
+	PerformDeviceUpdatePath           = "/userapi/performDeviceUpdate"
+	PerformAccountDeactivationPath    = "/userapi/performAccountDeactivation"
+	PerformOpenIDTokenCreationPath    = "/userapi/performOpenIDTokenCreation"
+	PerformKeyBackupPath              = "/userapi/performKeyBackup"
+	PerformPusherSetPath              = "/pushserver/performPusherSet"
+	PerformPusherDeletionPath         = "/pushserver/performPusherDeletion"
+	PerformPushRulesPutPath           = "/pushserver/performPushRulesPut"
+	PerformUpdatePolicyVersionPath    = "/userapi/performUpdatePolicyVersion"
+	PerformUpdateServerNoticeRoomPath = "/userapi/performUpdateServerNoticeRoom"
 
-	QueryKeyBackupPath      = "/userapi/queryKeyBackup"
-	QueryProfilePath        = "/userapi/queryProfile"
-	QueryAccessTokenPath    = "/userapi/queryAccessToken"
-	QueryDevicesPath        = "/userapi/queryDevices"
-	QueryAccountDataPath    = "/userapi/queryAccountData"
-	QueryDeviceInfosPath    = "/userapi/queryDeviceInfos"
-	QuerySearchProfilesPath = "/userapi/querySearchProfiles"
-	QueryOpenIDTokenPath    = "/userapi/queryOpenIDToken"
-	QueryPushersPath        = "/pushserver/queryPushers"
-	QueryPushRulesPath      = "/pushserver/queryPushRules"
-	QueryNotificationsPath  = "/pushserver/queryNotifications"
+	QueryKeyBackupPath           = "/userapi/queryKeyBackup"
+	QueryProfilePath             = "/userapi/queryProfile"
+	QueryAccessTokenPath         = "/userapi/queryAccessToken"
+	QueryDevicesPath             = "/userapi/queryDevices"
+	QueryAccountDataPath         = "/userapi/queryAccountData"
+	QueryDeviceInfosPath         = "/userapi/queryDeviceInfos"
+	QuerySearchProfilesPath      = "/userapi/querySearchProfiles"
+	QueryOpenIDTokenPath         = "/userapi/queryOpenIDToken"
+	QueryPushersPath             = "/pushserver/queryPushers"
+	QueryPushRulesPath           = "/pushserver/queryPushRules"
+	QueryNotificationsPath       = "/pushserver/queryNotifications"
 	QueryPolicyVersionPath       = "/userapi/queryPolicyVersion"
 	QueryOutdatedPolicyUsersPath = "/userapi/queryOutdatedPolicy"
+	QueryServerNoticeRoomPath    = "/userapi/queryServerNoticeRoom"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -335,5 +337,21 @@ func (h *httpUserInternalAPI) PerformUpdatePolicyVersion(ctx context.Context, re
 	defer span.Finish()
 
 	apiURL := h.apiURL + PerformUpdatePolicyVersionPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) SelectServerNoticeRoomID(ctx context.Context, req *api.QueryServerNoticeRoomRequest, res *api.QueryServerNoticeRoomResponse) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "SelectServerNoticeRoomID")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryServerNoticeRoomPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) UpdateServerNoticeRoomID(ctx context.Context, req *api.UpdateServerNoticeRoomRequest, res *api.UpdateServerNoticeRoomResponse) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "UpdateServerNoticeRoomID")
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformUpdateServerNoticeRoomPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
