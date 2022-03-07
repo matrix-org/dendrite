@@ -105,7 +105,7 @@ type OutputNewRoomEvent struct {
 	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 	// Does the event completely rewrite the room state? If so, then AddsStateEventIDs
 	// will contain the entire room state.
-	RewritesState bool `json:"rewrites_state"`
+	RewritesState bool `json:"rewrites_state,omitempty"`
 	// The latest events in the room after this event.
 	// This can be used to set the prev events for new events in the room.
 	// This also can be used to get the full current state after this event.
@@ -113,9 +113,9 @@ type OutputNewRoomEvent struct {
 	// The state event IDs that were added to the state of the room by this event.
 	// Together with RemovesStateEventIDs this allows the receiver to keep an up to date
 	// view of the current state of the room.
-	AddsStateEventIDs []string `json:"adds_state_event_ids"`
+	AddsStateEventIDs []string `json:"adds_state_event_ids,omitempty"`
 	// The state event IDs that were removed from the state of the room by this event.
-	RemovesStateEventIDs []string `json:"removes_state_event_ids"`
+	RemovesStateEventIDs []string `json:"removes_state_event_ids,omitempty"`
 	// The ID of the event that was output before this event.
 	// Or the empty string if this is the first event output for this room.
 	// This is used by consumers to check if they can safely update their
@@ -138,10 +138,10 @@ type OutputNewRoomEvent struct {
 	//
 	// The state is given as a delta against the current state because they are
 	// usually either the same state, or differ by just a couple of events.
-	StateBeforeAddsEventIDs []string `json:"state_before_adds_event_ids"`
+	StateBeforeAddsEventIDs []string `json:"state_before_adds_event_ids,omitempty"`
 	// The state event IDs that are part of the current state, but not part
 	// of the state at the event.
-	StateBeforeRemovesEventIDs []string `json:"state_before_removes_event_ids"`
+	StateBeforeRemovesEventIDs []string `json:"state_before_removes_event_ids,omitempty"`
 	// The server name to use to push this event to other servers.
 	// Or empty if this event shouldn't be pushed to other servers.
 	//
@@ -160,7 +160,7 @@ type OutputNewRoomEvent struct {
 	SendAsServer string `json:"send_as_server"`
 	// The transaction ID of the send request if sent by a local user and one
 	// was specified
-	TransactionID *TransactionID `json:"transaction_id"`
+	TransactionID *TransactionID `json:"transaction_id,omitempty"`
 }
 
 // An OutputOldRoomEvent is written when the roomserver receives an old event.
