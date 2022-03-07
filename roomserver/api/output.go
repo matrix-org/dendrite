@@ -170,14 +170,16 @@ type OutputNewRoomEvent struct {
 // The slice returned contains the output room event itself in all cases.
 func (o *OutputNewRoomEvent) AddsState(ctx context.Context, rsAPI RoomserverInternalAPI) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(o.AddsStateEventIDs))
-	eventsReq := &QueryEventsByIDRequest{
-		EventIDs: o.AddsStateEventIDs,
+	if len(o.AddsStateEventIDs) > 0 {
+		eventsReq := &QueryEventsByIDRequest{
+			EventIDs: o.AddsStateEventIDs,
+		}
+		eventsRes := &QueryEventsByIDResponse{}
+		if err := rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
+			return nil, fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
+		}
+		events = append(events, eventsRes.Events...)
 	}
-	eventsRes := &QueryEventsByIDResponse{}
-	if err := rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
-		return nil, fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
-	}
-	events = append(events, eventsRes.Events...)
 	return events, nil
 }
 
