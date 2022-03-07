@@ -33,6 +33,8 @@ Remove group role
 # Flakey
 AS-ghosted users can use rooms themselves
 /context/ with lazy_load_members filter works
+AS-ghosted users can use rooms via AS
+Events in rooms with AS-hosted room aliases are sent to AS server
 
 # Flakey, need additional investigation
 Messages that notify from another user increment notification_count
