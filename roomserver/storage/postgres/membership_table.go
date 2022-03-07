@@ -296,14 +296,8 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 		rows *sql.Rows
 		err  error
 	)
-
-	if membershipState == tables.MemberShipStateAll {
-		stmt := sqlutil.TxStmt(txn, s.selectRoomsForUserStmt)
-		rows, err = stmt.QueryContext(ctx, userID)
-	} else {
-		stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
-		rows, err = stmt.QueryContext(ctx, membershipState, userID)
-	}
+	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
+	rows, err = stmt.QueryContext(ctx, membershipState, userID)
 
 	if err != nil {
 		return nil, err

@@ -1046,8 +1046,6 @@ func (d *Database) GetRoomsByMembership(ctx context.Context, userID, membership 
 		membershipState = tables.MembershipStateLeaveOrBan
 	case "ban":
 		membershipState = tables.MembershipStateLeaveOrBan
-	case "all":
-		membershipState = tables.MemberShipStateAll
 	default:
 		return nil, fmt.Errorf("GetRoomsByMembership: invalid membership %s", membership)
 	}
