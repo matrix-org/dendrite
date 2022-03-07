@@ -648,7 +648,6 @@ Device list doesn't change if remote server is down
 /context/ on joined room works
 /context/ on non world readable room does not work
 /context/ returns correct number of events
-
 GET /rooms/:room_id/messages lazy loads members correctly
 Can query remote device keys using POST after notification
 Device deletion propagates over federation
@@ -659,8 +658,9 @@ registration accepts non-ascii passwords
 registration with inhibit_login inhibits login
 The operation must be consistent through an interactive authentication session
 Multiple calls to /sync should not cause 500 errors
-
 Canonical alias can be set
 Canonical alias can include alt_aliases
 Can delete canonical alias
 Multiple calls to /sync should not cause 500 errors
+AS can make room aliases
+Accesing an AS-hosted room alias asks the AS server
