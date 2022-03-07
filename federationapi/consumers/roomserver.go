@@ -146,13 +146,28 @@ func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPee
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
 func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	stateEvents, err := ore.AddsState(s.ctx, s.rsAPI)
-	if err != nil {
-		return fmt.Errorf("ore.AddsState: %w", err)
-	}
-	stateEvents = append(stateEvents, ore.Event)
+	eventsRes := &api.QueryEventsByIDResponse{}
+	if len(ore.AddsStateEventIDs) > 0 {
+		eventsReq := &api.QueryEventsByIDRequest{
+			EventIDs: ore.AddsStateEventIDs,
+		}
+		if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
+			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
+		}
 
-	addsJoinedHosts, err := joinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(stateEvents))
+		found := false
+		for _, event := range eventsRes.Events {
+			if event.EventID() == ore.Event.EventID() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			eventsRes.Events = append(eventsRes.Events, ore.Event)
+		}
+	}
+
+	addsJoinedHosts, err := joinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(eventsRes.Events))
 	if err != nil {
 		return err
 	}

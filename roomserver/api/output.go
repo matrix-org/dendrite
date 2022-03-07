@@ -15,9 +15,6 @@
 package api
 
 import (
-	"context"
-	"fmt"
-
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -164,21 +161,6 @@ type OutputNewRoomEvent struct {
 	// The transaction ID of the send request if sent by a local user and one
 	// was specified
 	TransactionID *TransactionID `json:"transaction_id,omitempty"`
-}
-
-// AddsState asks the roomserver API for events specified in `adds_state_event_ids`.
-// The slice returned contains the output room event itself in all cases.
-func (o *OutputNewRoomEvent) AddsState(ctx context.Context, rsAPI RoomserverInternalAPI) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(o.AddsStateEventIDs))
-	eventsReq := &QueryEventsByIDRequest{
-		EventIDs: o.AddsStateEventIDs,
-	}
-	eventsRes := &QueryEventsByIDResponse{}
-	if err := rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
-		return nil, fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
-	}
-	events = append(events, eventsRes.Events...)
-	return events, nil
 }
 
 // An OutputOldRoomEvent is written when the roomserver receives an old event.
