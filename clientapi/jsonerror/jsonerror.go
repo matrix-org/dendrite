@@ -58,6 +58,11 @@ func BadJSON(msg string) *MatrixError {
 	return &MatrixError{"M_BAD_JSON", msg}
 }
 
+// BadAlias is an error when the client supplies a bad alias.
+func BadAlias(msg string) *MatrixError {
+	return &MatrixError{"M_BAD_ALIAS", msg}
+}
+
 // NotJSON is an error when the client supplies something that is not JSON
 // to a JSON endpoint.
 func NotJSON(msg string) *MatrixError {
