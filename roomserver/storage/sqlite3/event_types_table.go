@@ -140,6 +140,7 @@ func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	if err != nil {
 		return nil, err
 	}
+	defer selectPrep.Close()
 	stmt := sqlutil.TxStmt(txn, selectPrep)
 	///////////////
 
