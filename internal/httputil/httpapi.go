@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -119,14 +120,14 @@ func MakeAuthAPI(
 }
 
 func checkConsent(ctx context.Context, userID string, userAPI userapi.UserInternalAPI, userConsentCfg config.UserConsentOptions) *util.JSONResponse {
-	localPart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil
 	}
 	// check which version of the policy the user accepted
 	res := &userapi.QueryPolicyVersionResponse{}
 	err = userAPI.QueryPolicyVersion(ctx, &userapi.QueryPolicyVersionRequest{
-		Localpart: localPart,
+		Localpart: localpart,
 	}, res)
 	if err != nil {
 		return &util.JSONResponse{
@@ -166,18 +167,20 @@ func checkConsent(ctx context.Context, userID string, userAPI userapi.UserIntern
 }
 
 // getConsentURL constructs the URL shown to users to accept the TOS
-func getConsentURL(username string, config config.UserConsentOptions) (string, error) {
+func getConsentURL(userID string, config config.UserConsentOptions) (string, error) {
 	mac := hmac.New(sha256.New, []byte(config.FormSecret))
-	_, err := mac.Write([]byte(username))
+	_, err := mac.Write([]byte(userID))
 	if err != nil {
 		return "", err
 	}
 	hmac := hex.EncodeToString(mac.Sum(nil))
 
-	return fmt.Sprintf(
-		"%s/_matrix/client/consent?u=%s&h=%s&v=%s",
-		config.BaseURL, username, hmac, config.Version,
-	), nil
+	params := url.Values{}
+	params.Add("u", userID)
+	params.Add("h", string(hmac))
+	params.Add("v", config.Version)
+
+	return fmt.Sprintf("%s/_matrix/client/consent?%s", config.BaseURL, params.Encode()), nil
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.

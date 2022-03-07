@@ -82,6 +82,8 @@ func TestUserConsentOptions_Verify(t *testing.T) {
 				TemplateDir:           "./testdata/privacy",
 				Version:               "1.0",
 				PolicyName:            "Privacy policy",
+				FormSecret:            "helloWorld",
+				BaseURL:               "http://localhost",
 			},
 			args: struct {
 				configErrors *ConfigErrors
@@ -93,6 +95,9 @@ func TestUserConsentOptions_Verify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &UserConsentOptions{
+				Enabled:                 true,
+				BaseURL:                 tt.fields.BaseURL,
+				FormSecret:              tt.fields.FormSecret,
 				RequireAtRegistration:   tt.fields.RequireAtRegistration,
 				PolicyName:              tt.fields.PolicyName,
 				Version:                 tt.fields.Version,
@@ -102,7 +107,7 @@ func TestUserConsentOptions_Verify(t *testing.T) {
 				BlockEventsError:        tt.fields.BlockEventsError,
 			}
 			c.Verify(tt.args.configErrors, tt.args.isMonolith)
-			if tt.wantErr && tt.args.configErrors == nil {
+			if !tt.wantErr && len(*tt.args.configErrors) > 0 {
 				t.Errorf("expected no errors, got '%+v'", tt.args.configErrors)
 			}
 		})

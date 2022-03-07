@@ -12,13 +12,13 @@
     <p>
         Please give your consent to keep using this homeserver.
     </p>
-    {{ if not .PublicVersion }}
+    {{ if not .ReadOnly }}
         <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->
         <form method="post" action="consent">
             <input type="hidden" name="v" value="{{ .Version }}"/>
-            <input type="hidden" name="u" value="{{ .User }}"/>
+            <input type="hidden" name="u" value="{{ .UserID }}"/>
             <input type="hidden" name="h" value="{{ .UserHMAC }}"/>
-            <input type="submit" value="Sure thing!"/>
+            <input type="submit" value="I consent"/>
         </form>
     {{ end }}
 {{ end }}

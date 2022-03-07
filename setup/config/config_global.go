@@ -275,7 +275,6 @@ func (c *UserConsentOptions) Defaults() {
 	c.PolicyName = "Privacy Policy"
 	c.Version = "1.0"
 	c.TemplateDir = "./templates/privacy"
-	c.BaseURL = "http://localhost"
 }
 
 func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool) {
@@ -284,6 +283,7 @@ func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool)
 		checkNotEmpty(configErrors, "version", c.Version)
 		checkNotEmpty(configErrors, "policy_name", c.PolicyName)
 		checkNotEmpty(configErrors, "form_secret", c.FormSecret)
+		checkNotEmpty(configErrors, "base_url", c.BaseURL)
 		if len(*configErrors) > 0 {
 			return
 		}

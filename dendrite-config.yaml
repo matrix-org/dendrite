@@ -86,7 +86,7 @@ global:
     enabled: false
     # The base URL this homeserver will serve clients on, e.g. https://matrix.org
     base_url: http://localhost
-    # Randomly generated string to be used to calculate the HMAC
+    # Randomly generated string (e.g. by using "pwgen -sy 32") to be used to calculate the HMAC
     form_secret: "superSecretRandomlyGeneratedSecret"
     # Require consent when user registers for the first time
     require_at_registration: false
