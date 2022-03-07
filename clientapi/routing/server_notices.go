@@ -112,43 +112,25 @@ func sendServerNotice(
 		}, nil
 	}
 
-	// get rooms for specified user
-	allUserRooms, err := getAllUserRooms(ctx, rsAPI, serverNoticeRequest.UserID)
+	qryServerNoticeRoom := &userapi.QueryServerNoticeRoomResponse{}
+	localpart, _, err := gomatrixserverlib.SplitID('@', serverNoticeRequest.UserID)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Invalid request"),
+		}, nil
+	}
+	err = userAPI.SelectServerNoticeRoomID(ctx, &userapi.QueryServerNoticeRoomRequest{Localpart: localpart}, qryServerNoticeRoom)
 	if err != nil {
 		return util.ErrorResponse(err), nil
 	}
 
-	// get rooms of the sender
 	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
-	senderRooms := api.QueryRoomsForUserResponse{}
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         senderUserID,
-		WantMembership: "join",
-	}, &senderRooms); err != nil {
-		return util.ErrorResponse(err), nil
-	}
-
-	// check if we have rooms in common
-	commonRooms := []string{}
-	for _, userRoomID := range allUserRooms {
-		for _, senderRoomID := range senderRooms.RoomIDs {
-			if userRoomID == senderRoomID {
-				commonRooms = append(commonRooms, senderRoomID)
-			}
-		}
-	}
-
-	if len(commonRooms) > 1 {
-		return util.ErrorResponse(fmt.Errorf("expected to find one room, but got %d", len(commonRooms))), nil
-	}
-
-	var (
-		roomID      string
-		roomVersion = gomatrixserverlib.RoomVersionV6
-	)
+	roomID := qryServerNoticeRoom.RoomID
+	roomVersion := gomatrixserverlib.RoomVersionV6
 
 	// create a new room for the user
-	if len(commonRooms) == 0 {
+	if qryServerNoticeRoom.RoomID == "" {
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
 		powerLevelContent.Users[serverNoticeRequest.UserID] = -10 // taken from Synapse
 		pl, err := json.Marshal(powerLevelContent)
@@ -177,7 +159,12 @@ func sendServerNotice(
 		switch data := roomRes.JSON.(type) {
 		case createRoomResponse:
 			roomID = data.RoomID
-
+			res := &userapi.UpdateServerNoticeRoomResponse{}
+			err := userAPI.UpdateServerNoticeRoomID(ctx, &userapi.UpdateServerNoticeRoomRequest{RoomID: roomID, Localpart: localpart}, res)
+			if err != nil {
+				util.GetLogger(ctx).WithError(err).Error("UpdateServerNoticeRoomID failed")
+				return jsonerror.InternalServerError(), nil
+			}
 			// tag the room, so we can later check if the user tries to reject an invite
 			serverAlertTag := gomatrix.TagContent{Tags: map[string]gomatrix.TagProperties{
 				"m.server_notice": {
@@ -195,11 +182,17 @@ func sendServerNotice(
 		}
 
 	} else {
-		roomID = commonRooms[0]
-		// re-invite the user
-		res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+		res := &api.QueryMembershipForUserResponse{}
+		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: serverNoticeRequest.UserID, RoomID: roomID}, res)
 		if err != nil {
-			return res, nil
+			return util.ErrorResponse(err), nil
+		}
+		// re-invite the user
+		if res.Membership != gomatrixserverlib.Join {
+			res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			if err != nil {
+				return res, nil
+			}
 		}
 	}
 
@@ -263,17 +256,6 @@ func sendServerNotice(
 	sendEventDuration.With(prometheus.Labels{"action": "submit"}).Observe(float64(timeToSubmitEvent.Milliseconds()))
 
 	return res, nil
-}
-
-func getAllUserRooms(ctx context.Context, rsAPI api.RoomserverInternalAPI, userID string) ([]string, error) {
-	userRooms := api.QueryRoomsForUserResponse{}
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         userID,
-		WantMembership: "all",
-	}, &userRooms); err != nil {
-		return nil, err
-	}
-	return userRooms.RoomIDs, nil
 }
 
 func (r sendServerNoticeRequest) valid() (ok bool) {

@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -210,7 +211,12 @@ func buildConsentURI(cfgClient *config.ClientAPI, userID string) (string, error)
 	}
 	userMAC := mac.Sum(nil)
 
-	return fmt.Sprintf("%s/_matrix/client/consent?u=%s&h=%s&v=%s", cfgClient.Matrix.UserConsentOptions.BaseURL, userID, userMAC, consentOpts.Version), nil
+	params := url.Values{}
+	params.Add("u", userID)
+	params.Add("h", string(userMAC))
+	params.Add("v", consentOpts.Version)
+
+	return fmt.Sprintf("%s/_matrix/client/consent?%s", cfgClient.Matrix.UserConsentOptions.BaseURL, params.Encode()), nil
 }
 
 func validHMAC(username, userHMAC, secret string) (bool, error) {
