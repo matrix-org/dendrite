@@ -108,11 +108,12 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 		intfs[i] = int64(stateBlockNIDs[i])
 	}
 	selectOrig := strings.Replace(bulkSelectStateBlockEntriesSQL, "($1)", sqlutil.QueryVariadic(len(intfs)), 1)
-	selectStmt, err := s.db.Prepare(selectOrig)
+	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
 	}
-	selectStmt = sqlutil.TxStmt(txn, selectStmt)
+	defer selectPrep.Close() // nolint:errcheck
+	selectStmt := sqlutil.TxStmt(txn, selectPrep)
 	rows, err := selectStmt.QueryContext(ctx, intfs...)
 	if err != nil {
 		return nil, err
