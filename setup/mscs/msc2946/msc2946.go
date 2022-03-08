@@ -299,7 +299,7 @@ func (w *walker) walk() util.JSONResponse {
 				// as these children may be rooms we do know about.
 				roomType = ConstCreateEventContentValueSpace
 			}
-		} else if authorised, isJoined := w.authorised(rv.roomID, rv.parentRoomID); authorised {
+		} else if authorised, isJoinedOrInvited := w.authorised(rv.roomID, rv.parentRoomID); authorised {
 			// Get all `m.space.child` state events for this room
 			events, err := w.childReferences(rv.roomID)
 			if err != nil {
@@ -315,8 +315,8 @@ func (w *walker) walk() util.JSONResponse {
 				RoomType:      roomType,
 				ChildrenState: events,
 			})
-			// don't walk children if the user is not joined to the space
-			if !isJoined {
+			// don't walk children if the user is not joined/invited to the space
+			if !isJoinedOrInvited {
 				continue
 			}
 		} else {
@@ -476,7 +476,7 @@ func (w *walker) roomExists(roomID string) bool {
 }
 
 // authorised returns true iff the user is joined this room or the room is world_readable
-func (w *walker) authorised(roomID, parentRoomID string) (authed, isJoined bool) {
+func (w *walker) authorised(roomID, parentRoomID string) (authed, isJoinedOrInvited bool) {
 	if w.caller != nil {
 		return w.authorisedUser(roomID, parentRoomID)
 	}
@@ -543,7 +543,7 @@ func (w *walker) authorisedServer(roomID string) bool {
 
 // authorisedUser returns true iff the user is invited/joined this room or the room is world_readable.
 // Failing that, if the room has a restricted join rule and belongs to the space parent listed, it will return true.
-func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoined bool) {
+func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoinedOrInvited bool) {
 	hisVisTuple := gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomHistoryVisibility,
 		StateKey:  "",
@@ -571,7 +571,7 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 	if memberEv != nil {
 		membership, _ := memberEv.Membership()
 		if membership == gomatrixserverlib.Join || membership == gomatrixserverlib.Invite {
-			return true, membership == gomatrixserverlib.Join
+			return true, true
 		}
 	}
 	hisVisEv := queryRes.StateEvents[hisVisTuple]
