@@ -26,8 +26,30 @@ var ErrProfileNoExists = errors.New("no known profile for given user ID")
 // AccountData represents account data sent from the client API server to the
 // sync API server
 type AccountData struct {
+	RoomID     string          `json:"room_id"`
+	Type       string          `json:"type"`
+	ReadMarker *ReadMarkerJSON `json:"read_marker,omitempty"` // optional
+}
+
+type ReadMarkerJSON struct {
+	FullyRead string `json:"m.fully_read"`
+	Read      string `json:"m.read"`
+}
+
+// NotificationData contains statistics about notifications, sent from
+// the Push Server to the Sync API server.
+type NotificationData struct {
+	// RoomID identifies the scope of the statistics, together with
+	// MXID (which is encoded in the Kafka key).
 	RoomID string `json:"room_id"`
-	Type   string `json:"type"`
+
+	// HighlightCount is the number of unread notifications with the
+	// highlight tweak.
+	UnreadHighlightCount int `json:"unread_highlight_count"`
+
+	// UnreadNotificationCount is the total number of unread
+	// notifications.
+	UnreadNotificationCount int `json:"unread_notification_count"`
 }
 
 // ProfileResponse is a struct containing all known user profile data

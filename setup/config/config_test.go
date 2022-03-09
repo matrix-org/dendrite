@@ -205,6 +205,11 @@ user_api:
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
+  pusher_database:
+    connection_string: file:pushserver.db
+    max_open_conns: 100
+    max_idle_conns: 2
+    conn_max_lifetime: -1
 tracing:
   enabled: false
   jaeger:

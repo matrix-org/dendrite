@@ -87,7 +87,7 @@ global:
     # in monolith mode. It is required to specify the address of at least one
     # NATS Server node if running in polylith mode.
     addresses:
-      # - localhost:4222
+    # - localhost:4222
 
     # Keep all NATS streams in memory, rather than persisting it to the storage
     # path below. This option is present primarily for integration testing and
@@ -343,11 +343,6 @@ user_api:
     connect: http://localhost:7781 # Only used in polylith deployments
   account_database:
     connection_string: file:userapi_accounts.db
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-  device_database:
-    connection_string: file:userapi_devices.db
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1

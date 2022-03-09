@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
+	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -45,6 +46,7 @@ type OutputRoomEventConsumer struct {
 	pduStream    types.StreamProvider
 	inviteStream types.StreamProvider
 	notifier     *notifier.Notifier
+	producer     *producers.UserAPIStreamEventProducer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -57,6 +59,7 @@ func NewOutputRoomEventConsumer(
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
 	rsAPI api.RoomserverInternalAPI,
+	producer *producers.UserAPIStreamEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
@@ -69,6 +72,7 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
+		producer:     producer,
 	}
 }
 
@@ -150,7 +154,42 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-	addsStateEvents := msg.AddsState()
+
+	addsStateEvents := []*gomatrixserverlib.HeaderedEvent{}
+	foundEventIDs := map[string]bool{}
+	if len(msg.AddsStateEventIDs) > 0 {
+		for _, eventID := range msg.AddsStateEventIDs {
+			foundEventIDs[eventID] = false
+		}
+		foundEvents, err := s.db.Events(ctx, msg.AddsStateEventIDs)
+		if err != nil {
+			return fmt.Errorf("s.db.Events: %w", err)
+		}
+		for _, event := range foundEvents {
+			foundEventIDs[event.EventID()] = true
+		}
+		eventsReq := &api.QueryEventsByIDRequest{}
+		eventsRes := &api.QueryEventsByIDResponse{}
+		for eventID, found := range foundEventIDs {
+			if !found {
+				eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
+			}
+		}
+		if err = s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
+			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
+		}
+		for _, event := range eventsRes.Events {
+			eventID := event.EventID()
+			foundEvents = append(foundEvents, event)
+			foundEventIDs[eventID] = true
+		}
+		for eventID, found := range foundEventIDs {
+			if !found {
+				return fmt.Errorf("event %s is missing", eventID)
+			}
+		}
+		addsStateEvents = foundEvents
+	}
 
 	ev, err := s.updateStateEvent(ev)
 	if err != nil {
@@ -192,6 +231,12 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			"del":        msg.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
+	}
+
+	if err = s.producer.SendStreamEvent(ev.RoomID(), ev, pduPos); err != nil {
+		log.WithError(err).Errorf("Failed to send stream output event for event %s", ev.EventID())
+		sentry.CaptureException(err)
+		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {

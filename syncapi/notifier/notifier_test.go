@@ -219,7 +219,7 @@ func TestEDUWakeup(t *testing.T) {
 	go func() {
 		pos, err := waitForEvents(n, newTestSyncRequest(bob, bobDev, syncPositionAfter))
 		if err != nil {
-			t.Errorf("TestNewInviteEventForUser error: %w", err)
+			t.Errorf("TestNewInviteEventForUser error: %v", err)
 		}
 		mustEqualPositions(t, pos, syncPositionNewEDU)
 		wg.Done()

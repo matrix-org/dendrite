@@ -6,6 +6,7 @@ const (
 	RoomVersionCacheName       = "room_versions"
 	RoomVersionCacheMaxEntries = 1024
 	RoomVersionCacheMutable    = false
+	RoomVersionCacheMaxAge     = CacheNoMaxAge
 )
 
 // RoomVersionsCache contains the subset of functions needed for

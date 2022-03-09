@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
@@ -29,6 +30,7 @@ func JetStreamConsumer(
 	name := durable + "Pull"
 	sub, err := js.PullSubscribe(subj, name, opts...)
 	if err != nil {
+		sentry.CaptureException(err)
 		return fmt.Errorf("nats.SubscribeSync: %w", err)
 	}
 	go func() {
@@ -55,6 +57,7 @@ func JetStreamConsumer(
 					}
 				} else {
 					// Something else went wrong, so we'll panic.
+					sentry.CaptureException(err)
 					logrus.WithContext(ctx).WithField("subject", subj).Fatal(err)
 				}
 			}
@@ -64,15 +67,18 @@ func JetStreamConsumer(
 			msg := msgs[0]
 			if err = msg.InProgress(); err != nil {
 				logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.InProgress: %w", err))
+				sentry.CaptureException(err)
 				continue
 			}
 			if f(ctx, msg) {
 				if err = msg.Ack(); err != nil {
 					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.Ack: %w", err))
+					sentry.CaptureException(err)
 				}
 			} else {
 				if err = msg.Nak(); err != nil {
 					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.Nak: %w", err))
+					sentry.CaptureException(err)
 				}
 			}
 		}

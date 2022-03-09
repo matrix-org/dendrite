@@ -98,7 +98,7 @@ func PutTag(
 		return jsonerror.InternalServerError()
 	}
 
-	if err = syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+	if err = syncProducer.SendData(userID, roomID, "m.tag", nil); err != nil {
 		logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
 	}
 
@@ -151,7 +151,7 @@ func DeleteTag(
 	}
 
 	// TODO: user API should do this since it's account data
-	if err := syncProducer.SendData(userID, roomID, "m.tag"); err != nil {
+	if err := syncProducer.SendData(userID, roomID, "m.tag", nil); err != nil {
 		logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
 	}
 

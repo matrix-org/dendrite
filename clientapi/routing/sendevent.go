@@ -16,6 +16,8 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -119,6 +121,40 @@ func SendEvent(
 		return *resErr
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
+
+	// validate that the aliases exists
+	if eventType == gomatrixserverlib.MRoomCanonicalAlias && stateKey != nil && *stateKey == "" {
+		aliasReq := api.AliasEvent{}
+		if err = json.Unmarshal(e.Content(), &aliasReq); err != nil {
+			return util.ErrorResponse(fmt.Errorf("unable to parse alias event: %w", err))
+		}
+		if !aliasReq.Valid() {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidParam("Request contains invalid aliases."),
+			}
+		}
+		aliasRes := &api.GetAliasesForRoomIDResponse{}
+		if err = rsAPI.GetAliasesForRoomID(req.Context(), &api.GetAliasesForRoomIDRequest{RoomID: roomID}, aliasRes); err != nil {
+			return jsonerror.InternalServerError()
+		}
+		var found int
+		requestAliases := append(aliasReq.AltAliases, aliasReq.Alias)
+		for _, alias := range aliasRes.Aliases {
+			for _, altAlias := range requestAliases {
+				if altAlias == alias {
+					found++
+				}
+			}
+		}
+		// check that we found at least the same amount of existing aliases as are in the request
+		if aliasReq.Alias != "" && found < len(requestAliases) {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadAlias("No matching alias found."),
+			}
+		}
+	}
 
 	var txnAndSessionID *api.TransactionID
 	if txnID != nil {

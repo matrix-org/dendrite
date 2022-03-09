@@ -23,6 +23,21 @@ type parsedRespState struct {
 	StateEvents []*gomatrixserverlib.Event
 }
 
+func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
+	eventsByID := make(map[string]*gomatrixserverlib.Event, len(p.AuthEvents)+len(p.StateEvents))
+	for i, event := range p.AuthEvents {
+		eventsByID[event.EventID()] = p.AuthEvents[i]
+	}
+	for i, event := range p.StateEvents {
+		eventsByID[event.EventID()] = p.StateEvents[i]
+	}
+	allEvents := make([]*gomatrixserverlib.Event, 0, len(eventsByID))
+	for _, event := range eventsByID {
+		allEvents = append(allEvents, event)
+	}
+	return gomatrixserverlib.ReverseTopologicalOrdering(allEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
+}
+
 type missingStateReq struct {
 	origin          gomatrixserverlib.ServerName
 	db              storage.Database
@@ -124,11 +139,8 @@ func (t *missingStateReq) processEventWithMissingState(
 	t.hadEventsMutex.Unlock()
 
 	sendOutliers := func(resolvedState *parsedRespState) error {
-		outliers, oerr := gomatrixserverlib.OrderAuthAndStateEvents(resolvedState.AuthEvents, resolvedState.StateEvents, roomVersion)
-		if oerr != nil {
-			return fmt.Errorf("gomatrixserverlib.OrderAuthAndStateEvents: %w", oerr)
-		}
-		var outlierRoomEvents []api.InputRoomEvent
+		outliers := resolvedState.Events()
+		outlierRoomEvents := make([]api.InputRoomEvent, 0, len(outliers))
 		for _, outlier := range outliers {
 			if hadEvents[outlier.EventID()] {
 				continue
