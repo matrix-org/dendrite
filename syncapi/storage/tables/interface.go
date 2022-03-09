@@ -87,8 +87,8 @@ type Topology interface {
 	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (depth types.StreamPosition, spos types.StreamPosition, err error)
 	// DeleteTopologyForRoom removes all topological information for a room. This should only be done when removing the room entirely.
 	DeleteTopologyForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
-	// SelectStreamToTopologicalPosition converts a stream position to a topological position.
-	SelectStreamToTopologicalPosition(ctx context.Context, txn *sql.Tx, streamPos types.StreamPosition) (topoPos types.StreamPosition, err error)
+	// SelectStreamToTopologicalPosition converts a stream position to a topological position by finding the nearest topological position in the room.
+	SelectStreamToTopologicalPosition(ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, forward bool) (topoPos types.StreamPosition, err error)
 }
 
 type CurrentRoomState interface {

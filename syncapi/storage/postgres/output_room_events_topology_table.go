@@ -50,14 +50,14 @@ const insertEventInTopologySQL = "" +
 const selectEventIDsInRangeASCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND (" +
-	"(topological_position > $2 AND topological_position < $3) OR" +
+	"(topological_position > $2 AND topological_position <= $3) OR" +
 	"(topological_position = $4 AND stream_position <= $5)" +
 	") ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
 
 const selectEventIDsInRangeDESCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND (" +
-	"(topological_position > $2 AND topological_position < $3) OR" +
+	"(topological_position >= $2 AND topological_position < $3) OR" +
 	"(topological_position = $4 AND stream_position <= $5)" +
 	") ORDER BY topological_position DESC, stream_position DESC LIMIT $6"
 
@@ -76,17 +76,21 @@ const selectMaxPositionInTopologySQL = "" +
 const deleteTopologyForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
 
-const selectStreamToTopologicalPositionSQL = "" +
-	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE stream_position = $1"
+const selectStreamToTopologicalPositionAscSQL = "" +
+	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE room_id = $1 AND stream_position >= $2 ORDER BY topological_position ASC LIMIT 1;"
+
+const selectStreamToTopologicalPositionDescSQL = "" +
+	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE room_id = $1 AND stream_position <= $2 ORDER BY topological_position DESC LIMIT 1;"
 
 type outputRoomEventsTopologyStatements struct {
-	insertEventInTopologyStmt             *sql.Stmt
-	selectEventIDsInRangeASCStmt          *sql.Stmt
-	selectEventIDsInRangeDESCStmt         *sql.Stmt
-	selectPositionInTopologyStmt          *sql.Stmt
-	selectMaxPositionInTopologyStmt       *sql.Stmt
-	deleteTopologyForRoomStmt             *sql.Stmt
-	selectStreamToTopologicalPositionStmt *sql.Stmt
+	insertEventInTopologyStmt                 *sql.Stmt
+	selectEventIDsInRangeASCStmt              *sql.Stmt
+	selectEventIDsInRangeDESCStmt             *sql.Stmt
+	selectPositionInTopologyStmt              *sql.Stmt
+	selectMaxPositionInTopologyStmt           *sql.Stmt
+	deleteTopologyForRoomStmt                 *sql.Stmt
+	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
+	selectStreamToTopologicalPositionDescStmt *sql.Stmt
 }
 
 func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -113,7 +117,10 @@ func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
 	if s.deleteTopologyForRoomStmt, err = db.Prepare(deleteTopologyForRoomSQL); err != nil {
 		return nil, err
 	}
-	if s.selectStreamToTopologicalPositionStmt, err = db.Prepare(selectStreamToTopologicalPositionSQL); err != nil {
+	if s.selectStreamToTopologicalPositionAscStmt, err = db.Prepare(selectStreamToTopologicalPositionAscSQL); err != nil {
+		return nil, err
+	}
+	if s.selectStreamToTopologicalPositionDescStmt, err = db.Prepare(selectStreamToTopologicalPositionDescSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -177,12 +184,16 @@ func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 	return
 }
 
-// SelectStreamToTopologicalPosition returns the position of a given event
+// SelectStreamToTopologicalPosition returns the closest position of a given event
 // in the topology of the room it belongs to from the given stream position.
 func (s *outputRoomEventsTopologyStatements) SelectStreamToTopologicalPosition(
-	ctx context.Context, txn *sql.Tx, streamPos types.StreamPosition,
+	ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
 ) (topoPos types.StreamPosition, err error) {
-	err = s.selectStreamToTopologicalPositionStmt.QueryRowContext(ctx, streamPos).Scan(&topoPos)
+	if backwardOrdering {
+		err = s.selectStreamToTopologicalPositionDescStmt.QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
+	} else {
+		err = s.selectStreamToTopologicalPositionAscStmt.QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
+	}
 	return
 }
 

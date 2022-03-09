@@ -48,11 +48,10 @@ type messagesReq struct {
 }
 
 type messagesResp struct {
-	Start       string                          `json:"start"`
-	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: so clients can hit /messages then immediately /sync with a latest sync token
-	End         string                          `json:"end"`
-	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
-	State       []gomatrixserverlib.ClientEvent `json:"state"`
+	Start string                          `json:"start"`
+	End   string                          `json:"end"`
+	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+	State []gomatrixserverlib.ClientEvent `json:"state"`
 }
 
 // OnIncomingMessagesRequest implements the /messages endpoint from the
@@ -90,31 +89,14 @@ func OnIncomingMessagesRequest(
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
-	var fromStream *types.StreamingToken
 	fromQuery := req.URL.Query().Get("from")
+	toQuery := req.URL.Query().Get("to")
 	emptyFromSupplied := fromQuery == ""
 	if emptyFromSupplied {
 		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
 		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
 		currPos := srp.Notifier.CurrentPosition()
 		fromQuery = currPos.String()
-	}
-
-	from, err := types.NewTopologyTokenFromString(fromQuery)
-	if err != nil {
-		var streamToken types.StreamingToken
-		if streamToken, err = types.NewStreamTokenFromString(fromQuery); err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
-			}
-		} else {
-			from, err = db.StreamToTopologicalPosition(req.Context(), streamToken.PDUPosition)
-			if err != nil {
-				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
-				return jsonerror.InternalServerError()
-			}
-		}
 	}
 
 	// Direction to return events from.
@@ -129,10 +111,27 @@ func OnIncomingMessagesRequest(
 	// to have one of the two accepted values (so dir == "f" <=> !backwardOrdering).
 	backwardOrdering := (dir == "b")
 
+	from, err := types.NewTopologyTokenFromString(fromQuery)
+	if err != nil {
+		var streamToken types.StreamingToken
+		if streamToken, err = types.NewStreamTokenFromString(fromQuery); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
+			}
+		} else {
+			from, err = db.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
+			if err != nil {
+				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+				return jsonerror.InternalServerError()
+			}
+			logrus.Infof("XXX: 'from' mapping %v to %v", fromQuery, from)
+		}
+	}
+
 	// Pagination tokens. To is optional, and its default value depends on the
 	// direction ("b" or "f").
 	var to types.TopologyToken
-	toQuery := req.URL.Query().Get("to")
 	wasToProvided := true
 	if len(toQuery) > 0 {
 		to, err = types.NewTopologyTokenFromString(toQuery)
@@ -144,11 +143,12 @@ func OnIncomingMessagesRequest(
 					JSON: jsonerror.InvalidArgumentValue("Invalid to parameter: " + err.Error()),
 				}
 			} else {
-				to, err = db.StreamToTopologicalPosition(req.Context(), streamToken.PDUPosition)
+				to, err = db.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
 				if err != nil {
 					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
 					return jsonerror.InternalServerError()
 				}
+				logrus.Infof("XXX: 'to' mapping %v to %v", toQuery, to)
 			}
 		}
 	} else {
@@ -187,6 +187,8 @@ func OnIncomingMessagesRequest(
 		backwardOrdering: backwardOrdering,
 		device:           device,
 	}
+
+	logrus.Infof("XXX: Retrieving events %v to %v", from, to)
 
 	clientEvents, start, end, err := mReq.retrieveEvents()
 	if err != nil {
@@ -227,9 +229,6 @@ func OnIncomingMessagesRequest(
 		Start: start.String(),
 		End:   end.String(),
 		State: state,
-	}
-	if emptyFromSupplied {
-		res.StartStream = fromStream.String()
 	}
 
 	// Respond with the events.
@@ -273,7 +272,12 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	var events []*gomatrixserverlib.HeaderedEvent
-	util.GetLogger(r.ctx).WithField("start", start).WithField("end", end).Infof("Fetched %d events locally", len(streamEvents))
+	util.GetLogger(r.ctx).WithFields(logrus.Fields{
+		"from":  *r.from,
+		"to":    *r.to,
+		"start": start,
+		"end":   end,
+	}).Infof("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending

@@ -155,37 +155,6 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
-// GetEventsInStreamingRange retrieves all of the events on a given ordering using the
-// given extremities and limit.
-func (d *Database) GetEventsInStreamingRange(
-	ctx context.Context,
-	from, to *types.StreamingToken,
-	roomID string, eventFilter *gomatrixserverlib.RoomEventFilter,
-	backwardOrdering bool,
-) (events []types.StreamEvent, err error) {
-	r := types.Range{
-		From:      from.PDUPosition,
-		To:        to.PDUPosition,
-		Backwards: backwardOrdering,
-	}
-	if backwardOrdering {
-		// When using backward ordering, we want the most recent events first.
-		if events, _, err = d.OutputEvents.SelectRecentEvents(
-			ctx, nil, roomID, r, eventFilter, false, false,
-		); err != nil {
-			return
-		}
-	} else {
-		// When using forward ordering, we want the least recent events first.
-		if events, err = d.OutputEvents.SelectEarlyEvents(
-			ctx, nil, roomID, r, eventFilter,
-		); err != nil {
-			return
-		}
-	}
-	return events, err
-}
-
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
@@ -514,9 +483,9 @@ func (d *Database) EventPositionInTopology(
 }
 
 func (d *Database) StreamToTopologicalPosition(
-	ctx context.Context, streamPos types.StreamPosition,
+	ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
 ) (types.TopologyToken, error) {
-	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, nil, streamPos)
+	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, nil, roomID, streamPos, backwardOrdering)
 	if err != nil {
 		return types.TopologyToken{}, err
 	}
