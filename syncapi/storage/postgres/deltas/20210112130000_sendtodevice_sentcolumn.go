@@ -15,17 +15,12 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadRemoveSendToDeviceSentColumn(m *sqlutil.Migrations) {
-	m.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
-}
-
-func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
+func UpRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE syncapi_send_to_device
 		  DROP COLUMN IF EXISTS sent_by_token;
@@ -36,7 +31,7 @@ func UpRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
 	return nil
 }
 
-func DownRemoveSendToDeviceSentColumn(tx *sql.Tx) error {
+func DownRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE syncapi_send_to_device
 		  ADD COLUMN IF NOT EXISTS sent_by_token TEXT;

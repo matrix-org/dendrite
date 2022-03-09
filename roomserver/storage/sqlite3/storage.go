@@ -18,6 +18,8 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -56,13 +58,28 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 		return nil, err
 	}
 
-	// Then execute the migrations. By this point the tables are created with the latest
-	// schemas.
-	m := sqlutil.NewMigrations()
-	deltas.LoadAddForgottenColumn(m)
-	deltas.LoadStateBlocksRefactor(m)
-	if err := m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
+	// Special case, since this migration uses several tables, so it needs to
+	// be sure that all tables are created first.
+	// TODO: Remove when we are sure we are not having goose artifacts in the db
+	row := db.QueryRow("SELECT COUNT(*) FROM goose_db_version WHERE version_id = '2021041615092700';")
+	var gooseCount int
+	if err := row.Scan(&gooseCount); err != nil {
+		if !strings.Contains(err.Error(), "no such table") {
+			return nil, fmt.Errorf("unable to get goose_db_version: %w", err)
+		}
+	}
+	// Migration not yet applied
+	if gooseCount == 0 {
+		m := sqlutil.NewMigrator(db)
+		m.AddMigrations([]sqlutil.Migration{
+			{
+				Version: "state blocks refactor",
+				Up:      deltas.UpStateBlocksRefactor,
+			},
+		}...)
+		if err := m.Up(context.Background()); err != nil {
+			return nil, err
+		}
 	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred

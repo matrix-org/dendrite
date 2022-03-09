@@ -15,23 +15,12 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpFixSequences, DownFixSequences)
-	goose.AddMigration(UpRemoveSendToDeviceSentColumn, DownRemoveSendToDeviceSentColumn)
-}
-
-func LoadFixSequences(m *sqlutil.Migrations) {
-	m.AddMigration(UpFixSequences, DownFixSequences)
-}
-
-func UpFixSequences(tx *sql.Tx) error {
+func UpFixSequences(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		-- We need to delete all of the existing receipts because the indexes
 		-- will be wrong, and we'll get primary key violations if we try to
@@ -49,7 +38,7 @@ func UpFixSequences(tx *sql.Tx) error {
 	return nil
 }
 
-func DownFixSequences(tx *sql.Tx) error {
+func DownFixSequences(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		-- We need to delete all of the existing receipts because the indexes
 		-- will be wrong, and we'll get primary key violations if we try to

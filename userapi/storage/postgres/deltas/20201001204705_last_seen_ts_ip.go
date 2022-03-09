@@ -1,17 +1,12 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadLastSeenTSIP(m *sqlutil.Migrations) {
-	m.AddMigration(UpLastSeenTSIP, DownLastSeenTSIP)
-}
-
-func UpLastSeenTSIP(tx *sql.Tx) error {
+func UpLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 ALTER TABLE device_devices ADD COLUMN IF NOT EXISTS last_seen_ts BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)*1000;
 ALTER TABLE device_devices ADD COLUMN IF NOT EXISTS ip TEXT;
@@ -22,7 +17,7 @@ ALTER TABLE device_devices ADD COLUMN IF NOT EXISTS user_agent TEXT;`)
 	return nil
 }
 
-func DownLastSeenTSIP(tx *sql.Tx) error {
+func DownLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 	ALTER TABLE device_devices DROP COLUMN last_seen_ts;
 	ALTER TABLE device_devices DROP COLUMN ip;

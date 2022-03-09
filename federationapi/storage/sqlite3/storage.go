@@ -16,6 +16,7 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
@@ -82,9 +83,13 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 	if err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadRemoveRoomsTable(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigration(sqlutil.Migration{
+		Version: "drop federationsender_rooms",
+		Up:      deltas.UpRemoveRoomsTable,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{

@@ -1,17 +1,12 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadAddAccountType(m *sqlutil.Migrations) {
-	m.AddMigration(UpAddAccountType, DownAddAccountType)
-}
-
-func UpAddAccountType(tx *sql.Tx) error {
+func UpAddAccountType(ctx context.Context, tx *sql.Tx) error {
 	// initially set every account to useraccount, change appservice and guest accounts afterwards
 	// (user = 1, guest = 2, admin = 3, appservice = 4)
 	_, err := tx.Exec(`ALTER TABLE account_accounts ADD COLUMN IF NOT EXISTS account_type SMALLINT NOT NULL DEFAULT 1;
@@ -25,7 +20,7 @@ ALTER TABLE account_accounts ALTER COLUMN account_type DROP DEFAULT;`,
 	return nil
 }
 
-func DownAddAccountType(tx *sql.Tx) error {
+func DownAddAccountType(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec("ALTER TABLE account_accounts DROP COLUMN account_type;")
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)

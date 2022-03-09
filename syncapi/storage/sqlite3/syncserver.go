@@ -21,7 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -102,12 +101,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	}
 	notificationData, err := NewSqliteNotificationDataTable(d.db)
 	if err != nil {
-		return err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return err
 	}
 	d.Database = shared.Database{

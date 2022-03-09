@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -138,7 +139,15 @@ type membershipStatements struct {
 
 func createMembershipTable(db *sql.DB) error {
 	_, err := db.Exec(membershipSchema)
-	return err
+	if err != nil {
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "add forgotten column",
+		Up:      deltas.UpAddForgottenColumn,
+	})
+	return m.Up(context.Background())
 }
 
 func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {

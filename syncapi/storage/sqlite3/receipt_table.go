@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -68,6 +69,15 @@ type receiptStatements struct {
 
 func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Receipts, error) {
 	_, err := db.Exec(receiptsSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigration(sqlutil.Migration{
+		Version: "fix sequences",
+		Up:      deltas.UpFixSequences,
+	})
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}

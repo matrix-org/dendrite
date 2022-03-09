@@ -19,6 +19,8 @@ import (
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/keyserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 )
 
@@ -55,6 +57,15 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 		db: db,
 	}
 	_, err := db.Exec(keyChangesSchema)
+	if err != nil {
+		return s, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigration(sqlutil.Migration{
+		Version: "refactor key changes",
+		Up:      deltas.UpRefactorKeyChanges,
+	})
+	err = m.Up(context.Background())
 	return s, err
 }
 

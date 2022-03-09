@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -107,6 +108,14 @@ func NewSQLiteDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName) 
 	if err != nil {
 		return nil, err
 	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: "add last_seen_ts",
+			Up:      deltas.UpLastSeenTSIP,
+		},
+	}...)
+	err = m.Up(context.Background())
 	return s, sqlutil.StatementList{
 		{&s.insertDeviceStmt, insertDeviceSQL},
 		{&s.selectDevicesCountStmt, selectDevicesCountSQL},

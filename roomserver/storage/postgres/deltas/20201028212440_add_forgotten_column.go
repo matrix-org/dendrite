@@ -15,23 +15,12 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpAddForgottenColumn, DownAddForgottenColumn)
-	goose.AddMigration(UpStateBlocksRefactor, DownStateBlocksRefactor)
-}
-
-func LoadAddForgottenColumn(m *sqlutil.Migrations) {
-	m.AddMigration(UpAddForgottenColumn, DownAddForgottenColumn)
-}
-
-func UpAddForgottenColumn(tx *sql.Tx) error {
+func UpAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`ALTER TABLE roomserver_membership ADD COLUMN IF NOT EXISTS forgotten BOOLEAN NOT NULL DEFAULT false;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
@@ -39,7 +28,7 @@ func UpAddForgottenColumn(tx *sql.Tx) error {
 	return nil
 }
 
-func DownAddForgottenColumn(tx *sql.Tx) error {
+func DownAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`ALTER TABLE roomserver_membership DROP COLUMN IF EXISTS forgotten;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)

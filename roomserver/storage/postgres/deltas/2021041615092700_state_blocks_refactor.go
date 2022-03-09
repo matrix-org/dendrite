@@ -15,11 +15,11 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -36,12 +36,8 @@ type stateBlockData struct {
 	EventNIDs     types.EventNIDs
 }
 
-func LoadStateBlocksRefactor(m *sqlutil.Migrations) {
-	m.AddMigration(UpStateBlocksRefactor, DownStateBlocksRefactor)
-}
-
 // nolint:gocyclo
-func UpStateBlocksRefactor(tx *sql.Tx) error {
+func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	logrus.Warn("Performing state storage upgrade. Please wait, this may take some time!")
 	defer logrus.Warn("State storage upgrade complete")
 
@@ -307,6 +303,6 @@ func UpStateBlocksRefactor(tx *sql.Tx) error {
 	return nil
 }
 
-func DownStateBlocksRefactor(tx *sql.Tx) error {
+func DownStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	panic("Downgrading state storage is not supported")
 }

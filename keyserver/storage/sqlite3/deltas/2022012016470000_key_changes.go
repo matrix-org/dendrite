@@ -15,22 +15,12 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpRefactorKeyChanges, DownRefactorKeyChanges)
-}
-
-func LoadRefactorKeyChanges(m *sqlutil.Migrations) {
-	m.AddMigration(UpRefactorKeyChanges, DownRefactorKeyChanges)
-}
-
-func UpRefactorKeyChanges(tx *sql.Tx) error {
+func UpRefactorKeyChanges(ctx context.Context, tx *sql.Tx) error {
 	// start counting from the last max offset, else 0.
 	var maxOffset int64
 	var userID string
@@ -57,7 +47,7 @@ func UpRefactorKeyChanges(tx *sql.Tx) error {
 	return nil
 }
 
-func DownRefactorKeyChanges(tx *sql.Tx) error {
+func DownRefactorKeyChanges(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.Exec(`
 	-- Drop all data and revert back, we can't keep the data as Kafka offsets determine the numbers
 	DROP TABLE IF EXISTS keyserver_key_changes;
