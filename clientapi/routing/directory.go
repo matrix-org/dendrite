@@ -238,18 +238,19 @@ type roomVisibility struct {
 
 // GetVisibility implements GET /directory/list/room/{roomID}
 func GetVisibility(
-	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
+	httpReq *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
-	var res roomserverAPI.QueryPublishedRoomsResponse
-	err := rsAPI.QueryPublishedRooms(req.Context(), &roomserverAPI.QueryPublishedRoomsRequest{
+	req := &roomserverAPI.QueryPublishedRoomsRequest{
 		RoomID: roomID,
-	}, &res)
+	}
+	res := &roomserverAPI.QueryPublishedRoomsResponse{}
+	err := rsAPI.QueryPublishedRooms(httpReq.Context(), req, res)
 	logrus.Infof("XXX: QueryPublishedRoomsRequest: %+v", req)
 	logrus.Infof("XXX: QueryPublishedRoomsResponse: %+v", res)
 	logrus.Infof("XXX: err: %+v", err)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryPublishedRooms failed")
+		util.GetLogger(httpReq.Context()).WithError(err).Error("QueryPublishedRooms failed")
 		return jsonerror.InternalServerError()
 	}
 
