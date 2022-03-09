@@ -268,12 +268,7 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	var events []*gomatrixserverlib.HeaderedEvent
-	util.GetLogger(r.ctx).WithFields(logrus.Fields{
-		"from":  *r.from,
-		"to":    *r.to,
-		"start": start,
-		"end":   end,
-	}).Infof("Fetched %d events locally", len(streamEvents))
+	util.GetLogger(r.ctx).WithField("start", start).WithField("end", end).Infof("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
