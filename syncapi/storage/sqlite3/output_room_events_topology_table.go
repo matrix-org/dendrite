@@ -68,14 +68,18 @@ const selectMaxPositionInTopologySQL = "" +
 const deleteTopologyForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
 
+const selectStreamToTopologicalPositionSQL = "" +
+	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE stream_position = $1"
+
 type outputRoomEventsTopologyStatements struct {
-	db                              *sql.DB
-	insertEventInTopologyStmt       *sql.Stmt
-	selectEventIDsInRangeASCStmt    *sql.Stmt
-	selectEventIDsInRangeDESCStmt   *sql.Stmt
-	selectPositionInTopologyStmt    *sql.Stmt
-	selectMaxPositionInTopologyStmt *sql.Stmt
-	deleteTopologyForRoomStmt       *sql.Stmt
+	db                                    *sql.DB
+	insertEventInTopologyStmt             *sql.Stmt
+	selectEventIDsInRangeASCStmt          *sql.Stmt
+	selectEventIDsInRangeDESCStmt         *sql.Stmt
+	selectPositionInTopologyStmt          *sql.Stmt
+	selectMaxPositionInTopologyStmt       *sql.Stmt
+	deleteTopologyForRoomStmt             *sql.Stmt
+	selectStreamToTopologicalPositionStmt *sql.Stmt
 }
 
 func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -102,6 +106,9 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 		return nil, err
 	}
 	if s.deleteTopologyForRoomStmt, err = db.Prepare(deleteTopologyForRoomSQL); err != nil {
+		return nil, err
+	}
+	if s.selectStreamToTopologicalPositionStmt, err = db.Prepare(selectStreamToTopologicalPositionSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -160,6 +167,15 @@ func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
+	return
+}
+
+// SelectStreamToTopologicalPosition returns the position of a given event
+// in the topology of the room it belongs to from the given stream position.
+func (s *outputRoomEventsTopologyStatements) SelectStreamToTopologicalPosition(
+	ctx context.Context, txn *sql.Tx, streamPos types.StreamPosition,
+) (topoPos types.StreamPosition, err error) {
+	err = s.selectStreamToTopologicalPositionStmt.QueryRowContext(ctx, streamPos).Scan(&topoPos)
 	return
 }
 

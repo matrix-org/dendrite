@@ -513,6 +513,16 @@ func (d *Database) EventPositionInTopology(
 	return types.TopologyToken{Depth: depth, PDUPosition: stream}, nil
 }
 
+func (d *Database) StreamToTopologicalPosition(
+	ctx context.Context, streamPos types.StreamPosition,
+) (types.TopologyToken, error) {
+	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, nil, streamPos)
+	if err != nil {
+		return types.TopologyToken{}, err
+	}
+	return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
+}
+
 func (d *Database) GetFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrixserverlib.Filter, error) {
