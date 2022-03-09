@@ -26,6 +26,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 type roomDirectoryResponse struct {
@@ -244,6 +245,9 @@ func GetVisibility(
 	err := rsAPI.QueryPublishedRooms(req.Context(), &roomserverAPI.QueryPublishedRoomsRequest{
 		RoomID: roomID,
 	}, &res)
+	logrus.Infof("XXX: QueryPublishedRoomsRequest: %+v", req)
+	logrus.Infof("XXX: QueryPublishedRoomsResponse: %+v", res)
+	logrus.Infof("XXX: err: %+v", err)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryPublishedRooms failed")
 		return jsonerror.InternalServerError()
