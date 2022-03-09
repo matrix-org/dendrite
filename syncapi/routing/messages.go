@@ -125,7 +125,6 @@ func OnIncomingMessagesRequest(
 				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
 				return jsonerror.InternalServerError()
 			}
-			logrus.Infof("XXX: 'from' mapping %v to %v", fromQuery, from)
 		}
 	}
 
@@ -148,7 +147,6 @@ func OnIncomingMessagesRequest(
 					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
 					return jsonerror.InternalServerError()
 				}
-				logrus.Infof("XXX: 'to' mapping %v to %v", toQuery, to)
 			}
 		}
 	} else {
@@ -187,8 +185,6 @@ func OnIncomingMessagesRequest(
 		backwardOrdering: backwardOrdering,
 		device:           device,
 	}
-
-	logrus.Infof("XXX: Retrieving events %v to %v", from, to)
 
 	clientEvents, start, end, err := mReq.retrieveEvents()
 	if err != nil {
