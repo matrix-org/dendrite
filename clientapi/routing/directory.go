@@ -240,10 +240,10 @@ func GetVisibility(
 	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
 	roomID string,
 ) util.JSONResponse {
-	res := &roomserverAPI.QueryPublishedRoomsResponse{}
+	res := roomserverAPI.QueryPublishedRoomsResponse{}
 	err := rsAPI.QueryPublishedRooms(req.Context(), &roomserverAPI.QueryPublishedRoomsRequest{
 		RoomID: roomID,
-	}, res)
+	}, &res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryPublishedRooms failed")
 		return jsonerror.InternalServerError()
