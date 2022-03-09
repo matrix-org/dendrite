@@ -486,10 +486,20 @@ func (d *Database) StreamToTopologicalPosition(
 	ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
 ) (types.TopologyToken, error) {
 	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, nil, roomID, streamPos, backwardOrdering)
-	if err != nil {
-		return types.TopologyToken{}, err
+	switch {
+	case err == sql.ErrNoRows && backwardOrdering: // no events in range, going backward
+		return types.TopologyToken{PDUPosition: streamPos}, nil
+	case err == sql.ErrNoRows && !backwardOrdering: // no events in range, going forward
+		topoPos, streamPos, err = d.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
+		if err != nil {
+			return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectMaxPositionInTopology: %w", err)
+		}
+		return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
+	case err != nil: // some other error happened
+		return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectStreamToTopologicalPosition: %w", err)
+	default:
+		return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
 	}
-	return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
 }
 
 func (d *Database) GetFilter(
