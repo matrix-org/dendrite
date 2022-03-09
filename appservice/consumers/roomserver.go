@@ -88,7 +88,16 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 	}
 
 	events := []*gomatrixserverlib.HeaderedEvent{output.NewRoomEvent.Event}
-	events = append(events, output.NewRoomEvent.AddStateEvents...)
+	if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
+		eventsReq := &api.QueryEventsByIDRequest{
+			EventIDs: output.NewRoomEvent.AddsStateEventIDs,
+		}
+		eventsRes := &api.QueryEventsByIDResponse{}
+		if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
+			return false
+		}
+		events = append(events, eventsRes.Events...)
+	}
 
 	// Send event to any relevant application services
 	if err := s.filterRoomserverEvents(context.TODO(), events); err != nil {
