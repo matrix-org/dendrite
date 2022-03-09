@@ -379,7 +379,7 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, nil, requestSenderUserID)
 		return err
 	})
 	if err != nil {
@@ -563,11 +563,11 @@ func (d *Database) storeEvent(
 			return fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 		}
 
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
+		if roomNID, err = d.assignRoomNID(ctx, nil, event.RoomID(), roomVersion); err != nil {
 			return fmt.Errorf("d.assignRoomNID: %w", err)
 		}
 
-		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
+		if eventTypeNID, err = d.assignEventTypeNID(ctx, nil, event.Type()); err != nil {
 			return fmt.Errorf("d.assignEventTypeNID: %w", err)
 		}
 
@@ -575,7 +575,7 @@ func (d *Database) storeEvent(
 		// Assigned a numeric ID for the state_key if there is one present.
 		// Otherwise set the numeric ID for the state_key to 0.
 		if eventStateKey != nil {
-			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
+			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, nil, *eventStateKey); err != nil {
 				return fmt.Errorf("d.assignStateKeyNID: %w", err)
 			}
 		}
