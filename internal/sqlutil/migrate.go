@@ -80,7 +80,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
 			}
-			_, err = txn.ExecContext(ctx, "INSERT INTO db_migrations (version, time) VALUES ($1, $2)", migration.Version, time.Now().UTC())
+			_, err = txn.ExecContext(ctx, "INSERT INTO db_migrations (version, time) VALUES ($1, $2)", migration.Version, time.Now().UTC().Format(time.RFC3339))
 			if err != nil {
 				return fmt.Errorf("unable to insert executed migrations: %w", err)
 			}
