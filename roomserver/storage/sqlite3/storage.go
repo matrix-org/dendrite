@@ -18,8 +18,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strings"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -61,15 +59,11 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	// Special case, since this migration uses several tables, so it needs to
 	// be sure that all tables are created first.
 	// TODO: Remove when we are sure we are not having goose artifacts in the db
-	row := db.QueryRow("SELECT COUNT(*) FROM goose_db_version WHERE version_id = '2021041615092700';")
-	var gooseCount int
-	if err := row.Scan(&gooseCount); err != nil {
-		if !strings.Contains(err.Error(), "no such table") {
-			return nil, fmt.Errorf("unable to get goose_db_version: %w", err)
-		}
-	}
-	// Migration not yet applied
-	if gooseCount == 0 {
+	// This forces an error, which indicates the migration is already applied, since the
+	// column event_nid was removed from the table
+	var count int
+	err = db.QueryRow("SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan(&count)
+	if err == nil {
 		m := sqlutil.NewMigrator(db)
 		m.AddMigrations([]sqlutil.Migration{
 			{
