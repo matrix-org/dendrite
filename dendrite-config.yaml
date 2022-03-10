@@ -33,7 +33,7 @@ version: 2
 # Global Matrix configuration. This configuration applies to all components.
 global:
   # The domain name of this homeserver.
-  server_name: localhost:8008
+  server_name: localhost
 
   # The path to the signing private key file, used to sign requests and events.
   # Note that this is NOT the same private key as used for TLS! To generate a
@@ -223,7 +223,6 @@ federation_api:
   # Perspective keyservers to use as a backup when direct key fetches fail. This may
   # be required to satisfy key requests for servers that are no longer online when
   # joining some rooms.
-
   key_perspectives:
     - server_name: matrix.org
       keys:
