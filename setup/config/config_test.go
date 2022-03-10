@@ -200,11 +200,14 @@ user_api:
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
+<<<<<<< HEAD
   pusher_database:
     connection_string: file:pushserver.db
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
+=======
+>>>>>>> bc7a8b0600c5d121807b45a8be59dfd8731716c4
   pusher_database:
     connection_string: file:pushserver.db
     max_open_conns: 100
