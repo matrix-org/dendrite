@@ -109,7 +109,7 @@ type DeviceListUpdaterDatabase interface {
 	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error
 
 	// PrevIDsExists returns true if all prev IDs exist for this user.
-	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
+	PrevIDsExists(ctx context.Context, userID string, prevIDs []int64) (bool, error)
 
 	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` or `StreamID` already then it will be replaced.
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error

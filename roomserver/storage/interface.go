@@ -139,6 +139,8 @@ type Database interface {
 	PublishRoom(ctx context.Context, roomID string, publish bool) error
 	// Returns a list of room IDs for rooms which are published.
 	GetPublishedRooms(ctx context.Context) ([]string, error)
+	// Returns whether a given room is published or not.
+	GetPublishedRoom(ctx context.Context, roomID string) (bool, error)
 
 	// TODO: factor out - from currentstateserver
 

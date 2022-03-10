@@ -669,6 +669,10 @@ func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool)
 	})
 }
 
+func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, error) {
+	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
+}
+
 func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
 	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
 }

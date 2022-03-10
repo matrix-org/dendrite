@@ -610,6 +610,14 @@ func (r *Queryer) QueryPublishedRooms(
 	req *api.QueryPublishedRoomsRequest,
 	res *api.QueryPublishedRoomsResponse,
 ) error {
+	if req.RoomID != "" {
+		visible, err := r.DB.GetPublishedRoom(ctx, req.RoomID)
+		if err == nil && visible {
+			res.RoomIDs = []string{req.RoomID}
+			return nil
+		}
+		return err
+	}
 	rooms, err := r.DB.GetPublishedRooms(ctx)
 	if err != nil {
 		return err
