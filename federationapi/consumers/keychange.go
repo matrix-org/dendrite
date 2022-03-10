@@ -203,9 +203,9 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	return err == nil
 }
 
-func prevID(streamID int) []int {
+func prevID(streamID int64) []int64 {
 	if streamID <= 1 {
 		return nil
 	}
-	return []int{streamID - 1}
+	return []int64{streamID - 1}
 }

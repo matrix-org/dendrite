@@ -70,7 +70,7 @@ type DeviceMessage struct {
 	*DeviceKeys                         `json:"DeviceKeys,omitempty"`
 	*eduapi.OutputCrossSigningKeyUpdate `json:"CrossSigningKeyUpdate,omitempty"`
 	// A monotonically increasing number which represents device changes for this user.
-	StreamID       int
+	StreamID       int64
 	DeviceChangeID int64
 }
 
@@ -108,7 +108,7 @@ type DeviceKeys struct {
 }
 
 // WithStreamID returns a copy of this device message with the given stream ID
-func (k *DeviceKeys) WithStreamID(streamID int) DeviceMessage {
+func (k *DeviceKeys) WithStreamID(streamID int64) DeviceMessage {
 	return DeviceMessage{
 		DeviceKeys: k,
 		StreamID:   streamID,
@@ -281,7 +281,7 @@ type QueryDeviceMessagesRequest struct {
 
 type QueryDeviceMessagesResponse struct {
 	// The latest stream ID
-	StreamID int
+	StreamID int64
 	Devices  []DeviceMessage
 	Error    *KeyError
 }
