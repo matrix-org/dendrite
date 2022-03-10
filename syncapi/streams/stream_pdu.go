@@ -276,7 +276,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	if !wantFullState {
 		excludingEventIDs = make([]string, 0, len(recentStreamEvents))
 		for _, event := range recentStreamEvents {
-			if event.StateKey() != nil {
+			if event.StateKey() != nil && event.Type() != "m.room.name" {
 				excludingEventIDs = append(excludingEventIDs, event.EventID())
 			}
 		}
