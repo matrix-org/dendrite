@@ -184,16 +184,18 @@ func OnIncomingMessagesRequest(
 	// at least fetch the membership events for the users returned in chunk if LazyLoadMembers is set
 	state := []gomatrixserverlib.ClientEvent{}
 	if filter.LazyLoadMembers {
-		memberShipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
+		membershipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
 		for _, evt := range clientEvents {
-			memberShip, err := db.GetStateEvent(req.Context(), roomID, gomatrixserverlib.MRoomMember, evt.Sender)
+			membership, err := db.GetStateEvent(req.Context(), roomID, gomatrixserverlib.MRoomMember, evt.Sender)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to get membership event for user")
 				continue
 			}
-			memberShipToUser[evt.Sender] = memberShip
+			if membership != nil {
+				membershipToUser[evt.Sender] = membership
+			}
 		}
-		for _, evt := range memberShipToUser {
+		for _, evt := range membershipToUser {
 			state = append(state, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatAll))
 		}
 	}
