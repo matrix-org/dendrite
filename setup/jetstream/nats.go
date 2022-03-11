@@ -25,7 +25,6 @@ func Prepare(cfg *config.JetStream) natsclient.JetStreamContext {
 		var err error
 		natsServer, err = natsserver.NewServer(&natsserver.Options{
 			ServerName:      "monolith",
-			DontListen:      true,
 			JetStream:       true,
 			StoreDir:        string(cfg.StoragePath),
 			NoSystemAccount: true,
