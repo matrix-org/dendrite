@@ -10,11 +10,6 @@ import (
 )
 
 func platformSanityChecks() {
-	// If Dendrite is running as root, that's probably bad.
-	if syscall.Geteuid() == 0 {
-		logrus.Warnf("IMPORTANT: Dendrite is currently running as root, this is potentially dangerous!")
-	}
-
 	// Dendrite needs a relatively high number of file descriptors in order
 	// to function properly, particularly when federating with lots of servers.
 	// If we run out of file descriptors, we might run into problems accessing
