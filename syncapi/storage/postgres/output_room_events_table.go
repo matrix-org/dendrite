@@ -151,7 +151,6 @@ const selectContextAfterEventSQL = "" +
 	" ORDER BY id ASC LIMIT $3"
 
 type outputRoomEventsStatements struct {
-	db                            *sql.DB
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
 	selectMaxEventIDStmt          *sql.Stmt
@@ -167,9 +166,7 @@ type outputRoomEventsStatements struct {
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
-	s := &outputRoomEventsStatements{
-		db: db,
-	}
+	s := &outputRoomEventsStatements{}
 	_, err := db.Exec(outputRoomEventsSchema)
 	if err != nil {
 		return nil, err
