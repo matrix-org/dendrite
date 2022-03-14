@@ -100,6 +100,7 @@ const (
 // The componentName is used for logging purposes, and should be a friendly name
 // of the compontent running, e.g. "SyncAPI"
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
+	platformSanityChecks()
 	useHTTPAPIs := false
 	cacheMetrics := true
 	for _, opt := range options {
