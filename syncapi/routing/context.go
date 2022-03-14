@@ -158,17 +158,19 @@ func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter
 	}
 
 	newState := []*gomatrixserverlib.HeaderedEvent{}
+	membershipEvents := []*gomatrixserverlib.HeaderedEvent{}
 	for _, event := range state {
 		if event.Type() != gomatrixserverlib.MRoomMember {
 			newState = append(newState, event)
 		} else {
 			// did the user send an event?
 			if x[event.Sender()] {
-				newState = append(newState, event)
+				membershipEvents = append(newState, event)
 			}
 		}
 	}
-	return newState
+	// Add the membershipEvents to the end of the list, to make Sytest happy
+	return append(newState, membershipEvents...)
 }
 
 func parseRoomEventFilter(req *http.Request) (*gomatrixserverlib.RoomEventFilter, error) {
