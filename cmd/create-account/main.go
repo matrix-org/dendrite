@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/matrix-org/dendrite/setup/base"
@@ -54,13 +55,14 @@ Arguments:
 `
 
 var (
-	username      = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
-	password      = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
-	pwdFile       = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
-	pwdStdin      = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	askPass       = flag.Bool("ask-pass", false, "Ask for the password to use")
-	isAdmin       = flag.Bool("admin", false, "Create an admin account")
-	resetPassword = flag.Bool("reset-password", false, "Resets the password for the given username")
+	username           = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	password           = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
+	pwdFile            = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
+	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
+	askPass            = flag.Bool("ask-pass", false, "Ask for the password to use")
+	isAdmin            = flag.Bool("admin", false, "Create an admin account")
+	resetPassword      = flag.Bool("reset-password", false, "Resets the password for the given username")
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
 
 func main() {
@@ -73,6 +75,11 @@ func main() {
 
 	if *username == "" {
 		flag.Usage()
+		os.Exit(1)
+	}
+
+	if !validUsernameRegex.MatchString(*username) {
+		logrus.Warn("Username can only contain characters a-z, 0-9, or '_-./='")
 		os.Exit(1)
 	}
 
