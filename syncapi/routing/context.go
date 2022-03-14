@@ -66,7 +66,7 @@ func Context(
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
 	membershipReq := roomserver.QueryMembershipForUserRequest{UserID: device.UserID, RoomID: roomID}
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
-		logrus.WithError(err).Error("unable to fo membership")
+		logrus.WithError(err).Error("unable to query membership")
 		return jsonerror.InternalServerError()
 	}
 
@@ -165,7 +165,7 @@ func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter
 		} else {
 			// did the user send an event?
 			if x[event.Sender()] {
-				membershipEvents = append(newState, event)
+				membershipEvents = append(membershipEvents, event)
 			}
 		}
 	}
