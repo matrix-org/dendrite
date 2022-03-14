@@ -33,6 +33,8 @@ Remove group role
 AS-ghosted users can use rooms themselves
 AS-ghosted users can use rooms via AS
 Events in rooms with AS-hosted room aliases are sent to AS server
+Inviting an AS-hosted user asks the AS server
+Accesing an AS-hosted room alias asks the AS server
 
 # Flakey, need additional investigation
 Messages that notify from another user increment notification_count
