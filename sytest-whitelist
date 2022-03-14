@@ -664,3 +664,4 @@ Can delete canonical alias
 Multiple calls to /sync should not cause 500 errors
 AS can make room aliases
 Accesing an AS-hosted room alias asks the AS server
+/context/ with lazy_load_members filter works
