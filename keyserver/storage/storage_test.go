@@ -177,7 +177,7 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeviceKeysForUser returned error: %s", err)
 	}
-	wantStreamIDs := map[string]int{
+	wantStreamIDs := map[string]int64{
 		"AAA":            3,
 		"another_device": 2,
 	}
