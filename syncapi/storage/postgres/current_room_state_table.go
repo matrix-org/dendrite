@@ -75,7 +75,7 @@ const DeleteRoomStateForRoomSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
-	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
+	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE (type = 'm.room.member' AND state_key = $1 AND membership = $2) OR sender = $1"
 
 const selectRoomIDsWithAnyMembershipSQL = "" +
 	"SELECT DISTINCT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"

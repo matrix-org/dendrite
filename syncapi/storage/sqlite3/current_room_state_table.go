@@ -64,7 +64,7 @@ const DeleteRoomStateForRoomSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
-	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
+	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE (type = 'm.room.member' AND state_key = $1 AND membership = $2) OR sender = $3"
 
 const selectRoomIDsWithAnyMembershipSQL = "" +
 	"SELECT DISTINCT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
@@ -165,7 +165,7 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	membership string, // nolint: unparam
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithMembershipStmt)
-	rows, err := stmt.QueryContext(ctx, userID, membership)
+	rows, err := stmt.QueryContext(ctx, userID, membership, userID)
 	if err != nil {
 		return nil, err
 	}
