@@ -60,8 +60,8 @@ const upsertRoomStateSQL = "" +
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
-const DeleteRoomStateForRoomSQL = "" +
-	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
+const deleteRoomStateForRoomSQL = "" +
+	"DELETE FROM syncapi_current_room_state WHERE room_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
@@ -93,7 +93,7 @@ type currentRoomStateStatements struct {
 	streamIDStatements                 *streamIDStatements
 	upsertRoomStateStmt                *sql.Stmt
 	deleteRoomStateByEventIDStmt       *sql.Stmt
-	DeleteRoomStateForRoomStmt         *sql.Stmt
+	deleteRoomStateForRoomStmt         *sql.Stmt
 	selectRoomIDsWithMembershipStmt    *sql.Stmt
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
@@ -115,7 +115,7 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (t
 	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
 		return nil, err
 	}
-	if s.DeleteRoomStateForRoomStmt, err = db.Prepare(DeleteRoomStateForRoomSQL); err != nil {
+	if s.deleteRoomStateForRoomStmt, err = db.Prepare(deleteRoomStateForRoomSQL); err != nil {
 		return nil, err
 	}
 	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
@@ -246,7 +246,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.DeleteRoomStateForRoomStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateForRoomStmt)
 	_, err := stmt.ExecContext(ctx, roomID)
 	return err
 }
