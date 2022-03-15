@@ -73,7 +73,7 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Re
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(db)
-	m.AddMigration(sqlutil.Migration{
+	m.AddMigrations(sqlutil.Migration{
 		Version: "fix sequences",
 		Up:      deltas.UpFixSequences,
 	})

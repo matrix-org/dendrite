@@ -167,7 +167,7 @@ func createMembershipTable(db *sql.DB) error {
 		return err
 	}
 	m := sqlutil.NewMigrator(db)
-	m.AddMigration(sqlutil.Migration{
+	m.AddMigrations(sqlutil.Migration{
 		Version: "add forgotten column",
 		Up:      deltas.UpAddForgottenColumn,
 	})

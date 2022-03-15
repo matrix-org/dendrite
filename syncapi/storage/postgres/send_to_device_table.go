@@ -77,7 +77,7 @@ func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(db)
-	m.AddMigration(sqlutil.Migration{
+	m.AddMigrations(sqlutil.Migration{
 		Version: "drop sent_by_token",
 		Up:      deltas.UpRemoveSendToDeviceSentColumn,
 	})

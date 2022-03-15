@@ -68,7 +68,7 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	err = db.QueryRow("SELECT partition FROM keyserver_key_changes LIMIT 1;").Scan(&count)
 	if err == nil {
 		m := sqlutil.NewMigrator(db)
-		m.AddMigration(sqlutil.Migration{
+		m.AddMigrations(sqlutil.Migration{
 			Version: "refactor key changes",
 			Up:      deltas.UpRefactorKeyChanges,
 		})

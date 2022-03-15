@@ -20,7 +20,23 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/matrix-org/dendrite/internal"
 )
+
+const createDBMigrationsSQL = "" +
+	"CREATE TABLE IF NOT EXISTS db_migrations (" +
+	" version TEXT PRIMARY KEY," +
+	" time TEXT," +
+	" dendrite_version TEXT" +
+	");"
+
+const insertVersionSQL = "" +
+	"INSERT INTO db_migrations (version, time, dendrite_version)" +
+	" VALUES ($1, $2, $3) " +
+	" ON CONFLICT(version) DO UPDATE SET dendrite_version = $4, time = $5"
+
+const selectDBMigrationsSQL = "SELECT version FROM db_migrations"
 
 // Migration defines a migration to be run.
 type Migration struct {
@@ -50,73 +66,68 @@ func NewMigrator(db *sql.DB) *Migrator {
 	}
 }
 
-// AddMigration adds new migrations to the list.
+// AddMigrations adds new migrations to the list.
 // De-duplicates migrations by their version
-func (m *Migrator) AddMigration(migration Migration) {
+func (m *Migrator) AddMigrations(migrations ...Migration) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if !m.knownMigrations[migration.Version] {
-		m.migrations = append(m.migrations, migration)
-		m.knownMigrations[migration.Version] = true
-	}
-}
-
-// AddMigrations is a convenience method to add migrations
-func (m *Migrator) AddMigrations(migrations ...Migration) {
 	for _, mig := range migrations {
-		m.AddMigration(mig)
+		if !m.knownMigrations[mig.Version] {
+			m.migrations = append(m.migrations, mig)
+			m.knownMigrations[mig.Version] = true
+		}
 	}
 }
 
 // Up executes all migrations
 func (m *Migrator) Up(ctx context.Context) error {
-	var err error
+	var (
+		err             error
+		dendriteVersion = internal.VersionString()
+	)
 	// ensure there is a table for known migrations
 	executedMigrations, err := m.ExecutedMigrations(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to create/get migrations: %w", err)
 	}
 
-	txn, err := m.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("unable to begin transaction: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			_ = txn.Rollback()
-		}
-	}()
-
-	for i := range m.migrations {
-		migration := m.migrations[i]
-		if !executedMigrations[migration.Version] {
-			err = migration.Up(ctx, txn)
-			if err != nil {
-				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
+	return WithTransaction(m.db, func(txn *sql.Tx) error {
+		for i := range m.migrations {
+			now := time.Now().UTC().Format(time.RFC3339)
+			migration := m.migrations[i]
+			if !executedMigrations[migration.Version] {
+				err = migration.Up(ctx, txn)
+				if err != nil {
+					return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
+				}
+				_, err = txn.ExecContext(ctx, insertVersionSQL,
+					migration.Version,
+					now,
+					dendriteVersion,
+					dendriteVersion,
+					now,
+				)
+				if err != nil {
+					return fmt.Errorf("unable to insert executed migrations: %w", err)
+				}
 			}
-			_, err = txn.ExecContext(ctx, "INSERT INTO db_migrations (version, time) VALUES ($1, $2)", migration.Version, time.Now().UTC().Format(time.RFC3339))
-			if err != nil {
-				return fmt.Errorf("unable to insert executed migrations: %w", err)
-			}
 		}
-	}
-	if err = txn.Commit(); err != nil {
-		return fmt.Errorf("unable to commit transaction: %w", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // ExecutedMigrations returns a map with already executed migrations
 func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]bool, error) {
 	result := make(map[string]bool)
-	_, err := m.db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS db_migrations ( version TEXT, time TEXT );")
+	_, err := m.db.ExecContext(ctx, createDBMigrationsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create db_migrations: %w", err)
 	}
-	rows, err := m.db.QueryContext(ctx, "SELECT version FROM db_migrations")
+	rows, err := m.db.QueryContext(ctx, selectDBMigrationsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query db_migrations: %w", err)
 	}
+	defer rows.Close() // nolint: errcheck
 	var version string
 	for rows.Next() {
 		if err := rows.Scan(&version); err != nil {

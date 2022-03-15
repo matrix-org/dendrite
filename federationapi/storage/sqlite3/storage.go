@@ -84,7 +84,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 		return nil, err
 	}
 	m := sqlutil.NewMigrator(d.db)
-	m.AddMigration(sqlutil.Migration{
+	m.AddMigrations(sqlutil.Migration{
 		Version: "drop federationsender_rooms",
 		Up:      deltas.UpRemoveRoomsTable,
 	})

@@ -65,12 +65,10 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	err = db.QueryRow("SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan(&count)
 	if err == nil {
 		m := sqlutil.NewMigrator(db)
-		m.AddMigrations([]sqlutil.Migration{
-			{
-				Version: "state blocks refactor",
-				Up:      deltas.UpStateBlocksRefactor,
-			},
-		}...)
+		m.AddMigrations(sqlutil.Migration{
+			Version: "state blocks refactor",
+			Up:      deltas.UpStateBlocksRefactor,
+		})
 		if err := m.Up(context.Background()); err != nil {
 			return nil, err
 		}
