@@ -70,7 +70,9 @@ func RoomAliasToID(
 				util.GetLogger(httpReq.Context()).WithError(err).Error("senderAPI.QueryJoinedHostServerNamesInRoom failed")
 				return jsonerror.InternalServerError()
 			}
-
+			if !serverQueryReq.ExcludeSelf && len(serverQueryRes.ServerNames) == 0 {
+				serverQueryRes.ServerNames = []gomatrixserverlib.ServerName{domain}
+			}
 			resp = gomatrixserverlib.RespDirectory{
 				RoomID:  queryRes.RoomID,
 				Servers: serverQueryRes.ServerNames,
