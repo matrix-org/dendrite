@@ -119,13 +119,14 @@ const selectStateInRangeSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	" AND ( $3::text[] IS NULL OR     sender  = ANY($3)  )" +
-	" AND ( $4::text[] IS NULL OR NOT(sender  = ANY($4)) )" +
-	" AND ( $5::text[] IS NULL OR     type LIKE ANY($5)  )" +
-	" AND ( $6::text[] IS NULL OR NOT(type LIKE ANY($6)) )" +
-	" AND ( $7::bool IS NULL   OR     contains_url = $7  )" +
+	" AND room_id = ANY($3)" +
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" AND ( $8::bool IS NULL   OR     contains_url = $8  )" +
 	" ORDER BY id ASC" +
-	" LIMIT $8"
+	" LIMIT $9"
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -200,12 +201,12 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
-	stateFilter *gomatrixserverlib.StateFilter,
+	stateFilter *gomatrixserverlib.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
 
 	rows, err := stmt.QueryContext(
-		ctx, r.Low(), r.High(),
+		ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
 		pq.StringArray(stateFilter.Senders),
 		pq.StringArray(stateFilter.NotSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
