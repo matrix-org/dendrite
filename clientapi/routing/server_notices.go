@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/version"
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -127,7 +128,7 @@ func sendServerNotice(
 
 	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
 	roomID := qryServerNoticeRoom.RoomID
-	roomVersion := gomatrixserverlib.RoomVersionV6
+	roomVersion := version.DefaultRoomVersion()
 
 	// create a new room for the user
 	if qryServerNoticeRoom.RoomID == "" {
