@@ -365,6 +365,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		LastSentEventID: u.lastEventIDSent,
 		LatestEventIDs:  latestEventIDs,
 		TransactionID:   u.transactionID,
+		SendAsServer:    u.sendAsServer,
 	}
 
 	eventIDMap, err := u.stateEventMap()
@@ -384,51 +385,17 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 		ore.StateBeforeAddsEventIDs = append(ore.StateBeforeAddsEventIDs, eventIDMap[entry.EventNID])
 	}
 
-	ore.SendAsServer = u.sendAsServer
-
-	// include extra state events if they were added as nearly every downstream component will care about it
-	// and we'd rather not have them all hit QueryEventsByID at the same time!
-	if len(ore.AddsStateEventIDs) > 0 {
-		var err error
-		if ore.AddStateEvents, err = u.extraEventsForIDs(u.roomInfo.RoomVersion, ore.AddsStateEventIDs); err != nil {
-			return nil, fmt.Errorf("failed to load add_state_events from db: %w", err)
-		}
-	}
-
 	return &api.OutputEvent{
 		Type:         api.OutputTypeNewRoomEvent,
 		NewRoomEvent: &ore,
 	}, nil
 }
 
-// extraEventsForIDs returns the full events for the event IDs given, but does not include the current event being
-// updated.
-func (u *latestEventsUpdater) extraEventsForIDs(roomVersion gomatrixserverlib.RoomVersion, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	var extraEventIDs []string
-	for _, e := range eventIDs {
-		if e == u.event.EventID() {
-			continue
-		}
-		extraEventIDs = append(extraEventIDs, e)
-	}
-	if len(extraEventIDs) == 0 {
-		return nil, nil
-	}
-	extraEvents, err := u.updater.UnsentEventsFromIDs(u.ctx, extraEventIDs)
-	if err != nil {
-		return nil, err
-	}
-	var h []*gomatrixserverlib.HeaderedEvent
-	for _, e := range extraEvents {
-		h = append(h, e.Headered(roomVersion))
-	}
-	return h, nil
-}
-
 // retrieve an event nid -> event ID map for all events that need updating
 func (u *latestEventsUpdater) stateEventMap() (map[types.EventNID]string, error) {
-	var stateEventNIDs []types.EventNID
-	var allStateEntries []types.StateEntry
+	cap := len(u.added) + len(u.removed) + len(u.stateBeforeEventRemoves) + len(u.stateBeforeEventAdds)
+	stateEventNIDs := make(types.EventNIDs, 0, cap)
+	allStateEntries := make([]types.StateEntry, 0, cap)
 	allStateEntries = append(allStateEntries, u.added...)
 	allStateEntries = append(allStateEntries, u.removed...)
 	allStateEntries = append(allStateEntries, u.stateBeforeEventRemoves...)
@@ -436,12 +403,6 @@ func (u *latestEventsUpdater) stateEventMap() (map[types.EventNID]string, error)
 	for _, entry := range allStateEntries {
 		stateEventNIDs = append(stateEventNIDs, entry.EventNID)
 	}
-	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(eventNIDSorter(stateEventNIDs))]
+	stateEventNIDs = stateEventNIDs[:util.SortAndUnique(stateEventNIDs)]
 	return u.updater.EventIDs(u.ctx, stateEventNIDs)
 }
-
-type eventNIDSorter []types.EventNID
-
-func (s eventNIDSorter) Len() int           { return len(s) }
-func (s eventNIDSorter) Less(i, j int) bool { return s[i] < s[j] }
-func (s eventNIDSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

@@ -154,7 +154,42 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-	addsStateEvents := msg.AddsState()
+
+	addsStateEvents := []*gomatrixserverlib.HeaderedEvent{}
+	foundEventIDs := map[string]bool{}
+	if len(msg.AddsStateEventIDs) > 0 {
+		for _, eventID := range msg.AddsStateEventIDs {
+			foundEventIDs[eventID] = false
+		}
+		foundEvents, err := s.db.Events(ctx, msg.AddsStateEventIDs)
+		if err != nil {
+			return fmt.Errorf("s.db.Events: %w", err)
+		}
+		for _, event := range foundEvents {
+			foundEventIDs[event.EventID()] = true
+		}
+		eventsReq := &api.QueryEventsByIDRequest{}
+		eventsRes := &api.QueryEventsByIDResponse{}
+		for eventID, found := range foundEventIDs {
+			if !found {
+				eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
+			}
+		}
+		if err = s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
+			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
+		}
+		for _, event := range eventsRes.Events {
+			eventID := event.EventID()
+			foundEvents = append(foundEvents, event)
+			foundEventIDs[eventID] = true
+		}
+		for eventID, found := range foundEventIDs {
+			if !found {
+				return fmt.Errorf("event %s is missing", eventID)
+			}
+		}
+		addsStateEvents = foundEvents
+	}
 
 	ev, err := s.updateStateEvent(ev)
 	if err != nil {
