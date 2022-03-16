@@ -21,16 +21,15 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
 
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 const usage = `Usage: %s
@@ -56,13 +55,14 @@ Arguments:
 `
 
 var (
-	username      = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
-	password      = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
-	pwdFile       = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
-	pwdStdin      = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	askPass       = flag.Bool("ask-pass", false, "Ask for the password to use")
-	isAdmin       = flag.Bool("admin", false, "Create an admin account")
-	resetPassword = flag.Bool("reset-password", false, "Resets the password for the given username")
+	username           = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	password           = flag.String("password", "", "The password to associate with the account (optional, account will be password-less if not specified)")
+	pwdFile            = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
+	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
+	askPass            = flag.Bool("ask-pass", false, "Ask for the password to use")
+	isAdmin            = flag.Bool("admin", false, "Create an admin account")
+	resetPassword      = flag.Bool("reset-password", false, "Resets the password for the given username")
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
 
 func main() {
@@ -78,25 +78,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	if !validUsernameRegex.MatchString(*username) {
+		logrus.Warn("Username can only contain characters a-z, 0-9, or '_-./='")
+		os.Exit(1)
+	}
+
 	pass := getPassword(password, pwdFile, pwdStdin, askPass, os.Stdin)
 
-	accountDB, err := userdb.NewDatabase(
-		&config.DatabaseOptions{
-			ConnectionString: cfg.UserAPI.AccountDatabase.ConnectionString,
-		},
-		cfg.Global.ServerName, bcrypt.DefaultCost,
-		cfg.UserAPI.OpenIDTokenLifetimeMS,
-		api.DefaultLoginTokenLifetime,
-	)
-	if err != nil {
-		logrus.Fatalln("Failed to connect to the database:", err.Error())
-	}
+	b := base.NewBaseDendrite(cfg, "create-account")
+	accountDB := b.CreateAccountsDB()
 
 	accType := api.AccountTypeUser
 	if *isAdmin {
 		accType = api.AccountTypeAdmin
 	}
-
+	var err error
 	if *resetPassword {
 		err = accountDB.SetPassword(context.Background(), *username, pass)
 		if err != nil {

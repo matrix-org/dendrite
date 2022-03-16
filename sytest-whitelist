@@ -515,7 +515,6 @@ AS can create a user with inhibit_login
 AS can set avatar for ghosted users
 AS can set displayname for ghosted users
 Ghost user must register before joining room
-Inviting an AS-hosted user asks the AS server
 Can generate a openid access_token that can be exchanged for information about a user
 Invalid openid access tokens are rejected
 Requests to userinfo without access tokens are rejected
@@ -661,6 +660,5 @@ Multiple calls to /sync should not cause 500 errors
 Canonical alias can be set
 Canonical alias can include alt_aliases
 Can delete canonical alias
-Multiple calls to /sync should not cause 500 errors
 AS can make room aliases
-Accesing an AS-hosted room alias asks the AS server
+/context/ with lazy_load_members filter works
