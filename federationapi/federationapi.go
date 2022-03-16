@@ -92,7 +92,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	js := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
