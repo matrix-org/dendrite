@@ -271,22 +271,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		return
 	}
 
-	// Get the event IDs of the stream events we fetched. There's no point in us
-	var excludingEventIDs []string
-	if !wantFullState {
-		excludingEventIDs = make([]string, 0, len(recentStreamEvents))
-		for _, event := range recentStreamEvents {
-			if event.StateKey() != nil {
-				excludingEventIDs = append(excludingEventIDs, event.EventID())
-			}
-		}
-	}
-
-	stateEvents, err := p.DB.CurrentState(ctx, roomID, stateFilter, excludingEventIDs)
-	if err != nil {
-		return
-	}
-
 	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
 	// which is equiv to history_visibility: joined
@@ -312,6 +296,25 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		// cut all events earlier than the join (but not the join itself)
 		recentStreamEvents = recentStreamEvents[joinEventIndex:]
 		limited = false // so clients know not to try to backpaginate
+	}
+
+	// Work our way through the timeline events and pick out the event IDs
+	// of any state events that appear in the timeline. We'll specifically
+	// exclude them at the next step, so that we don't get duplicate state
+	// events in both `recentStreamEvents` and `stateEvents`.
+	var excludingEventIDs []string
+	if !wantFullState {
+		excludingEventIDs = make([]string, 0, len(recentStreamEvents))
+		for _, event := range recentStreamEvents {
+			if event.StateKey() != nil {
+				excludingEventIDs = append(excludingEventIDs, event.EventID())
+			}
+		}
+	}
+
+	stateEvents, err := p.DB.CurrentState(ctx, roomID, stateFilter, excludingEventIDs)
+	if err != nil {
+		return
 	}
 
 	// Retrieve the backward topology position, i.e. the position of the
