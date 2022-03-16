@@ -42,7 +42,7 @@ func NewInternalAPI(
 ) api.EDUServerInputAPI {
 	cfg := &base.Cfg.EDUServer
 
-	js := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	return &input.EDUServerInputAPI{
 		Cache:                        eduCache,

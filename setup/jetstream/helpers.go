@@ -71,8 +71,8 @@ func JetStreamConsumer(
 				continue
 			}
 			if f(ctx, msg) {
-				if err = msg.Ack(); err != nil {
-					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.Ack: %w", err))
+				if err = msg.AckSync(); err != nil {
+					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.AckSync: %w", err))
 					sentry.CaptureException(err)
 				}
 			} else {

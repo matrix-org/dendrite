@@ -46,7 +46,7 @@ func NewInternalAPI(
 	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
-	js := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncProducer := producers.NewSyncAPI(
 		db, js,
