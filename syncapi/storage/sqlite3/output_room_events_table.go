@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -87,6 +88,7 @@ const selectStateInRangeSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2)" +
+	" AND room_id IN ($3)" +
 	" AND ((add_state_ids IS NOT NULL AND add_state_ids != '') OR (remove_state_ids IS NOT NULL AND remove_state_ids != ''))"
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
@@ -155,13 +157,17 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
-	stateFilter *gomatrixserverlib.StateFilter,
+	stateFilter *gomatrixserverlib.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
+	stmtSQL := strings.Replace(selectStateInRangeSQL, "($3)", sqlutil.QueryVariadicOffset(len(roomIDs), 2), 1)
+	inputParams := []interface{}{
+		r.Low(), r.High(),
+	}
+	for _, roomID := range roomIDs {
+		inputParams = append(inputParams, roomID)
+	}
 	stmt, params, err := prepareWithFilters(
-		s.db, txn, selectStateInRangeSQL,
-		[]interface{}{
-			r.Low(), r.High(),
-		},
+		s.db, txn, stmtSQL, inputParams,
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
 		nil, stateFilter.Limit, FilterOrderAsc,

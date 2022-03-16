@@ -689,10 +689,26 @@ func (d *Database) GetStateDeltas(
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
+	// Look up all memberships for the user. We only care about rooms that a
+	// user has ever interacted with — joined to, kicked/banned from, left.
+	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	allRoomIDs := make([]string, 0, len(memberships))
+	joinedRoomIDs := make([]string, 0, len(memberships))
+	for roomID, membership := range memberships {
+		allRoomIDs = append(allRoomIDs, roomID)
+		if membership == gomatrixserverlib.Join {
+			joinedRoomIDs = append(joinedRoomIDs, roomID)
+		}
+	}
+
 	var deltas []types.StateDelta
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
+	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -760,10 +776,6 @@ func (d *Database) GetStateDeltas(
 	}
 
 	// Add in currently joined rooms
-	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
-	if err != nil {
-		return nil, nil, err
-	}
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  gomatrixserverlib.Join,
@@ -792,6 +804,22 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
+	// Look up all memberships for the user. We only care about rooms that a
+	// user has ever interacted with — joined to, kicked/banned from, left.
+	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	allRoomIDs := make([]string, 0, len(memberships))
+	joinedRoomIDs := make([]string, 0, len(memberships))
+	for roomID, membership := range memberships {
+		allRoomIDs = append(allRoomIDs, roomID)
+		if membership == gomatrixserverlib.Join {
+			joinedRoomIDs = append(joinedRoomIDs, roomID)
+		}
+	}
+
 	// Use a reasonable initial capacity
 	deltas := make(map[string]types.StateDelta)
 
@@ -816,7 +844,7 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	}
 
 	// Get all the state events ever between these two positions
-	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
+	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -840,11 +868,6 @@ func (d *Database) GetStateDeltasForFullStateSync(
 				break
 			}
 		}
-	}
-
-	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	// Add full states for all joined rooms

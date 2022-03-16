@@ -49,7 +49,7 @@ type Database interface {
 	StoreRemoteDeviceKeys(ctx context.Context, keys []api.DeviceMessage, clearUserIDs []string) error
 
 	// PrevIDsExists returns true if all prev IDs exist for this user.
-	PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error)
+	PrevIDsExists(ctx context.Context, userID string, prevIDs []int64) (bool, error)
 
 	// DeviceKeysForUser returns the device keys for the device IDs given. If the length of deviceIDs is 0, all devices are selected.
 	// If there are some missing keys, they are omitted from the returned slice. There is no ordering on the returned slice.
