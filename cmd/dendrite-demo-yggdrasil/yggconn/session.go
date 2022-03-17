@@ -37,12 +37,12 @@ func (n *Node) Accept() (net.Conn, error) {
 
 // Implements net.Listener
 func (n *Node) Close() error {
-	return n.listener.Close()
+	return n.utpSocket.Close()
 }
 
 // Implements net.Listener
 func (n *Node) Addr() net.Addr {
-	return n.listener.Addr()
+	return n.utpSocket.Addr()
 }
 
 // Implements http.Transport.Dial

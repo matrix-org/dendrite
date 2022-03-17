@@ -42,7 +42,7 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      OutputKeyChangeEvent,
-		Retention: nats.LimitsPolicy,
+		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},
 	{
