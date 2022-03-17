@@ -47,7 +47,7 @@ const selectEventIDsInRangeASCSQL = "" +
 	"SELECT event_id FROM syncapi_output_room_events_topology" +
 	" WHERE room_id = $1 AND (" +
 	"(topological_position > $2 AND topological_position < $3) OR" +
-	"(topological_position = $4 AND stream_position <= $5)" +
+	"(topological_position = $4 AND stream_position >= $5)" +
 	") ORDER BY topological_position ASC, stream_position ASC LIMIT $6"
 
 const selectEventIDsInRangeDESCSQL = "" +
