@@ -27,15 +27,12 @@ INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("invite", 0)
 `
 
 const increaseStreamIDStmt = "" +
-	"UPDATE syncapi_stream_id SET stream_id = stream_id + 1 WHERE stream_name = $1"
-
-const selectStreamIDStmt = "" +
-	"SELECT stream_id FROM syncapi_stream_id WHERE stream_name = $1"
+	"UPDATE syncapi_stream_id SET stream_id = stream_id + 1 WHERE stream_name = $1" +
+	" RETURNING stream_id"
 
 type streamIDStatements struct {
 	db                   *sql.DB
 	increaseStreamIDStmt *sql.Stmt
-	selectStreamIDStmt   *sql.Stmt
 }
 
 func (s *streamIDStatements) prepare(db *sql.DB) (err error) {
@@ -47,48 +44,29 @@ func (s *streamIDStatements) prepare(db *sql.DB) (err error) {
 	if s.increaseStreamIDStmt, err = db.Prepare(increaseStreamIDStmt); err != nil {
 		return
 	}
-	if s.selectStreamIDStmt, err = db.Prepare(selectStreamIDStmt); err != nil {
-		return
-	}
 	return
 }
 
 func (s *streamIDStatements) nextPDUID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
 	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
-	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
-	if _, err = increaseStmt.ExecContext(ctx, "global"); err != nil {
-		return
-	}
-	err = selectStmt.QueryRowContext(ctx, "global").Scan(&pos)
+	err = increaseStmt.QueryRowContext(ctx, "global").Scan(&pos)
 	return
 }
 
 func (s *streamIDStatements) nextReceiptID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
 	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
-	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
-	if _, err = increaseStmt.ExecContext(ctx, "receipt"); err != nil {
-		return
-	}
-	err = selectStmt.QueryRowContext(ctx, "receipt").Scan(&pos)
+	err = increaseStmt.QueryRowContext(ctx, "receipt").Scan(&pos)
 	return
 }
 
 func (s *streamIDStatements) nextInviteID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
 	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
-	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
-	if _, err = increaseStmt.ExecContext(ctx, "invite"); err != nil {
-		return
-	}
-	err = selectStmt.QueryRowContext(ctx, "invite").Scan(&pos)
+	err = increaseStmt.QueryRowContext(ctx, "invite").Scan(&pos)
 	return
 }
 
 func (s *streamIDStatements) nextAccountDataID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
 	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
-	selectStmt := sqlutil.TxStmt(txn, s.selectStreamIDStmt)
-	if _, err = increaseStmt.ExecContext(ctx, "accountdata"); err != nil {
-		return
-	}
-	err = selectStmt.QueryRowContext(ctx, "accountdata").Scan(&pos)
+	err = increaseStmt.QueryRowContext(ctx, "accountdata").Scan(&pos)
 	return
 }

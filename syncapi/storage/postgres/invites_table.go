@@ -52,7 +52,7 @@ const insertInviteEventSQL = "" +
 	") VALUES ($1, $2, $3, $4, FALSE) RETURNING id"
 
 const deleteInviteEventSQL = "" +
-	"UPDATE syncapi_invite_events SET deleted=TRUE, id=nextval('syncapi_stream_id') WHERE event_id = $1 RETURNING id"
+	"UPDATE syncapi_invite_events SET deleted=TRUE, id=nextval('syncapi_stream_id') WHERE event_id = $1 AND deleted=FALSE RETURNING id"
 
 const selectInviteEventsInRangeSQL = "" +
 	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +

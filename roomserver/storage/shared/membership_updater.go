@@ -92,7 +92,7 @@ func (u *MembershipUpdater) IsKnock() bool {
 }
 
 // SetToInvite implements types.MembershipUpdater
-func (u *MembershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, error) {
+func (u *MembershipUpdater) SetToInvite(event *gomatrixserverlib.Event) (bool, error) {
 	var inserted bool
 	err := u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
 		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
@@ -106,7 +106,7 @@ func (u *MembershipUpdater) SetToInvite(event gomatrixserverlib.Event) (bool, er
 			return fmt.Errorf("u.d.InvitesTable.InsertInviteEvent: %w", err)
 		}
 		if u.membership != tables.MembershipStateInvite {
-			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, 0, false); err != nil {
+			if inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, 0, false); err != nil {
 				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 			}
 		}
@@ -142,7 +142,7 @@ func (u *MembershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 		}
 
 		if u.membership != tables.MembershipStateJoin || isUpdate {
-			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateJoin, nIDs[eventID], false); err != nil {
+			if _, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateJoin, nIDs[eventID], false); err != nil {
 				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 			}
 		}
@@ -176,7 +176,7 @@ func (u *MembershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 		}
 
 		if u.membership != tables.MembershipStateLeaveOrBan {
-			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateLeaveOrBan, nIDs[eventID], false); err != nil {
+			if _, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateLeaveOrBan, nIDs[eventID], false); err != nil {
 				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 			}
 		}
@@ -201,7 +201,7 @@ func (u *MembershipUpdater) SetToKnock(event *gomatrixserverlib.Event) (bool, er
 				return fmt.Errorf("u.d.EventNIDs: %w", err)
 			}
 
-			if err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateKnock, nIDs[event.EventID()], false); err != nil {
+			if inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateKnock, nIDs[event.EventID()], false); err != nil {
 				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 			}
 		}
