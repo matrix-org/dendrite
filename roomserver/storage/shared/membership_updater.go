@@ -26,12 +26,12 @@ func NewMembershipUpdater(
 	var targetUserNID types.EventStateKeyNID
 	var err error
 	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-		roomNID, err = d.assignRoomNID(ctx, txn, roomID, roomVersion)
+		roomNID, err = d.assignRoomNID(ctx, roomID, roomVersion)
 		if err != nil {
 			return err
 		}
 
-		targetUserNID, err = d.assignStateKeyNID(ctx, txn, targetUserID)
+		targetUserNID, err = d.assignStateKeyNID(ctx, targetUserID)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (u *MembershipUpdater) IsKnock() bool {
 func (u *MembershipUpdater) SetToInvite(event *gomatrixserverlib.Event) (bool, error) {
 	var inserted bool
 	err := u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, event.Sender())
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
@@ -120,7 +120,7 @@ func (u *MembershipUpdater) SetToJoin(senderUserID string, eventID string, isUpd
 	var inviteEventIDs []string
 
 	err := u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, senderUserID)
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, senderUserID)
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
@@ -158,7 +158,7 @@ func (u *MembershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 	var inviteEventIDs []string
 
 	err := u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, senderUserID)
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, senderUserID)
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
@@ -190,7 +190,7 @@ func (u *MembershipUpdater) SetToLeave(senderUserID string, eventID string) ([]s
 func (u *MembershipUpdater) SetToKnock(event *gomatrixserverlib.Event) (bool, error) {
 	var inserted bool
 	err := u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, event.Sender())
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
