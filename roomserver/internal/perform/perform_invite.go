@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -139,13 +140,15 @@ func (r *Inviter) PerformInvite(
 		// will never pass auth checks due to lacking room state, but we
 		// still need to tell the client about the invite so we can accept
 		// it, hence we return an output event to send to the sync api.
-		updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
+		var updater *shared.MembershipUpdater
+		updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
 		if err != nil {
 			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 		}
 
 		unwrapped := event.Unwrap()
-		outputUpdates, err := helpers.UpdateToInviteMembership(updater, unwrapped, nil, req.Event.RoomVersion)
+		var outputUpdates []api.OutputEvent
+		outputUpdates, err = helpers.UpdateToInviteMembership(updater, unwrapped, nil, req.Event.RoomVersion)
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 		}
