@@ -48,10 +48,11 @@ type messagesReq struct {
 }
 
 type messagesResp struct {
-	Start string                          `json:"start"`
-	End   string                          `json:"end"`
-	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
-	State []gomatrixserverlib.ClientEvent `json:"state"`
+	Start       string                          `json:"start"`
+	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
+	End         string                          `json:"end"`
+	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
+	State       []gomatrixserverlib.ClientEvent `json:"state"`
 }
 
 // OnIncomingMessagesRequest implements the /messages endpoint from the
@@ -89,6 +90,7 @@ func OnIncomingMessagesRequest(
 
 	// Extract parameters from the request's URL.
 	// Pagination tokens.
+	var fromStream *types.StreamingToken
 	fromQuery := req.URL.Query().Get("from")
 	toQuery := req.URL.Query().Get("to")
 	emptyFromSupplied := fromQuery == ""
@@ -120,6 +122,7 @@ func OnIncomingMessagesRequest(
 				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
 			}
 		} else {
+			fromStream = &streamToken
 			from, err = db.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
 			if err != nil {
 				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
@@ -225,6 +228,9 @@ func OnIncomingMessagesRequest(
 		Start: start.String(),
 		End:   end.String(),
 		State: state,
+	}
+	if fromStream != nil {
+		res.StartStream = fromStream.String()
 	}
 
 	// Respond with the events.
