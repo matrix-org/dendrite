@@ -99,7 +99,7 @@ func main() {
 		}
 	}
 
-	b := base.NewBaseDendrite(cfg, "create-account")
+	b := base.NewBaseDendrite(cfg, "Monolith")
 	accountDB := b.CreateAccountsDB()
 
 	accType := api.AccountTypeUser
