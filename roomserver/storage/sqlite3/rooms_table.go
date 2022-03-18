@@ -43,7 +43,8 @@ const roomsSchema = `
 // Same as insertEventTypeNIDSQL
 const insertRoomNIDSQL = `
 	INSERT INTO roomserver_rooms (room_id, room_version) VALUES ($1, $2)
-	  ON CONFLICT DO NOTHING;
+	  ON CONFLICT DO NOTHING
+	  RETURNING room_nid;
 `
 
 const selectRoomNIDSQL = "" +
@@ -151,13 +152,8 @@ func (s *roomStatements) InsertRoomNID(
 	roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (roomNID types.RoomNID, err error) {
 	insertStmt := sqlutil.TxStmt(txn, s.insertRoomNIDStmt)
-	_, err = insertStmt.ExecContext(ctx, roomID, roomVersion)
-	if err != nil {
-		return 0, fmt.Errorf("insertStmt.ExecContext: %w", err)
-	}
-	roomNID, err = s.SelectRoomNID(ctx, txn, roomID)
-	if err != nil {
-		return 0, fmt.Errorf("s.SelectRoomNID: %w", err)
+	if err = insertStmt.QueryRowContext(ctx, roomID, roomVersion).Scan(&roomNID); err != nil {
+		return 0, fmt.Errorf("resultStmt.QueryRowContext.Scan: %w", err)
 	}
 	return
 }

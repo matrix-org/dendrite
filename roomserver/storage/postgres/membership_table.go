@@ -276,11 +276,15 @@ func (s *membershipStatements) UpdateMembership(
 	ctx context.Context, txn *sql.Tx,
 	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, senderUserNID types.EventStateKeyNID, membership tables.MembershipState,
 	eventNID types.EventNID, forgotten bool,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.updateMembershipStmt).ExecContext(
+) (bool, error) {
+	res, err := sqlutil.TxStmt(txn, s.updateMembershipStmt).ExecContext(
 		ctx, roomNID, targetUserNID, senderUserNID, membership, eventNID, forgotten,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	rows, err := res.RowsAffected()
+	return rows > 0, err
 }
 
 func (s *membershipStatements) SelectRoomsWithMembership(
