@@ -26,7 +26,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/lucas-clemente/quic-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/neilalexander/utp"
 
@@ -44,7 +43,6 @@ type Node struct {
 	config    *yggdrasilconfig.NodeConfig
 	multicast *yggdrasilmulticast.Multicast
 	log       *gologme.Logger
-	listener  quic.Listener
 	utpSocket *utp.Socket
 	incoming  chan net.Conn
 }

@@ -59,7 +59,7 @@ func NewInternalAPI(
 			},
 		},
 	}
-	js := jetstream.Prepare(&base.Cfg.Global.JetStream)
+	js, _ := jetstream.Prepare(&base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)

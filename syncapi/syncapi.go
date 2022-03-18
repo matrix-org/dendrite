@@ -49,7 +49,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	js := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
