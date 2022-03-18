@@ -81,7 +81,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	pass, err := getPassword(password, pwdFile, pwdStdin, os.Stdin)
+	if len(fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName)) > 255 {
+		logrus.Fatalln("Username can not be longer than 255 characters.")
+	}
+
+	pass, err := getPassword(*password, *pwdFile, *pwdStdin, os.Stdin)
 	if err != nil {
 		logrus.Fatalln(err)
 	}
@@ -124,10 +128,10 @@ func main() {
 	logrus.Infoln("Created account", *username)
 }
 
-func getPassword(password, pwdFile *string, pwdStdin *bool, r io.Reader) (string, error) {
+func getPassword(password, pwdFile string, pwdStdin bool, r io.Reader) (string, error) {
 	// read password from file
-	if *pwdFile != "" {
-		pw, err := ioutil.ReadFile(*pwdFile)
+	if pwdFile != "" {
+		pw, err := ioutil.ReadFile(pwdFile)
 		if err != nil {
 			return "", fmt.Errorf("Unable to read password from file: %v", err)
 		}
@@ -135,7 +139,7 @@ func getPassword(password, pwdFile *string, pwdStdin *bool, r io.Reader) (string
 	}
 
 	// read password from stdin
-	if *pwdStdin {
+	if pwdStdin {
 		data, err := ioutil.ReadAll(r)
 		if err != nil {
 			return "", fmt.Errorf("Unable to read password from stdin: %v", err)
@@ -143,7 +147,7 @@ func getPassword(password, pwdFile *string, pwdStdin *bool, r io.Reader) (string
 		return strings.TrimSpace(string(data)), nil
 	}
 
-	if *password == "" && *pwdFile == "" && !*pwdStdin {
+	if password == "" && pwdFile == "" && !pwdStdin {
 		// If no parameter was set, ask the user to provide the password
 		fmt.Print("Enter Password: ")
 		bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
@@ -162,5 +166,5 @@ func getPassword(password, pwdFile *string, pwdStdin *bool, r io.Reader) (string
 		}
 		return strings.TrimSpace(string(bytePassword)), nil
 	}
-	return *password, nil
+	return password, nil
 }

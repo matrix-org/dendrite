@@ -8,18 +8,14 @@ import (
 
 func Test_getPassword(t *testing.T) {
 	type args struct {
-		password *string
-		pwdFile  *string
-		pwdStdin *bool
+		password string
+		pwdFile  string
+		pwdStdin bool
 		reader   io.Reader
-		writer   func()
 	}
 
 	pass := "mySecretPass"
-	empty := ""
-	f := false
 	passwordFile := "testdata/my.pass"
-	passwordStdin := true
 	reader := &bytes.Buffer{}
 	_, err := reader.WriteString(pass)
 	if err != nil {
@@ -34,37 +30,28 @@ func Test_getPassword(t *testing.T) {
 		{
 			name: "password defined",
 			args: args{
-				password: &pass,
-				pwdFile:  &empty,
-				pwdStdin: &f,
+				password: pass,
 			},
 			want: pass,
 		},
 		{
 			name: "pwdFile defined",
 			args: args{
-				pwdFile:  &passwordFile,
-				password: &empty,
-				pwdStdin: &f,
+				pwdFile: passwordFile,
 			},
 			want: pass,
 		},
 		{
 			name: "read pass from stdin defined",
 			args: args{
-				pwdStdin: &passwordStdin,
+				pwdStdin: true,
 				reader:   reader,
-				password: &empty,
-				pwdFile:  &empty,
 			},
 			want: pass,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.args.writer != nil {
-				go tt.args.writer()
-			}
 			got, err := getPassword(tt.args.password, tt.args.pwdFile, tt.args.pwdStdin, tt.args.reader)
 			if !tt.wantErr && err != nil {
 				t.Errorf("expected no error, but got %v", err)
