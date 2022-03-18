@@ -11,11 +11,13 @@ func Test_getPassword(t *testing.T) {
 		password *string
 		pwdFile  *string
 		pwdStdin *bool
-		askPass  *bool
 		reader   io.Reader
+		writer   func()
 	}
 
 	pass := "mySecretPass"
+	empty := ""
+	f := false
 	passwordFile := "testdata/my.pass"
 	passwordStdin := true
 	reader := &bytes.Buffer{}
@@ -24,23 +26,27 @@ func Test_getPassword(t *testing.T) {
 		t.Errorf("unable to write to buffer: %+v", err)
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		args    args
+		want    string
+		wantErr bool
 	}{
 		{
-			name: "no password defined",
-			args: args{},
-			want: "",
-		},
-		{
 			name: "password defined",
-			args: args{password: &pass},
+			args: args{
+				password: &pass,
+				pwdFile:  &empty,
+				pwdStdin: &f,
+			},
 			want: pass,
 		},
 		{
 			name: "pwdFile defined",
-			args: args{pwdFile: &passwordFile},
+			args: args{
+				pwdFile:  &passwordFile,
+				password: &empty,
+				pwdStdin: &f,
+			},
 			want: pass,
 		},
 		{
@@ -48,13 +54,22 @@ func Test_getPassword(t *testing.T) {
 			args: args{
 				pwdStdin: &passwordStdin,
 				reader:   reader,
+				password: &empty,
+				pwdFile:  &empty,
 			},
 			want: pass,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getPassword(tt.args.password, tt.args.pwdFile, tt.args.pwdStdin, tt.args.askPass, tt.args.reader); got != tt.want {
+			if tt.args.writer != nil {
+				go tt.args.writer()
+			}
+			got, err := getPassword(tt.args.password, tt.args.pwdFile, tt.args.pwdStdin, tt.args.reader)
+			if !tt.wantErr && err != nil {
+				t.Errorf("expected no error, but got %v", err)
+			}
+			if got != tt.want {
 				t.Errorf("getPassword() = '%v', want '%v'", got, tt.want)
 			}
 		})
