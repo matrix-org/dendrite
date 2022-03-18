@@ -42,6 +42,11 @@ func Test_getPassword(t *testing.T) {
 			want: pass,
 		},
 		{
+			name:    "pwdFile does not exist",
+			args:    args{pwdFile: "iDontExist"},
+			wantErr: true,
+		},
+		{
 			name: "read pass from stdin defined",
 			args: args{
 				pwdStdin: true,

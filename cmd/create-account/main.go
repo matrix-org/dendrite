@@ -58,6 +58,7 @@ var (
 	password           = flag.String("password", "", "The password to associate with the account")
 	pwdFile            = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
 	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
+	pwdLess            = flag.Bool("passwordless", false, "Create a passwordless account, e.g. if only an accesstoken is required")
 	isAdmin            = flag.Bool("admin", false, "Create an admin account")
 	resetPassword      = flag.Bool("reset-password", false, "Resets the password for the given username")
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
@@ -76,18 +77,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *pwdLess && *resetPassword {
+		logrus.Fatalf("Can not reset to an empty password, unable to login afterwards.")
+	}
+
 	if !validUsernameRegex.MatchString(*username) {
 		logrus.Warn("Username can only contain characters a-z, 0-9, or '_-./='")
 		os.Exit(1)
 	}
 
 	if len(fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName)) > 255 {
-		logrus.Fatalln("Username can not be longer than 255 characters.")
+		logrus.Fatalf("Username can not be longer than 255 characters: %s", fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName))
 	}
 
-	pass, err := getPassword(*password, *pwdFile, *pwdStdin, os.Stdin)
-	if err != nil {
-		logrus.Fatalln(err)
+	var pass string
+	var err error
+	if !*pwdLess {
+		pass, err = getPassword(*password, *pwdFile, *pwdStdin, os.Stdin)
+		if err != nil {
+			logrus.Fatalln(err)
+		}
 	}
 
 	b := base.NewBaseDendrite(cfg, "create-account")
@@ -147,24 +156,22 @@ func getPassword(password, pwdFile string, pwdStdin bool, r io.Reader) (string, 
 		return strings.TrimSpace(string(data)), nil
 	}
 
-	if password == "" && pwdFile == "" && !pwdStdin {
-		// If no parameter was set, ask the user to provide the password
-		fmt.Print("Enter Password: ")
-		bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
-		if err != nil {
-			return "", fmt.Errorf("Unable to read password: %v", err)
-		}
-		fmt.Println()
-		fmt.Print("Confirm Password: ")
-		bytePassword2, err := term.ReadPassword(int(os.Stdin.Fd()))
-		if err != nil {
-			return "", fmt.Errorf("Unable to read password: %v", err)
-		}
-		fmt.Println()
-		if strings.TrimSpace(string(bytePassword)) != strings.TrimSpace(string(bytePassword2)) {
-			return "", fmt.Errorf("Entered passwords don't match")
-		}
-		return strings.TrimSpace(string(bytePassword)), nil
+	// If no parameter was set, ask the user to provide the password
+	fmt.Print("Enter Password: ")
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("Unable to read password: %v", err)
 	}
-	return password, nil
+	fmt.Println()
+	fmt.Print("Confirm Password: ")
+	bytePassword2, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("Unable to read password: %v", err)
+	}
+	fmt.Println()
+	if strings.TrimSpace(string(bytePassword)) != strings.TrimSpace(string(bytePassword2)) {
+		return "", fmt.Errorf("Entered passwords don't match")
+	}
+	return strings.TrimSpace(string(bytePassword)), nil
+
 }
