@@ -157,21 +157,24 @@ func getPassword(password, pwdFile string, pwdStdin bool, r io.Reader) (string, 
 	}
 
 	// If no parameter was set, ask the user to provide the password
-	fmt.Print("Enter Password: ")
-	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
-	if err != nil {
-		return "", fmt.Errorf("Unable to read password: %v", err)
+	if password == "" {
+		fmt.Print("Enter Password: ")
+		bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return "", fmt.Errorf("Unable to read password: %v", err)
+		}
+		fmt.Println()
+		fmt.Print("Confirm Password: ")
+		bytePassword2, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return "", fmt.Errorf("Unable to read password: %v", err)
+		}
+		fmt.Println()
+		if strings.TrimSpace(string(bytePassword)) != strings.TrimSpace(string(bytePassword2)) {
+			return "", fmt.Errorf("Entered passwords don't match")
+		}
+		return strings.TrimSpace(string(bytePassword)), nil
 	}
-	fmt.Println()
-	fmt.Print("Confirm Password: ")
-	bytePassword2, err := term.ReadPassword(int(os.Stdin.Fd()))
-	if err != nil {
-		return "", fmt.Errorf("Unable to read password: %v", err)
-	}
-	fmt.Println()
-	if strings.TrimSpace(string(bytePassword)) != strings.TrimSpace(string(bytePassword2)) {
-		return "", fmt.Errorf("Entered passwords don't match")
-	}
-	return strings.TrimSpace(string(bytePassword)), nil
 
+	return password, nil
 }
