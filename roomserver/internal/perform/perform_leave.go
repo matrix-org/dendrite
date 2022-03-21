@@ -91,12 +91,12 @@ func (r *Leaver) performLeaveRoomByID(
 		}
 		// check that this is not a "server notice room"
 		accData := &userapi.QueryAccountDataResponse{}
-		if err := r.UserAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
+		if err = r.UserAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
 			UserID:   req.UserID,
 			RoomID:   req.RoomID,
 			DataType: "m.tag",
 		}, accData); err != nil {
-			return nil, fmt.Errorf("unable to query account data")
+			return nil, fmt.Errorf("unable to query account data: %w", err)
 		}
 
 		if roomData, ok := accData.RoomAccountData[req.RoomID]; ok {

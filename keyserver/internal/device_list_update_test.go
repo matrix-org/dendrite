@@ -46,7 +46,7 @@ func (p *mockKeyChangeProducer) ProduceKeyChanges(keys []api.DeviceMessage) erro
 
 type mockDeviceListUpdaterDatabase struct {
 	staleUsers   map[string]bool
-	prevIDsExist func(string, []int) bool
+	prevIDsExist func(string, []int64) bool
 	storedKeys   []api.DeviceMessage
 	mu           sync.Mutex // protect staleUsers
 }
@@ -101,7 +101,7 @@ func (d *mockDeviceListUpdaterDatabase) StoreRemoteDeviceKeys(ctx context.Contex
 }
 
 // PrevIDsExists returns true if all prev IDs exist for this user.
-func (d *mockDeviceListUpdaterDatabase) PrevIDsExists(ctx context.Context, userID string, prevIDs []int) (bool, error) {
+func (d *mockDeviceListUpdaterDatabase) PrevIDsExists(ctx context.Context, userID string, prevIDs []int64) (bool, error) {
 	return d.prevIDsExist(userID, prevIDs), nil
 }
 
@@ -139,7 +139,7 @@ func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrix
 func TestUpdateHavePrevID(t *testing.T) {
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
-		prevIDsExist: func(string, []int) bool {
+		prevIDsExist: func(string, []int64) bool {
 			return true
 		},
 	}
@@ -151,7 +151,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 		Deleted:           false,
 		DeviceID:          "FOO",
 		Keys:              []byte(`{"key":"value"}`),
-		PrevID:            []int{0},
+		PrevID:            []int64{0},
 		StreamID:          1,
 		UserID:            "@alice:localhost",
 	}
@@ -185,7 +185,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 func TestUpdateNoPrevID(t *testing.T) {
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
-		prevIDsExist: func(string, []int) bool {
+		prevIDsExist: func(string, []int64) bool {
 			return false
 		},
 	}
@@ -226,7 +226,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 		Deleted:           false,
 		DeviceID:          "another_device_id",
 		Keys:              []byte(`{"key":"value"}`),
-		PrevID:            []int{3},
+		PrevID:            []int64{3},
 		StreamID:          4,
 		UserID:            remoteUserID,
 	}
@@ -268,7 +268,7 @@ func TestDebounce(t *testing.T) {
 	t.Skipf("panic on closed channel on GHA")
 	db := &mockDeviceListUpdaterDatabase{
 		staleUsers: make(map[string]bool),
-		prevIDsExist: func(string, []int) bool {
+		prevIDsExist: func(string, []int64) bool {
 			return true
 		},
 	}

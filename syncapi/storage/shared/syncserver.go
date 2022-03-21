@@ -155,37 +155,6 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
-// GetEventsInStreamingRange retrieves all of the events on a given ordering using the
-// given extremities and limit.
-func (d *Database) GetEventsInStreamingRange(
-	ctx context.Context,
-	from, to *types.StreamingToken,
-	roomID string, eventFilter *gomatrixserverlib.RoomEventFilter,
-	backwardOrdering bool,
-) (events []types.StreamEvent, err error) {
-	r := types.Range{
-		From:      from.PDUPosition,
-		To:        to.PDUPosition,
-		Backwards: backwardOrdering,
-	}
-	if backwardOrdering {
-		// When using backward ordering, we want the most recent events first.
-		if events, _, err = d.OutputEvents.SelectRecentEvents(
-			ctx, nil, roomID, r, eventFilter, false, false,
-		); err != nil {
-			return
-		}
-	} else {
-		// When using forward ordering, we want the least recent events first.
-		if events, err = d.OutputEvents.SelectEarlyEvents(
-			ctx, nil, roomID, r, eventFilter,
-		); err != nil {
-			return
-		}
-	}
-	return events, err
-}
-
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
@@ -513,6 +482,26 @@ func (d *Database) EventPositionInTopology(
 	return types.TopologyToken{Depth: depth, PDUPosition: stream}, nil
 }
 
+func (d *Database) StreamToTopologicalPosition(
+	ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
+) (types.TopologyToken, error) {
+	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, nil, roomID, streamPos, backwardOrdering)
+	switch {
+	case err == sql.ErrNoRows && backwardOrdering: // no events in range, going backward
+		return types.TopologyToken{PDUPosition: streamPos}, nil
+	case err == sql.ErrNoRows && !backwardOrdering: // no events in range, going forward
+		topoPos, streamPos, err = d.Topology.SelectMaxPositionInTopology(ctx, nil, roomID)
+		if err != nil {
+			return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectMaxPositionInTopology: %w", err)
+		}
+		return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
+	case err != nil: // some other error happened
+		return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectStreamToTopologicalPosition: %w", err)
+	default:
+		return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
+	}
+}
+
 func (d *Database) GetFilter(
 	ctx context.Context, localpart string, filterID string,
 ) (*gomatrixserverlib.Filter, error) {
@@ -689,10 +678,26 @@ func (d *Database) GetStateDeltas(
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
+	// Look up all memberships for the user. We only care about rooms that a
+	// user has ever interacted with — joined to, kicked/banned from, left.
+	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	allRoomIDs := make([]string, 0, len(memberships))
+	joinedRoomIDs := make([]string, 0, len(memberships))
+	for roomID, membership := range memberships {
+		allRoomIDs = append(allRoomIDs, roomID)
+		if membership == gomatrixserverlib.Join {
+			joinedRoomIDs = append(joinedRoomIDs, roomID)
+		}
+	}
+
 	var deltas []types.StateDelta
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
+	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -760,10 +765,6 @@ func (d *Database) GetStateDeltas(
 	}
 
 	// Add in currently joined rooms
-	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
-	if err != nil {
-		return nil, nil, err
-	}
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  gomatrixserverlib.Join,
@@ -792,6 +793,22 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
 
+	// Look up all memberships for the user. We only care about rooms that a
+	// user has ever interacted with — joined to, kicked/banned from, left.
+	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	allRoomIDs := make([]string, 0, len(memberships))
+	joinedRoomIDs := make([]string, 0, len(memberships))
+	for roomID, membership := range memberships {
+		allRoomIDs = append(allRoomIDs, roomID)
+		if membership == gomatrixserverlib.Join {
+			joinedRoomIDs = append(joinedRoomIDs, roomID)
+		}
+	}
+
 	// Use a reasonable initial capacity
 	deltas := make(map[string]types.StateDelta)
 
@@ -816,7 +833,7 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	}
 
 	// Get all the state events ever between these two positions
-	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter)
+	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -840,11 +857,6 @@ func (d *Database) GetStateDeltasForFullStateSync(
 				break
 			}
 		}
-	}
-
-	joinedRoomIDs, err := d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, txn, userID, gomatrixserverlib.Join)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	// Add full states for all joined rooms

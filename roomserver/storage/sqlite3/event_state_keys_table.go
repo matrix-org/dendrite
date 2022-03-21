@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -39,7 +40,8 @@ const eventStateKeysSchema = `
 // Same as insertEventTypeNIDSQL
 const insertEventStateKeyNIDSQL = `
 	INSERT INTO roomserver_event_state_keys (event_state_key) VALUES ($1)
-	  ON CONFLICT DO NOTHING;
+	  ON CONFLICT DO NOTHING
+	  RETURNING event_state_key_nid;
 `
 
 const selectEventStateKeyNIDSQL = `
@@ -89,17 +91,12 @@ func prepareEventStateKeysTable(db *sql.DB) (tables.EventStateKeys, error) {
 
 func (s *eventStateKeyStatements) InsertEventStateKeyNID(
 	ctx context.Context, txn *sql.Tx, eventStateKey string,
-) (types.EventStateKeyNID, error) {
+) (eventStateKeyNID types.EventStateKeyNID, err error) {
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventStateKeyNIDStmt)
-	res, err := insertStmt.ExecContext(ctx, eventStateKey)
-	if err != nil {
-		return 0, err
+	if err := insertStmt.QueryRowContext(ctx, eventStateKey).Scan(&eventStateKeyNID); err != nil {
+		return 0, fmt.Errorf("resultStmt.QueryRowContext.Scan: %w", err)
 	}
-	eventStateKeyNID, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-	return types.EventStateKeyNID(eventStateKeyNID), err
+	return
 }
 
 func (s *eventStateKeyStatements) SelectEventStateKeyNID(

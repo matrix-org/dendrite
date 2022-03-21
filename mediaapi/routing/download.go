@@ -556,7 +556,8 @@ func (r *downloadRequest) getRemoteFile(
 				cfg.MaxThumbnailGenerators,
 			)
 			if err != nil {
-				return fmt.Errorf("r.fetchRemoteFileAndStoreMetadata: %w", err)
+				r.Logger.WithError(err).Errorf("r.fetchRemoteFileAndStoreMetadata: failed to fetch remote file")
+				return err
 			}
 		} else {
 			// If we have a record, we can respond from the local file
@@ -720,13 +721,12 @@ func (r *downloadRequest) fetchRemoteFile(
 	r.Logger.Debug("Fetching remote file")
 
 	// create request for remote file
-	resp, err := r.createRemoteRequest(ctx, client)
-	if err != nil {
-		return "", false, err
-	}
-	if resp == nil {
-		// Remote file not found
-		return "", false, nil
+	resp, err := client.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
+	if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return "", false, fmt.Errorf("File with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
+		}
+		return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 	}
 	defer resp.Body.Close() // nolint: errcheck
 
@@ -795,25 +795,4 @@ func (r *downloadRequest) fetchRemoteFile(
 	}
 
 	return types.Path(finalPath), duplicate, nil
-}
-
-func (r *downloadRequest) createRemoteRequest(
-	ctx context.Context, matrixClient *gomatrixserverlib.Client,
-) (*http.Response, error) {
-	resp, err := matrixClient.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
-	if err != nil {
-		return nil, fmt.Errorf("file with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
-			return nil, nil
-		}
-		r.Logger.WithFields(log.Fields{
-			"StatusCode": resp.StatusCode,
-		}).Warn("Received error response")
-		return nil, fmt.Errorf("file with media ID %q could not be downloaded from %q", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
-	}
-
-	return resp, nil
 }
