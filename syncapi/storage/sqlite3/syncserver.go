@@ -28,9 +28,8 @@ import (
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
-	sqlutil.PartitionOffsetStatements
+	db       *sql.DB
+	writer   sqlutil.Writer
 	streamID streamIDStatements
 }
 
@@ -50,9 +49,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 }
 
 func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
-		return err
-	}
 	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}
