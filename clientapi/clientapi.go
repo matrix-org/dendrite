@@ -27,6 +27,7 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -34,6 +35,7 @@ import (
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
+	process *process.ProcessContext,
 	router *mux.Router,
 	synapseAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
@@ -49,7 +51,7 @@ func AddPublicRoutes(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
-	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream: js,
