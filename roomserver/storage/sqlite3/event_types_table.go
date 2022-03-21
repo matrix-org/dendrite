@@ -57,12 +57,8 @@ const eventTypesSchema = `
 // to the indexes.
 const insertEventTypeNIDSQL = `
 	INSERT INTO roomserver_event_types (event_type) VALUES ($1)
-	  ON CONFLICT DO NOTHING;
-`
-
-const insertEventTypeNIDResultSQL = `
-	SELECT event_type_nid FROM roomserver_event_types
-		WHERE rowid = last_insert_rowid();
+	  ON CONFLICT DO NOTHING
+	  RETURNING event_type_nid;
 `
 
 const selectEventTypeNIDSQL = `
@@ -77,11 +73,10 @@ const bulkSelectEventTypeNIDSQL = `
 `
 
 type eventTypeStatements struct {
-	db                           *sql.DB
-	insertEventTypeNIDStmt       *sql.Stmt
-	insertEventTypeNIDResultStmt *sql.Stmt
-	selectEventTypeNIDStmt       *sql.Stmt
-	bulkSelectEventTypeNIDStmt   *sql.Stmt
+	db                         *sql.DB
+	insertEventTypeNIDStmt     *sql.Stmt
+	selectEventTypeNIDStmt     *sql.Stmt
+	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
 func createEventTypesTable(db *sql.DB) error {
@@ -96,7 +91,6 @@ func prepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 
 	return s, sqlutil.StatementList{
 		{&s.insertEventTypeNIDStmt, insertEventTypeNIDSQL},
-		{&s.insertEventTypeNIDResultStmt, insertEventTypeNIDResultSQL},
 		{&s.selectEventTypeNIDStmt, selectEventTypeNIDSQL},
 		{&s.bulkSelectEventTypeNIDStmt, bulkSelectEventTypeNIDSQL},
 	}.Prepare(db)
@@ -104,18 +98,12 @@ func prepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 
 func (s *eventTypeStatements) InsertEventTypeNID(
 	ctx context.Context, txn *sql.Tx, eventType string,
-) (types.EventTypeNID, error) {
-	var eventTypeNID int64
+) (eventTypeNID types.EventTypeNID, err error) {
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDStmt)
-	resultStmt := sqlutil.TxStmt(txn, s.insertEventTypeNIDResultStmt)
-	_, err := insertStmt.ExecContext(ctx, eventType)
-	if err != nil {
-		return 0, fmt.Errorf("insertStmt.ExecContext: %w", err)
-	}
-	if err = resultStmt.QueryRowContext(ctx).Scan(&eventTypeNID); err != nil {
+	if err = insertStmt.QueryRowContext(ctx, eventType).Scan(&eventTypeNID); err != nil {
 		return 0, fmt.Errorf("resultStmt.QueryRowContext.Scan: %w", err)
 	}
-	return types.EventTypeNID(eventTypeNID), err
+	return
 }
 
 func (s *eventTypeStatements) SelectEventTypeNID(

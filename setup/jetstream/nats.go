@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
@@ -15,7 +16,7 @@ import (
 var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
 
-func Prepare(cfg *config.JetStream) natsclient.JetStreamContext {
+func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
 		return setupNATS(cfg, nil)
@@ -35,7 +36,16 @@ func Prepare(cfg *config.JetStream) natsclient.JetStreamContext {
 			panic(err)
 		}
 		natsServer.ConfigureLogger()
-		go natsServer.Start()
+		go func() {
+			process.ComponentStarted()
+			natsServer.Start()
+		}()
+		go func() {
+			<-process.WaitForShutdown()
+			natsServer.Shutdown()
+			natsServer.WaitForShutdown()
+			process.ComponentFinished()
+		}()
 	}
 	natsServerMutex.Unlock()
 	if !natsServer.ReadyForConnections(time.Second * 10) {
@@ -48,20 +58,20 @@ func Prepare(cfg *config.JetStream) natsclient.JetStreamContext {
 	return setupNATS(cfg, nc)
 }
 
-func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) natsclient.JetStreamContext {
+func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	if nc == nil {
 		var err error
 		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","))
 		if err != nil {
 			logrus.WithError(err).Panic("Unable to connect to NATS")
-			return nil
+			return nil, nil
 		}
 	}
 
 	s, err := nc.JetStream()
 	if err != nil {
 		logrus.WithError(err).Panic("Unable to get JetStream context")
-		return nil
+		return nil, nil
 	}
 
 	for _, stream := range streams { // streams are defined in streams.go
@@ -89,5 +99,5 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) natsclient.JetStreamC
 		}
 	}
 
-	return s
+	return s, nc
 }
