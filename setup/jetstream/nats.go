@@ -75,7 +75,7 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 	}
 
 	for _, stream := range streams { // streams are defined in streams.go
-		name := cfg.TopicFor(stream.Name)
+		name := cfg.Prefixed(stream.Name)
 		info, err := s.StreamInfo(name)
 		if err != nil && err != natsclient.ErrStreamNotFound {
 			logrus.WithError(err).Fatal("Unable to get stream info")

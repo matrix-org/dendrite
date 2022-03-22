@@ -67,18 +67,18 @@ func AddPublicRoutes(
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputStreamEvent),
+		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputStreamEvent),
 	}
 
 	userAPIReadUpdateProducer := &producers.UserAPIReadProducer{
 		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputReadUpdate),
+		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
 	}
 
 	_ = userAPIReadUpdateProducer
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		process, cfg, cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
+		process, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		js, keyAPI, rsAPI, syncDB, notifier,
 		streams.DeviceListStreamProvider,
 	)

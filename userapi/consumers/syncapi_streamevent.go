@@ -54,7 +54,7 @@ func NewOutputStreamEventConsumer(
 		jetstream:    js,
 		db:           store,
 		durable:      cfg.Matrix.JetStream.Durable("UserAPISyncAPIStreamEventConsumer"),
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputStreamEvent),
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputStreamEvent),
 		pgClient:     pgClient,
 		userAPI:      userAPI,
 		rsAPI:        rsAPI,

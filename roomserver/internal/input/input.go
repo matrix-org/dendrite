@@ -78,26 +78,21 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 	})
 	w := v.(*worker)
 	if !loaded {
-		consumer := "DendriteRoomInputConsumerPull" + jetstream.Tokenise(w.roomID)
+		consumer := r.Cfg.Matrix.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(w.roomID))
 		subject := jetstream.InputRoomEventSubj(w.roomID)
 
-		if info, err := w.r.JetStream.ConsumerInfo(
-			jetstream.InputRoomEvent,
-			consumer,
-		); err != nil || info == nil {
-			if _, err := w.r.JetStream.AddConsumer(
-				r.Cfg.Matrix.JetStream.TopicFor(jetstream.InputRoomEvent),
-				&nats.ConsumerConfig{
-					Durable:       consumer,
-					AckPolicy:     nats.AckExplicitPolicy,
-					DeliverPolicy: nats.DeliverAllPolicy,
-					FilterSubject: subject,
-					AckWait:       MaximumMissingProcessingTime + (time.Second * 10),
-				},
-			); err != nil {
-				logrus.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
-				return
-			}
+		if _, err := w.r.JetStream.AddConsumer(
+			r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
+			&nats.ConsumerConfig{
+				Durable:       consumer,
+				AckPolicy:     nats.AckAllPolicy,
+				DeliverPolicy: nats.DeliverAllPolicy,
+				FilterSubject: subject,
+				AckWait:       MaximumMissingProcessingTime + (time.Second * 10),
+			},
+		); err != nil {
+			logrus.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
+			return
 		}
 
 		sub, err := w.r.JetStream.PullSubscribe(
