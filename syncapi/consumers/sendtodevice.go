@@ -75,20 +75,21 @@ func (s *OutputSendToDeviceEventConsumer) Start() error {
 }
 
 func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
-	var output api.OutputSendToDeviceEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU server output log: message parse failure")
-		sentry.CaptureException(err)
-		return true
-	}
-
-	_, domain, err := gomatrixserverlib.SplitID('@', output.UserID)
+	userID := msg.Header.Get(jetstream.UserID)
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		sentry.CaptureException(err)
 		return true
 	}
 	if domain != s.serverName {
+		return true
+	}
+
+	var output api.OutputSendToDeviceEvent
+	if err := json.Unmarshal(msg.Data, &output); err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return true
 	}
 

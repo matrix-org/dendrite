@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -28,9 +30,12 @@ import (
 
 // SyncAPIProducer produces events for the sync API server to consume
 type SyncAPIProducer struct {
-	TopicClientData   string
-	TopicReceiptEvent string
-	JetStream         nats.JetStreamContext
+	TopicClientData        string
+	TopicReceiptEvent      string
+	TopicSendToDeviceEvent string
+	JetStream              nats.JetStreamContext
+	ServerName             gomatrixserverlib.ServerName
+	UserAPI                userapi.UserInternalAPI
 }
 
 // SendData sends account data to the sync API server
@@ -79,4 +84,75 @@ func (p *SyncAPIProducer) SendReceipt(
 	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
+}
+
+func (p *SyncAPIProducer) SendToDevice(
+	ctx context.Context, sender, userID, deviceID, eventType string,
+	message interface{},
+) error {
+	devices := []string{}
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return err
+	}
+
+	// If the event is targeted locally then we want to expand the wildcard
+	// out into individual device IDs so that we can send them to each respective
+	// device. If the event isn't targeted locally then we can't expand the
+	// wildcard as we don't know about the remote devices, so instead we leave it
+	// as-is, so that the federation sender can send it on with the wildcard intact.
+	if domain == p.ServerName && deviceID == "*" {
+		var res userapi.QueryDevicesResponse
+		err = p.UserAPI.QueryDevices(context.TODO(), &userapi.QueryDevicesRequest{
+			UserID: userID,
+		}, &res)
+		if err != nil {
+			return err
+		}
+		for _, dev := range res.Devices {
+			devices = append(devices, dev.ID)
+		}
+	} else {
+		devices = append(devices, deviceID)
+	}
+
+	js, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"user_id":     userID,
+		"num_devices": len(devices),
+		"type":        eventType,
+	}).Tracef("Producing to topic '%s'", p.TopicSendToDeviceEvent)
+	for _, device := range devices {
+		ote := &api.OutputSendToDeviceEvent{
+			UserID:   userID,
+			DeviceID: device,
+			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
+				Sender:  sender,
+				Type:    eventType,
+				Content: js,
+			},
+		}
+
+		eventJSON, err := json.Marshal(ote)
+		if err != nil {
+			log.WithError(err).Error("sendToDevice failed json.Marshal")
+			return err
+		}
+		m := &nats.Msg{
+			Subject: p.TopicSendToDeviceEvent,
+			Data:    eventJSON,
+			Header:  nats.Header{},
+		}
+		m.Header.Set("sender", sender)
+		m.Header.Set(jetstream.UserID, userID)
+		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
+			log.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
+			return err
+		}
+	}
+	return nil
 }

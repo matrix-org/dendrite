@@ -35,8 +35,6 @@ type EDUServerInputAPI struct {
 	Cache *cache.EDUCache
 	// The kafka topic to output new typing events to.
 	OutputTypingEventTopic string
-	// The kafka topic to output new send to device events to.
-	OutputSendToDeviceEventTopic string
 	// kafka producer
 	JetStream nats.JetStreamContext
 	// Internal user query API
@@ -63,16 +61,6 @@ func (t *EDUServerInputAPI) InputTypingEvent(
 	}
 
 	return t.sendTypingEvent(ite)
-}
-
-// InputTypingEvent implements api.EDUServerInputAPI
-func (t *EDUServerInputAPI) InputSendToDeviceEvent(
-	ctx context.Context,
-	request *api.InputSendToDeviceEventRequest,
-	response *api.InputSendToDeviceEventResponse,
-) error {
-	ise := &request.InputSendToDeviceEvent
-	return t.sendToDeviceEvent(ise)
 }
 
 func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
@@ -109,61 +97,4 @@ func (t *EDUServerInputAPI) sendTypingEvent(ite *api.InputTypingEvent) error {
 		Data:    eventJSON,
 	})
 	return err
-}
-
-func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) error {
-	devices := []string{}
-	_, domain, err := gomatrixserverlib.SplitID('@', ise.UserID)
-	if err != nil {
-		return err
-	}
-
-	// If the event is targeted locally then we want to expand the wildcard
-	// out into individual device IDs so that we can send them to each respective
-	// device. If the event isn't targeted locally then we can't expand the
-	// wildcard as we don't know about the remote devices, so instead we leave it
-	// as-is, so that the federation sender can send it on with the wildcard intact.
-	if domain == t.ServerName && ise.DeviceID == "*" {
-		var res userapi.QueryDevicesResponse
-		err = t.UserAPI.QueryDevices(context.TODO(), &userapi.QueryDevicesRequest{
-			UserID: ise.UserID,
-		}, &res)
-		if err != nil {
-			return err
-		}
-		for _, dev := range res.Devices {
-			devices = append(devices, dev.ID)
-		}
-	} else {
-		devices = append(devices, ise.DeviceID)
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"user_id":     ise.UserID,
-		"num_devices": len(devices),
-		"type":        ise.Type,
-	}).Tracef("Producing to topic '%s'", t.OutputSendToDeviceEventTopic)
-	for _, device := range devices {
-		ote := &api.OutputSendToDeviceEvent{
-			UserID:            ise.UserID,
-			DeviceID:          device,
-			SendToDeviceEvent: ise.SendToDeviceEvent,
-		}
-
-		eventJSON, err := json.Marshal(ote)
-		if err != nil {
-			logrus.WithError(err).Error("sendToDevice failed json.Marshal")
-			return err
-		}
-
-		if _, err = t.JetStream.PublishMsg(&nats.Msg{
-			Subject: t.OutputSendToDeviceEventTopic,
-			Data:    eventJSON,
-		}); err != nil {
-			logrus.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
-			return err
-		}
-	}
-
-	return nil
 }

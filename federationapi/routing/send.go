@@ -346,7 +346,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			for userID, byUser := range directPayload.Messages {
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
-					if err := eduserverAPI.SendToDevice(ctx, t.eduAPI, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
 						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 							"sender":    directPayload.Sender,
 							"user_id":   userID,

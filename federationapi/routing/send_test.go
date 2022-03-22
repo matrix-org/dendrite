@@ -67,14 +67,6 @@ func (p *testEDUProducer) InputTypingEvent(
 	return nil
 }
 
-func (p *testEDUProducer) InputSendToDeviceEvent(
-	ctx context.Context,
-	request *eduAPI.InputSendToDeviceEventRequest,
-	response *eduAPI.InputSendToDeviceEventResponse,
-) error {
-	return nil
-}
-
 func (o *testEDUProducer) InputCrossSigningKeyUpdate(
 	ctx context.Context,
 	request *eduAPI.InputCrossSigningKeyUpdateRequest,

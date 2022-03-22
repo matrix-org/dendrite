@@ -45,11 +45,10 @@ func NewInternalAPI(
 	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	return &input.EDUServerInputAPI{
-		Cache:                        eduCache,
-		UserAPI:                      userAPI,
-		JetStream:                    js,
-		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
-		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
-		ServerName:                   cfg.Matrix.ServerName,
+		Cache:                  eduCache,
+		UserAPI:                userAPI,
+		JetStream:              js,
+		OutputTypingEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		ServerName:             cfg.Matrix.ServerName,
 	}
 }

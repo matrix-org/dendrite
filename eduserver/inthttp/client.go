@@ -12,8 +12,7 @@ import (
 
 // HTTP paths for the internal HTTP APIs
 const (
-	EDUServerInputTypingEventPath       = "/eduserver/input"
-	EDUServerInputSendToDeviceEventPath = "/eduserver/sendToDevice"
+	EDUServerInputTypingEventPath = "/eduserver/input"
 )
 
 // NewEDUServerClient creates a EDUServerInputAPI implemented by talking to a HTTP POST API.
@@ -39,18 +38,5 @@ func (h *httpEDUServerInputAPI) InputTypingEvent(
 	defer span.Finish()
 
 	apiURL := h.eduServerURL + EDUServerInputTypingEventPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// InputSendToDeviceEvent implements EDUServerInputAPI
-func (h *httpEDUServerInputAPI) InputSendToDeviceEvent(
-	ctx context.Context,
-	request *api.InputSendToDeviceEventRequest,
-	response *api.InputSendToDeviceEventResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputSendToDeviceEvent")
-	defer span.Finish()
-
-	apiURL := h.eduServerURL + EDUServerInputSendToDeviceEventPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }

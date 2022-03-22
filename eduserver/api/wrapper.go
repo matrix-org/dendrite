@@ -16,7 +16,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -41,29 +40,4 @@ func SendTyping(
 	)
 
 	return err
-}
-
-// SendToDevice sends a typing event to EDU server
-func SendToDevice(
-	ctx context.Context, eduAPI EDUServerInputAPI, sender, userID, deviceID, eventType string,
-	message interface{},
-) error {
-	js, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
-	requestData := InputSendToDeviceEvent{
-		UserID:   userID,
-		DeviceID: deviceID,
-		SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{
-			Sender:  sender,
-			Type:    eventType,
-			Content: js,
-		},
-	}
-	request := InputSendToDeviceEventRequest{
-		InputSendToDeviceEvent: requestData,
-	}
-	response := InputSendToDeviceEventResponse{}
-	return eduAPI.InputSendToDeviceEvent(ctx, &request, &response)
 }

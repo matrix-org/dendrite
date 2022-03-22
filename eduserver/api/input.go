@@ -37,12 +37,6 @@ type InputTypingEvent struct {
 	OriginServerTS gomatrixserverlib.Timestamp `json:"origin_server_ts"`
 }
 
-type InputSendToDeviceEvent struct {
-	UserID   string `json:"user_id"`
-	DeviceID string `json:"device_id"`
-	gomatrixserverlib.SendToDeviceEvent
-}
-
 // InputTypingEventRequest is a request to EDUServerInputAPI
 type InputTypingEventRequest struct {
 	InputTypingEvent InputTypingEvent `json:"input_typing_event"`
@@ -50,14 +44,6 @@ type InputTypingEventRequest struct {
 
 // InputTypingEventResponse is a response to InputTypingEvents
 type InputTypingEventResponse struct{}
-
-// InputSendToDeviceEventRequest is a request to EDUServerInputAPI
-type InputSendToDeviceEventRequest struct {
-	InputSendToDeviceEvent InputSendToDeviceEvent `json:"input_send_to_device_event"`
-}
-
-// InputSendToDeviceEventResponse is a response to InputSendToDeviceEventRequest
-type InputSendToDeviceEventResponse struct{}
 
 type InputCrossSigningKeyUpdateRequest struct {
 	CrossSigningKeyUpdate `json:"signing_keys"`
@@ -71,11 +57,5 @@ type EDUServerInputAPI interface {
 		ctx context.Context,
 		request *InputTypingEventRequest,
 		response *InputTypingEventResponse,
-	) error
-
-	InputSendToDeviceEvent(
-		ctx context.Context,
-		request *InputSendToDeviceEventRequest,
-		response *InputSendToDeviceEventResponse,
 	) error
 }

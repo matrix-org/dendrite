@@ -92,21 +92,21 @@ func (t *OutputEDUConsumer) Start() error {
 // onSendToDeviceEvent is called in response to a message received on the
 // send-to-device events topic from the EDU server.
 func (t *OutputEDUConsumer) onSendToDeviceEvent(ctx context.Context, msg *nats.Msg) bool {
-	// Extract the send-to-device event from msg.
-	var ote api.OutputSendToDeviceEvent
-	if err := json.Unmarshal(msg.Data, &ote); err != nil {
-		log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
-		return true
-	}
-
+	sender := msg.Header.Get("sender")
 	// only send send-to-device events which originated from us
-	_, originServerName, err := gomatrixserverlib.SplitID('@', ote.Sender)
+	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)
 	if err != nil {
-		log.WithError(err).WithField("user_id", ote.Sender).Error("Failed to extract domain from send-to-device sender")
+		log.WithError(err).WithField("user_id", sender).Error("Failed to extract domain from send-to-device sender")
 		return true
 	}
 	if originServerName != t.ServerName {
 		log.WithField("other_server", originServerName).Info("Suppressing send-to-device: originated elsewhere")
+		return true
+	}
+	// Extract the send-to-device event from msg.
+	var ote api.OutputSendToDeviceEvent
+	if err := json.Unmarshal(msg.Data, &ote); err != nil {
+		log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
 		return true
 	}
 

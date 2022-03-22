@@ -497,7 +497,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, syncProducer, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -511,7 +511,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, syncProducer, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
