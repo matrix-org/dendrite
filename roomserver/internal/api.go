@@ -90,6 +90,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	r.KeyRing = keyRing
 
 	r.Inputer = &input.Inputer{
+		Cfg:                  r.Cfg,
 		ProcessContext:       r.ProcessContext,
 		DB:                   r.DB,
 		InputRoomEventTopic:  r.InputRoomEventTopic,
