@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -82,6 +83,8 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 		}
 		if info != nil {
 			switch {
+			case !reflect.DeepEqual(info.Config.Subjects, stream.Subjects):
+				fallthrough
 			case info.Config.Retention != stream.Retention:
 				fallthrough
 			case info.Config.Storage != stream.Storage:
