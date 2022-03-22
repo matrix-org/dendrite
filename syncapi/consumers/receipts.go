@@ -17,8 +17,8 @@ package consumers
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/eduserver/api"
@@ -81,13 +81,22 @@ func (s *OutputReceiptEventConsumer) Start() error {
 }
 
 func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
-	var output api.OutputReceiptEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
+	output := api.OutputReceiptEvent{
+		UserID:  msg.Header.Get(jetstream.UserID),
+		RoomID:  msg.Header.Get(jetstream.RoomID),
+		EventID: msg.Header.Get(jetstream.EventID),
+		Type:    msg.Header.Get("type"),
+	}
+
+	timestamp, err := strconv.Atoi(msg.Header.Get("timestamp"))
+	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU server output log: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
+
+	output.Timestamp = gomatrixserverlib.Timestamp(timestamp)
 
 	streamPos, err := s.db.StoreReceipt(
 		s.ctx,

@@ -19,21 +19,20 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/dendrite/eduserver/api"
 
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
-func SetReceipt(req *http.Request, eduAPI api.EDUServerInputAPI, device *userapi.Device, roomId, receiptType, eventId string) util.JSONResponse {
+func SetReceipt(req *http.Request, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
 	timestamp := gomatrixserverlib.AsTimestamp(time.Now())
 	logrus.WithFields(logrus.Fields{
-		"roomId":      roomId,
+		"roomID":      roomID,
 		"receiptType": receiptType,
-		"eventId":     eventId,
+		"eventID":     eventID,
 		"userId":      device.UserID,
 		"timestamp":   timestamp,
 	}).Debug("Setting receipt")
@@ -43,7 +42,7 @@ func SetReceipt(req *http.Request, eduAPI api.EDUServerInputAPI, device *userapi
 		return util.MessageResponse(400, fmt.Sprintf("receipt type must be m.read not '%s'", receiptType))
 	}
 
-	if err := api.SendReceipt(req.Context(), eduAPI, device.UserID, roomId, eventId, receiptType, timestamp); err != nil {
+	if err := syncProducer.SendReceipt(req.Context(), device.UserID, roomID, eventID, receiptType, timestamp); err != nil {
 		return util.ErrorResponse(err)
 	}
 

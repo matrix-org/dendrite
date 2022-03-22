@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/inthttp"
+	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -31,6 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 
@@ -46,6 +48,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
+	process *process.ProcessContext,
 	fedRouter, keyRouter, wellKnownRouter *mux.Router,
 	cfg *config.FederationAPI,
 	userAPI userapi.UserInternalAPI,
@@ -58,11 +61,18 @@ func AddPublicRoutes(
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
 ) {
+
+	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	producer := &producers.SyncAPIProducer{
+		JetStream:         js,
+		TopicReceiptEvent: cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+	}
+
 	routing.Setup(
 		fedRouter, keyRouter, wellKnownRouter, cfg, rsAPI,
 		eduAPI, federationAPI, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
-		servers,
+		servers, producer,
 	)
 }
 

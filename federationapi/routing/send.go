@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -93,6 +94,7 @@ func Send(
 	federation *gomatrixserverlib.FederationClient,
 	mu *internal.MutexByRoom,
 	servers federationAPI.ServersInRoomProvider,
+	producer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	// First we should check if this origin has already submitted this
 	// txn ID to us. If they have and the txnIDs map contains an entry,
@@ -133,6 +135,7 @@ func Send(
 		servers:    servers,
 		keyAPI:     keyAPI,
 		roomsMu:    mu,
+		producer:   producer,
 	}
 
 	var txnEvents struct {
@@ -191,6 +194,7 @@ type txnReq struct {
 	federation txnFederationClient
 	roomsMu    *internal.MutexByRoom
 	servers    federationAPI.ServersInRoomProvider
+	producer   *producers.SyncAPIProducer
 }
 
 // A subset of FederationClient functionality that txn requires. Useful for testing.
@@ -430,17 +434,7 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 ) error {
 	// store every event
 	for _, eventID := range eventIDs {
-		req := eduserverAPI.InputReceiptEventRequest{
-			InputReceiptEvent: eduserverAPI.InputReceiptEvent{
-				UserID:    userID,
-				RoomID:    roomID,
-				EventID:   eventID,
-				Type:      receiptType,
-				Timestamp: timestamp,
-			},
-		}
-		resp := eduserverAPI.InputReceiptEventResponse{}
-		if err := t.eduAPI.InputReceiptEvent(ctx, &req, &resp); err != nil {
+		if err := t.producer.SendReceipt(ctx, userID, roomID, eventID, receiptType, timestamp); err != nil {
 			return fmt.Errorf("unable to set receipt event: %w", err)
 		}
 	}

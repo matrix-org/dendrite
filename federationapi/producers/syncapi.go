@@ -16,10 +16,8 @@ package producers
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -28,38 +26,8 @@ import (
 
 // SyncAPIProducer produces events for the sync API server to consume
 type SyncAPIProducer struct {
-	TopicClientData   string
 	TopicReceiptEvent string
 	JetStream         nats.JetStreamContext
-}
-
-// SendData sends account data to the sync API server
-func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string, readMarker *eventutil.ReadMarkerJSON) error {
-	m := &nats.Msg{
-		Subject: p.TopicClientData,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
-
-	data := eventutil.AccountData{
-		RoomID:     roomID,
-		Type:       dataType,
-		ReadMarker: readMarker,
-	}
-	var err error
-	m.Data, err = json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   roomID,
-		"data_type": dataType,
-	}).Tracef("Producing to topic '%s'", p.TopicClientData)
-
-	_, err = p.JetStream.PublishMsg(m)
-	return err
 }
 
 func (p *SyncAPIProducer) SendReceipt(

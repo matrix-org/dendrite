@@ -17,7 +17,9 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -198,15 +200,25 @@ func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bo
 // onReceiptEvent is called in response to a message received on the receipt
 // events topic from the EDU server.
 func (t *OutputEDUConsumer) onReceiptEvent(ctx context.Context, msg *nats.Msg) bool {
-	// Extract the typing event from msg.
-	var receipt api.OutputReceiptEvent
-	if err := json.Unmarshal(msg.Data, &receipt); err != nil {
-		// Skip this msg but continue processing messages.
-		log.WithError(err).Errorf("eduserver output log: message parse failed (expected receipt)")
+	receipt := api.OutputReceiptEvent{
+		UserID:  msg.Header.Get(jetstream.UserID),
+		RoomID:  msg.Header.Get(jetstream.RoomID),
+		EventID: msg.Header.Get(jetstream.EventID),
+		Type:    msg.Header.Get("type"),
+	}
+
+	timestamp, err := strconv.Atoi(msg.Header.Get("timestamp"))
+	if err != nil {
+		// If the message was invalid, log it and move on to the next message in the stream
+		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		sentry.CaptureException(err)
 		return true
 	}
 
+	receipt.Timestamp = gomatrixserverlib.Timestamp(timestamp)
+
 	// only send receipt events which originated from us
+	// TODO: We're consuming/producing on the same topic from the federation api, maybe add different topics?
 	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
 	if err != nil {
 		log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")

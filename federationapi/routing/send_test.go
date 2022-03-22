@@ -75,14 +75,6 @@ func (p *testEDUProducer) InputSendToDeviceEvent(
 	return nil
 }
 
-func (o *testEDUProducer) InputReceiptEvent(
-	ctx context.Context,
-	request *eduAPI.InputReceiptEventRequest,
-	response *eduAPI.InputReceiptEventResponse,
-) error {
-	return nil
-}
-
 func (o *testEDUProducer) InputCrossSigningKeyUpdate(
 	ctx context.Context,
 	request *eduAPI.InputCrossSigningKeyUpdateRequest,

@@ -37,8 +37,6 @@ type EDUServerInputAPI struct {
 	OutputTypingEventTopic string
 	// The kafka topic to output new send to device events to.
 	OutputSendToDeviceEventTopic string
-	// The kafka topic to output new receipt events to
-	OutputReceiptEventTopic string
 	// kafka producer
 	JetStream nats.JetStreamContext
 	// Internal user query API
@@ -168,31 +166,4 @@ func (t *EDUServerInputAPI) sendToDeviceEvent(ise *api.InputSendToDeviceEvent) e
 	}
 
 	return nil
-}
-
-// InputReceiptEvent implements api.EDUServerInputAPI
-// TODO: Intelligently batch requests sent by the same user (e.g wait a few milliseconds before emitting output events)
-func (t *EDUServerInputAPI) InputReceiptEvent(
-	ctx context.Context,
-	request *api.InputReceiptEventRequest,
-	response *api.InputReceiptEventResponse,
-) error {
-	logrus.WithFields(logrus.Fields{}).Tracef("Producing to topic '%s'", t.OutputReceiptEventTopic)
-	output := &api.OutputReceiptEvent{
-		UserID:    request.InputReceiptEvent.UserID,
-		RoomID:    request.InputReceiptEvent.RoomID,
-		EventID:   request.InputReceiptEvent.EventID,
-		Type:      request.InputReceiptEvent.Type,
-		Timestamp: request.InputReceiptEvent.Timestamp,
-	}
-	js, err := json.Marshal(output)
-	if err != nil {
-		return err
-	}
-
-	_, err = t.JetStream.PublishMsg(&nats.Msg{
-		Subject: t.OutputReceiptEventTopic,
-		Data:    js,
-	})
-	return err
 }
