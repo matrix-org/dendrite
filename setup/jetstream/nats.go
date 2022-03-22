@@ -26,8 +26,8 @@ func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient
 	if natsServer == nil {
 		var err error
 		natsServer, err = natsserver.NewServer(&natsserver.Options{
-			ServerName: "monolith",
-			//DontListen:      true,
+			ServerName:      "monolith",
+			DontListen:      true,
 			JetStream:       true,
 			StoreDir:        string(cfg.StoragePath),
 			NoSystemAccount: true,
@@ -81,12 +81,13 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 		if err != nil && err != natsclient.ErrStreamNotFound {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
-		if len(stream.Subjects) == 0 {
-			stream.Subjects = []string{name, name + ".>"}
+		subjects := stream.Subjects
+		if len(subjects) == 0 {
+			subjects = []string{name, name + ".>"}
 		}
 		if info != nil {
 			switch {
-			case !reflect.DeepEqual(info.Config.Subjects, stream.Subjects):
+			case !reflect.DeepEqual(info.Config.Subjects, subjects):
 				fallthrough
 			case info.Config.Retention != stream.Retention:
 				fallthrough
@@ -108,8 +109,9 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 			// array, otherwise we end up with namespaces on namespaces.
 			namespaced := *stream
 			namespaced.Name = name
+			namespaced.Subjects = subjects
 			if _, err = s.AddStream(&namespaced); err != nil {
-				logrus.WithError(err).WithField("stream", name).Fatal("Unable to add stream")
+				logrus.WithError(err).WithField("stream", name).WithField("subjects", subjects).Fatal("Unable to add stream")
 			}
 		}
 	}
