@@ -81,6 +81,9 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 		if err != nil && err != natsclient.ErrStreamNotFound {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
+		if len(stream.Subjects) == 0 {
+			stream.Subjects = []string{name, name + ".>"}
+		}
 		if info != nil {
 			switch {
 			case !reflect.DeepEqual(info.Config.Subjects, stream.Subjects):
@@ -93,10 +96,6 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 				}
 			}
 		} else {
-			if len(stream.Subjects) == 0 {
-				stream.Subjects = []string{name}
-			}
-
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {
