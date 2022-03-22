@@ -41,7 +41,6 @@ var streams = []*nats.StreamConfig{
 		Name:      InputRoomEvent,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
-		Subjects:  []string{InputRoomEvent + ".>"}, // room ID
 	},
 	{
 		Name:      OutputRoomEvent,
