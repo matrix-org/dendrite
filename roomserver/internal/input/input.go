@@ -120,6 +120,7 @@ func (w *worker) next() {
 		if len(msgs) != 1 {
 			return
 		}
+		defer w.Act(nil, w.next)
 	case context.DeadlineExceeded:
 		logrus.Infof("Stream for room %q idle, shutting down", w.roomID)
 		if err = w.subscription.Unsubscribe(); err != nil {
@@ -140,7 +141,6 @@ func (w *worker) next() {
 	}
 
 	msg := msgs[0]
-
 	var inputRoomEvent api.InputRoomEvent
 	if err = json.Unmarshal(msg.Data, &inputRoomEvent); err != nil {
 		_ = msg.Term()
@@ -174,8 +174,6 @@ func (w *worker) next() {
 			}).Warn("Roomserver failed to respond for sync event")
 		}
 	}
-
-	w.Act(nil, w.next)
 }
 
 // InputRoomEvents implements api.RoomserverInternalAPI
