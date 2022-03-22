@@ -25,8 +25,8 @@ func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient
 	if natsServer == nil {
 		var err error
 		natsServer, err = natsserver.NewServer(&natsserver.Options{
-			ServerName:      "monolith",
-			DontListen:      true,
+			ServerName: "monolith",
+			//DontListen:      true,
 			JetStream:       true,
 			StoreDir:        string(cfg.StoragePath),
 			NoSystemAccount: true,
@@ -81,7 +81,9 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
 		if info == nil {
-			stream.Subjects = []string{name}
+			if len(stream.Subjects) == 0 {
+				stream.Subjects = []string{name}
+			}
 
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
@@ -95,6 +97,8 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 			namespaced.Name = name
 			if _, err = s.AddStream(&namespaced); err != nil {
 				logrus.WithError(err).WithField("stream", name).Fatal("Unable to add stream")
+			} else {
+				logrus.WithField("stream", name).Infof("Added stream")
 			}
 		}
 	}
