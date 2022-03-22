@@ -107,7 +107,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 			return
 		}
 
-		logrus.Infof("Started stream for room %q", w.roomID)
+		logrus.Infof("Stream for room %q active", w.roomID)
 		w.subscription = sub
 		w.Act(nil, w.next)
 	}
@@ -139,7 +139,7 @@ func (w *worker) next() {
 		}
 		defer w.Act(nil, w.next)
 	case context.DeadlineExceeded:
-		logrus.Infof("Stream for room %q idle, shutting down", w.roomID)
+		logrus.Infof("Stream for room %q inactive", w.roomID)
 		if err = w.subscription.Unsubscribe(); err != nil {
 			logrus.WithError(err).Errorf("Failed to unsubscribe to stream for room %q", w.roomID)
 		}

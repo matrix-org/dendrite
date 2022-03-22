@@ -80,7 +80,16 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 		if err != nil && err != natsclient.ErrStreamNotFound {
 			logrus.WithError(err).Fatal("Unable to get stream info")
 		}
-		if info == nil {
+		if info != nil {
+			switch {
+			case info.Config.Retention != stream.Retention:
+				fallthrough
+			case info.Config.Storage != stream.Storage:
+				if err = s.DeleteStream(name); err != nil {
+					logrus.WithError(err).Fatal("Unable to recreate stream")
+				}
+			}
+		} else {
 			if len(stream.Subjects) == 0 {
 				stream.Subjects = []string{name}
 			}
@@ -97,8 +106,6 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 			namespaced.Name = name
 			if _, err = s.AddStream(&namespaced); err != nil {
 				logrus.WithError(err).WithField("stream", name).Fatal("Unable to add stream")
-			} else {
-				logrus.WithField("stream", name).Infof("Added stream")
 			}
 		}
 	}
