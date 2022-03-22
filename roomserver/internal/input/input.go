@@ -79,7 +79,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 	})
 	w := v.(*worker)
 	w.Lock()
-	defer w.Lock()
+	defer w.Unlock()
 	if !loaded || w.subscription == nil {
 		consumer := r.Cfg.Matrix.JetStream.Prefixed("RoomInput" + jetstream.Tokenise(w.roomID))
 		subject := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEventSubj(w.roomID))
