@@ -92,10 +92,12 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 				fallthrough
 			case info.Config.Storage != stream.Storage:
 				if err = s.DeleteStream(name); err != nil {
-					logrus.WithError(err).Fatal("Unable to recreate stream")
+					logrus.WithError(err).Fatal("Unable to delete stream")
 				}
+				info = nil
 			}
-		} else {
+		}
+		if info == nil {
 			// If we're trying to keep everything in memory (e.g. unit tests)
 			// then overwrite the storage policy.
 			if cfg.InMemory {
