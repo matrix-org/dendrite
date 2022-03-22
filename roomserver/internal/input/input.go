@@ -144,10 +144,11 @@ func (r *Inputer) Start() error {
 		func(m *nats.Msg) {
 			roomID := m.Header.Get(jetstream.RoomID)
 			r.startWorkerForRoom(roomID)
+			_ = m.Ack()
 		},
 		nats.HeadersOnly(),
 		nats.DeliverAll(),
-		nats.AckNone(),
+		nats.AckAll(),
 		nats.BindStream(r.InputRoomEventTopic),
 	)
 	return err
