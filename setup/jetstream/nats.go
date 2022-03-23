@@ -83,6 +83,12 @@ func setupNATS(cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStream
 		}
 		subjects := stream.Subjects
 		if len(subjects) == 0 {
+			// By default we want each stream to listen for the subjects
+			// that are either an exact match for the stream name, or where
+			// the first part of the subject is the stream name. ">" is a
+			// wildcard in NATS for one or more subject tokens. In the case
+			// that the stream is called "Foo", this will match any message
+			// with the subject "Foo", "Foo.Bar" or "Foo.Bar.Baz" etc.
 			subjects = []string{name, name + ".>"}
 		}
 		if info != nil {
