@@ -21,7 +21,6 @@ import (
 	"strconv"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -81,7 +80,7 @@ func (s *OutputReceiptEventConsumer) Start() error {
 }
 
 func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
-	output := api.OutputReceiptEvent{
+	output := types.OutputReceiptEvent{
 		UserID:  msg.Header.Get(jetstream.UserID),
 		RoomID:  msg.Header.Get(jetstream.RoomID),
 		EventID: msg.Header.Get(jetstream.EventID),
@@ -91,7 +90,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Ms
 	timestamp, err := strconv.Atoi(msg.Header.Get("timestamp"))
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		log.WithError(err).Errorf("output log: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -126,7 +125,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Ms
 	return true
 }
 
-func (s *OutputReceiptEventConsumer) sendReadUpdate(ctx context.Context, output api.OutputReceiptEvent) error {
+func (s *OutputReceiptEventConsumer) sendReadUpdate(ctx context.Context, output types.OutputReceiptEvent) error {
 	if output.Type != "m.read" {
 		return nil
 	}

@@ -20,12 +20,13 @@ import (
 	"strconv"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	fedTypes "github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
@@ -45,7 +46,7 @@ type OutputEDUConsumer struct {
 	receiptTopic      string
 }
 
-// NewOutputEDUConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming from EDU servers.
+// NewOutputEDUConsumer creates a new OutputEDUConsumer. Call Start() to begin consuming EDUs.
 func NewOutputEDUConsumer(
 	process *process.ProcessContext,
 	cfg *config.FederationAPI,
@@ -104,9 +105,9 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(ctx context.Context, msg *nats.M
 		return true
 	}
 	// Extract the send-to-device event from msg.
-	var ote api.OutputSendToDeviceEvent
+	var ote syncTypes.OutputSendToDeviceEvent
 	if err := json.Unmarshal(msg.Data, &ote); err != nil {
-		log.WithError(err).Errorf("eduserver output log: message parse failed (expected send-to-device)")
+		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
 		return true
 	}
 
@@ -154,7 +155,7 @@ func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bo
 	userID := msg.Header.Get(jetstream.UserID)
 	typing, err := strconv.ParseBool(msg.Header.Get("typing"))
 	if err != nil {
-		log.WithError(err).Errorf("EDU server output log: typing parse failure")
+		log.WithError(err).Errorf("EDU output log: typing parse failure")
 		return true
 	}
 
@@ -189,7 +190,6 @@ func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bo
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
-	log.Debugf("sending edu: %+v", edu)
 	if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
@@ -201,7 +201,7 @@ func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bo
 // onReceiptEvent is called in response to a message received on the receipt
 // events topic from the EDU server.
 func (t *OutputEDUConsumer) onReceiptEvent(ctx context.Context, msg *nats.Msg) bool {
-	receipt := api.OutputReceiptEvent{
+	receipt := syncTypes.OutputReceiptEvent{
 		UserID:  msg.Header.Get(jetstream.UserID),
 		RoomID:  msg.Header.Get(jetstream.RoomID),
 		EventID: msg.Header.Get(jetstream.EventID),
@@ -211,7 +211,7 @@ func (t *OutputEDUConsumer) onReceiptEvent(ctx context.Context, msg *nats.Msg) b
 	timestamp, err := strconv.Atoi(msg.Header.Get("timestamp"))
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU server output log: message parse failure")
+		log.WithError(err).Errorf("EDU output log: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -240,11 +240,11 @@ func (t *OutputEDUConsumer) onReceiptEvent(ctx context.Context, msg *nats.Msg) b
 		names[i] = joined[i].ServerName
 	}
 
-	content := map[string]api.FederationReceiptMRead{}
-	content[receipt.RoomID] = api.FederationReceiptMRead{
-		User: map[string]api.FederationReceiptData{
+	content := map[string]fedTypes.FederationReceiptMRead{}
+	content[receipt.RoomID] = fedTypes.FederationReceiptMRead{
+		User: map[string]fedTypes.FederationReceiptData{
 			receipt.UserID: {
-				Data: api.ReceiptTS{
+				Data: fedTypes.ReceiptTS{
 					TS: receipt.Timestamp,
 				},
 				EventIDs: []string{receipt.EventID},

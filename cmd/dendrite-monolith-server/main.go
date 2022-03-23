@@ -59,7 +59,6 @@ func main() {
 		// itself.
 		cfg.AppServiceAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.ClientAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.EDUServer.InternalAPI.Connect = httpAPIAddr
 		cfg.FederationAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.KeyServer.InternalAPI.Connect = httpAPIAddr
 		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr

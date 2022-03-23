@@ -19,9 +19,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -128,7 +128,7 @@ func (p *SyncAPIProducer) SendToDevice(
 		"type":        eventType,
 	}).Tracef("Producing to topic '%s'", p.TopicSendToDeviceEvent)
 	for _, device := range devices {
-		ote := &api.OutputSendToDeviceEvent{
+		ote := &types.OutputSendToDeviceEvent{
 			UserID:   userID,
 			DeviceID: device,
 			SendToDeviceEvent: gomatrixserverlib.SendToDeviceEvent{

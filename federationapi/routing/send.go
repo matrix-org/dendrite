@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
+	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -331,7 +331,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				continue
 			}
 			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to edu server")
+				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to JetStream")
 			}
 		case gomatrixserverlib.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
@@ -348,7 +348,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 							"sender":    directPayload.Sender,
 							"user_id":   userID,
 							"device_id": deviceID,
-						}).Error("Failed to send send-to-device event to edu server")
+						}).Error("Failed to send send-to-device event to JetStream")
 					}
 				}
 			}
@@ -356,7 +356,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			t.processDeviceListUpdate(ctx, e)
 		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
-			payload := map[string]eduserverAPI.FederationReceiptMRead{}
+			payload := map[string]types.FederationReceiptMRead{}
 
 			if err := json.Unmarshal(e.Content, &payload); err != nil {
 				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
@@ -380,12 +380,12 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 							"user_id": userID,
 							"room_id": roomID,
 							"events":  mread.EventIDs,
-						}).Error("Failed to send receipt event to edu server")
+						}).Error("Failed to send receipt event to JetStream")
 						continue
 					}
 				}
 			}
-		case eduserverAPI.MSigningKeyUpdate:
+		case types.MSigningKeyUpdate:
 			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
@@ -396,7 +396,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 }
 
 func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
-	var updatePayload eduserverAPI.CrossSigningKeyUpdate
+	var updatePayload keyapi.CrossSigningKeyUpdate
 	if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
 		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 			"user_id": updatePayload.UserID,
@@ -423,7 +423,7 @@ func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverli
 	return nil
 }
 
-// processReceiptEvent sends receipt events to the edu server
+// processReceiptEvent sends receipt events to JetStream
 func (t *txnReq) processReceiptEvent(ctx context.Context,
 	userID, roomID, receiptType string,
 	timestamp gomatrixserverlib.Timestamp,

@@ -19,8 +19,6 @@ package caching
 import (
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 const defaultTypingTimeout = 10 * time.Second
@@ -102,7 +100,6 @@ func (t *EDUCache) GetTypingUsersIfUpdatedAfter(
 func (t *EDUCache) AddTypingUser(
 	userID, roomID string, expire *time.Time,
 ) int64 {
-	logrus.Debugf("Adding user to room: %s %s", userID, roomID)
 	expireTime := getExpireTime(expire)
 	if until := time.Until(expireTime); until > 0 {
 		timer := time.AfterFunc(until, func() {
