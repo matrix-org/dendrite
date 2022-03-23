@@ -48,9 +48,9 @@ func NewInternalAPI(
 		Cache:                        eduCache,
 		UserAPI:                      userAPI,
 		JetStream:                    js,
-		OutputTypingEventTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
-		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
-		OutputReceiptEventTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		OutputTypingEventTopic:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		OutputSendToDeviceEventTopic: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		OutputReceiptEventTopic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		ServerName:                   cfg.Matrix.ServerName,
 	}
 }
