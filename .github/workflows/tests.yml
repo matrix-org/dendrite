@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: ["main"]
+    branches: ["s7evink/gha"]
   pull_request:
 
 concurrency:
@@ -10,7 +10,80 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Run golangci-lint
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+
+  # run go test with different go versions
+  test:
+    name: Unit tests Go ${{ matrix.go }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [ '1.16', '1.17', '1.18' ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go test ./...
+
+  # build Dendrite for linux with different architectures and go versions
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [ '1.16', '1.17', '1.18' ]
+        goos: [ 'linux' ]
+        goarch: [ 'amd64', '386' ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install dependencies
+        run: sudo apt update && sudo apt-get install -y gcc-multilib
+      - env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+        run: go build -trimpath -v -o "bin/" ./cmd/...
+
+  # build for Windows 64-bit
+  build_windows:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.16' ]
+        goos: [ 'windows' ]
+        goarch: [ 'amd64' ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
+      - env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          CC: "/usr/bin/x86_64-w64-mingw32-gcc"
+        run: go build -trimpath -v -o "bin/" ./cmd/...
+
+  # run Complement
   complement:
+    if: "false"
     runs-on: ubuntu-latest
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
