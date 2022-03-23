@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
@@ -42,7 +41,6 @@ func AddPublicRoutes(
 	accountsDB userdb.Database,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.FederationInternalAPI,
@@ -58,11 +56,12 @@ func AddPublicRoutes(
 		TopicClientData:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
 		TopicReceiptEvent:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		UserAPI:                userAPI,
 	}
 
 	routing.Setup(
-		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
+		router, synapseAdminRouter, cfg, rsAPI, asAPI,
 		accountsDB, userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg,

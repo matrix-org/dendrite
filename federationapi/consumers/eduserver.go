@@ -149,18 +149,19 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(ctx context.Context, msg *nats.M
 // events topic from the EDU server.
 func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bool {
 	// Extract the typing event from msg.
-	var ote api.OutputTypingEvent
-	if err := json.Unmarshal(msg.Data, &ote); err != nil {
-		// Skip this msg but continue processing messages.
-		log.WithError(err).Errorf("eduserver output log: message parse failed (expected typing)")
-		_ = msg.Ack()
+
+	roomID := msg.Header.Get(jetstream.RoomID)
+	userID := msg.Header.Get(jetstream.UserID)
+	typing, err := strconv.ParseBool(msg.Header.Get("typing"))
+	if err != nil {
+		log.WithError(err).Errorf("EDU server output log: typing parse failure")
 		return true
 	}
 
 	// only send typing events which originated from us
-	_, typingServerName, err := gomatrixserverlib.SplitID('@', ote.Event.UserID)
+	_, typingServerName, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
-		log.WithError(err).WithField("user_id", ote.Event.UserID).Error("Failed to extract domain from typing sender")
+		log.WithError(err).WithField("user_id", userID).Error("Failed to extract domain from typing sender")
 		_ = msg.Ack()
 		return true
 	}
@@ -168,9 +169,9 @@ func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bo
 		return true
 	}
 
-	joined, err := t.db.GetJoinedHosts(ctx, ote.Event.RoomID)
+	joined, err := t.db.GetJoinedHosts(ctx, roomID)
 	if err != nil {
-		log.WithError(err).WithField("room_id", ote.Event.RoomID).Error("failed to get joined hosts for room")
+		log.WithError(err).WithField("room_id", roomID).Error("failed to get joined hosts for room")
 		return false
 	}
 
@@ -179,16 +180,16 @@ func (t *OutputEDUConsumer) onTypingEvent(ctx context.Context, msg *nats.Msg) bo
 		names[i] = joined[i].ServerName
 	}
 
-	edu := &gomatrixserverlib.EDU{Type: ote.Event.Type}
+	edu := &gomatrixserverlib.EDU{Type: "m.typing"}
 	if edu.Content, err = json.Marshal(map[string]interface{}{
-		"room_id": ote.Event.RoomID,
-		"user_id": ote.Event.UserID,
-		"typing":  ote.Event.Typing,
+		"room_id": roomID,
+		"user_id": userID,
+		"typing":  typing,
 	}); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
-
+	log.Debugf("sending edu: %+v", edu)
 	if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false

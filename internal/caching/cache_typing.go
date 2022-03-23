@@ -1,5 +1,5 @@
 // Copyright 2017 Vector Creations Ltd
-// Copyright 2017-2018 New Vector Ltd
+// Copyright 2017-2018 NewTypingCache Vector Ltd
 // Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package caching
 
 import (
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 const defaultTypingTimeout = 10 * time.Second
@@ -53,8 +55,8 @@ func (t *EDUCache) newRoomData() *roomData {
 	}
 }
 
-// New returns a new EDUCache initialised for use.
-func New() *EDUCache {
+// NewTypingCache returns a new EDUCache initialised for use.
+func NewTypingCache() *EDUCache {
 	return &EDUCache{data: make(map[string]*roomData)}
 }
 
@@ -100,6 +102,7 @@ func (t *EDUCache) GetTypingUsersIfUpdatedAfter(
 func (t *EDUCache) AddTypingUser(
 	userID, roomID string, expire *time.Time,
 ) int64 {
+	logrus.Debugf("Adding user to room: %s %s", userID, roomID)
 	expireTime := getExpireTime(expire)
 	if until := time.Until(expireTime); until > 0 {
 		timer := time.AfterFunc(until, func() {

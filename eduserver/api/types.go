@@ -20,21 +20,6 @@ const (
 	MSigningKeyUpdate = "m.signing_key_update"
 )
 
-type TypingEvent struct {
-	Type   string `json:"type"`
-	RoomID string `json:"room_id"`
-	UserID string `json:"user_id"`
-	Typing bool   `json:"typing"`
-}
-
-type ReceiptEvent struct {
-	UserID    string                      `json:"user_id"`
-	RoomID    string                      `json:"room_id"`
-	EventID   string                      `json:"event_id"`
-	Type      string                      `json:"type"`
-	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
-}
-
 type FederationReceiptMRead struct {
 	User map[string]FederationReceiptData `json:"m.read"`
 }

@@ -23,8 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -315,10 +313,6 @@ func (m *DendriteMonolith) Start() {
 	m.userAPI = userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(m.userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), m.userAPI,
-	)
-
 	asAPI := appservice.NewInternalAPI(base, m.userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
@@ -333,7 +327,6 @@ func (m *DendriteMonolith) Start() {
 		KeyRing:   keyRing,
 
 		AppserviceAPI:          asAPI,
-		EDUInternalAPI:         eduInputAPI,
 		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                m.userAPI,

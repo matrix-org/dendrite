@@ -1,5 +1,5 @@
 // Copyright 2017 Vector Creations Ltd
-// Copyright 2017-2018 New Vector Ltd
+// Copyright 2017-2018 NewTypingCache Vector Ltd
 // Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package caching
 
 import (
 	"testing"
@@ -24,9 +24,9 @@ import (
 )
 
 func TestEDUCache(t *testing.T) {
-	tCache := New()
+	tCache := NewTypingCache()
 	if tCache == nil {
-		t.Fatal("New failed")
+		t.Fatal("NewTypingCache failed")
 	}
 
 	t.Run("AddTypingUser", func(t *testing.T) {

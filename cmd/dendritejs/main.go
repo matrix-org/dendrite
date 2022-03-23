@@ -24,8 +24,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -203,7 +201,6 @@ func main() {
 	}
 
 	rsAPI := roomserver.NewInternalAPI(base)
-	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
 	)
@@ -222,7 +219,6 @@ func main() {
 		KeyRing:   &keyRing,
 
 		AppserviceAPI:       asQuery,
-		EDUInternalAPI:      eduInputAPI,
 		FederationSenderAPI: fedSenderAPI,
 		RoomserverAPI:       rsAPI,
 		UserAPI:             userAPI,

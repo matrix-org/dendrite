@@ -31,7 +31,7 @@ func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	federationapi.AddPublicRoutes(
 		base.ProcessContext, base.PublicFederationAPIMux, base.PublicKeyAPIMux, base.PublicWellKnownAPIMux,
 		&base.Cfg.FederationAPI, userAPI, federation, keyRing,
-		rsAPI, fsAPI, base.EDUServerClient(), keyAPI,
+		rsAPI, fsAPI, keyAPI,
 		&base.Cfg.MSCs, nil,
 	)
 

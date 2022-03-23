@@ -17,21 +17,8 @@
 package api
 
 import (
-	"time"
-
 	"github.com/matrix-org/gomatrixserverlib"
 )
-
-// OutputTypingEvent is an entry in typing server output kafka log.
-// This contains the event with extra fields used to create 'm.typing' event
-// in clientapi & federation.
-type OutputTypingEvent struct {
-	// The Event for the typing edu event.
-	Event TypingEvent `json:"event"`
-	// ExpireTime is the interval after which the user should no longer be
-	// considered typing. Only available if Event.Typing is true.
-	ExpireTime *time.Time
-}
 
 // OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.
 // This contains the full event content, along with the user ID and device ID

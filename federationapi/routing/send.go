@@ -88,7 +88,6 @@ func Send(
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
-	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyapi.KeyInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
@@ -129,7 +128,6 @@ func Send(
 
 	t := txnReq{
 		rsAPI:      rsAPI,
-		eduAPI:     eduAPI,
 		keys:       keys,
 		federation: federation,
 		servers:    servers,
@@ -188,7 +186,6 @@ func Send(
 type txnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI      api.RoomserverInternalAPI
-	eduAPI     eduserverAPI.EDUServerInputAPI
 	keyAPI     keyapi.KeyInternalAPI
 	keys       gomatrixserverlib.JSONVerifier
 	federation txnFederationClient
@@ -333,7 +330,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				util.GetLogger(ctx).Debugf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 				continue
 			}
-			if err := eduserverAPI.SendTyping(ctx, t.eduAPI, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
+			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to edu server")
 			}
 		case gomatrixserverlib.MDirectToDevice:

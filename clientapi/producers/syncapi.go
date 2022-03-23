@@ -33,6 +33,7 @@ type SyncAPIProducer struct {
 	TopicClientData        string
 	TopicReceiptEvent      string
 	TopicSendToDeviceEvent string
+	TopicTypingEvent       string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
 	UserAPI                userapi.UserInternalAPI
@@ -155,4 +156,20 @@ func (p *SyncAPIProducer) SendToDevice(
 		}
 	}
 	return nil
+}
+
+func (p *SyncAPIProducer) SendTyping(
+	ctx context.Context, userID, roomID string, typing bool, timeoutMS int64,
+) error {
+	m := &nats.Msg{
+		Subject: p.TopicTypingEvent,
+		Header:  nats.Header{},
+	}
+	m.Header.Set(jetstream.UserID, userID)
+	m.Header.Set(jetstream.RoomID, roomID)
+	m.Header.Set("typing", strconv.FormatBool(typing))
+	m.Header.Set("timeout_ms", strconv.Itoa(int(timeoutMS)))
+
+	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	return err
 }

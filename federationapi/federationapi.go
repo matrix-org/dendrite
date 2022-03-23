@@ -16,7 +16,6 @@ package federationapi
 
 import (
 	"github.com/gorilla/mux"
-	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
@@ -56,7 +55,6 @@ func AddPublicRoutes(
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	federationAPI federationAPI.FederationInternalAPI,
-	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
@@ -67,11 +65,12 @@ func AddPublicRoutes(
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 	}
 
 	routing.Setup(
 		fedRouter, keyRouter, wellKnownRouter, cfg, rsAPI,
-		eduAPI, federationAPI, keyRing,
+		federationAPI, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,
 	)
