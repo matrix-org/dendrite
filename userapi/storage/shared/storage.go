@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -298,7 +299,12 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string,
 ) (*api.Account, error) {
-	return d.Accounts.SelectAccountByLocalpart(ctx, localpart)
+	// try to get the account with lowercase localpart (majority)
+	acc, err := d.Accounts.SelectAccountByLocalpart(ctx, strings.ToLower(localpart))
+	if err == sql.ErrNoRows {
+		acc, err = d.Accounts.SelectAccountByLocalpart(ctx, localpart) // try with localpart as passed by the request
+	}
+	return acc, err
 }
 
 // SearchProfiles returns all profiles where the provided localpart or display name
