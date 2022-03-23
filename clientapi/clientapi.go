@@ -58,6 +58,7 @@ func AddPublicRoutes(
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
 		UserAPI:                userAPI,
+		ServerName:             cfg.Matrix.ServerName,
 	}
 
 	routing.Setup(
