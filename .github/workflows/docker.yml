@@ -1,6 +1,6 @@
 # Based on https://github.com/docker/build-push-action
 
-name: "Docker Hub"
+name: "Docker"
 
 on:
   release: # A GitHub release was published
@@ -9,6 +9,7 @@ on:
     workflows: [Dendrite]
     types: [completed]
     branches: [main]
+  workflow_dispatch: # A build was manually requested
 
 env:
   DOCKER_NAMESPACE: matrixdotorg
@@ -39,13 +40,13 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build monolith image
         if: >-
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success'
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+          github.event_name == 'workflow_dispatch'
         id: docker_build_monolith
         uses: docker/build-push-action@v2
         with:
@@ -56,12 +57,12 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:main
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:main
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
 
       - name: Build release monolith image
         if: github.event_name == 'release' # Only for GitHub releases
-        id: docker_build_monolith
+        id: docker_build_monolith_release
         uses: docker/build-push-action@v2
         with:
           cache-from: type=gha
@@ -98,13 +99,13 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build polylith image
         if: >-
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success'
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+          github.event_name == 'workflow_dispatch'
         id: docker_build_polylith
         uses: docker/build-push-action@v2
         with:
@@ -115,12 +116,12 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:main
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:main
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
 
       - name: Build release polylith image
         if: github.event_name == 'release' # Only for GitHub releases
-        id: docker_build_polylith
+        id: docker_build_polylith_release
         uses: docker/build-push-action@v2
         with:
           cache-from: type=gha
