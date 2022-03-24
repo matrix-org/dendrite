@@ -55,8 +55,8 @@ func NewKeyChangeConsumer(
 	return &KeyChangeConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		durable:    cfg.Matrix.JetStream.TopicFor("FederationAPIKeyChangeConsumer"),
-		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
+		durable:    cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		queues:     queues,
 		db:         store,
 		serverName: cfg.Matrix.ServerName,

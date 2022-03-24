@@ -53,10 +53,10 @@ func AddPublicRoutes(
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
-		TopicClientData:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
-		TopicReceiptEvent:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
-		TopicSendToDeviceEvent: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
-		TopicTypingEvent:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
+		TopicClientData:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
+		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		UserAPI:                userAPI,
 		ServerName:             cfg.Matrix.ServerName,
 	}
