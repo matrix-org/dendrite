@@ -158,11 +158,15 @@ jobs:
 
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
-      name: Initial tests passed
-      needs: [ lint, test, build, build_windows ]
-      runs-on: ubuntu-latest
-      steps:
-        - run: "true"
+    name: Initial tests passed
+    needs: [ lint, test, build, build_windows ]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
+    steps:
+      - name: Check initial tests passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
 
   # run database upgrade tests
   upgrade_test:
