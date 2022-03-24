@@ -159,7 +159,6 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
       name: Initial tests passed
-      if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
       needs: [ lint, test, build, build_windows ]
       runs-on: ubuntu-latest
       steps:
