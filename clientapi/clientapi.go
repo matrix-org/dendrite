@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -39,7 +38,6 @@ func AddPublicRoutes(
 	router *mux.Router,
 	synapseAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
-	accountsDB userdb.Database,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	eduInputAPI eduServerAPI.EDUServerInputAPI,
@@ -60,7 +58,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
-		accountsDB, userAPI, federation,
+		userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg,
 	)
