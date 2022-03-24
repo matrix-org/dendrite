@@ -313,5 +313,5 @@ jobs:
         name: Run Complement Tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
-          API: ${{ matrix.api && "true" }}
+          API: ${{ matrix.api && 1 }}
         working-directory: complement
