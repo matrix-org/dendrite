@@ -9,8 +9,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   wasm:
+    name: WASM build test
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
@@ -58,7 +58,7 @@ jobs:
   lint:
     timeout-minutes: 5
     if: "true"
-    name: golangci-lint
+    name: Linting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -71,7 +71,7 @@ jobs:
   test:
     timeout-minutes: 5
     if: "true"
-    name: Unit tests Go ${{ matrix.go }}
+    name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -95,6 +95,7 @@ jobs:
 
   # build Dendrite for linux with different architectures and go versions
   build:
+    name: Build for Linux
     timeout-minutes: 10
     if: "true"
     runs-on: ubuntu-latest
@@ -129,6 +130,7 @@ jobs:
 
   # build for Windows 64-bit
   build_windows:
+    name: Build for Windows
     timeout-minutes: 10
     if: "true"
     runs-on: ubuntu-latest
@@ -139,7 +141,7 @@ jobs:
         goarch: [ 'amd64' ]
     steps:
       - uses: actions/checkout@v3
-      - name: Setup go
+      - name: Setup Go ${{ matrix.go }}
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
@@ -162,6 +164,7 @@ jobs:
 
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
+      name: Initial tests passed
       #if: "true"
       if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
       needs: [ test, build, build_windows ]
@@ -171,6 +174,7 @@ jobs:
 
   # run database upgrade tests
   upgrade_test:
+    name: Upgrade tests
     timeout-minutes: 20
     needs: initial-tests-done
     runs-on: ubuntu-latest
@@ -197,7 +201,7 @@ jobs:
   sytest:
     timeout-minutes: 20
     needs: initial-tests-done
-    name: "Sytest: ${{ matrix.label }}"
+    name: "Sytest (${{ matrix.label }})"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -208,10 +212,10 @@ jobs:
           - label: SQLite, full HTTP APIs
             api: full-http
 
-          - label: Postgres
+          - label: PostgreSQL
             postgres: postgres
 
-          - label: Postgres, full HTTP APIs
+          - label: PostgreSQL, full HTTP APIs
             postgres: postgres
             api: full-http
     container:
@@ -223,14 +227,14 @@ jobs:
         API: ${{ matrix.api && 1 }}
     steps:
       - uses: actions/checkout@v2
-      - name: Run SyTest
+      - name: Run Sytest
         run: /bootstrap.sh dendrite
         working-directory: /src
       - name: Summarise results.tap
         if: ${{ always() }}
         run:  /sytest/scripts/tap_to_gha.pl /logs/results.tap
 
-      - name: Upload SyTest logs
+      - name: Upload Sytest logs
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
@@ -241,6 +245,7 @@ jobs:
 
   # run Complement
   complement:
+    name: Complement
     timeout-minutes: 20
     needs: initial-tests-done
     if: "true"
