@@ -9,6 +9,7 @@ on:
     workflows: [Dendrite]
     types: [completed]
     branches: [main]
+  workflow_dispatch: # A build was manually requested
 
 env:
   DOCKER_NAMESPACE: matrixdotorg
@@ -44,8 +45,8 @@ jobs:
 
       - name: Build monolith image
         if: >-
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success'
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+          github.event_name == 'workflow_dispatch'
         id: docker_build_monolith
         uses: docker/build-push-action@v2
         with:
@@ -56,8 +57,8 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:main
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:main
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
 
       - name: Build release monolith image
         if: github.event_name == 'release' # Only for GitHub releases
@@ -103,8 +104,8 @@ jobs:
 
       - name: Build polylith image
         if: >-
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion == 'success'
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+          github.event_name == 'workflow_dispatch'
         id: docker_build_polylith
         uses: docker/build-push-action@v2
         with:
@@ -115,8 +116,8 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:main
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:main
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
 
       - name: Build release polylith image
         if: github.event_name == 'release' # Only for GitHub releases
