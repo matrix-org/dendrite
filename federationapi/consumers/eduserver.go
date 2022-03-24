@@ -71,7 +71,7 @@ func NewOutputEDUConsumer(
 func (t *OutputEDUConsumer) Start() error {
 	if err := jetstream.JetStreamConsumer(
 		t.ctx, t.jetstream, t.typingTopic, t.durable, t.onTypingEvent,
-		nats.DeliverAll(), nats.ManualAck(),
+		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	); err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (t *OutputEDUConsumer) Start() error {
 	}
 	if err := jetstream.JetStreamConsumer(
 		t.ctx, t.jetstream, t.receiptTopic, t.durable, t.onReceiptEvent,
-		nats.DeliverAll(), nats.ManualAck(),
+		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	); err != nil {
 		return err
 	}
