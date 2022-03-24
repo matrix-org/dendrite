@@ -160,7 +160,7 @@ jobs:
   initial-tests-done:
       name: Initial tests passed
       if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-      needs: [ test, build, build_windows ]
+      needs: [ lint, test, build, build_windows ]
       runs-on: ubuntu-latest
       steps:
         - run: "true"
@@ -239,8 +239,8 @@ jobs:
   # run Complement
   complement:
     name: "Complement (${{ matrix.label }})"
-    #timeout-minutes: 20
-    #needs: initial-tests-done
+    timeout-minutes: 20
+    needs: initial-tests-done
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
