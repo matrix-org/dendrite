@@ -1,6 +1,6 @@
 # Based on https://github.com/docker/build-push-action
 
-name: "Docker Hub"
+name: "Docker"
 
 on:
   release: # A GitHub release was published
@@ -40,7 +40,7 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build monolith image
@@ -99,7 +99,7 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build polylith image
