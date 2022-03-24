@@ -64,8 +64,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
-        with:
-          only-new-issues: true
 
   # run go test with different go versions
   test:
