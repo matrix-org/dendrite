@@ -62,7 +62,7 @@ func (t *LoginTypePassword) LoginFromJSON(ctx context.Context, reqBytes []byte) 
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-  username := strings.ToLower(r.Username())
+	username := strings.ToLower(r.Username())
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,

@@ -128,7 +128,7 @@ func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	if err != nil {
 		return nil, err
 	}
-	defer selectPrep.Close()
+	defer internal.CloseAndLogIfError(ctx, selectPrep, "selectPrep.close() failed")
 	stmt := sqlutil.TxStmt(txn, selectPrep)
 	///////////////
 
