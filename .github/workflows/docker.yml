@@ -5,6 +5,9 @@ name: "Docker Hub"
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - main
 
 env:
   DOCKER_NAMESPACE: matrixdotorg
@@ -13,7 +16,8 @@ env:
   PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7
 
 jobs:
-  Monolith:
+  monolith:
+    name: Monolith image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,9 +41,27 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build monolith image
+        if: ${{ github.event_name == 'push' }}
         id: docker_build_monolith
         uses: docker/build-push-action@v2
         with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          file: ./build/docker/Dockerfile.monolith
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:main
+            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:main
+
+      - name: Build release monolith image
+        if: ${{ github.event_name == 'release' }}
+        id: docker_build_monolith
+        uses: docker/build-push-action@v2
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           context: .
           file: ./build/docker/Dockerfile.monolith
           platforms: ${{ env.PLATFORMS }}
@@ -50,7 +72,8 @@ jobs:
             ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:latest
             ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
 
-  Polylith:
+  polylith:
+    name: Polylith image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -74,9 +97,27 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build polylith image
+        if: ${{ github.event_name == 'push' }}
         id: docker_build_polylith
         uses: docker/build-push-action@v2
         with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          file: ./build/docker/Dockerfile.polylith
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:main
+            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:main
+
+      - name: Build release polylith image
+        if: ${{ github.event_name == 'release' }}
+        id: docker_build_polylith
+        uses: docker/build-push-action@v2
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           context: .
           file: ./build/docker/Dockerfile.polylith
           platforms: ${{ env.PLATFORMS }}
