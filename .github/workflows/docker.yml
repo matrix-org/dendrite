@@ -62,7 +62,7 @@ jobs:
 
       - name: Build release monolith image
         if: github.event_name == 'release' # Only for GitHub releases
-        id: docker_build_monolith
+        id: docker_build_monolith_release
         uses: docker/build-push-action@v2
         with:
           cache-from: type=gha
@@ -121,7 +121,7 @@ jobs:
 
       - name: Build release polylith image
         if: github.event_name == 'release' # Only for GitHub releases
-        id: docker_build_polylith
+        id: docker_build_polylith_release
         uses: docker/build-push-action@v2
         with:
           cache-from: type=gha
