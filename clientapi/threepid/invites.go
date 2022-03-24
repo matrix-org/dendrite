@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -87,7 +86,7 @@ var (
 func CheckAndProcessInvite(
 	ctx context.Context,
 	device *userapi.Device, body *MembershipRequest, cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI, db userdb.Database,
+	rsAPI api.RoomserverInternalAPI, db userapi.UserProfileAPI,
 	roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
@@ -137,7 +136,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db userdb.Database, cfg *config.ClientAPI, device *userapi.Device,
+	db userapi.UserProfileAPI, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -206,7 +205,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db userdb.Database, cfg *config.ClientAPI, device *userapi.Device,
+	db userapi.UserProfileAPI, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
@@ -217,10 +216,17 @@ func queryIDServerStoreInvite(
 
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
-		profile, err = db.GetProfileByLocalpart(ctx, localpart)
+		res := &userapi.QueryProfileResponse{}
+		err = db.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
 		if err != nil {
 			return nil, err
 		}
+		profile = &authtypes.Profile{
+			Localpart:   localpart,
+			DisplayName: res.DisplayName,
+			AvatarURL:   res.AvatarURL,
+		}
+
 	} else {
 		profile = &authtypes.Profile{}
 	}
