@@ -217,7 +217,7 @@ func queryIDServerStoreInvite(
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
 		res := &userapi.QueryProfileResponse{}
-		err := db.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
+		err = db.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
 		if err != nil {
 			return nil, err
 		}

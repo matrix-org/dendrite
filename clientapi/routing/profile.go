@@ -141,7 +141,7 @@ func SetAvatarURL(
 	}
 
 	setRes := &userapi.PerformSetAvatarURLResponse{}
-	if err := profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
+	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
 		Localpart: localpart,
 		AvatarURL: r.AvatarURL,
 	}, setRes); err != nil {
@@ -259,7 +259,10 @@ func SetDisplayName(
 	err = profileAPI.QueryProfile(req.Context(), &userapi.QueryProfileRequest{
 		UserID: userID,
 	}, pRes)
-
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.QueryProfile failed")
+		return jsonerror.InternalServerError()
+	}
 	oldProfile := &authtypes.Profile{
 		Localpart:   localpart,
 		DisplayName: pRes.DisplayName,
