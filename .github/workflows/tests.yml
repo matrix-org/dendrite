@@ -238,10 +238,25 @@ jobs:
 
   # run Complement
   complement:
-    name: Complement
-    timeout-minutes: 20
-    needs: initial-tests-done
+    name: "Complement (${{ matrix.label }})"
+    #timeout-minutes: 20
+    #needs: initial-tests-done
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: SQLite
+
+          - label: SQLite, full HTTP APIs
+            api: full-http
+
+          - label: PostgreSQL
+            postgres: Postgres
+
+          - label: PostgreSQL, full HTTP APIs
+            postgres: Postgres
+            api: full-http
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
       # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
@@ -287,7 +302,7 @@ jobs:
           done
 
       # Build initial Dendrite image
-      - run: docker build -t complement-dendrite -f build/scripts/Complement.Dockerfile .
+      - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
 
       # Run Complement
@@ -298,4 +313,5 @@ jobs:
         name: Run Complement Tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
+          API: ${{ matrix.api && "true" }}
         working-directory: complement
