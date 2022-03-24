@@ -24,6 +24,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Get release tag
+        if: github.event_name == 'release' # Only for GitHub releases
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -59,7 +60,7 @@ jobs:
             ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:main
 
       - name: Build release monolith image
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' # Only for GitHub releases
         id: docker_build_monolith
         uses: docker/build-push-action@v2
         with:
@@ -82,6 +83,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Get release tag
+        if: github.event_name == 'release' # Only for GitHub releases
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -117,7 +119,7 @@ jobs:
             ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:main
 
       - name: Build release polylith image
-        if: ${{ github.event_name == 'release' }}
+        if: github.event_name == 'release' # Only for GitHub releases
         id: docker_build_polylith
         uses: docker/build-push-action@v2
         with:
