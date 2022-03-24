@@ -57,7 +57,6 @@ jobs:
   # Run golangci-lint
   lint:
     timeout-minutes: 5
-    if: "true"
     name: Linting
     runs-on: ubuntu-latest
     steps:
@@ -68,7 +67,6 @@ jobs:
   # run go test with different go versions
   test:
     timeout-minutes: 5
-    if: "true"
     name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     strategy:
@@ -95,7 +93,6 @@ jobs:
   build:
     name: Build for Linux
     timeout-minutes: 10
-    if: "true"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -130,7 +127,6 @@ jobs:
   build_windows:
     name: Build for Windows
     timeout-minutes: 10
-    if: "true"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -163,7 +159,6 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
       name: Initial tests passed
-      #if: "true"
       if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
       needs: [ test, build, build_windows ]
       runs-on: ubuntu-latest
@@ -246,7 +241,6 @@ jobs:
     name: Complement
     timeout-minutes: 20
     needs: initial-tests-done
-    if: "true"
     runs-on: ubuntu-latest
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
