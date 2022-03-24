@@ -22,29 +22,29 @@ func TestAliasEvent_Valid(t *testing.T) {
 		{
 			name: "empty alias, invalid alt aliases",
 			fields: fields{
-				Alias: "",
-				AltAliases: []string{ "%not:valid.local"},
+				Alias:      "",
+				AltAliases: []string{"%not:valid.local"},
 			},
 		},
 		{
 			name: "valid alias, invalid alt aliases",
 			fields: fields{
-				Alias: "#valid:test.local",
-				AltAliases: []string{ "%not:valid.local"},
+				Alias:      "#valid:test.local",
+				AltAliases: []string{"%not:valid.local"},
 			},
 		},
 		{
 			name: "empty alias, invalid alt aliases",
 			fields: fields{
-				Alias: "",
-				AltAliases: []string{ "%not:valid.local"},
+				Alias:      "",
+				AltAliases: []string{"%not:valid.local"},
 			},
 		},
 		{
 			name: "invalid alias",
 			fields: fields{
-				Alias: "%not:valid.local",
-				AltAliases: []string{ },
+				Alias:      "%not:valid.local",
+				AltAliases: []string{},
 			},
 		},
 	}

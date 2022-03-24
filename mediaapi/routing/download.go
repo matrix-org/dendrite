@@ -722,8 +722,8 @@ func (r *downloadRequest) fetchRemoteFile(
 
 	// create request for remote file
 	resp, err := client.CreateMediaDownloadRequest(ctx, r.MediaMetadata.Origin, string(r.MediaMetadata.MediaID))
-	if err != nil || resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusNotFound {
+	if err != nil || (resp != nil && resp.StatusCode != http.StatusOK) {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return "", false, fmt.Errorf("File with media ID %q does not exist on %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
 		}
 		return "", false, fmt.Errorf("file with media ID %q could not be downloaded from %s", r.MediaMetadata.MediaID, r.MediaMetadata.Origin)
