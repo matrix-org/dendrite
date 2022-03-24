@@ -2,7 +2,6 @@ name: Tests
 
 on:
   push:
-    branches: ["s7evink/gha"]
   pull_request:
 
 concurrency:
@@ -10,17 +9,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  wasm:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-wasm-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-wasm
+
+      - name: Install Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Reconfigure Git to use HTTPS auth for repo packages
+        run: >
+          git config --global url."https://github.com/".insteadOf
+          ssh://git@github.com/
+
+      - name: Install test dependencies
+        working-directory: ./test/wasm
+        run: npm ci
+
+      - name: Test
+        run: ./test-dendritejs.sh
+
   # Run golangci-lint
   lint:
+    timeout-minutes: 5
+    if: "true"
     name: golangci-lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
+        with:
+          only-new-issues: true
 
   # run go test with different go versions
   test:
+    timeout-minutes: 5
+    if: "true"
     name: Unit tests Go ${{ matrix.go }}
     runs-on: ubuntu-latest
     strategy:
@@ -33,10 +83,20 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go${{ matrix.go }}-test-
       - run: go test ./...
 
   # build Dendrite for linux with different architectures and go versions
   build:
+    timeout-minutes: 10
+    if: "true"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -50,8 +110,17 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
-      - name: Install dependencies
+      - name: Install dependencies x86
+        if: ${{ matrix.goarch == '386' }}
         run: sudo apt update && sudo apt-get install -y gcc-multilib
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goarch }}-
       - env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -60,10 +129,12 @@ jobs:
 
   # build for Windows 64-bit
   build_windows:
+    timeout-minutes: 10
+    if: "true"
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.16' ]
+        go: [ '1.16', '1.17', '1.18' ]
         goos: [ 'windows' ]
         goarch: [ 'amd64' ]
     steps:
@@ -74,6 +145,14 @@ jobs:
           go-version: ${{ matrix.go }}
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}
       - env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -81,9 +160,90 @@ jobs:
           CC: "/usr/bin/x86_64-w64-mingw32-gcc"
         run: go build -trimpath -v -o "bin/" ./cmd/...
 
+  # Dummy step to gate other tests on without repeating the whole list
+  initial-tests-done:
+      #if: "true"
+      if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
+      needs: [ test, build, build_windows ]
+      runs-on: ubuntu-latest
+      steps:
+        - run: "true"
+
+  # run database upgrade tests
+  upgrade_test:
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-upgrade
+      - name: Build upgrade-tests
+        run: go build ./cmd/dendrite-upgrade-tests
+      - name: Test upgrade
+        run: ./dendrite-upgrade-tests --head .
+
+  # run Sytest in different variations
+  sytest:
+    timeout-minutes: 20
+    needs: initial-tests-done
+    name: "Sytest: ${{ matrix.label }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: SQLite
+
+          - label: SQLite, full HTTP APIs
+            api: full-http
+
+          - label: Postgres
+            postgres: postgres
+
+          - label: Postgres, full HTTP APIs
+            postgres: postgres
+            api: full-http
+    container:
+      image: matrixdotorg/sytest-dendrite:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+      env:
+        POSTGRES: ${{ matrix.postgres && 1}}
+        API: ${{ matrix.api && 1 }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run SyTest
+        run: /bootstrap.sh dendrite
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run:  /sytest/scripts/tap_to_gha.pl /logs/results.tap
+
+      - name: Upload SyTest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
+
   # run Complement
   complement:
-    if: "false"
+    timeout-minutes: 20
+    needs: initial-tests-done
+    if: "true"
     runs-on: ubuntu-latest
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
