@@ -9,6 +9,7 @@ on:
 env:
   DOCKER_NAMESPACE: matrixdotorg
   DOCKER_HUB_USER: dendritegithub
+  GHCR_NAMESPACE: matrix-org
   PLATFORMS: linux/amd64,linux/arm64,linux/arm/v7
 
 jobs:
@@ -24,10 +25,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Login to Docker Hub
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v1
         with:
           username: ${{ env.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Login to GitHub Containers
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build monolith image
         id: docker_build_monolith
@@ -40,6 +47,8 @@ jobs:
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:latest
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:latest
+            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
 
   Polylith:
     runs-on: ubuntu-latest
@@ -53,10 +62,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Login to Docker Hub
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v1
         with:
           username: ${{ env.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Login to GitHub Containers
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build polylith image
         id: docker_build_polylith
@@ -69,3 +84,5 @@ jobs:
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:latest
             ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:latest
+            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
