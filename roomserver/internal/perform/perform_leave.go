@@ -212,7 +212,7 @@ func (r *Leaver) performFederatedRejectInvite(
 		ServerNames: []gomatrixserverlib.ServerName{domain},
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
-	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
+	if err = r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
 		// failures in PerformLeave should NEVER stop us from telling other components like the
 		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
 		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
