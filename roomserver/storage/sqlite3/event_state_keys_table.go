@@ -151,7 +151,7 @@ func (s *eventStateKeyStatements) BulkSelectEventStateKey(
 	if err != nil {
 		return nil, err
 	}
-	defer selectPrep.Close()
+	defer internal.CloseAndLogIfError(ctx, selectPrep, "selectPrep.close() failed")
 	stmt := sqlutil.TxStmt(txn, selectPrep)
 	rows, err := stmt.QueryContext(ctx, iEventStateKeyNIDs...)
 	if err != nil {
