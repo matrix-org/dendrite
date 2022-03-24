@@ -57,7 +57,7 @@ jobs:
           push: true
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:main
-            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:main
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:main
 
       - name: Build release monolith image
         if: github.event_name == 'release' # Only for GitHub releases
@@ -73,8 +73,8 @@ jobs:
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:latest
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
-            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:latest
-            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:latest
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
 
   polylith:
     name: Polylith image
@@ -116,7 +116,7 @@ jobs:
           push: true
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:main
-            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:main
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:main
 
       - name: Build release polylith image
         if: github.event_name == 'release' # Only for GitHub releases
@@ -132,5 +132,5 @@ jobs:
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:latest
             ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
-            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:latest
-            ghcr.io/${{ GHCR_NAMESPACE }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:latest
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:${{ env.RELEASE_VERSION }}
