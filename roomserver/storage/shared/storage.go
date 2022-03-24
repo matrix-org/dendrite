@@ -379,7 +379,7 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, requestSenderUserID)
 		return err
 	})
 	if err != nil {
@@ -563,11 +563,11 @@ func (d *Database) storeEvent(
 			return fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 		}
 
-		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
+		if roomNID, err = d.assignRoomNID(ctx, event.RoomID(), roomVersion); err != nil {
 			return fmt.Errorf("d.assignRoomNID: %w", err)
 		}
 
-		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
+		if eventTypeNID, err = d.assignEventTypeNID(ctx, event.Type()); err != nil {
 			return fmt.Errorf("d.assignEventTypeNID: %w", err)
 		}
 
@@ -575,7 +575,7 @@ func (d *Database) storeEvent(
 		// Assigned a numeric ID for the state_key if there is one present.
 		// Otherwise set the numeric ID for the state_key to 0.
 		if eventStateKey != nil {
-			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
+			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, *eventStateKey); err != nil {
 				return fmt.Errorf("d.assignStateKeyNID: %w", err)
 			}
 		}
@@ -701,52 +701,51 @@ func (d *Database) MissingAuthPrevEvents(
 }
 
 func (d *Database) assignRoomNID(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, roomVersion gomatrixserverlib.RoomVersion,
+	ctx context.Context, roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
 		return roomInfo.RoomNID, nil
 	}
 	// Check if we already have a numeric ID in the database.
-	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
+		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, nil, roomID, roomVersion)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
 		}
 	}
 	return roomNID, err
 }
 
 func (d *Database) assignEventTypeNID(
-	ctx context.Context, txn *sql.Tx, eventType string,
+	ctx context.Context, eventType string,
 ) (types.EventTypeNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, eventType)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, txn, eventType)
+		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, nil, eventType)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
+			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, nil, eventType)
 		}
 	}
 	return eventTypeNID, err
 }
 
 func (d *Database) assignStateKeyNID(
-	ctx context.Context, txn *sql.Tx, eventStateKey string,
+	ctx context.Context, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
+	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventStateKeyNID, err = d.EventStateKeysTable.InsertEventStateKeyNID(ctx, txn, eventStateKey)
+		eventStateKeyNID, err = d.EventStateKeysTable.InsertEventStateKeyNID(ctx, nil, eventStateKey)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
+			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, eventStateKey)
 		}
 	}
 	return eventStateKeyNID, err

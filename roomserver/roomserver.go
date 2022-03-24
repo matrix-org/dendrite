@@ -50,12 +50,12 @@ func NewInternalAPI(
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	js := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, nc := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	return internal.NewRoomserverAPI(
-		base.ProcessContext, cfg, roomserverDB, js,
-		cfg.Matrix.JetStream.TopicFor(jetstream.InputRoomEvent),
-		cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		base.ProcessContext, cfg, roomserverDB, js, nc,
+		cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
+		cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		base.Caches, perspectiveServerNames,
 	)
 }

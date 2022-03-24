@@ -51,7 +51,7 @@ type Peeks interface {
 }
 
 type Events interface {
-	SelectStateInRange(ctx context.Context, txn *sql.Tx, r types.Range, stateFilter *gomatrixserverlib.StateFilter) (map[string]map[string]bool, map[string]types.StreamEvent, error)
+	SelectStateInRange(ctx context.Context, txn *sql.Tx, r types.Range, stateFilter *gomatrixserverlib.StateFilter, roomIDs []string) (map[string]map[string]bool, map[string]types.StreamEvent, error)
 	SelectMaxEventID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 	InsertEvent(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, addState, removeState []string, transactionID *api.TransactionID, excludeFromSync bool) (streamPos types.StreamPosition, err error)
 	// SelectRecentEvents returns events between the two stream positions: exclusive of low and inclusive of high.
@@ -87,6 +87,8 @@ type Topology interface {
 	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (depth types.StreamPosition, spos types.StreamPosition, err error)
 	// DeleteTopologyForRoom removes all topological information for a room. This should only be done when removing the room entirely.
 	DeleteTopologyForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
+	// SelectStreamToTopologicalPosition converts a stream position to a topological position by finding the nearest topological position in the room.
+	SelectStreamToTopologicalPosition(ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, forward bool) (topoPos types.StreamPosition, err error)
 }
 
 type CurrentRoomState interface {
@@ -99,6 +101,8 @@ type CurrentRoomState interface {
 	SelectCurrentState(ctx context.Context, txn *sql.Tx, roomID string, stateFilter *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	// SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.
 	SelectRoomIDsWithMembership(ctx context.Context, txn *sql.Tx, userID string, membership string) ([]string, error)
+	// SelectRoomIDsWithAnyMembership returns a map of all memberships for the given user.
+	SelectRoomIDsWithAnyMembership(ctx context.Context, txn *sql.Tx, userID string) (map[string]string, error)
 	// SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
 	SelectJoinedUsers(ctx context.Context) (map[string][]string, error)
 }

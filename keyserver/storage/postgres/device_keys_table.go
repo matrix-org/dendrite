@@ -121,7 +121,7 @@ func NewPostgresDeviceKeysTable(db *sql.DB) (tables.DeviceKeys, error) {
 func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error {
 	for i, key := range keys {
 		var keyJSONStr string
-		var streamID int
+		var streamID int64
 		var displayName sql.NullString
 		err := s.selectDeviceKeysStmt.QueryRowContext(ctx, key.UserID, key.DeviceID).Scan(&keyJSONStr, &streamID, &displayName)
 		if err != nil && err != sql.ErrNoRows {
@@ -138,15 +138,15 @@ func (s *deviceKeysStatements) SelectDeviceKeysJSON(ctx context.Context, keys []
 	return nil
 }
 
-func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int32, err error) {
+func (s *deviceKeysStatements) SelectMaxStreamIDForUser(ctx context.Context, txn *sql.Tx, userID string) (streamID int64, err error) {
 	// nullable if there are no results
-	var nullStream sql.NullInt32
+	var nullStream sql.NullInt64
 	err = sqlutil.TxStmt(txn, s.selectMaxStreamForUserStmt).QueryRowContext(ctx, userID).Scan(&nullStream)
 	if err == sql.ErrNoRows {
 		err = nil
 	}
 	if nullStream.Valid {
-		streamID = nullStream.Int32
+		streamID = nullStream.Int64
 	}
 	return
 }
@@ -211,7 +211,7 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 		}
 		dk.UserID = userID
 		var keyJSON string
-		var streamID int
+		var streamID int64
 		var displayName sql.NullString
 		if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID, &displayName); err != nil {
 			return nil, err

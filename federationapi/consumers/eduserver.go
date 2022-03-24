@@ -58,9 +58,9 @@ func NewOutputEDUConsumer(
 		db:                store,
 		ServerName:        cfg.Matrix.ServerName,
 		durable:           cfg.Matrix.JetStream.Durable("FederationAPIEDUServerConsumer"),
-		typingTopic:       cfg.Matrix.JetStream.TopicFor(jetstream.OutputTypingEvent),
-		sendToDeviceTopic: cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
-		receiptTopic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		typingTopic:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		sendToDeviceTopic: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		receiptTopic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 	}
 }
 

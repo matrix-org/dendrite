@@ -61,7 +61,7 @@ func NewOutputClientDataConsumer(
 	return &OutputClientDataConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
 		durable:    cfg.Matrix.JetStream.Durable("SyncAPIClientAPIConsumer"),
 		db:         store,
 		notifier:   notifier,

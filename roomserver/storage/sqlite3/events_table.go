@@ -567,7 +567,7 @@ func (s *eventStatements) SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, 
 	if err != nil {
 		return 0, err
 	}
-	defer sqlPrep.Close()
+	defer internal.CloseAndLogIfError(ctx, sqlPrep, "sqlPrep.close() failed")
 	err = sqlutil.TxStmt(txn, sqlPrep).QueryRowContext(ctx, iEventIDs...).Scan(&result)
 	if err != nil {
 		return 0, fmt.Errorf("sqlutil.TxStmt.QueryRowContext: %w", err)
@@ -583,7 +583,7 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 	if err != nil {
 		return nil, err
 	}
-	defer sqlPrep.Close()
+	defer internal.CloseAndLogIfError(ctx, sqlPrep, "sqlPrep.close() failed")
 	sqlStmt := sqlutil.TxStmt(txn, sqlPrep)
 	iEventNIDs := make([]interface{}, len(eventNIDs))
 	for i, v := range eventNIDs {
