@@ -218,6 +218,25 @@ func (r *Leaver) performFederatedRejectInvite(
 		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
 	}
 
+	info, err := r.DB.RoomInfo(ctx, req.RoomID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("failed to get RoomInfo, still retiring invite event")
+	}
+
+	updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, req.UserID, true, info.RoomVersion)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
+	}
+	if updater != nil {
+		if _, err := updater.SetToLeave(req.UserID, eventID); err != nil {
+			util.GetLogger(ctx).WithError(err).Errorf("failed to set membership to leave, still retiring invite event")
+		} else {
+			if err := updater.Commit(); err != nil {
+				util.GetLogger(ctx).WithError(err).Errorf("failed to commit membership update, still retiring invite event")
+			}
+		}
+	}
+
 	// Withdraw the invite, so that the sync API etc are
 	// notified that we rejected it.
 	return []api.OutputEvent{
