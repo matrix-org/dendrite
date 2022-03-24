@@ -472,7 +472,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
 
 	for rows.Next() {
 		var (
@@ -504,7 +504,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
 
 	for rows.Next() {
 		var (

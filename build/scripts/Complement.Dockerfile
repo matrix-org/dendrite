@@ -21,6 +21,7 @@ WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost
+ENV API=0
 EXPOSE 8008 8448
 
 # At runtime, generate TLS cert based on the CA now mounted at /ca
@@ -28,4 +29,4 @@ EXPOSE 8008 8448
 CMD ./generate-keys --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
  ./generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
  cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
- ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}

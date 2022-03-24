@@ -102,4 +102,3 @@ func (a AliasEvent) Valid() bool {
 	}
 	return a.Alias == "" || validateAliasRegex.MatchString(a.Alias)
 }
-

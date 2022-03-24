@@ -62,7 +62,7 @@ func NewOutputReceiptEventConsumer(
 	return &OutputReceiptEventConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputReceiptEvent),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		durable:    cfg.Matrix.JetStream.Durable("SyncAPIEDUServerReceiptConsumer"),
 		db:         store,
 		notifier:   notifier,
