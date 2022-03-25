@@ -2,13 +2,19 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"sync"
+
+	"github.com/getsentry/sentry-go"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/atomic"
 )
 
 type ProcessContext struct {
 	wg       *sync.WaitGroup    // used to wait for components to shutdown
 	ctx      context.Context    // cancelled when Stop is called
 	shutdown context.CancelFunc // shut down Dendrite
+	degraded atomic.Bool
 }
 
 func NewProcessContext() *ProcessContext {
@@ -42,4 +48,15 @@ func (b *ProcessContext) WaitForShutdown() <-chan struct{} {
 
 func (b *ProcessContext) WaitForComponentsToFinish() {
 	b.wg.Wait()
+}
+
+func (b *ProcessContext) Degraded() {
+	if b.degraded.CAS(false, true) {
+		logrus.Warn("Dendrite is running in a degraded state")
+		sentry.CaptureException(fmt.Errorf("Process is running in a degraded state"))
+	}
+}
+
+func (b *ProcessContext) IsDegraded() bool {
+	return b.degraded.Load()
 }
