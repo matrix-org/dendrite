@@ -1,0 +1,54 @@
+[Unit]
+Description=Dendrite (Matrix Homeserver)
+After=syslog.target
+After=network.target
+After=postgresql.service
+
+[Service]
+Type=simple
+RestartSec=10s
+Restart=always
+DynamicUser=true
+User=dendrite
+Group=dendrite
+# Set the working directory to the dynamicaly created directory
+WorkingDirectory=/var/lib/private/dendrite
+ExecStart=/opt/dendrite/bin/dendrite-monolith-server -config /etc/dendrite/dendrite.yaml
+LimitNOFILE=65535
+TasksMax=100
+
+# hardening settings
+ProtectHome=true
+# Creates /var/log/private/dendrite (requires the config to be updated accordingly)
+LogsDirectory=dendrite
+# Creates a /var/lib/private/dendrite folder for e.g. media data or jetstream (requires the config to be updated accordingly)
+StateDirectory=dendrite
+# Create /etc/dendrite for the configuration
+ConfigurationDirectory=dendrite
+KeyringMode=private
+# Uncomment this and add the paths Dendrite should be able to write to (e.g. when setting log path, media store or jetstream path)
+#ReadWritePaths=/data/dendrite/media /data/dendrite/logs
+# Allow IPv4/IPv6 as well as UNIX sockets
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectClock=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+ProtectHostname=yes
+ProtectControlGroups=yes
+PrivateDevices=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+PrivateUsers=yes
+CapabilityBoundingSet=
+SystemCallFilter=~@mount @swap @resources @reboot @privileged @module @debug @clock @cpu-emulation @obsolete
+ProcSubset=pid
+SystemCallArchitectures=native
+UMask=0017
+
+[Install]
+WantedBy=multi-user.target
