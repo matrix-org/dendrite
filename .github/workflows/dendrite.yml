@@ -323,9 +323,8 @@ jobs:
           API: ${{ matrix.api && 1 }}
         working-directory: complement
 
-  update-docker-images:
-    name: Update Docker images
-    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
+  integration-tests-done:
+    name: Integration tests passed
     needs: [initial-tests-done, upgrade_test, sytest, complement]
     runs-on: ubuntu-latest
     steps:
@@ -333,5 +332,9 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
-      - name: Dispatch Docker build
-        uses: matrix-org/dendrite/.github/workflows/dendrite.yml@main
+
+  update-docker-images:
+    name: Update Docker images
+    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
+    needs: [integration-tests-done]
+    uses: matrix-org/dendrite/.github/workflows/dendrite.yml@main
