@@ -220,6 +220,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		return r.From, err
 	}
 
+	// If we didn't return any events at all then don't bother doing anything else.
+	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
+		return r.To, nil
+	}
+
 	// Sort the events so that we can pick out the latest events from both sections.
 	recentEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(recentEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
 	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(delta.StateEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
