@@ -167,12 +167,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 		}
 	}
 
-	if len(stateDeltas) == 0 {
-		return to
-	}
-
 	for _, roomID := range joinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
+	}
+
+	if len(stateDeltas) == 0 {
+		return to
 	}
 
 	newPos = from
