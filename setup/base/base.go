@@ -379,10 +379,10 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
-	b.DendriteAdminMux.HandleFunc("/started", func(w http.ResponseWriter, r *http.Request) {
+	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	})
-	b.DendriteAdminMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
 		if b.ProcessContext.IsDegraded() {
 			w.WriteHeader(503)
 			return
