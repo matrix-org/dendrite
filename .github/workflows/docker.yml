@@ -7,6 +7,9 @@ on:
     types: [published]
   workflow_dispatch: # A build was manually requested
   workflow_call: # Another pipeline called us
+    secrets:
+      DOCKER_TOKEN:
+        required: true
 
 env:
   DOCKER_NAMESPACE: matrixdotorg
