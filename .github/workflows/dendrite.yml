@@ -334,4 +334,4 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
       - name: Dispatch Docker build
-        uses: ./.github/workflows/dendrite.yml
+        uses: matrix-org/dendrite/.github/workflows/dendrite.yml
