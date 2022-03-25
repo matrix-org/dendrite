@@ -220,24 +220,19 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		return r.From, err
 	}
 
-	// If we didn't return any events at all then don't bother advancing the stream position.
-	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
-		return r.From, nil
-	}
-
 	// Sort the events so that we can pick out the latest events from both sections.
 	recentEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(recentEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
 	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(delta.StateEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
 
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
-	latestPosition := r.From
+	latestPosition := r.To
 	updateLatestPosition := func(mostRecentEventID string) {
 		if _, pos, err := p.DB.PositionInTopology(ctx, mostRecentEventID); err == nil {
 			switch {
-			case r.Backwards && pos < latestPosition:
+			case r.Backwards && pos > latestPosition:
 				fallthrough
-			case !r.Backwards && pos > latestPosition:
+			case !r.Backwards && pos < latestPosition:
 				latestPosition = pos
 			}
 		}
