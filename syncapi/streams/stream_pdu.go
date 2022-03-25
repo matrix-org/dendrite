@@ -147,7 +147,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 		To:        to,
 		Backwards: from > to,
 	}
-	newPos = from
 
 	var err error
 	var stateDeltas []types.StateDelta
@@ -168,10 +167,15 @@ func (p *PDUStreamProvider) IncrementalSync(
 		}
 	}
 
+	if len(stateDeltas) == 0 {
+		return to
+	}
+
 	for _, roomID := range joinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
 
+	newPos = from
 	for _, delta := range stateDeltas {
 		var pos types.StreamPosition
 		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, req.Response); err != nil {
