@@ -178,7 +178,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return to
 		}
-		if pos > newPos {
+		switch {
+		case r.Backwards && pos < newPos:
+			fallthrough
+		case !r.Backwards && pos > newPos:
 			newPos = pos
 		}
 	}
