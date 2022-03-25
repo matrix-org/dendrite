@@ -5,11 +5,8 @@ name: "Docker"
 on:
   release: # A GitHub release was published
     types: [published]
-  #workflow_run: # The Dendrite pipeline completed successfully on main
-  #  workflows: [Dendrite]
-  #  types: [completed]
-  #  branches: [main]
   workflow_dispatch: # A build was manually requested
+  workflow_call: # Another pipeline called us
 
 env:
   DOCKER_NAMESPACE: matrixdotorg
@@ -46,10 +43,8 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build monolith image
-        if: >-
-          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-          github.event_name == 'workflow_dispatch'
+      - name: Build main monolith image
+        if: github.ref_name == 'main'
         id: docker_build_monolith
         uses: docker/build-push-action@v2
         with:
@@ -108,10 +103,8 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build polylith image
-        if: >-
-          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-          github.event_name == 'workflow_dispatch'
+      - name: Build main polylith image
+        if: github.ref_name == 'main'
         id: docker_build_polylith
         uses: docker/build-push-action@v2
         with:

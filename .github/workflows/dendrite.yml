@@ -76,7 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [ '1.16', '1.17', '1.18' ]
+        go: ["1.16", "1.17", "1.18"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -101,9 +101,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [ '1.16', '1.17', '1.18' ]
-        goos: [ 'linux' ]
-        goarch: [ 'amd64', '386' ]
+        go: ["1.16", "1.17", "1.18"]
+        goos: ["linux"]
+        goarch: ["amd64", "386"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -134,9 +134,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.16', '1.17', '1.18' ]
-        goos: [ 'windows' ]
-        goarch: [ 'amd64' ]
+        go: ["1.16", "1.17", "1.18"]
+        goos: ["windows"]
+        goarch: ["amd64"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Go ${{ matrix.go }}
@@ -163,7 +163,7 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
     name: Initial tests passed
-    needs: [ lint, test, build, build_windows ]
+    needs: [lint, test, build, build_windows]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:
@@ -183,7 +183,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.16'
+          go-version: "1.16"
       - uses: actions/cache@v3
         with:
           path: |
@@ -232,7 +232,7 @@ jobs:
         working-directory: /src
       - name: Summarise results.tap
         if: ${{ always() }}
-        run:  /sytest/scripts/tap_to_gha.pl /logs/results.tap
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
 
       - name: Upload Sytest logs
         uses: actions/upload-artifact@v2
@@ -322,3 +322,16 @@ jobs:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
           API: ${{ matrix.api && 1 }}
         working-directory: complement
+
+  update-docker-images:
+    name: Update Docker images
+    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
+    needs: [initial-tests-done, upgrade_test, sytest, complement]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check integration tests passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+      - name: Dispatch Docker build
+        uses: ./.github/workflows/dendrite.yml
