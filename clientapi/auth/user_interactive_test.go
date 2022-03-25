@@ -25,15 +25,25 @@ var (
 )
 
 type fakeAccountDatabase struct {
-	AccountDatabase
+	api.UserAccountAPI
 }
 
-func (*fakeAccountDatabase) GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error) {
-	acc, ok := lookup[localpart+" "+plaintextPassword]
+func (d *fakeAccountDatabase) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
+	return nil
+}
+
+func (d *fakeAccountDatabase) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	return nil
+}
+
+func (d *fakeAccountDatabase) QueryAccountByPassword(ctx context.Context, req *api.QueryAccountByPasswordRequest, res *api.QueryAccountByPasswordResponse) error {
+	acc, ok := lookup[req.Localpart+" "+req.PlaintextPassword]
 	if !ok {
-		return nil, fmt.Errorf("unknown user/password")
+		return fmt.Errorf("unknown user/password")
 	}
-	return acc, nil
+	res.Account = acc
+	res.Exists = true
+	return nil
 }
 
 func setup() *UserInteractive {
