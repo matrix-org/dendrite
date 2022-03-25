@@ -327,6 +327,7 @@ jobs:
     name: Integration tests passed
     needs: [initial-tests-done, upgrade_test, sytest, complement]
     runs-on: ubuntu-latest
+    if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:
       - name: Check integration tests passed
         uses: re-actors/alls-green@release/v1
