@@ -85,7 +85,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msg *na
 	}
 
 	var output types.OutputSendToDeviceEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
+	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("output log: message parse failure")
 		sentry.CaptureException(err)

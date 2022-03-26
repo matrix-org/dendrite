@@ -106,7 +106,7 @@ func (t *OutputEDUConsumer) onSendToDeviceEvent(ctx context.Context, msg *nats.M
 	}
 	// Extract the send-to-device event from msg.
 	var ote syncTypes.OutputSendToDeviceEvent
-	if err := json.Unmarshal(msg.Data, &ote); err != nil {
+	if err = json.Unmarshal(msg.Data, &ote); err != nil {
 		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
 		return true
 	}
