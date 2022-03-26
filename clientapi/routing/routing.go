@@ -965,7 +965,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return UpgradeRoom(req, device, cfg, vars["roomID"], accountDB, rsAPI, asAPI)
+			return UpgradeRoom(req, device, cfg, vars["roomID"], userAPI, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 

@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	accounts "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -46,7 +45,7 @@ type upgradeRoomResponse struct {
 func UpgradeRoom(
 	req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI,
-	roomID string, accountDB accounts.Database,
+	roomID string, profileAPI userapi.UserProfileAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -140,14 +139,14 @@ func UpgradeRoom(
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	newRoomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
 	userID := device.UserID
-	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(req.Context(), userID, asAPI, profileAPI)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return jsonerror.InternalServerError()
 	}
 
 	// Make the tombstone event
-	tombstoneEvent, resErr := makeTombstoneEvent(req, device, cfg, evTime, roomID, newRoomID, accountDB, rsAPI)
+	tombstoneEvent, resErr := makeTombstoneEvent(req, device, cfg, evTime, roomID, newRoomID, rsAPI)
 	if err != nil {
 		return *resErr
 	}
@@ -402,7 +401,7 @@ func UpgradeRoom(
 	}
 
 	// Clear the old canonical alias event in the old room
-	emptyCanonicalAliasEvent, resErr := makeHeaderedEvent(req, device, cfg, evTime, roomID, accountDB, rsAPI, fledglingEvent{
+	emptyCanonicalAliasEvent, resErr := makeHeaderedEvent(req, device, cfg, evTime, roomID, rsAPI, fledglingEvent{
 		Type:    gomatrixserverlib.MRoomCanonicalAlias,
 		Content: map[string]interface{}{},
 	})
@@ -424,7 +423,7 @@ func UpgradeRoom(
 	}
 
 	// 6. Restrict power levels in the old room
-	if resErr = restrictOldRoomPowerLevels(req, device, cfg, evTime, roomID, accountDB, rsAPI, *powerLevelContent); resErr != nil {
+	if resErr = restrictOldRoomPowerLevels(req, device, cfg, evTime, roomID, rsAPI, *powerLevelContent); resErr != nil {
 		return *resErr
 	}
 
@@ -555,7 +554,7 @@ func moveLocalAliases(req *http.Request,
 
 func restrictOldRoomPowerLevels(req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI, evTime time.Time,
-	roomID string, accountDB accounts.Database,
+	roomID string,
 	rsAPI roomserverAPI.RoomserverInternalAPI, powerLevelContent gomatrixserverlib.PowerLevelContent) *util.JSONResponse {
 	restrictedPowerLevelContent := &gomatrixserverlib.PowerLevelContent{}
 	*restrictedPowerLevelContent = powerLevelContent
@@ -567,7 +566,7 @@ func restrictOldRoomPowerLevels(req *http.Request, device *userapi.Device,
 	restrictedPowerLevelContent.EventsDefault = restrictedDefaultPowerLevel
 	restrictedPowerLevelContent.Invite = restrictedDefaultPowerLevel
 
-	restrictedPowerLevelsHeadered, resErr := makeHeaderedEvent(req, device, cfg, evTime, roomID, accountDB, rsAPI, fledglingEvent{
+	restrictedPowerLevelsHeadered, resErr := makeHeaderedEvent(req, device, cfg, evTime, roomID, rsAPI, fledglingEvent{
 		Type:    gomatrixserverlib.MRoomPowerLevels,
 		Content: restrictedPowerLevelContent,
 	})
@@ -629,7 +628,7 @@ func userIsAuthorized(
 
 func makeHeaderedEvent(req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI, evTime time.Time,
-	roomID string, accountDB accounts.Database,
+	roomID string,
 	rsAPI roomserverAPI.RoomserverInternalAPI, event fledglingEvent) (*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
 
 	builder := gomatrixserverlib.EventBuilder{
@@ -693,7 +692,7 @@ func makeHeaderedEvent(req *http.Request, device *userapi.Device,
 func makeTombstoneEvent(
 	req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI, evTime time.Time,
-	roomID, newRoomID string, accountDB accounts.Database,
+	roomID, newRoomID string,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) (*gomatrixserverlib.HeaderedEvent, *util.JSONResponse) {
 	content := map[string]interface{}{
@@ -704,7 +703,7 @@ func makeTombstoneEvent(
 		Type:    "m.room.tombstone",
 		Content: content,
 	}
-	return makeHeaderedEvent(req, device, cfg, evTime, roomID, accountDB, rsAPI, event)
+	return makeHeaderedEvent(req, device, cfg, evTime, roomID, rsAPI, event)
 
 }
 
