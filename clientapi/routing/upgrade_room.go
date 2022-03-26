@@ -64,7 +64,7 @@ func UpgradeRoom(
 	}
 
 	// Validate that the room version is supported
-	if _, err := version.SupportedRoomVersion(gomatrixserverlib.RoomVersion(r.NewVersion)); err != nil {
+	if _, err = version.SupportedRoomVersion(gomatrixserverlib.RoomVersion(r.NewVersion)); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnsupportedRoomVersion("This server does not support that room version"),
@@ -74,7 +74,7 @@ func UpgradeRoom(
 	// Return an immediate error if the room does not exist
 	verReq := roomserverAPI.QueryRoomVersionForRoomRequest{RoomID: roomID}
 	verRes := roomserverAPI.QueryRoomVersionForRoomResponse{}
-	if err := rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
+	if err = rsAPI.QueryRoomVersionForRoom(req.Context(), &verReq, &verRes); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
