@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -42,6 +41,8 @@ type upgradeRoomResponse struct {
 	ReplacementRoom string `json:"replacement_room"`
 }
 
+// UpgradeRoom implements /upgrade
+// nolint: gocyclo
 func UpgradeRoom(
 	req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI,
@@ -81,8 +82,8 @@ func UpgradeRoom(
 	}
 
 	// 1. Check if the user is authorized to actually perform the upgrade (can send m.room.tombstone)
-	if err := userIsAuthorized(req, device, roomID, rsAPI); err != nil {
-		return *err
+	if rErr := userIsAuthorized(req, device, roomID, rsAPI); rErr != nil {
+		return *rErr
 	}
 
 	oldCreateEvent := roomserverAPI.GetStateEvent(req.Context(), rsAPI, roomID, gomatrixserverlib.StateKeyTuple{
@@ -194,6 +195,10 @@ func UpgradeRoom(
 	tempPowerLevelsEvent := createTemporaryPowerLevels(powerLevelContent, userID)
 
 	joinRulesContent, err := oldJoinRulesEvent.JoinRule()
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("Join rules event had bad content")
+		return jsonerror.InternalServerError()
+	}
 	newJoinRulesEvent := fledglingEvent{
 		Type: gomatrixserverlib.MRoomJoinRules,
 		Content: map[string]interface{}{
@@ -202,6 +207,10 @@ func UpgradeRoom(
 	}
 
 	historyVisibilityContent, err := oldHistoryVisibilityEvent.HistoryVisibility()
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("History visibility event had bad content")
+		return jsonerror.InternalServerError()
+	}
 	newHistoryVisibilityEvent := fledglingEvent{
 		Type: gomatrixserverlib.MRoomHistoryVisibility,
 		Content: map[string]interface{}{
@@ -530,7 +539,7 @@ func moveLocalAliases(req *http.Request,
 
 	aliasReq := roomserverAPI.GetAliasesForRoomIDRequest{RoomID: roomID}
 	aliasRes := roomserverAPI.GetAliasesForRoomIDResponse{}
-	if err := rsAPI.GetAliasesForRoomID(req.Context(), &aliasReq, &aliasRes); err != nil {
+	if err = rsAPI.GetAliasesForRoomID(req.Context(), &aliasReq, &aliasRes); err != nil {
 		return &internalServerError
 	}
 
@@ -643,7 +652,7 @@ func makeHeaderedEvent(req *http.Request, device *userapi.Device,
 		resErr := jsonerror.InternalServerError()
 		return nil, &resErr
 	}
-	var queryRes api.QueryLatestEventsAndStateResponse
+	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
 	headeredEvent, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, evTime, rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
