@@ -173,12 +173,15 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	}
 
 	if creatorID != request.UserID {
-		plEvent, err := r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
+		var plEvent *gomatrixserverlib.HeaderedEvent
+		var pls *gomatrixserverlib.PowerLevelContent
+
+		plEvent, err = r.DB.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomPowerLevels, "")
 		if err != nil {
 			return fmt.Errorf("r.DB.GetStateEvent: %w", err)
 		}
 
-		pls, err := plEvent.PowerLevels()
+		pls, err = plEvent.PowerLevels()
 		if err != nil {
 			return fmt.Errorf("plEvent.PowerLevels: %w", err)
 		}
@@ -223,7 +226,7 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 			}
 
 			stateRes := &api.QueryLatestEventsAndStateResponse{}
-			if err := helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
+			if err = helpers.QueryLatestEventsAndState(ctx, r.DB, &api.QueryLatestEventsAndStateRequest{RoomID: roomID, StateToFetch: eventsNeeded.Tuples()}, stateRes); err != nil {
 				return err
 			}
 

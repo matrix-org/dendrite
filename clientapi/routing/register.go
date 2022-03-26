@@ -44,7 +44,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 var (
@@ -523,8 +522,7 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	userAPI userapi.UserInternalAPI,
-	accountDB userdb.Database,
+	userAPI userapi.UserRegisterAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var r registerRequest
@@ -552,13 +550,12 @@ func Register(
 	}
 	// Auto generate a numeric username if r.Username is empty
 	if r.Username == "" {
-		id, err := accountDB.GetNewNumericLocalpart(req.Context())
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
+		res := &userapi.QueryNumericLocalpartResponse{}
+		if err := userAPI.QueryNumericLocalpart(req.Context(), res); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return jsonerror.InternalServerError()
 		}
-
-		r.Username = strconv.FormatInt(id, 10)
+		r.Username = strconv.FormatInt(res.ID, 10)
 	}
 
 	// Is this an appservice registration? It will be if the access
@@ -606,7 +603,7 @@ func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
 		return util.JSONResponse{
@@ -671,7 +668,7 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 	accessToken string,
 	accessTokenErr error,
 ) util.JSONResponse {
@@ -760,7 +757,7 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -798,7 +795,7 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
@@ -825,7 +822,7 @@ func checkAndCompleteFlow(
 // not all
 func completeRegistration(
 	ctx context.Context,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 	username, password, appserviceID, ipAddr, userAgent, sessionID string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
@@ -991,7 +988,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.ClientAPI,
-	accountDB userdb.Database,
+	registerAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 
@@ -1013,14 +1010,18 @@ func RegisterAvailable(
 		}
 	}
 
-	availability, availabilityErr := accountDB.CheckAccountAvailability(req.Context(), username)
-	if availabilityErr != nil {
+	res := &userapi.QueryAccountAvailabilityResponse{}
+	err := registerAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
+		Localpart: username,
+	}, res)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to check availability: " + availabilityErr.Error()),
+			JSON: jsonerror.Unknown("failed to check availability:" + err.Error()),
 		}
 	}
-	if !availability {
+
+	if !res.Available {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UserInUse("Desired User ID is already taken."),

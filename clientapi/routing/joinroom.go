@@ -18,12 +18,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -32,7 +30,7 @@ func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	accountDB userdb.Database,
+	profileAPI api.UserProfileAPI,
 	roomIDOrAlias string,
 ) util.JSONResponse {
 	// Prepare to ask the roomserver to perform the room join.
@@ -60,19 +58,23 @@ func JoinRoomByIDOrAlias(
 	_ = httputil.UnmarshalJSONRequest(req, &joinReq.Content)
 
 	// Work out our localpart for the client profile request.
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-	} else {
-		// Request our profile content to populate the request content with.
-		var profile *authtypes.Profile
-		profile, err = accountDB.GetProfileByLocalpart(req.Context(), localpart)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
-		} else {
-			joinReq.Content["displayname"] = profile.DisplayName
-			joinReq.Content["avatar_url"] = profile.AvatarURL
+
+	// Request our profile content to populate the request content with.
+	res := &api.QueryProfileResponse{}
+	err := profileAPI.QueryProfile(req.Context(), &api.QueryProfileRequest{UserID: device.UserID}, res)
+	if err != nil || !res.UserExists {
+		if !res.UserExists {
+			util.GetLogger(req.Context()).Error("Unable to query user profile, no profile found.")
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("Unable to query user profile, no profile found."),
+			}
 		}
+
+		util.GetLogger(req.Context()).WithError(err).Error("UserProfileAPI.QueryProfile failed")
+	} else {
+		joinReq.Content["displayname"] = res.DisplayName
+		joinReq.Content["avatar_url"] = res.AvatarURL
 	}
 
 	// Ask the roomserver to perform the join.

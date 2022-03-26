@@ -63,7 +63,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, synapseAdminRouter, cfg, rsAPI, asAPI,
-		accountsDB, userAPI, federation,
+		userAPI, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg,
 	)

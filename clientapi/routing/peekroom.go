@@ -19,7 +19,6 @@ import (
 
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -28,7 +27,6 @@ func PeekRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	accountDB userdb.Database,
 	roomIDOrAlias string,
 ) util.JSONResponse {
 	// if this is a remote roomIDOrAlias, we have to ask the roomserver (or federation sender?) to
@@ -82,7 +80,6 @@ func UnpeekRoomByID(
 	req *http.Request,
 	device *api.Device,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	accountDB userdb.Database,
 	roomID string,
 ) util.JSONResponse {
 	unpeekReq := roomserverAPI.PerformUnpeekRequest{
