@@ -169,8 +169,9 @@ func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) 
 	return promhttp.InstrumentHandlerCounter(
 		promauto.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: metricsName,
-				Help: "Total number of http requests for HTML resources",
+				Name:      metricsName,
+				Help:      "Total number of http requests for HTML resources",
+				Namespace: "dendrite",
 			},
 			[]string{"code"},
 		),
@@ -201,7 +202,28 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 		h.ServeHTTP(w, req)
 	}
 
-	return http.HandlerFunc(withSpan)
+	return promhttp.InstrumentHandlerCounter(
+		promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name:      metricsName + "_requests_total",
+				Help:      "Total number of internal API calls",
+				Namespace: "dendrite",
+			},
+			[]string{"code"},
+		),
+		promhttp.InstrumentHandlerResponseSize(
+			promauto.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Namespace: "dendrite",
+					Name:      metricsName + "_response_size_bytes",
+					Help:      "A histogram of response sizes for requests.",
+					Buckets:   []float64{200, 500, 900, 1500, 5000, 15000, 50000, 100000},
+				},
+				[]string{},
+			),
+			http.HandlerFunc(withSpan),
+		),
+	)
 }
 
 // MakeFedAPI makes an http.Handler that checks matrix federation authentication.
