@@ -75,9 +75,6 @@ func SearchUserDirectory(
 			userID = fmt.Sprintf("@%s:%s", user.Localpart, serverName)
 		}
 		if _, ok := results[userID]; !ok {
-			if userID == "_server" {
-				continue
-			}
 			results[userID] = authtypes.FullyQualifiedProfile{
 				UserID:      userID,
 				DisplayName: user.DisplayName,
