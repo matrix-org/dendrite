@@ -178,7 +178,7 @@ func Setup(
 			logrus.Warnf("Consent tracking is enabled, but server notes are not. No server notice will be sent to users")
 		} else {
 			// start a new go routine to send messages about consent
-			go sendServerNoticeForConsent(userAPI, rsAPI, &cfg.Matrix.ServerNotices, cfg, serverNotificationSender, accountDB, asAPI)
+			go sendServerNoticeForConsent(userAPI, rsAPI, &cfg.Matrix.ServerNotices, cfg, serverNotificationSender, asAPI)
 		}
 		publicAPIMux.Handle("/consent",
 			httputil.MakeHTMLAPI("consent", func(writer http.ResponseWriter, request *http.Request) *util.JSONResponse {
