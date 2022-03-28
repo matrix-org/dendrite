@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/eduserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/util"
 )
 
@@ -33,7 +32,7 @@ type typingContentJSON struct {
 // sends the typing events to client API typingProducer
 func SendTyping(
 	req *http.Request, device *userapi.Device, roomID string,
-	userID string, accountDB userdb.Database,
+	userID string,
 	eduAPI api.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) util.JSONResponse {

@@ -39,14 +39,14 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
 ) api.KeyInternalAPI {
-	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	db, err := storage.NewDatabase(&cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
 	keyChangeProducer := &producers.KeyChange{
-		Topic:     string(cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent)),
+		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent)),
 		JetStream: js,
 		DB:        db,
 	}

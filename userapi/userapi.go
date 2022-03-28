@@ -46,7 +46,7 @@ func NewInternalAPI(
 	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
-	js, _ := jetstream.Prepare(&cfg.Matrix.JetStream)
+	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncProducer := producers.NewSyncAPI(
 		db, js,
@@ -54,8 +54,8 @@ func NewInternalAPI(
 		// it's handled by clientapi, and hence uses its topic. When user
 		// API handles it for all account data, we can remove it from
 		// here.
-		cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
-		cfg.Matrix.JetStream.TopicFor(jetstream.OutputNotificationData),
+		cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
+		cfg.Matrix.JetStream.Prefixed(jetstream.OutputNotificationData),
 	)
 
 	userAPI := &internal.UserInternalAPI{

@@ -70,8 +70,5 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 		CrossSigningKeysTable: csk,
 		CrossSigningSigsTable: css,
 	}
-	if err = d.PartitionOffsetStatements.Prepare(db, d.Writer, "keyserver"); err != nil {
-		return nil, err
-	}
 	return d, nil
 }

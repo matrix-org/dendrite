@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/version"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -59,7 +58,6 @@ func SendServerNotice(
 	cfgClient *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
-	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
@@ -86,7 +84,7 @@ func SendServerNotice(
 	if resErr != nil {
 		return *resErr
 	}
-	res, _ := sendServerNotice(ctx, r, rsAPI, cfgNotices, cfgClient, senderDevice, accountsDB, asAPI, userAPI, txnID, device, txnCache)
+	res, _ := sendServerNotice(ctx, r, rsAPI, cfgNotices, cfgClient, senderDevice, asAPI, userAPI, txnID, device, txnCache)
 	return res
 }
 
@@ -97,7 +95,6 @@ func sendServerNotice(
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,
-	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.UserInternalAPI,
 	txnID *string,
@@ -155,7 +152,7 @@ func sendServerNotice(
 			PowerLevelContentOverride: pl,
 		}
 
-		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, accountsDB, rsAPI, asAPI, time.Now())
+		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, userAPI, rsAPI, asAPI, time.Now())
 
 		switch data := roomRes.JSON.(type) {
 		case createRoomResponse:
@@ -190,7 +187,7 @@ func sendServerNotice(
 		}
 		// re-invite the user
 		if res.Membership != gomatrixserverlib.Join {
-			res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			res, err := sendInvite(ctx, userAPI, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
 			if err != nil {
 				return res, nil
 			}
@@ -274,7 +271,6 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 func getSenderDevice(
 	ctx context.Context,
 	userAPI userapi.UserInternalAPI,
-	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse
@@ -289,8 +285,12 @@ func getSenderDevice(
 	}
 
 	// set the avatarurl for the user
-	if err = accountDB.SetAvatarURL(ctx, cfg.Matrix.ServerNotices.LocalPart, cfg.Matrix.ServerNotices.AvatarURL); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("accountDB.SetAvatarURL failed")
+	res := &userapi.PerformSetAvatarURLResponse{}
+	if err = userAPI.SetAvatarURL(ctx, &userapi.PerformSetAvatarURLRequest{
+		Localpart: cfg.Matrix.ServerNotices.LocalPart,
+		AvatarURL: cfg.Matrix.ServerNotices.AvatarURL,
+	}, res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 

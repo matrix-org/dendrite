@@ -408,6 +408,8 @@ func (m *DendriteMonolith) Stop() {
 	_ = m.PineconeRouter.Close()
 }
 
+const MaxFrameSize = types.MaxFrameSize
+
 type Conduit struct {
 	conn      net.Conn
 	port      types.SwitchPortID

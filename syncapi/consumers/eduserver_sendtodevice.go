@@ -57,7 +57,7 @@ func NewOutputSendToDeviceEventConsumer(
 	return &OutputSendToDeviceEventConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputSendToDeviceEvent),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		durable:    cfg.Matrix.JetStream.Durable("SyncAPIEDUServerSendToDeviceConsumer"),
 		db:         store,
 		serverName: cfg.Matrix.ServerName,

@@ -40,7 +40,7 @@ type threePIDsResponse struct {
 // RequestEmailToken implements:
 //     POST /account/3pid/email/requestToken
 //     POST /register/email/requestToken
-func RequestEmailToken(req *http.Request, accountDB userdb.Database, cfg *config.ClientAPI) util.JSONResponse {
+func RequestEmailToken(req *http.Request, threePIDAPI api.UserThreePIDAPI, cfg *config.ClientAPI) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -50,13 +50,18 @@ func RequestEmailToken(req *http.Request, accountDB userdb.Database, cfg *config
 	var err error
 
 	// Check if the 3PID is already in use locally
-	localpart, err := accountDB.GetLocalpartForThreePID(req.Context(), body.Email, "email")
+	res := &api.QueryLocalpartForThreePIDResponse{}
+	err = threePIDAPI.QueryLocalpartForThreePID(req.Context(), &api.QueryLocalpartForThreePIDRequest{
+		ThreePID: body.Email,
+		Medium:   "email",
+	}, res)
+
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetLocalpartForThreePID failed")
+		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.QueryLocalpartForThreePID failed")
 		return jsonerror.InternalServerError()
 	}
 
-	if len(localpart) > 0 {
+	if len(res.Localpart) > 0 {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MatrixError{
@@ -85,7 +90,7 @@ func RequestEmailToken(req *http.Request, accountDB userdb.Database, cfg *config
 
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
-	req *http.Request, accountDB userdb.Database, device *api.Device,
+	req *http.Request, threePIDAPI api.UserThreePIDAPI, device *api.Device,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
@@ -136,8 +141,12 @@ func CheckAndSave3PIDAssociation(
 		return jsonerror.InternalServerError()
 	}
 
-	if err = accountDB.SaveThreePIDAssociation(req.Context(), address, localpart, medium); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountsDB.SaveThreePIDAssociation failed")
+	if err = threePIDAPI.PerformSaveThreePIDAssociation(req.Context(), &api.PerformSaveThreePIDAssociationRequest{
+		ThreePID:  address,
+		Localpart: localpart,
+		Medium:    medium,
+	}, &struct{}{}); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.PerformSaveThreePIDAssociation failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -149,7 +158,7 @@ func CheckAndSave3PIDAssociation(
 
 // GetAssociated3PIDs implements GET /account/3pid
 func GetAssociated3PIDs(
-	req *http.Request, accountDB userdb.Database, device *api.Device,
+	req *http.Request, threepidAPI api.UserThreePIDAPI, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -157,27 +166,30 @@ func GetAssociated3PIDs(
 		return jsonerror.InternalServerError()
 	}
 
-	threepids, err := accountDB.GetThreePIDsForLocalpart(req.Context(), localpart)
+	res := &api.QueryThreePIDsForLocalpartResponse{}
+	err = threepidAPI.QueryThreePIDsForLocalpart(req.Context(), &api.QueryThreePIDsForLocalpartRequest{
+		Localpart: localpart,
+	}, res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetThreePIDsForLocalpart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.QueryThreePIDsForLocalpart failed")
 		return jsonerror.InternalServerError()
 	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: threePIDsResponse{threepids},
+		JSON: threePIDsResponse{res.ThreePIDs},
 	}
 }
 
 // Forget3PID implements POST /account/3pid/delete
-func Forget3PID(req *http.Request, accountDB userdb.Database) util.JSONResponse {
+func Forget3PID(req *http.Request, threepidAPI api.UserThreePIDAPI) util.JSONResponse {
 	var body authtypes.ThreePID
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
 	}
 
-	if err := accountDB.RemoveThreePIDAssociation(req.Context(), body.Address, body.Medium); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.RemoveThreePIDAssociation failed")
+	if err := threepidAPI.PerformForgetThreePID(req.Context(), &api.PerformForgetThreePIDRequest{}, &struct{}{}); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.PerformForgetThreePID failed")
 		return jsonerror.InternalServerError()
 	}
 
