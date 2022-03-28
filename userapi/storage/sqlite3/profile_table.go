@@ -54,6 +54,7 @@ const selectProfilesBySearchSQL = "" +
 
 type profilesStatements struct {
 	db                           *sql.DB
+	serverNoticesLocalpart       string
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt
@@ -61,9 +62,10 @@ type profilesStatements struct {
 	selectProfilesBySearchStmt   *sql.Stmt
 }
 
-func NewSQLiteProfilesTable(db *sql.DB) (tables.ProfileTable, error) {
+func NewSQLiteProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables.ProfileTable, error) {
 	s := &profilesStatements{
-		db: db,
+		db:                     db,
+		serverNoticesLocalpart: serverNoticesLocalpart,
 	}
 	_, err := db.Exec(profilesSchema)
 	if err != nil {
@@ -131,7 +133,9 @@ func (s *profilesStatements) SelectProfilesBySearch(
 		if err := rows.Scan(&profile.Localpart, &profile.DisplayName, &profile.AvatarURL); err != nil {
 			return nil, err
 		}
-		profiles = append(profiles, profile)
+		if profile.Localpart != s.serverNoticesLocalpart {
+			profiles = append(profiles, profile)
+		}
 	}
 	return profiles, nil
 }
