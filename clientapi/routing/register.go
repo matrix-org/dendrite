@@ -615,12 +615,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	fmt.Printf("Request: %+v\n", r)
-
-	res := handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
-	fmt.Printf("Response: %+v\n", res)
-
-	return res
+	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }
 
 func handleGuestRegistration(
