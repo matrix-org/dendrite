@@ -41,6 +41,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -549,7 +550,7 @@ func Register(
 		r.InitialDisplayName = data.InitialDisplayName
 		r.InhibitLogin = data.InhibitLogin
 	}
-	if resErr := json.Unmarshal(reqBody, &r); resErr != nil {
+	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Request body contains invalid JSON"),
