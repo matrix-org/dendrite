@@ -362,13 +362,14 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()
+	pMux.PathPrefix(users.PublicURL).HandlerFunc(userProvider.FederatedUserProfiles)
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	pHTTP := m.PineconeQUIC.HTTP()
+	pHTTP.Mux().Handle(users.PublicURL, pMux)
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
-	pHTTP.Mux().HandleFunc(users.PublicURL, userProvider.FederatedUserProfiles)
 
 	// Build both ends of a HTTP multiplex.
 	h2s := &http2.Server{}
