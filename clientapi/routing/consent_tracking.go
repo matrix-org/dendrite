@@ -96,7 +96,7 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 			}
 			return &internalError
 		}
-		if err := userAPI.PerformUpdatePolicyVersion(
+		if err = userAPI.PerformUpdatePolicyVersion(
 			req.Context(),
 			&userapi.UpdatePolicyVersionRequest{
 				PolicyVersion: data.Version,

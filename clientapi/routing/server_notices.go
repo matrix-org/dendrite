@@ -107,7 +107,7 @@ func sendServerNotice(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
-		}, nil
+		}, fmt.Errorf("Invalid JSON")
 	}
 
 	qryServerNoticeRoom := &userapi.QueryServerNoticeRoomResponse{}
@@ -116,11 +116,11 @@ func sendServerNotice(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
-		}, nil
+		}, fmt.Errorf("Invalid JSON")
 	}
 	err = userAPI.SelectServerNoticeRoomID(ctx, &userapi.QueryServerNoticeRoomRequest{Localpart: localpart}, qryServerNoticeRoom)
 	if err != nil {
-		return util.ErrorResponse(err), nil
+		return util.ErrorResponse(err), err
 	}
 
 	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
@@ -129,17 +129,18 @@ func sendServerNotice(
 
 	// create a new room for the user
 	if qryServerNoticeRoom.RoomID == "" {
+		var pl, cc []byte
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
 		powerLevelContent.Users[serverNoticeRequest.UserID] = -10 // taken from Synapse
-		pl, err := json.Marshal(powerLevelContent)
+		pl, err = json.Marshal(powerLevelContent)
 		if err != nil {
-			return util.ErrorResponse(err), nil
+			return util.ErrorResponse(err), err
 		}
 		createContent := map[string]interface{}{}
 		createContent["m.federate"] = false
-		cc, err := json.Marshal(createContent)
+		cc, err = json.Marshal(createContent)
 		if err != nil {
-			return util.ErrorResponse(err), nil
+			return util.ErrorResponse(err), err
 		}
 		crReq := createRoomRequest{
 			Invite:                    []string{serverNoticeRequest.UserID},
@@ -158,7 +159,7 @@ func sendServerNotice(
 		case createRoomResponse:
 			roomID = data.RoomID
 			res := &userapi.UpdateServerNoticeRoomResponse{}
-			err := userAPI.UpdateServerNoticeRoomID(ctx, &userapi.UpdateServerNoticeRoomRequest{RoomID: roomID, Localpart: localpart}, res)
+			err = userAPI.UpdateServerNoticeRoomID(ctx, &userapi.UpdateServerNoticeRoomRequest{RoomID: roomID, Localpart: localpart}, res)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("UpdateServerNoticeRoomID failed")
 				return jsonerror.InternalServerError(), nil
@@ -171,25 +172,26 @@ func sendServerNotice(
 			}}
 			if err = saveTagData(ctx, serverNoticeRequest.UserID, roomID, userAPI, serverAlertTag); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
-				return jsonerror.InternalServerError(), nil
+				return jsonerror.InternalServerError(), err
 			}
 
 		default:
 			// if we didn't get a createRoomResponse, we probably received an error, so return that.
-			return roomRes, nil
+			return roomRes, fmt.Errorf("Unable to create room")
 		}
 
 	} else {
 		res := &api.QueryMembershipForUserResponse{}
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: serverNoticeRequest.UserID, RoomID: roomID}, res)
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: serverNoticeRequest.UserID, RoomID: roomID}, res)
 		if err != nil {
-			return util.ErrorResponse(err), nil
+			return util.ErrorResponse(err), err
 		}
 		// re-invite the user
 		if res.Membership != gomatrixserverlib.Join {
-			res, err := sendInvite(ctx, userAPI, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			var inviteRes util.JSONResponse
+			inviteRes, err = sendInvite(ctx, userAPI, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
 			if err != nil {
-				return res, nil
+				return inviteRes, err
 			}
 		}
 	}
@@ -203,7 +205,7 @@ func sendServerNotice(
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
-		return *resErr, nil
+		return *resErr, fmt.Errorf("Unable to send event")
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
 
@@ -218,7 +220,7 @@ func sendServerNotice(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	startedSubmittingEvent := time.Now()
-	if err := api.SendEvents(
+	if err = api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{
@@ -230,7 +232,7 @@ func sendServerNotice(
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError(), nil
+		return jsonerror.InternalServerError(), err
 	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
