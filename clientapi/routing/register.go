@@ -557,8 +557,6 @@ func Register(
 		return handleGuestRegistration(req, r, cfg, userAPI)
 	}
 
-	// Retrieve or generate the sessionID
-
 	// Don't allow numeric usernames less than MAX_INT64.
 	if _, err := strconv.ParseInt(r.Username, 10, 64); err == nil {
 		return util.JSONResponse{
