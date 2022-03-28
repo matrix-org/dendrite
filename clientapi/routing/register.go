@@ -531,7 +531,7 @@ func Register(
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Unable to read request body"),
+			JSON: jsonerror.NotJSON("Unable to read request body"),
 		}
 	}
 
