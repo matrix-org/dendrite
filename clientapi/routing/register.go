@@ -525,6 +525,7 @@ func Register(
 	userAPI userapi.UserRegisterAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
+	defer req.Body.Close() // nolint: errcheck
 	reqBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
