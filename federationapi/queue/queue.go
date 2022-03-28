@@ -73,6 +73,13 @@ var destinationQueueBackingOff = prometheus.NewGauge(
 	},
 )
 
+func init() {
+	prometheus.MustRegister(
+		destinationQueueTotal, destinationQueueRunning,
+		destinationQueueBackingOff,
+	)
+}
+
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
 	db storage.Database,
@@ -84,10 +91,6 @@ func NewOutgoingQueues(
 	statistics *statistics.Statistics,
 	signing *SigningInfo,
 ) *OutgoingQueues {
-	prometheus.MustRegister(
-		destinationQueueTotal, destinationQueueRunning,
-		destinationQueueBackingOff,
-	)
 	queues := &OutgoingQueues{
 		disabled:   disabled,
 		process:    process,
