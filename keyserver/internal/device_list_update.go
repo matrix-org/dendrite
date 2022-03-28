@@ -42,12 +42,6 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(
-		deviceListUpdateCount,
-	)
-}
-
 // DeviceListUpdater handles device list updates from remote servers.
 //
 // In the case where we have the prev_id for an update, the updater just stores the update (after acquiring a per-user lock).
@@ -129,6 +123,9 @@ func NewDeviceListUpdater(
 	db DeviceListUpdaterDatabase, api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.FederationClient, numWorkers int,
 ) *DeviceListUpdater {
+	prometheus.MustRegister(
+		deviceListUpdateCount,
+	)
 	return &DeviceListUpdater{
 		userIDToMutex:  make(map[string]*sync.Mutex),
 		mu:             &sync.Mutex{},

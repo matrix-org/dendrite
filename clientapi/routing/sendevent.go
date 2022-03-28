@@ -46,10 +46,6 @@ var (
 	userRoomSendMutexes sync.Map // (roomID+userID) -> mutex. mutexes to ensure correct ordering of sendEvents
 )
 
-func init() {
-	prometheus.MustRegister(sendEventDuration)
-}
-
 var sendEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "dendrite",
