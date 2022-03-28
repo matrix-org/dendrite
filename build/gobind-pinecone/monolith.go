@@ -401,11 +401,12 @@ func (m *DendriteMonolith) Start() {
 }
 
 func (m *DendriteMonolith) Stop() {
+	m.processContext.ShutdownDendrite()
 	_ = m.listener.Close()
 	m.PineconeMulticast.Stop()
 	_ = m.PineconeQUIC.Close()
-	m.processContext.ShutdownDendrite()
 	_ = m.PineconeRouter.Close()
+	m.processContext.WaitForComponentsToFinish()
 }
 
 const MaxFrameSize = types.MaxFrameSize
