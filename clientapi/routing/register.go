@@ -551,10 +551,7 @@ func Register(
 		r.InhibitLogin = data.InhibitLogin
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Request body contains invalid JSON"),
-		}
+		return *resErr
 	}
 	if req.URL.Query().Get("kind") == "guest" {
 		return handleGuestRegistration(req, r, cfg, userAPI)
