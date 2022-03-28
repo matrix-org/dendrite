@@ -35,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/embed"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/eduserver/cache"
@@ -198,6 +199,9 @@ func main() {
 
 	rsComponent.SetFederationAPI(fsAPI, keyRing)
 
+	userProvider := users.NewPineconeUserProvider(pRouter, pQUIC, userAPI, federation)
+	roomProvider := rooms.NewPineconeRoomProvider(pRouter, pQUIC, fsAPI, federation)
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -205,13 +209,14 @@ func main() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:          asAPI,
-		EDUInternalAPI:         eduInputAPI,
-		FederationAPI:          fsAPI,
-		RoomserverAPI:          rsAPI,
-		UserAPI:                userAPI,
-		KeyAPI:                 keyAPI,
-		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pQUIC, fsAPI, federation),
+		AppserviceAPI:            asAPI,
+		EDUInternalAPI:           eduInputAPI,
+		FederationAPI:            fsAPI,
+		RoomserverAPI:            rsAPI,
+		UserAPI:                  userAPI,
+		KeyAPI:                   keyAPI,
+		ExtPublicRoomsProvider:   roomProvider,
+		ExtUserDirectoryProvider: userProvider,
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,
@@ -256,6 +261,7 @@ func main() {
 	pHTTP := pQUIC.HTTP()
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
+	pHTTP.Mux().HandleFunc(users.PublicURL, userProvider.FederatedUserProfiles)
 
 	// Build both ends of a HTTP multiplex.
 	httpServer := &http.Server{

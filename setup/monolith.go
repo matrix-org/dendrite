@@ -51,16 +51,21 @@ type Monolith struct {
 	KeyAPI         keyAPI.KeyInternalAPI
 
 	// Optional
-	ExtPublicRoomsProvider api.ExtraPublicRoomsProvider
+	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
+	ExtUserDirectoryProvider userapi.UserDirectoryProvider
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ssMux, keyMux, wkMux, mediaMux, synapseMux *mux.Router) {
+	userDirectoryProvider := m.ExtUserDirectoryProvider
+	if userDirectoryProvider == nil {
+		userDirectoryProvider = m.UserAPI
+	}
 	clientapi.AddPublicRoutes(
 		process, csMux, synapseMux, &m.Config.ClientAPI,
 		m.FedClient, m.RoomserverAPI,
 		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationAPI, m.UserAPI, m.KeyAPI,
+		m.FederationAPI, m.UserAPI, userDirectoryProvider, m.KeyAPI,
 		m.ExtPublicRoomsProvider, &m.Config.MSCs,
 	)
 	federationapi.AddPublicRoutes(

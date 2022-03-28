@@ -45,6 +45,7 @@ func AddPublicRoutes(
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI,
+	userDirectoryProvider userapi.UserDirectoryProvider,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
@@ -58,7 +59,7 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
-		userAPI, federation,
+		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg,
 	)
