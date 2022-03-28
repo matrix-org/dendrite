@@ -16,6 +16,7 @@ package routing
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -35,6 +36,7 @@ func SearchUserDirectory(
 	device *userapi.Device,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
+	provider userapi.UserDirectoryProvider,
 	serverName gomatrixserverlib.ServerName,
 	searchString string,
 	limit int,
@@ -50,13 +52,12 @@ func SearchUserDirectory(
 	}
 
 	// First start searching local users.
-
 	userReq := &userapi.QuerySearchProfilesRequest{
 		SearchString: searchString,
 		Limit:        limit,
 	}
 	userRes := &userapi.QuerySearchProfilesResponse{}
-	if err := userAPI.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
+	if err := provider.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
 		errRes := util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
 		return &errRes
 	}
@@ -67,7 +68,12 @@ func SearchUserDirectory(
 			break
 		}
 
-		userID := fmt.Sprintf("@%s:%s", user.Localpart, serverName)
+		var userID string
+		if user.ServerName != "" {
+			userID = fmt.Sprintf("@%s:%s", user.Localpart, user.ServerName)
+		} else {
+			userID = fmt.Sprintf("@%s:%s", user.Localpart, serverName)
+		}
 		if _, ok := results[userID]; !ok {
 			results[userID] = authtypes.FullyQualifiedProfile{
 				UserID:      userID,
@@ -87,7 +93,7 @@ func SearchUserDirectory(
 			Limit:        limit - len(results),
 		}
 		stateRes := &api.QueryKnownUsersResponse{}
-		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil {
+		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil && err != sql.ErrNoRows {
 			errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 			return &errRes
 		}

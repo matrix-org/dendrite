@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
@@ -34,6 +35,7 @@ type DendriteMonolith struct {
 	StorageDirectory string
 	listener         net.Listener
 	httpServer       *http.Server
+	processContext   *process.ProcessContext
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -85,6 +87,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.PrivateKey = ygg.PrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", m.StorageDirectory))
+	cfg.Global.JetStream.InMemory = true
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-account.db", m.StorageDirectory))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-mediaapi.db", m.StorageDirectory))
 	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-syncapi.db", m.StorageDirectory))
@@ -99,6 +102,7 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	m.processContext = base.ProcessContext
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
@@ -190,9 +194,12 @@ func (m *DendriteMonolith) Start() {
 	}()
 }
 
-func (m *DendriteMonolith) Suspend() {
-	m.logger.Info("Suspending monolith")
+func (m *DendriteMonolith) Stop() {
 	if err := m.httpServer.Close(); err != nil {
 		m.logger.Warn("Error stopping HTTP server:", err)
+	}
+	if m.processContext != nil {
+		m.processContext.ShutdownDendrite()
+		m.processContext.WaitForComponentsToFinish()
 	}
 }

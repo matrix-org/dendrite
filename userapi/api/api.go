@@ -54,6 +54,10 @@ type UserInternalAPI interface {
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 }
 
+type UserDirectoryProvider interface {
+	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
+}
+
 // UserProfileAPI provides functions for getting user profiles
 type UserProfileAPI interface {
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error

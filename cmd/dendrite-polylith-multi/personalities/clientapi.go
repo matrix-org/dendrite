@@ -22,7 +22,6 @@ import (
 )
 
 func ClientAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
-	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
 	asQuery := base.AppserviceHTTPClient()
@@ -33,7 +32,7 @@ func ClientAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 
 	clientapi.AddPublicRoutes(
 		base.ProcessContext, base.PublicClientAPIMux, base.SynapseAdminMux, &base.Cfg.ClientAPI,
-		accountDB, federation, rsAPI, asQuery, transactions.New(), fsAPI, userAPI,
+		federation, rsAPI, asQuery, transactions.New(), fsAPI, userAPI, userAPI,
 		keyAPI, nil, &cfg.MSCs,
 	)
 

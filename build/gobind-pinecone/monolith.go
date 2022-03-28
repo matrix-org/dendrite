@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
@@ -279,6 +280,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+	cfg.Global.JetStream.InMemory = true
 	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/%s", m.StorageDirectory, prefix))
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-account.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-mediaapi.db", m.StorageDirectory))
@@ -319,6 +321,9 @@ func (m *DendriteMonolith) Start() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 
+	userProvider := users.NewPineconeUserProvider(m.PineconeRouter, m.PineconeQUIC, m.userAPI, federation)
+	roomProvider := rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, fsAPI, federation)
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -326,12 +331,13 @@ func (m *DendriteMonolith) Start() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:          asAPI,
-		FederationAPI:          fsAPI,
-		RoomserverAPI:          rsAPI,
-		UserAPI:                m.userAPI,
-		KeyAPI:                 keyAPI,
-		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, fsAPI, federation),
+		AppserviceAPI:            asAPI,
+		FederationAPI:            fsAPI,
+		RoomserverAPI:            rsAPI,
+		UserAPI:                  m.userAPI,
+		KeyAPI:                   keyAPI,
+		ExtPublicRoomsProvider:   roomProvider,
+		ExtUserDirectoryProvider: userProvider,
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,
@@ -349,10 +355,12 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()
+	pMux.PathPrefix(users.PublicURL).HandlerFunc(userProvider.FederatedUserProfiles)
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
 	pHTTP := m.PineconeQUIC.HTTP()
+	pHTTP.Mux().Handle(users.PublicURL, pMux)
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
 
@@ -394,11 +402,12 @@ func (m *DendriteMonolith) Start() {
 }
 
 func (m *DendriteMonolith) Stop() {
+	m.processContext.ShutdownDendrite()
 	_ = m.listener.Close()
 	m.PineconeMulticast.Stop()
 	_ = m.PineconeQUIC.Close()
-	m.processContext.ShutdownDendrite()
 	_ = m.PineconeRouter.Close()
+	m.processContext.WaitForComponentsToFinish()
 }
 
 const MaxFrameSize = types.MaxFrameSize
