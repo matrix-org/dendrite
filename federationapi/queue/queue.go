@@ -49,6 +49,13 @@ type OutgoingQueues struct {
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
 
+func init() {
+	prometheus.MustRegister(
+		destinationQueueTotal, destinationQueueRunning,
+		destinationQueueBackingOff,
+	)
+}
+
 var destinationQueueTotal = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Namespace: "dendrite",
@@ -72,13 +79,6 @@ var destinationQueueBackingOff = prometheus.NewGauge(
 		Name:      "destination_queues_backing_off",
 	},
 )
-
-func init() {
-	prometheus.MustRegister(
-		destinationQueueTotal, destinationQueueRunning,
-		destinationQueueBackingOff,
-	)
-}
 
 // NewOutgoingQueues makes a new OutgoingQueues
 func NewOutgoingQueues(
