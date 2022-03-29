@@ -89,7 +89,7 @@ func (r *Upgrader) performRoomUpgrade(
 
 	// Generate the initial events we need to send into the new room. This includes copied state events and bans
 	// as well as the power level events needed to set up the room
-	eventsToMake, pErr := r.generateInitialEvents(ctx, userID, roomID, newRoomID, string(req.RoomVersion), tombstoneEvent)
+	eventsToMake, pErr := r.generateInitialEvents(ctx, userID, roomID, string(req.RoomVersion), tombstoneEvent)
 	if pErr != nil {
 		return "", pErr
 	}
@@ -309,7 +309,7 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 	return pl.UserLevel(userID) >= plToUpgrade
 }
 
-func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, newRoomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
+func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
 	oldCreateEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomCreate,
 		StateKey:  "",
