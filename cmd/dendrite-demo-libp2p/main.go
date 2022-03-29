@@ -29,7 +29,6 @@ import (
 	p2pdisc "github.com/libp2p/go-libp2p/p2p/discovery"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/embed"
-	"github.com/matrix-org/dendrite/eduserver"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -39,8 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/dendrite/eduserver/cache"
 
 	"github.com/sirupsen/logrus"
 
@@ -152,9 +149,6 @@ func main() {
 	userAPI := userapi.NewInternalAPI(&base.Base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.Base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(
-		&base.Base, cache.New(), userAPI,
-	)
 	asAPI := appservice.NewInternalAPI(&base.Base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 	fsAPI := federationapi.NewInternalAPI(
@@ -180,7 +174,6 @@ func main() {
 		KeyRing:   keyRing,
 
 		AppserviceAPI:          asAPI,
-		EDUInternalAPI:         eduInputAPI,
 		FederationAPI:          fsAPI,
 		RoomserverAPI:          rsAPI,
 		UserAPI:                userAPI,

@@ -487,3 +487,21 @@ type StreamedEvent struct {
 	Event          *gomatrixserverlib.HeaderedEvent `json:"event"`
 	StreamPosition StreamPosition                   `json:"stream_position"`
 }
+
+// OutputReceiptEvent is an entry in the receipt output kafka log
+type OutputReceiptEvent struct {
+	UserID    string                      `json:"user_id"`
+	RoomID    string                      `json:"room_id"`
+	EventID   string                      `json:"event_id"`
+	Type      string                      `json:"type"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}
+
+// OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.
+// This contains the full event content, along with the user ID and device ID
+// to which it is destined.
+type OutputSendToDeviceEvent struct {
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+	gomatrixserverlib.SendToDeviceEvent
+}

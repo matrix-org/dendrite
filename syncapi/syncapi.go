@@ -18,9 +18,9 @@ import (
 	"context"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -56,7 +56,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
-	eduCache := cache.New()
+	eduCache := caching.NewTypingCache()
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache)
 	notifier := notifier.NewNotifier(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
@@ -110,7 +110,7 @@ func AddPublicRoutes(
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		process, cfg, js, syncDB, eduCache, notifier, streams.TypingStreamProvider,
+		process, cfg, js, eduCache, notifier, streams.TypingStreamProvider,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")

@@ -37,8 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -191,10 +189,6 @@ func main() {
 	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), userAPI,
-	)
-
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	rsComponent.SetFederationAPI(fsAPI, keyRing)
@@ -210,7 +204,6 @@ func main() {
 		KeyRing:   keyRing,
 
 		AppserviceAPI:            asAPI,
-		EDUInternalAPI:           eduInputAPI,
 		FederationAPI:            fsAPI,
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  userAPI,

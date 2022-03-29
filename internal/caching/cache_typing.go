@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package caching
 
 import (
 	"sync"
@@ -53,8 +53,8 @@ func (t *EDUCache) newRoomData() *roomData {
 	}
 }
 
-// New returns a new EDUCache initialised for use.
-func New() *EDUCache {
+// NewTypingCache returns a new EDUCache initialised for use.
+func NewTypingCache() *EDUCache {
 	return &EDUCache{data: make(map[string]*roomData)}
 }
 

@@ -16,16 +16,14 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
+	"strconv"
+	"time"
 
-	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/eduserver/api"
-	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -37,7 +35,7 @@ type OutputTypingEventConsumer struct {
 	jetstream nats.JetStreamContext
 	durable   string
 	topic     string
-	eduCache  *cache.EDUCache
+	eduCache  *caching.EDUCache
 	stream    types.StreamProvider
 	notifier  *notifier.Notifier
 }
@@ -48,8 +46,7 @@ func NewOutputTypingEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
-	store storage.Database,
-	eduCache *cache.EDUCache,
+	eduCache *caching.EDUCache,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 ) *OutputTypingEventConsumer {
@@ -57,14 +54,14 @@ func NewOutputTypingEventConsumer(
 		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPIEDUServerTypingConsumer"),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPITypingConsumer"),
 		eduCache:  eduCache,
 		notifier:  notifier,
 		stream:    stream,
 	}
 }
 
-// Start consuming from EDU api
+// Start consuming typing events.
 func (s *OutputTypingEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
@@ -73,34 +70,40 @@ func (s *OutputTypingEventConsumer) Start() error {
 }
 
 func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
-	var output api.OutputTypingEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("EDU server output log: message parse failure")
-		sentry.CaptureException(err)
+	roomID := msg.Header.Get(jetstream.RoomID)
+	userID := msg.Header.Get(jetstream.UserID)
+	typing, err := strconv.ParseBool(msg.Header.Get("typing"))
+	if err != nil {
+		log.WithError(err).Errorf("output log: typing parse failure")
+		return true
+	}
+	timeout, err := strconv.Atoi(msg.Header.Get("timeout_ms"))
+	if err != nil {
+		log.WithError(err).Errorf("output log: timeout_ms parse failure")
 		return true
 	}
 
 	log.WithFields(log.Fields{
-		"room_id": output.Event.RoomID,
-		"user_id": output.Event.UserID,
-		"typing":  output.Event.Typing,
-	}).Debug("received data from EDU server")
+		"room_id": roomID,
+		"user_id": userID,
+		"typing":  typing,
+		"timeout": timeout,
+	}).Debug("syncapi received EDU data from client api")
 
 	var typingPos types.StreamPosition
-	typingEvent := output.Event
-	if typingEvent.Typing {
+	if typing {
+		expiry := time.Now().Add(time.Duration(timeout) * time.Millisecond)
 		typingPos = types.StreamPosition(
-			s.eduCache.AddTypingUser(typingEvent.UserID, typingEvent.RoomID, output.ExpireTime),
+			s.eduCache.AddTypingUser(userID, roomID, &expiry),
 		)
 	} else {
 		typingPos = types.StreamPosition(
-			s.eduCache.RemoveUser(typingEvent.UserID, typingEvent.RoomID),
+			s.eduCache.RemoveUser(userID, roomID),
 		)
 	}
 
 	s.stream.Advance(typingPos)
-	s.notifier.OnNewTyping(output.Event.RoomID, types.StreamingToken{TypingPosition: typingPos})
+	s.notifier.OnNewTyping(roomID, types.StreamingToken{TypingPosition: typingPos})
 
 	return true
 }
