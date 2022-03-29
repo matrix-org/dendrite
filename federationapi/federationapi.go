@@ -124,17 +124,28 @@ func NewInternalAPI(
 	if err = rsConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start room server consumer")
 	}
-
-	tsConsumer := consumers.NewOutputEDUConsumer(
+	tsConsumer := consumers.NewOutputSendToDeviceConsumer(
 		base.ProcessContext, cfg, js, queues, federationDB,
 	)
-	if err := tsConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start typing server consumer")
+	if err = tsConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start send-to-device consumer")
+	}
+	receiptConsumer := consumers.NewOutputReceiptConsumer(
+		base.ProcessContext, cfg, js, queues, federationDB,
+	)
+	if err = receiptConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start receipt consumer")
+	}
+	typingConsumer := consumers.NewOutputTypingConsumer(
+		base.ProcessContext, cfg, js, queues, federationDB,
+	)
+	if err = typingConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start typing consumer")
 	}
 	keyConsumer := consumers.NewKeyChangeConsumer(
 		base.ProcessContext, &base.Cfg.KeyServer, js, queues, federationDB, rsAPI,
 	)
-	if err := keyConsumer.Start(); err != nil {
+	if err = keyConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
