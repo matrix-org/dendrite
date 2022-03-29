@@ -57,7 +57,7 @@ func NewOutputSendToDeviceEventConsumer(
 		ctx:        process.Context(),
 		jetstream:  js,
 		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIEDUServerSendToDeviceConsumer"),
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
 		notifier:   notifier,
@@ -65,7 +65,7 @@ func NewOutputSendToDeviceEventConsumer(
 	}
 }
 
-// Start consuming from EDU api
+// Start consuming send-to-device events.
 func (s *OutputSendToDeviceEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,

@@ -62,7 +62,7 @@ func NewOutputReceiptEventConsumer(
 		ctx:        process.Context(),
 		jetstream:  js,
 		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIEDUServerReceiptConsumer"),
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
 		db:         store,
 		notifier:   notifier,
 		stream:     stream,
@@ -71,7 +71,7 @@ func NewOutputReceiptEventConsumer(
 	}
 }
 
-// Start consuming from EDU api
+// Start consuming receipts events.
 func (s *OutputReceiptEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,

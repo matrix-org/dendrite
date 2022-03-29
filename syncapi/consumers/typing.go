@@ -54,14 +54,14 @@ func NewOutputTypingEventConsumer(
 		ctx:       process.Context(),
 		jetstream: js,
 		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-		durable:   cfg.Matrix.JetStream.Durable("SyncAPIEDUServerTypingConsumer"),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPITypingConsumer"),
 		eduCache:  eduCache,
 		notifier:  notifier,
 		stream:    stream,
 	}
 }
 
-// Start consuming from EDU api
+// Start consuming typing events.
 func (s *OutputTypingEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
