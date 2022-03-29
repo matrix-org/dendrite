@@ -263,14 +263,6 @@ This manages end-to-end encryption keys for users.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml keyserver
 ```
 
-#### EDU server
-
-This manages processing EDUs such as typing, send-to-device events and presence. Clients do not talk to
-
-```bash
-./bin/dendrite-polylith-multi --config=dendrite.yaml eduserver
-```
-
 #### User server
 
 This manages user accounts, device access tokens and user account data,
