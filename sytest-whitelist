@@ -661,3 +661,17 @@ Canonical alias can include alt_aliases
 Can delete canonical alias
 AS can make room aliases
 /context/ with lazy_load_members filter works
+GET /presence/:user_id/status fetches initial status
+PUT /presence/:user_id/status updates my presence
+Presence change reports an event to myself
+Existing members see new members' presence
+Existing members see new member's presence
+Newly joined room includes presence in incremental sync
+Get presence for newly joined members in incremental sync
+User sees their own presence in a sync
+User sees updates to presence from other users in the incremental sync.
+Presence changes are reported to local room members
+Presence changes are also reported to remote room members
+Presence changes to UNAVAILABLE are reported to local room members
+Presence changes to UNAVAILABLE are reported to remote room members
+New federated private chats get full presence information (SYN-115)
