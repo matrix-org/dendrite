@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi/api"
 )
 
 type dummyPublisher struct {
@@ -21,7 +20,7 @@ func (d *dummyPublisher) SendPresence(userID, presence string) error {
 func TestRequestPool_updatePresence(t *testing.T) {
 	type args struct {
 		presence string
-		device   *api.Device
+		userID   string
 		sleep    time.Duration
 	}
 	publisher := &dummyPublisher{}
@@ -36,20 +35,20 @@ func TestRequestPool_updatePresence(t *testing.T) {
 			name:         "new presence is published",
 			wantIncrease: true,
 			args: args{
-				device: &api.Device{UserID: "dummy"},
+				userID: "dummy",
 			},
 		},
 		{
 			name: "presence not published, no change",
 			args: args{
-				device: &api.Device{UserID: "dummy"},
+				userID: "dummy",
 			},
 		},
 		{
 			name:         "new presence is published dummy2",
 			wantIncrease: true,
 			args: args{
-				device:   &api.Device{UserID: "dummy2"},
+				userID:   "dummy2",
 				presence: "online",
 			},
 		},
@@ -57,14 +56,14 @@ func TestRequestPool_updatePresence(t *testing.T) {
 			name:         "different presence is published dummy2",
 			wantIncrease: true,
 			args: args{
-				device:   &api.Device{UserID: "dummy2"},
+				userID:   "dummy2",
 				presence: "unavailable",
 			},
 		},
 		{
 			name: "same presence is not published dummy2",
 			args: args{
-				device:   &api.Device{UserID: "dummy2"},
+				userID:   "dummy2",
 				presence: "unavailable",
 				sleep:    time.Millisecond * 150,
 			},
@@ -73,7 +72,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 			name:         "same presence is published after being deleted",
 			wantIncrease: true,
 			args: args{
-				device:   &api.Device{UserID: "dummy2"},
+				userID:   "dummy2",
 				presence: "unavailable",
 			},
 		},
@@ -94,7 +93,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			beforeCount := publisher.count
-			rp.updatePresence(tt.args.presence, tt.args.device)
+			rp.updatePresence(tt.args.presence, tt.args.userID)
 			if tt.wantIncrease && publisher.count <= beforeCount {
 				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
 			}

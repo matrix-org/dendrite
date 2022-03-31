@@ -97,6 +97,7 @@ func (rp *RequestPool) cleanPresence(cleanupTime time.Duration) {
 		rp.presence.Range(func(key interface{}, v interface{}) bool {
 			p := v.(types.Presence)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
+				rp.updatePresence("unavailable", p.UserID)
 				rp.presence.Delete(key)
 			}
 			return true
@@ -106,7 +107,7 @@ func (rp *RequestPool) cleanPresence(cleanupTime time.Duration) {
 }
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
-func (rp *RequestPool) updatePresence(presence string, device *userapi.Device) {
+func (rp *RequestPool) updatePresence(presence string, userID string) {
 	if rp.cfg.Matrix.DisablePresence {
 		return
 	}
@@ -118,11 +119,11 @@ func (rp *RequestPool) updatePresence(presence string, device *userapi.Device) {
 		ClientFields: types.PresenceClientResponse{
 			Presence: presence,
 		},
-		UserID:       device.UserID,
+		UserID:       userID,
 		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 	// avoid spamming presence updates when syncing
-	existingPresence, ok := rp.presence.LoadOrStore(device.UserID, newPresence)
+	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
 	if ok {
 		p := existingPresence.(types.Presence)
 		if p.ClientFields.Presence == newPresence.ClientFields.Presence {
@@ -130,12 +131,12 @@ func (rp *RequestPool) updatePresence(presence string, device *userapi.Device) {
 		}
 	}
 
-	if err := rp.producer.SendPresence(device.UserID, strings.ToLower(presence)); err != nil {
+	if err := rp.producer.SendPresence(userID, strings.ToLower(presence)); err != nil {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
 
-	rp.presence.Store(device.UserID, newPresence)
+	rp.presence.Store(userID, newPresence)
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
@@ -214,7 +215,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(req.FormValue("set_presence"), device)
+	rp.updatePresence(req.FormValue("set_presence"), device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
