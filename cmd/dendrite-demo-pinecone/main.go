@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -245,6 +245,7 @@ func main() {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})
+	httpRouter.HandleFunc("/pinecone", pRouter.ManholeHandler)
 	embed.Embed(httpRouter, *instancePort, "Pinecone Demo")
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()
