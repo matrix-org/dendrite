@@ -41,6 +41,9 @@ type Global struct {
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 
+	// Disable presence. Dendrite will not handle presence events.
+	DisablePresence bool `yaml:"disable_presence"`
+
 	// List of domains that the server will trust as identity servers to
 	// verify third-party identifiers.
 	// Defaults to an empty array.
@@ -68,6 +71,7 @@ func (c *Global) Defaults(generate bool) {
 		c.PrivateKeyPath = "matrix_key.pem"
 		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 		c.KeyID = "ed25519:auto"
+		c.DisablePresence = false
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 

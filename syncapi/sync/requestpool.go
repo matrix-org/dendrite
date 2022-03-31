@@ -107,6 +107,9 @@ func (rp *RequestPool) cleanPresence(cleanupTime time.Duration) {
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
 func (rp *RequestPool) updatePresence(presence string, device *userapi.Device) {
+	if rp.cfg.Matrix.DisablePresence {
+		return
+	}
 	if presence == "" {
 		presence = "online"
 	}

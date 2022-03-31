@@ -68,6 +68,9 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
+  # Disable presence. Dendrite will not handle presence events.
+  disable_presence: true
+
   # Server notices allows server admins to send messages to all users.
   server_notices:
     enabled: false

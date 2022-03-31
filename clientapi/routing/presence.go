@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -40,10 +41,17 @@ type presenceReq struct {
 
 func SetPresence(
 	req *http.Request,
+	cfg *config.ClientAPI,
 	device *api.Device,
 	producer *producers.SyncAPIProducer,
 	userID string,
 ) util.JSONResponse {
+	if cfg.Matrix.DisablePresence {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	}
 	if device.UserID != userID {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

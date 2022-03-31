@@ -86,6 +86,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 				JetStream: config.JetStream{
 					TopicPrefix: "Dendrite",
 				},
+				DisablePresence: false,
 			},
 		},
 	}

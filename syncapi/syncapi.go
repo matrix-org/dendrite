@@ -63,7 +63,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
-	federationPresenceProducer := producers.FederationAPIPresenceProducer{
+	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		JetStream: js,
 	}
