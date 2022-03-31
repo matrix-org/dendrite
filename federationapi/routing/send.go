@@ -389,10 +389,28 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
+		case gomatrixserverlib.MPresence:
+			if err := t.processPresence(ctx, e); err != nil {
+				logrus.WithError(err).Errorf("Failed to process presence update")
+			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
+}
+
+// processPresence handles m.receipt events
+func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) error {
+	payload := types.Presence{}
+	if err := json.Unmarshal(e.Content, &payload); err != nil {
+		return err
+	}
+	for _, content := range payload.Push {
+		if err := t.producer.SendPresence(ctx, content.UserID, content.Presence, content.StatusMsg, content.LastActiveAgo); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
