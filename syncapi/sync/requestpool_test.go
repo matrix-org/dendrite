@@ -7,16 +7,15 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/nats-io/nats.go"
 )
 
 type dummyPublisher struct {
 	count int
 }
 
-func (d *dummyPublisher) PublishMsg(m *nats.Msg, opts ...nats.PubOpt) (*nats.PubAck, error) {
+func (d *dummyPublisher) SendPresence(userID, presence string) error {
 	d.count++
-	return nil, nil
+	return nil
 }
 
 func TestRequestPool_updatePresence(t *testing.T) {
@@ -80,8 +79,8 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		},
 	}
 	rp := &RequestPool{
-		presence:  &syncMap,
-		jetstream: publisher,
+		presence: &syncMap,
+		producer: publisher,
 		cfg: &config.SyncAPI{
 			Matrix: &config.Global{
 				JetStream: config.JetStream{

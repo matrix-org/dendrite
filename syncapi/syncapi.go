@@ -63,7 +63,12 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, js)
+	federationPresenceProducer := producers.FederationAPIPresenceProducer{
+		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		JetStream: js,
+	}
+
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -74,8 +79,6 @@ func AddPublicRoutes(
 		JetStream: js,
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
 	}
-
-	_ = userAPIReadUpdateProducer
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		process, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
