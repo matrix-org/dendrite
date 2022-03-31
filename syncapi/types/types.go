@@ -522,7 +522,7 @@ type Presence struct {
 }
 
 type PresenceClientResponse struct {
-	CurrentlyActive bool    `json:"currently_active"`
+	CurrentlyActive *bool   `json:"currently_active,omitempty"`
 	LastActiveAgo   int64   `json:"last_active_ago,omitempty"`
 	Presence        string  `json:"presence"`
 	StatusMsg       *string `json:"status_msg,omitempty"`

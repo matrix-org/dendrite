@@ -124,10 +124,11 @@ func GetPresence(
 	}
 
 	lastActiveTS := gomatrixserverlib.Timestamp(lastActive)
+	currentlyActive := time.Since(lastActiveTS.Time()).Minutes() < 5
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: types.PresenceClientResponse{
-			CurrentlyActive: time.Since(lastActiveTS.Time()).Minutes() < 5,
+			CurrentlyActive: &currentlyActive,
 			LastActiveAgo:   time.Since(lastActiveTS.Time()).Milliseconds(),
 			Presence:        presence.Header.Get("presence"),
 			StatusMsg:       &statusMsg,
