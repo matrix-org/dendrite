@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -34,6 +35,7 @@ type SyncAPIProducer struct {
 	TopicReceiptEvent      string
 	TopicSendToDeviceEvent string
 	TopicTypingEvent       string
+	TopicPresenceEvent     string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
 	UserAPI                userapi.UserInternalAPI
@@ -169,6 +171,24 @@ func (p *SyncAPIProducer) SendTyping(
 	m.Header.Set(jetstream.RoomID, roomID)
 	m.Header.Set("typing", strconv.FormatBool(typing))
 	m.Header.Set("timeout_ms", strconv.Itoa(int(timeoutMS)))
+
+	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	return err
+}
+
+func (p *SyncAPIProducer) SendPresence(
+	ctx context.Context, userID, presence string, statusMsg *string,
+) error {
+	m := nats.NewMsg(p.TopicPresenceEvent)
+	m.Header.Set(jetstream.UserID, userID)
+	m.Header.Set("presence", presence)
+	nilMsg := statusMsg == nil
+	if !nilMsg {
+		m.Header.Set("status_msg", *statusMsg)
+	}
+	m.Header.Set("status_msg_nil", strconv.FormatBool(nilMsg))
+
+	m.Header.Set("last_active_ts", strconv.Itoa(int(gomatrixserverlib.AsTimestamp(time.Now()))))
 
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
