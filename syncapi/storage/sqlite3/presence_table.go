@@ -1,0 +1,180 @@
+// Copyright 2022 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package sqlite3
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
+)
+
+const presenceSchema = `
+-- Stores data about presence
+CREATE TABLE IF NOT EXISTS syncapi_presence (
+	-- The ID
+	id BIGINT NOT NULL,
+	-- The Matrix user ID
+	user_id TEXT NOT NULL,
+	-- The actual presence
+	presence INT NOT NULL,
+	-- The status message
+	status_msg TEXT,
+	-- The last time an action was received by this user
+	last_active_ts BIGINT NOT NULL,
+	CONSTRAINT presence_presences_unique UNIQUE (user_id)
+);
+CREATE INDEX IF NOT EXISTS syncapi_presence_user_id ON syncapi_presence(user_id);
+`
+
+const upsertPresenceSQL = "" +
+	"INSERT INTO syncapi_presence AS p" +
+	" (id, user_id, presence, status_msg, last_active_ts)" +
+	" VALUES ($1, $2, $3, $4, $5)" +
+	" ON CONFLICT (user_id)" +
+	" DO UPDATE SET id = $6, " +
+	" presence = $7, status_msg = COALESCE($8, p.status_msg), last_active_ts = $9" +
+	" RETURNING id"
+
+const upsertPresenceFromSyncSQL = "" +
+	"INSERT INTO syncapi_presence AS p" +
+	" (id, user_id, presence, last_active_ts)" +
+	" VALUES ($1, $2, $3, $4)" +
+	" ON CONFLICT (user_id)" +
+	" DO UPDATE SET id = $5, " +
+	" presence = $6, last_active_ts = $7" +
+	" RETURNING id"
+
+const selectPresenceForUserSQL = "" +
+	"SELECT presence, status_msg, last_active_ts" +
+	" FROM syncapi_presence" +
+	" WHERE user_id = $1 LIMIT 1"
+
+const selectMaxPresenceSQL = "" +
+	"SELECT COALESCE(MAX(id), 0) FROM syncapi_presence"
+
+const selectPresenceAfter = "" +
+	" SELECT id, user_id, presence, status_msg, last_active_ts" +
+	" FROM syncapi_presence" +
+	" WHERE id > $1"
+
+type presenceStatements struct {
+	db                         *sql.DB
+	streamIDStatements         *streamIDStatements
+	upsertPresenceStmt         *sql.Stmt
+	upsertPresenceFromSyncStmt *sql.Stmt
+	selectPresenceForUsersStmt *sql.Stmt
+	selectMaxPresenceStmt      *sql.Stmt
+	selectPresenceAfterStmt    *sql.Stmt
+}
+
+func NewSqlitePresenceTable(db *sql.DB, streamID *streamIDStatements) (*presenceStatements, error) {
+	_, err := db.Exec(presenceSchema)
+	if err != nil {
+		return nil, err
+	}
+	s := &presenceStatements{
+		db:                 db,
+		streamIDStatements: streamID,
+	}
+	return s, sqlutil.StatementList{
+		{&s.upsertPresenceStmt, upsertPresenceSQL},
+		{&s.upsertPresenceFromSyncStmt, upsertPresenceFromSyncSQL},
+		{&s.selectPresenceForUsersStmt, selectPresenceForUserSQL},
+		{&s.selectMaxPresenceStmt, selectMaxPresenceSQL},
+		{&s.selectPresenceAfterStmt, selectPresenceAfter},
+	}.Prepare(db)
+}
+
+// UpsertPresence creates/updates a presence status.
+func (p *presenceStatements) UpsertPresence(
+	ctx context.Context,
+	txn *sql.Tx,
+	userID string,
+	statusMsg *string,
+	presence string,
+	lastActiveTS gomatrixserverlib.Timestamp,
+	fromSync bool,
+) (pos types.StreamPosition, err error) {
+	pos, err = p.streamIDStatements.nextPresenceID(ctx, txn)
+	if err != nil {
+		return pos, err
+	}
+
+	presenceStatusID := types.PresenceToInt[presence]
+	if fromSync {
+		stmt := sqlutil.TxStmt(txn, p.upsertPresenceFromSyncStmt)
+		err = stmt.QueryRowContext(ctx,
+			pos, userID, presenceStatusID,
+			lastActiveTS, pos,
+			presenceStatusID, lastActiveTS).Scan(&pos)
+	} else {
+		stmt := sqlutil.TxStmt(txn, p.upsertPresenceStmt)
+		err = stmt.QueryRowContext(ctx,
+			pos, userID, presenceStatusID,
+			statusMsg, lastActiveTS, pos,
+			presenceStatusID, statusMsg, lastActiveTS).Scan(&pos)
+	}
+	return
+}
+
+// GetPresenceForUser returns the current presence of a user.
+func (p *presenceStatements) GetPresenceForUser(
+	ctx context.Context, txn *sql.Tx,
+	userID string,
+) (*types.Presence, error) {
+	result := &types.Presence{
+		UserID: userID,
+	}
+	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
+	var presenceStatusID int
+	err := stmt.QueryRowContext(ctx, userID).Scan(&presenceStatusID, &result.ClientFields.StatusMsg, &result.LastActiveTS)
+	result.ClientFields.Presence = types.PresenceToString[presenceStatusID]
+	return result, err
+}
+
+func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
+	stmt := sqlutil.TxStmt(txn, p.selectMaxPresenceStmt)
+	err = stmt.QueryRowContext(ctx).Scan(&pos)
+	return
+}
+
+// GetPresenceAfter returns the changes presences after a given stream id
+func (p *presenceStatements) GetPresenceAfter(
+	ctx context.Context, txn *sql.Tx,
+	after types.StreamPosition,
+) (presences map[string]*types.Presence, err error) {
+	presences = make(map[string]*types.Presence)
+	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
+
+	rows, err := stmt.QueryContext(ctx, after)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceAfter: failed to close rows")
+	var presenceStatusID int
+	for rows.Next() {
+		presence := &types.Presence{}
+		if err := rows.Scan(&presence.StreamPos, &presence.UserID, &presenceStatusID, &presence.ClientFields.StatusMsg, &presence.LastActiveTS); err != nil {
+			return nil, err
+		}
+		presence.ClientFields.Presence = types.PresenceToString[presenceStatusID]
+		presences[presence.UserID] = presence
+	}
+	return presences, rows.Err()
+}
