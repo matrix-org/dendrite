@@ -49,7 +49,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	js, natsClient := jetstream.Prepare(process, &cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
@@ -63,7 +63,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier)
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, js)
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -129,6 +129,15 @@ func AddPublicRoutes(
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
+	}
+
+	presenceConsumer := consumers.NewPresenceConsumer(
+		process, cfg, js, natsClient, syncDB,
+		notifier, streams.PresenceStreamProvider,
+		rsAPI,
+	)
+	if err = presenceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
 	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)

@@ -20,6 +20,7 @@ type Streams struct {
 	AccountDataStreamProvider      types.StreamProvider
 	DeviceListStreamProvider       types.StreamProvider
 	NotificationDataStreamProvider types.StreamProvider
+	PresenceStreamProvider         types.StreamProvider
 }
 
 func NewSyncStreamProviders(
@@ -56,6 +57,9 @@ func NewSyncStreamProviders(
 			rsAPI:          rsAPI,
 			keyAPI:         keyAPI,
 		},
+		PresenceStreamProvider: &PresenceStreamProvider{
+			StreamProvider: StreamProvider{DB: d},
+		},
 	}
 
 	streams.PDUStreamProvider.Setup()
@@ -66,6 +70,7 @@ func NewSyncStreamProviders(
 	streams.AccountDataStreamProvider.Setup()
 	streams.NotificationDataStreamProvider.Setup()
 	streams.DeviceListStreamProvider.Setup()
+	streams.PresenceStreamProvider.Setup()
 
 	return streams
 }
@@ -80,5 +85,6 @@ func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 		AccountDataPosition:      s.AccountDataStreamProvider.LatestPosition(ctx),
 		NotificationDataPosition: s.NotificationDataStreamProvider.LatestPosition(ctx),
 		DeviceListPosition:       s.DeviceListStreamProvider.LatestPosition(ctx),
+		PresencePosition:         s.PresenceStreamProvider.LatestPosition(ctx),
 	}
 }

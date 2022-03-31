@@ -228,6 +228,28 @@ func (n *Notifier) OnNewNotificationData(
 	n.wakeupUsers([]string{userID}, nil, n.currPos)
 }
 
+func (n *Notifier) OnNewPresence(
+	posUpdate types.StreamingToken, userID string,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
+	sharedUsers := n.sharedUsers(userID)
+	sharedUsers = append(sharedUsers, userID)
+
+	n.wakeupUsers(sharedUsers, nil, n.currPos)
+}
+
+func (n *Notifier) sharedUsers(userID string) (sharedUsers []string) {
+	for roomID, users := range n.roomIDToJoinedUsers {
+		if _, ok := users[userID]; ok {
+			sharedUsers = append(sharedUsers, n.joinedUsers(roomID)...)
+		}
+	}
+	return sharedUsers
+}
+
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos

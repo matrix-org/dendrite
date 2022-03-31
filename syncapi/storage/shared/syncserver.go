@@ -48,6 +48,7 @@ type Database struct {
 	Receipts            tables.Receipts
 	Memberships         tables.Memberships
 	NotificationData    tables.NotificationData
+	Presence            tables.Presence
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -997,4 +998,20 @@ func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID 
 }
 func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
+}
+
+func (s *Database) UpdatePresence(ctx context.Context, userID, presence string, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+	return s.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
+}
+
+func (s *Database) GetPresence(ctx context.Context, userID string) (*types.Presence, error) {
+	return s.Presence.GetPresenceForUser(ctx, nil, userID)
+}
+
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.Presence, error) {
+	return s.Presence.GetPresenceAfter(ctx, nil, after)
+}
+
+func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return s.Presence.GetMaxPresenceID(ctx, nil)
 }

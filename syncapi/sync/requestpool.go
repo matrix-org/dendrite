@@ -19,6 +19,7 @@ package sync
 import (
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,26 +28,36 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
 type RequestPool struct {
-	db       storage.Database
-	cfg      *config.SyncAPI
-	userAPI  userapi.UserInternalAPI
-	keyAPI   keyapi.KeyInternalAPI
-	rsAPI    roomserverAPI.RoomserverInternalAPI
-	lastseen sync.Map
-	streams  *streams.Streams
-	Notifier *notifier.Notifier
+	db        storage.Database
+	cfg       *config.SyncAPI
+	userAPI   userapi.UserInternalAPI
+	keyAPI    keyapi.KeyInternalAPI
+	rsAPI     roomserverAPI.RoomserverInternalAPI
+	lastseen  sync.Map
+	presence  sync.Map
+	streams   *streams.Streams
+	Notifier  *notifier.Notifier
+	jetstream JetstreamPublisher
+}
+
+type JetstreamPublisher interface {
+	PublishMsg(m *nats.Msg, opts ...nats.PubOpt) (*nats.PubAck, error)
 }
 
 // NewRequestPool makes a new RequestPool
@@ -55,18 +66,22 @@ func NewRequestPool(
 	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	streams *streams.Streams, notifier *notifier.Notifier,
+	jetstream nats.JetStreamContext,
 ) *RequestPool {
 	rp := &RequestPool{
-		db:       db,
-		cfg:      cfg,
-		userAPI:  userAPI,
-		keyAPI:   keyAPI,
-		rsAPI:    rsAPI,
-		lastseen: sync.Map{},
-		streams:  streams,
-		Notifier: notifier,
+		db:        db,
+		cfg:       cfg,
+		userAPI:   userAPI,
+		keyAPI:    keyAPI,
+		rsAPI:     rsAPI,
+		lastseen:  sync.Map{},
+		presence:  sync.Map{},
+		streams:   streams,
+		Notifier:  notifier,
+		jetstream: jetstream,
 	}
 	go rp.cleanLastSeen()
+	go rp.cleanPresence(time.Minute * 5)
 	return rp
 }
 
@@ -78,6 +93,58 @@ func (rp *RequestPool) cleanLastSeen() {
 		})
 		time.Sleep(time.Minute)
 	}
+}
+
+func (rp *RequestPool) cleanPresence(cleanupTime time.Duration) {
+	for {
+		rp.presence.Range(func(key interface{}, v interface{}) bool {
+			p := v.(types.Presence)
+			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
+				rp.presence.Delete(key)
+			}
+			return true
+		})
+		time.Sleep(cleanupTime)
+	}
+}
+
+/*
+Controls whether the client is automatically marked as online by polling this API.
+If this parameter is omitted then the client is automatically marked as online when it uses this API.
+Otherwise if the parameter is set to “offline” then the client is not marked as being online when it uses this API. When set to “unavailable”, the client is marked as being idle.
+*/
+func (rp *RequestPool) updatePresence(presence string, device *userapi.Device) {
+	if presence == "" {
+		presence = "online"
+	}
+
+	newPresence := types.Presence{
+		ClientFields: types.PresenceClientResponse{
+			Presence: presence,
+		},
+		UserID:       device.UserID,
+		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
+	}
+	// avoid spamming presence updates when syncing
+	existingPresence, ok := rp.presence.LoadOrStore(device.UserID, newPresence)
+	if ok {
+		p := existingPresence.(types.Presence)
+		if p.ClientFields.Presence == newPresence.ClientFields.Presence {
+			return
+		}
+	}
+
+	msg := nats.NewMsg(rp.cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent))
+	msg.Header.Set(jetstream.UserID, device.UserID)
+	msg.Header.Set("presence", strings.ToLower(presence))
+	msg.Header.Set("from_sync", "true") // only update last_active_ts and presence
+	msg.Header.Set("last_active_ts", strconv.Itoa(int(gomatrixserverlib.AsTimestamp(time.Now()))))
+
+	if _, err := rp.jetstream.PublishMsg(msg); err != nil {
+		logrus.WithError(err).Error("Unable to publish presence message from sync")
+	}
+
+	rp.presence.Store(device.UserID, newPresence)
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
@@ -156,6 +223,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
+	rp.updatePresence(req.FormValue("set_presence"), device)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
@@ -219,6 +287,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
 				syncReq.Context, syncReq,
 			),
+			PresencePosition: rp.streams.PresenceStreamProvider.CompleteSync(
+				syncReq.Context, syncReq,
+			),
 		}
 	} else {
 		// Incremental sync
@@ -254,6 +325,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
 				syncReq.Context, syncReq,
 				syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
+			),
+			PresencePosition: rp.streams.PresenceStreamProvider.IncrementalSync(
+				syncReq.Context, syncReq,
+				syncReq.Since.PresencePosition, currentPos.PresencePosition,
 			),
 		}
 	}
