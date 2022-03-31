@@ -80,7 +80,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		},
 	}
 	rp := &RequestPool{
-		presence:  syncMap,
+		presence:  &syncMap,
 		jetstream: publisher,
 		cfg: &config.SyncAPI{
 			Matrix: &config.Global{

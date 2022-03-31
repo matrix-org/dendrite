@@ -49,8 +49,8 @@ type RequestPool struct {
 	userAPI   userapi.UserInternalAPI
 	keyAPI    keyapi.KeyInternalAPI
 	rsAPI     roomserverAPI.RoomserverInternalAPI
-	lastseen  sync.Map
-	presence  sync.Map
+	lastseen  *sync.Map
+	presence  *sync.Map
 	streams   *streams.Streams
 	Notifier  *notifier.Notifier
 	jetstream JetstreamPublisher
@@ -74,8 +74,8 @@ func NewRequestPool(
 		userAPI:   userAPI,
 		keyAPI:    keyAPI,
 		rsAPI:     rsAPI,
-		lastseen:  sync.Map{},
-		presence:  sync.Map{},
+		lastseen:  &sync.Map{},
+		presence:  &sync.Map{},
 		streams:   streams,
 		Notifier:  notifier,
 		jetstream: jetstream,
