@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -26,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -92,8 +92,6 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 		return true
 	}
 
-	timestamp := gomatrixserverlib.Timestamp(ts)
-
 	joined, err := t.db.GetAllJoinedHosts(ctx)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
@@ -108,11 +106,13 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 		newStatusMsg = nil
 	}
 
+	p := types.Presence{LastActiveTS: gomatrixserverlib.Timestamp(ts)}
+
 	content := fedTypes.Presence{
 		Push: []fedTypes.PresenceContent{
 			{
-				CurrentlyActive: time.Since(timestamp.Time()).Minutes() < 5,
-				LastActiveAgo:   time.Since(timestamp.Time()).Milliseconds(),
+				CurrentlyActive: p.CurrentlyActive(),
+				LastActiveAgo:   p.LastActiveAgo(),
 				Presence:        presence,
 				StatusMsg:       newStatusMsg,
 				UserID:          userID,

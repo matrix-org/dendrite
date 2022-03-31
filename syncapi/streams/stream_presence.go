@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"sync"
-	"time"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -27,6 +26,7 @@ import (
 
 type PresenceStreamProvider struct {
 	StreamProvider
+	// cache contains previously sent presence updates to avoid unneeded updates
 	cache sync.Map
 }
 
@@ -91,10 +91,10 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			}
 			presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
 			if err != nil {
-				req.Log.WithError(err).Warn("unable to query presence for user")
 				if err == sql.ErrNoRows {
 					continue
 				}
+				req.Log.WithError(err).Error("unable to query presence for user")
 				return from
 			}
 		}
@@ -111,18 +111,16 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		if ok {
 			// skip already sent presence
 			prevPresence := pres.(*types.Presence)
-			currentlyActive := time.Since(prevPresence.LastActiveTS.Time()).Minutes() < 5
-			samePresence := prevPresence.ClientFields.Presence == presence.ClientFields.Presence &&
-				prevPresence.ClientFields.StatusMsg == presence.ClientFields.StatusMsg
-			skip := currentlyActive && samePresence && req.Device.UserID != presence.UserID
+			currentlyActive := prevPresence.CurrentlyActive()
+			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
 			if skip {
 				req.Log.Debugf("Skipping presence, no change (%s)", presence.UserID)
 				continue
 			}
 		}
-		presence.ClientFields.LastActiveAgo = time.Since(presence.LastActiveTS.Time()).Milliseconds()
-		currentlyActive := time.Since(presence.LastActiveTS.Time()).Minutes() < 5
+		presence.ClientFields.LastActiveAgo = presence.LastActiveAgo()
 		if presence.ClientFields.Presence == "online" {
+			currentlyActive := presence.CurrentlyActive()
 			presence.ClientFields.CurrentlyActive = &currentlyActive
 		}
 
