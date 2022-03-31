@@ -1,4 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
+// Copyright 2020 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -51,12 +50,9 @@ func NewPineconeRoomProvider(
 }
 
 func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
-	list := map[gomatrixserverlib.ServerName]struct{}{}
-	for k := range defaults.DefaultServerNames {
-		list[k] = struct{}{}
-	}
+	list := []gomatrixserverlib.ServerName{}
 	for _, k := range p.r.Peers() {
-		list[gomatrixserverlib.ServerName(k.PublicKey)] = struct{}{}
+		list = append(list, gomatrixserverlib.ServerName(k.PublicKey))
 	}
 	return bulkFetchPublicRoomsFromServers(context.Background(), p.fedClient, list)
 }
@@ -65,7 +61,7 @@ func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
 	ctx context.Context, fedClient *gomatrixserverlib.FederationClient,
-	homeservers map[gomatrixserverlib.ServerName]struct{},
+	homeservers []gomatrixserverlib.ServerName,
 ) (publicRooms []gomatrixserverlib.PublicRoom) {
 	limit := 200
 	// follow pipeline semantics, see https://blog.golang.org/pipelines for more info.
@@ -78,7 +74,7 @@ func bulkFetchPublicRoomsFromServers(
 	wg.Add(len(homeservers))
 	// concurrently query for public rooms
 	reqctx, reqcancel := context.WithTimeout(ctx, time.Second*5)
-	for hs := range homeservers {
+	for _, hs := range homeservers {
 		go func(homeserverDomain gomatrixserverlib.ServerName) {
 			defer wg.Done()
 			util.GetLogger(reqctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")

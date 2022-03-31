@@ -1,17 +1,3 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package users
 
 import (
@@ -25,7 +11,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	clienthttputil "github.com/matrix-org/dendrite/clientapi/httputil"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/defaults"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -79,12 +64,9 @@ func (p *PineconeUserProvider) FederatedUserProfiles(w http.ResponseWriter, r *h
 }
 
 func (p *PineconeUserProvider) QuerySearchProfiles(ctx context.Context, req *userapi.QuerySearchProfilesRequest, res *userapi.QuerySearchProfilesResponse) error {
-	list := map[gomatrixserverlib.ServerName]struct{}{}
-	for k := range defaults.DefaultServerNames {
-		list[k] = struct{}{}
-	}
+	list := map[string]struct{}{}
 	for _, k := range p.r.Peers() {
-		list[gomatrixserverlib.ServerName(k.PublicKey)] = struct{}{}
+		list[k.PublicKey] = struct{}{}
 	}
 	res.Profiles = bulkFetchUserDirectoriesFromServers(context.Background(), req, p.fedClient, list)
 	return nil
@@ -95,7 +77,7 @@ func (p *PineconeUserProvider) QuerySearchProfiles(ctx context.Context, req *use
 func bulkFetchUserDirectoriesFromServers(
 	ctx context.Context, req *userapi.QuerySearchProfilesRequest,
 	fedClient *gomatrixserverlib.FederationClient,
-	homeservers map[gomatrixserverlib.ServerName]struct{},
+	homeservers map[string]struct{},
 ) (profiles []authtypes.Profile) {
 	jsonBody, err := json.Marshal(req)
 	if err != nil {
@@ -114,7 +96,7 @@ func bulkFetchUserDirectoriesFromServers(
 	// concurrently query for public rooms
 	reqctx, reqcancel := context.WithTimeout(ctx, time.Second*5)
 	for hs := range homeservers {
-		go func(homeserverDomain gomatrixserverlib.ServerName) {
+		go func(homeserverDomain string) {
 			defer wg.Done()
 			util.GetLogger(reqctx).WithField("hs", homeserverDomain).Info("Querying HS for users")
 
@@ -133,7 +115,7 @@ func bulkFetchUserDirectoriesFromServers(
 				return
 			}
 			for _, profile := range res.Profiles {
-				profile.ServerName = string(homeserverDomain)
+				profile.ServerName = homeserverDomain
 				// atomically send a room or stop
 				select {
 				case profileCh <- profile:
