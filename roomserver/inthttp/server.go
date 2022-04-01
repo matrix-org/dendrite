@@ -96,7 +96,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(RoomserverPerformPeekPath,
+	internalAPIMux.Handle(RoomserverPerformRoomUpgradePath,
 		httputil.MakeInternalAPI("performRoomUpgrade", func(req *http.Request) util.JSONResponse {
 			var request api.PerformRoomUpgradeRequest
 			var response api.PerformRoomUpgradeResponse
