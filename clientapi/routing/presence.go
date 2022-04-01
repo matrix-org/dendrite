@@ -108,6 +108,7 @@ func GetPresence(
 	statusMsg := presence.Header.Get("status_msg")
 	e := presence.Header.Get("error")
 	if e != "" {
+		log.Errorf("received error msg from nats: %s", e)
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: types.PresenceClientResponse{

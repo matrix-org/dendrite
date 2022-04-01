@@ -137,7 +137,7 @@ func AddPublicRoutes(
 	presenceConsumer := consumers.NewPresenceConsumer(
 		process, cfg, js, natsClient, syncDB,
 		notifier, streams.PresenceStreamProvider,
-		rsAPI,
+		userAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")

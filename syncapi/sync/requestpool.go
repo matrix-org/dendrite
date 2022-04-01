@@ -122,6 +122,7 @@ func (rp *RequestPool) updatePresence(presence string, userID string) {
 		UserID:       userID,
 		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
+	defer rp.presence.Store(userID, newPresence)
 	// avoid spamming presence updates when syncing
 	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
 	if ok {
@@ -135,8 +136,6 @@ func (rp *RequestPool) updatePresence(presence string, userID string) {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
-
-	rp.presence.Store(userID, newPresence)
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {

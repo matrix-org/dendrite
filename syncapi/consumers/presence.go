@@ -18,13 +18,13 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -41,7 +41,7 @@ type PresenceConsumer struct {
 	db            storage.Database
 	stream        types.StreamProvider
 	notifier      *notifier.Notifier
-	rsAPI         api.RoomserverInternalAPI
+	deviceAPI     api.UserDeviceAPI
 }
 
 // NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
@@ -54,7 +54,7 @@ func NewPresenceConsumer(
 	db storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
-	rsAPI api.RoomserverInternalAPI,
+	deviceAPI api.UserDeviceAPI,
 ) *PresenceConsumer {
 	return &PresenceConsumer{
 		ctx:           process.Context(),
@@ -66,7 +66,7 @@ func NewPresenceConsumer(
 		db:            db,
 		notifier:      notifier,
 		stream:        stream,
-		rsAPI:         rsAPI,
+		deviceAPI:     deviceAPI,
 	}
 }
 
@@ -74,16 +74,32 @@ func NewPresenceConsumer(
 func (s *PresenceConsumer) Start() error {
 	// Normal NATS subscription, used by Request/Reply
 	_, err := s.nats.Subscribe(s.requestTopic, func(msg *nats.Msg) {
-		presence, err := s.db.GetPresence(context.Background(), msg.Header.Get(jetstream.UserID))
+		userID := msg.Header.Get(jetstream.UserID)
+		presence, err := s.db.GetPresence(context.Background(), userID)
 		m := &nats.Msg{
 			Header: nats.Header{},
 		}
 		if err != nil {
 			m.Header.Set("error", err.Error())
 			if err = msg.RespondMsg(m); err != nil {
-				return
+				logrus.WithError(err).Error("Unable to respond to messages")
 			}
 			return
+		}
+
+		deviceRes := api.QueryDevicesResponse{}
+		if err = s.deviceAPI.QueryDevices(s.ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
+			m.Header.Set("error", err.Error())
+			if err = msg.RespondMsg(m); err != nil {
+				logrus.WithError(err).Error("Unable to respond to messages")
+			}
+			return
+		}
+
+		for i := range deviceRes.Devices {
+			if int64(presence.LastActiveTS) < deviceRes.Devices[i].LastSeenTS {
+				presence.LastActiveTS = gomatrixserverlib.Timestamp(deviceRes.Devices[i].LastSeenTS)
+			}
 		}
 
 		m.Header.Set(jetstream.UserID, presence.UserID)
@@ -92,6 +108,7 @@ func (s *PresenceConsumer) Start() error {
 		m.Header.Set("last_active_ts", strconv.Itoa(int(presence.LastActiveTS)))
 
 		if err = msg.RespondMsg(m); err != nil {
+			logrus.WithError(err).Error("Unable to respond to messages")
 			return
 		}
 	})

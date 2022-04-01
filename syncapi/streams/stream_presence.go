@@ -107,7 +107,8 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		if !sharedUsers[presence.UserID] {
 			continue
 		}
-		pres, ok := p.cache.Load(req.Device.UserID + presence.UserID)
+		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID
+		pres, ok := p.cache.Load(cacheKey)
 		if ok {
 			// skip already sent presence
 			prevPresence := pres.(*types.Presence)
@@ -137,7 +138,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		if presence.StreamPos > lastPos {
 			lastPos = presence.StreamPos
 		}
-		p.cache.Store(req.Device.UserID+presence.UserID, presence)
+		p.cache.Store(cacheKey, presence)
 	}
 
 	return lastPos
