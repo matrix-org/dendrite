@@ -6,6 +6,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -26,7 +27,7 @@ type Streams struct {
 func NewSyncStreamProviders(
 	d storage.Database, userAPI userapi.UserInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	eduCache *caching.EDUCache,
+	eduCache *caching.EDUCache, notifier *notifier.Notifier,
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
@@ -59,6 +60,7 @@ func NewSyncStreamProviders(
 		},
 		PresenceStreamProvider: &PresenceStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
+			notifier:       notifier,
 		},
 	}
 

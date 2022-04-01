@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -27,7 +28,8 @@ import (
 type PresenceStreamProvider struct {
 	StreamProvider
 	// cache contains previously sent presence updates to avoid unneeded updates
-	cache sync.Map
+	cache    sync.Map
+	notifier *notifier.Notifier
 }
 
 func (p *PresenceStreamProvider) Setup() {
@@ -63,39 +65,42 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	}
 
 	// get all joined users
-	rooms, err := p.DB.AllJoinedUsersInRooms(ctx)
-	if err != nil {
-		req.Log.WithError(err).Error("unable to query joined users")
-		return from
-	}
+	// TODO: SharedUsers might get out of syncf
+	sharedUsers := p.notifier.SharedUsers(req.Device.UserID)
 
-	sharedUsers := map[string]bool{
+	sharedUsersMap := map[string]bool{
 		req.Device.UserID: true,
 	}
-	for roomID := range req.Rooms {
-		roomUsers := rooms[roomID]
-		for i := range roomUsers {
-			sharedUsers[roomUsers[i]] = true
-		}
+	// convert array to a map for easier checking if a user exists
+	for i := range sharedUsers {
+		sharedUsersMap[sharedUsers[i]] = true
 	}
 
 	// add newly joined rooms user presences
 	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
-	for _, roomID := range newlyJoined {
-		roomUsers := rooms[roomID]
-		for i := range roomUsers {
-			sharedUsers[roomUsers[i]] = true
-			// we already got a presence from this user
-			if _, ok := presences[roomUsers[i]]; ok {
-				continue
-			}
-			presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
-			if err != nil {
-				if err == sql.ErrNoRows {
+	if len(newlyJoined) > 0 {
+		// TODO: This refreshes all lists and is quite expensive
+		// The notifier should update the lists itself
+		if err = p.notifier.Load(ctx, p.DB); err != nil {
+			req.Log.WithError(err).Error("unable to refresh notifier lists")
+			return from
+		}
+		for _, roomID := range newlyJoined {
+			roomUsers := p.notifier.JoinedUsers(roomID)
+			for i := range roomUsers {
+				sharedUsersMap[roomUsers[i]] = true
+				// we already got a presence from this user
+				if _, ok := presences[roomUsers[i]]; ok {
 					continue
 				}
-				req.Log.WithError(err).Error("unable to query presence for user")
-				return from
+				presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
+				if err != nil {
+					if err == sql.ErrNoRows {
+						continue
+					}
+					req.Log.WithError(err).Error("unable to query presence for user")
+					return from
+				}
 			}
 		}
 	}
@@ -104,7 +109,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	for i := range presences {
 		presence := presences[i]
 		// Ignore users we don't share a room with
-		if !sharedUsers[presence.UserID] {
+		if !sharedUsersMap[presence.UserID] {
 			continue
 		}
 		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID

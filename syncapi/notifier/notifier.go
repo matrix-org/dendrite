@@ -48,15 +48,20 @@ type Notifier struct {
 // NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
-func NewNotifier(currPos types.StreamingToken) *Notifier {
+func NewNotifier() *Notifier {
 	return &Notifier{
-		currPos:                currPos,
 		roomIDToJoinedUsers:    make(map[string]userIDSet),
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
 		streamLock:             &sync.Mutex{},
 		lastCleanUpTime:        time.Now(),
 	}
+}
+
+// SetCurrentPosition sets the current streaming positions.
+// This must be called directly after NewNotifier and initialising the streams.
+func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
+	n.currPos = currPos
 }
 
 // OnNewEvent is called when a new event is received from the room server. Must only be
@@ -83,7 +88,7 @@ func (n *Notifier) OnNewEvent(
 
 	if ev != nil {
 		// Map this event's room_id to a list of joined users, and wake them up.
-		usersToNotify := n.joinedUsers(ev.RoomID())
+		usersToNotify := n.JoinedUsers(ev.RoomID())
 		// Map this event's room_id to a list of peeking devices, and wake them up.
 		peekingDevicesToNotify := n.PeekingDevices(ev.RoomID())
 		// If this is an invite, also add in the invitee to this list.
@@ -114,7 +119,7 @@ func (n *Notifier) OnNewEvent(
 
 		n.wakeupUsers(usersToNotify, peekingDevicesToNotify, n.currPos)
 	} else if roomID != "" {
-		n.wakeupUsers(n.joinedUsers(roomID), n.PeekingDevices(roomID), n.currPos)
+		n.wakeupUsers(n.JoinedUsers(roomID), n.PeekingDevices(roomID), n.currPos)
 	} else if len(userIDs) > 0 {
 		n.wakeupUsers(userIDs, nil, n.currPos)
 	} else {
@@ -182,7 +187,7 @@ func (n *Notifier) OnNewTyping(
 	defer n.streamLock.Unlock()
 
 	n.currPos.ApplyUpdates(posUpdate)
-	n.wakeupUsers(n.joinedUsers(roomID), nil, n.currPos)
+	n.wakeupUsers(n.JoinedUsers(roomID), nil, n.currPos)
 }
 
 // OnNewReceipt updates the current position
@@ -194,7 +199,7 @@ func (n *Notifier) OnNewReceipt(
 	defer n.streamLock.Unlock()
 
 	n.currPos.ApplyUpdates(posUpdate)
-	n.wakeupUsers(n.joinedUsers(roomID), nil, n.currPos)
+	n.wakeupUsers(n.JoinedUsers(roomID), nil, n.currPos)
 }
 
 func (n *Notifier) OnNewKeyChange(
@@ -235,16 +240,16 @@ func (n *Notifier) OnNewPresence(
 	defer n.streamLock.Unlock()
 
 	n.currPos.ApplyUpdates(posUpdate)
-	sharedUsers := n.sharedUsers(userID)
+	sharedUsers := n.SharedUsers(userID)
 	sharedUsers = append(sharedUsers, userID)
 
 	n.wakeupUsers(sharedUsers, nil, n.currPos)
 }
 
-func (n *Notifier) sharedUsers(userID string) (sharedUsers []string) {
+func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
 	for roomID, users := range n.roomIDToJoinedUsers {
 		if _, ok := users[userID]; ok {
-			sharedUsers = append(sharedUsers, n.joinedUsers(roomID)...)
+			sharedUsers = append(sharedUsers, n.JoinedUsers(roomID)...)
 		}
 	}
 	return sharedUsers
@@ -414,7 +419,7 @@ func (n *Notifier) removeJoinedUser(roomID, userID string) {
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
-func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
+func (n *Notifier) JoinedUsers(roomID string) (userIDs []string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
 		return
 	}
