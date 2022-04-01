@@ -310,7 +310,7 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 	return pl.UserLevel(userID) >= plToUpgrade
 }
 
-// nolint:composites,gocyclo
+// nolint:gocyclo
 func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
 	req := &api.QueryLatestEventsAndStateRequest{
 		RoomID: roomID,
@@ -321,54 +321,45 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 			Msg: fmt.Sprintf("Failed to get latest state: %s", err),
 		}
 	}
+
 	state := make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent, len(res.StateEvents))
 	for _, event := range res.StateEvents {
 		if event.StateKey() == nil {
-			continue // shouldn't ever happen, but better to be safe than sorry
+			// This shouldn't ever happen, but better to be safe than sorry.
+			continue
 		}
-		tuple := gomatrixserverlib.StateKeyTuple{EventType: event.Type(), StateKey: *event.StateKey()}
-		state[tuple] = event
+		if event.Type() == gomatrixserverlib.MRoomMember && !event.StateKeyEquals(userID) {
+			// Ignore membership events that aren't our own, as event auth will
+			// prevent us from being able to create membership events on behalf
+			// of other users anyway unless they are invites or bans.
+			continue
+		}
+		state[gomatrixserverlib.StateKeyTuple{EventType: event.Type(), StateKey: *event.StateKey()}] = event
 	}
 
-	oldCreateEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomCreate, StateKey: "",
-	}]
-	oldMembershipEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomMember, StateKey: userID,
-	}]
-	oldPowerLevelsEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: "",
-	}]
-	oldJoinRulesEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomJoinRules, StateKey: "",
-	}]
-	oldHistoryVisibilityEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: "",
-	}]
-	oldNameEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomName, StateKey: "",
-	}]
-	oldTopicEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomTopic, StateKey: "",
-	}]
-	oldGuestAccessEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomGuestAccess, StateKey: "",
-	}]
-	oldAvatarEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomAvatar, StateKey: "",
-	}]
-	oldEncryptionEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomEncryption, StateKey: "",
-	}]
-	oldCanonicalAliasEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: "",
-	}]
-	oldServerAclEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: "m.room.server_acl", StateKey: "",
-	}]
-	oldRelatedGroupsEvent := state[gomatrixserverlib.StateKeyTuple{
-		EventType: "m.room.related_groups", StateKey: "",
-	}]
+	// The following events are ones that we are going to override manually
+	// in the following section.
+	override := map[gomatrixserverlib.StateKeyTuple]struct{}{
+		{EventType: gomatrixserverlib.MRoomCreate, StateKey: ""}:      {},
+		{EventType: gomatrixserverlib.MRoomMember, StateKey: userID}:  {},
+		{EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: ""}: {},
+		{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}:   {},
+	}
+
+	// The overridden events are essential events that must be present in the
+	// old room state. Check that they are there.
+	for tuple := range override {
+		if _, ok := state[tuple]; !ok {
+			return nil, &api.PerformError{
+				Msg: fmt.Sprintf("Essential event of type %q state key %q is missing", tuple.EventType, tuple.StateKey),
+			}
+		}
+	}
+
+	oldCreateEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomCreate, StateKey: ""}]
+	oldMembershipEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomMember, StateKey: userID}]
+	oldPowerLevelsEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: ""}]
+	oldJoinRulesEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}]
 
 	newCreateContent := map[string]interface{}{
 		"creator":      userID,
@@ -433,125 +424,19 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		},
 	}
 
-	historyVisibilityContent, err := oldHistoryVisibilityEvent.HistoryVisibility()
-	if err != nil {
-		return nil, &api.PerformError{
-			Msg: "History visibility event had bad content",
-		}
-	}
-	newHistoryVisibilityEvent := fledglingEvent{
-		Type: gomatrixserverlib.MRoomHistoryVisibility,
-		Content: map[string]interface{}{
-			"history_visibility": historyVisibilityContent,
-		},
-	}
+	eventsToMake := make([]fledglingEvent, 0, len(state))
+	eventsToMake = append(eventsToMake, newCreateEvent, membershipEvent, tempPowerLevelsEvent, newJoinRulesEvent)
 
-	var newNameEvent fledglingEvent
-	var newTopicEvent fledglingEvent
-	var newGuestAccessEvent fledglingEvent
-	var newAvatarEvent fledglingEvent
-	var newEncryptionEvent fledglingEvent
-	var newServerACLEvent fledglingEvent
-	var newRelatedGroupsEvent fledglingEvent
-	var newCanonicalAliasEvent fledglingEvent
-
-	if oldNameEvent != nil {
-		newNameEvent = fledglingEvent{
-			Type:    gomatrixserverlib.MRoomName,
-			Content: unmarshal(oldNameEvent.Content()),
-		}
-	}
-	if oldTopicEvent != nil {
-		newTopicEvent = fledglingEvent{
-			Type:    gomatrixserverlib.MRoomTopic,
-			Content: unmarshal(oldTopicEvent.Content()),
-		}
-	}
-	if oldGuestAccessEvent != nil {
-		newGuestAccessEvent = fledglingEvent{
-			Type:    gomatrixserverlib.MRoomGuestAccess,
-			Content: unmarshal(oldGuestAccessEvent.Content()),
-		}
-	}
-	if oldAvatarEvent != nil {
-		newAvatarEvent = fledglingEvent{
-			Type:    gomatrixserverlib.MRoomAvatar,
-			Content: unmarshal(oldAvatarEvent.Content()),
-		}
-	}
-	if oldEncryptionEvent != nil {
-		newEncryptionEvent = fledglingEvent{
-			Type:    gomatrixserverlib.MRoomEncryption,
-			Content: unmarshal(oldEncryptionEvent.Content()),
-		}
-	}
-	if oldServerAclEvent != nil {
-		newServerACLEvent = fledglingEvent{
-			Type:    "m.room.server_acl",
-			Content: unmarshal(oldServerAclEvent.Content()),
-		}
-	}
-	if oldRelatedGroupsEvent != nil {
-		newRelatedGroupsEvent = fledglingEvent{
-			Type:    "m.room.related_groups",
-			Content: unmarshal(oldRelatedGroupsEvent.Content()),
-		}
-	}
-	if oldCanonicalAliasEvent != nil {
-		newCanonicalAliasEvent = fledglingEvent{
-			Type:    gomatrixserverlib.MRoomCanonicalAlias,
-			Content: unmarshal(oldCanonicalAliasEvent.Content()),
-		}
-	}
-
-	// 3. Replicate transferable state events
-	//  send events into the room in order of:
-	//  1- m.room.create
-	//  2- m.room.power_levels (temporary, to allow the upgrading user to send everything)
-	//  3- m.room.join_rules
-	//  4- m.room.history_visibility
-	//  5- m.room.guest_access
-	//  6- m.room.name
-	//	7- m.room.avatar
-	//  8- m.room.topic
-	//	9- m.room.encryption
-	//	10-m.room.server_acl
-	//  11-m.room.related_groups
-	//  12-m.room.canonical_alias
-	//  13-All ban events from the old room
-	//  14-The original room power levels
-	eventsToMake := []fledglingEvent{
-		newCreateEvent, membershipEvent, tempPowerLevelsEvent, newJoinRulesEvent, newHistoryVisibilityEvent,
-	}
-	if oldGuestAccessEvent != nil {
-		eventsToMake = append(eventsToMake, newGuestAccessEvent)
-	} else { // Always create this with the default value to appease sytests
+	if _, ok := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomGuestAccess, StateKey: ""}]; !ok {
+		// Appease sytest, as it expects a guest access event for some reason.
 		eventsToMake = append(eventsToMake, fledglingEvent{
-			Type:    gomatrixserverlib.MRoomGuestAccess,
-			Content: map[string]interface{}{"guest_access": "forbidden"},
+			Type: gomatrixserverlib.MRoomGuestAccess,
+			Content: map[string]string{
+				"guest_access": "forbidden",
+			},
 		})
 	}
-	if oldNameEvent != nil {
-		eventsToMake = append(eventsToMake, newNameEvent)
-	}
-	if oldAvatarEvent != nil {
-		eventsToMake = append(eventsToMake, newAvatarEvent)
-	}
-	if oldTopicEvent != nil {
-		eventsToMake = append(eventsToMake, newTopicEvent)
-	}
-	if oldEncryptionEvent != nil {
-		eventsToMake = append(eventsToMake, newEncryptionEvent)
-	}
-	if oldServerAclEvent != nil {
-		eventsToMake = append(eventsToMake, newServerACLEvent)
-	}
-	if oldRelatedGroupsEvent != nil {
-		eventsToMake = append(eventsToMake, newRelatedGroupsEvent)
-	}
-	if oldCanonicalAliasEvent != nil {
-		eventsToMake = append(eventsToMake, newCanonicalAliasEvent)
-	}
+
 	banEvents, err := getBanEvents(ctx, roomID, r.URSAPI)
 	if err != nil {
 		return nil, &api.PerformError{
@@ -559,6 +444,30 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		}
 	} else {
 		eventsToMake = append(eventsToMake, banEvents...)
+	}
+
+	// Duplicate all of the old state events into the new room.
+	for tuple, event := range state {
+		if _, ok := override[tuple]; ok {
+			// Don't duplicate events we have overridden already. They
+			// are already in `eventsToMake`.
+			continue
+		}
+		if event.Type() == gomatrixserverlib.MRoomMember {
+			// Don't duplicate membership events. Our own membership
+			// event has already been created above, and event auth won't
+			// let us create membership events for other users.
+			continue
+		}
+		newEvent := fledglingEvent{
+			Type:     tuple.EventType,
+			StateKey: tuple.StateKey,
+		}
+		if err = json.Unmarshal(event.Content(), &newEvent.Content); err != nil {
+			logrus.WithError(err).Error("Failed to unmarshal old event")
+			continue
+		}
+		eventsToMake = append(eventsToMake, newEvent)
 	}
 	eventsToMake = append(eventsToMake, newPowerLevelsEvent)
 	return eventsToMake, nil
