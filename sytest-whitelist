@@ -661,3 +661,4 @@ Canonical alias can include alt_aliases
 Can delete canonical alias
 AS can make room aliases
 /context/ with lazy_load_members filter works
+Room summary counts change when membership changes
