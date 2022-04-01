@@ -377,6 +377,11 @@ func (r *Response) IsEmpty() bool {
 
 // JoinResponse represents a /sync response for a room which is under the 'join' or 'peek' key.
 type JoinResponse struct {
+	Summary struct {
+		Heroes             []string `json:"m.heroes,omitempty"`
+		JoinedMemberCount  *int     `json:"m.joined_member_count,omitempty"`
+		InvitedMemberCount *int     `json:"m.invited_member_count,omitempty"`
+	} `json:"summary"`
 	State struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"state"`
