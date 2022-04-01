@@ -255,7 +255,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	hasMembershipChange := false
 	for _, recentEvent := range recentStreamEvents {
-		if recentEvent.Type() == gomatrixserverlib.MRoomMember {
+		if recentEvent.Type() == gomatrixserverlib.MRoomMember && recentEvent.StateKey() != nil {
 			hasMembershipChange = true
 			break
 		}
