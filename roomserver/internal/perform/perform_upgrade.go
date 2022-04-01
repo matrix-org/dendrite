@@ -49,6 +49,7 @@ func (r *Upgrader) PerformRoomUpgrade(
 	res.NewRoomID, res.Error = r.performRoomUpgrade(ctx, req)
 	if res.Error != nil {
 		res.NewRoomID = ""
+		logrus.WithContext(ctx).WithError(res.Error).Error("Room upgrade failed")
 	}
 }
 
@@ -309,56 +310,65 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 	return pl.UserLevel(userID) >= plToUpgrade
 }
 
+// nolint:composites,gocyclo
 func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
-	oldCreateEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomCreate,
-		StateKey:  "",
-	})
-	oldPowerLevelsEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomPowerLevels,
-		StateKey:  "",
-	})
-	oldJoinRulesEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomJoinRules,
-		StateKey:  "",
-	})
-	oldHistoryVisibilityEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomHistoryVisibility,
-		StateKey:  "",
-	})
-	oldNameEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomName,
-		StateKey:  "",
-	})
-	oldTopicEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomTopic,
-		StateKey:  "",
-	})
-	oldGuestAccessEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomGuestAccess,
-		StateKey:  "",
-	})
-	oldAvatarEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomAvatar,
-		StateKey:  "",
-	})
-	oldEncryptionEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomEncryption,
-		StateKey:  "",
-	})
-	oldServerAclEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: "m.room.server_acl",
-		StateKey:  "",
-	})
-	// Not in the spec, but needed for sytest compatablility
-	oldRelatedGroupsEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: "m.room.related_groups",
-		StateKey:  "",
-	})
-	oldCanonicalAliasEvent := api.GetStateEvent(ctx, r.URSAPI, roomID, gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomCanonicalAlias,
-		StateKey:  "",
-	})
+	req := &api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+	}
+	res := &api.QueryLatestEventsAndStateResponse{}
+	if err := r.URSAPI.QueryLatestEventsAndState(ctx, req, res); err != nil {
+		return nil, &api.PerformError{
+			Msg: fmt.Sprintf("Failed to get latest state: %s", err),
+		}
+	}
+	state := make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent, len(res.StateEvents))
+	for _, event := range res.StateEvents {
+		if event.StateKey() == nil {
+			continue // shouldn't ever happen, but better to be safe than sorry
+		}
+		tuple := gomatrixserverlib.StateKeyTuple{EventType: event.Type(), StateKey: *event.StateKey()}
+		state[tuple] = event
+	}
+
+	oldCreateEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomCreate, StateKey: "",
+	}]
+	oldMembershipEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomMember, StateKey: userID,
+	}]
+	oldPowerLevelsEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: "",
+	}]
+	oldJoinRulesEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomJoinRules, StateKey: "",
+	}]
+	oldHistoryVisibilityEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: "",
+	}]
+	oldNameEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomName, StateKey: "",
+	}]
+	oldTopicEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomTopic, StateKey: "",
+	}]
+	oldGuestAccessEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomGuestAccess, StateKey: "",
+	}]
+	oldAvatarEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomAvatar, StateKey: "",
+	}]
+	oldEncryptionEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomEncryption, StateKey: "",
+	}]
+	oldCanonicalAliasEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: gomatrixserverlib.MRoomCanonicalAlias, StateKey: "",
+	}]
+	oldServerAclEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: "m.room.server_acl", StateKey: "",
+	}]
+	oldRelatedGroupsEvent := state[gomatrixserverlib.StateKeyTuple{
+		EventType: "m.room.related_groups", StateKey: "",
+	}]
 
 	newCreateContent := map[string]interface{}{
 		"creator":      userID,
@@ -378,14 +388,20 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		Content: newCreateContent,
 	}
 
+	membershipContent := gomatrixserverlib.MemberContent{
+		Membership: gomatrixserverlib.Join,
+	}
+	if err := json.Unmarshal(oldMembershipEvent.Content(), &membershipContent); err != nil {
+		util.GetLogger(ctx).WithError(err).Error()
+		return nil, &api.PerformError{
+			Msg: "Membership event content was invalid",
+		}
+	}
+	membershipContent.Membership = gomatrixserverlib.Join
 	membershipEvent := fledglingEvent{
 		Type:     gomatrixserverlib.MRoomMember,
 		StateKey: userID,
-		Content: gomatrixserverlib.MemberContent{
-			Membership:  gomatrixserverlib.Join,
-			DisplayName: "",
-			AvatarURL:   "", // TODO
-		},
+		Content:  membershipContent,
 	}
 
 	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
