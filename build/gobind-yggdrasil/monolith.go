@@ -13,8 +13,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggconn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/yggrooms"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -123,10 +121,6 @@ func (m *DendriteMonolith) Start() {
 	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), userAPI,
-	)
-
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 	rsAPI.SetAppserviceAPI(asAPI)
 
@@ -141,12 +135,11 @@ func (m *DendriteMonolith) Start() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:  asAPI,
-		EDUInternalAPI: eduInputAPI,
-		FederationAPI:  fsAPI,
-		RoomserverAPI:  rsAPI,
-		UserAPI:        userAPI,
-		KeyAPI:         keyAPI,
+		AppserviceAPI: asAPI,
+		FederationAPI: fsAPI,
+		RoomserverAPI: rsAPI,
+		UserAPI:       userAPI,
+		KeyAPI:        keyAPI,
 		ExtPublicRoomsProvider: yggrooms.NewYggdrasilRoomProvider(
 			ygg, fsAPI, federation,
 		),

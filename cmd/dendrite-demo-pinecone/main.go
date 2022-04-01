@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,8 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -191,10 +189,6 @@ func main() {
 	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), userAPI,
-	)
-
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	rsComponent.SetFederationAPI(fsAPI, keyRing)
@@ -210,7 +204,6 @@ func main() {
 		KeyRing:   keyRing,
 
 		AppserviceAPI:            asAPI,
-		EDUInternalAPI:           eduInputAPI,
 		FederationAPI:            fsAPI,
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  userAPI,
@@ -252,6 +245,7 @@ func main() {
 			logrus.WithError(err).Error("Failed to connect WebSocket peer to Pinecone switch")
 		}
 	})
+	httpRouter.HandleFunc("/pinecone", pRouter.ManholeHandler)
 	embed.Embed(httpRouter, *instancePort, "Pinecone Demo")
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()

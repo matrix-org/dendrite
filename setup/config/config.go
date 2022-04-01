@@ -56,7 +56,6 @@ type Dendrite struct {
 	Global        Global        `yaml:"global"`
 	AppServiceAPI AppServiceAPI `yaml:"app_service_api"`
 	ClientAPI     ClientAPI     `yaml:"client_api"`
-	EDUServer     EDUServer     `yaml:"edu_server"`
 	FederationAPI FederationAPI `yaml:"federation_api"`
 	KeyServer     KeyServer     `yaml:"key_server"`
 	MediaAPI      MediaAPI      `yaml:"media_api"`
@@ -296,7 +295,6 @@ func (c *Dendrite) Defaults(generate bool) {
 
 	c.Global.Defaults(generate)
 	c.ClientAPI.Defaults(generate)
-	c.EDUServer.Defaults(generate)
 	c.FederationAPI.Defaults(generate)
 	c.KeyServer.Defaults(generate)
 	c.MediaAPI.Defaults(generate)
@@ -314,8 +312,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		Verify(configErrs *ConfigErrors, isMonolith bool)
 	}
 	for _, c := range []verifiable{
-		&c.Global, &c.ClientAPI,
-		&c.EDUServer, &c.FederationAPI,
+		&c.Global, &c.ClientAPI, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
 		&c.AppServiceAPI, &c.MSCs,
@@ -327,7 +324,6 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 func (c *Dendrite) Wiring() {
 	c.Global.JetStream.Matrix = &c.Global
 	c.ClientAPI.Matrix = &c.Global
-	c.EDUServer.Matrix = &c.Global
 	c.FederationAPI.Matrix = &c.Global
 	c.KeyServer.Matrix = &c.Global
 	c.MediaAPI.Matrix = &c.Global
@@ -517,15 +513,6 @@ func (config *Dendrite) UserAPIURL() string {
 	// People setting up servers shouldn't need to get a certificate valid for the public
 	// internet for an internal API.
 	return string(config.UserAPI.InternalAPI.Connect)
-}
-
-// EDUServerURL returns an HTTP URL for where the EDU server is listening.
-func (config *Dendrite) EDUServerURL() string {
-	// Hard code the EDU server to talk HTTP for now.
-	// If we support HTTPS we need to think of a practical way to do certificate validation.
-	// People setting up servers shouldn't need to get a certificate valid for the public
-	// internet for an internal API.
-	return string(config.EDUServer.InternalAPI.Connect)
 }
 
 // KeyServerURL returns an HTTP URL for where the key server is listening.

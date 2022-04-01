@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	UserID = "user_id"
-	RoomID = "room_id"
+	UserID  = "user_id"
+	RoomID  = "room_id"
+	EventID = "event_id"
 )
 
 var (

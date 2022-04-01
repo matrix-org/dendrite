@@ -12,16 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !ios
-// +build !ios
+package defaults
 
-package gobind
+import "github.com/matrix-org/gomatrixserverlib"
 
-import "log"
-
-type BindLogger struct{}
-
-func (nsl BindLogger) Write(p []byte) (n int, err error) {
-	log.Println(string(p))
-	return len(p), nil
+var DefaultServerNames = map[gomatrixserverlib.ServerName]struct{}{
+	"3bf0258d23c60952639cc4c69c71d1508a7d43a0475d9000ff900a1848411ec7": {},
 }
