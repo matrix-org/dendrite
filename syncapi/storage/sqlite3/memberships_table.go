@@ -65,7 +65,7 @@ const selectMembershipSQL = "" +
 
 const selectMembershipCountSQL = "" +
 	"SELECT COUNT(*) FROM (" +
-	" SELECT *, max(stream_pos) FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 GROUP BY user_id" +
+	" SELECT * FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 GROUP BY user_id HAVING(max(stream_pos))" +
 	") t WHERE t.membership = $3"
 
 type membershipsStatements struct {
