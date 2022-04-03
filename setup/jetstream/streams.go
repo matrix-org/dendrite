@@ -94,6 +94,7 @@ var streams = []*nats.StreamConfig{
 	{
 		Name:      OutputPresenceEvent,
 		Retention: nats.InterestPolicy,
-		Storage:   nats.FileStorage,
+		Storage:   nats.MemoryStorage,
+		MaxAge:    time.Minute * 5,
 	},
 }
