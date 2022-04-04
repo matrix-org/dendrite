@@ -169,7 +169,7 @@ def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
         for name, passing in tests.items():
             if passing:
                 group_passing += 1
-            test_names_and_marks.append(f"{'✓' if passing else '×'} {name}")
+            test_names_and_marks.append(f"{'✅' if passing else '❌'} {name}")
             
         total_tests += group_total
         total_passing += group_passing
@@ -186,11 +186,11 @@ def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
     print("%s: %s (%d/%d tests)" % (header_name, pct, total_passing, total_tests))
     print("-" * (len(header_name)+1))
     for line in subsections:
-        print("  %s" % (line,))
+        print("::group::%s" % (line,))
         if verbose:
             for test_name_and_pass_mark in subsection_test_names[line]:
                 print("    %s" % (test_name_and_pass_mark,))
-            print("")
+            print("::endgroup::")
     print("")
 
 def main(results_tap_path, verbose):
