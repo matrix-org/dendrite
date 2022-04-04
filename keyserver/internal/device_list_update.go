@@ -157,8 +157,12 @@ func (u *DeviceListUpdater) Start() error {
 	if err != nil {
 		return err
 	}
+	offset := time.Second * 10
 	for _, userID := range staleLists {
-		u.notifyWorkers(userID)
+		time.AfterFunc(offset, func() {
+			u.notifyWorkers(userID)
+		})
+		offset += time.Second
 	}
 	return nil
 }
