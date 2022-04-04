@@ -346,11 +346,18 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 			continue
 		}
 		if event.Type() == gomatrixserverlib.MRoomMember && !event.StateKeyEquals(userID) {
-			// With the exception of bans which we do want to copy, we should ignore
-			// membership events that aren't our own, as event auth will prevent us
-			// from being able to create membership events on behalf of other users
-			// anyway unless they are invites or bans.
-			if membership, err := event.Membership(); err == nil && membership != gomatrixserverlib.Ban {
+			// With the exception of bans and invites which we do want to copy, we
+			// should ignore membership events that aren't our own, as event auth will
+			// prevent us from being able to create membership events on behalf of other
+			// users anyway unless they are invites or bans.
+			membership, err := event.Membership()
+			if err != nil {
+				continue
+			}
+			switch membership {
+			case gomatrixserverlib.Ban:
+			case gomatrixserverlib.Invite:
+			default:
 				continue
 			}
 		}
