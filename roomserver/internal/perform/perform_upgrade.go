@@ -302,11 +302,7 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 	}
 	// Check for power level required to send tombstone event (marks the current room as obsolete),
 	// if not found, use the StateDefault power level
-	plToUpgrade, ok := pl.Events["m.room.tombstone"]
-	if !ok {
-		plToUpgrade = pl.StateDefault
-	}
-	return pl.UserLevel(userID) >= plToUpgrade
+	return pl.UserLevel(userID) >= pl.EventLevel("m.room.tombstone", true)
 }
 
 // nolint:gocyclo
@@ -380,8 +376,9 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		RoomID:  roomID,
 	}
 	newCreateEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomCreate,
-		Content: newCreateContent,
+		Type:     gomatrixserverlib.MRoomCreate,
+		StateKey: "",
+		Content:  newCreateContent,
 	}
 
 	membershipContent := gomatrixserverlib.MemberContent{}
@@ -420,7 +417,8 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		}
 	}
 	newJoinRulesEvent := fledglingEvent{
-		Type: gomatrixserverlib.MRoomJoinRules,
+		Type:     gomatrixserverlib.MRoomJoinRules,
+		StateKey: "",
 		Content: map[string]interface{}{
 			"join_rule": joinRulesContent,
 		},
@@ -444,12 +442,6 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		if _, ok := override[tuple]; ok {
 			// Don't duplicate events we have overridden already. They
 			// are already in `eventsToMake`.
-			continue
-		}
-		if membership, merr := event.Membership(); merr == nil && membership != gomatrixserverlib.Ban {
-			// Don't duplicate membership events that aren't bans. Our own
-			// membership event has already been created above, and event auth
-			// won't let us create join membership events for other users.
 			continue
 		}
 		newEvent := fledglingEvent{
