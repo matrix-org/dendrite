@@ -363,19 +363,22 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 	oldPowerLevelsEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomPowerLevels, StateKey: ""}]
 	oldJoinRulesEvent := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomJoinRules, StateKey: ""}]
 
-	newCreateContent := map[string]interface{}{
-		"creator":      userID,
-		"room_version": newVersion, // TODO: change struct to single var?
-		"predecessor": gomatrixserverlib.PreviousRoom{
-			EventID: tombstoneEvent.EventID(),
-			RoomID:  roomID,
-		},
+	// Create the new room create event. Using a map here instead of CreateContent
+	// means that we preserve any other interesting fields that might be present
+	// in the create event (such as for the room types MSC).
+	newCreateContent := map[string]interface{}{}
+	if err := json.Unmarshal(oldCreateEvent.Content(), &newCreateContent); err != nil {
+		util.GetLogger(ctx).WithError(err).Error()
+		return nil, &api.PerformError{
+			Msg: "Create event content was invalid",
+		}
 	}
-	oldCreateContent := unmarshal(oldCreateEvent.Content())
-	if federate, ok := oldCreateContent["m.federate"].(bool); ok {
-		newCreateContent["m.federate"] = federate
+	newCreateContent["creator"] = userID
+	newCreateContent["room_version"] = newVersion
+	newCreateContent["predecessor"] = gomatrixserverlib.PreviousRoom{
+		EventID: tombstoneEvent.EventID(),
+		RoomID:  roomID,
 	}
-
 	newCreateEvent := fledglingEvent{
 		Type:    gomatrixserverlib.MRoomCreate,
 		Content: newCreateContent,
@@ -401,22 +404,21 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error()
 		return nil, &api.PerformError{
-			Msg: "powerLevel event was not actually a power level event",
+			Msg: "Power level event content was invalid",
 		}
 	}
 
-	newPowerLevelsEvent := fledglingEvent{
-		Type:    gomatrixserverlib.MRoomPowerLevels,
-		Content: powerLevelContent,
-	}
-
-	//create temporary power level event that elevates upgrading user's prvileges to create every copied state event
-	tempPowerLevelsEvent := createTemporaryPowerLevels(powerLevelContent, userID)
+	// We might need to temporarily give ourselves a higher power level
+	// than we had in the old room in order to be able to send all of
+	// the relevant state events. This function will return whether we
+	// had to override the power level events or not — if we did, we
+	// need to send the original power levels again later on.
+	tempPowerLevelsEvent, powerLevelsOverridden := createTemporaryPowerLevels(powerLevelContent, userID)
 
 	joinRulesContent, err := oldJoinRulesEvent.JoinRule()
 	if err != nil {
 		return nil, &api.PerformError{
-			Msg: "Join rules event had bad content",
+			Msg: "Join rules event content was invalid",
 		}
 	}
 	newJoinRulesEvent := fledglingEvent{
@@ -462,7 +464,15 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		}
 		eventsToMake = append(eventsToMake, newEvent)
 	}
-	eventsToMake = append(eventsToMake, newPowerLevelsEvent)
+
+	// If we sent a temporary power level event into the room before,
+	// override that now by restoring the original power levels.
+	if powerLevelsOverridden {
+		eventsToMake = append(eventsToMake, fledglingEvent{
+			Type:    gomatrixserverlib.MRoomPowerLevels,
+			Content: powerLevelContent,
+		})
+	}
 	return eventsToMake, nil
 }
 
@@ -600,7 +610,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	return headeredEvent, nil
 }
 
-func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) fledglingEvent {
+func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) (fledglingEvent, bool) {
 	// Work out what power level we need in order to be able to send events
 	// of all types into the room.
 	neededPowerLevel := powerLevelContent.StateDefault
@@ -612,6 +622,7 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 
 	// Make a copy of the existing power level content.
 	tempPowerLevelContent := *powerLevelContent
+	powerLevelsOverridden := false
 
 	// At this point, the "Users", "Events" and "Notifications" keys are all
 	// pointing to the map of the original PL content, so we will specifically
@@ -624,15 +635,16 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 
 	// If the user who is upgrading the room doesn't already have sufficient
 	// power, then elevate their power levels.
-	if val := tempPowerLevelContent.Users[userID]; val < neededPowerLevel {
+	if tempPowerLevelContent.UserLevel(userID) < neededPowerLevel {
 		tempPowerLevelContent.Users[userID] = neededPowerLevel
+		powerLevelsOverridden = true
 	}
 
 	// Then return the temporary power levels event.
 	return fledglingEvent{
 		Type:    gomatrixserverlib.MRoomPowerLevels,
 		Content: tempPowerLevelContent,
-	}
+	}, powerLevelsOverridden
 }
 
 func (r *Upgrader) sendHeaderedEvent(
@@ -678,13 +690,4 @@ func (r *Upgrader) buildEvent(
 		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
 	}
 	return event, nil
-}
-
-func unmarshal(in []byte) map[string]interface{} {
-	ret := make(map[string]interface{})
-	err := json.Unmarshal(in, &ret)
-	if err != nil {
-		logrus.Fatalf("One of our own state events is not valid JSON: %v", err)
-	}
-	return ret
 }
