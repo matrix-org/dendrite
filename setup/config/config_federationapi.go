@@ -12,13 +12,6 @@ type FederationAPI struct {
 	// send transactions to remote servers.
 	Database DatabaseOptions `yaml:"database"`
 
-	// List of paths to X509 certificates used by the external federation listeners.
-	// These are used to calculate the TLS fingerprints to publish for this server.
-	// Other matrix servers talking to this server will expect the x509 certificate
-	// to match one of these certificates.
-	// The certificates should be in PEM format.
-	FederationCertificatePaths []Path `yaml:"federation_certificates"`
-
 	// Federation failure threshold. How many consecutive failures that we should
 	// tolerate when sending federation requests to a specific server. The backoff
 	// is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc.
@@ -57,8 +50,6 @@ func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
 	checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
-	// TODO: not applicable always, e.g. in demos
-	//checkNotZero(configErrs, "federation_api.federation_certificates", int64(len(c.FederationCertificatePaths)))
 }
 
 // The config for setting a proxy to use for server->server requests
