@@ -300,7 +300,7 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 	if err != nil {
 		return false
 	}
-	// Check for power level required to send tombstone event (marks the curren room as obsolete),
+	// Check for power level required to send tombstone event (marks the current room as obsolete),
 	// if not found, use the StateDefault power level
 	plToUpgrade, ok := pl.Events["m.room.tombstone"]
 	if !ok {
@@ -384,9 +384,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		Content: newCreateContent,
 	}
 
-	membershipContent := gomatrixserverlib.MemberContent{
-		Membership: gomatrixserverlib.Join,
-	}
+	membershipContent := gomatrixserverlib.MemberContent{}
 	if err := json.Unmarshal(oldMembershipEvent.Content(), &membershipContent); err != nil {
 		util.GetLogger(ctx).WithError(err).Error()
 		return nil, &api.PerformError{

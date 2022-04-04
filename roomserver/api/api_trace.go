@@ -73,7 +73,7 @@ func (t *RoomserverInternalAPITrace) PerformRoomUpgrade(
 	res *PerformRoomUpgradeResponse,
 ) {
 	t.Impl.PerformRoomUpgrade(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformUnpeek req=%+v res=%+v", js(req), js(res))
+	util.GetLogger(ctx).Infof("PerformRoomUpgrade req=%+v res=%+v", js(req), js(res))
 }
 
 func (t *RoomserverInternalAPITrace) PerformJoin(
