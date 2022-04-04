@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -93,7 +92,7 @@ func (m *DendriteMonolith) PeerCount(peertype int) int {
 }
 
 func (m *DendriteMonolith) SessionCount() int {
-	return len(m.PineconeQUIC.Sessions())
+	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -283,10 +282,9 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
-	logger := log.New(os.Stdout, "PINECONE: ", 0)
-	m.PineconeRouter = pineconeRouter.NewRouter(logger, sk, false)
-	m.PineconeQUIC = pineconeSessions.NewSessions(logger, m.PineconeRouter)
-	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
+	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
+	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
@@ -374,7 +372,7 @@ func (m *DendriteMonolith) Start() {
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	pHTTP := m.PineconeQUIC.HTTP()
+	pHTTP := m.PineconeQUIC.Protocol("matrix").HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, pMux)
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
@@ -400,7 +398,7 @@ func (m *DendriteMonolith) Start() {
 
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
-		m.logger.Fatal(m.httpServer.Serve(m.PineconeQUIC))
+		m.logger.Fatal(m.httpServer.Serve(m.PineconeQUIC.Protocol("matrix")))
 	}()
 	go func() {
 		logrus.Info("Listening on ", m.listener.Addr())
