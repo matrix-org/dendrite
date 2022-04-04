@@ -253,9 +253,25 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
 	}
 
+	hasMembershipChange := false
+	for _, recentEvent := range recentStreamEvents {
+		if recentEvent.Type() == gomatrixserverlib.MRoomMember && recentEvent.StateKey() != nil {
+			hasMembershipChange = true
+			break
+		}
+	}
+
+	// Work out how many members are in the room.
+	joinedCount, _ := p.DB.MembershipCount(ctx, delta.RoomID, gomatrixserverlib.Join, latestPosition)
+	invitedCount, _ := p.DB.MembershipCount(ctx, delta.RoomID, gomatrixserverlib.Invite, latestPosition)
+
 	switch delta.Membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
+		if hasMembershipChange {
+			jr.Summary.JoinedMemberCount = &joinedCount
+			jr.Summary.InvitedMemberCount = &invitedCount
+		}
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
@@ -367,12 +383,18 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		prevBatch.Decrement()
 	}
 
+	// Work out how many members are in the room.
+	joinedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Join, r.From)
+	invitedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, r.From)
+
 	// We don't include a device here as we don't need to send down
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	jr = types.NewJoinResponse()
+	jr.Summary.JoinedMemberCount = &joinedCount
+	jr.Summary.InvitedMemberCount = &invitedCount
 	jr.Timeline.PrevBatch = prevBatch
 	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 	jr.Timeline.Limited = limited

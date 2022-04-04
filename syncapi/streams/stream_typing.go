@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type TypingStreamProvider struct {
 	StreamProvider
-	EDUCache *cache.EDUCache
+	EDUCache *caching.EDUCache
 }
 
 func (p *TypingStreamProvider) CompleteSync(

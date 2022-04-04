@@ -59,6 +59,10 @@ type UserInternalAPI interface {
 	UpdateServerNoticeRoomID(ctx context.Context, req *UpdateServerNoticeRoomRequest, res *UpdateServerNoticeRoomResponse) (err error)
 }
 
+type UserDirectoryProvider interface {
+	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
+}
+
 // UserProfileAPI provides functions for getting user profiles
 type UserProfileAPI interface {
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error

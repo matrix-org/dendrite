@@ -157,5 +157,26 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		}
 	}
 
+	// Clean up old consumers so that interest-based consumers do the
+	// right thing.
+	for stream, consumers := range map[string][]string{
+		OutputClientData:        {"SyncAPIClientAPIConsumer"},
+		OutputReceiptEvent:      {"SyncAPIEDUServerReceiptConsumer", "FederationAPIEDUServerConsumer"},
+		OutputSendToDeviceEvent: {"SyncAPIEDUServerSendToDeviceConsumer", "FederationAPIEDUServerConsumer"},
+		OutputTypingEvent:       {"SyncAPIEDUServerTypingConsumer", "FederationAPIEDUServerConsumer"},
+	} {
+		streamName := cfg.Matrix.JetStream.Prefixed(stream)
+		for _, consumer := range consumers {
+			consumerName := cfg.Matrix.JetStream.Prefixed(consumer) + "Pull"
+			consumerInfo, err := s.ConsumerInfo(streamName, consumerName)
+			if err != nil || consumerInfo == nil {
+				continue
+			}
+			if err = s.DeleteConsumer(streamName, consumerName); err != nil {
+				logrus.WithError(err).Errorf("Unable to clean up old consumer %q for stream %q", consumer, stream)
+			}
+		}
+	}
+
 	return s, nc
 }

@@ -26,7 +26,6 @@ import (
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -47,10 +46,10 @@ import (
 // nolint: gocyclo
 func Setup(
 	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
-	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.UserInternalAPI,
+	userDirectoryProvider userapi.UserDirectoryProvider,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
@@ -486,7 +485,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], eduAPI, rsAPI)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], rsAPI, syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/redact/{eventID}",
@@ -515,7 +514,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, syncProducer, transactionsCache, vars["eventType"], &txnID)
 		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -529,7 +528,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, syncProducer, transactionsCache, vars["eventType"], &txnID)
 		}, consentRequiredCheck),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -924,6 +923,7 @@ func Setup(
 				device,
 				userAPI,
 				rsAPI,
+				userDirectoryProvider,
 				cfg.Matrix.ServerName,
 				postContent.SearchString,
 				postContent.Limit,
@@ -960,7 +960,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveReadMarker(req, userAPI, rsAPI, eduAPI, syncProducer, device, vars["roomID"])
+			return SaveReadMarker(req, userAPI, rsAPI, syncProducer, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -1315,7 +1315,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 
-			return SetReceipt(req, eduAPI, device, vars["roomId"], vars["receiptType"], vars["eventId"])
+			return SetReceipt(req, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}, consentRequiredCheck),
 	).Methods(http.MethodPost, http.MethodOptions)
 }

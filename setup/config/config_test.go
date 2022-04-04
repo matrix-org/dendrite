@@ -101,10 +101,6 @@ current_state_server:
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
-edu_server:
-  internal_api:
-    listen: http://localhost:7778
-    connect: http://localhost:7778
 federation_api:
   internal_api:
     listen: http://localhost:7772
