@@ -113,7 +113,10 @@ func NewSQLiteDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName) 
 		Version: "add last_seen_ts",
 		Up:      deltas.UpLastSeenTSIP,
 	})
-	err = m.Up(context.Background())
+	if err = m.Up(context.Background()); err != nil {
+		return nil, err
+	}
+
 	return s, sqlutil.StatementList{
 		{&s.insertDeviceStmt, insertDeviceSQL},
 		{&s.selectDevicesCountStmt, selectDevicesCountSQL},

@@ -41,13 +41,13 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.writer = sqlutil.NewExclusiveWriter()
-	if err = d.prepare(dbProperties); err != nil {
+	if err = d.prepare(); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
-func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
+func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.streamID.prepare(d.db); err != nil {
 		return err
 	}

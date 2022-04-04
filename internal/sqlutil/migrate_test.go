@@ -91,16 +91,16 @@ func Test_migrations_Up(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, err := sql.Open("sqlite3", tt.connectionString)
 			if err != nil {
-				t.Errorf("unable to open database: %w", err)
+				t.Errorf("unable to open database: %v", err)
 			}
 			m := sqlutil.NewMigrator(db)
 			m.AddMigrations(tt.migrations...)
-			if err := m.Up(tt.ctx); (err != nil) != tt.wantErr {
+			if err = m.Up(tt.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Up() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			result, err := m.ExecutedMigrations(tt.ctx)
 			if err != nil {
-				t.Errorf("unable to get executed migrations: %w", err)
+				t.Errorf("unable to get executed migrations: %v", err)
 			}
 			if !tt.wantErr && !reflect.DeepEqual(result, tt.wantResult) {
 				t.Errorf("expected: %+v, got %v", tt.wantResult, result)

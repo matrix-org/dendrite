@@ -130,7 +130,7 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]bool, err
 	defer rows.Close() // nolint: errcheck
 	var version string
 	for rows.Next() {
-		if err := rows.Scan(&version); err != nil {
+		if err = rows.Scan(&version); err != nil {
 			return nil, fmt.Errorf("unable to scan version: %w", err)
 		}
 		result[version] = true

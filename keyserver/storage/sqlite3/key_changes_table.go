@@ -58,7 +58,7 @@ func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	if err != nil {
 		return s, err
 	}
-	// TODO: Remove when we are sure we are not having goose artifacts in the db
+	// TODO: Remove when we are sure we are not having goose artefacts in the db
 	// This forces an error, which indicates the migration is already applied, since the
 	// column partition was removed from the table
 	var count int

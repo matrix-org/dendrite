@@ -44,13 +44,13 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 	}
 
 	// Create the tables.
-	if err := d.create(db); err != nil {
+	if err = d.create(db); err != nil {
 		return nil, err
 	}
 
 	// Special case, since this migration uses several tables, so it needs to
 	// be sure that all tables are created first.
-	// TODO: Remove when we are sure we are not having goose artifacts in the db
+	// TODO: Remove when we are sure we are not having goose artefacts in the db
 	// This forces an error, which indicates the migration is already applied, since the
 	// column event_nid was removed from the table
 	var count int
