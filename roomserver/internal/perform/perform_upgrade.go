@@ -75,7 +75,6 @@ func (r *Upgrader) performRoomUpgrade(
 			Code: api.PerformErrorNotAllowed,
 			Msg:  "You don't have permission to upgrade the room, power level too low.",
 		}
-
 	}
 
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
@@ -602,37 +601,38 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 }
 
 func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) fledglingEvent {
-	eventPowerLevels := powerLevelContent.Events
-	stateDefaultPowerLevel := powerLevelContent.StateDefault
-	neededPowerLevel := stateDefaultPowerLevel
-	for _, powerLevel := range eventPowerLevels {
+	// Work out what power level we need in order to be able to send events
+	// of all types into the room.
+	neededPowerLevel := powerLevelContent.StateDefault
+	for _, powerLevel := range powerLevelContent.Events {
 		if powerLevel > neededPowerLevel {
 			neededPowerLevel = powerLevel
 		}
 	}
 
-	tempPowerLevelContent := &gomatrixserverlib.PowerLevelContent{}
-	*tempPowerLevelContent = *powerLevelContent
-	newUserPowerLevels := make(map[string]int64)
-	for key, value := range powerLevelContent.Users {
-		newUserPowerLevels[key] = value
-	}
-	tempPowerLevelContent.Users = newUserPowerLevels
+	// Make a copy of the existing power level content.
+	tempPowerLevelContent := *powerLevelContent
 
-	if val, ok := tempPowerLevelContent.Users[userID]; ok {
-		if val < neededPowerLevel {
-			tempPowerLevelContent.Users[userID] = neededPowerLevel
-		}
-	} else {
-		if tempPowerLevelContent.UsersDefault < val {
-			tempPowerLevelContent.UsersDefault = neededPowerLevel
-		}
+	// At this point, the "Users", "Events" and "Notifications" keys are all
+	// pointing to the map of the original PL content, so we will specifically
+	// override the users map with a new one and duplicate the values deeply,
+	// so that we can modify them without modifying the original.
+	tempPowerLevelContent.Users = make(map[string]int64, len(powerLevelContent.Users))
+	for key, value := range powerLevelContent.Users {
+		tempPowerLevelContent.Users[key] = value
 	}
-	tempPowerLevelsEvent := fledglingEvent{
+
+	// If the user who is upgrading the room doesn't already have sufficient
+	// power, then elevate their power levels.
+	if val := tempPowerLevelContent.Users[userID]; val < neededPowerLevel {
+		tempPowerLevelContent.Users[userID] = neededPowerLevel
+	}
+
+	// Then return the temporary power levels event.
+	return fledglingEvent{
 		Type:    gomatrixserverlib.MRoomPowerLevels,
 		Content: tempPowerLevelContent,
 	}
-	return tempPowerLevelsEvent
 }
 
 func (r *Upgrader) sendHeaderedEvent(
