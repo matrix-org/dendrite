@@ -107,7 +107,6 @@ federation_api:
     connect: http://localhost:7772
   external_api:
     listen: http://[::]:8072
-  federation_certificates: []
 federation_sender:
   internal_api:
     listen: http://localhost:7775
