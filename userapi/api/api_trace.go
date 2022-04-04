@@ -149,6 +149,60 @@ func (t *UserInternalAPITrace) QueryNotifications(ctx context.Context, req *Quer
 	return err
 }
 
+func (t *UserInternalAPITrace) SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error {
+	err := t.Impl.SetAvatarURL(ctx, req, res)
+	util.GetLogger(ctx).Infof("SetAvatarURL req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error {
+	err := t.Impl.QueryNumericLocalpart(ctx, res)
+	util.GetLogger(ctx).Infof("QueryNumericLocalpart req= res=%+v", js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error {
+	err := t.Impl.QueryAccountAvailability(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryAccountAvailability req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error {
+	err := t.Impl.SetDisplayName(ctx, req, res)
+	util.GetLogger(ctx).Infof("SetDisplayName req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error {
+	err := t.Impl.QueryAccountByPassword(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryAccountByPassword req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error {
+	err := t.Impl.QueryLocalpartForThreePID(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryLocalpartForThreePID req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) QueryThreePIDsForLocalpart(ctx context.Context, req *QueryThreePIDsForLocalpartRequest, res *QueryThreePIDsForLocalpartResponse) error {
+	err := t.Impl.QueryThreePIDsForLocalpart(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryThreePIDsForLocalpart req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) PerformForgetThreePID(ctx context.Context, req *PerformForgetThreePIDRequest, res *struct{}) error {
+	err := t.Impl.PerformForgetThreePID(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformForgetThreePID req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *UserInternalAPITrace) PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error {
+	err := t.Impl.PerformSaveThreePIDAssociation(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformSaveThreePIDAssociation req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {

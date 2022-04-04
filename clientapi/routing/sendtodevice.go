@@ -18,17 +18,17 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 )
 
 // SendToDevice handles PUT /_matrix/client/r0/sendToDevice/{eventType}/{txnId}
-// sends the device events to the EDU Server
+// sends the device events to the syncapi & federationsender
 func SendToDevice(
 	req *http.Request, device *userapi.Device,
-	eduAPI api.EDUServerInputAPI,
+	syncProducer *producers.SyncAPIProducer,
 	txnCache *transactions.Cache,
 	eventType string, txnID *string,
 ) util.JSONResponse {
@@ -48,8 +48,8 @@ func SendToDevice(
 
 	for userID, byUser := range httpReq.Messages {
 		for deviceID, message := range byUser {
-			if err := api.SendToDevice(
-				req.Context(), eduAPI, device.UserID, userID, deviceID, eventType, message,
+			if err := syncProducer.SendToDevice(
+				req.Context(), device.UserID, userID, deviceID, eventType, message,
 			); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("eduProducer.SendToDevice failed")
 				return jsonerror.InternalServerError()

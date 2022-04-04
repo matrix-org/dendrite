@@ -18,9 +18,9 @@ import (
 	"context"
 	"encoding/json"
 
-	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -55,8 +55,8 @@ func NewKeyChangeConsumer(
 	return &KeyChangeConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		durable:    cfg.Matrix.JetStream.TopicFor("FederationAPIKeyChangeConsumer"),
-		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputKeyChangeEvent),
+		durable:    cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		queues:     queues,
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
@@ -190,7 +190,7 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
-		Type:   eduserverAPI.MSigningKeyUpdate,
+		Type:   types.MSigningKeyUpdate,
 		Origin: string(t.serverName),
 	}
 	if edu.Content, err = json.Marshal(output); err != nil {

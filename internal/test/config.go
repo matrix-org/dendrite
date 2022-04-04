@@ -97,7 +97,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(database)
 
 	cfg.AppServiceAPI.InternalAPI.Listen = assignAddress()
-	cfg.EDUServer.InternalAPI.Listen = assignAddress()
 	cfg.FederationAPI.InternalAPI.Listen = assignAddress()
 	cfg.KeyServer.InternalAPI.Listen = assignAddress()
 	cfg.MediaAPI.InternalAPI.Listen = assignAddress()
@@ -106,7 +105,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.UserAPI.InternalAPI.Listen = assignAddress()
 
 	cfg.AppServiceAPI.InternalAPI.Connect = cfg.AppServiceAPI.InternalAPI.Listen
-	cfg.EDUServer.InternalAPI.Connect = cfg.EDUServer.InternalAPI.Listen
 	cfg.FederationAPI.InternalAPI.Connect = cfg.FederationAPI.InternalAPI.Listen
 	cfg.KeyServer.InternalAPI.Connect = cfg.KeyServer.InternalAPI.Listen
 	cfg.MediaAPI.InternalAPI.Connect = cfg.MediaAPI.InternalAPI.Listen

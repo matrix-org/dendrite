@@ -3,7 +3,7 @@ package streams
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/caching"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -25,7 +25,7 @@ type Streams struct {
 func NewSyncStreamProviders(
 	d storage.Database, userAPI userapi.UserInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	eduCache *cache.EDUCache,
+	eduCache *caching.EDUCache,
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{

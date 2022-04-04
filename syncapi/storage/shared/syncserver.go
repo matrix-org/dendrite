@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -119,6 +118,10 @@ func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, mem
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
 
+func (d *Database) MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error) {
+	return d.Memberships.SelectMembershipCount(ctx, nil, roomID, membership, pos)
+}
+
 func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
@@ -135,7 +138,7 @@ func (d *Database) PeeksInRange(ctx context.Context, userID, deviceID string, r 
 	return d.Peeks.SelectPeeksInRange(ctx, nil, userID, deviceID, r)
 }
 
-func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []eduAPI.OutputReceiptEvent, error) {
+func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
 	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 }
 
@@ -972,7 +975,7 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 	return
 }
 
-func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error) {
+func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error) {
 	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 	return receipts, err
 }

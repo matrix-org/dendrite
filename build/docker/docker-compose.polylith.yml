@@ -84,18 +84,6 @@ services:
       - internal
     restart: unless-stopped
 
-  edu_server:
-    hostname: edu_server
-    image: matrixdotorg/dendrite-polylith:latest
-    command: eduserver
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-    networks:
-      - internal
-    restart: unless-stopped
-
   federation_api:
     hostname: federation_api
     image: matrixdotorg/dendrite-polylith:latest

@@ -223,6 +223,7 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 	res.StreamID = maxStreamID
 }
 
+// nolint:gocyclo
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.MasterKeys = make(map[string]gomatrixserverlib.CrossSigningKey)

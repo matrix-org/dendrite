@@ -17,10 +17,9 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/eduserver/api"
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/util"
 )
 
@@ -33,9 +32,8 @@ type typingContentJSON struct {
 // sends the typing events to client API typingProducer
 func SendTyping(
 	req *http.Request, device *userapi.Device, roomID string,
-	userID string, accountDB userdb.Database,
-	eduAPI api.EDUServerInputAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userID string, rsAPI roomserverAPI.RoomserverInternalAPI,
+	syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if device.UserID != userID {
 		return util.JSONResponse{
@@ -57,9 +55,7 @@ func SendTyping(
 		return *resErr
 	}
 
-	if err := api.SendTyping(
-		req.Context(), eduAPI, userID, roomID, r.Typing, r.Timeout,
-	); err != nil {
+	if err := syncProducer.SendTyping(req.Context(), userID, roomID, r.Typing, r.Timeout); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("eduProducer.Send failed")
 		return jsonerror.InternalServerError()
 	}

@@ -1,14 +1,17 @@
 package jetstream
 
 import (
+	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/nats-io/nats.go"
 )
 
 const (
-	UserID = "user_id"
-	RoomID = "room_id"
+	UserID  = "user_id"
+	RoomID  = "room_id"
+	EventID = "event_id"
 )
 
 var (
@@ -24,10 +27,20 @@ var (
 	OutputReadUpdate        = "OutputReadUpdate"
 )
 
+var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
+
+func Tokenise(str string) string {
+	return safeCharacters.ReplaceAllString(str, "_")
+}
+
+func InputRoomEventSubj(roomID string) string {
+	return fmt.Sprintf("%s.%s", InputRoomEvent, Tokenise(roomID))
+}
+
 var streams = []*nats.StreamConfig{
 	{
 		Name:      InputRoomEvent,
-		Retention: nats.WorkQueuePolicy,
+		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},
 	{

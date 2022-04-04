@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/clientapi/routing"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
@@ -29,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -39,14 +37,13 @@ func AddPublicRoutes(
 	router *mux.Router,
 	synapseAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
-	accountsDB userdb.Database,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	eduInputAPI eduServerAPI.EDUServerInputAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI,
+	userDirectoryProvider userapi.UserDirectoryProvider,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
@@ -54,13 +51,18 @@ func AddPublicRoutes(
 	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
-		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
+		JetStream:              js,
+		TopicClientData:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
+		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		UserAPI:                userAPI,
+		ServerName:             cfg.Matrix.ServerName,
 	}
 
 	routing.Setup(
-		router, synapseAdminRouter, cfg, eduInputAPI, rsAPI, asAPI,
-		accountsDB, userAPI, federation,
+		router, synapseAdminRouter, cfg, rsAPI, asAPI,
+		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg,
 	)
