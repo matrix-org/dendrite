@@ -278,8 +278,10 @@ func generateSendEvent(
 		content := make(map[string]interface{})
 		if err = json.Unmarshal(e.Content(), &content); err != nil {
 			util.GetLogger(ctx).WithError(err).Error("Cannot unmarshal the event content.")
-			resErr := jsonerror.InternalServerError()
-			return nil, &resErr
+			return nil, &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("Cannot unmarshal the event content."),
+			}
 		}
 		if content["replacement_room"] == e.RoomID() {
 			return nil, &util.JSONResponse{
