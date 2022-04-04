@@ -38,7 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -271,7 +270,7 @@ func (m *DendriteMonolith) Start() {
 		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	m.listener, err = net.Listen("tcp", "localhost:65432")
+	m.listener, err = net.Listen("tcp", ":65432")
 	if err != nil {
 		panic(err)
 	}
@@ -403,14 +402,6 @@ func (m *DendriteMonolith) Start() {
 	go func() {
 		logrus.Info("Listening on ", m.listener.Addr())
 		logrus.Fatal(http.Serve(m.listener, httpRouter))
-	}()
-	go func() {
-		logrus.Info("Sending wake-up message to known nodes")
-		req := &api.PerformBroadcastEDURequest{}
-		res := &api.PerformBroadcastEDUResponse{}
-		if err := fsAPI.PerformBroadcastEDU(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
-		}
 	}()
 }
 

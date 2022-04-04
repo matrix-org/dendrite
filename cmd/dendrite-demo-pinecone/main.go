@@ -37,7 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -279,14 +278,6 @@ func main() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
-	}()
-	go func() {
-		logrus.Info("Sending wake-up message to known nodes")
-		req := &api.PerformBroadcastEDURequest{}
-		res := &api.PerformBroadcastEDUResponse{}
-		if err := fsAPI.PerformBroadcastEDU(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
-		}
 	}()
 
 	base.WaitForShutdown()
