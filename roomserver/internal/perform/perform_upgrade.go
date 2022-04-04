@@ -81,6 +81,17 @@ func (r *Upgrader) performRoomUpgrade(
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
 	newRoomID := fmt.Sprintf("!%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
 
+	// Get the existing room state for the old room.
+	oldRoomReq := &api.QueryLatestEventsAndStateRequest{
+		RoomID: roomID,
+	}
+	oldRoomRes := &api.QueryLatestEventsAndStateResponse{}
+	if err := r.URSAPI.QueryLatestEventsAndState(ctx, oldRoomReq, oldRoomRes); err != nil {
+		return "", &api.PerformError{
+			Msg: fmt.Sprintf("Failed to get latest state: %s", err),
+		}
+	}
+
 	// Make the tombstone event
 	tombstoneEvent, pErr := r.makeTombstoneEvent(ctx, evTime, userID, roomID, newRoomID)
 	if pErr != nil {
@@ -89,7 +100,7 @@ func (r *Upgrader) performRoomUpgrade(
 
 	// Generate the initial events we need to send into the new room. This includes copied state events and bans
 	// as well as the power level events needed to set up the room
-	eventsToMake, pErr := r.generateInitialEvents(ctx, userID, roomID, string(req.RoomVersion), tombstoneEvent)
+	eventsToMake, pErr := r.generateInitialEvents(ctx, oldRoomRes, userID, roomID, string(req.RoomVersion), tombstoneEvent)
 	if pErr != nil {
 		return "", pErr
 	}
@@ -110,7 +121,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// If the old room had a canonical alias event, it should be deleted in the old room
-	if pErr = r.clearOldCanonicalAliasEvent(ctx, evTime, userID, roomID); pErr != nil {
+	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, userID, roomID); pErr != nil {
 		return "", pErr
 	}
 
@@ -211,7 +222,26 @@ func moveLocalAliases(ctx context.Context,
 	return nil
 }
 
-func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, evTime time.Time, userID, roomID string) *api.PerformError {
+func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, evTime time.Time, userID, roomID string) *api.PerformError {
+	for _, event := range oldRoom.StateEvents {
+		if event.Type() != gomatrixserverlib.MRoomCanonicalAlias || !event.StateKeyEquals("") {
+			continue
+		}
+		var aliasContent struct {
+			Alias      string   `json:"alias"`
+			AltAliases []string `json:"alt_aliases"`
+		}
+		if err := json.Unmarshal(event.Content(), &aliasContent); err != nil {
+			return &api.PerformError{
+				Msg: fmt.Sprintf("Failed to unmarshal canonical aliases: %s", err),
+			}
+		}
+		if aliasContent.Alias == "" && len(aliasContent.AltAliases) == 0 {
+			// There are no canonical aliases to clear, therefore do nothing.
+			return nil
+		}
+	}
+
 	emptyCanonicalAliasEvent, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, fledglingEvent{
 		Type:    gomatrixserverlib.MRoomCanonicalAlias,
 		Content: map[string]interface{}{},
@@ -308,19 +338,9 @@ func (r *Upgrader) userIsAuthorized(ctx context.Context, userID, roomID string,
 }
 
 // nolint:gocyclo
-func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
-	req := &api.QueryLatestEventsAndStateRequest{
-		RoomID: roomID,
-	}
-	res := &api.QueryLatestEventsAndStateResponse{}
-	if err := r.URSAPI.QueryLatestEventsAndState(ctx, req, res); err != nil {
-		return nil, &api.PerformError{
-			Msg: fmt.Sprintf("Failed to get latest state: %s", err),
-		}
-	}
-
-	state := make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent, len(res.StateEvents))
-	for _, event := range res.StateEvents {
+func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, userID, roomID, newVersion string, tombstoneEvent *gomatrixserverlib.HeaderedEvent) ([]fledglingEvent, *api.PerformError) {
+	state := make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent, len(oldRoom.StateEvents))
+	for _, event := range oldRoom.StateEvents {
 		if event.StateKey() == nil {
 			// This shouldn't ever happen, but better to be safe than sorry.
 			continue
