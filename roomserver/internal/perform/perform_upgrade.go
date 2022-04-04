@@ -329,10 +329,13 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 			continue
 		}
 		if event.Type() == gomatrixserverlib.MRoomMember && !event.StateKeyEquals(userID) {
-			// Ignore membership events that aren't our own, as event auth will
-			// prevent us from being able to create membership events on behalf
-			// of other users anyway unless they are invites or bans.
-			continue
+			// With the exception of bans which we do want to copy, we should ignore
+			// membership events that aren't our own, as event auth will prevent us
+			// from being able to create membership events on behalf of other users
+			// anyway unless they are invites or bans.
+			if membership, err := event.Membership(); err == nil && membership != gomatrixserverlib.Ban {
+				continue
+			}
 		}
 		state[gomatrixserverlib.StateKeyTuple{EventType: event.Type(), StateKey: *event.StateKey()}] = event
 	}
@@ -437,15 +440,6 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 		})
 	}
 
-	banEvents, err := getBanEvents(ctx, roomID, r.URSAPI)
-	if err != nil {
-		return nil, &api.PerformError{
-			Msg: err.Error(),
-		}
-	} else {
-		eventsToMake = append(eventsToMake, banEvents...)
-	}
-
 	// Duplicate all of the old state events into the new room.
 	for tuple, event := range state {
 		if _, ok := override[tuple]; ok {
@@ -453,10 +447,10 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, userID, roomID, ne
 			// are already in `eventsToMake`.
 			continue
 		}
-		if event.Type() == gomatrixserverlib.MRoomMember {
-			// Don't duplicate membership events. Our own membership
-			// event has already been created above, and event auth won't
-			// let us create membership events for other users.
+		if membership, merr := event.Membership(); merr == nil && membership != gomatrixserverlib.Ban {
+			// Don't duplicate membership events that aren't bans. Our own
+			// membership event has already been created above, and event auth
+			// won't let us create join membership events for other users.
 			continue
 		}
 		newEvent := fledglingEvent{
@@ -605,30 +599,6 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	}
 
 	return headeredEvent, nil
-}
-
-func getBanEvents(ctx context.Context, roomID string, URSAPI api.RoomserverInternalAPI) ([]fledglingEvent, error) {
-	var err error
-	banEvents := []fledglingEvent{}
-
-	roomMemberReq := api.QueryCurrentStateRequest{RoomID: roomID, AllowWildcards: true, StateTuples: []gomatrixserverlib.StateKeyTuple{
-		{EventType: gomatrixserverlib.MRoomMember, StateKey: "*"},
-	}}
-	roomMemberRes := api.QueryCurrentStateResponse{}
-	if err = URSAPI.QueryCurrentState(ctx, &roomMemberReq, &roomMemberRes); err != nil {
-		return nil, err
-	}
-	for _, event := range roomMemberRes.StateEvents {
-		if event == nil {
-			continue
-		}
-		memberContent, err := gomatrixserverlib.NewMemberContentFromEvent(event.Event)
-		if err != nil || memberContent.Membership != gomatrixserverlib.Ban {
-			continue
-		}
-		banEvents = append(banEvents, fledglingEvent{Type: gomatrixserverlib.MRoomMember, StateKey: *event.StateKey(), Content: memberContent})
-	}
-	return banEvents, nil
 }
 
 func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelContent, userID string) fledglingEvent {
