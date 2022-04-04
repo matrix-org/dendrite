@@ -143,14 +143,15 @@ func (r *Upgrader) getRoomPowerLevels(ctx context.Context, roomID string) (*goma
 }
 
 func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.Time, userID, roomID string) *api.PerformError {
-	powerLevelContent, pErr := r.getRoomPowerLevels(ctx, roomID)
+	restrictedPowerLevelContent, pErr := r.getRoomPowerLevels(ctx, roomID)
 	if pErr != nil {
 		return pErr
 	}
 
-	restrictedPowerLevelContent := &gomatrixserverlib.PowerLevelContent{}
-	*restrictedPowerLevelContent = *powerLevelContent
-
+	// From: https://spec.matrix.org/v1.2/client-server-api/#server-behaviour-16
+	// If possible, the power levels in the old room should also be modified to
+	// prevent sending of events and inviting new users. For example, setting
+	// events_default and invite to the greater of 50 and users_default + 1.
 	restrictedDefaultPowerLevel := int64(50)
 	if restrictedPowerLevelContent.UsersDefault+1 > restrictedDefaultPowerLevel {
 		restrictedDefaultPowerLevel = restrictedPowerLevelContent.UsersDefault + 1
@@ -159,8 +160,9 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 	restrictedPowerLevelContent.Invite = restrictedDefaultPowerLevel
 
 	restrictedPowerLevelsHeadered, resErr := r.makeHeaderedEvent(ctx, evTime, userID, roomID, fledglingEvent{
-		Type:    gomatrixserverlib.MRoomPowerLevels,
-		Content: restrictedPowerLevelContent,
+		Type:     gomatrixserverlib.MRoomPowerLevels,
+		StateKey: "",
+		Content:  restrictedPowerLevelContent,
 	})
 	if resErr != nil {
 		if resErr.Code == api.PerformErrorNotAllowed {
@@ -242,12 +244,12 @@ func (r *Upgrader) publishIfOldRoomWasPublic(ctx context.Context, roomID, newRoo
 
 	// if the old room is published (was public), publish the new room
 	if len(pubQueryRes.RoomIDs) == 1 {
-		publishNewRoom(ctx, r.URSAPI, roomID, newRoomID)
+		publishNewRoomAndUnpublishOldRoom(ctx, r.URSAPI, roomID, newRoomID)
 	}
 	return nil
 }
 
-func publishNewRoom(
+func publishNewRoomAndUnpublishOldRoom(
 	ctx context.Context,
 	URSAPI api.RoomserverInternalAPI,
 	oldRoomID, newRoomID string,
