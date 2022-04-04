@@ -154,7 +154,6 @@ func (p *SyncAPIProducer) SendPresence(
 	if statusMsg != nil {
 		m.Header.Set("status_msg", *statusMsg)
 	}
-	m.Header.Set("status_msg_nil", strconv.FormatBool(statusMsg == nil))
 	lastActiveTS := gomatrixserverlib.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(lastActiveTS)))

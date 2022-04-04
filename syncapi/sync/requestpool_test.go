@@ -1,20 +1,41 @@
 package sync
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type dummyPublisher struct {
 	count int
 }
 
-func (d *dummyPublisher) SendPresence(userID, presence string) error {
+func (d *dummyPublisher) SendPresence(userID, presence string, statusMsg *string) error {
 	d.count++
 	return nil
+}
+
+type dummyDB struct{}
+
+func (d dummyDB) UpdatePresence(ctx context.Context, userID, presence string, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+	return 0, nil
+}
+
+func (d dummyDB) GetPresence(ctx context.Context, userID string) (*types.Presence, error) {
+	return &types.Presence{}, nil
+}
+
+func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.Presence, error) {
+	return map[string]*types.Presence{}, nil
+}
+
+func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return 0, nil
 }
 
 func TestRequestPool_updatePresence(t *testing.T) {
@@ -89,11 +110,12 @@ func TestRequestPool_updatePresence(t *testing.T) {
 			},
 		},
 	}
-	go rp.cleanPresence(time.Millisecond * 50)
+	db := dummyDB{}
+	go rp.cleanPresence(db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			beforeCount := publisher.count
-			rp.updatePresence(tt.args.presence, tt.args.userID)
+			rp.updatePresence(db, tt.args.presence, tt.args.userID)
 			if tt.wantIncrease && publisher.count <= beforeCount {
 				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
 			}

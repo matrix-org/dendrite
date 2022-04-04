@@ -182,11 +182,9 @@ func (p *SyncAPIProducer) SendPresence(
 	m := nats.NewMsg(p.TopicPresenceEvent)
 	m.Header.Set(jetstream.UserID, userID)
 	m.Header.Set("presence", presence)
-	nilMsg := statusMsg == nil
-	if !nilMsg {
+	if statusMsg != nil {
 		m.Header.Set("status_msg", *statusMsg)
 	}
-	m.Header.Set("status_msg_nil", strconv.FormatBool(nilMsg))
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(gomatrixserverlib.AsTimestamp(time.Now()))))
 

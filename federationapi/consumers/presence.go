@@ -84,10 +84,8 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 	}
 
 	presence := msg.Header.Get("presence")
-	statusMsg := msg.Header.Get("status_msg")
-	nilStatusMsg, _ := strconv.ParseBool(msg.Header.Get("status_msg_nil"))
-	ts, err := strconv.Atoi(msg.Header.Get("last_active_ts"))
 
+	ts, err := strconv.Atoi(msg.Header.Get("last_active_ts"))
 	if err != nil {
 		return true
 	}
@@ -101,9 +99,10 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 		return true
 	}
 
-	newStatusMsg := &statusMsg
-	if nilStatusMsg {
-		newStatusMsg = nil
+	var statusMsg *string = nil
+	if data, ok := msg.Header["status_msg"]; ok && len(data) > 0 {
+		status := msg.Header.Get("status_msg")
+		statusMsg = &status
 	}
 
 	p := types.Presence{LastActiveTS: gomatrixserverlib.Timestamp(ts)}
@@ -114,7 +113,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 				CurrentlyActive: p.CurrentlyActive(),
 				LastActiveAgo:   p.LastActiveAgo(),
 				Presence:        presence,
-				StatusMsg:       newStatusMsg,
+				StatusMsg:       statusMsg,
 				UserID:          userID,
 			},
 		},

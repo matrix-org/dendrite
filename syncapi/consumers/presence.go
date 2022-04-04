@@ -124,10 +124,8 @@ func (s *PresenceConsumer) Start() error {
 func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	userID := msg.Header.Get(jetstream.UserID)
 	presence := msg.Header.Get("presence")
-	statusMsg := msg.Header.Get("status_msg")
 	timestamp := msg.Header.Get("last_active_ts")
 	fromSync, _ := strconv.ParseBool(msg.Header.Get("from_sync"))
-	nilStatusMsg, _ := strconv.ParseBool(msg.Header.Get("status_msg_nil"))
 
 	logrus.Debugf("syncAPI received presence event: %+v", msg.Header)
 
@@ -136,12 +134,13 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 		return true
 	}
 
-	newStatusMsg := &statusMsg
-	if nilStatusMsg {
-		newStatusMsg = nil
+	var statusMsg *string = nil
+	if data, ok := msg.Header["status_msg"]; ok && len(data) > 0 {
+		newMsg := msg.Header.Get("status_msg")
+		statusMsg = &newMsg
 	}
 
-	pos, err := s.db.UpdatePresence(ctx, userID, presence, newStatusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
+	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
 	if err != nil {
 		return true
 	}

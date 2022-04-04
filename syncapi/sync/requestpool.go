@@ -17,6 +17,8 @@
 package sync
 
 import (
+	"context"
+	"database/sql"
 	"net"
 	"net/http"
 	"strings"
@@ -54,7 +56,7 @@ type RequestPool struct {
 }
 
 type PresencePublisher interface {
-	SendPresence(userID, presence string) error
+	SendPresence(userID, presence string, statusMsg *string) error
 }
 
 // NewRequestPool makes a new RequestPool
@@ -78,7 +80,7 @@ func NewRequestPool(
 		producer: producer,
 	}
 	go rp.cleanLastSeen()
-	go rp.cleanPresence(time.Minute * 5)
+	go rp.cleanPresence(db, time.Minute*5)
 	return rp
 }
 
@@ -92,12 +94,12 @@ func (rp *RequestPool) cleanLastSeen() {
 	}
 }
 
-func (rp *RequestPool) cleanPresence(cleanupTime time.Duration) {
+func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Duration) {
 	for {
 		rp.presence.Range(func(key interface{}, v interface{}) bool {
 			p := v.(types.Presence)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
-				rp.updatePresence("unavailable", p.UserID)
+				rp.updatePresence(db, "unavailable", p.UserID)
 				rp.presence.Delete(key)
 			}
 			return true
@@ -107,7 +109,7 @@ func (rp *RequestPool) cleanPresence(cleanupTime time.Duration) {
 }
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
-func (rp *RequestPool) updatePresence(presence string, userID string) {
+func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
 	if rp.cfg.Matrix.DisablePresence {
 		return
 	}
@@ -132,7 +134,13 @@ func (rp *RequestPool) updatePresence(presence string, userID string) {
 		}
 	}
 
-	if err := rp.producer.SendPresence(userID, strings.ToLower(presence)); err != nil {
+	// ensure we also send the current status_msg to federated servers and not nil
+	dbPresence, err := db.GetPresence(context.Background(), userID)
+	if err != nil && err != sql.ErrNoRows {
+		return
+	}
+
+	if err := rp.producer.SendPresence(userID, strings.ToLower(presence), dbPresence.ClientFields.StatusMsg); err != nil {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
@@ -214,7 +222,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(req.FormValue("set_presence"), device.UserID)
+	rp.updatePresence(rp.db, req.FormValue("set_presence"), device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
