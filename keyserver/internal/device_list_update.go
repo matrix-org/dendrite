@@ -157,12 +157,15 @@ func (u *DeviceListUpdater) Start() error {
 	if err != nil {
 		return err
 	}
-	offset := time.Second * 10
+	offset, step := time.Second*10, time.Second
+	if max := len(staleLists); max > 120 {
+		step = (time.Second * 120) / time.Duration(max)
+	}
 	for _, userID := range staleLists {
 		time.AfterFunc(offset, func() {
 			u.notifyWorkers(userID)
 		})
-		offset += time.Second
+		offset += step
 	}
 	return nil
 }

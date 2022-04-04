@@ -119,11 +119,14 @@ func NewOutgoingQueues(
 		} else {
 			log.WithError(err).Error("Failed to get EDU server names for destination queue hydration")
 		}
-		offset := time.Second * 5
+		offset, step := time.Second*5, time.Second
+		if max := len(serverNames); max > 120 {
+			step = (time.Second * 120) / time.Duration(max)
+		}
 		for serverName := range serverNames {
 			if queue := queues.getQueue(serverName); queue != nil {
 				time.AfterFunc(offset, queue.wakeQueueIfNeeded)
-				offset += time.Second
+				offset += step
 			}
 		}
 	}
