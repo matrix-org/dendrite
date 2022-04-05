@@ -156,7 +156,7 @@ def parse_test_line(line):
 #    ✓ POST /register downcases capitals in usernames
 #    ...
 def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
-    ci = os.getenv("CI")
+    ci = os.getenv("CI") # When running from GHA, this groups the subsections
     subsections = [] # Registration: 100% (13/13 tests)
     subsection_test_names = {} # 'subsection name': ["✓ Test 1", "✓ Test 2", "× Test 3"]
     total_passing = 0
@@ -170,7 +170,7 @@ def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
         for name, passing in tests.items():
             if passing:
                 group_passing += 1
-            test_names_and_marks.append(f"{'✓' if passing else '×'} {name}")
+            test_names_and_marks.append(f"{'✅' if passing else '❌'} {name}")
             
         total_tests += group_total
         total_passing += group_passing
@@ -187,7 +187,7 @@ def print_stats(header_name, gid_to_tests, gid_to_name, verbose):
     print("%s: %s (%d/%d tests)" % (header_name, pct, total_passing, total_tests))
     print("-" * (len(header_name)+1))
     for line in subsections:
-        print("%s%s" % ("::group::" if ci else "", line,))
+        print("%s%s" % ("::group::" if ci and verbose else "", line,))
         if verbose:
             for test_name_and_pass_mark in subsection_test_names[line]:
                 print("    %s" % (test_name_and_pass_mark,))
