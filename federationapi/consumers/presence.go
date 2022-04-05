@@ -105,7 +105,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 		statusMsg = &status
 	}
 
-	p := types.Presence{LastActiveTS: gomatrixserverlib.Timestamp(ts)}
+	p := types.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(ts)}
 
 	content := fedTypes.Presence{
 		Push: []fedTypes.PresenceContent{

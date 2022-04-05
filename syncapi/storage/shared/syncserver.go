@@ -1004,15 +1004,15 @@ func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID s
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
 
-func (s *Database) UpdatePresence(ctx context.Context, userID, presence string, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	return s.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
 }
 
-func (s *Database) GetPresence(ctx context.Context, userID string) (*types.Presence, error) {
+func (s *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
 	return s.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.Presence, error) {
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
 	return s.Presence.GetPresenceAfter(ctx, nil, after)
 }
 

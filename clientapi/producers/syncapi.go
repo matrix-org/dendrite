@@ -177,11 +177,11 @@ func (p *SyncAPIProducer) SendTyping(
 }
 
 func (p *SyncAPIProducer) SendPresence(
-	ctx context.Context, userID, presence string, statusMsg *string,
+	ctx context.Context, userID string, presence types.Presence, statusMsg *string,
 ) error {
 	m := nats.NewMsg(p.TopicPresenceEvent)
 	m.Header.Set(jetstream.UserID, userID)
-	m.Header.Set("presence", presence)
+	m.Header.Set("presence", presence.String())
 	if statusMsg != nil {
 		m.Header.Set("status_msg", *statusMsg)
 	}

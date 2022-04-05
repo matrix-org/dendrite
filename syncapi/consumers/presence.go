@@ -139,8 +139,9 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 		newMsg := msg.Header.Get("status_msg")
 		statusMsg = &newMsg
 	}
-
-	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
+	// OK is already checked, so no need to do it again
+	p, _ := types.PresenceFromString(presence)
+	pos, err := s.db.UpdatePresence(ctx, userID, p, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
 	if err != nil {
 		return true
 	}

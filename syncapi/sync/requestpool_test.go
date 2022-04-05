@@ -15,23 +15,23 @@ type dummyPublisher struct {
 	count int
 }
 
-func (d *dummyPublisher) SendPresence(userID, presence string, statusMsg *string) error {
+func (d *dummyPublisher) SendPresence(userID string, presence types.Presence, statusMsg *string) error {
 	d.count++
 	return nil
 }
 
 type dummyDB struct{}
 
-func (d dummyDB) UpdatePresence(ctx context.Context, userID, presence string, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+func (d dummyDB) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
 	return 0, nil
 }
 
-func (d dummyDB) GetPresence(ctx context.Context, userID string) (*types.Presence, error) {
-	return &types.Presence{}, nil
+func (d dummyDB) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return &types.PresenceInternal{}, nil
 }
 
-func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.Presence, error) {
-	return map[string]*types.Presence{}, nil
+func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
+	return map[string]*types.PresenceInternal{}, nil
 }
 
 func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {

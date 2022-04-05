@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -63,15 +62,16 @@ func SetPresence(
 	if parseErr != nil {
 		return *parseErr
 	}
-	p := strings.ToLower(presence.Presence)
-	if _, ok := types.PresenceToInt[p]; !ok {
+
+	presenceStatus, ok := types.PresenceFromString(presence.Presence)
+	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown(fmt.Sprintf("Unknown presence '%s'.", p)),
+			JSON: jsonerror.Unknown(fmt.Sprintf("Unknown presence '%s'.", presence.Presence)),
 		}
 	}
 
-	err := producer.SendPresence(req.Context(), userID, presence.Presence, presence.StatusMsg)
+	err := producer.SendPresence(req.Context(), userID, presenceStatus, presence.StatusMsg)
 	if err != nil {
 		log.WithError(err).Errorf("failed to update presence")
 		return util.JSONResponse{
@@ -112,7 +112,7 @@ func GetPresence(
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: types.PresenceClientResponse{
-				Presence: "unavailable",
+				Presence: types.PresenceUnavailable.String(),
 			},
 		}
 	}
@@ -124,7 +124,7 @@ func GetPresence(
 		}
 	}
 
-	p := types.Presence{LastActiveTS: gomatrixserverlib.Timestamp(lastActive)}
+	p := types.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(lastActive)}
 	currentlyActive := p.CurrentlyActive()
 	return util.JSONResponse{
 		Code: http.StatusOK,

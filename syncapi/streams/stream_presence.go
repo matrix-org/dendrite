@@ -116,7 +116,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		pres, ok := p.cache.Load(cacheKey)
 		if ok {
 			// skip already sent presence
-			prevPresence := pres.(*types.Presence)
+			prevPresence := pres.(*types.PresenceInternal)
 			currentlyActive := prevPresence.CurrentlyActive()
 			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
 			if skip {

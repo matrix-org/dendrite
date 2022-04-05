@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -518,47 +517,4 @@ type OutputSendToDeviceEvent struct {
 	UserID   string `json:"user_id"`
 	DeviceID string `json:"device_id"`
 	gomatrixserverlib.SendToDeviceEvent
-}
-
-type Presence struct {
-	ClientFields PresenceClientResponse
-	StreamPos    StreamPosition              `json:"-"`
-	UserID       string                      `json:"-"`
-	LastActiveTS gomatrixserverlib.Timestamp `json:"-"`
-}
-
-// Equals compares p1 with p2.
-func (p1 *Presence) Equals(p2 *Presence) bool {
-	return p1.ClientFields.Presence == p2.ClientFields.Presence &&
-		p1.ClientFields.StatusMsg == p2.ClientFields.StatusMsg &&
-		p1.UserID == p2.UserID
-}
-
-// CurrentlyActive returns the current active state.
-func (p *Presence) CurrentlyActive() bool {
-	return time.Since(p.LastActiveTS.Time()).Minutes() < 5
-}
-
-// LastActiveAgo returns the time since the LastActiveTS in milliseconds.
-func (p *Presence) LastActiveAgo() int64 {
-	return time.Since(p.LastActiveTS.Time()).Milliseconds()
-}
-
-type PresenceClientResponse struct {
-	CurrentlyActive *bool   `json:"currently_active,omitempty"`
-	LastActiveAgo   int64   `json:"last_active_ago,omitempty"`
-	Presence        string  `json:"presence"`
-	StatusMsg       *string `json:"status_msg,omitempty"`
-}
-
-var PresenceToInt = map[string]int{
-	"unavailable": 1,
-	"online":      2,
-	"offline":     3,
-}
-
-var PresenceToString = map[int]string{
-	1: "unavailable",
-	2: "online",
-	3: "offline",
 }

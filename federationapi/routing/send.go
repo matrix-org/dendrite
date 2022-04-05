@@ -30,6 +30,7 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -406,7 +407,12 @@ func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 		return err
 	}
 	for _, content := range payload.Push {
-		if err := t.producer.SendPresence(ctx, content.UserID, content.Presence, content.StatusMsg, content.LastActiveAgo); err != nil {
+		presence, ok := syncTypes.PresenceFromString(content.Presence)
+		if !ok {
+			logrus.Warnf("invalid presence '%s', skipping.", content.Presence)
+			continue
+		}
+		if err := t.producer.SendPresence(ctx, content.UserID, presence, content.StatusMsg, content.LastActiveAgo); err != nil {
 			return err
 		}
 	}

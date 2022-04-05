@@ -153,8 +153,8 @@ type Database interface {
 }
 
 type Presence interface {
-	UpdatePresence(ctx context.Context, userID, presence string, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
-	GetPresence(ctx context.Context, userID string) (*types.Presence, error)
-	PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.Presence, error)
+	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
+	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
+	PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
 }
