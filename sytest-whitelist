@@ -680,3 +680,5 @@ remote user has push rules copied to upgraded room
 Cannot send tombstone event that points to the same room
 Room summary counts change when membership changes
 /upgrade copies >100 power levels to the new room
+Room state after a rejected message event is the same as before
+Room state after a rejected state event is the same as before
