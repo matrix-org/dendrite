@@ -392,12 +392,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// means that we preserve any other interesting fields that might be present
 	// in the create event (such as for the room types MSC).
 	newCreateContent := map[string]interface{}{}
-	if err := json.Unmarshal(oldCreateEvent.Content(), &newCreateContent); err != nil {
-		util.GetLogger(ctx).WithError(err).Error()
-		return nil, &api.PerformError{
-			Msg: "Create event content was invalid",
-		}
-	}
+	_ = json.Unmarshal(oldCreateEvent.Content(), &newCreateContent)
 	newCreateContent["creator"] = userID
 	newCreateContent["room_version"] = newVersion
 	newCreateContent["predecessor"] = gomatrixserverlib.PreviousRoom{
@@ -410,26 +405,17 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 		Content:  newCreateContent,
 	}
 
-	membershipContent := gomatrixserverlib.MemberContent{}
-	if err := json.Unmarshal(oldMembershipEvent.Content(), &membershipContent); err != nil {
-		util.GetLogger(ctx).WithError(err).Error()
-		return nil, &api.PerformError{
-			Msg: "Membership event content was invalid",
-		}
-	}
-	membershipContent.Membership = gomatrixserverlib.Join
-	membershipEvent := fledglingEvent{
+	// Now create the new membership event. Same rules apply as above, so
+	// that we preserve fields we don't otherwise know about. We'll always
+	// set the membership to join though, because that is necessary to auth
+	// the events after it.
+	newMembershipContent := map[string]interface{}{}
+	_ = json.Unmarshal(oldMembershipEvent.Content(), &newMembershipContent)
+	newMembershipContent["membership"] = gomatrixserverlib.Join
+	newMembershipEvent := fledglingEvent{
 		Type:     gomatrixserverlib.MRoomMember,
 		StateKey: userID,
-		Content:  membershipContent,
-	}
-
-	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
-	if err != nil {
-		util.GetLogger(ctx).WithError(err).Error()
-		return nil, &api.PerformError{
-			Msg: "Power level event content was invalid",
-		}
+		Content:  newMembershipContent,
 	}
 
 	// We might need to temporarily give ourselves a higher power level
@@ -437,27 +423,38 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	// the relevant state events. This function will return whether we
 	// had to override the power level events or not — if we did, we
 	// need to send the original power levels again later on.
-	tempPowerLevelsEvent, powerLevelsOverridden := createTemporaryPowerLevels(powerLevelContent, userID)
-
-	joinRulesContent, err := oldJoinRulesEvent.JoinRule()
+	powerLevelContent, err := oldPowerLevelsEvent.PowerLevels()
 	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error()
 		return nil, &api.PerformError{
-			Msg: "Join rules event content was invalid",
+			Msg: "Power level event content was invalid",
 		}
 	}
+	tempPowerLevelsEvent, powerLevelsOverridden := createTemporaryPowerLevels(powerLevelContent, userID)
+
+	// Now do the join rules event, same as the create and membership
+	// events. We'll set a sane default of "invite" so that if the
+	// existing join rules contains garbage, the room can still be
+	// upgraded.
+	newJoinRulesContent := map[string]interface{}{
+		"join_rule": gomatrixserverlib.Invite, // sane default
+	}
+	_ = json.Unmarshal(oldJoinRulesEvent.Content(), &newJoinRulesContent)
 	newJoinRulesEvent := fledglingEvent{
 		Type:     gomatrixserverlib.MRoomJoinRules,
 		StateKey: "",
-		Content: map[string]interface{}{
-			"join_rule": joinRulesContent,
-		},
+		Content:  newJoinRulesContent,
 	}
 
 	eventsToMake := make([]fledglingEvent, 0, len(state))
-	eventsToMake = append(eventsToMake, newCreateEvent, membershipEvent, tempPowerLevelsEvent, newJoinRulesEvent)
+	eventsToMake = append(
+		eventsToMake, newCreateEvent, newMembershipEvent,
+		tempPowerLevelsEvent, newJoinRulesEvent,
+	)
 
+	// For some reason Sytest expects there to be a guest access event.
+	// Create one if it doesn't exist.
 	if _, ok := state[gomatrixserverlib.StateKeyTuple{EventType: gomatrixserverlib.MRoomGuestAccess, StateKey: ""}]; !ok {
-		// Appease sytest, as it expects a guest access event for some reason.
 		eventsToMake = append(eventsToMake, fledglingEvent{
 			Type: gomatrixserverlib.MRoomGuestAccess,
 			Content: map[string]string{
