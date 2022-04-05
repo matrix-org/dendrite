@@ -80,6 +80,7 @@ func NewRequestPool(
 		producer: producer,
 	}
 	go rp.cleanLastSeen()
+
 	go rp.cleanPresence(db, time.Minute*5)
 	return rp
 }
@@ -110,7 +111,7 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
 func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
-	if rp.cfg.Matrix.DisablePresence {
+	if !rp.cfg.Matrix.Presence.EnableInbound {
 		return
 	}
 	if presence == "" {

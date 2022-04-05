@@ -42,10 +42,11 @@ type PresenceConsumer struct {
 	stream        types.StreamProvider
 	notifier      *notifier.Notifier
 	deviceAPI     api.UserDeviceAPI
+	cfg           *config.SyncAPI
 }
 
-// NewOutputTypingEventConsumer creates a new OutputTypingEventConsumer.
-// Call Start() to begin consuming from the EDU server.
+// NewPresenceConsumer creates a new PresenceConsumer.
+// Call Start() to begin consuming events.
 func NewPresenceConsumer(
 	process *process.ProcessContext,
 	cfg *config.SyncAPI,
@@ -67,6 +68,7 @@ func NewPresenceConsumer(
 		notifier:      notifier,
 		stream:        stream,
 		deviceAPI:     deviceAPI,
+		cfg:           cfg,
 	}
 }
 
@@ -114,6 +116,9 @@ func (s *PresenceConsumer) Start() error {
 	})
 	if err != nil {
 		return err
+	}
+	if !s.cfg.Matrix.Presence.EnableInbound && !s.cfg.Matrix.Presence.EnableOutbound {
+		return nil
 	}
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.presenceTopic, s.durable, s.onMessage,

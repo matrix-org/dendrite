@@ -128,13 +128,14 @@ func Send(
 	defer inFlightTxnsPerOrigin.Delete(index)
 
 	t := txnReq{
-		rsAPI:      rsAPI,
-		keys:       keys,
-		federation: federation,
-		servers:    servers,
-		keyAPI:     keyAPI,
-		roomsMu:    mu,
-		producer:   producer,
+		rsAPI:                  rsAPI,
+		keys:                   keys,
+		federation:             federation,
+		servers:                servers,
+		keyAPI:                 keyAPI,
+		roomsMu:                mu,
+		producer:               producer,
+		inboundPresenceEnabled: cfg.Matrix.Presence.EnableInbound,
 	}
 
 	var txnEvents struct {
@@ -186,13 +187,14 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
-	rsAPI      api.RoomserverInternalAPI
-	keyAPI     keyapi.KeyInternalAPI
-	keys       gomatrixserverlib.JSONVerifier
-	federation txnFederationClient
-	roomsMu    *internal.MutexByRoom
-	servers    federationAPI.ServersInRoomProvider
-	producer   *producers.SyncAPIProducer
+	rsAPI                  api.RoomserverInternalAPI
+	keyAPI                 keyapi.KeyInternalAPI
+	keys                   gomatrixserverlib.JSONVerifier
+	federation             txnFederationClient
+	roomsMu                *internal.MutexByRoom
+	servers                federationAPI.ServersInRoomProvider
+	producer               *producers.SyncAPIProducer
+	inboundPresenceEnabled bool
 }
 
 // A subset of FederationClient functionality that txn requires. Useful for testing.
@@ -391,8 +393,10 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
 		case gomatrixserverlib.MPresence:
-			if err := t.processPresence(ctx, e); err != nil {
-				logrus.WithError(err).Errorf("Failed to process presence update")
+			if t.inboundPresenceEnabled {
+				if err := t.processPresence(ctx, e); err != nil {
+					logrus.WithError(err).Errorf("Failed to process presence update")
+				}
 			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")

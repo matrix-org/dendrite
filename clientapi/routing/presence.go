@@ -45,7 +45,7 @@ func SetPresence(
 	producer *producers.SyncAPIProducer,
 	userID string,
 ) util.JSONResponse {
-	if cfg.Matrix.DisablePresence {
+	if !cfg.Matrix.Presence.EnableInbound {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},

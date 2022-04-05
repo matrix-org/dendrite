@@ -33,16 +33,17 @@ import (
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
 type OutputPresenceConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	db         storage.Database
-	queues     *queue.OutgoingQueues
-	ServerName gomatrixserverlib.ServerName
-	topic      string
+	ctx                     context.Context
+	jetstream               nats.JetStreamContext
+	durable                 string
+	db                      storage.Database
+	queues                  *queue.OutgoingQueues
+	ServerName              gomatrixserverlib.ServerName
+	topic                   string
+	outboundPresenceEnabled bool
 }
 
-// NewOutputReceiptConsumer creates a new OutputReceiptConsumer. Call Start() to begin consuming typing events.
+// NewOutputPresenceConsumer creates a new OutputPresenceConsumer. Call Start() to begin consuming events.
 func NewOutputPresenceConsumer(
 	process *process.ProcessContext,
 	cfg *config.FederationAPI,
@@ -51,25 +52,29 @@ func NewOutputPresenceConsumer(
 	store storage.Database,
 ) *OutputPresenceConsumer {
 	return &OutputPresenceConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		queues:     queues,
-		db:         store,
-		ServerName: cfg.Matrix.ServerName,
-		durable:    cfg.Matrix.JetStream.Durable("FederationAPIPresenceConsumer"),
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		ctx:                     process.Context(),
+		jetstream:               js,
+		queues:                  queues,
+		db:                      store,
+		ServerName:              cfg.Matrix.ServerName,
+		durable:                 cfg.Matrix.JetStream.Durable("FederationAPIPresenceConsumer"),
+		topic:                   cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		outboundPresenceEnabled: cfg.Matrix.Presence.EnableOutbound,
 	}
 }
 
 // Start consuming from the clientapi
 func (t *OutputPresenceConsumer) Start() error {
+	if !t.outboundPresenceEnabled {
+		return nil
+	}
 	return jetstream.JetStreamConsumer(
 		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
 
-// onMessage is called in response to a message received on the receipt
+// onMessage is called in response to a message received on the presence
 // events topic from the client api.
 func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	// only send presence events which originated from us
