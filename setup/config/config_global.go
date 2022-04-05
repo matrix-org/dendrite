@@ -41,7 +41,7 @@ type Global struct {
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 
-	// Disable presence. Dendrite will not handle presence events.
+	// Configures the handling of presence events.
 	Presence PresenceOptions `yaml:"presence"`
 
 	// List of domains that the server will trust as identity servers to
@@ -229,7 +229,10 @@ func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
 }
 
+// PresenceOptions defines possible configurations for presence events.
 type PresenceOptions struct {
-	EnableInbound  bool `yaml:"enable_inbound"`
+	// Whether inbound presence events are allowed
+	EnableInbound bool `yaml:"enable_inbound"`
+	// Whether outbound presence events are allowed
 	EnableOutbound bool `yaml:"enable_outbound"`
 }

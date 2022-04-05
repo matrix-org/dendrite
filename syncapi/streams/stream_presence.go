@@ -65,7 +65,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	}
 
 	// get all joined users
-	// TODO: SharedUsers might get out of syncf
+	// TODO: SharedUsers might get out of sync
 	sharedUsers := p.notifier.SharedUsers(req.Device.UserID)
 
 	sharedUsersMap := map[string]bool{
