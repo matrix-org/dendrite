@@ -661,4 +661,22 @@ Canonical alias can include alt_aliases
 Can delete canonical alias
 AS can make room aliases
 /context/ with lazy_load_members filter works
+/upgrade creates a new room
+/upgrade should preserve room visibility for public rooms
+/upgrade should preserve room visibility for private rooms
+/upgrade copies the power levels to the new room
+/upgrade preserves the power level of the upgrading user in old and new rooms
+/upgrade copies important state to the new room
+/upgrade copies ban events to the new room
+local user has push rules copied to upgraded room
+remote user has push rules copied to upgraded room
+/upgrade moves aliases to the new room
+/upgrade preserves room federation ability
+/upgrade restricts power levels in the old room
+/upgrade restricts power levels in the old room when the old PLs are unusual
+/upgrade to an unknown version is rejected
+/upgrade is rejected if the user can't send state events
+/upgrade of a bogus room fails gracefully
+Cannot send tombstone event that points to the same room
 Room summary counts change when membership changes
+/upgrade copies >100 power levels to the new room

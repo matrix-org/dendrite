@@ -170,6 +170,9 @@ type RoomserverInternalAPI interface {
 	// PerformForget forgets a rooms history for a specific user
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 
+	// PerformRoomUpgrade upgrades a room to a newer version
+	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
+
 	// Asks for the default room version as preferred by the server.
 	QueryRoomVersionCapabilities(
 		ctx context.Context,

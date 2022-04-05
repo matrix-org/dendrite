@@ -34,6 +34,7 @@ type RoomserverInternalAPI struct {
 	*perform.Publisher
 	*perform.Backfiller
 	*perform.Forgetter
+	*perform.Upgrader
 	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
@@ -158,6 +159,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	}
 	r.Forgetter = &perform.Forgetter{
 		DB: r.DB,
+	}
+	r.Upgrader = &perform.Upgrader{
+		Cfg:    r.Cfg,
+		URSAPI: r,
 	}
 
 	if err := r.Inputer.Start(); err != nil {
