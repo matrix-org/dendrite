@@ -107,7 +107,7 @@ func (p *presenceStatements) UpsertPresence(
 	txn *sql.Tx,
 	userID string,
 	statusMsg *string,
-	presence string,
+	presence types.Presence,
 	lastActiveTS gomatrixserverlib.Timestamp,
 	fromSync bool,
 ) (pos types.StreamPosition, err error) {
@@ -116,19 +116,18 @@ func (p *presenceStatements) UpsertPresence(
 		return pos, err
 	}
 
-	presenceStatusID := types.PresenceToInt[presence]
 	if fromSync {
 		stmt := sqlutil.TxStmt(txn, p.upsertPresenceFromSyncStmt)
 		err = stmt.QueryRowContext(ctx,
-			pos, userID, presenceStatusID,
+			pos, userID, presence,
 			lastActiveTS, pos,
-			presenceStatusID, lastActiveTS).Scan(&pos)
+			presence, lastActiveTS).Scan(&pos)
 	} else {
 		stmt := sqlutil.TxStmt(txn, p.upsertPresenceStmt)
 		err = stmt.QueryRowContext(ctx,
-			pos, userID, presenceStatusID,
+			pos, userID, presence,
 			statusMsg, lastActiveTS, pos,
-			presenceStatusID, statusMsg, lastActiveTS).Scan(&pos)
+			presence, statusMsg, lastActiveTS).Scan(&pos)
 	}
 	return
 }
@@ -137,14 +136,13 @@ func (p *presenceStatements) UpsertPresence(
 func (p *presenceStatements) GetPresenceForUser(
 	ctx context.Context, txn *sql.Tx,
 	userID string,
-) (*types.Presence, error) {
-	result := &types.Presence{
+) (*types.PresenceInternal, error) {
+	result := &types.PresenceInternal{
 		UserID: userID,
 	}
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
-	var presenceStatusID int
-	err := stmt.QueryRowContext(ctx, userID).Scan(&presenceStatusID, &result.ClientFields.StatusMsg, &result.LastActiveTS)
-	result.ClientFields.Presence = types.PresenceToString[presenceStatusID]
+	err := stmt.QueryRowContext(ctx, userID).Scan(&result.Presence, &result.ClientFields.StatusMsg, &result.LastActiveTS)
+	result.ClientFields.Presence = result.Presence.String()
 	return result, err
 }
 
@@ -158,8 +156,8 @@ func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) 
 func (p *presenceStatements) GetPresenceAfter(
 	ctx context.Context, txn *sql.Tx,
 	after types.StreamPosition,
-) (presences map[string]*types.Presence, err error) {
-	presences = make(map[string]*types.Presence)
+) (presences map[string]*types.PresenceInternal, err error) {
+	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
 
 	rows, err := stmt.QueryContext(ctx, after)
@@ -167,14 +165,13 @@ func (p *presenceStatements) GetPresenceAfter(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceAfter: failed to close rows")
-	var presenceStatusID int
 	for rows.Next() {
-		presence := &types.Presence{}
-		if err := rows.Scan(&presence.StreamPos, &presence.UserID, &presenceStatusID, &presence.ClientFields.StatusMsg, &presence.LastActiveTS); err != nil {
+		qryRes := &types.PresenceInternal{}
+		if err := rows.Scan(&qryRes.StreamPos, &qryRes.UserID, &qryRes.Presence, &qryRes.ClientFields.StatusMsg, &qryRes.LastActiveTS); err != nil {
 			return nil, err
 		}
-		presence.ClientFields.Presence = types.PresenceToString[presenceStatusID]
-		presences[presence.UserID] = presence
+		qryRes.ClientFields.Presence = qryRes.Presence.String()
+		presences[qryRes.UserID] = qryRes
 	}
 	return presences, rows.Err()
 }

@@ -65,7 +65,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	}
 
 	// get all joined users
-	// TODO: SharedUsers might get out of syncf
+	// TODO: SharedUsers might get out of sync
 	sharedUsers := p.notifier.SharedUsers(req.Device.UserID)
 
 	sharedUsersMap := map[string]bool{
@@ -116,7 +116,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		pres, ok := p.cache.Load(cacheKey)
 		if ok {
 			// skip already sent presence
-			prevPresence := pres.(*types.Presence)
+			prevPresence := pres.(*types.PresenceInternal)
 			currentlyActive := prevPresence.CurrentlyActive()
 			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
 			if skip {

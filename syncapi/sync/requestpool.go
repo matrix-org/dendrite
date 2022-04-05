@@ -56,7 +56,7 @@ type RequestPool struct {
 }
 
 type PresencePublisher interface {
-	SendPresence(userID, presence string, statusMsg *string) error
+	SendPresence(userID string, presence types.Presence, statusMsg *string) error
 }
 
 // NewRequestPool makes a new RequestPool
@@ -95,11 +95,14 @@ func (rp *RequestPool) cleanLastSeen() {
 }
 
 func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Duration) {
+	if !rp.cfg.Matrix.Presence.EnableOutbound {
+		return
+	}
 	for {
 		rp.presence.Range(func(key interface{}, v interface{}) bool {
-			p := v.(types.Presence)
+			p := v.(types.PresenceInternal)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
-				rp.updatePresence(db, "unavailable", p.UserID)
+				rp.updatePresence(db, types.PresenceUnavailable.String(), p.UserID)
 				rp.presence.Delete(key)
 			}
 			return true
@@ -110,17 +113,24 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
 func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
-	if rp.cfg.Matrix.DisablePresence {
+	if !rp.cfg.Matrix.Presence.EnableOutbound {
 		return
 	}
 	if presence == "" {
-		presence = "online"
+		presence = types.PresenceOnline.String()
 	}
 
-	newPresence := types.Presence{
+	presenceID, ok := types.PresenceFromString(presence)
+	if !ok { // this should almost never happen
+		logrus.Errorf("unknown presence '%s'", presence)
+		return
+	}
+
+	newPresence := types.PresenceInternal{
 		ClientFields: types.PresenceClientResponse{
-			Presence: presence,
+			Presence: presenceID.String(),
 		},
+		Presence:     presenceID,
 		UserID:       userID,
 		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
@@ -128,7 +138,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	// avoid spamming presence updates when syncing
 	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
 	if ok {
-		p := existingPresence.(types.Presence)
+		p := existingPresence.(types.PresenceInternal)
 		if p.ClientFields.Presence == newPresence.ClientFields.Presence {
 			return
 		}
@@ -140,7 +150,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 		return
 	}
 
-	if err := rp.producer.SendPresence(userID, strings.ToLower(presence), dbPresence.ClientFields.StatusMsg); err != nil {
+	if err := rp.producer.SendPresence(userID, presenceID, dbPresence.ClientFields.StatusMsg); err != nil {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
