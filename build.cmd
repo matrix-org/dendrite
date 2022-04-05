@@ -1,4 +1,4 @@
-REM @echo off
+@echo off
 
 :ENTRY_POINT
     setlocal EnableDelayedExpansion
