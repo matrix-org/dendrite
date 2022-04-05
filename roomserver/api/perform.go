@@ -203,3 +203,14 @@ type PerformForgetRequest struct {
 }
 
 type PerformForgetResponse struct{}
+
+type PerformRoomUpgradeRequest struct {
+	RoomID      string                        `json:"room_id"`
+	UserID      string                        `json:"user_id"`
+	RoomVersion gomatrixserverlib.RoomVersion `json:"room_version"`
+}
+
+type PerformRoomUpgradeResponse struct {
+	NewRoomID string
+	Error     *PerformError
+}

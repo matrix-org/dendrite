@@ -957,6 +957,16 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	v3mux.Handle("/rooms/{roomID}/upgrade",
+		httputil.MakeAuthAPI("rooms_upgrade", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return UpgradeRoom(req, device, cfg, vars["roomID"], userAPI, rsAPI, asAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	v3mux.Handle("/devices",
 		httputil.MakeAuthAPI("get_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return GetDevicesByLocalpart(req, userAPI, device)

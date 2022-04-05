@@ -34,6 +34,10 @@ If you want to run a polylith deployment, you also need:
 
 * A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
 
+If you want to build it on Windows, you need `gcc` in the path:
+
+* [MinGW-w64](https://www.mingw-w64.org/)
+
 ## Building Dendrite
 
 Start by cloning the code:
@@ -45,9 +49,15 @@ cd dendrite
 
 Then build it:
 
-```bash
-./build.sh
-```
+* Linux or UNIX-like systems:
+  ```bash
+  ./build.sh
+  ```
+
+* Windows:
+  ```dos
+  build.cmd
+  ```
 
 ## Install NATS Server
 
