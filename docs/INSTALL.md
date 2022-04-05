@@ -49,12 +49,12 @@ cd dendrite
 
 Then build it:
 
-* Linux
+* Linux or UNIX-like systems:
   ```bash
   ./build.sh
   ```
 
-* Windows
+* Windows:
   ```dos
   build.cmd
   ```
