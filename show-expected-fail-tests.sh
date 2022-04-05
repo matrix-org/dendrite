@@ -89,17 +89,17 @@ if [ -n "${tests_to_add}" ] && [ -n "${already_in_whitelist}" ]; then
 fi
 
 if [ -n "${tests_to_add}" ]; then
-	echo "**ERROR**: The following tests passed but are not present in \`$2\`. Please append them to the file:"
-    echo "\`\`\`"
-    echo -e "${tests_to_add}"
-    echo "\`\`\`"
+	echo "::error::The following tests passed but are not present in \`$2\`. Please append them to the file:"
+	echo "::group::Passing tests"
+  echo -e "${tests_to_add}"
+  echo "::endgroup::"
 fi
 
 if [ -n "${already_in_whitelist}" ]; then
-	echo "**WARN**: Tests in the whitelist still marked as **expected fail**:"
-    echo "\`\`\`"
-    echo -e "${already_in_whitelist}"
-    echo "\`\`\`"
+	echo "::warning::Tests in the whitelist still marked as **expected fail**:"
+	echo "::group::Still marked as expected fail"
+  echo -e "${already_in_whitelist}"
+  echo "::endgroup::"
 fi
 
 exit ${fail_build}
