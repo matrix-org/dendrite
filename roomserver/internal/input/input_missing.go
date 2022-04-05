@@ -613,12 +613,13 @@ func (t *missingStateReq) lookupMissingStateViaState(
 		return nil, err
 	}
 	// Check that the returned state is valid.
-	if err := state.Check(ctx, roomVersion, t.keys, nil); err != nil {
+	authEvents, stateEvents, err := state.Check(ctx, roomVersion, t.keys, nil)
+	if err != nil {
 		return nil, err
 	}
 	parsedState := &parsedRespState{
-		AuthEvents:  make([]*gomatrixserverlib.Event, len(state.AuthEvents)),
-		StateEvents: make([]*gomatrixserverlib.Event, len(state.StateEvents)),
+		AuthEvents:  authEvents,
+		StateEvents: stateEvents,
 	}
 	// Cache the results of this state lookup and deduplicate anything we already
 	// have in the cache, freeing up memory.
