@@ -78,8 +78,6 @@ func MakeConfig(configDir, kafkaURI, database, host string, startPort int) (*con
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(assignAddress())
 	cfg.Global.PrivateKeyPath = config.Path(serverKeyPath)
 
-	cfg.FederationAPI.FederationCertificatePaths = []config.Path{config.Path(tlsCertPath)}
-
 	cfg.MediaAPI.BasePath = config.Path(mediaBasePath)
 
 	cfg.Global.JetStream.Addresses = []string{kafkaURI}
