@@ -690,10 +690,12 @@ func (d *Database) GetStateDeltas(
 
 	allRoomIDs := make([]string, 0, len(memberships))
 	joinedRoomIDs := make([]string, 0, len(memberships))
+	joinedRoomMap := make(map[string]struct{}, len(memberships))
 	for roomID, membership := range memberships {
 		allRoomIDs = append(allRoomIDs, roomID)
 		if membership == gomatrixserverlib.Join {
 			joinedRoomIDs = append(joinedRoomIDs, roomID)
+			joinedRoomMap[roomID] = struct{}{}
 		}
 	}
 
@@ -739,13 +741,8 @@ func (d *Database) GetStateDeltas(
 	// handle newly joined rooms and non-joined rooms
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
-			//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
-			//       dupe join events will result in the entire room state coming down to the client again. This is added in
-			//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
-			//       the timeline.
 			if membership := getMembershipFromEvent(ev.Event, userID); membership != "" {
-				if membership == gomatrixserverlib.Join {
+				if _, ok := joinedRoomMap[roomID]; !ok && membership == gomatrixserverlib.Join {
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
