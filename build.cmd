@@ -35,8 +35,6 @@ REM @echo off
 
 :ALL_SET
     set CGO_ENABLED=1
-    set GOOS=windows
-    set GOARCH=amd64
     for /D %%P in (cmd\*) do (
         go build -trimpath -ldflags "%FLAGS%" -v -o ".\bin" ".\%%P"
     )
