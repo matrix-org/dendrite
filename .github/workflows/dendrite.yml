@@ -233,7 +233,14 @@ jobs:
       - name: Summarise results.tap
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
-
+      - name: Sytest List Maintenance
+        if: ${{ always() }}
+        run: /src/show-expected-fail-tests.sh /logs/results.tap /src/sytest-whitelist /src/sytest-blacklist
+        continue-on-error: true # not fatal
+      - name: Are We Synapse Yet?
+        if: ${{ always() }}
+        run: /src/are-we-synapse-yet.py /logs/results.tap -v
+        continue-on-error: true # not fatal
       - name: Upload Sytest logs
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
