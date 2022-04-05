@@ -694,3 +694,5 @@ Presence changes to UNAVAILABLE are reported to local room members
 Presence changes to UNAVAILABLE are reported to remote room members
 New federated private chats get full presence information (SYN-115)
 /upgrade copies >100 power levels to the new room
+Room state after a rejected message event is the same as before
+Room state after a rejected state event is the same as before
