@@ -259,9 +259,10 @@ func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
 }
 
 func (n *Notifier) IsSharedUser(userA, userB string) bool {
+	var okA, okB bool
 	for _, users := range n.roomIDToJoinedUsers {
-		_, okA := users[userA]
-		_, okB := users[userB]
+		_, okA = users[userA]
+		_, okB = users[userB]
 		if okA && okB {
 			return true
 		}
