@@ -682,3 +682,6 @@ Room summary counts change when membership changes
 /upgrade copies >100 power levels to the new room
 Room state after a rejected message event is the same as before
 Room state after a rejected state event is the same as before
+Ignore user in existing room
+Ignore invite in full sync
+Ignore invite in incremental sync

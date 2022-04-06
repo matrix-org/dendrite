@@ -395,6 +395,10 @@ func (s *OutputStreamEventConsumer) notifyLocal(ctx context.Context, event *goma
 	return nil
 }
 
+type ignoredUsers struct {
+	List map[string]interface{} `json:"ignored_users"`
+}
+
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
 func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
@@ -404,8 +408,24 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 		return nil, nil
 	}
 
+	// Get accountdata to check if the event.Sender() is ignored by mem.LocalPart
+	data, err := s.db.GetAccountDataByType(ctx, mem.Localpart, "", "m.ignored_user_list")
+	if err != nil {
+		return nil, err
+	}
+	if data != nil {
+		ignored := ignoredUsers{}
+		err = json.Unmarshal(data, &ignored)
+		if err != nil {
+			return nil, err
+		}
+		sender := event.Sender()
+		if _, ok := ignored.List[sender]; ok {
+			return nil, fmt.Errorf("user %s is ignored", sender)
+		}
+	}
 	var res api.QueryPushRulesResponse
-	if err := s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
+	if err = s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
 		return nil, err
 	}
 
