@@ -267,7 +267,7 @@ func (n *Notifier) SharedUsers(userID string) []string {
 			n._sharedUsers[userID] = struct{}{}
 		}
 	}
-	sharedUsers := make([]string, 0, len(n._sharedUsers))
+	sharedUsers := make([]string, 0, len(n._sharedUsers)+1)
 	for userID := range n._sharedUsers {
 		sharedUsers = append(sharedUsers, userID)
 		delete(n._sharedUsers, userID)
