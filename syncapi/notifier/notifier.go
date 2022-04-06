@@ -45,6 +45,8 @@ type Notifier struct {
 	lastCleanUpTime time.Time
 	// Protects roomIDToJoinedUsers and roomIDToPeekingDevices
 	mapLock *sync.RWMutex
+	// This map is reused to prevent allocations and GC pressure in SharedUsers.
+	_sharedUsers map[string]struct{}
 }
 
 // NewNotifier creates a new notifier set to the given sync position.
@@ -255,20 +257,19 @@ func (n *Notifier) OnNewPresence(
 func (n *Notifier) SharedUsers(userID string) []string {
 	n.mapLock.RLock()
 	defer n.mapLock.RUnlock()
-	sharedMap := map[string]struct{}{
-		userID: {},
-	}
+	n._sharedUsers[userID] = struct{}{}
 	for roomID, users := range n.roomIDToJoinedUsers {
 		if _, ok := users[userID]; !ok {
 			continue
 		}
 		for _, userID := range n.JoinedUsers(roomID) {
-			sharedMap[userID] = struct{}{}
+			n._sharedUsers[userID] = struct{}{}
 		}
 	}
-	sharedUsers := make([]string, 0, len(sharedMap))
-	for userID := range sharedMap {
+	sharedUsers := make([]string, 0, len(n._sharedUsers))
+	for userID := range n._sharedUsers {
 		sharedUsers = append(sharedUsers, userID)
+		delete(n._sharedUsers, userID)
 	}
 	return sharedUsers
 }
