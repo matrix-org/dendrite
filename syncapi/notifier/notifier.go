@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -253,15 +252,25 @@ func (n *Notifier) OnNewPresence(
 	n.wakeupUsers(sharedUsers, nil, n.currPos)
 }
 
-func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
+func (n *Notifier) SharedUsers(userID string) []string {
 	n.mapLock.RLock()
 	defer n.mapLock.RUnlock()
+	sharedMap := map[string]struct{}{
+		userID: {},
+	}
 	for roomID, users := range n.roomIDToJoinedUsers {
-		if _, ok := users[userID]; ok {
-			sharedUsers = append(sharedUsers, n.JoinedUsers(roomID)...)
+		if _, ok := users[userID]; !ok {
+			continue
+		}
+		for _, userID := range n.JoinedUsers(roomID) {
+			sharedMap[userID] = struct{}{}
 		}
 	}
-	return util.UniqueStrings(sharedUsers)
+	sharedUsers := make([]string, 0, len(sharedMap))
+	for userID := range sharedMap {
+		sharedUsers = append(sharedUsers, userID)
+	}
+	return sharedUsers
 }
 
 func (n *Notifier) IsSharedUser(userA, userB string) bool {
