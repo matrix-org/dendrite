@@ -100,10 +100,12 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 				eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
 			}
 		}
-		if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
-			return false
+		if len(eventsReq.EventIDs) > 0 {
+			if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
+				return false
+			}
+			events = append(events, eventsRes.Events...)
 		}
-		events = append(events, eventsRes.Events...)
 	}
 
 	// Send event to any relevant application services
