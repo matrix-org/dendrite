@@ -258,6 +258,17 @@ func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
 	return sharedUsers
 }
 
+func (n *Notifier) IsSharedUser(userA, userB string) bool {
+	for _, users := range n.roomIDToJoinedUsers {
+		_, okA := users[userA]
+		_, okB := users[userB]
+		if okA && okB {
+			return true
+		}
+	}
+	return false
+}
+
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos
