@@ -43,7 +43,6 @@ func main() {
 	components := map[string]entrypoint{
 		"appservice":    personalities.Appservice,
 		"clientapi":     personalities.ClientAPI,
-		"eduserver":     personalities.EDUServer,
 		"federationapi": personalities.FederationAPI,
 		"keyserver":     personalities.KeyServer,
 		"mediaapi":      personalities.MediaAPI,

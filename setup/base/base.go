@@ -45,8 +45,6 @@ import (
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
-	eduinthttp "github.com/matrix-org/dendrite/eduserver/inthttp"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	federationIntHTTP "github.com/matrix-org/dendrite/federationapi/inthttp"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
@@ -76,6 +74,7 @@ type BaseDendrite struct {
 	PublicMediaAPIMux      *mux.Router
 	PublicWellKnownAPIMux  *mux.Router
 	InternalAPIMux         *mux.Router
+	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
 	UseHTTPAPIs            bool
 	apiHttpClient          *http.Client
@@ -208,7 +207,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
-		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix("/_synapse/").Subrouter().UseEncodedPath(),
+		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
+		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
 		apiHttpClient:          &apiClient,
 	}
 }
@@ -245,15 +245,6 @@ func (b *BaseDendrite) UserAPIClient() userapi.UserInternalAPI {
 	return userAPI
 }
 
-// EDUServerClient returns EDUServerInputAPI for hitting the EDU server over HTTP
-func (b *BaseDendrite) EDUServerClient() eduServerAPI.EDUServerInputAPI {
-	e, err := eduinthttp.NewEDUServerClient(b.Cfg.EDUServerURL(), b.apiHttpClient)
-	if err != nil {
-		logrus.WithError(err).Panic("EDUServerClient failed", b.apiHttpClient)
-	}
-	return e
-}
-
 // FederationAPIHTTPClient returns FederationInternalAPI for hitting
 // the federation API server over HTTP
 func (b *BaseDendrite) FederationAPIHTTPClient() federationAPI.FederationInternalAPI {
@@ -287,6 +278,7 @@ func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
 		b.Cfg.UserAPI.BCryptCost,
 		b.Cfg.UserAPI.OpenIDTokenLifetimeMS,
 		userapi.DefaultLoginTokenLifetime,
+		b.Cfg.Global.ServerNotices.LocalPart,
 	)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to accounts db")
@@ -377,6 +369,17 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
+	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+		if b.ProcessContext.IsDegraded() {
+			w.WriteHeader(503)
+			return
+		}
+		w.WriteHeader(200)
+	})
+
 	var clientHandler http.Handler
 	clientHandler = b.PublicClientAPIMux
 	if b.Cfg.Global.Sentry.Enabled {
@@ -393,12 +396,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		})
 		federationHandler = sentryHandler.Handle(b.PublicFederationAPIMux)
 	}
+	internalRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(b.DendriteAdminMux)
 	externalRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(clientHandler)
 	if !b.Cfg.Global.DisableFederation {
 		externalRouter.PathPrefix(httputil.PublicKeyPathPrefix).Handler(b.PublicKeyAPIMux)
 		externalRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(federationHandler)
 	}
-	externalRouter.PathPrefix("/_synapse/").Handler(b.SynapseAdminMux)
+	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.SynapseAdminMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
 

@@ -1,5 +1,43 @@
 # Changelog
 
+## Dendrite 0.7.0 (2022-03-25)
+
+### Features
+
+* The roomserver input API will now queue all events into NATS, which provides better crash resilience
+* The roomserver input API now configures per-room consumers, which should use less memory
+* Canonical aliases can now be added and removed
+* MSC2946 Spaces Summary now works correctly, both locally and over federation
+* Healthcheck endpoints are now available at:
+  * `/_dendrite/monitor/up`, which will return 200 when Dendrite is ready to accept requests
+  * `/_dendrite/monitor/health`, which will return 200 if healthy and 503 if degraded for some reason
+* The `X-Matrix` federation authorisation header now includes a `destination` field, as per MSC3383
+* The `/sync` endpoint now uses less memory by only ranging state for rooms that the user has participated in
+* The `/messages` endpoint now accepts stream positions in both the `from` and `to` parameters
+* Dendrite will now log a warning at startup if the file descriptor limit is set too low
+* The federation client will now attempt to use HTTP/2 if available
+* The federation client will now attempt to resume TLS sessions if possible, to reduce handshake overheads
+* The built-in NATS Server has been updated to version 2.7.4
+* NATS streams that don't match the desired configuration will now be recreated automatically
+* When performing a graceful shutdown, Dendrite will now wait for NATS Server to shutdown completely, which should avoid some corruption of data on-disk
+* The `create-account` tool has seen a number of improvements, will now ask for passwords automatically
+
+### Fixes
+
+* The `/sync` endpoint will no longer lose state events when truncating the timeline for history visibility
+* The `/context` endpoint now works correctly with `lazy_load_members`
+* The `/directory/list/room/{roomID}` endpoint now correctly reports whether a room is published in the server room directory or not
+* Some bugs around appservice username validation have been fixed
+* Roomserver output messages are no longer unnecessarily inflated by state events, which should reduce the number of NATS message size errors
+* Stream IDs for device list updates are now always 64-bit, which should fix some problems when running Dendrite on a 32-bit system
+* Purging room state in the sync API has been fixed after a faulty database query was corrected
+* The federation client will now release host records for remote destinations after 5 minutes instead of holding them in memory forever
+* Remote media requests will now correctly return an error if the file cannot be found or downloaded
+* A panic in the media API that could happen when the remote file doesn't exist has been fixed
+* Various bugs around membership state and invites have been fixed
+* The memberships table will now be correctly updated when rejecting a federated invite
+* The client API and appservice API will now access the user database using the user API rather than accessing the database directly
+
 ## Dendrite 0.6.5 (2022-03-04)
 
 ### Features

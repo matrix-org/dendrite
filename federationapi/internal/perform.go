@@ -392,16 +392,16 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// we have the peek state now so let's process regardless of whether upstream gives up
 	ctx = context.Background()
-
 	respState := respPeek.ToRespState()
-	authEvents := respState.AuthEvents.UntrustedEvents(respPeek.RoomVersion)
+
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
+	authEvents, _, err := respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName))
+	if err != nil {
+		return fmt.Errorf("error checking state returned from peeking: %w", err)
+	}
 	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
-	}
-	if err = respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName)); err != nil {
-		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
 
 	// If we've got this far, the remote server is peeking.
