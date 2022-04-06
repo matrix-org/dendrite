@@ -250,12 +250,28 @@ func (n *Notifier) OnNewPresence(
 }
 
 func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
 	for roomID, users := range n.roomIDToJoinedUsers {
 		if _, ok := users[userID]; ok {
 			sharedUsers = append(sharedUsers, n.JoinedUsers(roomID)...)
 		}
 	}
 	return sharedUsers
+}
+
+func (n *Notifier) IsSharedUser(userA, userB string) bool {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
+	var okA, okB bool
+	for _, users := range n.roomIDToJoinedUsers {
+		_, okA = users[userA]
+		_, okB = users[userB]
+		if okA && okB {
+			return true
+		}
+	}
+	return false
 }
 
 // GetListener returns a UserStreamListener that can be used to wait for
@@ -509,6 +525,7 @@ func (s userIDSet) remove(str string) {
 }
 
 func (s userIDSet) values() (vals []string) {
+	vals = make([]string, 0, len(s))
 	for str := range s {
 		vals = append(vals, str)
 	}
@@ -529,6 +546,7 @@ func (s peekingDeviceSet) remove(d types.PeekingDevice) {
 }
 
 func (s peekingDeviceSet) values() (vals []types.PeekingDevice) {
+	vals = make([]types.PeekingDevice, 0, len(s))
 	for d := range s {
 		vals = append(vals, d)
 	}

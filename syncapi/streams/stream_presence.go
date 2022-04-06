@@ -64,18 +64,6 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		return to
 	}
 
-	// get all joined users
-	// TODO: SharedUsers might get out of sync
-	sharedUsers := p.notifier.SharedUsers(req.Device.UserID)
-
-	sharedUsersMap := map[string]bool{
-		req.Device.UserID: true,
-	}
-	// convert array to a map for easier checking if a user exists
-	for i := range sharedUsers {
-		sharedUsersMap[sharedUsers[i]] = true
-	}
-
 	// add newly joined rooms user presences
 	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
 	if len(newlyJoined) > 0 {
@@ -88,7 +76,6 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		for _, roomID := range newlyJoined {
 			roomUsers := p.notifier.JoinedUsers(roomID)
 			for i := range roomUsers {
-				sharedUsersMap[roomUsers[i]] = true
 				// we already got a presence from this user
 				if _, ok := presences[roomUsers[i]]; ok {
 					continue
@@ -109,7 +96,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	for i := range presences {
 		presence := presences[i]
 		// Ignore users we don't share a room with
-		if !sharedUsersMap[presence.UserID] {
+		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
 			continue
 		}
 		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID
