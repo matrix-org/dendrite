@@ -509,6 +509,7 @@ func (s userIDSet) remove(str string) {
 }
 
 func (s userIDSet) values() (vals []string) {
+	vals = make([]string, 0, len(s))
 	for str := range s {
 		vals = append(vals, str)
 	}
@@ -529,6 +530,7 @@ func (s peekingDeviceSet) remove(d types.PeekingDevice) {
 }
 
 func (s peekingDeviceSet) values() (vals []types.PeekingDevice) {
+	vals = make([]types.PeekingDevice, 0, len(s))
 	for d := range s {
 		vals = append(vals, d)
 	}

@@ -68,10 +68,9 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	// TODO: SharedUsers might get out of sync
 	sharedUsers := p.notifier.SharedUsers(req.Device.UserID)
 
-	sharedUsersMap := map[string]bool{
-		req.Device.UserID: true,
-	}
 	// convert array to a map for easier checking if a user exists
+	sharedUsersMap := make(map[string]bool, len(sharedUsers))
+	sharedUsersMap[req.Device.UserID] = true
 	for i := range sharedUsers {
 		sharedUsersMap[sharedUsers[i]] = true
 	}
