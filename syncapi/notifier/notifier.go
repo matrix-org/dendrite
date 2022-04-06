@@ -250,6 +250,8 @@ func (n *Notifier) OnNewPresence(
 }
 
 func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
 	for roomID, users := range n.roomIDToJoinedUsers {
 		if _, ok := users[userID]; ok {
 			sharedUsers = append(sharedUsers, n.JoinedUsers(roomID)...)
@@ -259,6 +261,8 @@ func (n *Notifier) SharedUsers(userID string) (sharedUsers []string) {
 }
 
 func (n *Notifier) IsSharedUser(userA, userB string) bool {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
 	var okA, okB bool
 	for _, users := range n.roomIDToJoinedUsers {
 		_, okA = users[userA]
