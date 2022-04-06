@@ -98,4 +98,3 @@ func NewInternalAPI(
 
 	return userAPI
 }
-

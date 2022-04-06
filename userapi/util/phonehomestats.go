@@ -62,18 +62,12 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, userDB s
 	}
 
 	// start initial run after 5min
-	time.AfterFunc(time.Minute * 5, func() {
-		p.collect()
-	})
+	time.AfterFunc(time.Minute*5, p.collect)
 
 	// run every 3 hours
 	ticker := time.NewTicker(time.Hour * 3)
-
-	for {
-		select {
-		case <-ticker.C:
-			p.collect()
-		}
+	for range ticker.C {
+		p.collect()
 	}
 }
 
@@ -89,7 +83,7 @@ func (p *phoneHomeStats) collect() {
 	p.stats["go_os"] = runtime.GOOS
 	p.stats["num_cpu"] = runtime.NumCPU()
 	p.stats["num_go_routine"] = runtime.NumGoroutine()
-	p.stats["uptime_seconds"] = math.Floor(time.Now().Sub(p.startTime).Seconds())
+	p.stats["uptime_seconds"] = math.Floor(time.Since(p.startTime).Seconds())
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute*1)
 	defer cancel()
@@ -118,10 +112,10 @@ func (p *phoneHomeStats) collect() {
 	// database configuration
 	db, err := sqlutil.Open(&p.cfg.UserAPI.AccountDatabase)
 	if err != nil {
-		logrus.WithError(err).Error("unable to connecto to database")
+		logrus.WithError(err).Error("unable to connect to database")
 		return
 	}
-	defer db.Close()
+	defer internal.CloseAndLogIfError(context.Background(), db, "phoneHomeStats.collect(): failed to close database connection")
 
 	dbVersion := "unknown"
 	dbEngine := "unknown"
@@ -129,14 +123,14 @@ func (p *phoneHomeStats) collect() {
 	case p.cfg.UserAPI.AccountDatabase.ConnectionString.IsSQLite():
 		dbEngine = "SQLite"
 		row := db.QueryRow("select sqlite_version();")
-		if err := row.Scan(&dbVersion); err != nil {
+		if err = row.Scan(&dbVersion); err != nil {
 			logrus.WithError(err).Error("unable to query version")
 			return
 		}
 	case p.cfg.UserAPI.AccountDatabase.ConnectionString.IsPostgres():
 		dbEngine = "Postgres"
 		row := db.QueryRow("SHOW server_version;")
-		if err := row.Scan(&dbVersion); err != nil {
+		if err = row.Scan(&dbVersion); err != nil {
 			logrus.WithError(err).Error("unable to query version")
 			return
 		}

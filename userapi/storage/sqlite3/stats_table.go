@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -140,7 +141,7 @@ ON CONFLICT (localpart, device_id, timestamp) DO NOTHING
 
 type statsStatements struct {
 	serverName                    gomatrixserverlib.ServerName
-	db *sql.DB
+	db                            *sql.DB
 	lastUpdate                    time.Time
 	countUsersLastSeenAfterStmt   *sql.Stmt
 	countR30UsersStmt             *sql.Stmt
@@ -154,7 +155,7 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 	s := &statsStatements{
 		serverName: serverName,
 		lastUpdate: time.Now(),
-		db: db,
+		db:         db,
 	}
 
 	_, err := db.Exec(userDailyVisitsSchema)
@@ -173,24 +174,15 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 }
 
 func (s *statsStatements) startTimers() {
-	// initial run
-	time.AfterFunc(time.Minute*5, func() {
+	var updateStatsFunc func()
+	updateStatsFunc = func() {
 		logrus.Infof("Executing UpdateUserDailyVisits")
 		if err := s.updateUserDailyVisits(context.Background(), nil); err != nil {
 			logrus.WithError(err).Error("failed to update daily user visits")
 		}
-	})
-	// every x hours
-	ticker := time.NewTicker(time.Hour * 3)
-	for {
-		select {
-		case <-ticker.C:
-			logrus.Infof("Executing UpdateUserDailyVisits")
-			if err := s.updateUserDailyVisits(context.Background(), nil); err != nil {
-				logrus.WithError(err).Error("failed to update daily user visits")
-			}
-		}
+		time.AfterFunc(time.Hour*3, updateStatsFunc)
 	}
+	time.AfterFunc(time.Minute*5, updateStatsFunc)
 }
 
 func (s *statsStatements) AllUsers(ctx context.Context, txn *sql.Tx) (result int64, err error) {
@@ -201,7 +193,7 @@ func (s *statsStatements) AllUsers(ctx context.Context, txn *sql.Tx) (result int
 	}
 	stmt := sqlutil.TxStmt(txn, queryStmt)
 	err = stmt.QueryRowContext(ctx,
-	1, 2, 3, 4,
+		1, 2, 3, 4,
 	).Scan(&result)
 	return
 }
@@ -229,6 +221,7 @@ func (s *statsStatements) RegisteredUserByType(ctx context.Context, txn *sql.Tx)
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "RegisteredUserByType: failed to close rows")
 
 	var userType string
 	var count int64
@@ -279,6 +272,7 @@ func (s *statsStatements) R30Users(ctx context.Context, txn *sql.Tx) (map[string
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "R30Users: failed to close rows")
 
 	var platform string
 	var count int64
@@ -315,6 +309,7 @@ func (s *statsStatements) R30UsersV2(ctx context.Context, txn *sql.Tx) (map[stri
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, rows, "R30UsersV2: failed to close rows")
 
 	var platform string
 	var count int64

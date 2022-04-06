@@ -18,7 +18,6 @@
 package util
 
 import (
-	"math"
 	"syscall"
 	"time"
 
@@ -40,7 +39,7 @@ func getMemoryStats(p *phoneHomeStats) error {
 	if usedCPUTime == 0 || newData.timestamp == oldUsage.timestamp {
 		p.stats["cpu_average"] = 0
 	} else {
-		p.stats["cpu_average"] = math.Floor(float64(usedCPUTime / (newData.timestamp - oldUsage.timestamp) * 100))
+		p.stats["cpu_average"] = usedCPUTime / (newData.timestamp - oldUsage.timestamp) * 100
 	}
 	p.stats["memory_rss"] = newUsage.Maxrss
 	return nil
