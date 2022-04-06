@@ -60,6 +60,7 @@ func NewNotifier() *Notifier {
 		streamLock:             &sync.Mutex{},
 		mapLock:                &sync.RWMutex{},
 		lastCleanUpTime:        time.Now(),
+		_sharedUsers:           map[string]struct{}{},
 	}
 }
 
