@@ -48,7 +48,7 @@ func AddPublicRoutes(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs,
 ) {
-	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	js, natsClient := jetstream.Prepare(process, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
@@ -56,6 +56,7 @@ func AddPublicRoutes(
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		UserAPI:                userAPI,
 		ServerName:             cfg.Matrix.ServerName,
 	}
@@ -64,6 +65,6 @@ func AddPublicRoutes(
 		router, synapseAdminRouter, cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
-		extRoomsProvider, mscCfg,
+		extRoomsProvider, mscCfg, natsClient,
 	)
 }

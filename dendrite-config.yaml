@@ -68,13 +68,20 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
+  # Configures the handling of presence events.
+  presence:
+    # Whether inbound presence events are allowed, e.g. receiving presence events from other servers
+    enable_inbound: false
+    # Whether outbound presence events are allowed, e.g. sending presence events to other servers
+    enable_outbound: false
+
   # Whether this instance sends anonymous usage stats
   report_stats: false
 
   # The endpoint to report the anonymized homeserver usage statistics to.
   # Defaults to https://matrix.org/report-usage-stats/push
   #
-  #report_stats_endpoint: https://example.com/report-usage-stats/push
+  report_stats_endpoint: https://matrix.org/report-usage-stats/push
 
   # Server notices allows server admins to send messages to all users.
   server_notices:

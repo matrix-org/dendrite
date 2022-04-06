@@ -184,6 +184,7 @@ func (s *OutputStreamEventConsumer) localRoomMembers(ctx context.Context, roomID
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
+		LocalOnly:  true,
 	}
 	var res rsapi.QueryMembershipsForRoomResponse
 

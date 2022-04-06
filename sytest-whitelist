@@ -679,6 +679,20 @@ remote user has push rules copied to upgraded room
 /upgrade of a bogus room fails gracefully
 Cannot send tombstone event that points to the same room
 Room summary counts change when membership changes
+GET /presence/:user_id/status fetches initial status
+PUT /presence/:user_id/status updates my presence
+Presence change reports an event to myself
+Existing members see new members' presence
+#Existing members see new member's presence
+Newly joined room includes presence in incremental sync
+Get presence for newly joined members in incremental sync
+User sees their own presence in a sync
+User sees updates to presence from other users in the incremental sync.
+Presence changes are reported to local room members
+Presence changes are also reported to remote room members
+Presence changes to UNAVAILABLE are reported to local room members
+Presence changes to UNAVAILABLE are reported to remote room members
+New federated private chats get full presence information (SYN-115)
 /upgrade copies >100 power levels to the new room
 Room state after a rejected message event is the same as before
 Room state after a rejected state event is the same as before
