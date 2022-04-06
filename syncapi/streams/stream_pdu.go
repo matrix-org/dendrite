@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ type PDUStreamProvider struct {
 
 	tasks   chan func()
 	workers atomic.Int32
+	userAPI userapi.UserInternalAPI
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -86,6 +88,10 @@ func (p *PDUStreamProvider) CompleteSync(
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
+
+	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
+		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+	}
 
 	// Build up a /sync response. Add joined rooms.
 	var reqMutex sync.Mutex
@@ -173,6 +179,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if len(stateDeltas) == 0 {
 		return to
+	}
+
+	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
+		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
 	newPos = from
@@ -400,6 +410,30 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil
+}
+
+// addIgnoredUsersToFilter adds ignored users to the eventfilter and
+// the syncreq itself for further use in streams.
+func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
+	accountData := userapi.QueryAccountDataResponse{}
+	err := p.userAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
+		UserID: req.Device.UserID, RoomID: "", DataType: "m.ignored_user_list",
+	}, &accountData)
+	if err != nil {
+		req.Log.WithError(err).Error("unable to query ignored users")
+		return err
+	}
+	if data, ok := accountData.GlobalAccountData["m.ignored_user_list"]; ok {
+		err = json.Unmarshal(data, &req)
+		if err != nil {
+			req.Log.WithError(err).Error("unable to parse json")
+			return err
+		}
+		for userID := range req.IgnoredUsers {
+			eventFilter.NotSenders = append(eventFilter.NotSenders, userID)
+		}
+	}
+	return nil
 }
 
 func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
