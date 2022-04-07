@@ -41,6 +41,9 @@ type Global struct {
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 
+	// Configures the handling of presence events.
+	Presence PresenceOptions `yaml:"presence"`
+
 	// List of domains that the server will trust as identity servers to
 	// verify third-party identifiers.
 	// Defaults to an empty array.
@@ -224,4 +227,12 @@ func (c *DNSCacheOptions) Defaults() {
 func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkPositive(configErrs, "cache_size", int64(c.CacheSize))
 	checkPositive(configErrs, "cache_lifetime", int64(c.CacheLifetime))
+}
+
+// PresenceOptions defines possible configurations for presence events.
+type PresenceOptions struct {
+	// Whether inbound presence events are allowed
+	EnableInbound bool `yaml:"enable_inbound"`
+	// Whether outbound presence events are allowed
+	EnableOutbound bool `yaml:"enable_outbound"`
 }

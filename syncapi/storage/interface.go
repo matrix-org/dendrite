@@ -26,6 +26,7 @@ import (
 )
 
 type Database interface {
+	Presence
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error)
@@ -149,4 +150,11 @@ type Database interface {
 	SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
 
 	StreamToTopologicalPosition(ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool) (types.TopologyToken, error)
+}
+
+type Presence interface {
+	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
+	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
+	PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error)
+	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
 }
