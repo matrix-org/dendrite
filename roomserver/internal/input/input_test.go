@@ -2,8 +2,6 @@ package input_test
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -14,29 +12,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
-
-func psqlConnectionString() config.DataSource {
-	user := os.Getenv("POSTGRES_USER")
-	if user == "" {
-		user = "dendrite"
-	}
-	dbName := os.Getenv("POSTGRES_DB")
-	if dbName == "" {
-		dbName = "dendrite"
-	}
-	connStr := fmt.Sprintf(
-		"user=%s dbname=%s sslmode=disable", user, dbName,
-	)
-	password := os.Getenv("POSTGRES_PASSWORD")
-	if password != "" {
-		connStr += fmt.Sprintf(" password=%s", password)
-	}
-	host := os.Getenv("POSTGRES_HOST")
-	if host != "" {
-		connStr += fmt.Sprintf(" host=%s", host)
-	}
-	return config.DataSource(connStr)
-}
 
 func TestSingleTransactionOnInput(t *testing.T) {
 	t.SkipNow() // this doesn't work even with postgres enabled due to nats client not being set and you can't easily make one.
@@ -64,7 +39,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 	}
 	db, err := storage.Open(
 		&config.DatabaseOptions{
-			ConnectionString:   psqlConnectionString(),
+			ConnectionString:   "",
 			MaxOpenConnections: 1,
 			MaxIdleConnections: 1,
 		},
