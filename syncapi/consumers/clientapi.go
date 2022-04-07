@@ -119,6 +119,15 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg)
 		return false
 	}
 
+	if output.IgnoredUsers != nil {
+		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
+			log.WithError(err).WithFields(logrus.Fields{
+				"user_id": userID,
+			}).Errorf("Failed to update ignored users")
+			sentry.CaptureException(err)
+		}
+	}
+
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
 

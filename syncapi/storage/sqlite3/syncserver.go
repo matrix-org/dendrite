@@ -100,6 +100,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	ignores, err := NewSqliteIgnoresTable(d.db)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -121,6 +125,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Receipts:            receipts,
 		Memberships:         memberships,
 		NotificationData:    notificationData,
+		Ignores:             ignores,
 	}
 	return nil
 }

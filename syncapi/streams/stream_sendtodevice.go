@@ -49,7 +49,7 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 		// Add the updates into the sync response.
 		for _, event := range events {
 			// skip ignored user events
-			if _, ok := req.IgnoredUsers[event.Sender]; ok {
+			if _, ok := req.IgnoredUsers.List[event.Sender]; ok {
 				continue
 			}
 			req.Response.ToDevice.Events = append(req.Response.ToDevice.Events, event.SendToDeviceEvent)

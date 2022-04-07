@@ -22,7 +22,7 @@ type SyncRequest struct {
 	// Updated by the PDU stream.
 	Rooms map[string]string
 	// Updated by the PDU stream.
-	IgnoredUsers map[string]interface{} `json:"ignored_users"`
+	IgnoredUsers IgnoredUsers
 }
 
 type StreamProvider interface {

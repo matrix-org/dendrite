@@ -395,10 +395,6 @@ func (s *OutputStreamEventConsumer) notifyLocal(ctx context.Context, event *goma
 	return nil
 }
 
-type ignoredUsers struct {
-	List map[string]interface{} `json:"ignored_users"`
-}
-
 // evaluatePushRules fetches and evaluates the push rules of a local
 // user. Returns actions (including dont_notify).
 func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int) ([]*pushrules.Action, error) {
@@ -414,7 +410,7 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 		return nil, err
 	}
 	if data != nil {
-		ignored := ignoredUsers{}
+		ignored := types.IgnoredUsers{}
 		err = json.Unmarshal(data, &ignored)
 		if err != nil {
 			return nil, err

@@ -43,7 +43,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 			typingUsers := make([]string, 0, len(users))
 			for i := range users {
 				// skip ignored user events
-				if _, ok := req.IgnoredUsers[users[i]]; !ok {
+				if _, ok := req.IgnoredUsers.List[users[i]]; !ok {
 					typingUsers = append(typingUsers, users[i])
 				}
 			}

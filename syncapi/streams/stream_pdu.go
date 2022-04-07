@@ -2,7 +2,7 @@ package streams
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
 	"sync"
 	"time"
 
@@ -415,23 +415,16 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 // addIgnoredUsersToFilter adds ignored users to the eventfilter and
 // the syncreq itself for further use in streams.
 func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
-	accountData := userapi.QueryAccountDataResponse{}
-	err := p.userAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
-		UserID: req.Device.UserID, RoomID: "", DataType: "m.ignored_user_list",
-	}, &accountData)
+	ignores, err := p.DB.SelectIgnores(ctx, req.Device.UserID)
 	if err != nil {
-		req.Log.WithError(err).Error("unable to query ignored users")
+		if err == sql.ErrNoRows {
+			return nil
+		}
 		return err
 	}
-	if data, ok := accountData.GlobalAccountData["m.ignored_user_list"]; ok {
-		err = json.Unmarshal(data, &req)
-		if err != nil {
-			req.Log.WithError(err).Error("unable to parse json")
-			return err
-		}
-		for userID := range req.IgnoredUsers {
-			eventFilter.NotSenders = append(eventFilter.NotSenders, userID)
-		}
+	req.IgnoredUsers = *ignores
+	for userID := range ignores.List {
+		eventFilter.NotSenders = append(eventFilter.NotSenders, userID)
 	}
 	return nil
 }

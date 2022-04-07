@@ -510,3 +510,7 @@ type OutputSendToDeviceEvent struct {
 	DeviceID string `json:"device_id"`
 	gomatrixserverlib.SendToDeviceEvent
 }
+
+type IgnoredUsers struct {
+	List map[string]interface{} `json:"ignored_users"`
+}

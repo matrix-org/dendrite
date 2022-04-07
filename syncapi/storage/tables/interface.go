@@ -182,3 +182,8 @@ type NotificationData interface {
 	SelectUserUnreadCounts(ctx context.Context, userID string, fromExcl, toIncl types.StreamPosition) (map[string]*eventutil.NotificationData, error)
 	SelectMaxID(ctx context.Context) (int64, error)
 }
+
+type Ignores interface {
+	SelectIgnores(ctx context.Context, userID string) (*types.IgnoredUsers, error)
+	UpsertIgnores(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
+}

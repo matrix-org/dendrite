@@ -55,7 +55,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	receiptsByRoom := make(map[string][]types.OutputReceiptEvent)
 	for _, receipt := range receipts {
 		// skip ignored user events
-		if _, ok := req.IgnoredUsers[receipt.UserID]; ok {
+		if _, ok := req.IgnoredUsers.List[receipt.UserID]; ok {
 			continue
 		}
 		receiptsByRoom[receipt.RoomID] = append(receiptsByRoom[receipt.RoomID], receipt)
