@@ -62,6 +62,17 @@ global:
     - matrix.org
     - vector.im
 
+  # Disables federation. Dendrite will not be able to make any outbound HTTP requests
+  # to other servers and the federation API will not be exposed.
+  disable_federation: false
+
+  # Configures the handling of presence events.
+  presence:
+    # Whether inbound presence events are allowed, e.g. receiving presence events from other servers
+    enable_inbound: false
+    # Whether outbound presence events are allowed, e.g. sending presence events to other servers
+    enable_outbound: false
+
   # Configuration for NATS JetStream
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an

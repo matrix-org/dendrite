@@ -104,6 +104,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	presence, err := NewSqlitePresenceTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -126,6 +130,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Memberships:         memberships,
 		NotificationData:    notificationData,
 		Ignores:             ignores,
+		Presence:            presence,
 	}
 	return nil
 }

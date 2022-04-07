@@ -43,20 +43,34 @@ type Notifier struct {
 	userDeviceStreams map[string]map[string]*UserDeviceStream
 	// The last time we cleaned out stale entries from the userStreams map
 	lastCleanUpTime time.Time
+	// Protects roomIDToJoinedUsers and roomIDToPeekingDevices
+	mapLock *sync.RWMutex
+	// This map is reused to prevent allocations and GC pressure in SharedUsers.
+	_sharedUsers map[string]struct{}
 }
 
 // NewNotifier creates a new notifier set to the given sync position.
 // In order for this to be of any use, the Notifier needs to be told all rooms and
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
-func NewNotifier(currPos types.StreamingToken) *Notifier {
+func NewNotifier() *Notifier {
 	return &Notifier{
-		currPos:                currPos,
 		roomIDToJoinedUsers:    make(map[string]userIDSet),
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
 		streamLock:             &sync.Mutex{},
+		mapLock:                &sync.RWMutex{},
 		lastCleanUpTime:        time.Now(),
+		_sharedUsers:           map[string]struct{}{},
 	}
+}
+
+// SetCurrentPosition sets the current streaming positions.
+// This must be called directly after NewNotifier and initialising the streams.
+func (n *Notifier) SetCurrentPosition(currPos types.StreamingToken) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.currPos = currPos
 }
 
 // OnNewEvent is called when a new event is received from the room server. Must only be
@@ -83,7 +97,7 @@ func (n *Notifier) OnNewEvent(
 
 	if ev != nil {
 		// Map this event's room_id to a list of joined users, and wake them up.
-		usersToNotify := n.joinedUsers(ev.RoomID())
+		usersToNotify := n.JoinedUsers(ev.RoomID())
 		// Map this event's room_id to a list of peeking devices, and wake them up.
 		peekingDevicesToNotify := n.PeekingDevices(ev.RoomID())
 		// If this is an invite, also add in the invitee to this list.
@@ -114,7 +128,7 @@ func (n *Notifier) OnNewEvent(
 
 		n.wakeupUsers(usersToNotify, peekingDevicesToNotify, n.currPos)
 	} else if roomID != "" {
-		n.wakeupUsers(n.joinedUsers(roomID), n.PeekingDevices(roomID), n.currPos)
+		n.wakeupUsers(n.JoinedUsers(roomID), n.PeekingDevices(roomID), n.currPos)
 	} else if len(userIDs) > 0 {
 		n.wakeupUsers(userIDs, nil, n.currPos)
 	} else {
@@ -182,7 +196,7 @@ func (n *Notifier) OnNewTyping(
 	defer n.streamLock.Unlock()
 
 	n.currPos.ApplyUpdates(posUpdate)
-	n.wakeupUsers(n.joinedUsers(roomID), nil, n.currPos)
+	n.wakeupUsers(n.JoinedUsers(roomID), nil, n.currPos)
 }
 
 // OnNewReceipt updates the current position
@@ -194,7 +208,7 @@ func (n *Notifier) OnNewReceipt(
 	defer n.streamLock.Unlock()
 
 	n.currPos.ApplyUpdates(posUpdate)
-	n.wakeupUsers(n.joinedUsers(roomID), nil, n.currPos)
+	n.wakeupUsers(n.JoinedUsers(roomID), nil, n.currPos)
 }
 
 func (n *Notifier) OnNewKeyChange(
@@ -228,6 +242,53 @@ func (n *Notifier) OnNewNotificationData(
 	n.wakeupUsers([]string{userID}, nil, n.currPos)
 }
 
+func (n *Notifier) OnNewPresence(
+	posUpdate types.StreamingToken, userID string,
+) {
+	n.streamLock.Lock()
+	defer n.streamLock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
+	sharedUsers := n.SharedUsers(userID)
+	sharedUsers = append(sharedUsers, userID)
+
+	n.wakeupUsers(sharedUsers, nil, n.currPos)
+}
+
+func (n *Notifier) SharedUsers(userID string) []string {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
+	n._sharedUsers[userID] = struct{}{}
+	for roomID, users := range n.roomIDToJoinedUsers {
+		if _, ok := users[userID]; !ok {
+			continue
+		}
+		for _, userID := range n.JoinedUsers(roomID) {
+			n._sharedUsers[userID] = struct{}{}
+		}
+	}
+	sharedUsers := make([]string, 0, len(n._sharedUsers)+1)
+	for userID := range n._sharedUsers {
+		sharedUsers = append(sharedUsers, userID)
+		delete(n._sharedUsers, userID)
+	}
+	return sharedUsers
+}
+
+func (n *Notifier) IsSharedUser(userA, userB string) bool {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
+	var okA, okB bool
+	for _, users := range n.roomIDToJoinedUsers {
+		_, okA = users[userA]
+		_, okB = users[userB]
+		if okA && okB {
+			return true
+		}
+	}
+	return false
+}
+
 // GetListener returns a UserStreamListener that can be used to wait for
 // updates for a user. Must be closed.
 // notify for anything before sincePos
@@ -250,6 +311,8 @@ func (n *Notifier) GetListener(req types.SyncRequest) UserDeviceStreamListener {
 
 // Load the membership states required to notify users correctly.
 func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
+	n.mapLock.Lock()
+	defer n.mapLock.Unlock()
 	roomToUsers, err := db.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err
@@ -280,7 +343,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	// This is just the bulk form of addJoinedUser
 	for roomID, userIDs := range roomIDToUserIDs {
 		if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-			n.roomIDToJoinedUsers[roomID] = make(userIDSet)
+			n.roomIDToJoinedUsers[roomID] = make(userIDSet, len(userIDs))
 		}
 		for _, userID := range userIDs {
 			n.roomIDToJoinedUsers[roomID].add(userID)
@@ -295,7 +358,7 @@ func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]types.P
 	// This is just the bulk form of addPeekingDevice
 	for roomID, peekingDevices := range roomIDToPeekingDevices {
 		if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
-			n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
+			n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet, len(peekingDevices))
 		}
 		for _, peekingDevice := range peekingDevices {
 			n.roomIDToPeekingDevices[roomID].add(peekingDevice)
@@ -368,7 +431,7 @@ func (n *Notifier) fetchUserStreams(userID string) []*UserDeviceStream {
 	if !ok {
 		return []*UserDeviceStream{}
 	}
-	streams := []*UserDeviceStream{}
+	streams := make([]*UserDeviceStream, 0, len(user))
 	for _, stream := range user {
 		streams = append(streams, stream)
 	}
@@ -377,6 +440,8 @@ func (n *Notifier) fetchUserStreams(userID string) []*UserDeviceStream {
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) addJoinedUser(roomID, userID string) {
+	n.mapLock.Lock()
+	defer n.mapLock.Unlock()
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
 		n.roomIDToJoinedUsers[roomID] = make(userIDSet)
 	}
@@ -385,6 +450,8 @@ func (n *Notifier) addJoinedUser(roomID, userID string) {
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) removeJoinedUser(roomID, userID string) {
+	n.mapLock.Lock()
+	defer n.mapLock.Unlock()
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
 		n.roomIDToJoinedUsers[roomID] = make(userIDSet)
 	}
@@ -392,7 +459,9 @@ func (n *Notifier) removeJoinedUser(roomID, userID string) {
 }
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
-func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
+func (n *Notifier) JoinedUsers(roomID string) (userIDs []string) {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
 		return
 	}
@@ -401,6 +470,8 @@ func (n *Notifier) joinedUsers(roomID string) (userIDs []string) {
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
+	n.mapLock.Lock()
+	defer n.mapLock.Unlock()
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
@@ -410,6 +481,8 @@ func (n *Notifier) addPeekingDevice(roomID, userID, deviceID string) {
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 // nolint:unused
 func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
+	n.mapLock.Lock()
+	defer n.mapLock.Unlock()
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		n.roomIDToPeekingDevices[roomID] = make(peekingDeviceSet)
 	}
@@ -419,6 +492,8 @@ func (n *Notifier) removePeekingDevice(roomID, userID, deviceID string) {
 
 // Not thread-safe: must be called on the OnNewEvent goroutine only
 func (n *Notifier) PeekingDevices(roomID string) (peekingDevices []types.PeekingDevice) {
+	n.mapLock.RLock()
+	defer n.mapLock.RUnlock()
 	if _, ok := n.roomIDToPeekingDevices[roomID]; !ok {
 		return
 	}
@@ -454,10 +529,10 @@ func (n *Notifier) removeEmptyUserStreams() {
 }
 
 // A string set, mainly existing for improving clarity of structs in this file.
-type userIDSet map[string]bool
+type userIDSet map[string]struct{}
 
 func (s userIDSet) add(str string) {
-	s[str] = true
+	s[str] = struct{}{}
 }
 
 func (s userIDSet) remove(str string) {
@@ -465,6 +540,7 @@ func (s userIDSet) remove(str string) {
 }
 
 func (s userIDSet) values() (vals []string) {
+	vals = make([]string, 0, len(s))
 	for str := range s {
 		vals = append(vals, str)
 	}
@@ -473,10 +549,10 @@ func (s userIDSet) values() (vals []string) {
 
 // A set of PeekingDevices, similar to userIDSet
 
-type peekingDeviceSet map[types.PeekingDevice]bool
+type peekingDeviceSet map[types.PeekingDevice]struct{}
 
 func (s peekingDeviceSet) add(d types.PeekingDevice) {
-	s[d] = true
+	s[d] = struct{}{}
 }
 
 // nolint:unused
@@ -485,6 +561,7 @@ func (s peekingDeviceSet) remove(d types.PeekingDevice) {
 }
 
 func (s peekingDeviceSet) values() (vals []types.PeekingDevice) {
+	vals = make([]types.PeekingDevice, 0, len(s))
 	for d := range s {
 		vals = append(vals, d)
 	}

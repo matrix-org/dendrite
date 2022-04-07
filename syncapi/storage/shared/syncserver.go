@@ -49,6 +49,7 @@ type Database struct {
 	Memberships         tables.Memberships
 	NotificationData    tables.NotificationData
 	Ignores             tables.Ignores
+	Presence            tables.Presence
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -1010,4 +1011,20 @@ func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.Ig
 
 func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
 	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
+}
+
+func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+	return s.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
+}
+
+func (s *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceForUser(ctx, nil, userID)
+}
+
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceAfter(ctx, nil, after)
+}
+
+func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return s.Presence.GetMaxPresenceID(ctx, nil)
 }

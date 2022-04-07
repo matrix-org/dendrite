@@ -107,7 +107,8 @@ func mustEqualPositions(t *testing.T, got, want types.StreamingToken) {
 
 // Test that the current position is returned if a request is already behind.
 func TestImmediateNotification(t *testing.T) {
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	pos, err := waitForEvents(n, newTestSyncRequest(alice, aliceDev, syncPositionVeryOld))
 	if err != nil {
 		t.Fatalf("TestImmediateNotification error: %s", err)
@@ -117,7 +118,8 @@ func TestImmediateNotification(t *testing.T) {
 
 // Test that new events to a joined room unblocks the request.
 func TestNewEventAndJoinedToRoom(t *testing.T) {
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: {alice, bob},
 	})
@@ -142,7 +144,8 @@ func TestNewEventAndJoinedToRoom(t *testing.T) {
 }
 
 func TestCorrectStream(t *testing.T) {
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	stream := lockedFetchUserStream(n, bob, bobDev)
 	if stream.UserID != bob {
 		t.Fatalf("expected user %q, got %q", bob, stream.UserID)
@@ -153,7 +156,8 @@ func TestCorrectStream(t *testing.T) {
 }
 
 func TestCorrectStreamWakeup(t *testing.T) {
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	awoken := make(chan string)
 
 	streamone := lockedFetchUserStream(n, alice, "one")
@@ -180,7 +184,8 @@ func TestCorrectStreamWakeup(t *testing.T) {
 
 // Test that an invite unblocks the request
 func TestNewInviteEventForUser(t *testing.T) {
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: {alice, bob},
 	})
@@ -236,7 +241,8 @@ func TestEDUWakeup(t *testing.T) {
 
 // Test that all blocked requests get woken up on a new event.
 func TestMultipleRequestWakeup(t *testing.T) {
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: {alice, bob},
 	})
@@ -272,7 +278,8 @@ func TestMultipleRequestWakeup(t *testing.T) {
 func TestNewEventAndWasPreviouslyJoinedToRoom(t *testing.T) {
 	// listen as bob. Make bob leave room. Make alice send event to room.
 	// Make sure alice gets woken up only and not bob as well.
-	n := NewNotifier(syncPositionBefore)
+	n := NewNotifier()
+	n.SetCurrentPosition(syncPositionBefore)
 	n.setUsersJoinedToRooms(map[string][]string{
 		roomID: {alice, bob},
 	})

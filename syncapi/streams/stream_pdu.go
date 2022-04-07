@@ -415,7 +415,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 // addIgnoredUsersToFilter adds ignored users to the eventfilter and
 // the syncreq itself for further use in streams.
 func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
-	ignores, err := p.DB.SelectIgnores(ctx, req.Device.UserID)
+	ignores, err := p.DB.IgnoresForUser(ctx, req.Device.UserID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil
