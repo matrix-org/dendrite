@@ -39,7 +39,8 @@ func getMemoryStats(p *phoneHomeStats) error {
 	if usedCPUTime == 0 || newData.timestamp == oldUsage.timestamp {
 		p.stats["cpu_average"] = 0
 	} else {
-		p.stats["cpu_average"] = usedCPUTime / (newData.timestamp - oldUsage.timestamp) * 100
+		// conversion to int64 required for GOARCH=386
+		p.stats["cpu_average"] = int64(usedCPUTime) / (newData.timestamp - oldUsage.timestamp) * 100
 	}
 	p.stats["memory_rss"] = newUsage.Maxrss
 	return nil
