@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/util"
@@ -126,8 +127,14 @@ func SaveAccountData(
 		return util.ErrorResponse(err)
 	}
 
+	var ignoredUsers *types.IgnoredUsers
+	if dataType == "m.ignored_user_list" {
+		ignoredUsers = &types.IgnoredUsers{}
+		_ = json.Unmarshal(body, ignoredUsers)
+	}
+
 	// TODO: user API should do this since it's account data
-	if err := syncProducer.SendData(userID, roomID, dataType, nil); err != nil {
+	if err := syncProducer.SendData(userID, roomID, dataType, nil, ignoredUsers); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
 		return jsonerror.InternalServerError()
 	}
@@ -184,7 +191,7 @@ func SaveReadMarker(
 		return util.ErrorResponse(err)
 	}
 
-	if err := syncProducer.SendData(device.UserID, roomID, "m.fully_read", &r); err != nil {
+	if err := syncProducer.SendData(device.UserID, roomID, "m.fully_read", &r, nil); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
 		return jsonerror.InternalServerError()
 	}

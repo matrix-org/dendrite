@@ -100,6 +100,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	ignores, err := NewSqliteIgnoresTable(d.db)
+	if err != nil {
+		return err
+	}
 	presence, err := NewSqlitePresenceTable(d.db, &d.streamID)
 	if err != nil {
 		return err
@@ -125,6 +129,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Receipts:            receipts,
 		Memberships:         memberships,
 		NotificationData:    notificationData,
+		Ignores:             ignores,
 		Presence:            presence,
 	}
 	return nil

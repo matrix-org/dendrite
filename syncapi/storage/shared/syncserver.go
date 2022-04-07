@@ -48,6 +48,7 @@ type Database struct {
 	Receipts            tables.Receipts
 	Memberships         tables.Memberships
 	NotificationData    tables.NotificationData
+	Ignores             tables.Ignores
 	Presence            tables.Presence
 }
 
@@ -1002,6 +1003,14 @@ func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID 
 }
 func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
+}
+
+func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
+	return s.Ignores.SelectIgnores(ctx, userID)
+}
+
+func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
+	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
 }
 
 func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
