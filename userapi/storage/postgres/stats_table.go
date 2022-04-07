@@ -303,10 +303,10 @@ func (s *statsStatements) r30Users(ctx context.Context, txn *sql.Tx) (map[string
 		if err = rows.Scan(&platform, &count); err != nil {
 			return nil, err
 		}
-		result["all"] += count
 		if platform == "unknown" {
 			continue
 		}
+		result["all"] += count
 		result[platform] = count
 	}
 
@@ -321,13 +321,13 @@ R30UsersV2 counts the number of 30 day retained users, defined as users that:
 func (s *statsStatements) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.countR30UsersV2Stmt)
 	sixtyDaysAgo := time.Now().AddDate(0, 0, -60)
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+	diff := time.Hour * 24 * 30
 	tomorrow := time.Now().Add(time.Hour * 24)
 
 	rows, err := stmt.QueryContext(ctx,
 		gomatrixserverlib.AsTimestamp(sixtyDaysAgo),
 		gomatrixserverlib.AsTimestamp(tomorrow),
-		gomatrixserverlib.AsTimestamp(thirtyDaysAgo),
+		diff.Milliseconds(),
 	)
 	if err != nil {
 		return nil, err
@@ -347,10 +347,10 @@ func (s *statsStatements) r30UsersV2(ctx context.Context, txn *sql.Tx) (map[stri
 		if err = rows.Scan(&platform, &count); err != nil {
 			return nil, err
 		}
-		result["all"] += count
-		if platform == "unknown" {
+		if _, ok := result[platform]; !ok {
 			continue
 		}
+		result["all"] += count
 		result[platform] = count
 	}
 
