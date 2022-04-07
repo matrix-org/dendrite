@@ -39,7 +39,10 @@ func createLocalDB(dbName string) string {
 		createDB.Stdout = os.Stdout
 		createDB.Stderr = os.Stderr
 	}
-	createDB.Run()
+	err := createDB.Run()
+	if err != nil && !Quiet {
+		fmt.Println("createLocalDB returned error:", err)
+	}
 	return dbName
 }
 
@@ -105,7 +108,7 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 		if err != nil {
 			t.Fatalf("failed to cleanup postgres db '%s': %s", connStr, err)
 		}
-		db.Close()
+		_ = db.Close()
 	}
 }
 
