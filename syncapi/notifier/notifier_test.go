@@ -175,7 +175,7 @@ func TestCorrectStreamWakeup(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	wake := "two"
-	n.wakeupUserDevice(alice, []string{wake}, syncPositionAfter)
+	n._wakeupUserDevice(alice, []string{wake}, syncPositionAfter)
 
 	if result := <-awoken; result != wake {
 		t.Fatalf("expected to wake %q, got %q", wake, result)
@@ -359,10 +359,10 @@ func waitForBlocking(s *UserDeviceStream, numBlocking uint) {
 // lockedFetchUserStream invokes Notifier.fetchUserStream, respecting Notifier.streamLock.
 // A new stream is made if it doesn't exist already.
 func lockedFetchUserStream(n *Notifier, userID, deviceID string) *UserDeviceStream {
-	n.streamLock.Lock()
-	defer n.streamLock.Unlock()
+	n.lock.Lock()
+	defer n.lock.Unlock()
 
-	return n.fetchUserDeviceStream(userID, deviceID, true)
+	return n._fetchUserDeviceStream(userID, deviceID, true)
 }
 
 func newTestSyncRequest(userID, deviceID string, since types.StreamingToken) types.SyncRequest {

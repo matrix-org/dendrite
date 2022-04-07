@@ -1,5 +1,11 @@
 # Changelog
 
+## Dendrite 0.8.1 (2022-04-07)
+
+### Fixes
+
+* A bug which could result in the sync API deadlocking due to lock contention in the notifier has been fixed
+
 ## Dendrite 0.8.0 (2022-04-07)
 
 ### Features
