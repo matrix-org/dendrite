@@ -7,7 +7,8 @@
 * Support for presence has been added
   * Presence is not enabled by default
   * The `global.presence.enable_inbound` and `global.presence.enable_outbound` configuration options allow configuring inbound and outbound presence separately
-* Support for room upgrades via the `/room/{roomID}/upgrade` endpoint has been added
+* Support for room upgrades via the `/room/{roomID}/upgrade` endpoint has been added (contributed by [DavidSpenler](https://github.com/DavidSpenler), [alexkursell](https://github.com/alexkursell))
+* Support for ignoring users has been added
 * Joined and invite user counts are now sent in the `/sync` room summaries
 * Queued federation and stale device list updates will now be staggered at startup over an up-to 2 minute warm-up period, rather than happening all at once
 * Memory pressure created by the sync notifier has been reduced
