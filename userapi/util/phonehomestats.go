@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -38,7 +37,7 @@ type phoneHomeStats struct {
 	serverName gomatrixserverlib.ServerName
 	startTime  time.Time
 	cfg        *config.Dendrite
-	db         storage.Database
+	db         storage.Statistics
 	isMonolith bool
 	client     *http.Client
 }
@@ -48,13 +47,13 @@ type timestampToRUUsage struct {
 	usage     syscall.Rusage
 }
 
-func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, userDB storage.Database) {
+func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB storage.Statistics) {
 
 	p := phoneHomeStats{
 		startTime:  startTime,
 		serverName: cfg.Global.ServerName,
 		cfg:        cfg,
-		db:         userDB,
+		db:         statsDB,
 		isMonolith: cfg.IsMonolith,
 		client: &http.Client{
 			Timeout: time.Second * 30,
@@ -91,8 +90,7 @@ func (p *phoneHomeStats) collect() {
 	// cpu and memory usage information
 	err := getMemoryStats(p)
 	if err != nil {
-		logrus.WithError(err).Error("unable to get memory/cpu stats")
-		return
+		logrus.WithError(err).Error("unable to get memory/cpu stats, using defaults")
 	}
 
 	// configuration information
@@ -109,35 +107,6 @@ func (p *phoneHomeStats) collect() {
 		p.stats["log_level"] = "info"
 	}
 
-	// database configuration
-	db, err := sqlutil.Open(&p.cfg.UserAPI.AccountDatabase)
-	if err != nil {
-		logrus.WithError(err).Error("unable to connect to database")
-		return
-	}
-	defer internal.CloseAndLogIfError(context.Background(), db, "phoneHomeStats.collect(): failed to close database connection")
-
-	dbVersion := "unknown"
-	dbEngine := "unknown"
-	switch {
-	case p.cfg.UserAPI.AccountDatabase.ConnectionString.IsSQLite():
-		dbEngine = "SQLite"
-		row := db.QueryRow("select sqlite_version();")
-		if err = row.Scan(&dbVersion); err != nil {
-			logrus.WithError(err).Error("unable to query version")
-			return
-		}
-	case p.cfg.UserAPI.AccountDatabase.ConnectionString.IsPostgres():
-		dbEngine = "Postgres"
-		row := db.QueryRow("SHOW server_version;")
-		if err = row.Scan(&dbVersion); err != nil {
-			logrus.WithError(err).Error("unable to query version")
-			return
-		}
-	}
-	p.stats["database_engine"] = dbEngine
-	p.stats["database_server_version"] = dbVersion
-
 	// message and room stats
 	// TODO: Find a solution to actually set these values
 	p.stats["total_room_count"] = 0
@@ -146,57 +115,24 @@ func (p *phoneHomeStats) collect() {
 	p.stats["daily_e2ee_messages"] = 0
 	p.stats["daily_sent_e2ee_messages"] = 0
 
-	count, err := p.db.AllUsers(ctx)
+	// user stats and DB engine
+	userStats, db, err := p.db.UserStatistics(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("unable to query AllUsers")
-		return
+		logrus.WithError(err).Error("unable to query userstats, using default values")
 	}
-	p.stats["total_users"] = count
-
-	count, err = p.db.NonBridgedUsers(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("unable to query NonBridgedUsers")
-		return
-	}
-	p.stats["total_nonbridged_users"] = count
-
-	count, err = p.db.DailyUsers(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("unable to query DailyUsers")
-		return
-	}
-	p.stats["daily_active_users"] = count
-
-	count, err = p.db.MonthlyUsers(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("unable to query MonthlyUsers")
-		return
-	}
-	p.stats["monthly_active_users"] = count
-
-	res, err := p.db.RegisteredUserByType(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("unable to query RegisteredUserByType")
-		return
-	}
-	for t, c := range res {
+	p.stats["database_engine"] = db.Engine
+	p.stats["database_server_version"] = db.Version
+	p.stats["total_users"] = userStats.AllUsers
+	p.stats["total_nonbridged_users"] = userStats.NonBridgedUsers
+	p.stats["daily_active_users"] = userStats.DailyUsers
+	p.stats["monthly_active_users"] = userStats.MonthlyUsers
+	for t, c := range userStats.RegisteredUsersByType {
 		p.stats["daily_user_type_"+t] = c
 	}
-
-	res, err = p.db.R30Users(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("unable to query R30Users")
-		return
-	}
-	for t, c := range res {
+	for t, c := range userStats.R30Users {
 		p.stats["r30_users_"+t] = c
 	}
-	res, err = p.db.R30UsersV2(ctx)
-	if err != nil {
-		logrus.WithError(err).Error("unable to query R30UsersV2")
-		return
-	}
-	for t, c := range res {
+	for t, c := range userStats.R30UsersV2 {
 		p.stats["r30v2_users_"+t] = c
 	}
 

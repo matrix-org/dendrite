@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
@@ -773,24 +774,7 @@ func (d *Database) RemovePushers(
 	})
 }
 
-func (d *Database) AllUsers(ctx context.Context) (result int64, err error) {
-	return d.Stats.AllUsers(ctx, nil)
-}
-func (d *Database) NonBridgedUsers(ctx context.Context) (result int64, err error) {
-	return d.Stats.NonBridgedUsers(ctx, nil)
-}
-func (d *Database) RegisteredUserByType(ctx context.Context) (map[string]int64, error) {
-	return d.Stats.RegisteredUserByType(ctx, nil)
-}
-func (d *Database) DailyUsers(ctx context.Context) (result int64, err error) {
-	return d.Stats.DailyUsers(ctx, nil)
-}
-func (d *Database) MonthlyUsers(ctx context.Context) (result int64, err error) {
-	return d.Stats.MonthlyUsers(ctx, nil)
-}
-func (d *Database) R30Users(ctx context.Context) (map[string]int64, error) {
-	return d.Stats.R30Users(ctx, nil)
-}
-func (d *Database) R30UsersV2(ctx context.Context) (map[string]int64, error) {
-	return d.Stats.R30UsersV2(ctx, nil)
+// UserStatistics populates types.UserStatistics, used in reports.
+func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error) {
+	return d.Stats.UserStatistics(ctx, nil)
 }

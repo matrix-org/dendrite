@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/dendrite/userapi/types"
 )
 
 type Profile interface {
@@ -34,6 +35,7 @@ type Profile interface {
 
 type Database interface {
 	Profile
+	Statistics
 	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
@@ -107,14 +109,10 @@ type Database interface {
 	GetPushers(ctx context.Context, localpart string) ([]api.Pusher, error)
 	RemovePusher(ctx context.Context, appid, pushkey, localpart string) error
 	RemovePushers(ctx context.Context, appid, pushkey string) error
+}
 
-	AllUsers(ctx context.Context) (result int64, err error)
-	NonBridgedUsers(ctx context.Context) (result int64, err error)
-	RegisteredUserByType(ctx context.Context) (map[string]int64, error)
-	DailyUsers(ctx context.Context) (result int64, err error)
-	MonthlyUsers(ctx context.Context) (result int64, err error)
-	R30Users(ctx context.Context) (map[string]int64, error)
-	R30UsersV2(ctx context.Context) (map[string]int64, error)
+type Statistics interface {
+	UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

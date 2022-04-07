@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -113,13 +114,7 @@ type NotificationTable interface {
 }
 
 type StatsTable interface {
-	AllUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
-	NonBridgedUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
-	RegisteredUserByType(ctx context.Context, txn *sql.Tx) (map[string]int64, error)
-	DailyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
-	MonthlyUsers(ctx context.Context, txn *sql.Tx) (result int64, err error)
-	R30Users(ctx context.Context, txn *sql.Tx) (map[string]int64, error)
-	R30UsersV2(ctx context.Context, txn *sql.Tx) (map[string]int64, error)
+	UserStatistics(ctx context.Context, txn *sql.Tx) (*types.UserStatistics, *types.DatabaseEngine, error)
 }
 
 type NotificationFilter uint32
