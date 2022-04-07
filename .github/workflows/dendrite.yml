@@ -116,7 +116,7 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: syncv3
+          POSTGRES_DB: dendrite
 
   # build Dendrite for linux with different architectures and go versions
   build:
