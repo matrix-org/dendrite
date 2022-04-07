@@ -32,6 +32,7 @@ func NewSyncStreamProviders(
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
+			userAPI:        userAPI,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
