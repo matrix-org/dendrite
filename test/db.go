@@ -56,7 +56,7 @@ func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	if err != nil {
 		t.Fatalf("failed to CREATE DATABASE: %s", err)
 	}
-	db.Close()
+	_ = db.Close()
 }
 
 func currentUser() string {
