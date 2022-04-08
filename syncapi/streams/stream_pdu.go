@@ -423,7 +423,7 @@ func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *ty
 		return err
 	}
 	req.IgnoredUsers = *ignores
-	var userList []string = nil
+	userList := make([]string, 0, len(ignores.List))
 	for userID := range ignores.List {
 		userList = append(userList, userID)
 	}

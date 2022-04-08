@@ -61,9 +61,7 @@ func Context(
 		}
 	}
 	if filter.Rooms != nil {
-		roomsFilter := *filter.Rooms
-		roomsFilter = append(roomsFilter, roomID)
-		filter.Rooms = &roomsFilter
+		*filter.Rooms = append(*filter.Rooms, roomID)
 	}
 
 	ctx := req.Context()
