@@ -165,9 +165,9 @@ func TestCorrectStreamWakeup(t *testing.T) {
 
 	go func() {
 		select {
-		case <-streamone.signalChannel:
+		case <-streamone.ch():
 			awoken <- "one"
-		case <-streamtwo.signalChannel:
+		case <-streamtwo.ch():
 			awoken <- "two"
 		}
 	}()

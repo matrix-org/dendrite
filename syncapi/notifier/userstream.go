@@ -118,6 +118,12 @@ func (s *UserDeviceStream) TimeOfLastNonEmpty() time.Time {
 	return s.timeOfLastChannel
 }
 
+func (s *UserDeviceStream) ch() <-chan struct{} {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.signalChannel
+}
+
 // GetSyncPosition returns last sync position which the UserStream was
 // notified about
 func (s *UserDeviceStreamListener) GetSyncPosition() types.StreamingToken {
