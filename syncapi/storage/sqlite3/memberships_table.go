@@ -18,7 +18,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -56,12 +55,6 @@ const upsertMembershipSQL = "" +
 	" VALUES ($1, $2, $3, $4, $5, $6)" +
 	" ON CONFLICT (room_id, user_id, membership)" +
 	" DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
-
-const selectMembershipSQL = "" +
-	"SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
-	" WHERE room_id = $1 AND user_id = $2 AND membership IN ($3)" +
-	" ORDER BY stream_pos DESC" +
-	" LIMIT 1"
 
 const selectMembershipCountSQL = "" +
 	"SELECT COUNT(*) FROM (" +
@@ -109,22 +102,6 @@ func (s *membershipsStatements) UpsertMembership(
 		topologicalPos,
 	)
 	return err
-}
-
-func (s *membershipsStatements) SelectMembership(
-	ctx context.Context, txn *sql.Tx, roomID, userID, memberships []string,
-) (eventID string, streamPos, topologyPos types.StreamPosition, err error) {
-	params := []interface{}{roomID, userID}
-	for _, membership := range memberships {
-		params = append(params, membership)
-	}
-	orig := strings.Replace(selectMembershipSQL, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
-	stmt, err := s.db.Prepare(orig)
-	if err != nil {
-		return "", 0, 0, err
-	}
-	err = sqlutil.TxStmt(txn, stmt).QueryRowContext(ctx, params...).Scan(&eventID, &streamPos, &topologyPos)
-	return
 }
 
 func (s *membershipsStatements) SelectMembershipCount(
