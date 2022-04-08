@@ -60,7 +60,11 @@ func Context(
 			Headers: nil,
 		}
 	}
-	filter.Rooms = append(filter.Rooms, roomID)
+	if filter.Rooms != nil {
+		roomsFilter := *filter.Rooms
+		roomsFilter = append(roomsFilter, roomID)
+		filter.Rooms = &roomsFilter
+	}
 
 	ctx := req.Context()
 	membershipRes := roomserver.QueryMembershipForUserResponse{}

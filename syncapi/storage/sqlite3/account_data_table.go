@@ -119,12 +119,12 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		// and positional parameters makes the query annoyingly hard to do, it's easier
 		// and clearer to do it in Go-land. If there are no filters for [not]types then
 		// this gets skipped.
-		for _, includeType := range accountDataFilterPart.Types {
+		for _, includeType := range *accountDataFilterPart.Types {
 			if includeType != dataType { // TODO: wildcard support
 				continue
 			}
 		}
-		for _, excludeType := range accountDataFilterPart.NotTypes {
+		for _, excludeType := range *accountDataFilterPart.NotTypes {
 			if excludeType == dataType { // TODO: wildcard support
 				continue
 			}
