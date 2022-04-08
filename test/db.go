@@ -23,6 +23,8 @@ import (
 	"os/exec"
 	"os/user"
 	"testing"
+
+	"github.com/lib/pq"
 )
 
 type DBType int
@@ -54,7 +56,14 @@ func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	}
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
 	if err != nil {
-		t.Fatalf("failed to CREATE DATABASE: %s", err)
+		pqErr, ok := err.(*pq.Error)
+		if !ok {
+			t.Fatalf("failed to CREATE DATABASE: %s", err)
+		}
+		// we ignore duplicate database error as we expect this
+		if pqErr.Code != "42P04" {
+			t.Fatalf("failed to CREATE DATABASE with code=%s msg=%s", pqErr.Code, pqErr.Message)
+		}
 	}
 	_, err = db.Exec(fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`, dbName, user))
 	if err != nil {
