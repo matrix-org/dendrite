@@ -64,11 +64,6 @@ const (
 	sessionIDLength   = 24
 )
 
-func init() {
-	// Register prometheus metrics. They must be registered to be exposed.
-	prometheus.MustRegister(amtRegUsers)
-}
-
 // sessionsDict keeps track of completed auth stages for each session.
 // It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {

@@ -74,12 +74,6 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal,
-	)
-}
-
 var inFlightTxnsPerOrigin sync.Map // transaction ID -> chan util.JSONResponse
 
 // Send implements /_matrix/federation/v1/send/{txnID}
