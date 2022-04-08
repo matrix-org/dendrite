@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -60,6 +61,8 @@ func Setup(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
+	prometheus.MustRegister(amtRegUsers, sendEventDuration)
+
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
 

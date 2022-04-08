@@ -67,6 +67,9 @@ func NewRequestPool(
 	streams *streams.Streams, notifier *notifier.Notifier,
 	producer PresencePublisher,
 ) *RequestPool {
+	prometheus.MustRegister(
+		activeSyncRequests, waitingSyncRequests,
+	)
 	rp := &RequestPool{
 		db:       db,
 		cfg:      cfg,
@@ -181,12 +184,6 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
 
 	rp.lastseen.Store(device.UserID+device.ID, time.Now())
-}
-
-func init() {
-	prometheus.MustRegister(
-		activeSyncRequests, waitingSyncRequests,
-	)
 }
 
 var activeSyncRequests = prometheus.NewGauge(
