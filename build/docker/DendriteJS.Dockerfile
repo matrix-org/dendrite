@@ -5,25 +5,25 @@
 # $ docker build -t dendritejs -f DendriteJS.Dockerfile .
 # $ docker run --rm -p 8888:80 dendritejs
 # Then visit http://localhost:8888
-FROM golang:1.14-alpine AS gobuild
+FROM golang:1.18-alpine AS gobuild
 
 # Download and build dendrite
 WORKDIR /build
 ADD https://github.com/matrix-org/dendrite/archive/main.tar.gz /build/main.tar.gz
 RUN tar xvfz main.tar.gz
 WORKDIR /build/dendrite-main
-RUN GOOS=js GOARCH=wasm go build -o main.wasm ./cmd/dendritejs
+RUN GOOS=js GOARCH=wasm go build -o main.wasm ./cmd/dendritejs-pinecone
 
 
 FROM node:14-stretch AS jsbuild
 # apparently some deps require python
-RUN apt-get update && apt-get -y install python
+RUN apt-get update && apt-get -y install python libpangocairo-1.0-0 libpango1.0-dev
 
 # Download riot-web and libp2p repos
 WORKDIR /build
-ADD https://github.com/matrix-org/go-http-js-libp2p/archive/main.tar.gz /build/libp2p.tar.gz
+ADD https://github.com/matrix-org/go-http-js-libp2p/archive/master.tar.gz /build/libp2p.tar.gz
 RUN tar xvfz libp2p.tar.gz
-ADD https://github.com/vector-im/element-web/archive/matthew/p2p.tar.gz /build/p2p.tar.gz
+ADD https://github.com/neilalexander/element-web/archive/matthew/p2p.tar.gz /build/p2p.tar.gz
 RUN tar xvfz p2p.tar.gz
 
 # Install deps for element-web, symlink in libp2p repo and build that too
