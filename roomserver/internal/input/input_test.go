@@ -2,6 +2,7 @@ package input_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -10,11 +11,25 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 )
 
+var js nats.JetStreamContext
+var jc *nats.Conn
+
+func TestMain(m *testing.M) {
+	var pc *process.ProcessContext
+	pc, js, jc = jetstream.PrepareForTests()
+	code := m.Run()
+	pc.ShutdownDendrite()
+	pc.WaitForComponentsToFinish()
+	os.Exit(code)
+}
+
 func TestSingleTransactionOnInput(t *testing.T) {
-	t.SkipNow() // this doesn't work even with postgres enabled due to nats client not being set and you can't easily make one.
 	deadline, _ := t.Deadline()
 	if max := time.Now().Add(time.Second * 3); deadline.After(max) {
 		deadline = max
@@ -50,7 +65,9 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		t.SkipNow()
 	}
 	inputter := &input.Inputer{
-		DB: db,
+		DB:         db,
+		JetStream:  js,
+		NATSClient: jc,
 	}
 	res := &api.InputRoomEventsResponse{}
 	inputter.InputRoomEvents(
