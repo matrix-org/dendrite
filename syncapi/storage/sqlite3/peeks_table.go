@@ -66,7 +66,7 @@ const selectMaxPeekIDSQL = "" +
 
 type peekStatements struct {
 	db                       *sql.DB
-	streamIDStatements       *streamIDStatements
+	streamIDStatements       *StreamIDStatements
 	insertPeekStmt           *sql.Stmt
 	deletePeekStmt           *sql.Stmt
 	deletePeeksStmt          *sql.Stmt
@@ -75,7 +75,7 @@ type peekStatements struct {
 	selectMaxPeekIDStmt      *sql.Stmt
 }
 
-func NewSqlitePeeksTable(db *sql.DB, streamID *streamIDStatements) (tables.Peeks, error) {
+func NewSqlitePeeksTable(db *sql.DB, streamID *StreamIDStatements) (tables.Peeks, error) {
 	_, err := db.Exec(peeksSchema)
 	if err != nil {
 		return nil, err

@@ -148,9 +148,9 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 	// is requested or not.
 	var stmt *sql.Stmt
 	if chronologicalOrder {
-		stmt = s.selectEventIDsInRangeASCStmt
+		stmt = sqlutil.TxStmt(txn, s.selectEventIDsInRangeASCStmt)
 	} else {
-		stmt = s.selectEventIDsInRangeDESCStmt
+		stmt = sqlutil.TxStmt(txn, s.selectEventIDsInRangeDESCStmt)
 	}
 
 	// Query the event IDs.
