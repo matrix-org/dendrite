@@ -35,6 +35,8 @@ func prepareWithFilters(
 			for _, v := range *senders {
 				params, offset = append(params, v), offset+1
 			}
+		} else {
+			query += ` AND sender = ""`
 		}
 	}
 	if notsenders != nil {
@@ -43,6 +45,8 @@ func prepareWithFilters(
 			for _, v := range *notsenders {
 				params, offset = append(params, v), offset+1
 			}
+		} else {
+			query += ` AND sender NOT = ""`
 		}
 	}
 	if types != nil {
@@ -51,6 +55,8 @@ func prepareWithFilters(
 			for _, v := range *types {
 				params, offset = append(params, v), offset+1
 			}
+		} else {
+			query += ` AND type = ""`
 		}
 	}
 	if nottypes != nil {
@@ -59,6 +65,8 @@ func prepareWithFilters(
 			for _, v := range *nottypes {
 				params, offset = append(params, v), offset+1
 			}
+		} else {
+			query += ` AND type NOT = ""`
 		}
 	}
 	if count := len(excludeEventIDs); count > 0 {
