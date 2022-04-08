@@ -220,7 +220,7 @@ func (r *Queryer) QueryMembershipsForRoom(
 	if request.Sender == "" {
 		var events []types.Event
 		var eventNIDs []types.EventNID
-		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
+		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.LocalOnly)
 		if err != nil {
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}

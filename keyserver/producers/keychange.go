@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 
-	eduapi "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/storage"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -70,10 +69,10 @@ func (p *KeyChange) ProduceKeyChanges(keys []api.DeviceMessage) error {
 	return nil
 }
 
-func (p *KeyChange) ProduceSigningKeyUpdate(key eduapi.CrossSigningKeyUpdate) error {
+func (p *KeyChange) ProduceSigningKeyUpdate(key api.CrossSigningKeyUpdate) error {
 	output := &api.DeviceMessage{
 		Type: api.TypeCrossSigningUpdate,
-		OutputCrossSigningKeyUpdate: &eduapi.OutputCrossSigningKeyUpdate{
+		OutputCrossSigningKeyUpdate: &api.OutputCrossSigningKeyUpdate{
 			CrossSigningKeyUpdate: key,
 		},
 	}

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -51,44 +50,6 @@ func init() {
 			}] = h
 		}
 	}
-}
-
-type testEDUProducer struct {
-	// this producer keeps track of calls to InputTypingEvent
-	invocations []eduAPI.InputTypingEventRequest
-}
-
-func (p *testEDUProducer) InputTypingEvent(
-	ctx context.Context,
-	request *eduAPI.InputTypingEventRequest,
-	response *eduAPI.InputTypingEventResponse,
-) error {
-	p.invocations = append(p.invocations, *request)
-	return nil
-}
-
-func (p *testEDUProducer) InputSendToDeviceEvent(
-	ctx context.Context,
-	request *eduAPI.InputSendToDeviceEventRequest,
-	response *eduAPI.InputSendToDeviceEventResponse,
-) error {
-	return nil
-}
-
-func (o *testEDUProducer) InputReceiptEvent(
-	ctx context.Context,
-	request *eduAPI.InputReceiptEventRequest,
-	response *eduAPI.InputReceiptEventResponse,
-) error {
-	return nil
-}
-
-func (o *testEDUProducer) InputCrossSigningKeyUpdate(
-	ctx context.Context,
-	request *eduAPI.InputCrossSigningKeyUpdateRequest,
-	response *eduAPI.InputCrossSigningKeyUpdateResponse,
-) error {
-	return nil
 }
 
 type testRoomserverAPI struct {
@@ -225,7 +186,6 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserver
 func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
 	t := &txnReq{
 		rsAPI:      rsAPI,
-		eduAPI:     &testEDUProducer{},
 		keys:       &test.NopJSONVerifier{},
 		federation: fedClient,
 		roomsMu:    internal.NewMutexByRoom(),

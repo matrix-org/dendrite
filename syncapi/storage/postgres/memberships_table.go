@@ -62,9 +62,15 @@ const selectMembershipSQL = "" +
 	" ORDER BY stream_pos DESC" +
 	" LIMIT 1"
 
+const selectMembershipCountSQL = "" +
+	"SELECT COUNT(*) FROM (" +
+	" SELECT DISTINCT ON (room_id, user_id) room_id, user_id, membership FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC" +
+	") t WHERE t.membership = $3"
+
 type membershipsStatements struct {
-	upsertMembershipStmt *sql.Stmt
-	selectMembershipStmt *sql.Stmt
+	upsertMembershipStmt      *sql.Stmt
+	selectMembershipStmt      *sql.Stmt
+	selectMembershipCountStmt *sql.Stmt
 }
 
 func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -77,6 +83,9 @@ func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 		return nil, err
 	}
 	if s.selectMembershipStmt, err = db.Prepare(selectMembershipSQL); err != nil {
+		return nil, err
+	}
+	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCountSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -107,5 +116,13 @@ func (s *membershipsStatements) SelectMembership(
 ) (eventID string, streamPos, topologyPos types.StreamPosition, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectMembershipStmt)
 	err = stmt.QueryRowContext(ctx, roomID, userID, memberships).Scan(&eventID, &streamPos, &topologyPos)
+	return
+}
+
+func (s *membershipsStatements) SelectMembershipCount(
+	ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition,
+) (count int, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
+	err = stmt.QueryRowContext(ctx, roomID, pos, membership).Scan(&count)
 	return
 }

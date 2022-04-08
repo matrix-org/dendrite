@@ -13,11 +13,21 @@ import (
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	natsclient "github.com/nats-io/nats.go"
 )
 
 var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
+
+func PrepareForTests() (*process.ProcessContext, nats.JetStreamContext, *nats.Conn) {
+	cfg := &config.Dendrite{}
+	cfg.Defaults(true)
+	cfg.Global.JetStream.InMemory = true
+	pc := process.NewProcessContext()
+	js, jc := Prepare(pc, &cfg.Global.JetStream)
+	return pc, js, jc
+}
 
 func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server
@@ -153,6 +163,27 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 					logrus.Warn("Stream is running in-memory; this may be due to data corruption in the JetStream storage directory, investigate as soon as possible")
 					process.Degraded()
 				}
+			}
+		}
+	}
+
+	// Clean up old consumers so that interest-based consumers do the
+	// right thing.
+	for stream, consumers := range map[string][]string{
+		OutputClientData:        {"SyncAPIClientAPIConsumer"},
+		OutputReceiptEvent:      {"SyncAPIEDUServerReceiptConsumer", "FederationAPIEDUServerConsumer"},
+		OutputSendToDeviceEvent: {"SyncAPIEDUServerSendToDeviceConsumer", "FederationAPIEDUServerConsumer"},
+		OutputTypingEvent:       {"SyncAPIEDUServerTypingConsumer", "FederationAPIEDUServerConsumer"},
+	} {
+		streamName := cfg.Matrix.JetStream.Prefixed(stream)
+		for _, consumer := range consumers {
+			consumerName := cfg.Matrix.JetStream.Prefixed(consumer) + "Pull"
+			consumerInfo, err := s.ConsumerInfo(streamName, consumerName)
+			if err != nil || consumerInfo == nil {
+				continue
+			}
+			if err = s.DeleteConsumer(streamName, consumerName); err != nil {
+				logrus.WithError(err).Errorf("Unable to clean up old consumer %q for stream %q", consumer, stream)
 			}
 		}
 	}

@@ -776,12 +776,8 @@ func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.Qu
 }
 
 func (a *UserInternalAPI) QueryAccountAvailability(ctx context.Context, req *api.QueryAccountAvailabilityRequest, res *api.QueryAccountAvailabilityResponse) error {
-	_, err := a.DB.CheckAccountAvailability(ctx, req.Localpart)
-	if err == sql.ErrNoRows {
-		res.Available = true
-		return nil
-	}
-	res.Available = false
+	var err error
+	res.Available, err = a.DB.CheckAccountAvailability(ctx, req.Localpart)
 	return err
 }
 

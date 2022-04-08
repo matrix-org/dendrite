@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -49,6 +48,8 @@ type Database struct {
 	Receipts            tables.Receipts
 	Memberships         tables.Memberships
 	NotificationData    tables.NotificationData
+	Ignores             tables.Ignores
+	Presence            tables.Presence
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -119,6 +120,10 @@ func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, mem
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, nil, userID, membership)
 }
 
+func (d *Database) MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error) {
+	return d.Memberships.SelectMembershipCount(ctx, nil, roomID, membership, pos)
+}
+
 func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
@@ -135,7 +140,7 @@ func (d *Database) PeeksInRange(ctx context.Context, userID, deviceID string, r 
 	return d.Peeks.SelectPeeksInRange(ctx, nil, userID, deviceID, r)
 }
 
-func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []eduAPI.OutputReceiptEvent, error) {
+func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
 	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 }
 
@@ -972,7 +977,7 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 	return
 }
 
-func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]eduAPI.OutputReceiptEvent, error) {
+func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error) {
 	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
 	return receipts, err
 }
@@ -998,4 +1003,28 @@ func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID 
 }
 func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
+}
+
+func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
+	return s.Ignores.SelectIgnores(ctx, userID)
+}
+
+func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
+	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
+}
+
+func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+	return s.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
+}
+
+func (s *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceForUser(ctx, nil, userID)
+}
+
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceAfter(ctx, nil, after)
+}
+
+func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return s.Presence.GetMaxPresenceID(ctx, nil)
 }

@@ -17,6 +17,8 @@ package eventutil
 import (
 	"errors"
 	"strconv"
+
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // ErrProfileNoExists is returned when trying to lookup a user's profile that
@@ -26,9 +28,10 @@ var ErrProfileNoExists = errors.New("no known profile for given user ID")
 // AccountData represents account data sent from the client API server to the
 // sync API server
 type AccountData struct {
-	RoomID     string          `json:"room_id"`
-	Type       string          `json:"type"`
-	ReadMarker *ReadMarkerJSON `json:"read_marker,omitempty"` // optional
+	RoomID       string              `json:"room_id"`
+	Type         string              `json:"type"`
+	ReadMarker   *ReadMarkerJSON     `json:"read_marker,omitempty"`   // optional
+	IgnoredUsers *types.IgnoredUsers `json:"ignored_users,omitempty"` // optional
 }
 
 type ReadMarkerJSON struct {

@@ -18,6 +18,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+const MSigningKeyUpdate = "m.signing_key_update" // TODO: move to gomatrixserverlib
+
 // A JoinedHost is a server that is joined to a matrix room.
 type JoinedHost struct {
 	// The MemberEventID of a m.room.member join event.
@@ -50,4 +52,29 @@ type InboundPeek struct {
 	CreationTimestamp int64
 	RenewedTimestamp  int64
 	RenewalInterval   int64
+}
+
+type FederationReceiptMRead struct {
+	User map[string]FederationReceiptData `json:"m.read"`
+}
+
+type FederationReceiptData struct {
+	Data     ReceiptTS `json:"data"`
+	EventIDs []string  `json:"event_ids"`
+}
+
+type ReceiptTS struct {
+	TS gomatrixserverlib.Timestamp `json:"ts"`
+}
+
+type Presence struct {
+	Push []PresenceContent `json:"push"`
+}
+
+type PresenceContent struct {
+	CurrentlyActive bool    `json:"currently_active,omitempty"`
+	LastActiveAgo   int64   `json:"last_active_ago"`
+	Presence        string  `json:"presence"`
+	StatusMsg       *string `json:"status_msg,omitempty"`
+	UserID          string  `json:"user_id"`
 }

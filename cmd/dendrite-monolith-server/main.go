@@ -19,8 +19,6 @@ import (
 	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -61,7 +59,6 @@ func main() {
 		// itself.
 		cfg.AppServiceAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.ClientAPI.InternalAPI.Connect = httpAPIAddr
-		cfg.EDUServer.InternalAPI.Connect = httpAPIAddr
 		cfg.FederationAPI.InternalAPI.Connect = httpAPIAddr
 		cfg.KeyServer.InternalAPI.Connect = httpAPIAddr
 		cfg.MediaAPI.InternalAPI.Connect = httpAPIAddr
@@ -136,14 +133,6 @@ func main() {
 	rsImpl.SetUserAPI(userAPI)
 	keyImpl.SetUserAPI(userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(
-		base, cache.New(), userAPI,
-	)
-	if base.UseHTTPAPIs {
-		eduserver.AddInternalRoutes(base.InternalAPIMux, eduInputAPI)
-		eduInputAPI = base.EDUServerClient()
-	}
-
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
@@ -151,12 +140,10 @@ func main() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:  asAPI,
-		EDUInternalAPI: eduInputAPI,
-		FederationAPI:  fsAPI,
-		RoomserverAPI:  rsAPI,
-		UserAPI:        userAPI,
-		KeyAPI:         keyAPI,
+		AppserviceAPI: asAPI, FederationAPI: fsAPI,
+		RoomserverAPI: rsAPI,
+		UserAPI:       userAPI,
+		KeyAPI:        keyAPI,
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,

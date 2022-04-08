@@ -26,16 +26,17 @@ import (
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
@@ -48,17 +49,17 @@ import (
 // nolint: gocyclo
 func Setup(
 	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
-	eduAPI eduServerAPI.EDUServerInputAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.UserInternalAPI,
+	userDirectoryProvider userapi.UserDirectoryProvider,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.FederationInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	mscCfg *config.MSCs,
+	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
 	prometheus.MustRegister(amtRegUsers, sendEventDuration)
 
@@ -469,7 +470,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendTyping(req, device, vars["roomID"], vars["userID"], eduAPI, rsAPI)
+			return SendTyping(req, device, vars["roomID"], vars["userID"], rsAPI, syncProducer)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/redact/{eventID}",
@@ -498,7 +499,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, syncProducer, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -512,7 +513,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			txnID := vars["txnID"]
-			return SendToDevice(req, device, eduAPI, transactionsCache, vars["eventType"], &txnID)
+			return SendToDevice(req, device, syncProducer, transactionsCache, vars["eventType"], &txnID)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -783,20 +784,6 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
-	// Element logs get flooded unless this is handled
-	v3mux.Handle("/presence/{userID}/status",
-		httputil.MakeExternalAPI("presence", func(req *http.Request) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
-				return *r
-			}
-			// TODO: Set presence (probably the responsibility of a presence server not clientapi)
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: struct{}{},
-			}
-		}),
-	).Methods(http.MethodPut, http.MethodOptions)
-
 	v3mux.Handle("/voip/turnServer",
 		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req); r != nil {
@@ -907,6 +894,7 @@ func Setup(
 				device,
 				userAPI,
 				rsAPI,
+				userDirectoryProvider,
 				cfg.Matrix.ServerName,
 				postContent.SearchString,
 				postContent.Limit,
@@ -943,7 +931,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SaveReadMarker(req, userAPI, rsAPI, eduAPI, syncProducer, device, vars["roomID"])
+			return SaveReadMarker(req, userAPI, rsAPI, syncProducer, device, vars["roomID"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -957,6 +945,16 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return SendForget(req, device, vars["roomID"], rsAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/upgrade",
+		httputil.MakeAuthAPI("rooms_upgrade", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return UpgradeRoom(req, device, cfg, vars["roomID"], userAPI, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
@@ -1298,7 +1296,25 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 
-			return SetReceipt(req, eduAPI, device, vars["roomId"], vars["receiptType"], vars["eventId"])
+			return SetReceipt(req, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+	v3mux.Handle("/presence/{userId}/status",
+		httputil.MakeAuthAPI("set_presence", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return SetPresence(req, cfg, device, syncProducer, vars["userId"])
+		}),
+	).Methods(http.MethodPut, http.MethodOptions)
+	v3mux.Handle("/presence/{userId}/status",
+		httputil.MakeAuthAPI("get_presence", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetPresence(req, device, natsClient, cfg.Matrix.JetStream.Prefixed(jetstream.RequestPresence), vars["userId"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
