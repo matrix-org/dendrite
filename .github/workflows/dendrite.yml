@@ -111,7 +111,7 @@ jobs:
           key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go${{ matrix.go }}-test-
-      - run: go test -p 1 ./...
+      - run: go test ./...
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
