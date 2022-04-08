@@ -95,10 +95,10 @@ func SaveAccountData(
 		}
 	}
 
-	if dataType == "m.fully_read" {
+	if dataType == "m.fully_read" || dataType == "m.push_rules" {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Unable to set read marker"),
+			JSON: jsonerror.Forbidden(fmt.Sprintf("Unable to modify %q using this API", dataType)),
 		}
 	}
 
