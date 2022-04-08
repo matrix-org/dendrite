@@ -75,7 +75,7 @@ const selectPresenceAfter = "" +
 
 type presenceStatements struct {
 	db                         *sql.DB
-	streamIDStatements         *streamIDStatements
+	streamIDStatements         *StreamIDStatements
 	upsertPresenceStmt         *sql.Stmt
 	upsertPresenceFromSyncStmt *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
@@ -83,7 +83,7 @@ type presenceStatements struct {
 	selectPresenceAfterStmt    *sql.Stmt
 }
 
-func NewSqlitePresenceTable(db *sql.DB, streamID *streamIDStatements) (*presenceStatements, error) {
+func NewSqlitePresenceTable(db *sql.DB, streamID *StreamIDStatements) (*presenceStatements, error) {
 	_, err := db.Exec(presenceSchema)
 	if err != nil {
 		return nil, err
