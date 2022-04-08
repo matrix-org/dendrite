@@ -52,9 +52,13 @@ func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	if err != nil {
 		t.Fatalf("failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
-	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s; GRANT ALL PRIVILEGES ON DATABASE %s TO %s`, dbName, dbName, user))
+	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
 	if err != nil {
 		t.Fatalf("failed to CREATE DATABASE: %s", err)
+	}
+	_, err = db.Exec(fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE %s TO %s`, dbName, user))
+	if err != nil {
+		t.Fatalf("failed to GRANT: %s", err)
 	}
 	_ = db.Close()
 }
