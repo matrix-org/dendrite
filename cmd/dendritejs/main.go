@@ -19,25 +19,33 @@ package main
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
 	"fmt"
 	"syscall/js"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi"
-	go_http_js_libp2p "github.com/matrix-org/go-http-js-libp2p"
 
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/sirupsen/logrus"
 
 	_ "github.com/matrix-org/go-sqlite3-js"
+
+	pineconeRouter "github.com/matrix-org/pinecone/router"
+	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
 
 var GitCommit string
@@ -46,6 +54,7 @@ func init() {
 	fmt.Printf("[%s] dendrite.js starting...\n", GitCommit)
 }
 
+const publicPeer = "wss://pinecone.matrix.org/public"
 const keyNameEd25519 = "_go_ed25519_key"
 
 func readKeyFromLocalStorage() (key ed25519.PrivateKey, err error) {
@@ -132,35 +141,20 @@ func generateKey() ed25519.PrivateKey {
 	return priv
 }
 
-func createFederationClient(cfg *config.Dendrite, node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.FederationClient {
-	fmt.Println("Running in js-libp2p federation mode")
-	fmt.Println("Warning: Federation with non-libp2p homeservers will not work in this mode yet!")
-	tr := go_http_js_libp2p.NewP2pTransport(node)
-
-	fed := gomatrixserverlib.NewFederationClient(
-		cfg.Global.ServerName, cfg.Global.KeyID, cfg.Global.PrivateKey,
-		gomatrixserverlib.WithTransport(tr),
-	)
-
-	return fed
-}
-
-func createClient(node *go_http_js_libp2p.P2pLocalNode) *gomatrixserverlib.Client {
-	tr := go_http_js_libp2p.NewP2pTransport(node)
-	return gomatrixserverlib.NewClient(
-		gomatrixserverlib.WithTransport(tr),
-	)
-}
-
-func createP2PNode(privKey ed25519.PrivateKey) (serverName string, node *go_http_js_libp2p.P2pLocalNode) {
-	hosted := "/dns4/rendezvous.matrix.org/tcp/8443/wss/p2p-websocket-star/"
-	node = go_http_js_libp2p.NewP2pLocalNode("org.matrix.p2p.experiment", privKey.Seed(), []string{hosted}, "p2p")
-	serverName = node.Id
-	fmt.Println("p2p assigned ServerName: ", serverName)
-	return
-}
-
 func main() {
+	startup()
+
+	// We want to block forever to let the fetch and libp2p handler serve the APIs
+	select {}
+}
+
+func startup() {
+	sk := generateKey()
+	pk := sk.Public().(ed25519.PublicKey)
+
+	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	pSessions := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
+
 	cfg := &config.Dendrite{}
 	cfg.Defaults(true)
 	cfg.UserAPI.AccountDatabase.ConnectionString = "file:/idb/dendritejs_account.db"
@@ -171,67 +165,57 @@ func main() {
 	cfg.SyncAPI.Database.ConnectionString = "file:/idb/dendritejs_syncapi.db"
 	cfg.KeyServer.Database.ConnectionString = "file:/idb/dendritejs_e2ekey.db"
 	cfg.Global.JetStream.StoragePath = "file:/idb/dendritejs/"
-	cfg.Global.TrustedIDServers = []string{
-		"matrix.org", "vector.im",
-	}
-	cfg.Global.KeyID = libp2pMatrixKeyID
-	cfg.Global.PrivateKey = generateKey()
-
-	serverName, node := createP2PNode(cfg.Global.PrivateKey)
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(serverName)
+	cfg.Global.TrustedIDServers = []string{}
+	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+	cfg.Global.PrivateKey = sk
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := setup.NewBaseDendrite(cfg, "Monolith")
+	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
 	accountDB := base.CreateAccountsDB()
-	federation := createFederationClient(cfg, node)
+	federation := conn.CreateFederationClient(base, pSessions)
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(accountDB, &cfg.UserAPI, nil, keyAPI)
-	keyAPI.SetUserAPI(userAPI)
 
-	fetcher := &libp2pKeyFetcher{}
-	keyRing := gomatrixserverlib.KeyRing{
-		KeyFetchers: []gomatrixserverlib.KeyFetcher{
-			fetcher,
-		},
-		KeyDatabase: fetcher,
-	}
+	serverKeyAPI := &signing.YggdrasilKeys{}
+	keyRing := serverKeyAPI.KeyRing()
 
 	rsAPI := roomserver.NewInternalAPI(base)
+
+	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	keyAPI.SetUserAPI(userAPI)
+
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
 	)
 	rsAPI.SetAppserviceAPI(asQuery)
 	fedSenderAPI := federationapi.NewInternalAPI(base, federation, rsAPI, base.Caches, keyRing, true)
 	rsAPI.SetFederationAPI(fedSenderAPI, keyRing)
-	p2pPublicRoomProvider := NewLibP2PPublicRoomsProvider(node, fedSenderAPI, federation)
-
-	psAPI := pushserver.NewInternalAPI(base)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		AccountDB: accountDB,
-		Client:    createClient(node),
+		Client:    conn.CreateClient(base, pSessions),
 		FedClient: federation,
-		KeyRing:   &keyRing,
+		KeyRing:   keyRing,
 
-		AppserviceAPI:       asQuery,
-		FederationSenderAPI: fedSenderAPI,
-		RoomserverAPI:       rsAPI,
-		UserAPI:             userAPI,
-		KeyAPI:              keyAPI,
-		PushserverAPI:       psAPI,
+		AppserviceAPI: asQuery,
+		FederationAPI: fedSenderAPI,
+		RoomserverAPI: rsAPI,
+		UserAPI:       userAPI,
+		KeyAPI:        keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
-		ExtPublicRoomsProvider: p2pPublicRoomProvider,
+		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}
 	monolith.AddAllPublicRoutes(
 		base.ProcessContext,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
 	)
@@ -241,20 +225,9 @@ func main() {
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	libp2pRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
-	libp2pRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
-	libp2pRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
-
-	// Expose the matrix APIs via libp2p-js - for federation traffic
-	if node != nil {
-		go func() {
-			logrus.Info("Listening on libp2p-js host ID ", node.Id)
-			s := JSServer{
-				Mux: libp2pRouter,
-			}
-			s.ListenAndServe("p2p")
-		}()
-	}
+	p2pRouter := pSessions.Protocol("matrix").HTTP().Mux()
+	p2pRouter.Handle(httputil.PublicFederationPathPrefix, base.PublicFederationAPIMux)
+	p2pRouter.Handle(httputil.PublicMediaPathPrefix, base.PublicMediaAPIMux)
 
 	// Expose the matrix APIs via fetch - for local traffic
 	go func() {
@@ -265,6 +238,19 @@ func main() {
 		s.ListenAndServe("fetch")
 	}()
 
-	// We want to block forever to let the fetch and libp2p handler serve the APIs
-	select {}
+	// Connect to the static peer
+	go func() {
+		for {
+			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
+				if err := conn.ConnectToPeer(pRouter, publicPeer); err != nil {
+					logrus.WithError(err).Error("Failed to connect to static peer")
+				}
+			}
+			select {
+			case <-base.ProcessContext.Context().Done():
+				return
+			case <-time.After(time.Second * 5):
+			}
+		}
+	}()
 }
