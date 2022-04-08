@@ -369,6 +369,19 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(QueryAccountAvailabilityPath,
+		httputil.MakeInternalAPI("queryAccountAvailability", func(req *http.Request) util.JSONResponse {
+			request := api.QueryAccountAvailabilityRequest{}
+			response := api.QueryAccountAvailabilityResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryAccountAvailability(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
 	internalAPIMux.Handle(QueryAccountByPasswordPath,
 		httputil.MakeInternalAPI("queryAccountByPassword", func(req *http.Request) util.JSONResponse {
 			request := api.QueryAccountByPasswordRequest{}
