@@ -18,6 +18,9 @@ RUN --mount=target=. \
 
 # dendrite base image; mainly creates a user and switches to it
 FROM alpine:3.15 AS dendrite-base
+LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
+LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
 RUN addgroup dendrite && adduser dendrite -G dendrite -u 1337 -D
 USER dendrite
 WORKDIR /home/dendrite
@@ -25,9 +28,7 @@ WORKDIR /home/dendrite
 # polylith image, only contains the polylith binary
 FROM dendrite-base AS image-polylith
 LABEL org.opencontainers.image.title="Dendrite (Polylith)"
-LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
-LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 COPY --from=build /out/dendrite-polylith-multi /usr/bin/
 
 ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
@@ -35,9 +36,6 @@ ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
 # monolith image
 FROM dendrite-base AS image-monolith
 LABEL org.opencontainers.image.title="Dendrite (Monolith)"
-LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
-LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 COPY --from=build /out/create-account /usr/bin/create-account
 COPY --from=build /out/generate-config /usr/bin/generate-config
