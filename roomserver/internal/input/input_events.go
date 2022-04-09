@@ -37,10 +37,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func init() {
-	prometheus.MustRegister(processRoomEventDuration)
-}
-
 // TODO: Does this value make sense?
 const MaximumMissingProcessingTime = time.Minute * 2
 

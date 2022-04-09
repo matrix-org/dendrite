@@ -68,6 +68,13 @@ global:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
+  # Configures the handling of presence events.
+  presence:
+    # Whether inbound presence events are allowed, e.g. receiving presence events from other servers
+    enable_inbound: false
+    # Whether outbound presence events are allowed, e.g. sending presence events to other servers
+    enable_outbound: false
+
   # Server notices allows server admins to send messages to all users.
   server_notices:
     enabled: false
@@ -187,12 +194,6 @@ client_api:
     threshold: 5
     cooloff_ms: 500
 
-# Configuration for the EDU server.
-edu_server:
-  internal_api:
-    listen: http://localhost:7778 # Only used in polylith deployments
-    connect: http://localhost:7778 # Only used in polylith deployments
-
 # Configuration for the Federation API.
 federation_api:
   internal_api:
@@ -205,12 +206,6 @@ federation_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
-
-  # List of paths to X.509 certificates to be used by the external federation listeners.
-  # These certificates will be used to calculate the TLS fingerprints and other servers
-  # will expect the certificate to match these fingerprints. Certificates must be in PEM
-  # format.
-  federation_certificates: []
 
   # How many times we will try to resend a failed transaction to a specific server. The
   # backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc.

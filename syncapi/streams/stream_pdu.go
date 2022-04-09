@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ type PDUStreamProvider struct {
 
 	tasks   chan func()
 	workers atomic.Int32
+	userAPI userapi.UserInternalAPI
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -86,6 +88,10 @@ func (p *PDUStreamProvider) CompleteSync(
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
+
+	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
+		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+	}
 
 	// Build up a /sync response. Add joined rooms.
 	var reqMutex sync.Mutex
@@ -175,6 +181,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 		return to
 	}
 
+	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
+		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+	}
+
 	newPos = from
 	for _, delta := range stateDeltas {
 		var pos types.StreamPosition
@@ -253,9 +263,25 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
 	}
 
+	hasMembershipChange := false
+	for _, recentEvent := range recentStreamEvents {
+		if recentEvent.Type() == gomatrixserverlib.MRoomMember && recentEvent.StateKey() != nil {
+			hasMembershipChange = true
+			break
+		}
+	}
+
+	// Work out how many members are in the room.
+	joinedCount, _ := p.DB.MembershipCount(ctx, delta.RoomID, gomatrixserverlib.Join, latestPosition)
+	invitedCount, _ := p.DB.MembershipCount(ctx, delta.RoomID, gomatrixserverlib.Invite, latestPosition)
+
 	switch delta.Membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
+		if hasMembershipChange {
+			jr.Summary.JoinedMemberCount = &joinedCount
+			jr.Summary.InvitedMemberCount = &invitedCount
+		}
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
@@ -367,17 +393,40 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		prevBatch.Decrement()
 	}
 
+	// Work out how many members are in the room.
+	joinedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Join, r.From)
+	invitedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, r.From)
+
 	// We don't include a device here as we don't need to send down
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	jr = types.NewJoinResponse()
+	jr.Summary.JoinedMemberCount = &joinedCount
+	jr.Summary.InvitedMemberCount = &invitedCount
 	jr.Timeline.PrevBatch = prevBatch
 	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil
+}
+
+// addIgnoredUsersToFilter adds ignored users to the eventfilter and
+// the syncreq itself for further use in streams.
+func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
+	ignores, err := p.DB.IgnoresForUser(ctx, req.Device.UserID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return err
+	}
+	req.IgnoredUsers = *ignores
+	for userID := range ignores.List {
+		eventFilter.NotSenders = append(eventFilter.NotSenders, userID)
+	}
+	return nil
 }
 
 func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {

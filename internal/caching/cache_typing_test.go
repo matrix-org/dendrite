@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package caching
 
 import (
 	"testing"
@@ -24,9 +24,9 @@ import (
 )
 
 func TestEDUCache(t *testing.T) {
-	tCache := New()
+	tCache := NewTypingCache()
 	if tCache == nil {
-		t.Fatal("New failed")
+		t.Fatal("NewTypingCache failed")
 	}
 
 	t.Run("AddTypingUser", func(t *testing.T) {

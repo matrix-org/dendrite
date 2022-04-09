@@ -73,6 +73,26 @@ jobs:
     timeout-minutes: 5
     name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:13-alpine
+        # Provide the password for postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dendrite
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       fail-fast: false
       matrix:
@@ -91,7 +111,12 @@ jobs:
           key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go${{ matrix.go }}-test-
-      - run: go test ./...
+      - run: go test -p 1 ./...
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dendrite
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -233,7 +258,14 @@ jobs:
       - name: Summarise results.tap
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
-
+      - name: Sytest List Maintenance
+        if: ${{ always() }}
+        run: /src/show-expected-fail-tests.sh /logs/results.tap /src/sytest-whitelist /src/sytest-blacklist
+        continue-on-error: true # not fatal
+      - name: Are We Synapse Yet?
+        if: ${{ always() }}
+        run: /src/are-we-synapse-yet.py /logs/results.tap -v
+        continue-on-error: true # not fatal
       - name: Upload Sytest logs
         uses: actions/upload-artifact@v2
         if: ${{ always() }}

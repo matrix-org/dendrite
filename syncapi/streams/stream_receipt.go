@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	eduAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -53,8 +52,12 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	}
 
 	// Group receipts by room, so we can create one ClientEvent for every room
-	receiptsByRoom := make(map[string][]eduAPI.OutputReceiptEvent)
+	receiptsByRoom := make(map[string][]types.OutputReceiptEvent)
 	for _, receipt := range receipts {
+		// skip ignored user events
+		if _, ok := req.IgnoredUsers.List[receipt.UserID]; ok {
+			continue
+		}
 		receiptsByRoom[receipt.RoomID] = append(receiptsByRoom[receipt.RoomID], receipt)
 	}
 
@@ -68,15 +71,15 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 			Type:   gomatrixserverlib.MReceipt,
 			RoomID: roomID,
 		}
-		content := make(map[string]eduAPI.ReceiptMRead)
+		content := make(map[string]ReceiptMRead)
 		for _, receipt := range receipts {
 			read, ok := content[receipt.EventID]
 			if !ok {
-				read = eduAPI.ReceiptMRead{
-					User: make(map[string]eduAPI.ReceiptTS),
+				read = ReceiptMRead{
+					User: make(map[string]ReceiptTS),
 				}
 			}
-			read.User[receipt.UserID] = eduAPI.ReceiptTS{TS: receipt.Timestamp}
+			read.User[receipt.UserID] = ReceiptTS{TS: receipt.Timestamp}
 			content[receipt.EventID] = read
 		}
 		ev.Content, err = json.Marshal(content)
@@ -90,4 +93,12 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	}
 
 	return lastPos
+}
+
+type ReceiptMRead struct {
+	User map[string]ReceiptTS `json:"m.read"`
+}
+
+type ReceiptTS struct {
+	TS gomatrixserverlib.Timestamp `json:"ts"`
 }

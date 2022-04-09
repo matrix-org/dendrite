@@ -90,6 +90,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	ignores, err := NewPostgresIgnoresTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	presence, err := NewPostgresPresenceTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -111,6 +119,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		Receipts:            receipts,
 		Memberships:         memberships,
 		NotificationData:    notificationData,
+		Ignores:             ignores,
+		Presence:            presence,
 	}
 	return &d, nil
 }

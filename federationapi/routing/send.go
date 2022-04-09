@@ -23,12 +23,14 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/producers"
+	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -72,12 +74,6 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal,
-	)
-}
-
 var inFlightTxnsPerOrigin sync.Map // transaction ID -> chan util.JSONResponse
 
 // Send implements /_matrix/federation/v1/send/{txnID}
@@ -87,12 +83,12 @@ func Send(
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.FederationAPI,
 	rsAPI api.RoomserverInternalAPI,
-	eduAPI eduserverAPI.EDUServerInputAPI,
 	keyAPI keyapi.KeyInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	mu *internal.MutexByRoom,
 	servers federationAPI.ServersInRoomProvider,
+	producer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	// First we should check if this origin has already submitted this
 	// txn ID to us. If they have and the txnIDs map contains an entry,
@@ -126,13 +122,14 @@ func Send(
 	defer inFlightTxnsPerOrigin.Delete(index)
 
 	t := txnReq{
-		rsAPI:      rsAPI,
-		eduAPI:     eduAPI,
-		keys:       keys,
-		federation: federation,
-		servers:    servers,
-		keyAPI:     keyAPI,
-		roomsMu:    mu,
+		rsAPI:                  rsAPI,
+		keys:                   keys,
+		federation:             federation,
+		servers:                servers,
+		keyAPI:                 keyAPI,
+		roomsMu:                mu,
+		producer:               producer,
+		inboundPresenceEnabled: cfg.Matrix.Presence.EnableInbound,
 	}
 
 	var txnEvents struct {
@@ -184,13 +181,14 @@ func Send(
 
 type txnReq struct {
 	gomatrixserverlib.Transaction
-	rsAPI      api.RoomserverInternalAPI
-	eduAPI     eduserverAPI.EDUServerInputAPI
-	keyAPI     keyapi.KeyInternalAPI
-	keys       gomatrixserverlib.JSONVerifier
-	federation txnFederationClient
-	roomsMu    *internal.MutexByRoom
-	servers    federationAPI.ServersInRoomProvider
+	rsAPI                  api.RoomserverInternalAPI
+	keyAPI                 keyapi.KeyInternalAPI
+	keys                   gomatrixserverlib.JSONVerifier
+	federation             txnFederationClient
+	roomsMu                *internal.MutexByRoom
+	servers                federationAPI.ServersInRoomProvider
+	producer               *producers.SyncAPIProducer
+	inboundPresenceEnabled bool
 }
 
 // A subset of FederationClient functionality that txn requires. Useful for testing.
@@ -329,8 +327,8 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				util.GetLogger(ctx).Debugf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
 				continue
 			}
-			if err := eduserverAPI.SendTyping(ctx, t.eduAPI, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
-				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to edu server")
+			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to JetStream")
 			}
 		case gomatrixserverlib.MDirectToDevice:
 			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
@@ -342,12 +340,12 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			for userID, byUser := range directPayload.Messages {
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
-					if err := eduserverAPI.SendToDevice(ctx, t.eduAPI, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
 						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 							"sender":    directPayload.Sender,
 							"user_id":   userID,
 							"device_id": deviceID,
-						}).Error("Failed to send send-to-device event to edu server")
+						}).Error("Failed to send send-to-device event to JetStream")
 					}
 				}
 			}
@@ -355,7 +353,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			t.processDeviceListUpdate(ctx, e)
 		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
-			payload := map[string]eduserverAPI.FederationReceiptMRead{}
+			payload := map[string]types.FederationReceiptMRead{}
 
 			if err := json.Unmarshal(e.Content, &payload); err != nil {
 				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
@@ -379,14 +377,20 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 							"user_id": userID,
 							"room_id": roomID,
 							"events":  mread.EventIDs,
-						}).Error("Failed to send receipt event to edu server")
+						}).Error("Failed to send receipt event to JetStream")
 						continue
 					}
 				}
 			}
-		case eduserverAPI.MSigningKeyUpdate:
+		case types.MSigningKeyUpdate:
 			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
 				logrus.WithError(err).Errorf("Failed to process signing key update")
+			}
+		case gomatrixserverlib.MPresence:
+			if t.inboundPresenceEnabled {
+				if err := t.processPresence(ctx, e); err != nil {
+					logrus.WithError(err).Errorf("Failed to process presence update")
+				}
 			}
 		default:
 			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
@@ -394,8 +398,26 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 	}
 }
 
+// processPresence handles m.receipt events
+func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) error {
+	payload := types.Presence{}
+	if err := json.Unmarshal(e.Content, &payload); err != nil {
+		return err
+	}
+	for _, content := range payload.Push {
+		presence, ok := syncTypes.PresenceFromString(content.Presence)
+		if !ok {
+			continue
+		}
+		if err := t.producer.SendPresence(ctx, content.UserID, presence, content.StatusMsg, content.LastActiveAgo); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
-	var updatePayload eduserverAPI.CrossSigningKeyUpdate
+	var updatePayload keyapi.CrossSigningKeyUpdate
 	if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
 		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 			"user_id": updatePayload.UserID,
@@ -422,7 +444,7 @@ func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverli
 	return nil
 }
 
-// processReceiptEvent sends receipt events to the edu server
+// processReceiptEvent sends receipt events to JetStream
 func (t *txnReq) processReceiptEvent(ctx context.Context,
 	userID, roomID, receiptType string,
 	timestamp gomatrixserverlib.Timestamp,
@@ -430,17 +452,7 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 ) error {
 	// store every event
 	for _, eventID := range eventIDs {
-		req := eduserverAPI.InputReceiptEventRequest{
-			InputReceiptEvent: eduserverAPI.InputReceiptEvent{
-				UserID:    userID,
-				RoomID:    roomID,
-				EventID:   eventID,
-				Type:      receiptType,
-				Timestamp: timestamp,
-			},
-		}
-		resp := eduserverAPI.InputReceiptEventResponse{}
-		if err := t.eduAPI.InputReceiptEvent(ctx, &req, &resp); err != nil {
+		if err := t.producer.SendReceipt(ctx, userID, roomID, eventID, receiptType, timestamp); err != nil {
 			return fmt.Errorf("unable to set receipt event: %w", err)
 		}
 	}
