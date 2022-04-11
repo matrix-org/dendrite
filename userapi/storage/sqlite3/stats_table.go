@@ -246,8 +246,8 @@ func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx)
 	params := make([]interface{}, len(nonGuests)*2+2)
 	// nonGuests is used twice
 	for i, v := range nonGuests {
-		params[i] = v   // i: 0 1 2 => ($1, $2, $3)
-		params[i+2] = v // i: 3 4 5 => ($5, $6, $7)
+		params[i] = v                  // i: 0 1 2 => ($1, $2, $3)
+		params[i+1+len(nonGuests)] = v // i: 4 5 6 => ($5, $6, $7)
 	}
 	params[3] = api.AccountTypeGuest                           // $4
 	params[7] = gomatrixserverlib.AsTimestamp(registeredAfter) // $8
