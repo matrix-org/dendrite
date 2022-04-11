@@ -423,8 +423,12 @@ func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *ty
 		return err
 	}
 	req.IgnoredUsers = *ignores
+	userList := make([]string, 0, len(ignores.List))
 	for userID := range ignores.List {
-		eventFilter.NotSenders = append(eventFilter.NotSenders, userID)
+		userList = append(userList, userID)
+	}
+	if len(userList) > 0 {
+		eventFilter.NotSenders = &userList
 	}
 	return nil
 }
