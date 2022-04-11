@@ -122,16 +122,16 @@ SELECT COUNT(*) FROM account_accounts WHERE account_type IN ($1)
 
 // $1 = Guest AccountType
 // $3 & $4 = All non guest AccountType IDs
-const countRegisteredUserByTypeStmt = `
+const countRegisteredUserByTypeSQL = `
 SELECT user_type, COUNT(*) AS count FROM (
 	SELECT
     CASE
-    	WHEN account_type IN ($3) AND appservice_id IS NULL THEN 'native'
-        WHEN account_type = $1 AND appservice_id IS NULL THEN 'guest'
-		WHEN account_type IN ($4) AND appservice_id IS NOT NULL THEN 'bridged'
+    	WHEN account_type IN ($1) AND appservice_id IS NULL THEN 'native'
+        WHEN account_type = $4 AND appservice_id IS NULL THEN 'guest'
+		WHEN account_type IN ($5) AND appservice_id IS NOT NULL THEN 'bridged'
 	END AS user_type
     FROM account_accounts
-    WHERE created_ts > $2
+    WHERE created_ts > $8
 ) AS t GROUP BY user_type
 `
 
@@ -187,7 +187,7 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 		{&s.countR30UsersV2Stmt, countR30UsersV2SQL},
 		{&s.updateUserDailyVisitsStmt, updateUserDailyVisitsSQL},
 		{&s.countUserByAccountTypeStmt, countUserByAccountTypeSQL},
-		{&s.countRegisteredUserByTypeStmt, countRegisteredUserByTypeStmt},
+		{&s.countRegisteredUserByTypeStmt, countRegisteredUserByTypeSQL},
 		{&s.dbEngineVersionStmt, queryDBEngineVersion},
 	}.Prepare(db)
 }
@@ -196,7 +196,7 @@ func (s *statsStatements) startTimers() {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
 		logrus.Infof("Executing UpdateUserDailyVisits")
-		if err := s.updateUserDailyVisits(context.Background(), nil); err != nil {
+		if err := s.UpdateUserDailyVisits(context.Background(), nil, time.Now(), s.lastUpdate); err != nil {
 			logrus.WithError(err).Error("failed to update daily user visits")
 		}
 		time.AfterFunc(time.Hour*3, updateStatsFunc)
@@ -234,24 +234,23 @@ func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx)
 	// $1 = Guest AccountType; $2 = timestamp
 	// $3 & $4 = All non guest AccountType IDs
 	nonGuests := []api.AccountType{api.AccountTypeUser, api.AccountTypeAdmin, api.AccountTypeAppService}
-	countSQL := strings.Replace(countRegisteredUserByTypeStmt, "($3)", sqlutil.QueryVariadicOffset(len(nonGuests), 2), 1)
-	countSQL = strings.Replace(countSQL, "($4)", sqlutil.QueryVariadicOffset(len(nonGuests), 2+len(nonGuests)), 1)
-
+	countSQL := strings.Replace(countRegisteredUserByTypeSQL, "($1)", sqlutil.QueryVariadicOffset(len(nonGuests), 0), 1)
+	countSQL = strings.Replace(countSQL, "($5)", sqlutil.QueryVariadicOffset(len(nonGuests), 1+len(nonGuests)), 1)
 	queryStmt, err := s.db.Prepare(countSQL)
 	if err != nil {
 		return nil, err
 	}
 	stmt := sqlutil.TxStmt(txn, queryStmt)
-	registeredAfter := time.Now().AddDate(0, 0, -1)
+	registeredAfter := time.Now().AddDate(0, 0, -30)
 
 	params := make([]interface{}, len(nonGuests)*2+2)
-	params[0] = api.AccountTypeGuest                           // $1
-	params[1] = gomatrixserverlib.AsTimestamp(registeredAfter) // $2
 	// nonGuests is used twice
 	for i, v := range nonGuests {
-		params[i+2] = v                // i: 2 3 4 => ($3, $4, $5)
-		params[i+2+len(nonGuests)] = v // i: 5 6 7 => ($6, $7, $8)
+		params[i] = v   // i: 0 1 2 => ($1, $2, $3)
+		params[i+2] = v // i: 3 4 5 => ($5, $6, $7)
 	}
+	params[3] = api.AccountTypeGuest                           // $4
+	params[7] = gomatrixserverlib.AsTimestamp(registeredAfter) // $8
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -422,18 +421,20 @@ func (s *statsStatements) UserStatistics(ctx context.Context, txn *sql.Tx) (*typ
 	return stats, dbEngine, err
 }
 
-func (s *statsStatements) updateUserDailyVisits(ctx context.Context, txn *sql.Tx) error {
+func (s *statsStatements) UpdateUserDailyVisits(
+	ctx context.Context, txn *sql.Tx,
+	startTime, lastUpdate time.Time,
+) error {
 	stmt := sqlutil.TxStmt(txn, s.updateUserDailyVisitsStmt)
-	_ = stmt
-	todayStart := time.Now().Truncate(time.Hour * 24)
+	startTime = startTime.Truncate(time.Hour * 24)
 
 	// edge case
-	if todayStart.After(s.lastUpdate) {
-		todayStart = todayStart.AddDate(0, 0, -1)
+	if startTime.After(s.lastUpdate) {
+		startTime = startTime.AddDate(0, 0, -1)
 	}
 	_, err := stmt.ExecContext(ctx,
-		gomatrixserverlib.AsTimestamp(todayStart),
-		gomatrixserverlib.AsTimestamp(s.lastUpdate),
+		gomatrixserverlib.AsTimestamp(startTime),
+		gomatrixserverlib.AsTimestamp(lastUpdate),
 		gomatrixserverlib.AsTimestamp(time.Now()),
 	)
 	if err == nil {

@@ -194,7 +194,7 @@ func (s *statsStatements) startTimers() {
 	var updateStatsFunc func()
 	updateStatsFunc = func() {
 		logrus.Infof("Executing UpdateUserDailyVisits")
-		if err := s.updateUserDailyVisits(context.Background(), nil); err != nil {
+		if err := s.UpdateUserDailyVisits(context.Background(), nil, time.Now(), s.lastUpdate); err != nil {
 			logrus.WithError(err).Error("failed to update daily user visits")
 		}
 		time.AfterFunc(time.Hour*3, updateStatsFunc)
@@ -229,7 +229,7 @@ func (s *statsStatements) nonBridgedUsers(ctx context.Context, txn *sql.Tx) (res
 
 func (s *statsStatements) registeredUserByType(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.countRegisteredUserByTypeStmt)
-	registeredAfter := time.Now().AddDate(0, 0, -1)
+	registeredAfter := time.Now().AddDate(0, 0, -30)
 
 	rows, err := stmt.QueryContext(ctx,
 		pq.Int64Array{
@@ -410,18 +410,20 @@ func (s *statsStatements) UserStatistics(ctx context.Context, txn *sql.Tx) (*typ
 	return stats, dbEngine, err
 }
 
-func (s *statsStatements) updateUserDailyVisits(ctx context.Context, txn *sql.Tx) error {
+func (s *statsStatements) UpdateUserDailyVisits(
+	ctx context.Context, txn *sql.Tx,
+	startTime, lastUpdate time.Time,
+) error {
 	stmt := sqlutil.TxStmt(txn, s.updateUserDailyVisitsStmt)
-	_ = stmt
-	todayStart := time.Now().Truncate(time.Hour * 24)
+	startTime = startTime.Truncate(time.Hour * 24)
 
 	// edge case
-	if todayStart.After(s.lastUpdate) {
-		todayStart = todayStart.AddDate(0, 0, -1)
+	if startTime.After(s.lastUpdate) {
+		startTime = startTime.AddDate(0, 0, -1)
 	}
 	_, err := stmt.ExecContext(ctx,
-		gomatrixserverlib.AsTimestamp(todayStart),
-		gomatrixserverlib.AsTimestamp(s.lastUpdate),
+		gomatrixserverlib.AsTimestamp(startTime),
+		gomatrixserverlib.AsTimestamp(lastUpdate),
 		gomatrixserverlib.AsTimestamp(time.Now()),
 	)
 	if err == nil {
