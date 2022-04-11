@@ -59,7 +59,7 @@ type Events interface {
 	SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
 	// SelectEarlyEvents returns the earliest events in the given room.
 	SelectEarlyEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter) ([]types.StreamEvent, error)
-	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StreamEvent, error)
+	SelectEvents(ctx context.Context, txn *sql.Tx, eventIDs []string, preserveOrder bool) ([]types.StreamEvent, error)
 	UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
 	// DeleteEventsForRoom removes all event information for a room. This should only be done when removing the room entirely.
 	DeleteEventsForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
@@ -84,8 +84,6 @@ type Topology interface {
 	SelectPositionInTopology(ctx context.Context, txn *sql.Tx, eventID string) (depth, spos types.StreamPosition, err error)
 	// SelectMaxPositionInTopology returns the event which has the highest depth, and if there are multiple, the event with the highest stream position.
 	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (depth types.StreamPosition, spos types.StreamPosition, err error)
-	// DeleteTopologyForRoom removes all topological information for a room. This should only be done when removing the room entirely.
-	DeleteTopologyForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 	// SelectStreamToTopologicalPosition converts a stream position to a topological position by finding the nearest topological position in the room.
 	SelectStreamToTopologicalPosition(ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, forward bool) (topoPos types.StreamPosition, err error)
 }
@@ -132,8 +130,6 @@ type BackwardsExtremities interface {
 	SelectBackwardExtremitiesForRoom(ctx context.Context, roomID string) (bwExtrems map[string][]string, err error)
 	// DeleteBackwardExtremity removes a backwards extremity for a room, if one existed.
 	DeleteBackwardExtremity(ctx context.Context, txn *sql.Tx, roomID, knownEventID string) (err error)
-	// DeleteBackwardExtremitiesFoorRoomID removes all backward extremities for a room. This should only be done when removing the room entirely.
-	DeleteBackwardExtremitiesForRoom(ctx context.Context, txn *sql.Tx, roomID string) (err error)
 }
 
 // SendToDevice tracks send-to-device messages which are sent to individual
@@ -173,7 +169,6 @@ type Receipts interface {
 
 type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
-	SelectMembership(ctx context.Context, txn *sql.Tx, roomID, userID, memberships []string) (eventID string, streamPos, topologyPos types.StreamPosition, err error)
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
 }
 

@@ -78,7 +78,6 @@ type outputRoomEventsTopologyStatements struct {
 	selectEventIDsInRangeDESCStmt             *sql.Stmt
 	selectPositionInTopologyStmt              *sql.Stmt
 	selectMaxPositionInTopologyStmt           *sql.Stmt
-	deleteTopologyForRoomStmt                 *sql.Stmt
 	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
 	selectStreamToTopologicalPositionDescStmt *sql.Stmt
 }
@@ -190,11 +189,4 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
-}
-
-func (s *outputRoomEventsTopologyStatements) DeleteTopologyForRoom(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.deleteTopologyForRoomStmt).ExecContext(ctx, roomID)
-	return err
 }

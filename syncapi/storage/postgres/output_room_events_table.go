@@ -429,7 +429,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 // selectEvents returns the events for the given event IDs. If an event is
 // missing from the database, it will be omitted.
 func (s *outputRoomEventsStatements) SelectEvents(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, preserveOrder bool,
 ) ([]types.StreamEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
@@ -437,7 +437,25 @@ func (s *outputRoomEventsStatements) SelectEvents(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
-	return rowsToStreamEvents(rows)
+	streamEvents, err := rowsToStreamEvents(rows)
+	if err != nil {
+		return nil, err
+	}
+	if preserveOrder {
+		eventMap := make(map[string]types.StreamEvent)
+		for _, ev := range streamEvents {
+			eventMap[ev.EventID()] = ev
+		}
+		var returnEvents []types.StreamEvent
+		for _, eventID := range eventIDs {
+			ev, ok := eventMap[eventID]
+			if ok {
+				returnEvents = append(returnEvents, ev)
+			}
+		}
+		return returnEvents, nil
+	}
+	return streamEvents, nil
 }
 
 func (s *outputRoomEventsStatements) DeleteEventsForRoom(
