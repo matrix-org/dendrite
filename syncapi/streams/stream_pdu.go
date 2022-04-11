@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ type PDUStreamProvider struct {
 
 	tasks   chan func()
 	workers atomic.Int32
+	userAPI userapi.UserInternalAPI
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -86,6 +88,10 @@ func (p *PDUStreamProvider) CompleteSync(
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
+
+	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
+		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+	}
 
 	// Build up a /sync response. Add joined rooms.
 	var reqMutex sync.Mutex
@@ -173,6 +179,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if len(stateDeltas) == 0 {
 		return to
+	}
+
+	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
+		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
 	newPos = from
@@ -400,6 +410,27 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil
+}
+
+// addIgnoredUsersToFilter adds ignored users to the eventfilter and
+// the syncreq itself for further use in streams.
+func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
+	ignores, err := p.DB.IgnoresForUser(ctx, req.Device.UserID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return err
+	}
+	req.IgnoredUsers = *ignores
+	userList := make([]string, 0, len(ignores.List))
+	for userID := range ignores.List {
+		userList = append(userList, userID)
+	}
+	if len(userList) > 0 {
+		eventFilter.NotSenders = &userList
+	}
+	return nil
 }
 
 func removeDuplicates(stateEvents, recentEvents []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {

@@ -1,5 +1,32 @@
 # Changelog
 
+## Dendrite 0.8.1 (2022-04-07)
+
+### Fixes
+
+* A bug which could result in the sync API deadlocking due to lock contention in the notifier has been fixed
+
+## Dendrite 0.8.0 (2022-04-07)
+
+### Features
+
+* Support for presence has been added
+  * Presence is not enabled by default
+  * The `global.presence.enable_inbound` and `global.presence.enable_outbound` configuration options allow configuring inbound and outbound presence separately
+* Support for room upgrades via the `/room/{roomID}/upgrade` endpoint has been added (contributed by [DavidSpenler](https://github.com/DavidSpenler), [alexkursell](https://github.com/alexkursell))
+* Support for ignoring users has been added
+* Joined and invite user counts are now sent in the `/sync` room summaries
+* Queued federation and stale device list updates will now be staggered at startup over an up-to 2 minute warm-up period, rather than happening all at once
+* Memory pressure created by the sync notifier has been reduced
+* The EDU server component has now been removed, with the work being moved to more relevant components
+
+### Fixes
+
+* It is now possible to set the `power_level_content_override` when creating a room to include power levels over 100
+* `/send_join` and `/state` responses will now not unmarshal the JSON twice
+* The stream event consumer for push notifications will no longer request membership events that are irrelevant
+* Appservices will no longer incorrectly receive state events twice
+
 ## Dendrite 0.7.0 (2022-03-25)
 
 ### Features

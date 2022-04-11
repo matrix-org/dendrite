@@ -74,12 +74,6 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal,
-	)
-}
-
 var inFlightTxnsPerOrigin sync.Map // transaction ID -> chan util.JSONResponse
 
 // Send implements /_matrix/federation/v1/send/{txnID}
@@ -413,7 +407,6 @@ func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 	for _, content := range payload.Push {
 		presence, ok := syncTypes.PresenceFromString(content.Presence)
 		if !ok {
-			logrus.Warnf("invalid presence '%s', skipping.", content.Presence)
 			continue
 		}
 		if err := t.producer.SendPresence(ctx, content.UserID, presence, content.StatusMsg, content.LastActiveAgo); err != nil {

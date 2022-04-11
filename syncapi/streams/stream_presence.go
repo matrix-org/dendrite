@@ -111,10 +111,15 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				continue
 			}
 		}
-		presence.ClientFields.LastActiveAgo = presence.LastActiveAgo()
-		if presence.ClientFields.Presence == "online" {
-			currentlyActive := presence.CurrentlyActive()
-			presence.ClientFields.CurrentlyActive = &currentlyActive
+
+		if _, known := types.PresenceFromString(presence.ClientFields.Presence); known {
+			presence.ClientFields.LastActiveAgo = presence.LastActiveAgo()
+			if presence.ClientFields.Presence == "online" {
+				currentlyActive := presence.CurrentlyActive()
+				presence.ClientFields.CurrentlyActive = &currentlyActive
+			}
+		} else {
+			presence.ClientFields.Presence = "offline"
 		}
 
 		content, err := json.Marshal(presence.ClientFields)

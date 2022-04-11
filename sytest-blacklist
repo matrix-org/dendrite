@@ -2,10 +2,6 @@
 
 Latest account data appears in v2 /sync
 
-# Blacklisted because we don't support ignores yet
-
-Ignore invite in incremental sync
-
 # Relies on a rejected PL event which will never be accepted into the DAG
 
 # Caused by <https://github.com/matrix-org/sytest/pull/911>

@@ -54,6 +54,10 @@ func (p *InviteStreamProvider) IncrementalSync(
 	}
 
 	for roomID, inviteEvent := range invites {
+		// skip ignored user events
+		if _, ok := req.IgnoredUsers.List[inviteEvent.Sender()]; ok {
+			continue
+		}
 		ir := types.NewInviteResponse(inviteEvent)
 		req.Response.Rooms.Invite[roomID] = *ir
 	}

@@ -48,6 +48,7 @@ type Database struct {
 	Receipts            tables.Receipts
 	Memberships         tables.Memberships
 	NotificationData    tables.NotificationData
+	Ignores             tables.Ignores
 	Presence            tables.Presence
 }
 
@@ -149,7 +150,7 @@ func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, stre
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
 func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs)
+	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +312,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs())
+	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs(), false)
 	if err != nil {
 		return err
 	}
@@ -456,7 +457,7 @@ func (d *Database) GetEventsInTopologicalRange(
 	}
 
 	// Retrieve the events' contents using their IDs.
-	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs)
+	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs, true)
 	return
 }
 
@@ -618,7 +619,7 @@ func (d *Database) fetchMissingStateEvents(
 ) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
-	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs)
+	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1002,6 +1003,14 @@ func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID 
 }
 func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
 	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
+}
+
+func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
+	return s.Ignores.SelectIgnores(ctx, userID)
+}
+
+func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
+	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
 }
 
 func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {

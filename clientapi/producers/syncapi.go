@@ -42,7 +42,7 @@ type SyncAPIProducer struct {
 }
 
 // SendData sends account data to the sync API server
-func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string, readMarker *eventutil.ReadMarkerJSON) error {
+func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string, readMarker *eventutil.ReadMarkerJSON, ignoredUsers *types.IgnoredUsers) error {
 	m := &nats.Msg{
 		Subject: p.TopicClientData,
 		Header:  nats.Header{},
@@ -50,9 +50,10 @@ func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string
 	m.Header.Set(jetstream.UserID, userID)
 
 	data := eventutil.AccountData{
-		RoomID:     roomID,
-		Type:       dataType,
-		ReadMarker: readMarker,
+		RoomID:       roomID,
+		Type:         dataType,
+		ReadMarker:   readMarker,
+		IgnoredUsers: ignoredUsers,
 	}
 	var err error
 	m.Data, err = json.Marshal(data)
