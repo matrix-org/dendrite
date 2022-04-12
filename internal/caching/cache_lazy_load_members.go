@@ -32,13 +32,16 @@ func NewLazyLoadCache() (*LazyLoadCache, error) {
 	return &LazyLoadCache{cache}, err
 }
 
-func (c *LazyLoadCache) StoreLazyLoadedUser(reqUser, deviceID, roomID, userID string) {
+func (c *LazyLoadCache) StoreLazyLoadedUser(reqUser, deviceID, roomID, userID, eventID string) {
 	cacheKey := fmt.Sprintf("%s/%s/%s/%s", reqUser, deviceID, roomID, userID)
-	c.Set(cacheKey, true)
+	c.Set(cacheKey, eventID)
 }
 
-func (c *LazyLoadCache) IsLazyLoadedUserCached(reqUser, deviceID, roomID, userID string) bool {
+func (c *LazyLoadCache) IsLazyLoadedUserCached(reqUser, deviceID, roomID, userID string) (string, bool) {
 	cacheKey := fmt.Sprintf("%s/%s/%s/%s", reqUser, deviceID, roomID, userID)
-	_, ok := c.Get(cacheKey)
-	return ok
+	val, ok := c.Get(cacheKey)
+	if !ok {
+		return "", ok
+	}
+	return val.(string), ok
 }

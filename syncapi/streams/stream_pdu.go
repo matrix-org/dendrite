@@ -271,7 +271,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		if err != nil {
 			return r.From, err
 		}
-		delta.StateEvents, err = p.lazyLoadMembers(ctx, delta.RoomID, true, stateFilter, device, recentEvents, cache, delta.StateEvents)
+		delta.StateEvents, err = p.lazyLoadMembers(
+			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
+			device, cache,
+			recentEvents, delta.StateEvents,
+		)
 		if err != nil {
 			return r.From, err
 		}
@@ -422,7 +426,11 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		if err != nil {
 			return nil, err
 		}
-		stateEvents, err = p.lazyLoadMembers(ctx, roomID, false, stateFilter, device, recentEvents, cache, stateEvents)
+		stateEvents, err = p.lazyLoadMembers(ctx, roomID,
+			false, limited, stateFilter.IncludeRedundantMembers,
+			device, cache,
+			recentEvents, stateEvents,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -439,39 +447,40 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 }
 
 func (p *PDUStreamProvider) lazyLoadMembers(
-	ctx context.Context, roomID string, isIncremental bool,
-	stateFilter *gomatrixserverlib.StateFilter, device *userapi.Device,
-	timelineEvents []*gomatrixserverlib.HeaderedEvent, cache *caching.LazyLoadCache,
-	stateEvents []*gomatrixserverlib.HeaderedEvent,
+	ctx context.Context, roomID string,
+	incremental, limited, includeRedundant bool,
+	device *userapi.Device,
+	cache *caching.LazyLoadCache,
+	timelineEvents, stateEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	if len(timelineEvents) == 0 {
 		return stateEvents, nil
 	}
-	// Work out if we need to include membership events
+	// Work out which memberships to include
 	timelineUsers := make(map[string]struct{})
-
-	if !isIncremental {
+	if !incremental {
 		timelineUsers[device.UserID] = struct{}{}
 	}
-	// add all users the client doesn't know about yet to a list
+	// Add all users the client doesn't know about yet to a list
 	for _, event := range timelineEvents {
-		if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
-			continue
-		}
-		// membership is not yet cached, add it to the list
-		if !cache.IsLazyLoadedUserCached(device.UserID, device.ID, roomID, event.Sender()) {
+		// Membership is not yet cached, add it to the list
+		if _, ok := cache.IsLazyLoadedUserCached(device.UserID, device.ID, roomID, event.Sender()); !ok {
 			timelineUsers[event.Sender()] = struct{}{}
 		}
 	}
-	// remove existing membership events we don't care about, e.g. users not in the timeline.events
+	// Remove existing membership events we don't care about, e.g. users not in the timeline.events
 	newStateEvents := []*gomatrixserverlib.HeaderedEvent{}
 	for _, event := range stateEvents {
 		if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+			// If this is a gapped incremental sync, we still want this membership
+			isGappedIncremental := limited && incremental
 			// We want this users membership event, keep it in the list
-			if _, ok := timelineUsers[event.Sender()]; ok {
+			_, ok := timelineUsers[event.Sender()]
+			wantMembership := ok || isGappedIncremental
+			if wantMembership {
 				newStateEvents = append(newStateEvents, event)
-				if !stateFilter.IncludeRedundantMembers {
-					cache.StoreLazyLoadedUser(device.UserID, device.ID, roomID, event.Sender())
+				if !includeRedundant {
+					cache.StoreLazyLoadedUser(device.UserID, device.ID, roomID, event.Sender(), event.EventID())
 				}
 				delete(timelineUsers, event.Sender())
 			}
@@ -479,7 +488,6 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			newStateEvents = append(newStateEvents, event)
 		}
 	}
-
 	wantUsers := make([]string, 0, len(timelineUsers))
 	for userID := range timelineUsers {
 		wantUsers = append(wantUsers, userID)
@@ -495,12 +503,13 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// cache the membership events
 	for _, membership := range memberships {
-		cache.StoreLazyLoadedUser(device.UserID, device.ID, roomID, membership.Sender())
+		cache.StoreLazyLoadedUser(device.UserID, device.ID, roomID, membership.Sender(), membership.EventID())
 	}
 	stateEvents = append(newStateEvents, memberships...)
 	return stateEvents, nil
 }
 
+// getLazyLoadCache gets/creates a lazy load cache for a given device.
 func (p *PDUStreamProvider) getLazyLoadCache(device *userapi.Device) (*caching.LazyLoadCache, error) {
 	var err error
 	cacheKey := device.UserID + device.ID
