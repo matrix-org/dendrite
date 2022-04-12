@@ -3,8 +3,6 @@ package caching
 import (
 	"fmt"
 	"time"
-
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const (
@@ -34,16 +32,13 @@ func NewLazyLoadCache() (*LazyLoadCache, error) {
 	return &LazyLoadCache{cache}, err
 }
 
-func (c *LazyLoadCache) StoreLazyLoadedMembers(reqUser, deviceID, roomID, userID string, event *gomatrixserverlib.HeaderedEvent) {
+func (c *LazyLoadCache) StoreLazyLoadedUser(reqUser, deviceID, roomID, userID string) {
 	cacheKey := fmt.Sprintf("%s/%s/%s/%s", reqUser, deviceID, roomID, userID)
-	c.Set(cacheKey, event)
+	c.Set(cacheKey, true)
 }
 
-func (c *LazyLoadCache) GetLazyLoadedMembers(reqUser, deviceID, roomID, userID string) (*gomatrixserverlib.HeaderedEvent, bool) {
+func (c *LazyLoadCache) IsLazyLoadedUserCached(reqUser, deviceID, roomID, userID string) bool {
 	cacheKey := fmt.Sprintf("%s/%s/%s/%s", reqUser, deviceID, roomID, userID)
-	val, ok := c.Get(cacheKey)
-	if !ok {
-		return nil, ok
-	}
-	return val.(*gomatrixserverlib.HeaderedEvent), ok
+	_, ok := c.Get(cacheKey)
+	return ok
 }

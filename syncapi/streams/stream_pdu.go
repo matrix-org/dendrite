@@ -459,7 +459,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			continue
 		}
 		// membership is not yet cached, add it to the list
-		if _, ok := cache.GetLazyLoadedMembers(device.UserID, device.ID, roomID, event.Sender()); !ok {
+		if !cache.IsLazyLoadedUserCached(device.UserID, device.ID, roomID, event.Sender()) {
 			timelineUsers[event.Sender()] = struct{}{}
 		}
 	}
@@ -471,7 +471,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			if _, ok := timelineUsers[event.Sender()]; ok {
 				newStateEvents = append(newStateEvents, event)
 				if !stateFilter.IncludeRedundantMembers {
-					cache.StoreLazyLoadedMembers(device.UserID, device.ID, roomID, event.Sender(), event)
+					cache.StoreLazyLoadedUser(device.UserID, device.ID, roomID, event.Sender())
 				}
 				delete(timelineUsers, event.Sender())
 			}
@@ -495,7 +495,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// cache the membership events
 	for _, membership := range memberships {
-		cache.StoreLazyLoadedMembers(device.UserID, device.ID, roomID, membership.Sender(), membership)
+		cache.StoreLazyLoadedUser(device.UserID, device.ID, roomID, membership.Sender())
 	}
 	stateEvents = append(newStateEvents, memberships...)
 	return stateEvents, nil
