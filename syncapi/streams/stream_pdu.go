@@ -468,8 +468,9 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			timelineUsers[event.Sender()] = struct{}{}
 		}
 	}
+	// Preallocate with the same amount, even if it will end up with fewer values
+	newStateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(stateEvents))
 	// Remove existing membership events we don't care about, e.g. users not in the timeline.events
-	newStateEvents := []*gomatrixserverlib.HeaderedEvent{}
 	for _, event := range stateEvents {
 		if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
 			// If this is a gapped incremental sync, we still want this membership
