@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -26,7 +27,8 @@ type PDUStreamProvider struct {
 
 	tasks   chan func()
 	workers atomic.Int32
-	userAPI userapi.UserInternalAPI
+	// userID+deviceID -> lazy loading cache
+	lazyLoadCache map[string]*caching.LazyLoadCache
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -188,7 +190,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	newPos = from
 	for _, delta := range stateDeltas {
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, req.Response); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, &stateFilter, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return to
 		}
@@ -209,6 +211,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	r types.Range,
 	delta types.StateDelta,
 	eventFilter *gomatrixserverlib.RoomEventFilter,
+	stateFilter *gomatrixserverlib.StateFilter,
 	res *types.Response,
 ) (types.StreamPosition, error) {
 	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
@@ -261,6 +264,17 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 	if len(delta.StateEvents) > 0 {
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
+	}
+
+	if stateFilter.LazyLoadMembers {
+		cache, err := p.getLazyLoadCache(device)
+		if err != nil {
+			return r.From, err
+		}
+		delta.StateEvents, err = p.lazyLoadMembers(ctx, delta.RoomID, true, stateFilter, device, recentEvents, cache, delta.StateEvents)
+		if err != nil {
+			return r.From, err
+		}
 	}
 
 	hasMembershipChange := false
@@ -402,6 +416,18 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
+
+	if stateFilter.LazyLoadMembers {
+		cache, err := p.getLazyLoadCache(device)
+		if err != nil {
+			return nil, err
+		}
+		stateEvents, err = p.lazyLoadMembers(ctx, roomID, false, stateFilter, device, recentEvents, cache, stateEvents)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	jr = types.NewJoinResponse()
 	jr.Summary.JoinedMemberCount = &joinedCount
 	jr.Summary.InvitedMemberCount = &invitedCount
@@ -410,6 +436,83 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil
+}
+
+func (p *PDUStreamProvider) lazyLoadMembers(
+	ctx context.Context, roomID string, isIncremental bool,
+	stateFilter *gomatrixserverlib.StateFilter, device *userapi.Device,
+	timelineEvents []*gomatrixserverlib.HeaderedEvent, cache *caching.LazyLoadCache,
+	stateEvents []*gomatrixserverlib.HeaderedEvent,
+) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	if len(timelineEvents) == 0 {
+		return stateEvents, nil
+	}
+	// Work out if we need to include membership events
+	timelineUsers := make(map[string]struct{})
+
+	if !isIncremental {
+		timelineUsers[device.UserID] = struct{}{}
+	}
+	// add all users the client doesn't know about yet to a list
+	for _, event := range timelineEvents {
+		if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+			continue
+		}
+		// membership is not yet cached, add it to the list
+		if _, ok := cache.GetLazyLoadedMembers(device.UserID, device.ID, roomID, event.Sender()); !ok {
+			timelineUsers[event.Sender()] = struct{}{}
+		}
+	}
+	// remove existing membership events we don't care about, e.g. users not in the timeline.events
+	newStateEvents := []*gomatrixserverlib.HeaderedEvent{}
+	for _, event := range stateEvents {
+		if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+			// We want this users membership event, keep it in the list
+			if _, ok := timelineUsers[event.Sender()]; ok {
+				newStateEvents = append(newStateEvents, event)
+				if !stateFilter.IncludeRedundantMembers {
+					cache.StoreLazyLoadedMembers(device.UserID, device.ID, roomID, event.Sender(), event)
+				}
+				delete(timelineUsers, event.Sender())
+			}
+		} else {
+			newStateEvents = append(newStateEvents, event)
+		}
+	}
+
+	wantUsers := make([]string, 0, len(timelineUsers))
+	for userID := range timelineUsers {
+		wantUsers = append(wantUsers, userID)
+	}
+	// Query missing membership events
+	memberships, err := p.DB.GetStateEventsForRoom(ctx, roomID, &gomatrixserverlib.StateFilter{
+		Limit:   100,
+		Senders: &wantUsers,
+		Types:   &[]string{gomatrixserverlib.MRoomMember},
+	})
+	if err != nil {
+		return stateEvents, err
+	}
+	// cache the membership events
+	for _, membership := range memberships {
+		cache.StoreLazyLoadedMembers(device.UserID, device.ID, roomID, membership.Sender(), membership)
+	}
+	stateEvents = append(newStateEvents, memberships...)
+	return stateEvents, nil
+}
+
+func (p *PDUStreamProvider) getLazyLoadCache(device *userapi.Device) (*caching.LazyLoadCache, error) {
+	var err error
+	cacheKey := device.UserID + device.ID
+	cache, ok := p.lazyLoadCache[cacheKey]
+	if !ok {
+		cache, err = caching.NewLazyLoadCache()
+		if err != nil {
+			return nil, err
+		}
+		p.lazyLoadCache[cacheKey] = cache
+	}
+	return cache, nil
 }
 
 // addIgnoredUsersToFilter adds ignored users to the eventfilter and

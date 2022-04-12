@@ -337,69 +337,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		}
 	}
 
-	if syncReq.Filter.Room.State.LazyLoadMembers {
-		for roomID, jr := range syncReq.Response.Rooms.Join {
-			jr.State.Events = rp.applyLazyLoadMembers(req.Context(), syncReq.Since.IsEmpty(), roomID, syncReq.Device.UserID, jr.Timeline.Events, jr.State.Events)
-			syncReq.Response.Rooms.Join[roomID] = jr
-		}
-	}
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: syncReq.Response,
 	}
-}
-
-func (rp *RequestPool) applyLazyLoadMembers(
-	ctx context.Context, isInitial bool, roomID, userID string, timelineEvents, stateEvents []gomatrixserverlib.ClientEvent,
-) []gomatrixserverlib.ClientEvent {
-	if len(stateEvents) == 0 || len(timelineEvents) == 0 {
-		return stateEvents
-	}
-	logrus.Debugf("before stateEvents: %d", len(stateEvents))
-
-	// First, get a list of users we need in the response
-	requiredUsers := make(map[string]bool)
-	if isInitial {
-		requiredUsers[userID] = true
-	}
-	for _, ev := range timelineEvents {
-		requiredUsers[ev.Sender] = true
-	}
-	// Filter out users who didn't send an event
-	newState := []gomatrixserverlib.ClientEvent{}
-	membershipEvents := []gomatrixserverlib.ClientEvent{}
-	for _, event := range stateEvents {
-		if event.Type != gomatrixserverlib.MRoomMember {
-			newState = append(newState, event)
-		} else {
-			// did the user send an event?
-			if requiredUsers[event.Sender] {
-				membershipEvents = append(membershipEvents, event)
-				delete(requiredUsers, event.Sender)
-			}
-		}
-	}
-	// Get all remaining users in the list
-	membershipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
-	for userID := range requiredUsers {
-		membership, err := rp.db.GetStateEvent(ctx, roomID, gomatrixserverlib.MRoomMember, userID)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("failed to get membership event for user")
-			continue
-		}
-		if membership != nil {
-			membershipToUser[userID] = membership
-		}
-	}
-	// Convert HeaderedEvent to ClientEvent
-	for _, evt := range membershipToUser {
-		newState = append(newState, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatSync))
-	}
-
-	result := append(newState, membershipEvents...)
-	logrus.Debugf("after stateEvents: %d", len(result))
-	return result
 }
 
 func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *userapi.Device) util.JSONResponse {

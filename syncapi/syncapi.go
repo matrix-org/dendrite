@@ -58,7 +58,8 @@ func AddPublicRoutes(
 
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, notifier)
+	lazyLoadCache := make(map[string]*caching.LazyLoadCache)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
