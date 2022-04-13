@@ -262,7 +262,10 @@ func (n *Notifier) SharedUsers(userID string) []string {
 func (n *Notifier) _sharedUsers(userID string) []string {
 	n._sharedUserMap[userID] = struct{}{}
 	for roomID, users := range n.roomIDToJoinedUsers {
-		if _, ok := users.set[userID]; !ok {
+		users.Lock()
+		_, ok := users.set[userID]
+		users.Unlock()
+		if !ok {
 			continue
 		}
 		for _, userID := range n._joinedUsers(roomID) {
@@ -282,8 +285,10 @@ func (n *Notifier) IsSharedUser(userA, userB string) bool {
 	defer n.lock.RUnlock()
 	var okA, okB bool
 	for _, users := range n.roomIDToJoinedUsers {
+		users.Lock()
 		_, okA = users.set[userA]
 		_, okB = users.set[userB]
+		users.Unlock()
 		if okA && okB {
 			return true
 		}
@@ -350,7 +355,7 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 		for _, userID := range userIDs {
 			n.roomIDToJoinedUsers[roomID].add(userID)
 		}
-		n.roomIDToJoinedUsers[roomID]._precompute()
+		n.roomIDToJoinedUsers[roomID].precompute()
 	}
 }
 
@@ -441,18 +446,18 @@ func (n *Notifier) _fetchUserStreams(userID string) []*UserDeviceStream {
 
 func (n *Notifier) _addJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = newUserIDSet(1)
+		n.roomIDToJoinedUsers[roomID] = newUserIDSet(32)
 	}
 	n.roomIDToJoinedUsers[roomID].add(userID)
-	n.roomIDToJoinedUsers[roomID]._precompute()
+	n.roomIDToJoinedUsers[roomID].precompute()
 }
 
 func (n *Notifier) _removeJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = newUserIDSet(0)
+		n.roomIDToJoinedUsers[roomID] = newUserIDSet(7)
 	}
 	n.roomIDToJoinedUsers[roomID].remove(userID)
-	n.roomIDToJoinedUsers[roomID]._precompute()
+	n.roomIDToJoinedUsers[roomID].precompute()
 }
 
 func (n *Notifier) JoinedUsers(roomID string) (userIDs []string) {
@@ -551,7 +556,7 @@ func (s *userIDSet) remove(str string) {
 	s.precomputed = s.precomputed[:0] // invalidate cache
 }
 
-func (s *userIDSet) _precompute() {
+func (s *userIDSet) precompute() {
 	s.Lock()
 	defer s.Unlock()
 	s.precomputed = s.values()
