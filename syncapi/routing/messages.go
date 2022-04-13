@@ -262,12 +262,8 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
-	eventFilter := r.filter
-
 	// Retrieve the events from the local database.
-	streamEvents, err := r.db.GetEventsInTopologicalRange(
-		r.ctx, r.from, r.to, r.roomID, eventFilter.Limit, r.backwardOrdering,
-	)
+	streamEvents, err := r.db.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return
