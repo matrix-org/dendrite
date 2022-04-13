@@ -22,10 +22,10 @@ import (
 )
 
 // Open opens a postgres database.
-func Open(dbProperties *config.DatabaseOptions) (Database, error) {
+func NewMediaAPIDatasource(dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.Open(dbProperties)
+		return sqlite3.NewDatabase(dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

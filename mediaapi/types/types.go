@@ -45,16 +45,13 @@ type RequestMethod string
 // MatrixUserID is a Matrix user ID string in the form @user:domain e.g. @alice:matrix.org
 type MatrixUserID string
 
-// UnixMs is the milliseconds since the Unix epoch
-type UnixMs int64
-
 // MediaMetadata is metadata associated with a media file
 type MediaMetadata struct {
 	MediaID           MediaID
 	Origin            gomatrixserverlib.ServerName
 	ContentType       ContentType
 	FileSizeBytes     FileSizeBytes
-	CreationTimestamp UnixMs
+	CreationTimestamp gomatrixserverlib.Timestamp
 	UploadName        Filename
 	Base64Hash        Base64Hash
 	UserID            MatrixUserID
