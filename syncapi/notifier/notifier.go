@@ -36,7 +36,7 @@ import (
 type Notifier struct {
 	lock *sync.RWMutex
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
-	roomIDToJoinedUsers map[string]userIDSet
+	roomIDToJoinedUsers map[string]*userIDSet
 	// A map of RoomID => Set<UserID> : Must only be accessed by the OnNewEvent goroutine
 	roomIDToPeekingDevices map[string]peekingDeviceSet
 	// The latest sync position
@@ -54,7 +54,7 @@ type Notifier struct {
 // the joined users within each of them by calling Notifier.Load(*storage.SyncServerDatabase).
 func NewNotifier() *Notifier {
 	return &Notifier{
-		roomIDToJoinedUsers:    make(map[string]userIDSet),
+		roomIDToJoinedUsers:    make(map[string]*userIDSet),
 		roomIDToPeekingDevices: make(map[string]peekingDeviceSet),
 		userDeviceStreams:      make(map[string]map[string]*UserDeviceStream),
 		lock:                   &sync.RWMutex{},
@@ -262,7 +262,7 @@ func (n *Notifier) SharedUsers(userID string) []string {
 func (n *Notifier) _sharedUsers(userID string) []string {
 	n._sharedUserMap[userID] = struct{}{}
 	for roomID, users := range n.roomIDToJoinedUsers {
-		if _, ok := users[userID]; !ok {
+		if _, ok := users.set[userID]; !ok {
 			continue
 		}
 		for _, userID := range n._joinedUsers(roomID) {
@@ -282,8 +282,8 @@ func (n *Notifier) IsSharedUser(userA, userB string) bool {
 	defer n.lock.RUnlock()
 	var okA, okB bool
 	for _, users := range n.roomIDToJoinedUsers {
-		_, okA = users[userA]
-		_, okB = users[userB]
+		_, okA = users.set[userA]
+		_, okB = users.set[userB]
 		if okA && okB {
 			return true
 		}
@@ -345,11 +345,12 @@ func (n *Notifier) setUsersJoinedToRooms(roomIDToUserIDs map[string][]string) {
 	// This is just the bulk form of addJoinedUser
 	for roomID, userIDs := range roomIDToUserIDs {
 		if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-			n.roomIDToJoinedUsers[roomID] = make(userIDSet, len(userIDs))
+			n.roomIDToJoinedUsers[roomID] = newUserIDSet(len(userIDs))
 		}
 		for _, userID := range userIDs {
 			n.roomIDToJoinedUsers[roomID].add(userID)
 		}
+		n.roomIDToJoinedUsers[roomID]._precompute()
 	}
 }
 
@@ -440,16 +441,18 @@ func (n *Notifier) _fetchUserStreams(userID string) []*UserDeviceStream {
 
 func (n *Notifier) _addJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = make(userIDSet)
+		n.roomIDToJoinedUsers[roomID] = newUserIDSet(1)
 	}
 	n.roomIDToJoinedUsers[roomID].add(userID)
+	n.roomIDToJoinedUsers[roomID]._precompute()
 }
 
 func (n *Notifier) _removeJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = make(userIDSet)
+		n.roomIDToJoinedUsers[roomID] = newUserIDSet(0)
 	}
 	n.roomIDToJoinedUsers[roomID].remove(userID)
+	n.roomIDToJoinedUsers[roomID]._precompute()
 }
 
 func (n *Notifier) JoinedUsers(roomID string) (userIDs []string) {
@@ -521,19 +524,45 @@ func (n *Notifier) _removeEmptyUserStreams() {
 }
 
 // A string set, mainly existing for improving clarity of structs in this file.
-type userIDSet map[string]struct{}
-
-func (s userIDSet) add(str string) {
-	s[str] = struct{}{}
+type userIDSet struct {
+	sync.Mutex
+	set         map[string]struct{}
+	precomputed []string
 }
 
-func (s userIDSet) remove(str string) {
-	delete(s, str)
+func newUserIDSet(cap int) *userIDSet {
+	return &userIDSet{
+		set:         make(map[string]struct{}, cap),
+		precomputed: nil,
+	}
 }
 
-func (s userIDSet) values() (vals []string) {
-	vals = make([]string, 0, len(s))
-	for str := range s {
+func (s *userIDSet) add(str string) {
+	s.Lock()
+	defer s.Unlock()
+	s.set[str] = struct{}{}
+	s.precomputed = s.precomputed[:0] // invalidate cache
+}
+
+func (s *userIDSet) remove(str string) {
+	s.Lock()
+	defer s.Unlock()
+	delete(s.set, str)
+	s.precomputed = s.precomputed[:0] // invalidate cache
+}
+
+func (s *userIDSet) _precompute() {
+	s.Lock()
+	defer s.Unlock()
+	s.precomputed = s.values()
+}
+
+func (s *userIDSet) values() (vals []string) {
+	if len(s.precomputed) > 0 {
+		return s.precomputed
+	}
+	vals = make([]string, 0, len(s.set))
+	for str := range s.set {
 		vals = append(vals, str)
 	}
 	return
