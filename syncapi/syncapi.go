@@ -57,8 +57,8 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
+	lazyLoadCache := caching.NewLazyLoadCache()
 	notifier := notifier.NewNotifier()
-	lazyLoadCache := make(map[string]*caching.LazyLoadCache)
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
