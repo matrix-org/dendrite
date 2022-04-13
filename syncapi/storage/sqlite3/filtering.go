@@ -26,7 +26,7 @@ const (
 func prepareWithFilters(
 	db *sql.DB, txn *sql.Tx, query string, params []interface{},
 	senders, notsenders, types, nottypes *[]string, excludeEventIDs []string,
-	limit int, order FilterOrder,
+	containsURL *bool, limit int, order FilterOrder,
 ) (*sql.Stmt, []interface{}, error) {
 	offset := len(params)
 	if senders != nil {
@@ -68,6 +68,9 @@ func prepareWithFilters(
 		} else {
 			query += ` AND type NOT = ""`
 		}
+	}
+	if containsURL != nil {
+		query += fmt.Sprintf(" AND contains_url = %v", *containsURL)
 	}
 	if count := len(excludeEventIDs); count > 0 {
 		query += " AND event_id NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
