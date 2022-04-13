@@ -262,10 +262,7 @@ func (n *Notifier) SharedUsers(userID string) []string {
 func (n *Notifier) _sharedUsers(userID string) []string {
 	n._sharedUserMap[userID] = struct{}{}
 	for roomID, users := range n.roomIDToJoinedUsers {
-		users.Lock()
-		_, ok := users.set[userID]
-		users.Unlock()
-		if !ok {
+		if ok := users.isIn(userID); !ok {
 			continue
 		}
 		for _, userID := range n._joinedUsers(roomID) {
@@ -285,10 +282,8 @@ func (n *Notifier) IsSharedUser(userA, userB string) bool {
 	defer n.lock.RUnlock()
 	var okA, okB bool
 	for _, users := range n.roomIDToJoinedUsers {
-		users.Lock()
-		_, okA = users.set[userA]
-		_, okB = users.set[userB]
-		users.Unlock()
+		okA = users.isIn(userA)
+		okB = users.isIn(userB)
 		if okA && okB {
 			return true
 		}
@@ -562,9 +557,16 @@ func (s *userIDSet) precompute() {
 	s.precomputed = s.values()
 }
 
+func (s *userIDSet) isIn(str string) bool {
+	s.Lock()
+	defer s.Unlock()
+	_, ok := s.set[str]
+	return ok
+}
+
 func (s *userIDSet) values() (vals []string) {
 	if len(s.precomputed) > 0 {
-		return s.precomputed
+		return s.precomputed // only return if not invalidated
 	}
 	vals = make([]string, 0, len(s.set))
 	for str := range s.set {
