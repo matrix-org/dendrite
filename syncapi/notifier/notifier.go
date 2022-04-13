@@ -441,7 +441,7 @@ func (n *Notifier) _fetchUserStreams(userID string) []*UserDeviceStream {
 
 func (n *Notifier) _addJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = newUserIDSet(32)
+		n.roomIDToJoinedUsers[roomID] = newUserIDSet(8)
 	}
 	n.roomIDToJoinedUsers[roomID].add(userID)
 	n.roomIDToJoinedUsers[roomID].precompute()
@@ -449,7 +449,7 @@ func (n *Notifier) _addJoinedUser(roomID, userID string) {
 
 func (n *Notifier) _removeJoinedUser(roomID, userID string) {
 	if _, ok := n.roomIDToJoinedUsers[roomID]; !ok {
-		n.roomIDToJoinedUsers[roomID] = newUserIDSet(7)
+		n.roomIDToJoinedUsers[roomID] = newUserIDSet(8)
 	}
 	n.roomIDToJoinedUsers[roomID].remove(userID)
 	n.roomIDToJoinedUsers[roomID].precompute()
