@@ -699,3 +699,4 @@ Ignore invite in full sync
 Ignore invite in incremental sync
 A filtered timeline reaches its limit
 A change to displayname should not result in a full state sync
+Can fetch images in room

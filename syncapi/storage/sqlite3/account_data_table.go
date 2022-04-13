@@ -104,8 +104,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		},
 		filter.Senders, filter.NotSenders,
 		filter.Types, filter.NotTypes,
-		[]string{}, filter.Limit, FilterOrderAsc,
-	)
+		[]string{}, nil, filter.Limit, FilterOrderAsc)
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {

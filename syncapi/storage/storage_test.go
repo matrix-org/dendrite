@@ -180,7 +180,8 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 		to := types.TopologyToken{}
 
 		// backpaginate 5 messages starting at the latest position.
-		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, 5, true)
+		filter := &gomatrixserverlib.RoomEventFilter{Limit: 5}
+		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 		if err != nil {
 			t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 		}

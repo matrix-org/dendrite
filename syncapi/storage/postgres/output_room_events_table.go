@@ -81,6 +81,15 @@ const insertEventSQL = "" +
 const selectEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
+const selectEventsWithFilterSQL = "" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)" +
+	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
+	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
+	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" AND ( $6::bool   IS NULL OR     contains_url = $6 )" +
+	" LIMIT $7"
+
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
@@ -153,6 +162,7 @@ const selectContextAfterEventSQL = "" +
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
+	selectEventsWitFilterStmt     *sql.Stmt
 	selectMaxEventIDStmt          *sql.Stmt
 	selectRecentEventsStmt        *sql.Stmt
 	selectRecentEventsForSyncStmt *sql.Stmt
@@ -174,6 +184,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventsStmt, selectEventsSQL},
+		{&s.selectEventsWitFilterStmt, selectEventsWithFilterSQL},
 		{&s.selectMaxEventIDStmt, selectMaxEventIDSQL},
 		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
 		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
@@ -310,7 +321,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if json.Unmarshal(event.Content(), &content) != nil {
+	if json.Unmarshal(event.Content(), &content) == nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
@@ -429,10 +440,29 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 // selectEvents returns the events for the given event IDs. If an event is
 // missing from the database, it will be omitted.
 func (s *outputRoomEventsStatements) SelectEvents(
-	ctx context.Context, txn *sql.Tx, eventIDs []string, preserveOrder bool,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, filter *gomatrixserverlib.RoomEventFilter, preserveOrder bool,
 ) ([]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	var (
+		stmt *sql.Stmt
+		rows *sql.Rows
+		err  error
+	)
+	if filter == nil {
+		stmt = sqlutil.TxStmt(txn, s.selectEventsStmt)
+		rows, err = stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	} else {
+		senders, notSenders := getSendersRoomEventFilter(filter)
+		stmt = sqlutil.TxStmt(txn, s.selectEventsWitFilterStmt)
+		rows, err = stmt.QueryContext(ctx,
+			pq.StringArray(eventIDs),
+			pq.StringArray(senders),
+			pq.StringArray(notSenders),
+			pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
+			pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
+			filter.ContainsURL,
+			filter.Limit,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
