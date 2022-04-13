@@ -57,7 +57,10 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
-	lazyLoadCache := caching.NewLazyLoadCache()
+	lazyLoadCache, err := caching.NewLazyLoadCache()
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create lazy loading cache")
+	}
 	notifier := notifier.NewNotifier()
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
