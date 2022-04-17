@@ -51,6 +51,8 @@ The key files will now exist in your current working directory, and can be mount
 
 Create your config based on the [`dendrite.yaml`](https://github.com/matrix-org/dendrite/tree/master/build/docker/config) configuration file in the `build/docker/config` folder of this repository.
 
+If you intend to run a separate NATS server, start it now. Otherwise make sure that [`dendrite.yaml`] is configured to use the in-process NATS server.
+
 Then start the deployment:
 
 ```
@@ -77,3 +79,37 @@ to permissions).
 
 If you wish to build and push your own images, rename `matrixdotorg/dendrite` to
 the name of another Docker Hub repository in `images-build.sh` and `images-push.sh`.
+
+## Proxying dendrite
+
+Container deployments do often use a proxying webserver e.g. to implement various vhosts such as `example.com`, `www.example.com`, `images.example.com` and `matrix.example.com` on the same IP address. It is possible to use dendrite in such a setup.
+
+If you intend to use a webserver such as [Apache](https://apache.org) as a frontend proxy, make sure that it does not canonicalize URLs. Otherwise chats might fail because signatures on federated requests will not match (see https://github.com/matrix-org/synapse/issues/3294 ). An example vhost configuration might look as follows:
+
+```
+<VirtualHost matrix.example.com:443>
+        ServerName matrix.example.com
+
+        SSLEngine on
+        SSLCertificateFile      /etc/ssl/matrix.example.com/cert.pem
+        SSLCertificateKeyFile   /etc/ssl/matrix.example.com/privkey.pem
+        SSLCertificateChainFile /etc/ssl/matrix.example.com/chain.pem
+
+        # Container uses a unique non-signed certificate. 
+        SSLProxyEngine On
+        SSLProxyVerify None
+        SSLProxyCheckPeerCN Off
+        SSLProxyCheckPeerName Off
+
+        SetEnvIf Host "^(.*)$" THE_HOST=$1
+        RequestHeader setifempty X-Forwarded-Proto https
+        RequestHeader setifempty X-Forwarded-Host %{THE_HOST}e
+        ProxyAddHeaders Off
+
+        ProxyPass           / https://127.0.0.1:8448/ nocanon
+        ProxyPassReverse    / https://127.0.0.1:8448/
+</VirtualHost>
+```
+
+The certificates specified need to at least be valid for `matrix.example.com` (or whatever your homeserver hostname/vhost should be).
+
