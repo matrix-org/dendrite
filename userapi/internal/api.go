@@ -653,7 +653,7 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart)
 	}
 	if req.Pusher.PushKeyTS == 0 {
-		req.Pusher.PushKeyTS = gomatrixserverlib.AsTimestamp(time.Now())
+		req.Pusher.PushKeyTS = int64(time.Now().Second())
 	}
 	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart)
 }
