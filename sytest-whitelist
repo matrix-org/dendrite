@@ -700,3 +700,12 @@ Ignore invite in incremental sync
 A filtered timeline reaches its limit
 A change to displayname should not result in a full state sync
 Can fetch images in room
+The only membership state included in an initial sync is for all the senders in the timeline
+The only membership state included in an incremental sync is for senders in the timeline
+Old members are included in gappy incr LL sync if they start speaking
+We do send redundant membership state across incremental syncs if asked
+Rejecting invite over federation doesn't break incremental /sync
+Gapped incremental syncs include all state changes
+Old leaves are present in gapped incremental syncs
+Leaves are present in non-gapped incremental syncs
+Members from the gap are included in gappy incr LL sync
