@@ -709,3 +709,4 @@ Gapped incremental syncs include all state changes
 Old leaves are present in gapped incremental syncs
 Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
+Presence can be set from sync
