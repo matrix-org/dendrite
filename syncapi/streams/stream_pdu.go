@@ -269,9 +269,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	if stateFilter.LazyLoadMembers {
-		if err != nil {
-			return r.From, err
-		}
 		delta.StateEvents, err = p.lazyLoadMembers(
 			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, delta.StateEvents,
