@@ -46,10 +46,6 @@ var (
 	userRoomSendMutexes sync.Map // (roomID+userID) -> mutex. mutexes to ensure correct ordering of sendEvents
 )
 
-func init() {
-	prometheus.MustRegister(sendEventDuration)
-}
-
 var sendEventDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "dendrite",
@@ -272,5 +268,24 @@ func generateSendEvent(
 			JSON: jsonerror.Forbidden(err.Error()), // TODO: Is this error string comprehensible to the client?
 		}
 	}
+
+	// User should not be able to send a tombstone event to the same room.
+	if e.Type() == "m.room.tombstone" {
+		content := make(map[string]interface{})
+		if err = json.Unmarshal(e.Content(), &content); err != nil {
+			util.GetLogger(ctx).WithError(err).Error("Cannot unmarshal the event content.")
+			return nil, &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON("Cannot unmarshal the event content."),
+			}
+		}
+		if content["replacement_room"] == e.RoomID() {
+			return nil, &util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidParam("Cannot send tombstone event that points to the same room."),
+			}
+		}
+	}
+
 	return e.Event, nil
 }

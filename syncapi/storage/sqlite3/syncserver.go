@@ -28,10 +28,9 @@ import (
 // both the database for PDUs and caches for EDUs.
 type SyncServerDatasource struct {
 	shared.Database
-	db     *sql.DB
-	writer sqlutil.Writer
-	sqlutil.PartitionOffsetStatements
-	streamID streamIDStatements
+	db       *sql.DB
+	writer   sqlutil.Writer
+	streamID StreamIDStatements
 }
 
 // NewDatabase creates a new sync server database
@@ -50,10 +49,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 }
 
 func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
-		return err
-	}
-	if err = d.streamID.prepare(d.db); err != nil {
+	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
 	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
@@ -104,6 +100,14 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	ignores, err := NewSqliteIgnoresTable(d.db)
+	if err != nil {
+		return err
+	}
+	presence, err := NewSqlitePresenceTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -125,6 +129,8 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		Receipts:            receipts,
 		Memberships:         memberships,
 		NotificationData:    notificationData,
+		Ignores:             ignores,
+		Presence:            presence,
 	}
 	return nil
 }

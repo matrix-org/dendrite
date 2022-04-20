@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
@@ -169,7 +170,7 @@ func (r *uploadRequest) doUpload(
 	}
 
 	// Check if temp file size exceeds max file size configuration
-	if bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+	if *cfg.MaxFileSizeBytes > 0 && bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
 		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
 		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
 	}
@@ -311,6 +312,26 @@ func (r *uploadRequest) storeFileAndMetadata(
 	}
 
 	go func() {
+		file, err := os.Open(string(finalPath))
+		if err != nil {
+			r.Logger.WithError(err).Error("unable to open file")
+			return
+		}
+		defer file.Close() // nolint: errcheck
+		// http.DetectContentType only needs 512 bytes
+		buf := make([]byte, 512)
+		_, err = file.Read(buf)
+		if err != nil {
+			r.Logger.WithError(err).Error("unable to read file")
+			return
+		}
+		// Check if we need to generate thumbnails
+		fileType := http.DetectContentType(buf)
+		if !strings.HasPrefix(fileType, "image") {
+			r.Logger.WithField("contentType", fileType).Debugf("uploaded file is not an image or can not be thumbnailed, not generating thumbnails")
+			return
+		}
+
 		busy, err := thumbnailer.GenerateThumbnails(
 			context.Background(), finalPath, thumbnailSizes, r.MediaMetadata,
 			activeThumbnailGeneration, maxThumbnailGenerators, db, r.Logger,

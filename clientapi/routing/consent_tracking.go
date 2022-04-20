@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -97,7 +96,7 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 			}
 			return &internalError
 		}
-		if err := userAPI.PerformUpdatePolicyVersion(
+		if err = userAPI.PerformUpdatePolicyVersion(
 			req.Context(),
 			&userapi.UpdatePolicyVersionRequest{
 				PolicyVersion: data.Version,
@@ -129,7 +128,6 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,
-	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) {
 	res := &userapi.QueryOutdatedPolicyResponse{}
@@ -180,7 +178,7 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 				Body:    msgBody.String(),
 			},
 		}
-		_, err = sendServerNotice(context.Background(), req, rsAPI, cfgNotices, cfgClient, senderDevice, accountsDB, asAPI, userAPI, nil, nil, nil)
+		_, err = sendServerNotice(context.Background(), req, rsAPI, cfgNotices, cfgClient, senderDevice, asAPI, userAPI, nil, nil, nil)
 		if err != nil {
 			logrus.WithError(err).WithField("userID", userID).Error("failed to send server notice for consent to user")
 			continue

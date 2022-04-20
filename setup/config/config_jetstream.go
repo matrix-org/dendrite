@@ -19,12 +19,12 @@ type JetStream struct {
 	InMemory bool `yaml:"in_memory"`
 }
 
-func (c *JetStream) TopicFor(name string) string {
+func (c *JetStream) Prefixed(name string) string {
 	return fmt.Sprintf("%s%s", c.TopicPrefix, name)
 }
 
 func (c *JetStream) Durable(name string) string {
-	return c.TopicFor(name)
+	return c.Prefixed(name)
 }
 
 func (c *JetStream) Defaults(generate bool) {

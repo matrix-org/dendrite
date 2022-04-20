@@ -45,6 +45,9 @@ type Global struct {
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
 
+	// Configures the handling of presence events.
+	Presence PresenceOptions `yaml:"presence"`
+
 	// List of domains that the server will trust as identity servers to
 	// verify third-party identifiers.
 	// Defaults to an empty array.
@@ -310,4 +313,12 @@ func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool)
 			configErrors.Add(fmt.Sprintf("unable to load defined '%s' policy template", c.Version))
 		}
 	}
+}
+
+// PresenceOptions defines possible configurations for presence events.
+type PresenceOptions struct {
+	// Whether inbound presence events are allowed
+	EnableInbound bool `yaml:"enable_inbound"`
+	// Whether outbound presence events are allowed
+	EnableOutbound bool `yaml:"enable_outbound"`
 }

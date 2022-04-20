@@ -94,4 +94,4 @@ For more general questions please use
 
 We ask that everyone who contributes to the project signs off their
 contributions, in accordance with the
-[DCO](https://github.com/matrix-org/matrix-doc/blob/main/CONTRIBUTING.rst#sign-off).
+[DCO](https://github.com/matrix-org/matrix-spec/blob/main/CONTRIBUTING.rst#sign-off).

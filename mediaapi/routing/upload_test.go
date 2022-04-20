@@ -36,6 +36,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	}
 
 	maxSize := config.FileSizeBytes(8)
+	unlimitedSize := config.FileSizeBytes(0)
 	logger := log.New().WithField("mediaapi", "test")
 	testdataPath := filepath.Join(wd, "./testdata")
 
@@ -50,7 +51,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	_ = os.Mkdir(testdataPath, os.ModePerm)
 	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
 
-	db, err := storage.Open(&config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(&config.DatabaseOptions{
 		ConnectionString:       "file::memory:?cache=shared",
 		MaxOpenConnections:     100,
 		MaxIdleConnections:     2,
@@ -116,6 +117,27 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 				},
 			},
 			want: requestEntityTooLargeJSONResponse(maxSize),
+		},
+		{
+			name: "upload ok with unlimited filesize",
+			args: args{
+				ctx:       context.Background(),
+				reqReader: strings.NewReader("test test test"),
+				cfg: &config.MediaAPI{
+					MaxFileSizeBytes:  &unlimitedSize,
+					BasePath:          config.Path(testdataPath),
+					AbsBasePath:       config.Path(testdataPath),
+					DynamicThumbnails: false,
+				},
+				db: db,
+			},
+			fields: fields{
+				Logger: logger,
+				MediaMetadata: &types.MediaMetadata{
+					MediaID:    "1339",
+					UploadName: "test fail",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/version"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -59,7 +58,6 @@ func SendServerNotice(
 	cfgClient *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
-	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
@@ -86,7 +84,7 @@ func SendServerNotice(
 	if resErr != nil {
 		return *resErr
 	}
-	res, _ := sendServerNotice(ctx, r, rsAPI, cfgNotices, cfgClient, senderDevice, accountsDB, asAPI, userAPI, txnID, device, txnCache)
+	res, _ := sendServerNotice(ctx, r, rsAPI, cfgNotices, cfgClient, senderDevice, asAPI, userAPI, txnID, device, txnCache)
 	return res
 }
 
@@ -97,7 +95,6 @@ func sendServerNotice(
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,
-	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.UserInternalAPI,
 	txnID *string,
@@ -110,7 +107,7 @@ func sendServerNotice(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
-		}, nil
+		}, fmt.Errorf("invalid server notice request")
 	}
 
 	qryServerNoticeRoom := &userapi.QueryServerNoticeRoomResponse{}
@@ -119,11 +116,11 @@ func sendServerNotice(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
-		}, nil
+		}, err
 	}
 	err = userAPI.SelectServerNoticeRoomID(ctx, &userapi.QueryServerNoticeRoomRequest{Localpart: localpart}, qryServerNoticeRoom)
 	if err != nil {
-		return util.ErrorResponse(err), nil
+		return util.ErrorResponse(err), err
 	}
 
 	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
@@ -132,17 +129,18 @@ func sendServerNotice(
 
 	// create a new room for the user
 	if qryServerNoticeRoom.RoomID == "" {
+		var pl, cc []byte
 		powerLevelContent := eventutil.InitialPowerLevelsContent(senderUserID)
 		powerLevelContent.Users[serverNoticeRequest.UserID] = -10 // taken from Synapse
-		pl, err := json.Marshal(powerLevelContent)
+		pl, err = json.Marshal(powerLevelContent)
 		if err != nil {
-			return util.ErrorResponse(err), nil
+			return util.ErrorResponse(err), err
 		}
 		createContent := map[string]interface{}{}
 		createContent["m.federate"] = false
-		cc, err := json.Marshal(createContent)
+		cc, err = json.Marshal(createContent)
 		if err != nil {
-			return util.ErrorResponse(err), nil
+			return util.ErrorResponse(err), err
 		}
 		crReq := createRoomRequest{
 			Invite:                    []string{serverNoticeRequest.UserID},
@@ -155,16 +153,16 @@ func sendServerNotice(
 			PowerLevelContentOverride: pl,
 		}
 
-		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, accountsDB, rsAPI, asAPI, time.Now())
+		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, userAPI, rsAPI, asAPI, time.Now())
 
 		switch data := roomRes.JSON.(type) {
 		case createRoomResponse:
 			roomID = data.RoomID
 			res := &userapi.UpdateServerNoticeRoomResponse{}
-			err := userAPI.UpdateServerNoticeRoomID(ctx, &userapi.UpdateServerNoticeRoomRequest{RoomID: roomID, Localpart: localpart}, res)
+			err = userAPI.UpdateServerNoticeRoomID(ctx, &userapi.UpdateServerNoticeRoomRequest{RoomID: roomID, Localpart: localpart}, res)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("UpdateServerNoticeRoomID failed")
-				return jsonerror.InternalServerError(), nil
+				return jsonerror.InternalServerError(), err
 			}
 			// tag the room, so we can later check if the user tries to reject an invite
 			serverAlertTag := gomatrix.TagContent{Tags: map[string]gomatrix.TagProperties{
@@ -174,25 +172,26 @@ func sendServerNotice(
 			}}
 			if err = saveTagData(ctx, serverNoticeRequest.UserID, roomID, userAPI, serverAlertTag); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("saveTagData failed")
-				return jsonerror.InternalServerError(), nil
+				return jsonerror.InternalServerError(), err
 			}
 
 		default:
 			// if we didn't get a createRoomResponse, we probably received an error, so return that.
-			return roomRes, nil
+			return roomRes, err
 		}
 
 	} else {
 		res := &api.QueryMembershipForUserResponse{}
-		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: serverNoticeRequest.UserID, RoomID: roomID}, res)
+		err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: serverNoticeRequest.UserID, RoomID: roomID}, res)
 		if err != nil {
-			return util.ErrorResponse(err), nil
+			return util.ErrorResponse(err), err
 		}
 		// re-invite the user
 		if res.Membership != gomatrixserverlib.Join {
-			res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			var sendInviteRes util.JSONResponse
+			sendInviteRes, err = sendInvite(ctx, userAPI, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
 			if err != nil {
-				return res, nil
+				return sendInviteRes, err
 			}
 		}
 	}
@@ -206,7 +205,7 @@ func sendServerNotice(
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
-		return *resErr, nil
+		return *resErr, err
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
 
@@ -233,7 +232,7 @@ func sendServerNotice(
 		false,
 	); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError(), nil
+		return jsonerror.InternalServerError(), err
 	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"event_id":     e.EventID(),
@@ -274,7 +273,6 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 func getSenderDevice(
 	ctx context.Context,
 	userAPI userapi.UserInternalAPI,
-	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse
@@ -289,8 +287,12 @@ func getSenderDevice(
 	}
 
 	// set the avatarurl for the user
-	if err = accountDB.SetAvatarURL(ctx, cfg.Matrix.ServerNotices.LocalPart, cfg.Matrix.ServerNotices.AvatarURL); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("accountDB.SetAvatarURL failed")
+	res := &userapi.PerformSetAvatarURLResponse{}
+	if err = userAPI.SetAvatarURL(ctx, &userapi.PerformSetAvatarURLRequest{
+		Localpart: cfg.Matrix.ServerNotices.LocalPart,
+		AvatarURL: cfg.Matrix.ServerNotices.AvatarURL,
+	}, res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 

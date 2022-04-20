@@ -54,7 +54,7 @@ func NewOutputStreamEventConsumer(
 		jetstream:    js,
 		db:           store,
 		durable:      cfg.Matrix.JetStream.Durable("UserAPISyncAPIStreamEventConsumer"),
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputStreamEvent),
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputStreamEvent),
 		pgClient:     pgClient,
 		userAPI:      userAPI,
 		rsAPI:        rsAPI,
@@ -184,6 +184,7 @@ func (s *OutputStreamEventConsumer) localRoomMembers(ctx context.Context, roomID
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
+		LocalOnly:  true,
 	}
 	var res rsapi.QueryMembershipsForRoomResponse
 
@@ -403,8 +404,24 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 		return nil, nil
 	}
 
+	// Get accountdata to check if the event.Sender() is ignored by mem.LocalPart
+	data, err := s.db.GetAccountDataByType(ctx, mem.Localpart, "", "m.ignored_user_list")
+	if err != nil {
+		return nil, err
+	}
+	if data != nil {
+		ignored := types.IgnoredUsers{}
+		err = json.Unmarshal(data, &ignored)
+		if err != nil {
+			return nil, err
+		}
+		sender := event.Sender()
+		if _, ok := ignored.List[sender]; ok {
+			return nil, fmt.Errorf("user %s is ignored", sender)
+		}
+	}
 	var res api.QueryPushRulesResponse
-	if err := s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
+	if err = s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
 		return nil, err
 	}
 

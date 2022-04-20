@@ -65,7 +65,7 @@ func NewOutputRoomEventConsumer(
 		ctx:          process.Context(),
 		cfg:          cfg,
 		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		durable:      cfg.Matrix.JetStream.Durable("SyncAPIRoomServerConsumer"),
 		db:           store,
 		notifier:     notifier,

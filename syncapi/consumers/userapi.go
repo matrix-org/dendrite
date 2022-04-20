@@ -56,7 +56,7 @@ func NewOutputNotificationDataConsumer(
 		ctx:       process.Context(),
 		jetstream: js,
 		durable:   cfg.Matrix.JetStream.Durable("SyncAPINotificationDataConsumer"),
-		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputNotificationData),
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputNotificationData),
 		db:        store,
 		notifier:  notifier,
 		stream:    stream,

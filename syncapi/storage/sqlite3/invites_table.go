@@ -47,7 +47,7 @@ const insertInviteEventSQL = "" +
 	" VALUES ($1, $2, $3, $4, $5, false)"
 
 const deleteInviteEventSQL = "" +
-	"UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2"
+	"UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2 AND deleted=false"
 
 const selectInviteEventsInRangeSQL = "" +
 	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
@@ -59,14 +59,14 @@ const selectMaxInviteIDSQL = "" +
 
 type inviteEventsStatements struct {
 	db                            *sql.DB
-	streamIDStatements            *streamIDStatements
+	streamIDStatements            *StreamIDStatements
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
 	deleteInviteEventStmt         *sql.Stmt
 	selectMaxInviteIDStmt         *sql.Stmt
 }
 
-func NewSqliteInvitesTable(db *sql.DB, streamID *streamIDStatements) (tables.Invites, error) {
+func NewSqliteInvitesTable(db *sql.DB, streamID *StreamIDStatements) (tables.Invites, error) {
 	s := &inviteEventsStatements{
 		db:                 db,
 		streamIDStatements: streamID,

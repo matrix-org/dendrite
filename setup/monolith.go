@@ -19,7 +19,6 @@ import (
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/api"
-	eduServerAPI "github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/federationapi"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -43,30 +42,34 @@ type Monolith struct {
 	Client    *gomatrixserverlib.Client
 	FedClient *gomatrixserverlib.FederationClient
 
-	AppserviceAPI  appserviceAPI.AppServiceQueryAPI
-	EDUInternalAPI eduServerAPI.EDUServerInputAPI
-	FederationAPI  federationAPI.FederationInternalAPI
-	RoomserverAPI  roomserverAPI.RoomserverInternalAPI
-	UserAPI        userapi.UserInternalAPI
-	KeyAPI         keyAPI.KeyInternalAPI
+	AppserviceAPI appserviceAPI.AppServiceQueryAPI
+	FederationAPI federationAPI.FederationInternalAPI
+	RoomserverAPI roomserverAPI.RoomserverInternalAPI
+	UserAPI       userapi.UserInternalAPI
+	KeyAPI        keyAPI.KeyInternalAPI
 
 	// Optional
-	ExtPublicRoomsProvider api.ExtraPublicRoomsProvider
+	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
+	ExtUserDirectoryProvider userapi.UserDirectoryProvider
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
 func (m *Monolith) AddAllPublicRoutes(process *process.ProcessContext, csMux, ssMux, keyMux, wkMux, mediaMux, synapseMux *mux.Router) {
+	userDirectoryProvider := m.ExtUserDirectoryProvider
+	if userDirectoryProvider == nil {
+		userDirectoryProvider = m.UserAPI
+	}
 	clientapi.AddPublicRoutes(
-		csMux, synapseMux, &m.Config.ClientAPI, m.AccountDB,
+		process, csMux, synapseMux, &m.Config.ClientAPI,
 		m.FedClient, m.RoomserverAPI,
-		m.EDUInternalAPI, m.AppserviceAPI, transactions.New(),
-		m.FederationAPI, m.UserAPI, m.KeyAPI,
+		m.AppserviceAPI, transactions.New(),
+		m.FederationAPI, m.UserAPI, userDirectoryProvider, m.KeyAPI,
 		m.ExtPublicRoomsProvider, &m.Config.MSCs,
 	)
 	federationapi.AddPublicRoutes(
-		ssMux, keyMux, wkMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,
+		process, ssMux, keyMux, wkMux, &m.Config.FederationAPI, m.UserAPI, m.FedClient,
 		m.KeyRing, m.RoomserverAPI, m.FederationAPI,
-		m.EDUInternalAPI, m.KeyAPI, &m.Config.MSCs, nil,
+		m.KeyAPI, &m.Config.MSCs, nil,
 	)
 	mediaapi.AddPublicRoutes(mediaMux, &m.Config.MediaAPI, &m.Config.ClientAPI.RateLimiting, m.UserAPI, m.Client)
 	syncapi.AddPublicRoutes(

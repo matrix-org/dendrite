@@ -25,33 +25,52 @@ const (
 // parts.
 func prepareWithFilters(
 	db *sql.DB, txn *sql.Tx, query string, params []interface{},
-	senders, notsenders, types, nottypes []string, excludeEventIDs []string,
-	limit int, order FilterOrder,
+	senders, notsenders, types, nottypes *[]string, excludeEventIDs []string,
+	containsURL *bool, limit int, order FilterOrder,
 ) (*sql.Stmt, []interface{}, error) {
 	offset := len(params)
-	if count := len(senders); count > 0 {
-		query += " AND sender IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range senders {
-			params, offset = append(params, v), offset+1
+	if senders != nil {
+		if count := len(*senders); count > 0 {
+			query += " AND sender IN " + sqlutil.QueryVariadicOffset(count, offset)
+			for _, v := range *senders {
+				params, offset = append(params, v), offset+1
+			}
+		} else {
+			query += ` AND sender = ""`
 		}
 	}
-	if count := len(notsenders); count > 0 {
-		query += " AND sender NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range notsenders {
-			params, offset = append(params, v), offset+1
+	if notsenders != nil {
+		if count := len(*notsenders); count > 0 {
+			query += " AND sender NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
+			for _, v := range *notsenders {
+				params, offset = append(params, v), offset+1
+			}
+		} else {
+			query += ` AND sender NOT = ""`
 		}
 	}
-	if count := len(types); count > 0 {
-		query += " AND type IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range types {
-			params, offset = append(params, v), offset+1
+	if types != nil {
+		if count := len(*types); count > 0 {
+			query += " AND type IN " + sqlutil.QueryVariadicOffset(count, offset)
+			for _, v := range *types {
+				params, offset = append(params, v), offset+1
+			}
+		} else {
+			query += ` AND type = ""`
 		}
 	}
-	if count := len(nottypes); count > 0 {
-		query += " AND type NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
-		for _, v := range nottypes {
-			params, offset = append(params, v), offset+1
+	if nottypes != nil {
+		if count := len(*nottypes); count > 0 {
+			query += " AND type NOT IN " + sqlutil.QueryVariadicOffset(count, offset)
+			for _, v := range *nottypes {
+				params, offset = append(params, v), offset+1
+			}
+		} else {
+			query += ` AND type NOT = ""`
 		}
+	}
+	if containsURL != nil {
+		query += fmt.Sprintf(" AND contains_url = %v", *containsURL)
 	}
 	if count := len(excludeEventIDs); count > 0 {
 		query += " AND event_id NOT IN " + sqlutil.QueryVariadicOffset(count, offset)

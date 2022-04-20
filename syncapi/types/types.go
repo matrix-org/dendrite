@@ -103,6 +103,7 @@ type StreamingToken struct {
 	AccountDataPosition      StreamPosition
 	DeviceListPosition       StreamPosition
 	NotificationDataPosition StreamPosition
+	PresencePosition         StreamPosition
 }
 
 // This will be used as a fallback by json.Marshal.
@@ -118,11 +119,12 @@ func (s *StreamingToken) UnmarshalText(text []byte) (err error) {
 
 func (t StreamingToken) String() string {
 	posStr := fmt.Sprintf(
-		"s%d_%d_%d_%d_%d_%d_%d_%d",
+		"s%d_%d_%d_%d_%d_%d_%d_%d_%d",
 		t.PDUPosition, t.TypingPosition,
 		t.ReceiptPosition, t.SendToDevicePosition,
 		t.InvitePosition, t.AccountDataPosition,
 		t.DeviceListPosition, t.NotificationDataPosition,
+		t.PresencePosition,
 	)
 	return posStr
 }
@@ -146,12 +148,14 @@ func (t *StreamingToken) IsAfter(other StreamingToken) bool {
 		return true
 	case t.NotificationDataPosition > other.NotificationDataPosition:
 		return true
+	case t.PresencePosition > other.PresencePosition:
+		return true
 	}
 	return false
 }
 
 func (t *StreamingToken) IsEmpty() bool {
-	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition == 0
+	return t == nil || t.PDUPosition+t.TypingPosition+t.ReceiptPosition+t.SendToDevicePosition+t.InvitePosition+t.AccountDataPosition+t.DeviceListPosition+t.NotificationDataPosition+t.PresencePosition == 0
 }
 
 // WithUpdates returns a copy of the StreamingToken with updates applied from another StreamingToken.
@@ -191,6 +195,9 @@ func (t *StreamingToken) ApplyUpdates(other StreamingToken) {
 	}
 	if other.NotificationDataPosition > t.NotificationDataPosition {
 		t.NotificationDataPosition = other.NotificationDataPosition
+	}
+	if other.PresencePosition > t.PresencePosition {
+		t.PresencePosition = other.PresencePosition
 	}
 }
 
@@ -284,7 +291,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	// s478_0_0_0_0_13.dl-0-2 but we have now removed partitioned stream positions
 	tok = strings.Split(tok, ".")[0]
 	parts := strings.Split(tok[1:], "_")
-	var positions [8]StreamPosition
+	var positions [9]StreamPosition
 	for i, p := range parts {
 		if i >= len(positions) {
 			break
@@ -306,6 +313,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		AccountDataPosition:      positions[5],
 		DeviceListPosition:       positions[6],
 		NotificationDataPosition: positions[7],
+		PresencePosition:         positions[8],
 	}
 	return token, nil
 }
@@ -377,6 +385,11 @@ func (r *Response) IsEmpty() bool {
 
 // JoinResponse represents a /sync response for a room which is under the 'join' or 'peek' key.
 type JoinResponse struct {
+	Summary struct {
+		Heroes             []string `json:"m.heroes,omitempty"`
+		JoinedMemberCount  *int     `json:"m.joined_member_count,omitempty"`
+		InvitedMemberCount *int     `json:"m.invited_member_count,omitempty"`
+	} `json:"summary"`
 	State struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"state"`
@@ -486,4 +499,26 @@ type ReadUpdate struct {
 type StreamedEvent struct {
 	Event          *gomatrixserverlib.HeaderedEvent `json:"event"`
 	StreamPosition StreamPosition                   `json:"stream_position"`
+}
+
+// OutputReceiptEvent is an entry in the receipt output kafka log
+type OutputReceiptEvent struct {
+	UserID    string                      `json:"user_id"`
+	RoomID    string                      `json:"room_id"`
+	EventID   string                      `json:"event_id"`
+	Type      string                      `json:"type"`
+	Timestamp gomatrixserverlib.Timestamp `json:"timestamp"`
+}
+
+// OutputSendToDeviceEvent is an entry in the send-to-device output kafka log.
+// This contains the full event content, along with the user ID and device ID
+// to which it is destined.
+type OutputSendToDeviceEvent struct {
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+	gomatrixserverlib.SendToDeviceEvent
+}
+
+type IgnoredUsers struct {
+	List map[string]interface{} `json:"ignored_users"`
 }

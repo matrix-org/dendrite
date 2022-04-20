@@ -30,7 +30,6 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/util"
@@ -39,7 +38,7 @@ import (
 var errMissingUserID = errors.New("'user_id' must be supplied")
 
 func SendBan(
-	req *http.Request, accountDB userdb.Database, device *userapi.Device,
+	req *http.Request, profileAPI userapi.UserProfileAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -78,16 +77,16 @@ func SendBan(
 		}
 	}
 
-	return sendMembership(req.Context(), accountDB, device, roomID, "ban", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, "ban", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
 }
 
-func sendMembership(ctx context.Context, accountDB userdb.Database, device *userapi.Device,
+func sendMembership(ctx context.Context, profileAPI userapi.UserProfileAPI, device *userapi.Device,
 	roomID, membership, reason string, cfg *config.ClientAPI, targetUserID string, evTime time.Time,
 	roomVer gomatrixserverlib.RoomVersion,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI) util.JSONResponse {
 
 	event, err := buildMembershipEvent(
-		ctx, targetUserID, reason, accountDB, device, membership,
+		ctx, targetUserID, reason, profileAPI, device, membership,
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
@@ -125,7 +124,7 @@ func sendMembership(ctx context.Context, accountDB userdb.Database, device *user
 }
 
 func SendKick(
-	req *http.Request, accountDB userdb.Database, device *userapi.Device,
+	req *http.Request, profileAPI userapi.UserProfileAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -161,11 +160,11 @@ func SendKick(
 		}
 	}
 	// TODO: should we be using SendLeave instead?
-	return sendMembership(req.Context(), accountDB, device, roomID, "leave", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, "leave", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
 }
 
 func SendUnban(
-	req *http.Request, accountDB userdb.Database, device *userapi.Device,
+	req *http.Request, profileAPI userapi.UserProfileAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -196,11 +195,11 @@ func SendUnban(
 		}
 	}
 	// TODO: should we be using SendLeave instead?
-	return sendMembership(req.Context(), accountDB, device, roomID, "leave", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
+	return sendMembership(req.Context(), profileAPI, device, roomID, "leave", body.Reason, cfg, body.UserID, evTime, roomVer, rsAPI, asAPI)
 }
 
 func SendInvite(
-	req *http.Request, accountDB userdb.Database, device *userapi.Device,
+	req *http.Request, profileAPI userapi.UserProfileAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
@@ -210,7 +209,7 @@ func SendInvite(
 	}
 
 	inviteStored, jsonErrResp := checkAndProcessThreepid(
-		req, device, body, cfg, rsAPI, accountDB, roomID, evTime,
+		req, device, body, cfg, rsAPI, profileAPI, roomID, evTime,
 	)
 	if jsonErrResp != nil {
 		return *jsonErrResp
@@ -227,14 +226,14 @@ func SendInvite(
 	}
 
 	// We already received the return value, so no need to check for an error here.
-	response, _ := sendInvite(req.Context(), accountDB, device, roomID, body.UserID, body.Reason, cfg, rsAPI, asAPI, evTime)
+	response, _ := sendInvite(req.Context(), profileAPI, device, roomID, body.UserID, body.Reason, cfg, rsAPI, asAPI, evTime)
 	return response
 }
 
 // sendInvite sends an invitation to a user. Returns a JSONResponse and an error
 func sendInvite(
 	ctx context.Context,
-	accountDB userdb.Database,
+	profileAPI userapi.UserProfileAPI,
 	device *userapi.Device,
 	roomID, userID, reason string,
 	cfg *config.ClientAPI,
@@ -242,7 +241,7 @@ func sendInvite(
 	asAPI appserviceAPI.AppServiceQueryAPI, evTime time.Time,
 ) (util.JSONResponse, error) {
 	event, err := buildMembershipEvent(
-		ctx, userID, reason, accountDB, device, "invite",
+		ctx, userID, reason, profileAPI, device, "invite",
 		roomID, false, cfg, evTime, rsAPI, asAPI,
 	)
 	if err == errMissingUserID {
@@ -286,13 +285,13 @@ func sendInvite(
 
 func buildMembershipEvent(
 	ctx context.Context,
-	targetUserID, reason string, accountDB userdb.Database,
+	targetUserID, reason string, profileAPI userapi.UserProfileAPI,
 	device *userapi.Device,
 	membership, roomID string, isDirect bool,
 	cfg *config.ClientAPI, evTime time.Time,
 	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
-	profile, err := loadProfile(ctx, targetUserID, cfg, accountDB, asAPI)
+	profile, err := loadProfile(ctx, targetUserID, cfg, profileAPI, asAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +326,7 @@ func loadProfile(
 	ctx context.Context,
 	userID string,
 	cfg *config.ClientAPI,
-	accountDB userdb.Database,
+	profileAPI userapi.UserProfileAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*authtypes.Profile, error) {
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
@@ -337,7 +336,7 @@ func loadProfile(
 
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
-		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
+		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	} else {
 		profile = &authtypes.Profile{}
 	}
@@ -381,13 +380,13 @@ func checkAndProcessThreepid(
 	body *threepid.MembershipRequest,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	accountDB userdb.Database,
+	profileAPI userapi.UserProfileAPI,
 	roomID string,
 	evTime time.Time,
 ) (inviteStored bool, errRes *util.JSONResponse) {
 
 	inviteStored, err := threepid.CheckAndProcessInvite(
-		req.Context(), device, body, cfg, rsAPI, accountDB,
+		req.Context(), device, body, cfg, rsAPI, profileAPI,
 		roomID, evTime,
 	)
 	if err == threepid.ErrMissingParameter {

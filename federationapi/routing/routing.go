@@ -19,8 +19,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	eduserverAPI "github.com/matrix-org/dendrite/eduserver/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
@@ -29,6 +29,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,7 +45,6 @@ func Setup(
 	fedMux, keyMux, wkMux *mux.Router,
 	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-	eduAPI eduserverAPI.EDUServerInputAPI,
 	fsAPI federationAPI.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
@@ -52,7 +52,12 @@ func Setup(
 	keyAPI keyserverAPI.KeyInternalAPI,
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
+	producer *producers.SyncAPIProducer,
 ) {
+	prometheus.MustRegister(
+		pduCountTotal, eduCountTotal,
+	)
+
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
 	v2fedmux := fedMux.PathPrefix("/v2").Subrouter()
@@ -116,7 +121,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, eduAPI, keyAPI, keys, federation, mu, servers,
+				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)

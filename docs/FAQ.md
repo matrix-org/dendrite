@@ -12,6 +12,10 @@ No, although a good portion of the Matrix specification has been implemented. Mo
 
 No, not at present. There will be in the future when Dendrite reaches version 1.0.
 
+### Can I use Dendrite with an existing Synapse database?
+
+No, Dendrite has a very different database schema to Synapse and the two are not interchangeable.
+
 ### Should I run a monolith or a polylith deployment?
 
 Monolith deployments are always preferred where possible, and at this time, are far better tested than polylith deployments are. The only reason to consider a polylith deployment is if you wish to run different Dendrite components on separate physical machines.
@@ -33,7 +37,7 @@ It should do, although we are aware of some minor issues:
 
 ### Does Dendrite support push notifications?
 
-No, not yet. This is a planned feature.
+Yes, we have experimental support for push notifications. Configure them in the usual way in your Matrix client.
 
 ### Does Dendrite support application services/bridges?
 

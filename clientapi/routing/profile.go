@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/gomatrix"
@@ -36,12 +35,12 @@ import (
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, accountDB userdb.Database, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
+	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
 		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
@@ -65,11 +64,11 @@ func GetProfile(
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, accountDB userdb.Database, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
+	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
 		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
@@ -92,7 +91,7 @@ func GetAvatarURL(
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, accountDB userdb.Database,
+	req *http.Request, profileAPI userapi.UserProfileAPI,
 	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -127,22 +126,34 @@ func SetAvatarURL(
 		}
 	}
 
-	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+	res := &userapi.QueryProfileResponse{}
+	err = profileAPI.QueryProfile(req.Context(), &userapi.QueryProfileRequest{
+		UserID: userID,
+	}, res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.QueryProfile failed")
+		return jsonerror.InternalServerError()
+	}
+	oldProfile := &authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: res.DisplayName,
+		AvatarURL:   res.AvatarURL,
+	}
+
+	setRes := &userapi.PerformSetAvatarURLResponse{}
+	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
+		Localpart: localpart,
+		AvatarURL: r.AvatarURL,
+	}, setRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return jsonerror.InternalServerError()
 	}
 
-	if err = accountDB.SetAvatarURL(req.Context(), localpart, r.AvatarURL); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SetAvatarURL failed")
-		return jsonerror.InternalServerError()
-	}
-
-	var res api.QueryRoomsForUserResponse
+	var roomsRes api.QueryRoomsForUserResponse
 	err = rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
 		UserID:         device.UserID,
 		WantMembership: "join",
-	}, &res)
+	}, &roomsRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
 		return jsonerror.InternalServerError()
@@ -155,7 +166,7 @@ func SetAvatarURL(
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), res.RoomIDs, newProfile, userID, cfg, evTime, rsAPI,
+		req.Context(), roomsRes.RoomIDs, newProfile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -169,7 +180,7 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, false); err != nil {
+	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -182,11 +193,11 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, accountDB userdb.Database, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
-	profile, err := getProfile(req.Context(), accountDB, cfg, userID, asAPI, federation)
+	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
 	if err != nil {
 		if err == eventutil.ErrProfileNoExists {
 			return util.JSONResponse{
@@ -209,7 +220,7 @@ func GetDisplayName(
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, accountDB userdb.Database,
+	req *http.Request, profileAPI userapi.UserProfileAPI,
 	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -244,14 +255,26 @@ func SetDisplayName(
 		}
 	}
 
-	oldProfile, err := accountDB.GetProfileByLocalpart(req.Context(), localpart)
+	pRes := &userapi.QueryProfileResponse{}
+	err = profileAPI.QueryProfile(req.Context(), &userapi.QueryProfileRequest{
+		UserID: userID,
+	}, pRes)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetProfileByLocalpart failed")
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.QueryProfile failed")
 		return jsonerror.InternalServerError()
 	}
+	oldProfile := &authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: pRes.DisplayName,
+		AvatarURL:   pRes.AvatarURL,
+	}
 
-	if err = accountDB.SetDisplayName(req.Context(), localpart, r.DisplayName); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("accountDB.SetDisplayName failed")
+	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
+		Localpart:   localpart,
+		DisplayName: r.DisplayName,
+	}, &struct{}{})
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return jsonerror.InternalServerError()
 	}
 
@@ -302,7 +325,7 @@ func SetDisplayName(
 // Returns an error when something goes wrong or specifically
 // eventutil.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
-	ctx context.Context, accountDB userdb.Database, cfg *config.ClientAPI,
+	ctx context.Context, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -331,7 +354,7 @@ func getProfile(
 		}, nil
 	}
 
-	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	if err != nil {
 		return nil, err
 	}

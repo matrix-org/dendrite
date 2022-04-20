@@ -31,12 +31,12 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
-
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -44,7 +44,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 )
 
 var (
@@ -63,11 +62,6 @@ const (
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 	sessionIDLength   = 24
 )
-
-func init() {
-	// Register prometheus metrics. They must be registered to be exposed.
-	prometheus.MustRegister(amtRegUsers)
-}
 
 // sessionsDict keeps track of completed auth stages for each session.
 // It shouldn't be passed by value because it contains a mutex.
@@ -523,24 +517,38 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	userAPI userapi.UserInternalAPI,
-	accountDB userdb.Database,
+	userAPI userapi.UserRegisterAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
+	defer req.Body.Close() // nolint: errcheck
+	reqBody, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.NotJSON("Unable to read request body"),
+		}
+	}
+
 	var r registerRequest
-	resErr := httputil.UnmarshalJSONRequest(req, &r)
-	if resErr != nil {
+	sessionID := gjson.GetBytes(reqBody, "auth.session").String()
+	if sessionID == "" {
+		// Generate a new, random session ID
+		sessionID = util.RandomString(sessionIDLength)
+	} else if data, ok := sessions.getParams(sessionID); ok {
+		// Use the parameters from the session as our defaults.
+		// Some of these might end up being overwritten if the
+		// values are specified again in the request body.
+		r.Username = data.Username
+		r.Password = data.Password
+		r.DeviceID = data.DeviceID
+		r.InitialDisplayName = data.InitialDisplayName
+		r.InhibitLogin = data.InhibitLogin
+	}
+	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
 	}
 	if req.URL.Query().Get("kind") == "guest" {
 		return handleGuestRegistration(req, r, cfg, userAPI)
-	}
-
-	// Retrieve or generate the sessionID
-	sessionID := r.Auth.Session
-	if sessionID == "" {
-		// Generate a new, random session ID
-		sessionID = util.RandomString(sessionIDLength)
 	}
 
 	// Don't allow numeric usernames less than MAX_INT64.
@@ -552,13 +560,12 @@ func Register(
 	}
 	// Auto generate a numeric username if r.Username is empty
 	if r.Username == "" {
-		id, err := accountDB.GetNewNumericLocalpart(req.Context())
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("accountDB.GetNewNumericLocalpart failed")
+		res := &userapi.QueryNumericLocalpartResponse{}
+		if err := userAPI.QueryNumericLocalpart(req.Context(), res); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return jsonerror.InternalServerError()
 		}
-
-		r.Username = strconv.FormatInt(id, 10)
+		r.Username = strconv.FormatInt(res.ID, 10)
 	}
 
 	// Is this an appservice registration? It will be if the access
@@ -571,7 +578,7 @@ func Register(
 	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
 		// Spec-compliant case (the access_token is specified and the login type
 		// is correctly set, so it's an appservice registration)
-		if resErr = validateApplicationServiceUsername(r.Username); resErr != nil {
+		if resErr := validateApplicationServiceUsername(r.Username); resErr != nil {
 			return *resErr
 		}
 	case accessTokenErr == nil:
@@ -584,11 +591,11 @@ func Register(
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
-		if resErr = validateUsername(r.Username); resErr != nil {
+		if resErr := validateUsername(r.Username); resErr != nil {
 			return *resErr
 		}
 	}
-	if resErr = validatePassword(r.Password); resErr != nil {
+	if resErr := validatePassword(r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -606,7 +613,7 @@ func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
 		return util.JSONResponse{
@@ -671,7 +678,7 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 	accessToken string,
 	accessTokenErr error,
 ) util.JSONResponse {
@@ -762,7 +769,7 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -805,7 +812,7 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		policyVersion := ""
@@ -836,7 +843,7 @@ func checkAndCompleteFlow(
 // not all
 func completeRegistration(
 	ctx context.Context,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.UserRegisterAPI,
 	username, password, appserviceID, ipAddr, userAgent, sessionID, policyVersion string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
@@ -849,24 +856,17 @@ func completeRegistration(
 		}
 	}()
 
-	if data, ok := sessions.getParams(sessionID); ok {
-		username = data.Username
-		password = data.Password
-		deviceID = data.DeviceID
-		displayName = data.InitialDisplayName
-		inhibitLogin = data.InhibitLogin
-	}
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing username"),
+			JSON: jsonerror.MissingArgument("Missing username"),
 		}
 	}
 	// Blank passwords are only allowed by registered application services
 	if password == "" && appserviceID == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("missing password"),
+			JSON: jsonerror.MissingArgument("Missing password"),
 		}
 	}
 	var accRes userapi.PerformAccountCreationResponse
@@ -1003,7 +1003,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.ClientAPI,
-	accountDB userdb.Database,
+	registerAPI userapi.UserRegisterAPI,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 
@@ -1025,14 +1025,18 @@ func RegisterAvailable(
 		}
 	}
 
-	availability, availabilityErr := accountDB.CheckAccountAvailability(req.Context(), username)
-	if availabilityErr != nil {
+	res := &userapi.QueryAccountAvailabilityResponse{}
+	err := registerAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
+		Localpart: username,
+	}, res)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("failed to check availability: " + availabilityErr.Error()),
+			JSON: jsonerror.Unknown("failed to check availability:" + err.Error()),
 		}
 	}
-	if !availability {
+
+	if !res.Available {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UserInUse("Desired User ID is already taken."),

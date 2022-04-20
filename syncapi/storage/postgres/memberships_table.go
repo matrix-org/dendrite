@@ -56,15 +56,14 @@ const upsertMembershipSQL = "" +
 	" ON CONFLICT ON CONSTRAINT syncapi_memberships_unique" +
 	" DO UPDATE SET event_id = $4, stream_pos = $5, topological_pos = $6"
 
-const selectMembershipSQL = "" +
-	"SELECT event_id, stream_pos, topological_pos FROM syncapi_memberships" +
-	" WHERE room_id = $1 AND user_id = $2 AND membership = ANY($3)" +
-	" ORDER BY stream_pos DESC" +
-	" LIMIT 1"
+const selectMembershipCountSQL = "" +
+	"SELECT COUNT(*) FROM (" +
+	" SELECT DISTINCT ON (room_id, user_id) room_id, user_id, membership FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC" +
+	") t WHERE t.membership = $3"
 
 type membershipsStatements struct {
-	upsertMembershipStmt *sql.Stmt
-	selectMembershipStmt *sql.Stmt
+	upsertMembershipStmt      *sql.Stmt
+	selectMembershipCountStmt *sql.Stmt
 }
 
 func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -76,7 +75,7 @@ func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 	if s.upsertMembershipStmt, err = db.Prepare(upsertMembershipSQL); err != nil {
 		return nil, err
 	}
-	if s.selectMembershipStmt, err = db.Prepare(selectMembershipSQL); err != nil {
+	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCountSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -102,10 +101,10 @@ func (s *membershipsStatements) UpsertMembership(
 	return err
 }
 
-func (s *membershipsStatements) SelectMembership(
-	ctx context.Context, txn *sql.Tx, roomID, userID, memberships []string,
-) (eventID string, streamPos, topologyPos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembershipStmt)
-	err = stmt.QueryRowContext(ctx, roomID, userID, memberships).Scan(&eventID, &streamPos, &topologyPos)
+func (s *membershipsStatements) SelectMembershipCount(
+	ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition,
+) (count int, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
+	err = stmt.QueryRowContext(ctx, roomID, pos, membership).Scan(&count)
 	return
 }

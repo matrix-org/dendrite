@@ -34,6 +34,7 @@ type RoomserverInternalAPI struct {
 	*perform.Publisher
 	*perform.Backfiller
 	*perform.Forgetter
+	*perform.Upgrader
 	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
@@ -43,6 +44,7 @@ type RoomserverInternalAPI struct {
 	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.FederationInternalAPI
 	asAPI                  asAPI.AppServiceQueryAPI
+	NATSClient             *nats.Conn
 	JetStream              nats.JetStreamContext
 	Durable                string
 	InputRoomEventTopic    string // JetStream topic for new input room events
@@ -52,7 +54,8 @@ type RoomserverInternalAPI struct {
 
 func NewRoomserverAPI(
 	processCtx *process.ProcessContext, cfg *config.RoomServer, roomserverDB storage.Database,
-	consumer nats.JetStreamContext, inputRoomEventTopic, outputRoomEventTopic string,
+	consumer nats.JetStreamContext, nc *nats.Conn,
+	inputRoomEventTopic, outputRoomEventTopic string,
 	caches caching.RoomServerCaches, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
@@ -66,6 +69,7 @@ func NewRoomserverAPI(
 		InputRoomEventTopic:    inputRoomEventTopic,
 		OutputRoomEventTopic:   outputRoomEventTopic,
 		JetStream:              consumer,
+		NATSClient:             nc,
 		Durable:                cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
@@ -87,11 +91,13 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	r.KeyRing = keyRing
 
 	r.Inputer = &input.Inputer{
+		Cfg:                  r.Cfg,
 		ProcessContext:       r.ProcessContext,
 		DB:                   r.DB,
 		InputRoomEventTopic:  r.InputRoomEventTopic,
 		OutputRoomEventTopic: r.OutputRoomEventTopic,
 		JetStream:            r.JetStream,
+		NATSClient:           r.NATSClient,
 		Durable:              nats.Durable(r.Durable),
 		ServerName:           r.Cfg.Matrix.ServerName,
 		FSAPI:                fsAPI,
@@ -153,6 +159,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 	}
 	r.Forgetter = &perform.Forgetter{
 		DB: r.DB,
+	}
+	r.Upgrader = &perform.Upgrader{
+		Cfg:    r.Cfg,
+		URSAPI: r,
 	}
 
 	if err := r.Inputer.Start(); err != nil {

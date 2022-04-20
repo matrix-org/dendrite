@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/eduserver/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -60,13 +59,13 @@ const selectMaxReceiptIDSQL = "" +
 
 type receiptStatements struct {
 	db                 *sql.DB
-	streamIDStatements *streamIDStatements
+	streamIDStatements *StreamIDStatements
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
 	selectMaxReceiptID *sql.Stmt
 }
 
-func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Receipts, error) {
+func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Receipts, error) {
 	_, err := db.Exec(receiptsSchema)
 	if err != nil {
 		return nil, err
@@ -99,7 +98,7 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 }
 
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []api.OutputReceiptEvent, error) {
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
 	selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
 	var lastPos types.StreamPosition
 	params := make([]interface{}, len(roomIDs)+1)
@@ -112,9 +111,9 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomReceiptsAfter: rows.close() failed")
-	var res []api.OutputReceiptEvent
+	var res []types.OutputReceiptEvent
 	for rows.Next() {
-		r := api.OutputReceiptEvent{}
+		r := types.OutputReceiptEvent{}
 		var id types.StreamPosition
 		err = rows.Scan(&id, &r.RoomID, &r.Type, &r.UserID, &r.EventID, &r.Timestamp)
 		if err != nil {

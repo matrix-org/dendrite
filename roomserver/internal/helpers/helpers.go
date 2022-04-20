@@ -28,7 +28,7 @@ func UpdateToInviteMembership(
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, err := mu.SetToInvite(*add)
+	needsSending, err := mu.SetToInvite(add)
 	if err != nil {
 		return nil, err
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -652,7 +653,7 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart)
 	}
 	if req.Pusher.PushKeyTS == 0 {
-		req.Pusher.PushKeyTS = gomatrixserverlib.AsTimestamp(time.Now())
+		req.Pusher.PushKeyTS = int64(time.Now().Unix())
 	}
 	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart)
 }
@@ -759,6 +760,69 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 	}
 	res.RuleSets = &data
 	return nil
+}
+
+func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
+	return a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+}
+
+func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.QueryNumericLocalpartResponse) error {
+	id, err := a.DB.GetNewNumericLocalpart(ctx)
+	if err != nil {
+		return err
+	}
+	res.ID = id
+	return nil
+}
+
+func (a *UserInternalAPI) QueryAccountAvailability(ctx context.Context, req *api.QueryAccountAvailabilityRequest, res *api.QueryAccountAvailabilityResponse) error {
+	var err error
+	res.Available, err = a.DB.CheckAccountAvailability(ctx, req.Localpart)
+	return err
+}
+
+func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.QueryAccountByPasswordRequest, res *api.QueryAccountByPasswordResponse) error {
+	acc, err := a.DB.GetAccountByPassword(ctx, req.Localpart, req.PlaintextPassword)
+	switch err {
+	case sql.ErrNoRows: // user does not exist
+		return nil
+	case bcrypt.ErrMismatchedHashAndPassword: // user exists, but password doesn't match
+		return nil
+	default:
+		res.Exists = true
+		res.Account = acc
+		return nil
+	}
+}
+
+func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, _ *struct{}) error {
+	return a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+}
+
+func (a *UserInternalAPI) QueryLocalpartForThreePID(ctx context.Context, req *api.QueryLocalpartForThreePIDRequest, res *api.QueryLocalpartForThreePIDResponse) error {
+	localpart, err := a.DB.GetLocalpartForThreePID(ctx, req.ThreePID, req.Medium)
+	if err != nil {
+		return err
+	}
+	res.Localpart = localpart
+	return nil
+}
+
+func (a *UserInternalAPI) QueryThreePIDsForLocalpart(ctx context.Context, req *api.QueryThreePIDsForLocalpartRequest, res *api.QueryThreePIDsForLocalpartResponse) error {
+	r, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart)
+	if err != nil {
+		return err
+	}
+	res.ThreePIDs = r
+	return nil
+}
+
+func (a *UserInternalAPI) PerformForgetThreePID(ctx context.Context, req *api.PerformForgetThreePIDRequest, res *struct{}) error {
+	return a.DB.RemoveThreePIDAssociation(ctx, req.ThreePID, req.Medium)
+}
+
+func (a *UserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context, req *api.PerformSaveThreePIDAssociationRequest, res *struct{}) error {
+	return a.DB.SaveThreePIDAssociation(ctx, req.ThreePID, req.Localpart, req.Medium)
 }
 
 const pushRulesAccountDataType = "m.push_rules"

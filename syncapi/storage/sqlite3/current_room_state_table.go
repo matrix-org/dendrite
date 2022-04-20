@@ -60,8 +60,8 @@ const upsertRoomStateSQL = "" +
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
-const DeleteRoomStateForRoomSQL = "" +
-	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
+const deleteRoomStateForRoomSQL = "" +
+	"DELETE FROM syncapi_current_room_state WHERE room_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
@@ -90,17 +90,17 @@ const selectEventsWithEventIDsSQL = "" +
 
 type currentRoomStateStatements struct {
 	db                                 *sql.DB
-	streamIDStatements                 *streamIDStatements
+	streamIDStatements                 *StreamIDStatements
 	upsertRoomStateStmt                *sql.Stmt
 	deleteRoomStateByEventIDStmt       *sql.Stmt
-	DeleteRoomStateForRoomStmt         *sql.Stmt
+	deleteRoomStateForRoomStmt         *sql.Stmt
 	selectRoomIDsWithMembershipStmt    *sql.Stmt
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
 	selectStateEventStmt               *sql.Stmt
 }
 
-func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (tables.CurrentRoomState, error) {
+func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
 	s := &currentRoomStateStatements{
 		db:                 db,
 		streamIDStatements: streamID,
@@ -115,7 +115,7 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *streamIDStatements) (t
 	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
 		return nil, err
 	}
-	if s.DeleteRoomStateForRoomStmt, err = db.Prepare(DeleteRoomStateForRoomSQL); err != nil {
+	if s.deleteRoomStateForRoomStmt, err = db.Prepare(deleteRoomStateForRoomSQL); err != nil {
 		return nil, err
 	}
 	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
@@ -220,7 +220,7 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		excludeEventIDs, stateFilter.Limit, FilterOrderNone,
+		excludeEventIDs, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderNone,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -246,7 +246,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.DeleteRoomStateForRoomStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateForRoomStmt)
 	_, err := stmt.ExecContext(ctx, roomID)
 	return err
 }

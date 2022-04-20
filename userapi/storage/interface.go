@@ -24,12 +24,17 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
-type Database interface {
-	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
+type Profile interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
+	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
 	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
+}
+
+type Database interface {
+	Profile
+	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
 	// account already exists, it will return nil, ErrUserExists.
@@ -48,7 +53,6 @@ type Database interface {
 	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
 	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
-	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
 	DeactivateAccount(ctx context.Context, localpart string) (err error)
 	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
 	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)

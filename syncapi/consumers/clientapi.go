@@ -61,8 +61,8 @@ func NewOutputClientDataConsumer(
 	return &OutputClientDataConsumer{
 		ctx:        process.Context(),
 		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.TopicFor(jetstream.OutputClientData),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIClientAPIConsumer"),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
 		db:         store,
 		notifier:   notifier,
 		stream:     stream,
@@ -117,6 +117,15 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg)
 		}).Errorf("Failed to generate read update")
 		sentry.CaptureException(err)
 		return false
+	}
+
+	if output.IgnoredUsers != nil {
+		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
+			log.WithError(err).WithFields(logrus.Fields{
+				"user_id": userID,
+			}).Errorf("Failed to update ignored users")
+			sentry.CaptureException(err)
+		}
 	}
 
 	s.stream.Advance(streamPos)
