@@ -312,10 +312,10 @@ Inbound federation can return events
 Inbound federation can return missing events for world_readable visibility
 Inbound federation can return missing events for invite visibility
 Inbound federation can get public room list
-POST /rooms/:room_id/redact/:event_id as power user redacts message
-POST /rooms/:room_id/redact/:event_id as original message sender redacts message
-POST /rooms/:room_id/redact/:event_id as random user does not redact message
-POST /redact disallows redaction of event in different room
+PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
+PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
+PUT /rooms/:room_id/redact/:event_id/:txn_id as random user does not redact message
+PUT /redact disallows redaction of event in different room
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
 Redaction of a redaction redacts the redaction reason
