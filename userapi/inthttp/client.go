@@ -44,8 +44,8 @@ const (
 	PerformSetDisplayNamePath          = "/userapi/performSetDisplayName"
 	PerformForgetThreePIDPath          = "/userapi/performForgetThreePID"
 	PerformSaveThreePIDAssociationPath = "/userapi/performSaveThreePIDAssociation"
-	PerformUpdatePolicyVersionPath    = "/userapi/performUpdatePolicyVersion"
-	PerformUpdateServerNoticeRoomPath = "/userapi/performUpdateServerNoticeRoom"
+	PerformUpdatePolicyVersionPath     = "/userapi/performUpdatePolicyVersion"
+	PerformUpdateServerNoticeRoomPath  = "/userapi/performUpdateServerNoticeRoom"
 
 	QueryKeyBackupPath             = "/userapi/queryKeyBackup"
 	QueryProfilePath               = "/userapi/queryProfile"
@@ -63,9 +63,9 @@ const (
 	QueryAccountByPasswordPath     = "/userapi/queryAccountByPassword"
 	QueryLocalpartForThreePIDPath  = "/userapi/queryLocalpartForThreePID"
 	QueryThreePIDsForLocalpartPath = "/userapi/queryThreePIDsForLocalpart"
-	QueryPolicyVersionPath       = "/userapi/queryPolicyVersion"
-	QueryOutdatedPolicyUsersPath = "/userapi/queryOutdatedPolicy"
-	QueryServerNoticeRoomPath    = "/userapi/queryServerNoticeRoom"
+	QueryPolicyVersionPath         = "/userapi/queryPolicyVersion"
+	QueryOutdatedPolicyUsersPath   = "/userapi/queryOutdatedPolicy"
+	QueryServerNoticeRoomPath      = "/userapi/queryServerNoticeRoom"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -397,14 +397,6 @@ func (h *httpUserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
-func (h *httpUserInternalAPI) QueryPolicyVersion(ctx context.Context, req *api.QueryPolicyVersionRequest, res *api.QueryPolicyVersionResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPolicyVersion")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryPolicyVersionPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-}
-
 func (h *httpUserInternalAPI) QueryOutdatedPolicy(ctx context.Context, req *api.QueryOutdatedPolicyRequest, res *api.QueryOutdatedPolicyResponse) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryOutdatedPolicy")
 	defer span.Finish()
@@ -426,6 +418,14 @@ func (h *httpUserInternalAPI) SelectServerNoticeRoomID(ctx context.Context, req 
 	defer span.Finish()
 
 	apiURL := h.apiURL + QueryServerNoticeRoomPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) QueryPolicyVersion(ctx context.Context, req *api.QueryPolicyVersionRequest, res *api.QueryPolicyVersionResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPolicyVersion")
+	defer span.Finish()
+
+	apiURL := h.apiURL + QueryPolicyVersionPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 

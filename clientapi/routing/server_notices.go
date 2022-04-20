@@ -107,7 +107,7 @@ func sendServerNotice(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Invalid request"),
-		}, fmt.Errorf("invalid server notice request")
+		}, fmt.Errorf("Invalid JSON")
 	}
 
 	qryServerNoticeRoom := &userapi.QueryServerNoticeRoomResponse{}
@@ -177,7 +177,7 @@ func sendServerNotice(
 
 		default:
 			// if we didn't get a createRoomResponse, we probably received an error, so return that.
-			return roomRes, err
+			return roomRes, fmt.Errorf("Unable to create room")
 		}
 
 	} else {
@@ -188,10 +188,10 @@ func sendServerNotice(
 		}
 		// re-invite the user
 		if res.Membership != gomatrixserverlib.Join {
-			var sendInviteRes util.JSONResponse
-			sendInviteRes, err = sendInvite(ctx, userAPI, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			var inviteRes util.JSONResponse
+			inviteRes, err = sendInvite(ctx, userAPI, senderDevice, roomID, serverNoticeRequest.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
 			if err != nil {
-				return sendInviteRes, err
+				return inviteRes, err
 			}
 		}
 	}
@@ -205,7 +205,7 @@ func sendServerNotice(
 	e, resErr := generateSendEvent(ctx, request, senderDevice, roomID, "m.room.message", nil, cfgClient, rsAPI, time.Now())
 	if resErr != nil {
 		logrus.Errorf("failed to send message: %+v", resErr)
-		return *resErr, err
+		return *resErr, fmt.Errorf("Unable to send event")
 	}
 	timeToGenerateEvent := time.Since(startedGeneratingEvent)
 
@@ -220,7 +220,7 @@ func sendServerNotice(
 	// pass the new event to the roomserver and receive the correct event ID
 	// event ID in case of duplicate transaction is discarded
 	startedSubmittingEvent := time.Now()
-	if err := api.SendEvents(
+	if err = api.SendEvents(
 		ctx, rsAPI,
 		api.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{

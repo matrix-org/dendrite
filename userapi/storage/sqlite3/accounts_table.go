@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -235,7 +236,7 @@ func (s *accountsStatements) BatchSelectPrivacyPolicy(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "BatchSelectPrivacyPolicy: rows.close() failed")
 	for rows.Next() {
 		var userID string
 		if err := rows.Scan(&userID); err != nil {

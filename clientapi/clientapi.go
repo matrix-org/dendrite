@@ -68,4 +68,3 @@ func AddPublicRoutes(
 		extRoomsProvider, mscCfg, natsClient,
 	)
 }
-
