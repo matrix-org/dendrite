@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -228,13 +229,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		eventFilter, true, true,
 	)
 	if err != nil {
-		return r.From, err
+		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
 	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
-		return r.From, err
+		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
 	}
 
 	// If we didn't return any events at all then don't bother doing anything else.
@@ -276,7 +277,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			device, recentEvents, delta.StateEvents,
 		)
 		if err != nil {
-			return r.From, err
+			return r.From, fmt.Errorf("p.lazyLoadMembers: %w", err)
 		}
 	}
 
