@@ -206,6 +206,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
 	device *userapi.Device,
