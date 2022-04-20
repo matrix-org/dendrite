@@ -229,6 +229,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		eventFilter, true, true,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return r.To, nil
+		}
 		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
@@ -273,7 +276,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, delta.StateEvents,
 		)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return r.From, fmt.Errorf("p.lazyLoadMembers: %w", err)
 		}
 	}
