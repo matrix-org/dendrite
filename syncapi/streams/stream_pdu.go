@@ -341,12 +341,16 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	wantFullState bool,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
+	jr = types.NewJoinResponse()
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
 		ctx, roomID, r, eventFilter, true, true,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return jr, nil
+		}
 		return
 	}
 
@@ -430,12 +434,11 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			false, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, stateEvents,
 		)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}
 	}
 
-	jr = types.NewJoinResponse()
 	jr.Summary.JoinedMemberCount = &joinedCount
 	jr.Summary.InvitedMemberCount = &invitedCount
 	jr.Timeline.PrevBatch = prevBatch
