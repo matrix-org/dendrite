@@ -22,7 +22,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"syscall/js"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
@@ -44,6 +43,7 @@ import (
 
 	_ "github.com/matrix-org/go-sqlite3-js"
 
+	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
@@ -154,6 +154,8 @@ func startup() {
 
 	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
 	pSessions := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
+	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pManager.AddPeer("wss://pinecone.matrix.org/public")
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(true)
@@ -236,21 +238,5 @@ func startup() {
 			Mux: httpRouter,
 		}
 		s.ListenAndServe("fetch")
-	}()
-
-	// Connect to the static peer
-	go func() {
-		for {
-			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
-				if err := conn.ConnectToPeer(pRouter, publicPeer); err != nil {
-					logrus.WithError(err).Error("Failed to connect to static peer")
-				}
-			}
-			select {
-			case <-base.ProcessContext.Context().Done():
-				return
-			case <-time.After(time.Second * 5):
-			}
-		}
 	}()
 }

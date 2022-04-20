@@ -13,11 +13,21 @@ import (
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	natsclient "github.com/nats-io/nats.go"
 )
 
 var natsServer *natsserver.Server
 var natsServerMutex sync.Mutex
+
+func PrepareForTests() (*process.ProcessContext, nats.JetStreamContext, *nats.Conn) {
+	cfg := &config.Dendrite{}
+	cfg.Defaults(true)
+	cfg.Global.JetStream.InMemory = true
+	pc := process.NewProcessContext()
+	js, jc := Prepare(pc, &cfg.Global.JetStream)
+	return pc, js, jc
+}
 
 func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server

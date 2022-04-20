@@ -1,5 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postgres
+package test
 
 import (
-	"database/sql"
+	"fmt"
+	"sync/atomic"
 )
 
-type statements struct {
-	media     mediaStatements
-	thumbnail thumbnailStatements
+var (
+	userIDCounter = int64(0)
+)
+
+type User struct {
+	ID string
 }
 
-func (s *statements) prepare(db *sql.DB) (err error) {
-	if err = s.media.prepare(db); err != nil {
-		return
+func NewUser() *User {
+	counter := atomic.AddInt64(&userIDCounter, 1)
+	u := &User{
+		ID: fmt.Sprintf("@%d:localhost", counter),
 	}
-	if err = s.thumbnail.prepare(db); err != nil {
-		return
-	}
-
-	return
+	return u
 }

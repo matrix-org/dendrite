@@ -22,9 +22,17 @@ import (
 )
 
 type Database interface {
+	MediaRepository
+	Thumbnails
+}
+
+type MediaRepository interface {
 	StoreMediaMetadata(ctx context.Context, mediaMetadata *types.MediaMetadata) error
 	GetMediaMetadata(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error)
 	GetMediaMetadataByHash(ctx context.Context, mediaHash types.Base64Hash, mediaOrigin gomatrixserverlib.ServerName) (*types.MediaMetadata, error)
+}
+
+type Thumbnails interface {
 	StoreThumbnail(ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata) error
 	GetThumbnail(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName, width, height int, resizeMethod string) (*types.ThumbnailMetadata, error)
 	GetThumbnails(ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName) ([]*types.ThumbnailMetadata, error)

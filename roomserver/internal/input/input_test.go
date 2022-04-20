@@ -2,7 +2,6 @@ package input_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -12,30 +11,22 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 )
 
-func psqlConnectionString() config.DataSource {
-	user := os.Getenv("POSTGRES_USER")
-	if user == "" {
-		user = "dendrite"
-	}
-	dbName := os.Getenv("POSTGRES_DB")
-	if dbName == "" {
-		dbName = "dendrite"
-	}
-	connStr := fmt.Sprintf(
-		"user=%s dbname=%s sslmode=disable", user, dbName,
-	)
-	password := os.Getenv("POSTGRES_PASSWORD")
-	if password != "" {
-		connStr += fmt.Sprintf(" password=%s", password)
-	}
-	host := os.Getenv("POSTGRES_HOST")
-	if host != "" {
-		connStr += fmt.Sprintf(" host=%s", host)
-	}
-	return config.DataSource(connStr)
+var js nats.JetStreamContext
+var jc *nats.Conn
+
+func TestMain(m *testing.M) {
+	var pc *process.ProcessContext
+	pc, js, jc = jetstream.PrepareForTests()
+	code := m.Run()
+	pc.ShutdownDendrite()
+	pc.WaitForComponentsToFinish()
+	os.Exit(code)
 }
 
 func TestSingleTransactionOnInput(t *testing.T) {
@@ -63,7 +54,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 	}
 	db, err := storage.Open(
 		&config.DatabaseOptions{
-			ConnectionString:   psqlConnectionString(),
+			ConnectionString:   "",
 			MaxOpenConnections: 1,
 			MaxIdleConnections: 1,
 		},
@@ -74,7 +65,9 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		t.SkipNow()
 	}
 	inputter := &input.Inputer{
-		DB: db,
+		DB:         db,
+		JetStream:  js,
+		NATSClient: jc,
 	}
 	res := &api.InputRoomEventsResponse{}
 	inputter.InputRoomEvents(

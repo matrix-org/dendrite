@@ -1,121 +1,29 @@
 package storage_test
 
-// TODO: Fix these tests
-/*
 import (
 	"context"
-	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
-	"os"
+	"reflect"
 	"testing"
-	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-var (
-	ctx             = context.Background()
-	emptyStateKey   = ""
-	testOrigin      = gomatrixserverlib.ServerName("hollow.knight")
-	testRoomID      = fmt.Sprintf("!hallownest:%s", testOrigin)
-	testUserIDA     = fmt.Sprintf("@hornet:%s", testOrigin)
-	testUserIDB     = fmt.Sprintf("@paleking:%s", testOrigin)
-	testUserDeviceA = userapi.Device{
-		UserID:      testUserIDA,
-		ID:          "device_id_A",
-		DisplayName: "Device A",
-	}
-	testRoomVersion = gomatrixserverlib.RoomVersionV4
-	testKeyID       = gomatrixserverlib.KeyID("ed25519:storage_test")
-	testPrivateKey  = ed25519.NewKeyFromSeed([]byte{
-		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-		17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-	})
-)
+var ctx = context.Background()
 
-func MustCreateEvent(t *testing.T, roomID string, prevs []*gomatrixserverlib.HeaderedEvent, b *gomatrixserverlib.EventBuilder) *gomatrixserverlib.HeaderedEvent {
-	b.RoomID = roomID
-	if prevs != nil {
-		prevIDs := make([]string, len(prevs))
-		for i := range prevs {
-			prevIDs[i] = prevs[i].EventID()
-		}
-		b.PrevEvents = prevIDs
-	}
-	e, err := b.Build(time.Now(), testOrigin, testKeyID, testPrivateKey, testRoomVersion)
-	if err != nil {
-		t.Fatalf("failed to build event: %s", err)
-	}
-	return e.Headered(testRoomVersion)
-}
-
-func MustCreateDatabase(t *testing.T) storage.Database {
-	dbname := fmt.Sprintf("test_%s.db", t.Name())
-	if _, err := os.Stat(dbname); err == nil {
-		if err = os.Remove(dbname); err != nil {
-			t.Fatalf("tried to delete stale test database but failed: %s", err)
-		}
-	}
-	db, err := sqlite3.NewDatabase(&config.DatabaseOptions{
-		ConnectionString: config.DataSource(fmt.Sprintf("file:%s", dbname)),
+func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	db, err := storage.NewSyncServerDatasource(&config.DatabaseOptions{
+		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db
-}
-
-// Create a list of events which include a create event, join event and some messages.
-func SimpleRoom(t *testing.T, roomID, userA, userB string) (msgs []*gomatrixserverlib.HeaderedEvent, state []*gomatrixserverlib.HeaderedEvent) {
-	var events []*gomatrixserverlib.HeaderedEvent
-	events = append(events, MustCreateEvent(t, roomID, nil, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(fmt.Sprintf(`{"room_version":"4","creator":"%s"}`, userA)),
-		Type:     "m.room.create",
-		StateKey: &emptyStateKey,
-		Sender:   userA,
-		Depth:    int64(len(events) + 1),
-	}))
-	state = append(state, events[len(events)-1])
-	events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(`{"membership":"join"}`),
-		Type:     "m.room.member",
-		StateKey: &userA,
-		Sender:   userA,
-		Depth:    int64(len(events) + 1),
-	}))
-	state = append(state, events[len(events)-1])
-	for i := 0; i < 10; i++ {
-		events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-			Content: []byte(fmt.Sprintf(`{"body":"Message A %d"}`, i+1)),
-			Type:    "m.room.message",
-			Sender:  userA,
-			Depth:   int64(len(events) + 1),
-		}))
-	}
-	events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-		Content:  []byte(`{"membership":"join"}`),
-		Type:     "m.room.member",
-		StateKey: &userB,
-		Sender:   userB,
-		Depth:    int64(len(events) + 1),
-	}))
-	state = append(state, events[len(events)-1])
-	for i := 0; i < 10; i++ {
-		events = append(events, MustCreateEvent(t, roomID, []*gomatrixserverlib.HeaderedEvent{events[len(events)-1]}, &gomatrixserverlib.EventBuilder{
-			Content: []byte(fmt.Sprintf(`{"body":"Message B %d"}`, i+1)),
-			Type:    "m.room.message",
-			Sender:  userB,
-			Depth:   int64(len(events) + 1),
-		}))
-	}
-
-	return events, state
+	return db, close
 }
 
 func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
@@ -131,206 +39,158 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserver
 		if err != nil {
 			t.Fatalf("WriteEvent failed: %s", err)
 		}
-		fmt.Println("Event ID", ev.EventID(), " spos=", pos, "depth=", ev.Depth())
+		t.Logf("Event ID %s spos=%v depth=%v", ev.EventID(), pos, ev.Depth())
 		positions = append(positions, pos)
 	}
 	return
 }
 
 func TestWriteEvents(t *testing.T) {
-	t.Parallel()
-	db := MustCreateDatabase(t)
-	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
-	MustWriteEvents(t, db, events)
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		alice := test.NewUser()
+		r := test.NewRoom(t, alice)
+		db, close := MustCreateDatabase(t, dbType)
+		defer close()
+		MustWriteEvents(t, db, r.Events())
+	})
 }
 
-// These tests assert basic functionality of the IncrementalSync and CompleteSync functions.
-func TestSyncResponse(t *testing.T) {
-	t.Parallel()
-	db := MustCreateDatabase(t)
-	events, state := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
-	positions := MustWriteEvents(t, db, events)
-	latest, err := db.SyncPosition(ctx)
-	if err != nil {
-		t.Fatalf("failed to get SyncPosition: %s", err)
-	}
+// These tests assert basic functionality of RecentEvents for PDUs
+func TestRecentEventsPDU(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := MustCreateDatabase(t, dbType)
+		defer close()
+		alice := test.NewUser()
+		// dummy room to make sure SQL queries are filtering on room ID
+		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
 
-	testCases := []struct {
-		Name         string
-		DoSync       func() (*types.Response, error)
-		WantTimeline []*gomatrixserverlib.HeaderedEvent
-		WantState    []*gomatrixserverlib.HeaderedEvent
-	}{
-		// The purpose of this test is to make sure that incremental syncs are including up to the latest events.
-		// It's a basic sanity test that sync works. It creates a `since` token that is on the penultimate event.
-		// It makes sure the response includes the final event.
-		{
-			Name: "IncrementalSync penultimate",
-			DoSync: func() (*types.Response, error) {
-				from := types.StreamingToken{ // pretend we are at the penultimate event
-					PDUPosition: positions[len(positions)-2],
+		// actual test room
+		r := test.NewRoom(t, alice)
+		r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": "hi"})
+		events := r.Events()
+		positions := MustWriteEvents(t, db, events)
+
+		// dummy room to make sure SQL queries are filtering on room ID
+		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
+
+		latest, err := db.MaxStreamPositionForPDUs(ctx)
+		if err != nil {
+			t.Fatalf("failed to get MaxStreamPositionForPDUs: %s", err)
+		}
+
+		testCases := []struct {
+			Name         string
+			From         types.StreamPosition
+			To           types.StreamPosition
+			Limit        int
+			ReverseOrder bool
+			WantEvents   []*gomatrixserverlib.HeaderedEvent
+			WantLimited  bool
+		}{
+			// The purpose of this test is to make sure that incremental syncs are including up to the latest events.
+			// It's a basic sanity test that sync works. It creates a streaming position that is on the penultimate event.
+			// It makes sure the response includes the final event.
+			{
+				Name:        "penultimate",
+				From:        positions[len(positions)-2], // pretend we are at the penultimate event
+				To:          latest,
+				Limit:       100,
+				WantEvents:  events[len(events)-1:],
+				WantLimited: false,
+			},
+			// The purpose of this test is to check that limits can be applied and work.
+			// This is critical for big rooms hence the test here.
+			{
+				Name:        "limited",
+				From:        0,
+				To:          latest,
+				Limit:       1,
+				WantEvents:  events[len(events)-1:],
+				WantLimited: true,
+			},
+			// The purpose of this test is to check that we can return every event with a high
+			// enough limit
+			{
+				Name:        "large limited",
+				From:        0,
+				To:          latest,
+				Limit:       100,
+				WantEvents:  events,
+				WantLimited: false,
+			},
+			// The purpose of this test is to check that we can return events in reverse order
+			{
+				Name:         "reverse",
+				From:         positions[len(positions)-3], // 2 events back
+				To:           latest,
+				Limit:        100,
+				ReverseOrder: true,
+				WantEvents:   test.Reversed(events[len(events)-2:]),
+				WantLimited:  false,
+			},
+		}
+
+		for i := range testCases {
+			tc := testCases[i]
+			t.Run(tc.Name, func(st *testing.T) {
+				var filter gomatrixserverlib.RoomEventFilter
+				filter.Limit = tc.Limit
+				gotEvents, limited, err := db.RecentEvents(ctx, r.ID, types.Range{
+					From: tc.From,
+					To:   tc.To,
+				}, &filter, !tc.ReverseOrder, true)
+				if err != nil {
+					st.Fatalf("failed to do sync: %s", err)
 				}
-				res := types.NewResponse()
-				return db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
-			},
-			WantTimeline: events[len(events)-1:],
-		},
-		// The purpose of this test is to check that passing a `numRecentEventsPerRoom` correctly limits the
-		// number of returned events. This is critical for big rooms hence the test here.
-		{
-			Name: "IncrementalSync limited",
-			DoSync: func() (*types.Response, error) {
-				from := types.StreamingToken{ // pretend we are 10 events behind
-					PDUPosition: positions[len(positions)-11],
+				if limited != tc.WantLimited {
+					st.Errorf("got limited=%v want %v", limited, tc.WantLimited)
 				}
-				res := types.NewResponse()
-				// limit is set to 5
-				return db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
-			},
-			// want the last 5 events, NOT the last 10.
-			WantTimeline: events[len(events)-5:],
-		},
-		// The purpose of this test is to check that CompleteSync returns all the current state as well as
-		// honouring the `numRecentEventsPerRoom` value
-		{
-			Name: "CompleteSync limited",
-			DoSync: func() (*types.Response, error) {
-				res := types.NewResponse()
-				// limit set to 5
-				return db.CompleteSync(ctx, res, testUserDeviceA, 5)
-			},
-			// want the last 5 events
-			WantTimeline: events[len(events)-5:],
-			// want all state for the room
-			WantState: state,
-		},
-		// The purpose of this test is to check that CompleteSync can return everything with a high enough
-		// `numRecentEventsPerRoom`.
-		{
-			Name: "CompleteSync",
-			DoSync: func() (*types.Response, error) {
-				res := types.NewResponse()
-				return db.CompleteSync(ctx, res, testUserDeviceA, len(events)+1)
-			},
-			WantTimeline: events,
-			// We want no state at all as that field in /sync is the delta between the token (beginning of time)
-			// and the START of the timeline.
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.Name, func(st *testing.T) {
-			res, err := tc.DoSync()
-			if err != nil {
-				st.Fatalf("failed to do sync: %s", err)
-			}
-			next := types.StreamingToken{
-				PDUPosition:          latest.PDUPosition,
-				TypingPosition:       latest.TypingPosition,
-				ReceiptPosition:      latest.ReceiptPosition,
-				SendToDevicePosition: latest.SendToDevicePosition,
-			}
-			if res.NextBatch.String() != next.String() {
-				st.Errorf("NextBatch got %s want %s", res.NextBatch, next.String())
-			}
-			roomRes, ok := res.Rooms.Join[testRoomID]
-			if !ok {
-				st.Fatalf("IncrementalSync response missing room %s - response: %+v", testRoomID, res)
-			}
-			assertEventsEqual(st, "state for "+testRoomID, false, roomRes.State.Events, tc.WantState)
-			assertEventsEqual(st, "timeline for "+testRoomID, false, roomRes.Timeline.Events, tc.WantTimeline)
-		})
-	}
-}
-
-func TestGetEventsInRangeWithPrevBatch(t *testing.T) {
-	t.Parallel()
-	db := MustCreateDatabase(t)
-	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
-	positions := MustWriteEvents(t, db, events)
-	latest, err := db.SyncPosition(ctx)
-	if err != nil {
-		t.Fatalf("failed to get SyncPosition: %s", err)
-	}
-	from := types.StreamingToken{
-		PDUPosition: positions[len(positions)-2],
-	}
-
-	res := types.NewResponse()
-	res, err = db.IncrementalSync(ctx, res, testUserDeviceA, from, latest, 5, false)
-	if err != nil {
-		t.Fatalf("failed to IncrementalSync with latest token")
-	}
-	roomRes, ok := res.Rooms.Join[testRoomID]
-	if !ok {
-		t.Fatalf("IncrementalSync response missing room %s - response: %+v", testRoomID, res)
-	}
-	// returns the last event "Message 10"
-	assertEventsEqual(t, "IncrementalSync Timeline", false, roomRes.Timeline.Events, reversed(events[len(events)-1:]))
-
-	prev := roomRes.Timeline.PrevBatch.String()
-	if prev == "" {
-		t.Fatalf("IncrementalSync expected prev_batch token")
-	}
-	prevBatchToken, err := types.NewTopologyTokenFromString(prev)
-	if err != nil {
-		t.Fatalf("failed to NewTopologyTokenFromString : %s", err)
-	}
-	// backpaginate 5 messages starting at the latest position.
-	// head towards the beginning of time
-	to := types.TopologyToken{}
-	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &prevBatchToken, &to, testRoomID, 5, true)
-	if err != nil {
-		t.Fatalf("GetEventsInRange returned an error: %s", err)
-	}
-	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
-	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-6:len(events)-1]))
-}
-
-// The purpose of this test is to ensure that backfill does indeed go backwards, using a stream token.
-func TestGetEventsInRangeWithStreamToken(t *testing.T) {
-	t.Parallel()
-	db := MustCreateDatabase(t)
-	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
-	MustWriteEvents(t, db, events)
-	latest, err := db.SyncPosition(ctx)
-	if err != nil {
-		t.Fatalf("failed to get SyncPosition: %s", err)
-	}
-	// head towards the beginning of time
-	to := types.StreamingToken{}
-
-	// backpaginate 5 messages starting at the latest position.
-	paginatedEvents, err := db.GetEventsInStreamingRange(ctx, &latest, &to, testRoomID, 5, true)
-	if err != nil {
-		t.Fatalf("GetEventsInRange returned an error: %s", err)
-	}
-	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
-	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-5:]))
+				if len(gotEvents) != len(tc.WantEvents) {
+					st.Errorf("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
+				}
+				for j := range gotEvents {
+					if !reflect.DeepEqual(gotEvents[j].JSON(), tc.WantEvents[j].JSON()) {
+						st.Errorf("event %d got %s want %s", j, string(gotEvents[j].JSON()), string(tc.WantEvents[j].JSON()))
+					}
+				}
+			})
+		}
+	})
 }
 
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
 func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
-	t.Parallel()
-	db := MustCreateDatabase(t)
-	events, _ := SimpleRoom(t, testRoomID, testUserIDA, testUserIDB)
-	MustWriteEvents(t, db, events)
-	from, err := db.MaxTopologicalPosition(ctx, testRoomID)
-	if err != nil {
-		t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
-	}
-	// head towards the beginning of time
-	to := types.TopologyToken{}
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := MustCreateDatabase(t, dbType)
+		defer close()
+		alice := test.NewUser()
+		r := test.NewRoom(t, alice)
+		for i := 0; i < 10; i++ {
+			r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("hi %d", i)})
+		}
+		events := r.Events()
+		_ = MustWriteEvents(t, db, events)
 
-	// backpaginate 5 messages starting at the latest position.
-	paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, testRoomID, 5, true)
-	if err != nil {
-		t.Fatalf("GetEventsInRange returned an error: %s", err)
-	}
-	gots := gomatrixserverlib.HeaderedToClientEvents(db.StreamEventsToEvents(&testUserDeviceA, paginatedEvents), gomatrixserverlib.FormatAll)
-	assertEventsEqual(t, "", true, gots, reversed(events[len(events)-5:]))
+		from, err := db.MaxTopologicalPosition(ctx, r.ID)
+		if err != nil {
+			t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
+		}
+		t.Logf("max topo pos = %+v", from)
+		// head towards the beginning of time
+		to := types.TopologyToken{}
+
+		// backpaginate 5 messages starting at the latest position.
+		filter := &gomatrixserverlib.RoomEventFilter{Limit: 5}
+		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
+		if err != nil {
+			t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
+		}
+		gots := db.StreamEventsToEvents(nil, paginatedEvents)
+		test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
+	})
 }
 
+/*
 // The purpose of this test is to make sure that backpagination returns all events, even if some events have the same depth.
 // For cases where events have the same depth, the streaming token should be used to tie break so events written via WriteEvent
 // will appear FIRST when going backwards. This test creates a DAG like:
@@ -739,13 +599,5 @@ func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *typ
 	}
 	tok.Decrement()
 	return &tok
-}
-
-func reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
-	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
-	for i := 0; i < len(in); i++ {
-		out[i] = in[len(in)-i-1]
-	}
-	return out
 }
 */

@@ -150,7 +150,7 @@ func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, stre
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
 func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs)
+	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs())
+	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs(), nil, false)
 	if err != nil {
 		return err
 	}
@@ -429,7 +429,8 @@ func (d *Database) updateRoomState(
 func (d *Database) GetEventsInTopologicalRange(
 	ctx context.Context,
 	from, to *types.TopologyToken,
-	roomID string, limit int,
+	roomID string,
+	filter *gomatrixserverlib.RoomEventFilter,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
@@ -450,14 +451,14 @@ func (d *Database) GetEventsInTopologicalRange(
 	// Select the event IDs from the defined range.
 	var eIDs []string
 	eIDs, err = d.Topology.SelectEventIDsInRange(
-		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, limit, !backwardOrdering,
+		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, filter.Limit, !backwardOrdering,
 	)
 	if err != nil {
 		return
 	}
 
 	// Retrieve the events' contents using their IDs.
-	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs)
+	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs, filter, true)
 	return
 }
 
@@ -619,7 +620,7 @@ func (d *Database) fetchMissingStateEvents(
 ) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
-	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs)
+	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}

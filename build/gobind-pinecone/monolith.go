@@ -52,6 +52,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -71,11 +72,9 @@ type DendriteMonolith struct {
 	PineconeRouter    *pineconeRouter.Router
 	PineconeMulticast *pineconeMulticast.Multicast
 	PineconeQUIC      *pineconeSessions.Sessions
+	PineconeManager   *pineconeConnections.ConnectionManager
 	StorageDirectory  string
 	CacheDirectory    string
-	staticPeerURI     string
-	staticPeerMutex   sync.RWMutex
-	staticPeerAttempt chan struct{}
 	listener          net.Listener
 	httpServer        *http.Server
 	processContext    *process.ProcessContext
@@ -104,15 +103,8 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
-	m.staticPeerMutex.Lock()
-	m.staticPeerURI = strings.TrimSpace(uri)
-	m.staticPeerMutex.Unlock()
-	m.DisconnectType(int(pineconeRouter.PeerTypeRemote))
-	if uri != "" {
-		go func() {
-			m.staticPeerAttempt <- struct{}{}
-		}()
-	}
+	m.PineconeManager.RemovePeers()
+	m.PineconeManager.AddPeer(strings.TrimSpace(uri))
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -210,43 +202,6 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 	return loginRes.Device.AccessToken, nil
 }
 
-func (m *DendriteMonolith) staticPeerConnect() {
-	connected := map[string]bool{} // URI -> connected?
-	attempt := func() {
-		m.staticPeerMutex.RLock()
-		uri := m.staticPeerURI
-		m.staticPeerMutex.RUnlock()
-		if uri == "" {
-			return
-		}
-		for k := range connected {
-			delete(connected, k)
-		}
-		for _, uri := range strings.Split(uri, ",") {
-			connected[strings.TrimSpace(uri)] = false
-		}
-		for _, info := range m.PineconeRouter.Peers() {
-			connected[info.URI] = true
-		}
-		for k, online := range connected {
-			if !online {
-				if err := conn.ConnectToPeer(m.PineconeRouter, k); err != nil {
-					logrus.WithError(err).Error("Failed to connect to static peer")
-				}
-			}
-		}
-	}
-	for {
-		select {
-		case <-m.processContext.Context().Done():
-		case <-m.staticPeerAttempt:
-			attempt()
-		case <-time.After(time.Second * 5):
-			attempt()
-		}
-	}
-}
-
 // nolint:gocyclo
 func (m *DendriteMonolith) Start() {
 	var err error
@@ -284,6 +239,7 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
 	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
+	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter)
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
@@ -391,9 +347,6 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	m.processContext = base.ProcessContext
-
-	m.staticPeerAttempt = make(chan struct{}, 1)
-	go m.staticPeerConnect()
 
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
