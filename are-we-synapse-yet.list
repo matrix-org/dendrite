@@ -212,11 +212,12 @@ plv Users cannot set kick powerlevel higher than their own (2 subtests)
 plv Users cannot set redact powerlevel higher than their own (2 subtests)
 v1s Check that event streams started after a client joined a room work (SYT-1)
 v1s Event stream catches up fully after many messages
-xxx PUT /rooms/:room_id/redact/:event_id as power user redacts message
-xxx PUT /rooms/:room_id/redact/:event_id as original message sender redacts message
-xxx PUT /rooms/:room_id/redact/:event_id as random user does not redact message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as random user does not redact message
 xxx PUT /redact disallows redaction of event in different room
 xxx Redaction of a redaction redacts the redaction reason
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
 v1s A departed room is still included in /initialSync (SPEC-216)
 v1s Can get rooms/{roomId}/initialSync for a departed room (SPEC-216)
 rst Can get rooms/{roomId}/state for a departed room (SPEC-216)
@@ -931,7 +932,8 @@ fst /state returns M_NOT_FOUND for a rejected message event
 fst /state_ids returns M_NOT_FOUND for a rejected message event
 fst /state returns M_NOT_FOUND for a rejected state event
 fst /state_ids returns M_NOT_FOUND for a rejected state event
+fst Room state after a rejected message event is the same as before
 fst Room state after a rejected state event is the same as before
 fpb Federation publicRoom Name/topic keys are correct
-fed New federated private chats get full presence information (SYN-115) (9 subtests)
+fed New federated private chats get full presence information (SYN-115) (10 subtests)
 dvk Rejects invalid device keys
