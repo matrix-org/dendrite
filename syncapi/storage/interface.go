@@ -104,8 +104,8 @@ type Database interface {
 	// DeletePeek deletes all peeks for a given room by a given user
 	// Returns an error if there was a problem communicating with the database.
 	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
-	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit.
-	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, limit int, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit. If backwardsOrdering is true, the most recent event must be first, else last.
+	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *gomatrixserverlib.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
 	// EventPositionInTopology returns the depth and stream position of the given event.
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
 	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.

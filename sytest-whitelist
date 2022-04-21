@@ -312,10 +312,10 @@ Inbound federation can return events
 Inbound federation can return missing events for world_readable visibility
 Inbound federation can return missing events for invite visibility
 Inbound federation can get public room list
-POST /rooms/:room_id/redact/:event_id as power user redacts message
-POST /rooms/:room_id/redact/:event_id as original message sender redacts message
-POST /rooms/:room_id/redact/:event_id as random user does not redact message
-POST /redact disallows redaction of event in different room
+PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
+PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
+PUT /rooms/:room_id/redact/:event_id/:txn_id as random user does not redact message
+PUT /redact disallows redaction of event in different room
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
 Redaction of a redaction redacts the redaction reason
@@ -697,3 +697,16 @@ Room state after a rejected state event is the same as before
 Ignore user in existing room
 Ignore invite in full sync
 Ignore invite in incremental sync
+A filtered timeline reaches its limit
+A change to displayname should not result in a full state sync
+Can fetch images in room
+The only membership state included in an initial sync is for all the senders in the timeline
+The only membership state included in an incremental sync is for senders in the timeline
+Old members are included in gappy incr LL sync if they start speaking
+We do send redundant membership state across incremental syncs if asked
+Rejecting invite over federation doesn't break incremental /sync
+Gapped incremental syncs include all state changes
+Old leaves are present in gapped incremental syncs
+Leaves are present in non-gapped incremental syncs
+Members from the gap are included in gappy incr LL sync
+Presence can be set from sync

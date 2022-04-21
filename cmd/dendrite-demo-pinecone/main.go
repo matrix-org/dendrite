@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -47,6 +46,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -90,6 +90,13 @@ func main() {
 	}
 
 	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
+	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
+	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pMulticast.Start()
+	if instancePeer != nil && *instancePeer != "" {
+		pManager.AddPeer(*instancePeer)
+	}
 
 	go func() {
 		listener, err := net.Listen("tcp", *instanceListen)
@@ -118,36 +125,6 @@ func main() {
 			fmt.Println("Inbound connection", conn.RemoteAddr(), "is connected to port", port)
 		}
 	}()
-
-	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
-	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
-	pMulticast.Start()
-
-	connectToStaticPeer := func() {
-		connected := map[string]bool{} // URI -> connected?
-		for _, uri := range strings.Split(*instancePeer, ",") {
-			connected[strings.TrimSpace(uri)] = false
-		}
-		attempt := func() {
-			for k := range connected {
-				connected[k] = false
-			}
-			for _, info := range pRouter.Peers() {
-				connected[info.URI] = true
-			}
-			for k, online := range connected {
-				if !online {
-					if err := conn.ConnectToPeer(pRouter, k); err != nil {
-						logrus.WithError(err).Error("Failed to connect to static peer")
-					}
-				}
-			}
-		}
-		for {
-			attempt()
-			time.Sleep(time.Second * 5)
-		}
-	}
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(true)
@@ -268,7 +245,6 @@ func main() {
 		Handler: pMux,
 	}
 
-	go connectToStaticPeer()
 	go func() {
 		pubkey := pRouter.PublicKey()
 		logrus.Info("Listening on ", hex.EncodeToString(pubkey[:]))

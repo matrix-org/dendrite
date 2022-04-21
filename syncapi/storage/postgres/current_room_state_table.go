@@ -233,9 +233,10 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
+	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	rows, err := stmt.QueryContext(ctx, roomID,
-		pq.StringArray(stateFilter.Senders),
-		pq.StringArray(stateFilter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,

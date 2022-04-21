@@ -16,23 +16,30 @@
 package sqlite3
 
 import (
-	"database/sql"
-
+	// Import the postgres database driver.
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/mediaapi/storage/shared"
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
-type statements struct {
-	media     mediaStatements
-	thumbnail thumbnailStatements
-}
-
-func (s *statements) prepare(db *sql.DB, writer sqlutil.Writer) (err error) {
-	if err = s.media.prepare(db, writer); err != nil {
-		return
+// NewDatabase opens a SQLIte database.
+func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	db, err := sqlutil.Open(dbProperties)
+	if err != nil {
+		return nil, err
 	}
-	if err = s.thumbnail.prepare(db, writer); err != nil {
-		return
+	mediaRepo, err := NewSQLiteMediaRepositoryTable(db)
+	if err != nil {
+		return nil, err
 	}
-
-	return
+	thumbnails, err := NewSQLiteThumbnailsTable(db)
+	if err != nil {
+		return nil, err
+	}
+	return &shared.Database{
+		MediaRepository: mediaRepo,
+		Thumbnails:      thumbnails,
+		DB:              db,
+		Writer:          sqlutil.NewExclusiveWriter(),
+	}, nil
 }

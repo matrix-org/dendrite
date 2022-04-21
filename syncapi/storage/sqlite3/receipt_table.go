@@ -59,13 +59,13 @@ const selectMaxReceiptIDSQL = "" +
 
 type receiptStatements struct {
 	db                 *sql.DB
-	streamIDStatements *streamIDStatements
+	streamIDStatements *StreamIDStatements
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
 	selectMaxReceiptID *sql.Stmt
 }
 
-func NewSqliteReceiptsTable(db *sql.DB, streamID *streamIDStatements) (tables.Receipts, error) {
+func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Receipts, error) {
 	_, err := db.Exec(receiptsSchema)
 	if err != nil {
 		return nil, err

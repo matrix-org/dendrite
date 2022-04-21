@@ -30,7 +30,7 @@ type SyncServerDatasource struct {
 	shared.Database
 	db       *sql.DB
 	writer   sqlutil.Writer
-	streamID streamIDStatements
+	streamID StreamIDStatements
 }
 
 // NewDatabase creates a new sync server database
@@ -49,7 +49,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 }
 
 func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
-	if err = d.streamID.prepare(d.db); err != nil {
+	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
 	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)

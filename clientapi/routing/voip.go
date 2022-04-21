@@ -52,6 +52,7 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 
 	if turnConfig.SharedSecret != "" {
 		expiry := time.Now().Add(duration).Unix()
+		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
 		mac := hmac.New(sha1.New, []byte(turnConfig.SharedSecret))
 		_, err := mac.Write([]byte(resp.Username))
 
@@ -60,7 +61,6 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 			return jsonerror.InternalServerError()
 		}
 
-		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
 		resp.Password = base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	} else if turnConfig.Username != "" && turnConfig.Password != "" {
 		resp.Username = turnConfig.Username

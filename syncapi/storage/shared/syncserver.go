@@ -150,7 +150,7 @@ func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, stre
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
 func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs)
+	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs())
+	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs(), nil, false)
 	if err != nil {
 		return err
 	}
@@ -429,7 +429,8 @@ func (d *Database) updateRoomState(
 func (d *Database) GetEventsInTopologicalRange(
 	ctx context.Context,
 	from, to *types.TopologyToken,
-	roomID string, limit int,
+	roomID string,
+	filter *gomatrixserverlib.RoomEventFilter,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
@@ -450,14 +451,14 @@ func (d *Database) GetEventsInTopologicalRange(
 	// Select the event IDs from the defined range.
 	var eIDs []string
 	eIDs, err = d.Topology.SelectEventIDsInRange(
-		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, limit, !backwardOrdering,
+		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, filter.Limit, !backwardOrdering,
 	)
 	if err != nil {
 		return
 	}
 
 	// Retrieve the events' contents using their IDs.
-	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs)
+	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs, filter, true)
 	return
 }
 
@@ -619,7 +620,7 @@ func (d *Database) fetchMissingStateEvents(
 ) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
-	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs)
+	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -687,6 +688,9 @@ func (d *Database) GetStateDeltas(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -704,17 +708,23 @@ func (d *Database) GetStateDeltas(
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, nil, err
 	}
 
@@ -725,6 +735,9 @@ func (d *Database) GetStateDeltas(
 			var s []types.StreamEvent
 			s, err = d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 			if err != nil {
+				if err == sql.ErrNoRows {
+					continue
+				}
 				return nil, nil, err
 			}
 			state[peek.RoomID] = s
@@ -752,6 +765,9 @@ func (d *Database) GetStateDeltas(
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
 					if err != nil {
+						if err == sql.ErrNoRows {
+							continue
+						}
 						return nil, nil, err
 					}
 					state[roomID] = s
@@ -802,6 +818,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -818,7 +837,7 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	deltas := make(map[string]types.StateDelta)
 
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, nil, err
 	}
 
@@ -827,6 +846,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 		if !peek.Deleted {
 			s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 			if stateErr != nil {
+				if stateErr == sql.ErrNoRows {
+					continue
+				}
 				return nil, nil, stateErr
 			}
 			deltas[peek.RoomID] = types.StateDelta{
@@ -840,10 +862,16 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	// Get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -868,6 +896,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	for _, joinedRoomID := range joinedRoomIDs {
 		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
 		if stateErr != nil {
+			if stateErr == sql.ErrNoRows {
+				continue
+			}
 			return nil, nil, stateErr
 		}
 		deltas[joinedRoomID] = types.StateDelta{

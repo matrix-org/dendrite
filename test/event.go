@@ -15,7 +15,9 @@
 package test
 
 import (
+	"bytes"
 	"crypto/ed25519"
+	"testing"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -47,5 +49,42 @@ func WithStateKey(skey string) eventModifier {
 func WithUnsigned(unsigned interface{}) eventModifier {
 	return func(e *eventMods) {
 		e.unsigned = unsigned
+	}
+}
+
+// Reverse a list of events
+func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
+	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
+	for i := 0; i < len(in); i++ {
+		out[i] = in[len(in)-i-1]
+	}
+	return out
+}
+
+func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*gomatrixserverlib.HeaderedEvent) {
+	t.Helper()
+	if len(gotEventIDs) != len(wants) {
+		t.Fatalf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
+	}
+	for i := range wants {
+		w := wants[i].EventID()
+		g := gotEventIDs[i]
+		if w != g {
+			t.Errorf("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
+		}
+	}
+}
+
+func AssertEventsEqual(t *testing.T, gots, wants []*gomatrixserverlib.HeaderedEvent) {
+	t.Helper()
+	if len(gots) != len(wants) {
+		t.Fatalf("length mismatch: got %d events, want %d", len(gots), len(wants))
+	}
+	for i := range wants {
+		w := wants[i].JSON()
+		g := gots[i].JSON()
+		if !bytes.Equal(w, g) {
+			t.Errorf("event at index %d mismatch:\ngot  %s\n\nwant %s", i, string(g), string(w))
+		}
 	}
 }

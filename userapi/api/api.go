@@ -492,16 +492,16 @@ type PerformPusherDeletionRequest struct {
 
 // Pusher represents a push notification subscriber
 type Pusher struct {
-	SessionID         int64                       `json:"session_id,omitempty"`
-	PushKey           string                      `json:"pushkey"`
-	PushKeyTS         gomatrixserverlib.Timestamp `json:"pushkey_ts,omitempty"`
-	Kind              PusherKind                  `json:"kind"`
-	AppID             string                      `json:"app_id"`
-	AppDisplayName    string                      `json:"app_display_name"`
-	DeviceDisplayName string                      `json:"device_display_name"`
-	ProfileTag        string                      `json:"profile_tag"`
-	Language          string                      `json:"lang"`
-	Data              map[string]interface{}      `json:"data"`
+	SessionID         int64                  `json:"session_id,omitempty"`
+	PushKey           string                 `json:"pushkey"`
+	PushKeyTS         int64                  `json:"pushkey_ts,omitempty"`
+	Kind              PusherKind             `json:"kind"`
+	AppID             string                 `json:"app_id"`
+	AppDisplayName    string                 `json:"app_display_name"`
+	DeviceDisplayName string                 `json:"device_display_name"`
+	ProfileTag        string                 `json:"profile_tag"`
+	Language          string                 `json:"lang"`
+	Data              map[string]interface{} `json:"data"`
 }
 
 type PusherKind string
