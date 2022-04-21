@@ -66,3 +66,6 @@ test/wasm/node_modules
 complement/
 
 media_store/
+
+# Debug
+**/__debug_bin

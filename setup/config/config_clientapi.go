@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 type ClientAPI struct {
@@ -43,6 +45,12 @@ type ClientAPI struct {
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
 	MSCs *MSCs `yaml:"mscs"`
+
+	// Disable password authentication.
+	PasswordAuthenticationDisabled bool `yaml:"password_authentication_disabled"`
+
+	// Public key authentication
+	PublicKeyAuthentication publicKeyAuthentication `yaml:"public_key_authentication"`
 }
 
 func (c *ClientAPI) Defaults(generate bool) {
@@ -126,4 +134,45 @@ func (r *RateLimiting) Defaults() {
 	r.Enabled = true
 	r.Threshold = 5
 	r.CooloffMS = 500
+}
+
+type ethereumAuthParams struct {
+	Version  uint32   `json:"version"`
+	ChainIDs []string `json:"chain_ids"`
+}
+
+type ethereumAuthConfig struct {
+	Enabled  bool     `yaml:"enabled"`
+	Version  uint32   `yaml:"version"`
+	ChainIDs []string `yaml:"chain_ids"`
+}
+
+type publicKeyAuthentication struct {
+	Ethereum ethereumAuthConfig `yaml:"ethereum"`
+}
+
+func (pk *publicKeyAuthentication) Enabled() bool {
+	return pk.Ethereum.Enabled
+}
+
+func (pk *publicKeyAuthentication) GetPublicKeyRegistrationFlows() []authtypes.Flow {
+	var flows []authtypes.Flow
+	if pk.Ethereum.Enabled {
+		flows = append(flows, authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypePublicKeyEthereum}})
+	}
+
+	return flows
+}
+
+func (pk *publicKeyAuthentication) GetPublicKeyRegistrationParams() map[string]interface{} {
+	params := make(map[string]interface{})
+	if pk.Ethereum.Enabled {
+		p := ethereumAuthParams{
+			Version:  pk.Ethereum.Version,
+			ChainIDs: pk.Ethereum.ChainIDs,
+		}
+		params[authtypes.LoginTypePublicKeyEthereum] = p
+	}
+
+	return params
 }

@@ -61,6 +61,13 @@ func TestLoginFromJSONReader(t *testing.T) {
 			WantDeletedTokens: []string{"atoken"},
 		},
 	}
+	userInteractive := UserInteractive{
+		Completed: []string{},
+		Flows:     []userInteractiveFlow{},
+		Types:     make(map[string]Type),
+		Sessions:  make(map[string][]string),
+	}
+
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
@@ -69,7 +76,7 @@ func TestLoginFromJSONReader(t *testing.T) {
 					ServerName: serverName,
 				},
 			}
-			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
+			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, &userAPI, &userInteractive, cfg)
 			if err != nil {
 				t.Fatalf("LoginFromJSONReader failed: %+v", err)
 			}
@@ -139,6 +146,13 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			WantErrCode: "M_INVALID_ARGUMENT_VALUE",
 		},
 	}
+	userInteractive := UserInteractive{
+		Completed: []string{},
+		Flows:     []userInteractiveFlow{},
+		Types:     make(map[string]Type),
+		Sessions:  make(map[string][]string),
+	}
+
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
@@ -147,7 +161,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 					ServerName: serverName,
 				},
 			}
-			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
+			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, &userAPI, &userInteractive, cfg)
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
@@ -161,6 +175,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 type fakeUserInternalAPI struct {
 	UserInternalAPIForLogin
 	uapi.UserAccountAPI
+	uapi.UserRegisterAPI
 	DeletedTokens []string
 }
 

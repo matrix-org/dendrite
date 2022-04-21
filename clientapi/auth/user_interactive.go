@@ -108,25 +108,40 @@ type UserInteractive struct {
 	Types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
 	Sessions map[string][]string
+	Params   map[string]interface{}
 }
 
-func NewUserInteractive(userAccountAPI api.UserAccountAPI, cfg *config.ClientAPI) *UserInteractive {
-	typePassword := &LoginTypePassword{
-		GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
-		Config:               cfg,
-	}
-	return &UserInteractive{
+func NewUserInteractive(
+	userAccountAPI api.UserAccountAPI,
+	userRegisterAPI api.UserRegisterAPI,
+	cfg *config.ClientAPI,
+) *UserInteractive {
+	userInteractive := UserInteractive{
 		Completed: []string{},
-		Flows: []userInteractiveFlow{
-			{
-				Stages: []string{typePassword.Name()},
-			},
-		},
-		Types: map[string]Type{
-			typePassword.Name(): typePassword,
-		},
-		Sessions: make(map[string][]string),
+		Flows:     []userInteractiveFlow{},
+		Types:     make(map[string]Type),
+		Sessions:  make(map[string][]string),
+		Params:    make(map[string]interface{}),
 	}
+
+	if !cfg.PasswordAuthenticationDisabled {
+		typePassword := &LoginTypePassword{
+			GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
+			Config:               cfg,
+		}
+		typePassword.AddFLows(&userInteractive)
+	}
+
+	if cfg.PublicKeyAuthentication.Enabled() {
+		typePublicKey := &LoginTypePublicKey{
+			userRegisterAPI,
+			&userInteractive,
+			cfg,
+		}
+		typePublicKey.AddFlows(&userInteractive)
+	}
+
+	return &userInteractive
 }
 
 func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
@@ -141,6 +156,10 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 	// TODO: Handle multi-stage flows
 	u.Completed = append(u.Completed, authType)
+	delete(u.Sessions, sessionID)
+}
+
+func (u *UserInteractive) DeleteSession(sessionID string) {
 	delete(u.Sessions, sessionID)
 }
 
@@ -160,7 +179,7 @@ func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 			Completed: u.Completed,
 			Flows:     u.Flows,
 			Session:   sessionID,
-			Params:    make(map[string]interface{}),
+			Params:    u.Params,
 		},
 	}
 }
@@ -204,7 +223,7 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
 // Returns the login that was verified for additional checks if required.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"

@@ -26,6 +26,7 @@ var (
 
 type fakeAccountDatabase struct {
 	api.UserAccountAPI
+	api.UserRegisterAPI
 }
 
 func (d *fakeAccountDatabase) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
@@ -52,13 +53,14 @@ func setup() *UserInteractive {
 			ServerName: serverName,
 		},
 	}
-	return NewUserInteractive(&fakeAccountDatabase{}, cfg)
+	accountApi := fakeAccountDatabase{}
+	return NewUserInteractive(&accountApi, &accountApi, cfg)
 }
 
 func TestUserInteractiveChallenge(t *testing.T) {
 	uia := setup()
 	// no auth key results in a challenge
-	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
+	_, errRes := uia.Verify(ctx, []byte(`{}`))
 	if errRes == nil {
 		t.Fatalf("Verify succeeded with {} but expected failure")
 	}
@@ -98,7 +100,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 		}`),
 	}
 	for _, tc := range testCases {
-		_, errRes := uia.Verify(ctx, tc, device)
+		_, errRes := uia.Verify(ctx, tc)
 		if errRes != nil {
 			t.Errorf("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
 		}
@@ -179,7 +181,7 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		_, errRes := uia.Verify(ctx, tc.body, device)
+		_, errRes := uia.Verify(ctx, tc.body)
 		if errRes == nil {
 			t.Errorf("Verify succeeded but expected failure for request: %s", string(tc.body))
 			continue

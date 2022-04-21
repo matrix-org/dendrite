@@ -11,29 +11,36 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/btcsuite/btcd/btcec/v2 v2.1.3 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.6.2 // indirect
 	github.com/docker/docker v20.10.14+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/ethereum/go-ethereum v1.10.17
 	github.com/frankban/quicktest v1.14.3 // indirect
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.7
+	github.com/google/gopacket v1.1.18 // indirect
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/h2non/filetype v1.1.3 // indirect
-	github.com/hashicorp/golang-lru v0.5.4
+	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
 	github.com/lib/pq v1.10.5
+	github.com/libp2p/go-libp2p v0.13.0
+	github.com/libp2p/go-libp2p-core v0.8.3 // indirect
+	github.com/libp2p/go-libp2p-gostream v0.3.1
+	github.com/libp2p/go-libp2p-http v0.2.0
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
+	github.com/matrix-org/go-http-js-libp2p v0.0.0-20200518170932-783164aeeda4
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20220408160933-cf558306b56f
 	github.com/matrix-org/pinecone v0.0.0-20220408153826-2999ea29ed48
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.10
-	github.com/miekg/dns v1.1.31 // indirect
 	github.com/nats-io/nats-server/v2 v2.7.4-0.20220309205833-773636c1c5bb
 	github.com/nats-io/nats.go v1.14.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9

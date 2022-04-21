@@ -33,7 +33,16 @@ import (
 // called after authorization has completed, with the result of the authorization.
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
-func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.UserAccountAPI, userAPI UserInternalAPIForLogin, cfg *config.ClientAPI) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+func LoginFromJSONReader(
+	ctx context.Context,
+	r io.Reader,
+	useraccountAPI uapi.UserAccountAPI,
+	userAPI UserInternalAPIForLogin,
+	userRegisterAPI uapi.UserRegisterAPI,
+	userInteractiveAuth *UserInteractive,
+	cfg *config.ClientAPI,
+) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+
 	reqBytes, err := ioutil.ReadAll(r)
 	if err != nil {
 		err := &util.JSONResponse{
@@ -55,16 +64,22 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 	}
 
 	var typ Type
-	switch header.Type {
-	case authtypes.LoginTypePassword:
+	switch {
+	case header.Type == authtypes.LoginTypePassword && !cfg.PasswordAuthenticationDisabled:
 		typ = &LoginTypePassword{
 			GetAccountByPassword: useraccountAPI.QueryAccountByPassword,
 			Config:               cfg,
 		}
-	case authtypes.LoginTypeToken:
+	case header.Type == authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{
 			UserAPI: userAPI,
 			Config:  cfg,
+		}
+	case header.Type == authtypes.LoginTypePublicKey && cfg.PublicKeyAuthentication.Enabled():
+		typ = &LoginTypePublicKey{
+			UserAPI:         userRegisterAPI,
+			UserInteractive: userInteractiveAuth,
+			Config:          cfg,
 		}
 	default:
 		err := util.JSONResponse{
