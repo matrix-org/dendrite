@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -205,6 +206,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
 	device *userapi.Device,
@@ -228,13 +230,16 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		eventFilter, true, true,
 	)
 	if err != nil {
-		return r.From, err
+		if err == sql.ErrNoRows {
+			return r.To, nil
+		}
+		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
 	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
-		return r.From, err
+		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
 	}
 
 	// If we didn't return any events at all then don't bother doing anything else.
@@ -268,15 +273,12 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	if stateFilter.LazyLoadMembers {
-		if err != nil {
-			return r.From, err
-		}
 		delta.StateEvents, err = p.lazyLoadMembers(
 			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, delta.StateEvents,
 		)
-		if err != nil {
-			return r.From, err
+		if err != nil && err != sql.ErrNoRows {
+			return r.From, fmt.Errorf("p.lazyLoadMembers: %w", err)
 		}
 	}
 
@@ -339,12 +341,16 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	wantFullState bool,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
+	jr = types.NewJoinResponse()
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
 		ctx, roomID, r, eventFilter, true, true,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return jr, nil
+		}
 		return
 	}
 
@@ -428,12 +434,11 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			false, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, stateEvents,
 		)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}
 	}
 
-	jr = types.NewJoinResponse()
 	jr.Summary.JoinedMemberCount = &joinedCount
 	jr.Summary.InvitedMemberCount = &invitedCount
 	jr.Timeline.PrevBatch = prevBatch
