@@ -43,6 +43,9 @@ func GetUserDevices(
 		},
 	}
 	sigRes := &keyapi.QuerySignaturesResponse{}
+	for _, dev := range res.Devices {
+		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
+	}
 	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
 
 	response := gomatrixserverlib.RespUserDevices{
