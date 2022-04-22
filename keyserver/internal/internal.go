@@ -313,9 +313,31 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	// Finally, append signatures that we know about
 	// TODO: This is horrible because we need to round-trip the signature from
 	// JSON, add the signatures and marshal it again, for some reason?
-	for userID, forUserID := range res.DeviceKeys {
-		for keyID, key := range forUserID {
-			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, userID, gomatrixserverlib.KeyID(keyID))
+
+	for targetUserID, masterKey := range res.MasterKeys {
+		for targetKeyID := range masterKey.Keys {
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
+			if err != nil {
+				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
+				continue
+			}
+			if len(sigMap) == 0 {
+				continue
+			}
+			for sourceUserID, forSourceUser := range sigMap {
+				for sourceKeyID, sourceSig := range forSourceUser {
+					if _, ok := masterKey.Signatures[sourceUserID]; !ok {
+						masterKey.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+					}
+					masterKey.Signatures[sourceUserID][sourceKeyID] = sourceSig
+				}
+			}
+		}
+	}
+
+	for targetUserID, forUserID := range res.DeviceKeys {
+		for targetKeyID, key := range forUserID {
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, gomatrixserverlib.KeyID(targetKeyID))
 			if err != nil {
 				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
 				continue
@@ -339,7 +361,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				}
 			}
 			if js, err := json.Marshal(deviceKey); err == nil {
-				res.DeviceKeys[userID][keyID] = js
+				res.DeviceKeys[targetUserID][targetKeyID] = js
 			}
 		}
 	}
