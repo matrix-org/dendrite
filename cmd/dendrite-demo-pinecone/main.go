@@ -22,11 +22,9 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -38,7 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -49,6 +46,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -91,8 +89,14 @@ func main() {
 		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, sk, false)
+	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
+	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
+	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pMulticast.Start()
+	if instancePeer != nil && *instancePeer != "" {
+		pManager.AddPeer(*instancePeer)
+	}
 
 	go func() {
 		listener, err := net.Listen("tcp", *instanceListen)
@@ -121,36 +125,6 @@ func main() {
 			fmt.Println("Inbound connection", conn.RemoteAddr(), "is connected to port", port)
 		}
 	}()
-
-	pQUIC := pineconeSessions.NewSessions(logger, pRouter)
-	pMulticast := pineconeMulticast.NewMulticast(logger, pRouter)
-	pMulticast.Start()
-
-	connectToStaticPeer := func() {
-		connected := map[string]bool{} // URI -> connected?
-		for _, uri := range strings.Split(*instancePeer, ",") {
-			connected[strings.TrimSpace(uri)] = false
-		}
-		attempt := func() {
-			for k := range connected {
-				connected[k] = false
-			}
-			for _, info := range pRouter.Peers() {
-				connected[info.URI] = true
-			}
-			for k, online := range connected {
-				if !online {
-					if err := conn.ConnectToPeer(pRouter, k); err != nil {
-						logrus.WithError(err).Error("Failed to connect to static peer")
-					}
-				}
-			}
-		}
-		for {
-			attempt()
-			time.Sleep(time.Second * 5)
-		}
-	}
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(true)
@@ -253,7 +227,7 @@ func main() {
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	pHTTP := pQUIC.HTTP()
+	pHTTP := pQUIC.Protocol("matrix").HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, pMux)
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
@@ -271,24 +245,15 @@ func main() {
 		Handler: pMux,
 	}
 
-	go connectToStaticPeer()
 	go func() {
 		pubkey := pRouter.PublicKey()
 		logrus.Info("Listening on ", hex.EncodeToString(pubkey[:]))
-		logrus.Fatal(httpServer.Serve(pQUIC))
+		logrus.Fatal(httpServer.Serve(pQUIC.Protocol("matrix")))
 	}()
 	go func() {
 		httpBindAddr := fmt.Sprintf(":%d", *instancePort)
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
-	}()
-	go func() {
-		logrus.Info("Sending wake-up message to known nodes")
-		req := &api.PerformBroadcastEDURequest{}
-		res := &api.PerformBroadcastEDUResponse{}
-		if err := fsAPI.PerformBroadcastEDU(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
-		}
 	}()
 
 	base.WaitForShutdown()

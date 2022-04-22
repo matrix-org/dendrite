@@ -3,8 +3,6 @@ package pushgateway
 import (
 	"context"
 	"encoding/json"
-
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Client is how interactions with a Push Gateway is done.
@@ -47,11 +45,11 @@ type Counts struct {
 }
 
 type Device struct {
-	AppID     string                      `json:"app_id"`  // Required
-	Data      map[string]interface{}      `json:"data"`    // Required. UNSPEC: Sytests require this to allow unknown keys.
-	PushKey   string                      `json:"pushkey"` // Required
-	PushKeyTS gomatrixserverlib.Timestamp `json:"pushkey_ts,omitempty"`
-	Tweaks    map[string]interface{}      `json:"tweaks,omitempty"`
+	AppID     string                 `json:"app_id"`  // Required
+	Data      map[string]interface{} `json:"data"`    // Required. UNSPEC: Sytests require this to allow unknown keys.
+	PushKey   string                 `json:"pushkey"` // Required
+	PushKeyTS int64                  `json:"pushkey_ts,omitempty"`
+	Tweaks    map[string]interface{} `json:"tweaks,omitempty"`
 }
 
 type Prio string

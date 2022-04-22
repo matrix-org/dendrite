@@ -82,20 +82,17 @@ Then point your favourite Matrix client at `http://localhost:8008` or `https://l
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of March 2022 we're at around 76% CS API coverage and 95% Federation coverage, though check
+updates with CI. As of April 2022 we're at around 83% CS API coverage and 95% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
-servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
-
-- Search
-- User Directory
-- Presence
+servers such as matrix.org reasonably well, although there are still some missing features (like Search).
 
 We are prioritising features that will benefit single-user homeservers first (e.g Receipts, E2E) rather
 than features that massive deployments may be interested in (User Directory, OpenID, Guests, Admin APIs, AS API).
 This means Dendrite supports amongst others:
 
 - Core room functionality (creating rooms, invites, auth rules)
-- Federation in rooms v1-v7
+- Full support for room versions 1 to 7
+- Experimental support for room versions 8 to 9
 - Backfilling locally and via federation
 - Accounts, Profiles and Devices
 - Published room lists
@@ -108,6 +105,8 @@ This means Dendrite supports amongst others:
 - Receipts
 - Push
 - Guests
+- User Directory
+- Presence
 
 ## Contributing
 

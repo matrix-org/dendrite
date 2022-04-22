@@ -67,21 +67,22 @@ func (y *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func createTransport(s *pineconeSessions.Sessions) *http.Transport {
+	proto := s.Protocol("matrix")
 	tr := &http.Transport{
 		DisableKeepAlives: false,
-		Dial:              s.Dial,
-		DialContext:       s.DialContext,
-		DialTLS:           s.DialTLS,
-		DialTLSContext:    s.DialTLSContext,
+		Dial:              proto.Dial,
+		DialContext:       proto.DialContext,
+		DialTLS:           proto.DialTLS,
+		DialTLSContext:    proto.DialTLSContext,
 	}
 	tr.RegisterProtocol(
 		"matrix", &RoundTripper{
 			inner: &http.Transport{
 				DisableKeepAlives: false,
-				Dial:              s.Dial,
-				DialContext:       s.DialContext,
-				DialTLS:           s.DialTLS,
-				DialTLSContext:    s.DialTLSContext,
+				Dial:              proto.Dial,
+				DialContext:       proto.DialContext,
+				DialTLS:           proto.DialTLS,
+				DialTLSContext:    proto.DialTLSContext,
 			},
 		},
 	)

@@ -1,4 +1,4 @@
-// Copyright 2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !wasm
-// +build !wasm
+package test
 
-package main
+import (
+	"fmt"
+	"sync/atomic"
+)
 
-import "fmt"
+var (
+	userIDCounter = int64(0)
+)
 
-func main() {
-	fmt.Println("dendritejs: no-op when not compiling for WebAssembly")
+type User struct {
+	ID string
+}
+
+func NewUser() *User {
+	counter := atomic.AddInt64(&userIDCounter, 1)
+	u := &User{
+		ID: fmt.Sprintf("@%d:localhost", counter),
+	}
+	return u
 }

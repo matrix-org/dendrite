@@ -16,21 +16,45 @@ package postgres
 
 import (
 	"strings"
+
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // filterConvertWildcardToSQL converts wildcards as defined in
 // https://matrix.org/docs/spec/client_server/r0.3.0.html#post-matrix-client-r0-user-userid-filter
 // to SQL wildcards that can be used with LIKE()
-func filterConvertTypeWildcardToSQL(values []string) []string {
+func filterConvertTypeWildcardToSQL(values *[]string) []string {
 	if values == nil {
 		// Return nil instead of []string{} so IS NULL can work correctly when
 		// the return value is passed into SQL queries
 		return nil
 	}
 
-	ret := make([]string, len(values))
-	for i := range values {
-		ret[i] = strings.Replace(values[i], "*", "%", -1)
+	v := *values
+	ret := make([]string, len(v))
+	for i := range v {
+		ret[i] = strings.Replace(v[i], "*", "%", -1)
 	}
 	return ret
+}
+
+// TODO: Replace when Dendrite uses Go 1.18
+func getSendersRoomEventFilter(filter *gomatrixserverlib.RoomEventFilter) (senders []string, notSenders []string) {
+	if filter.Senders != nil {
+		senders = *filter.Senders
+	}
+	if filter.NotSenders != nil {
+		notSenders = *filter.NotSenders
+	}
+	return senders, notSenders
+}
+
+func getSendersStateFilterFilter(filter *gomatrixserverlib.StateFilter) (senders []string, notSenders []string) {
+	if filter.Senders != nil {
+		senders = *filter.Senders
+	}
+	if filter.NotSenders != nil {
+		notSenders = *filter.NotSenders
+	}
+	return senders, notSenders
 }

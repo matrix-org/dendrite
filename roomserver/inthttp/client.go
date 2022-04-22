@@ -32,6 +32,7 @@ const (
 	RoomserverPerformInvitePath      = "/roomserver/performInvite"
 	RoomserverPerformPeekPath        = "/roomserver/performPeek"
 	RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
+	RoomserverPerformRoomUpgradePath = "/roomserver/performRoomUpgrade"
 	RoomserverPerformJoinPath        = "/roomserver/performJoin"
 	RoomserverPerformLeavePath       = "/roomserver/performLeave"
 	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
@@ -244,6 +245,23 @@ func (h *httpRoomserverInternalAPI) PerformUnpeek(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformUnpeekPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	if err != nil {
+		response.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformRoomUpgrade(
+	ctx context.Context,
+	request *api.PerformRoomUpgradeRequest,
+	response *api.PerformRoomUpgradeResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformRoomUpgrade")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformRoomUpgradePath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 	if err != nil {
 		response.Error = &api.PerformError{

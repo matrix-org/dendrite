@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -64,6 +65,7 @@ func OnIncomingMessagesRequest(
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
+	lazyLoadCache *caching.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
 
@@ -200,6 +202,10 @@ func OnIncomingMessagesRequest(
 	if filter.LazyLoadMembers {
 		membershipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
 		for _, evt := range clientEvents {
+			// Don't add membership events the client should already know about
+			if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, roomID, evt.Sender); cached {
+				continue
+			}
 			membership, err := db.GetStateEvent(req.Context(), roomID, gomatrixserverlib.MRoomMember, evt.Sender)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to get membership event for user")
@@ -207,10 +213,11 @@ func OnIncomingMessagesRequest(
 			}
 			if membership != nil {
 				membershipToUser[evt.Sender] = membership
+				lazyLoadCache.StoreLazyLoadedUser(device, roomID, evt.Sender, membership.EventID())
 			}
 		}
 		for _, evt := range membershipToUser {
-			state = append(state, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatAll))
+			state = append(state, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatSync))
 		}
 	}
 
@@ -262,12 +269,8 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
-	eventFilter := r.filter
-
 	// Retrieve the events from the local database.
-	streamEvents, err := r.db.GetEventsInTopologicalRange(
-		r.ctx, r.from, r.to, r.roomID, eventFilter.Limit, r.backwardOrdering,
-	)
+	streamEvents, err := r.db.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return

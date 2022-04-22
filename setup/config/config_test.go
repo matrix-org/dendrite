@@ -107,18 +107,6 @@ federation_api:
     connect: http://localhost:7772
   external_api:
     listen: http://[::]:8072
-  federation_certificates: []
-federation_sender:
-  internal_api:
-    listen: http://localhost:7775
-    connect: http://localhost:7775
-  database:
-    connection_string: file:federationapi.db
-    max_open_conns: 100
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-  send_max_retries: 16
-  disable_tls_validation: false
 key_server:
   internal_api:
     listen: http://localhost:7779

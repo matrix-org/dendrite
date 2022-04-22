@@ -31,12 +31,10 @@ type UserInternalAPI interface {
 	UserRegisterAPI
 	UserAccountAPI
 	UserThreePIDAPI
+	UserDeviceAPI
 
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 
-	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
-	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
-	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
 	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
@@ -45,13 +43,19 @@ type UserInternalAPI interface {
 
 	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
-	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
-	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
+}
+
+type UserDeviceAPI interface {
+	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
+	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
+	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
+	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
+	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 }
 
 type UserDirectoryProvider interface {
@@ -488,16 +492,16 @@ type PerformPusherDeletionRequest struct {
 
 // Pusher represents a push notification subscriber
 type Pusher struct {
-	SessionID         int64                       `json:"session_id,omitempty"`
-	PushKey           string                      `json:"pushkey"`
-	PushKeyTS         gomatrixserverlib.Timestamp `json:"pushkey_ts,omitempty"`
-	Kind              PusherKind                  `json:"kind"`
-	AppID             string                      `json:"app_id"`
-	AppDisplayName    string                      `json:"app_display_name"`
-	DeviceDisplayName string                      `json:"device_display_name"`
-	ProfileTag        string                      `json:"profile_tag"`
-	Language          string                      `json:"lang"`
-	Data              map[string]interface{}      `json:"data"`
+	SessionID         int64                  `json:"session_id,omitempty"`
+	PushKey           string                 `json:"pushkey"`
+	PushKeyTS         int64                  `json:"pushkey_ts,omitempty"`
+	Kind              PusherKind             `json:"kind"`
+	AppID             string                 `json:"app_id"`
+	AppDisplayName    string                 `json:"app_display_name"`
+	DeviceDisplayName string                 `json:"device_display_name"`
+	ProfileTag        string                 `json:"profile_tag"`
+	Language          string                 `json:"lang"`
+	Data              map[string]interface{} `json:"data"`
 }
 
 type PusherKind string

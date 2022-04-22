@@ -128,6 +128,8 @@ type QueryMembershipForUserResponse struct {
 type QueryMembershipsForRoomRequest struct {
 	// If true, only returns the membership events of "join" membership
 	JoinedOnly bool `json:"joined_only"`
+	// If true, only returns the membership events of local users
+	LocalOnly bool `json:"local_only"`
 	// ID of the room to fetch memberships from
 	RoomID string `json:"room_id"`
 	// Optional - ID of the user sending the request, for checking if the

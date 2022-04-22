@@ -66,6 +66,7 @@ func AddPublicRoutes(
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		ServerName:             cfg.Matrix.ServerName,
 		UserAPI:                userAPI,
 	}
@@ -149,5 +150,11 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start key server consumer")
 	}
 
+	presenceConsumer := consumers.NewOutputPresenceConsumer(
+		base.ProcessContext, cfg, js, queues, federationDB,
+	)
+	if err = presenceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start presence consumer")
+	}
 	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
 }

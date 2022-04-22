@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -39,7 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -54,6 +52,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
@@ -73,11 +72,9 @@ type DendriteMonolith struct {
 	PineconeRouter    *pineconeRouter.Router
 	PineconeMulticast *pineconeMulticast.Multicast
 	PineconeQUIC      *pineconeSessions.Sessions
+	PineconeManager   *pineconeConnections.ConnectionManager
 	StorageDirectory  string
 	CacheDirectory    string
-	staticPeerURI     string
-	staticPeerMutex   sync.RWMutex
-	staticPeerAttempt chan struct{}
 	listener          net.Listener
 	httpServer        *http.Server
 	processContext    *process.ProcessContext
@@ -93,7 +90,7 @@ func (m *DendriteMonolith) PeerCount(peertype int) int {
 }
 
 func (m *DendriteMonolith) SessionCount() int {
-	return len(m.PineconeQUIC.Sessions())
+	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -106,15 +103,8 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
-	m.staticPeerMutex.Lock()
-	m.staticPeerURI = strings.TrimSpace(uri)
-	m.staticPeerMutex.Unlock()
-	m.DisconnectType(int(pineconeRouter.PeerTypeRemote))
-	if uri != "" {
-		go func() {
-			m.staticPeerAttempt <- struct{}{}
-		}()
-	}
+	m.PineconeManager.RemovePeers()
+	m.PineconeManager.AddPeer(strings.TrimSpace(uri))
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -212,43 +202,6 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 	return loginRes.Device.AccessToken, nil
 }
 
-func (m *DendriteMonolith) staticPeerConnect() {
-	connected := map[string]bool{} // URI -> connected?
-	attempt := func() {
-		m.staticPeerMutex.RLock()
-		uri := m.staticPeerURI
-		m.staticPeerMutex.RUnlock()
-		if uri == "" {
-			return
-		}
-		for k := range connected {
-			delete(connected, k)
-		}
-		for _, uri := range strings.Split(uri, ",") {
-			connected[strings.TrimSpace(uri)] = false
-		}
-		for _, info := range m.PineconeRouter.Peers() {
-			connected[info.URI] = true
-		}
-		for k, online := range connected {
-			if !online {
-				if err := conn.ConnectToPeer(m.PineconeRouter, k); err != nil {
-					logrus.WithError(err).Error("Failed to connect to static peer")
-				}
-			}
-		}
-	}
-	for {
-		select {
-		case <-m.processContext.Context().Done():
-		case <-m.staticPeerAttempt:
-			attempt()
-		case <-time.After(time.Second * 5):
-			attempt()
-		}
-	}
-}
-
 // nolint:gocyclo
 func (m *DendriteMonolith) Start() {
 	var err error
@@ -272,7 +225,7 @@ func (m *DendriteMonolith) Start() {
 		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	m.listener, err = net.Listen("tcp", "localhost:65432")
+	m.listener, err = net.Listen("tcp", ":65432")
 	if err != nil {
 		panic(err)
 	}
@@ -283,10 +236,10 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
-	logger := log.New(os.Stdout, "PINECONE: ", 0)
-	m.PineconeRouter = pineconeRouter.NewRouter(logger, sk, false)
-	m.PineconeQUIC = pineconeSessions.NewSessions(logger, m.PineconeRouter)
-	m.PineconeMulticast = pineconeMulticast.NewMulticast(logger, m.PineconeRouter)
+	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
+	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
+	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter)
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
@@ -374,7 +327,7 @@ func (m *DendriteMonolith) Start() {
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	pHTTP := m.PineconeQUIC.HTTP()
+	pHTTP := m.PineconeQUIC.Protocol("matrix").HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, pMux)
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
@@ -395,24 +348,13 @@ func (m *DendriteMonolith) Start() {
 
 	m.processContext = base.ProcessContext
 
-	m.staticPeerAttempt = make(chan struct{}, 1)
-	go m.staticPeerConnect()
-
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
-		m.logger.Fatal(m.httpServer.Serve(m.PineconeQUIC))
+		m.logger.Fatal(m.httpServer.Serve(m.PineconeQUIC.Protocol("matrix")))
 	}()
 	go func() {
 		logrus.Info("Listening on ", m.listener.Addr())
 		logrus.Fatal(http.Serve(m.listener, httpRouter))
-	}()
-	go func() {
-		logrus.Info("Sending wake-up message to known nodes")
-		req := &api.PerformBroadcastEDURequest{}
-		res := &api.PerformBroadcastEDUResponse{}
-		if err := fsAPI.PerformBroadcastEDU(context.TODO(), req, res); err != nil {
-			logrus.WithError(err).Error("Failed to send wake-up message to known nodes")
-		}
 	}()
 }
 

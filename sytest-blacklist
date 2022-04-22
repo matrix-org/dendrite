@@ -1,35 +1,42 @@
 # Blacklisted until matrix-org/dendrite#862 is reverted due to Riot bug
+
 Latest account data appears in v2 /sync
 
-# Blacklisted because we don't support ignores yet
-Ignore invite in incremental sync
-
 # Relies on a rejected PL event which will never be accepted into the DAG
-# Caused by https://github.com/matrix-org/sytest/pull/911
+
+# Caused by <https://github.com/matrix-org/sytest/pull/911>
+
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
 
-# We don't implement lazy membership loading yet.
+# We don't implement lazy membership loading yet
+
 The only membership state included in a gapped incremental sync is for senders in the timeline
 
 # Blacklisted out of flakiness after #1479
+
 Invited user can reject local invite after originator leaves
 Invited user can reject invite for empty room
 If user leaves room, remote user changes device and rejoins we see update in /sync and /keys/changes
 
 # Blacklisted due to flakiness
+
 Forgotten room messages cannot be paginated
 
 # Blacklisted due to flakiness after #1774
+
 Local device key changes get to remote servers with correct prev_id
 
 # Flakey
+
 Local device key changes appear in /keys/changes
 
 # we don't support groups
+
 Remove group category
 Remove group role
 
 # Flakey
+
 AS-ghosted users can use rooms themselves
 AS-ghosted users can use rooms via AS
 Events in rooms with AS-hosted room aliases are sent to AS server
@@ -37,6 +44,12 @@ Inviting an AS-hosted user asks the AS server
 Accesing an AS-hosted room alias asks the AS server
 
 # Flakey, need additional investigation
+
 Messages that notify from another user increment notification_count
 Messages that highlight from another user increment unread highlight count
 Notifications can be viewed with GET /notifications
+
+# More flakey
+
+If remote user leaves room we no longer receive device updates
+Local device key changes get to remote servers

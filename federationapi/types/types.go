@@ -66,3 +66,15 @@ type FederationReceiptData struct {
 type ReceiptTS struct {
 	TS gomatrixserverlib.Timestamp `json:"ts"`
 }
+
+type Presence struct {
+	Push []PresenceContent `json:"push"`
+}
+
+type PresenceContent struct {
+	CurrentlyActive bool    `json:"currently_active,omitempty"`
+	LastActiveAgo   int64   `json:"last_active_ago"`
+	Presence        string  `json:"presence"`
+	StatusMsg       *string `json:"status_msg,omitempty"`
+	UserID          string  `json:"user_id"`
+}

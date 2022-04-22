@@ -49,7 +49,7 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.SyncAPI,
 ) {
-	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	js, natsClient := jetstream.Prepare(process, &cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
 	if err != nil {
@@ -57,13 +57,23 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache)
-	notifier := notifier.NewNotifier(streams.Latest(context.Background()))
+	lazyLoadCache, err := caching.NewLazyLoadCache()
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create lazy loading cache")
+	}
+	notifier := notifier.NewNotifier()
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
+	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier)
+	federationPresenceProducer := &producers.FederationAPIPresenceProducer{
+		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		JetStream: js,
+	}
+
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -74,8 +84,6 @@ func AddPublicRoutes(
 		JetStream: js,
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
 	}
-
-	_ = userAPIReadUpdateProducer
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		process, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
@@ -131,5 +139,14 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
-	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
+	presenceConsumer := consumers.NewPresenceConsumer(
+		process, cfg, js, natsClient, syncDB,
+		notifier, streams.PresenceStreamProvider,
+		userAPI,
+	)
+	if err = presenceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start presence consumer")
+	}
+
+	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg, lazyLoadCache)
 }

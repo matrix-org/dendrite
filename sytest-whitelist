@@ -284,8 +284,6 @@ local user can join room with version 4
 remote user can join room with version 3
 remote user can join room with version 4
 Remote user can backfill in a room with version 4
-# We don't support ignores yet, so ignore this for now - ha ha.
-# Ignore invite in incremental sync
 Outbound federation can send invites via v2 API
 User can invite local user to room with version 3
 User can invite local user to room with version 4
@@ -314,10 +312,10 @@ Inbound federation can return events
 Inbound federation can return missing events for world_readable visibility
 Inbound federation can return missing events for invite visibility
 Inbound federation can get public room list
-POST /rooms/:room_id/redact/:event_id as power user redacts message
-POST /rooms/:room_id/redact/:event_id as original message sender redacts message
-POST /rooms/:room_id/redact/:event_id as random user does not redact message
-POST /redact disallows redaction of event in different room
+PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
+PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
+PUT /rooms/:room_id/redact/:event_id/:txn_id as random user does not redact message
+PUT /redact disallows redaction of event in different room
 An event which redacts itself should be ignored
 A pair of events which redact each other should be ignored
 Redaction of a redaction redacts the redaction reason
@@ -661,4 +659,54 @@ Canonical alias can include alt_aliases
 Can delete canonical alias
 AS can make room aliases
 /context/ with lazy_load_members filter works
+/upgrade creates a new room
+/upgrade should preserve room visibility for public rooms
+/upgrade should preserve room visibility for private rooms
+/upgrade copies the power levels to the new room
+/upgrade preserves the power level of the upgrading user in old and new rooms
+/upgrade copies important state to the new room
+/upgrade copies ban events to the new room
+local user has push rules copied to upgraded room
+remote user has push rules copied to upgraded room
+/upgrade moves aliases to the new room
+/upgrade preserves room federation ability
+/upgrade restricts power levels in the old room
+/upgrade restricts power levels in the old room when the old PLs are unusual
+/upgrade to an unknown version is rejected
+/upgrade is rejected if the user can't send state events
+/upgrade of a bogus room fails gracefully
+Cannot send tombstone event that points to the same room
 Room summary counts change when membership changes
+GET /presence/:user_id/status fetches initial status
+PUT /presence/:user_id/status updates my presence
+Presence change reports an event to myself
+Existing members see new members' presence
+#Existing members see new member's presence
+Newly joined room includes presence in incremental sync
+Get presence for newly joined members in incremental sync
+User sees their own presence in a sync
+User sees updates to presence from other users in the incremental sync.
+Presence changes are reported to local room members
+Presence changes are also reported to remote room members
+Presence changes to UNAVAILABLE are reported to local room members
+Presence changes to UNAVAILABLE are reported to remote room members
+New federated private chats get full presence information (SYN-115)
+/upgrade copies >100 power levels to the new room
+Room state after a rejected message event is the same as before
+Room state after a rejected state event is the same as before
+Ignore user in existing room
+Ignore invite in full sync
+Ignore invite in incremental sync
+A filtered timeline reaches its limit
+A change to displayname should not result in a full state sync
+Can fetch images in room
+The only membership state included in an initial sync is for all the senders in the timeline
+The only membership state included in an incremental sync is for senders in the timeline
+Old members are included in gappy incr LL sync if they start speaking
+We do send redundant membership state across incremental syncs if asked
+Rejecting invite over federation doesn't break incremental /sync
+Gapped incremental syncs include all state changes
+Old leaves are present in gapped incremental syncs
+Leaves are present in non-gapped incremental syncs
+Members from the gap are included in gappy incr LL sync
+Presence can be set from sync

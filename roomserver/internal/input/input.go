@@ -167,6 +167,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
 func (r *Inputer) Start() error {
+	prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
 	_, err := r.JetStream.Subscribe(
 		"", // This is blank because we specified it in BindStream.
 		func(m *nats.Msg) {
@@ -419,10 +420,6 @@ func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) er
 		}
 	}
 	return nil
-}
-
-func init() {
-	prometheus.MustRegister(roomserverInputBackpressure)
 }
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(

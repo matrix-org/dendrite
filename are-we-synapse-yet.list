@@ -106,10 +106,13 @@ rst Users cannot set notifications powerlevel higher than their own (2 subtests)
 rst Both GET and PUT work
 rct POST /rooms/:room_id/receipt can create receipts 
 red POST /rooms/:room_id/read_markers can create read marker
+med POST /media/v3/upload can create an upload
 med POST /media/r0/upload can create an upload 
+med GET /media/v3/download can fetch the value again
 med GET /media/r0/download can fetch the value again 
 cap GET /capabilities is present and well formed for registered user 
 cap GET /r0/capabilities is not public
+cap GET /v3/capabilities is not public
 reg Register with a recaptcha 
 reg registration is idempotent, without username specified 
 reg registration is idempotent, with username specified 
@@ -174,7 +177,9 @@ eph Ephemeral messages received from clients are correctly expired
 ali Room aliases can contain Unicode
 f,ali Remote room alias queries can handle Unicode
 ali Canonical alias can be set
+ali Canonical alias can be set (3 subtests)
 ali Canonical alias can include alt_aliases
+ali Canonical alias can include alt_aliases (4 subtests)
 ali Regular users can add and delete aliases in the default room configuration
 ali Regular users can add and delete aliases when m.room.aliases is restricted
 ali Deleting a non-existent alias should return a 404
@@ -207,11 +212,12 @@ plv Users cannot set kick powerlevel higher than their own (2 subtests)
 plv Users cannot set redact powerlevel higher than their own (2 subtests)
 v1s Check that event streams started after a client joined a room work (SYT-1)
 v1s Event stream catches up fully after many messages
-xxx POST /rooms/:room_id/redact/:event_id as power user redacts message
-xxx POST /rooms/:room_id/redact/:event_id as original message sender redacts message
-xxx POST /rooms/:room_id/redact/:event_id as random user does not redact message
-xxx POST /redact disallows redaction of event in different room
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as random user does not redact message
+xxx PUT /redact disallows redaction of event in different room
 xxx Redaction of a redaction redacts the redaction reason
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
 v1s A departed room is still included in /initialSync (SPEC-216)
 v1s Can get rooms/{roomId}/initialSync for a departed room (SPEC-216)
 rst Can get rooms/{roomId}/state for a departed room (SPEC-216)
@@ -478,6 +484,30 @@ rmv Inbound federation rejects invites which include invalid JSON for room versi
 rmv Outbound federation rejects invite response which include invalid JSON for room version 6
 rmv Inbound federation rejects invite rejections which include invalid JSON for room version 6
 rmv Server rejects invalid JSON in a version 6 room
+rmv User can create and send/receive messages in a room with version 7 (2 subtests)
+rmv local user can join room with version 7
+rmv User can invite local user to room with version 7
+rmv remote user can join room with version 7
+rmv User can invite remote user to room with version 7
+rmv Remote user can backfill in a room with version 7
+rmv Can reject invites over federation for rooms with version 7
+rmv Can receive redactions from regular users over federation in room version 7
+rmv User can create and send/receive messages in a room with version 8 (2 subtests)
+rmv local user can join room with version 8
+rmv User can invite local user to room with version 8
+rmv remote user can join room with version 8
+rmv User can invite remote user to room with version 8
+rmv Remote user can backfill in a room with version 8
+rmv Can reject invites over federation for rooms with version 8
+rmv Can receive redactions from regular users over federation in room version 8
+rmv User can create and send/receive messages in a room with version 9 (2 subtests)
+rmv local user can join room with version 9
+rmv User can invite local user to room with version 9
+rmv remote user can join room with version 9
+rmv User can invite remote user to room with version 9
+rmv Remote user can backfill in a room with version 9
+rmv Can reject invites over federation for rooms with version 9
+rmv Can receive redactions from regular users over federation in room version 9
 pre Presence changes are reported to local room members 
 f,pre Presence changes are also reported to remote room members 
 pre Presence changes to UNAVAILABLE are reported to local room members 
@@ -772,12 +802,15 @@ app AS can make room aliases
 app Regular users cannot create room aliases within the AS namespace
 app AS-ghosted users can use rooms via AS 
 app AS-ghosted users can use rooms themselves 
+app AS-ghosted users can use rooms via AS (2 subtests)
+app AS-ghosted users can use rooms themselves (3 subtests)
 app Ghost user must register before joining room 
 app AS can set avatar for ghosted users 
 app AS can set displayname for ghosted users 
 app AS can't set displayname for random users
 app Inviting an AS-hosted user asks the AS server 
 app Accesing an AS-hosted room alias asks the AS server 
+app Accesing an AS-hosted room alias asks the AS server (2 subtests)
 app Events in rooms with AS-hosted room aliases are sent to AS server 
 app AS user (not ghost) can join room without registering 
 app AS user (not ghost) can join room without registering, with user_id query param
@@ -789,6 +822,8 @@ app AS can publish rooms in their own list
 app AS and main public room lists are separate 
 app AS can deactivate a user 
 psh Test that a message is pushed 
+psh Test that a message is pushed (6 subtests)
+psh Test that rejected pushers are removed. (4 subtests)
 psh Invites are pushed 
 psh Rooms with names are correctly named in pushed 
 psh Rooms with canonical alias are correctly named in pushed 
@@ -857,9 +892,12 @@ pre Left room members do not cause problems for presence
 crm Rooms can be created with an initial invite list (SYN-205) (1 subtests)
 typ Typing notifications don't leak 
 ban Non-present room members cannot ban others 
+ban Non-present room members cannot ban others (3 subtests)
 psh Getting push rules doesn't corrupt the cache SYN-390 
+psh Getting push rules doesn't corrupt the cache SYN-390 (3 subtests)
 inv Test that we can be reinvited to a room we created 
 syn Multiple calls to /sync should not cause 500 errors 
+syn Multiple calls to /sync should not cause 500 errors (6 subtests)
 gst Guest user can call /events on another world_readable room (SYN-606) 
 gst Real user can call /events on another world_readable room (SYN-606) 
 gst Events come down the correct room
@@ -884,3 +922,18 @@ msc We can't peek into rooms with invited history_visibility
 msc We can't peek into rooms with joined history_visibility
 msc Local users can peek by room alias
 msc Peeked rooms only turn up in the sync for the device who peeked them
+ban 'ban' event respects room powerlevel (2 subtests)
+inv Test that we can be reinvited to a room we created (11 subtests)
+fiv Rejecting invite over federation doesn't break incremental /sync
+pre Presence can be set from sync
+fst /state returns M_NOT_FOUND for an outlier
+fst /state_ids returns M_NOT_FOUND for an outlier
+fst /state returns M_NOT_FOUND for a rejected message event
+fst /state_ids returns M_NOT_FOUND for a rejected message event
+fst /state returns M_NOT_FOUND for a rejected state event
+fst /state_ids returns M_NOT_FOUND for a rejected state event
+fst Room state after a rejected message event is the same as before
+fst Room state after a rejected state event is the same as before
+fpb Federation publicRoom Name/topic keys are correct
+fed New federated private chats get full presence information (SYN-115) (10 subtests)
+dvk Rejects invalid device keys

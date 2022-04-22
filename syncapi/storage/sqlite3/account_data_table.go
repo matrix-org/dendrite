@@ -41,23 +41,23 @@ const insertAccountDataSQL = "" +
 	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
 	" SET id = $5"
 
+// further parameters are added by prepareWithFilters
 const selectAccountDataInRangeSQL = "" +
 	"SELECT room_id, type FROM syncapi_account_data_type" +
-	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC"
+	" WHERE user_id = $1 AND id > $2 AND id <= $3"
 
 const selectMaxAccountDataIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_account_data_type"
 
 type accountDataStatements struct {
 	db                           *sql.DB
-	streamIDStatements           *streamIDStatements
+	streamIDStatements           *StreamIDStatements
 	insertAccountDataStmt        *sql.Stmt
 	selectMaxAccountDataIDStmt   *sql.Stmt
 	selectAccountDataInRangeStmt *sql.Stmt
 }
 
-func NewSqliteAccountDataTable(db *sql.DB, streamID *streamIDStatements) (tables.AccountData, error) {
+func NewSqliteAccountDataTable(db *sql.DB, streamID *StreamIDStatements) (tables.AccountData, error) {
 	s := &accountDataStatements{
 		db:                 db,
 		streamIDStatements: streamID,
@@ -94,17 +94,23 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	r types.Range,
-	accountDataFilterPart *gomatrixserverlib.EventFilter,
+	filter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, err error) {
 	data = make(map[string][]string)
+	stmt, params, err := prepareWithFilters(
+		s.db, nil, selectAccountDataInRangeSQL,
+		[]interface{}{
+			userID, r.Low(), r.High(),
+		},
+		filter.Senders, filter.NotSenders,
+		filter.Types, filter.NotTypes,
+		[]string{}, nil, filter.Limit, FilterOrderAsc)
 
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High())
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
-
-	var entries int
 
 	for rows.Next() {
 		var dataType string
@@ -114,30 +120,10 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 			return
 		}
 
-		// check if we should add this by looking at the filter.
-		// It would be nice if we could do this in SQL-land, but the mix of variadic
-		// and positional parameters makes the query annoyingly hard to do, it's easier
-		// and clearer to do it in Go-land. If there are no filters for [not]types then
-		// this gets skipped.
-		for _, includeType := range accountDataFilterPart.Types {
-			if includeType != dataType { // TODO: wildcard support
-				continue
-			}
-		}
-		for _, excludeType := range accountDataFilterPart.NotTypes {
-			if excludeType == dataType { // TODO: wildcard support
-				continue
-			}
-		}
-
 		if len(data[roomID]) > 0 {
 			data[roomID] = append(data[roomID], dataType)
 		} else {
 			data[roomID] = []string{dataType}
-		}
-		entries++
-		if entries >= accountDataFilterPart.Limit {
-			break
 		}
 	}
 

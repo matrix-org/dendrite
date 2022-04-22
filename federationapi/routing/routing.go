@@ -29,6 +29,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -53,6 +54,10 @@ func Setup(
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) {
+	prometheus.MustRegister(
+		pduCountTotal, eduCountTotal,
+	)
+
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
 	v2fedmux := fedMux.PathPrefix("/v2").Subrouter()
