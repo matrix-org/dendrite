@@ -49,11 +49,10 @@ const deleteCrossSigningSigsForTargetSQL = "" +
 	"DELETE FROM keyserver_cross_signing_sigs WHERE target_user_id=$1 AND target_key_id=$2"
 
 type crossSigningSigsStatements struct {
-	db                                        *sql.DB
-	selectCrossSigningSigsForTargetStmt       *sql.Stmt
-	selectCrossSigningSigsForOriginTargetStmt *sql.Stmt
-	upsertCrossSigningSigsForTargetStmt       *sql.Stmt
-	deleteCrossSigningSigsForTargetStmt       *sql.Stmt
+	db                                  *sql.DB
+	selectCrossSigningSigsForTargetStmt *sql.Stmt
+	upsertCrossSigningSigsForTargetStmt *sql.Stmt
+	deleteCrossSigningSigsForTargetStmt *sql.Stmt
 }
 
 func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error) {
@@ -74,7 +73,7 @@ func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error)
 func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
 	ctx context.Context, txn *sql.Tx, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 ) (r types.CrossSigningSigMap, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForOriginTargetStmt).QueryContext(ctx, originUserID, targetUserID, targetKeyID)
+	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForTargetStmt).QueryContext(ctx, originUserID, targetUserID, targetKeyID)
 	if err != nil {
 		return nil, err
 	}
