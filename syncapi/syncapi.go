@@ -148,5 +148,5 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
+	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg, lazyLoadCache)
 }
