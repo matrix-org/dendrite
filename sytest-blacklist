@@ -1,7 +1,3 @@
-# Blacklisted until matrix-org/dendrite#862 is reverted due to Riot bug
-
-Latest account data appears in v2 /sync
-
 # Relies on a rejected PL event which will never be accepted into the DAG
 
 # Caused by <https://github.com/matrix-org/sytest/pull/911>
