@@ -125,6 +125,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		context.TODO(),
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationapi_queue_json table
+		event.Type,
 	); err != nil {
 		logrus.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
