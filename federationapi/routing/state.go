@@ -129,6 +129,13 @@ func getState(
 		return nil, nil, &resErr
 	}
 
+	if response.IsRejected {
+		return nil, nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Event not found"),
+		}
+	}
+
 	if !response.RoomExists {
 		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}

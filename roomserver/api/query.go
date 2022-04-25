@@ -230,6 +230,8 @@ type QueryStateAndAuthChainResponse struct {
 	// The lists will be in an arbitrary order.
 	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	// True if the queried event was rejected earlier.
+	IsRejected bool `json:"is_rejected"`
 }
 
 // QueryRoomVersionCapabilitiesRequest asks for the default room version
