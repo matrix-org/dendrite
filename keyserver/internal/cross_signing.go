@@ -363,7 +363,8 @@ func (a *KeyInternalAPI) processSelfSignatures(
 			switch sig := signature.CrossSigningBody.(type) {
 			case *gomatrixserverlib.CrossSigningKey:
 				for keyID := range sig.Keys {
-					if gomatrixserverlib.KeyID(strings.SplitN(string(keyID), ":", 1)[1]) == keyID {
+					split := strings.SplitN(string(keyID), ":", 2)
+					if len(split) > 1 && gomatrixserverlib.KeyID(split[1]) == keyID {
 						targetKeyID = keyID // contains the ed25519: or other scheme
 						break
 					}
@@ -380,7 +381,8 @@ func (a *KeyInternalAPI) processSelfSignatures(
 
 			case *gomatrixserverlib.DeviceKeys:
 				for keyID := range sig.Keys {
-					if gomatrixserverlib.KeyID(strings.SplitN(string(keyID), ":", 1)[1]) == keyID {
+					split := strings.SplitN(string(keyID), ":", 2)
+					if len(split) > 1 && gomatrixserverlib.KeyID(split[1]) == keyID {
 						targetKeyID = keyID // contains the ed25519: or other scheme
 						break
 					}
