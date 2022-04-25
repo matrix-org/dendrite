@@ -210,6 +210,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
+	delete(destmap, oqs.signing.ServerName)
 
 	// Check if any of the destinations are prohibited by server ACLs.
 	for destination := range destmap {
@@ -275,6 +276,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
+	delete(destmap, oqs.signing.ServerName)
 
 	// There is absolutely no guarantee that the EDU will have a room_id
 	// field, as it is not required by the spec. However, if it *does*
