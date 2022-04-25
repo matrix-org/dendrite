@@ -154,7 +154,7 @@ Can add account data
 Can add account data to room
 Can get account data without syncing
 Can get room account data without syncing
-#Latest account data appears in v2 /sync
+Latest account data appears in v2 /sync
 New account data appears in incremental v2 /sync
 Checking local federation server
 Inbound federation can query profile data
