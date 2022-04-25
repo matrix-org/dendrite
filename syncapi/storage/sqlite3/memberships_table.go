@@ -18,7 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -61,10 +63,14 @@ const selectMembershipCountSQL = "" +
 	" SELECT * FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 GROUP BY user_id HAVING(max(stream_pos))" +
 	") t WHERE t.membership = $3"
 
+const selectHeroesSQL = "" +
+	"SELECT DISTINCT user_id FROM syncapi_memberships WHERE room_id = $1 AND user_id != $2 AND membership IN ($3) LIMIT 5"
+
 type membershipsStatements struct {
 	db                        *sql.DB
 	upsertMembershipStmt      *sql.Stmt
 	selectMembershipCountStmt *sql.Stmt
+	selectHeroesStmt          *sql.Stmt
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -75,13 +81,11 @@ func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.upsertMembershipStmt, err = db.Prepare(upsertMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCountSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertMembershipStmt, upsertMembershipSQL},
+		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
+		{&s.selectHeroesStmt, selectHeroesSQL},
+	}.Prepare(db)
 }
 
 func (s *membershipsStatements) UpsertMembership(
@@ -110,4 +114,36 @@ func (s *membershipsStatements) SelectMembershipCount(
 	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
 	err = stmt.QueryRowContext(ctx, roomID, pos, membership).Scan(&count)
 	return
+}
+
+func (s *membershipsStatements) SelectHeroes(
+	ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string,
+) (heroes []string, err error) {
+	stmtSQL := strings.Replace(selectHeroesSQL, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
+	stmt, err := s.db.Prepare(stmtSQL)
+	if err != nil {
+		return
+	}
+	params := []interface{}{
+		roomID, userID,
+	}
+	for _, membership := range memberships {
+		params = append(params, membership)
+	}
+
+	stmt = sqlutil.TxStmt(txn, stmt)
+	var rows *sql.Rows
+	rows, err = stmt.QueryContext(ctx, params...)
+	if err != nil {
+		return
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectHeroes: rows.close() failed")
+	var hero string
+	for rows.Next() {
+		if err = rows.Scan(&hero); err != nil {
+			return
+		}
+		heroes = append(heroes, hero)
+	}
+	return heroes, rows.Err()
 }

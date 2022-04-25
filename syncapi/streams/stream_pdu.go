@@ -4,13 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 	"go.uber.org/atomic"
 )
 
@@ -30,6 +33,7 @@ type PDUStreamProvider struct {
 	workers atomic.Int32
 	// userID+deviceID -> lazy loading cache
 	lazyLoadCache *caching.LazyLoadCache
+	rsAPI         roomserverAPI.RoomserverInternalAPI
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -300,6 +304,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		if hasMembershipChange {
 			jr.Summary.JoinedMemberCount = &joinedCount
 			jr.Summary.InvitedMemberCount = &invitedCount
+			p.addHeroes(ctx, jr, delta.RoomID, device.UserID)
 		}
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
@@ -330,6 +335,38 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	return latestPosition, nil
+}
+
+func (p *PDUStreamProvider) addHeroes(ctx context.Context, jr *types.JoinResponse, roomID, userID string) {
+	fetchStates := []gomatrixserverlib.StateKeyTuple{
+		{EventType: gomatrixserverlib.MRoomName},
+		{EventType: gomatrixserverlib.MRoomCanonicalAlias},
+	}
+	// Check if the room has a name or a canonical alias
+	latestState := &roomserverAPI.QueryLatestEventsAndStateResponse{}
+	err := p.rsAPI.QueryLatestEventsAndState(ctx, &roomserverAPI.QueryLatestEventsAndStateRequest{StateToFetch: fetchStates, RoomID: roomID}, latestState)
+	if err != nil {
+		return
+	}
+	// Check if the room has a name or canonical alias, if so, return.
+	for _, ev := range latestState.StateEvents {
+		switch ev.Type() {
+		case gomatrixserverlib.MRoomName:
+			if gjson.GetBytes(ev.Content(), "name").Str != "" {
+				return
+			}
+		case gomatrixserverlib.MRoomCanonicalAlias:
+			if gjson.GetBytes(ev.Content(), "alias").Str != "" {
+				return
+			}
+		}
+	}
+	heroes, err := p.DB.GetRoomHeroes(ctx, roomID, userID, []string{"join", "invite"})
+	if err != nil {
+		return
+	}
+	sort.Strings(heroes)
+	jr.Summary.Heroes = heroes
 }
 
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
@@ -419,6 +456,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// Work out how many members are in the room.
 	joinedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Join, r.From)
 	invitedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, r.From)
+	p.addHeroes(ctx, jr, roomID, device.UserID)
 
 	// We don't include a device here as we don't need to send down
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
