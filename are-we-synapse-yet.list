@@ -212,11 +212,12 @@ plv Users cannot set kick powerlevel higher than their own (2 subtests)
 plv Users cannot set redact powerlevel higher than their own (2 subtests)
 v1s Check that event streams started after a client joined a room work (SYT-1)
 v1s Event stream catches up fully after many messages
-xxx POST /rooms/:room_id/redact/:event_id as power user redacts message
-xxx POST /rooms/:room_id/redact/:event_id as original message sender redacts message
-xxx POST /rooms/:room_id/redact/:event_id as random user does not redact message
-xxx POST /redact disallows redaction of event in different room
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id as random user does not redact message
+xxx PUT /redact disallows redaction of event in different room
 xxx Redaction of a redaction redacts the redaction reason
+xxx PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
 v1s A departed room is still included in /initialSync (SPEC-216)
 v1s Can get rooms/{roomId}/initialSync for a departed room (SPEC-216)
 rst Can get rooms/{roomId}/state for a departed room (SPEC-216)
@@ -921,3 +922,18 @@ msc We can't peek into rooms with invited history_visibility
 msc We can't peek into rooms with joined history_visibility
 msc Local users can peek by room alias
 msc Peeked rooms only turn up in the sync for the device who peeked them
+ban 'ban' event respects room powerlevel (2 subtests)
+inv Test that we can be reinvited to a room we created (11 subtests)
+fiv Rejecting invite over federation doesn't break incremental /sync
+pre Presence can be set from sync
+fst /state returns M_NOT_FOUND for an outlier
+fst /state_ids returns M_NOT_FOUND for an outlier
+fst /state returns M_NOT_FOUND for a rejected message event
+fst /state_ids returns M_NOT_FOUND for a rejected message event
+fst /state returns M_NOT_FOUND for a rejected state event
+fst /state_ids returns M_NOT_FOUND for a rejected state event
+fst Room state after a rejected message event is the same as before
+fst Room state after a rejected state event is the same as before
+fpb Federation publicRoom Name/topic keys are correct
+fed New federated private chats get full presence information (SYN-115) (10 subtests)
+dvk Rejects invalid device keys
