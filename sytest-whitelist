@@ -710,3 +710,7 @@ Old leaves are present in gapped incremental syncs
 Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
 Presence can be set from sync
+/state returns M_NOT_FOUND for a rejected message event
+/state_ids returns M_NOT_FOUND for a rejected message event
+/state returns M_NOT_FOUND for a rejected state event
+/state_ids returns M_NOT_FOUND for a rejected state event
