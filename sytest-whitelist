@@ -710,3 +710,6 @@ Old leaves are present in gapped incremental syncs
 Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
 Presence can be set from sync
+Unnamed room comes with a name summary
+Named room comes with just joined member count summary
+Room summary only has 5 heroes
