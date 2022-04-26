@@ -118,7 +118,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 
 	var dataType string
 	var roomID string
-	var id types.StreamPosition
+	id := r.From
 
 	for rows.Next() {
 		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
