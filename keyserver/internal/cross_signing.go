@@ -521,7 +521,7 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 }
 
 func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySignaturesRequest, res *api.QuerySignaturesResponse) {
-	for targetUserID := range req.TargetIDs {
+	for targetUserID, forTargetUser := range req.TargetIDs {
 		keyMap, err := a.DB.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil && err != sql.ErrNoRows {
 			res.Error = &api.KeyError{
@@ -552,31 +552,31 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 			}
 		}
 
-		for _, targetSection := range []map[string]gomatrixserverlib.CrossSigningKey{
-			res.MasterKeys,
-			res.SelfSigningKeys,
-			res.UserSigningKeys,
-		} {
-			for targetKeyID, section := range targetSection {
-				// Get own signatures only.
-				sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, targetUserID, targetUserID, gomatrixserverlib.KeyID(targetKeyID))
-				if err != nil && err != sql.ErrNoRows {
-					res.Error = &api.KeyError{
-						Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
-					}
-					return
+		for _, targetKeyID := range forTargetUser {
+			// Get own signatures only.
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, targetUserID, targetUserID, targetKeyID)
+			if err != nil && err != sql.ErrNoRows {
+				res.Error = &api.KeyError{
+					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),
 				}
+				return
+			}
 
-				for sourceUserID, forSourceUser := range sigMap {
-					for sourceKeyID, sourceSig := range forSourceUser {
-						if section.Signatures == nil {
-							section.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
-						}
-						if _, ok := res.Signatures[sourceUserID]; !ok {
-							section.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
-						}
-						section.Signatures[sourceUserID][sourceKeyID] = sourceSig
+			for sourceUserID, forSourceUser := range sigMap {
+				for sourceKeyID, sourceSig := range forSourceUser {
+					if res.Signatures == nil {
+						res.Signatures = map[string]map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
 					}
+					if _, ok := res.Signatures[targetUserID]; !ok {
+						res.Signatures[targetUserID] = map[gomatrixserverlib.KeyID]types.CrossSigningSigMap{}
+					}
+					if _, ok := res.Signatures[targetUserID][targetKeyID]; !ok {
+						res.Signatures[targetUserID][targetKeyID] = types.CrossSigningSigMap{}
+					}
+					if _, ok := res.Signatures[targetUserID][targetKeyID][sourceUserID]; !ok {
+						res.Signatures[targetUserID][targetKeyID][sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+					}
+					res.Signatures[targetUserID][targetKeyID][sourceUserID][sourceKeyID] = sourceSig
 				}
 			}
 		}
