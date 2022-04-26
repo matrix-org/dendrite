@@ -513,9 +513,9 @@ func (d *Database) StreamToTopologicalPosition(
 }
 
 func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.Filter.SelectFilter(ctx, localpart, filterID)
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
