@@ -111,6 +111,12 @@ func (p *PresenceStreamProvider) populatePresence(
 		}
 	}
 
+	// TODO: This is expensive, why do we do this?
+	if err := p.notifier.Load(ctx, p.DB); err != nil {
+		req.Log.WithError(err).Error("unable to refresh notifier lists")
+		return err
+	}
+
 	for _, presence := range presences {
 		// Ignore users we don't share a room with
 		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
