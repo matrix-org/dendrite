@@ -174,7 +174,7 @@ func (p *presenceStatements) GetRecentPresence(
 	ctx context.Context, txn *sql.Tx,
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
-	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
+	stmt := sqlutil.TxStmt(txn, p.selectRecentPresenceStmt)
 
 	sinceTS := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute * -5))
 
