@@ -87,6 +87,7 @@ func (p *PresenceStreamProvider) populatePresence(
 	presences map[string]*types.PresenceInternal,
 	ignoreCache bool,
 ) error {
+	var changesMade bool
 	for _, room := range req.Response.Rooms.Join {
 		for _, stateEvent := range append(room.State.Events, room.Timeline.Events...) {
 			switch {
@@ -108,13 +109,17 @@ func (p *PresenceStreamProvider) populatePresence(
 			if err != nil && err != sql.ErrNoRows {
 				return err
 			}
+			changesMade = true
 		}
 	}
 
-	// TODO: This is expensive, why do we do this?
-	if err := p.notifier.Load(ctx, p.DB); err != nil {
-		req.Log.WithError(err).Error("unable to refresh notifier lists")
-		return err
+	if changesMade {
+		// TODO: This is expensive, but seems to be the only thing that
+		// stops sytest from racing on a couple of remote user tests.
+		if err := p.notifier.Load(ctx, p.DB); err != nil {
+			req.Log.WithError(err).Error("unable to refresh notifier lists")
+			return err
+		}
 	}
 
 	for _, presence := range presences {
