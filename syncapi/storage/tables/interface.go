@@ -27,7 +27,7 @@ import (
 type AccountData interface {
 	InsertAccountData(ctx context.Context, txn *sql.Tx, userID, roomID, dataType string) (pos types.StreamPosition, err error)
 	// SelectAccountDataInRange returns a map of room ID to a list of `dataType`.
-	SelectAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, err error)
+	SelectAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, pos types.StreamPosition, err error)
 	SelectMaxAccountDataID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
 

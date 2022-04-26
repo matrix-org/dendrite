@@ -265,7 +265,7 @@ func (d *Database) DeletePeeks(
 func (d *Database) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
+) (map[string][]string, types.StreamPosition, error) {
 	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
 }
 

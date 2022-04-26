@@ -53,6 +53,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 
 	m := sqlutil.NewMigrations()
 	deltas.LoadRefactorKeyChanges(m)
+	deltas.LoadFixCrossSigningSignatureIndexes(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
