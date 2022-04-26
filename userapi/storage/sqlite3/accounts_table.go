@@ -121,6 +121,7 @@ func (s *accountsStatements) InsertAccount(
 		UserID:       userutil.MakeUserID(localpart, s.serverName),
 		ServerName:   s.serverName,
 		AppServiceID: appserviceID,
+		AccountType:  accountType,
 	}, nil
 }
 
@@ -177,5 +178,5 @@ func (s *accountsStatements) SelectNewNumericLocalpart(
 		stmt = sqlutil.TxStmt(txn, stmt)
 	}
 	err = stmt.QueryRowContext(ctx).Scan(&id)
-	return
+	return id + 1, err
 }
