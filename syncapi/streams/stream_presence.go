@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -46,44 +47,18 @@ func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	presences, err := p.DB.RecentPresence(ctx)
+	presences, latest, err := p.DB.RecentPresence(ctx)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RecentPresence failed")
 		return 0
 	}
-
-	for i := range presences {
-		presence := presences[i]
-		// Ignore users we don't share a room with
-		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
-			continue
-		}
-		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID
-
-		if _, known := types.PresenceFromString(presence.ClientFields.Presence); known {
-			presence.ClientFields.LastActiveAgo = presence.LastActiveAgo()
-			if presence.ClientFields.Presence == "online" {
-				currentlyActive := presence.CurrentlyActive()
-				presence.ClientFields.CurrentlyActive = &currentlyActive
-			}
-		} else {
-			presence.ClientFields.Presence = "offline"
-		}
-
-		content, err := json.Marshal(presence.ClientFields)
-		if err != nil {
-			return 0
-		}
-
-		req.Response.Presence.Events = append(req.Response.Presence.Events, gomatrixserverlib.ClientEvent{
-			Content: content,
-			Sender:  presence.UserID,
-			Type:    gomatrixserverlib.MPresence,
-		})
-		p.cache.Store(cacheKey, presence)
+	if len(presences) == 0 {
+		return latest
 	}
-
-	return p.LatestPosition(ctx)
+	if err := p.populatePresence(ctx, req, presences, true); err != nil {
+		return 0
+	}
+	return latest
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(
@@ -96,19 +71,28 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
 		return from
 	}
-
 	if len(presences) == 0 {
 		return to
 	}
+	if err := p.populatePresence(ctx, req, presences, false); err != nil {
+		return from
+	}
+	return to
+}
 
+func (p *PresenceStreamProvider) populatePresence(
+	ctx context.Context,
+	req *types.SyncRequest,
+	presences map[string]*types.PresenceInternal,
+	ignoreCache bool,
+) error {
 	// add newly joined rooms user presences
 	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
 	if len(newlyJoined) > 0 {
 		// TODO: This refreshes all lists and is quite expensive
 		// The notifier should update the lists itself
-		if err = p.notifier.Load(ctx, p.DB); err != nil {
-			req.Log.WithError(err).Error("unable to refresh notifier lists")
-			return from
+		if err := p.notifier.Load(ctx, p.DB); err != nil {
+			return err
 		}
 		for _, roomID := range newlyJoined {
 			roomUsers := p.notifier.JoinedUsers(roomID)
@@ -117,19 +101,18 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				if _, ok := presences[roomUsers[i]]; ok {
 					continue
 				}
+				var err error
 				presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
 				if err != nil {
 					if err == sql.ErrNoRows {
 						continue
 					}
-					req.Log.WithError(err).Error("unable to query presence for user")
-					return from
+					return err
 				}
 			}
 		}
 	}
 
-	lastPos := to
 	for i := range presences {
 		presence := presences[i]
 		// Ignore users we don't share a room with
@@ -137,15 +120,15 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			continue
 		}
 		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID
-		pres, ok := p.cache.Load(cacheKey)
-		if ok {
-			// skip already sent presence
-			prevPresence := pres.(*types.PresenceInternal)
-			currentlyActive := prevPresence.CurrentlyActive()
-			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
-			if skip {
-				req.Log.Debugf("Skipping presence, no change (%s)", presence.UserID)
-				continue
+		if !ignoreCache {
+			pres, ok := p.cache.Load(cacheKey)
+			if ok {
+				// skip already sent presence
+				prevPresence := pres.(*types.PresenceInternal)
+				currentlyActive := prevPresence.CurrentlyActive()
+				if prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID {
+					continue
+				}
 			}
 		}
 
@@ -161,7 +144,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 
 		content, err := json.Marshal(presence.ClientFields)
 		if err != nil {
-			return from
+			return fmt.Errorf("json.Unmarshal: %w", err)
 		}
 
 		req.Response.Presence.Events = append(req.Response.Presence.Events, gomatrixserverlib.ClientEvent{
@@ -169,13 +152,10 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			Sender:  presence.UserID,
 			Type:    gomatrixserverlib.MPresence,
 		})
-		if presence.StreamPos > lastPos {
-			lastPos = presence.StreamPos
-		}
 		p.cache.Store(cacheKey, presence)
 	}
 
-	return lastPos
+	return nil
 }
 
 func joinedRooms(res *types.Response, userID string) []string {

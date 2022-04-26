@@ -1060,7 +1060,7 @@ func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition
 	return s.Presence.GetPresenceAfter(ctx, nil, after)
 }
 
-func (s *Database) RecentPresence(ctx context.Context) (map[string]*types.PresenceInternal, error) {
+func (s *Database) RecentPresence(ctx context.Context) (map[string]*types.PresenceInternal, types.StreamPosition, error) {
 	return s.Presence.GetRecentPresence(ctx, nil)
 }
 

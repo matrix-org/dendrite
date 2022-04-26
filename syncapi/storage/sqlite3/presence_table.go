@@ -187,7 +187,7 @@ func (p *presenceStatements) GetPresenceAfter(
 // GetRecentPresence gets updates from the last five minutes.
 func (p *presenceStatements) GetRecentPresence(
 	ctx context.Context, txn *sql.Tx,
-) (presences map[string]*types.PresenceInternal, err error) {
+) (presences map[string]*types.PresenceInternal, latest types.StreamPosition, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectRecentPresenceStmt)
 
@@ -195,16 +195,19 @@ func (p *presenceStatements) GetRecentPresence(
 
 	rows, err := stmt.QueryContext(ctx, sinceTS)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceAfter: failed to close rows")
+	defer internal.CloseAndLogIfError(ctx, rows, "GetRecentPresence: failed to close rows")
 	for rows.Next() {
 		qryRes := &types.PresenceInternal{}
 		if err := rows.Scan(&qryRes.StreamPos, &qryRes.UserID, &qryRes.Presence, &qryRes.ClientFields.StatusMsg, &qryRes.LastActiveTS); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		qryRes.ClientFields.Presence = qryRes.Presence.String()
 		presences[qryRes.UserID] = qryRes
+		if qryRes.StreamPos > latest {
+			latest = qryRes.StreamPos
+		}
 	}
-	return presences, rows.Err()
+	return presences, latest, rows.Err()
 }

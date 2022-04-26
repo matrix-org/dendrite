@@ -189,5 +189,5 @@ type Presence interface {
 	GetPresenceForUser(ctx context.Context, txn *sql.Tx, userID string) (presence *types.PresenceInternal, err error)
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
 	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition) (presences map[string]*types.PresenceInternal, err error)
-	GetRecentPresence(ctx context.Context, txn *sql.Tx) (presences map[string]*types.PresenceInternal, err error)
+	GetRecentPresence(ctx context.Context, txn *sql.Tx) (presences map[string]*types.PresenceInternal, latest types.StreamPosition, err error)
 }

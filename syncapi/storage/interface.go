@@ -161,5 +161,5 @@ type Presence interface {
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
-	RecentPresence(ctx context.Context) (map[string]*types.PresenceInternal, error)
+	RecentPresence(ctx context.Context) (map[string]*types.PresenceInternal, types.StreamPosition, error)
 }
