@@ -70,7 +70,7 @@ type membershipsStatements struct {
 	db                        *sql.DB
 	upsertMembershipStmt      *sql.Stmt
 	selectMembershipCountStmt *sql.Stmt
-	selectHeroesStmt          *sql.Stmt
+	//selectHeroesStmt          *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -84,7 +84,7 @@ func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 	return s, sqlutil.StatementList{
 		{&s.upsertMembershipStmt, upsertMembershipSQL},
 		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
-		{&s.selectHeroesStmt, selectHeroesSQL},
+		// {&s.selectHeroesStmt, selectHeroesSQL}, - prepared at runtime due to variadic
 	}.Prepare(db)
 }
 
@@ -120,10 +120,11 @@ func (s *membershipsStatements) SelectHeroes(
 	ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string,
 ) (heroes []string, err error) {
 	stmtSQL := strings.Replace(selectHeroesSQL, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
-	stmt, err := s.db.Prepare(stmtSQL)
+	stmt, err := s.db.PrepareContext(ctx, stmtSQL)
 	if err != nil {
 		return
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectHeroes: stmt.close() failed")
 	params := []interface{}{
 		roomID, userID,
 	}
