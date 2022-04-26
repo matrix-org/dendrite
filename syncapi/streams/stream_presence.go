@@ -87,22 +87,27 @@ func (p *PresenceStreamProvider) populatePresence(
 	ignoreCache bool,
 ) error {
 	// add newly joined rooms user presences
-	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
-	if len(newlyJoined) > 0 {
-		// TODO: This refreshes all lists and is quite expensive
-		// The notifier should update the lists itself
-		if err := p.notifier.Load(ctx, p.DB); err != nil {
-			return err
-		}
+	if newlyJoined := joinedRooms(req.Response, req.Device.UserID); len(newlyJoined) > 0 {
 		for _, roomID := range newlyJoined {
-			roomUsers := p.notifier.JoinedUsers(roomID)
-			for i := range roomUsers {
-				// we already got a presence from this user
-				if _, ok := presences[roomUsers[i]]; ok {
+			room, ok := req.Response.Rooms.Join[roomID]
+			if !ok {
+				continue
+			}
+			for _, stateEvent := range room.State.Events {
+				switch {
+				case stateEvent.Type != gomatrixserverlib.MRoomMember:
+					fallthrough
+				case stateEvent.StateKey == nil:
+					fallthrough
+				case *stateEvent.StateKey == "":
+					continue
+				}
+				userID := *stateEvent.StateKey
+				if _, ok := presences[userID]; ok {
 					continue
 				}
 				var err error
-				presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
+				presences[userID], err = p.DB.GetPresence(ctx, userID)
 				if err != nil {
 					if err == sql.ErrNoRows {
 						continue
