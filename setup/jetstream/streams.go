@@ -1,14 +1,17 @@
 package jetstream
 
 import (
+	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/nats-io/nats.go"
 )
 
 const (
-	UserID = "user_id"
-	RoomID = "room_id"
+	UserID  = "user_id"
+	RoomID  = "room_id"
+	EventID = "event_id"
 )
 
 var (
@@ -22,12 +25,24 @@ var (
 	OutputReceiptEvent      = "OutputReceiptEvent"
 	OutputStreamEvent       = "OutputStreamEvent"
 	OutputReadUpdate        = "OutputReadUpdate"
+	RequestPresence         = "GetPresence"
+	OutputPresenceEvent     = "OutputPresenceEvent"
 )
+
+var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
+
+func Tokenise(str string) string {
+	return safeCharacters.ReplaceAllString(str, "_")
+}
+
+func InputRoomEventSubj(roomID string) string {
+	return fmt.Sprintf("%s.%s", InputRoomEvent, Tokenise(roomID))
+}
 
 var streams = []*nats.StreamConfig{
 	{
 		Name:      InputRoomEvent,
-		Retention: nats.WorkQueuePolicy,
+		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},
 	{
@@ -42,7 +57,7 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      OutputKeyChangeEvent,
-		Retention: nats.LimitsPolicy,
+		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},
 	{
@@ -75,5 +90,11 @@ var streams = []*nats.StreamConfig{
 		Name:      OutputReadUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      OutputPresenceEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.MemoryStorage,
+		MaxAge:    time.Minute * 5,
 	},
 }

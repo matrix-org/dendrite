@@ -81,6 +81,15 @@ const insertEventSQL = "" +
 const selectEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
+const selectEventsWithFilterSQL = "" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)" +
+	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
+	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
+	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
+	" AND ( $6::bool   IS NULL OR     contains_url = $6 )" +
+	" LIMIT $7"
+
 const selectRecentEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
@@ -119,13 +128,14 @@ const selectStateInRangeSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
-	" AND ( $3::text[] IS NULL OR     sender  = ANY($3)  )" +
-	" AND ( $4::text[] IS NULL OR NOT(sender  = ANY($4)) )" +
-	" AND ( $5::text[] IS NULL OR     type LIKE ANY($5)  )" +
-	" AND ( $6::text[] IS NULL OR NOT(type LIKE ANY($6)) )" +
-	" AND ( $7::bool IS NULL   OR     contains_url = $7  )" +
+	" AND room_id = ANY($3)" +
+	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
+	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
+	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
+	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
+	" AND ( $8::bool IS NULL   OR     contains_url = $8  )" +
 	" ORDER BY id ASC" +
-	" LIMIT $8"
+	" LIMIT $9"
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -152,6 +162,7 @@ const selectContextAfterEventSQL = "" +
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
+	selectEventsWitFilterStmt     *sql.Stmt
 	selectMaxEventIDStmt          *sql.Stmt
 	selectRecentEventsStmt        *sql.Stmt
 	selectRecentEventsForSyncStmt *sql.Stmt
@@ -173,6 +184,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventsStmt, selectEventsSQL},
+		{&s.selectEventsWitFilterStmt, selectEventsWithFilterSQL},
 		{&s.selectMaxEventIDStmt, selectMaxEventIDSQL},
 		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
 		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
@@ -200,14 +212,14 @@ func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event 
 // two positions, only the most recent state is returned.
 func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
-	stateFilter *gomatrixserverlib.StateFilter,
+	stateFilter *gomatrixserverlib.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
-
+	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	rows, err := stmt.QueryContext(
-		ctx, r.Low(), r.High(),
-		pq.StringArray(stateFilter.Senders),
-		pq.StringArray(stateFilter.NotSenders),
+		ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,
@@ -309,7 +321,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if json.Unmarshal(event.Content(), &content) != nil {
+	if json.Unmarshal(event.Content(), &content) == nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
@@ -352,10 +364,11 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	} else {
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
+	senders, notSenders := getSendersRoomEventFilter(eventFilter)
 	rows, err := stmt.QueryContext(
 		ctx, roomID, r.Low(), r.High(),
-		pq.StringArray(eventFilter.Senders),
-		pq.StringArray(eventFilter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
 		eventFilter.Limit+1,
@@ -397,11 +410,12 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	ctx context.Context, txn *sql.Tx,
 	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
 ) ([]types.StreamEvent, error) {
+	senders, notSenders := getSendersRoomEventFilter(eventFilter)
 	stmt := sqlutil.TxStmt(txn, s.selectEarlyEventsStmt)
 	rows, err := stmt.QueryContext(
 		ctx, roomID, r.Low(), r.High(),
-		pq.StringArray(eventFilter.Senders),
-		pq.StringArray(eventFilter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.NotTypes)),
 		eventFilter.Limit,
@@ -426,15 +440,52 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 // selectEvents returns the events for the given event IDs. If an event is
 // missing from the database, it will be omitted.
 func (s *outputRoomEventsStatements) SelectEvents(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, filter *gomatrixserverlib.RoomEventFilter, preserveOrder bool,
 ) ([]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectEventsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	var (
+		stmt *sql.Stmt
+		rows *sql.Rows
+		err  error
+	)
+	if filter == nil {
+		stmt = sqlutil.TxStmt(txn, s.selectEventsStmt)
+		rows, err = stmt.QueryContext(ctx, pq.StringArray(eventIDs))
+	} else {
+		senders, notSenders := getSendersRoomEventFilter(filter)
+		stmt = sqlutil.TxStmt(txn, s.selectEventsWitFilterStmt)
+		rows, err = stmt.QueryContext(ctx,
+			pq.StringArray(eventIDs),
+			pq.StringArray(senders),
+			pq.StringArray(notSenders),
+			pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
+			pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
+			filter.ContainsURL,
+			filter.Limit,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectEvents: rows.close() failed")
-	return rowsToStreamEvents(rows)
+	streamEvents, err := rowsToStreamEvents(rows)
+	if err != nil {
+		return nil, err
+	}
+	if preserveOrder {
+		eventMap := make(map[string]types.StreamEvent)
+		for _, ev := range streamEvents {
+			eventMap[ev.EventID()] = ev
+		}
+		var returnEvents []types.StreamEvent
+		for _, eventID := range eventIDs {
+			ev, ok := eventMap[eventID]
+			if ok {
+				returnEvents = append(returnEvents, ev)
+			}
+		}
+		return returnEvents, nil
+	}
+	return streamEvents, nil
 }
 
 func (s *outputRoomEventsStatements) DeleteEventsForRoom(
@@ -461,17 +512,18 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (evts []*gomatrixserverlib.HeaderedEvent, err error) {
+	senders, notSenders := getSendersRoomEventFilter(filter)
 	rows, err := sqlutil.TxStmt(txn, s.selectContextBeforeEventStmt).QueryContext(
 		ctx, roomID, id, filter.Limit,
-		pq.StringArray(filter.Senders),
-		pq.StringArray(filter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
 	)
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
 
 	for rows.Next() {
 		var (
@@ -493,17 +545,18 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter,
 ) (lastID int, evts []*gomatrixserverlib.HeaderedEvent, err error) {
+	senders, notSenders := getSendersRoomEventFilter(filter)
 	rows, err := sqlutil.TxStmt(txn, s.selectContextAfterEventStmt).QueryContext(
 		ctx, roomID, id, filter.Limit,
-		pq.StringArray(filter.Senders),
-		pq.StringArray(filter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(filter.NotTypes)),
 	)
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
 
 	for rows.Next() {
 		var (

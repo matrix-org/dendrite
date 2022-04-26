@@ -13,6 +13,10 @@ RUN go build -trimpath -o bin/ ./cmd/create-account
 RUN go build -trimpath -o bin/ ./cmd/generate-keys
 
 FROM alpine:latest
+LABEL org.opencontainers.image.title="Dendrite (Polylith)"
+LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
+LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 COPY --from=base /build/bin/* /usr/bin/
 

@@ -53,6 +53,7 @@ const selectProfilesBySearchSQL = "" +
 	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
 type profilesStatements struct {
+	serverNoticesLocalpart       string
 	insertProfileStmt            *sql.Stmt
 	selectProfileByLocalpartStmt *sql.Stmt
 	setAvatarURLStmt             *sql.Stmt
@@ -60,8 +61,10 @@ type profilesStatements struct {
 	selectProfilesBySearchStmt   *sql.Stmt
 }
 
-func NewPostgresProfilesTable(db *sql.DB) (tables.ProfileTable, error) {
-	s := &profilesStatements{}
+func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables.ProfileTable, error) {
+	s := &profilesStatements{
+		serverNoticesLocalpart: serverNoticesLocalpart,
+	}
 	_, err := db.Exec(profilesSchema)
 	if err != nil {
 		return nil, err
@@ -126,7 +129,9 @@ func (s *profilesStatements) SelectProfilesBySearch(
 		if err := rows.Scan(&profile.Localpart, &profile.DisplayName, &profile.AvatarURL); err != nil {
 			return nil, err
 		}
-		profiles = append(profiles, profile)
+		if profile.Localpart != s.serverNoticesLocalpart {
+			profiles = append(profiles, profile)
+		}
 	}
 	return profiles, nil
 }

@@ -30,37 +30,7 @@ func (p *AccountDataStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	dataReq := &userapi.QueryAccountDataRequest{
-		UserID: req.Device.UserID,
-	}
-	dataRes := &userapi.QueryAccountDataResponse{}
-	if err := p.userAPI.QueryAccountData(ctx, dataReq, dataRes); err != nil {
-		req.Log.WithError(err).Error("p.userAPI.QueryAccountData failed")
-		return p.LatestPosition(ctx)
-	}
-	for datatype, databody := range dataRes.GlobalAccountData {
-		req.Response.AccountData.Events = append(
-			req.Response.AccountData.Events,
-			gomatrixserverlib.ClientEvent{
-				Type:    datatype,
-				Content: gomatrixserverlib.RawJSON(databody),
-			},
-		)
-	}
-	for r, j := range req.Response.Rooms.Join {
-		for datatype, databody := range dataRes.RoomAccountData[r] {
-			j.AccountData.Events = append(
-				j.AccountData.Events,
-				gomatrixserverlib.ClientEvent{
-					Type:    datatype,
-					Content: gomatrixserverlib.RawJSON(databody),
-				},
-			)
-			req.Response.Rooms.Join[r] = j
-		}
-	}
-
-	return p.LatestPosition(ctx)
+	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *AccountDataStreamProvider) IncrementalSync(
@@ -72,10 +42,9 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		From: from,
 		To:   to,
 	}
-	accountDataFilter := gomatrixserverlib.DefaultEventFilter() // TODO: use filter provided in req instead
 
 	dataTypes, err := p.DB.GetAccountDataInRange(
-		ctx, req.Device.UserID, r, &accountDataFilter,
+		ctx, req.Device.UserID, r, &req.Filter.AccountData,
 	)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.GetAccountDataInRange failed")

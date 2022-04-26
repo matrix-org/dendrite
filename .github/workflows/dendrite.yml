@@ -1,0 +1,378 @@
+name: Dendrite
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wasm:
+    name: WASM build test
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-wasm-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-wasm
+
+      - name: Install Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Reconfigure Git to use HTTPS auth for repo packages
+        run: >
+          git config --global url."https://github.com/".insteadOf
+          ssh://git@github.com/
+
+      - name: Install test dependencies
+        working-directory: ./test/wasm
+        run: npm ci
+
+      - name: Test
+        run: ./test-dendritejs.sh
+
+  # Run golangci-lint
+  lint:
+    timeout-minutes: 5
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+
+  # run go test with different go versions
+  test:
+    timeout-minutes: 5
+    name: Unit tests (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:13-alpine
+        # Provide the password for postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dendrite
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.16", "1.17", "1.18"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go${{ matrix.go }}-test-
+      - run: go test ./...
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dendrite
+
+  # build Dendrite for linux with different architectures and go versions
+  build:
+    name: Build for Linux
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.16", "1.17", "1.18"]
+        goos: ["linux"]
+        goarch: ["amd64", "386"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install dependencies x86
+        if: ${{ matrix.goarch == '386' }}
+        run: sudo apt update && sudo apt-get install -y gcc-multilib
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goarch }}-
+      - env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+        run: go build -trimpath -v -o "bin/" ./cmd/...
+
+  # build for Windows 64-bit
+  build_windows:
+    name: Build for Windows
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.16", "1.17", "1.18"]
+        goos: ["windows"]
+        goarch: ["amd64"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go ${{ matrix.go }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}
+      - env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          CC: "/usr/bin/x86_64-w64-mingw32-gcc"
+        run: go build -trimpath -v -o "bin/" ./cmd/...
+
+  # Dummy step to gate other tests on without repeating the whole list
+  initial-tests-done:
+    name: Initial tests passed
+    needs: [lint, test, build, build_windows]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
+    steps:
+      - name: Check initial tests passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  # run database upgrade tests
+  upgrade_test:
+    name: Upgrade tests
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.16"
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-upgrade
+      - name: Build upgrade-tests
+        run: go build ./cmd/dendrite-upgrade-tests
+      - name: Test upgrade
+        run: ./dendrite-upgrade-tests --head .
+
+  # run Sytest in different variations
+  sytest:
+    timeout-minutes: 20
+    needs: initial-tests-done
+    name: "Sytest (${{ matrix.label }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: SQLite
+
+          - label: SQLite, full HTTP APIs
+            api: full-http
+
+          - label: PostgreSQL
+            postgres: postgres
+
+          - label: PostgreSQL, full HTTP APIs
+            postgres: postgres
+            api: full-http
+    container:
+      image: matrixdotorg/sytest-dendrite:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+      env:
+        POSTGRES: ${{ matrix.postgres && 1}}
+        API: ${{ matrix.api && 1 }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run Sytest
+        run: /bootstrap.sh dendrite
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+      - name: Sytest List Maintenance
+        if: ${{ always() }}
+        run: /src/show-expected-fail-tests.sh /logs/results.tap /src/sytest-whitelist /src/sytest-blacklist
+        continue-on-error: true # not fatal
+      - name: Are We Synapse Yet?
+        if: ${{ always() }}
+        run: /src/are-we-synapse-yet.py /logs/results.tap -v
+        continue-on-error: true # not fatal
+      - name: Upload Sytest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
+
+  # run Complement
+  complement:
+    name: "Complement (${{ matrix.label }})"
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: SQLite
+
+          - label: SQLite, full HTTP APIs
+            api: full-http
+
+          - label: PostgreSQL
+            postgres: Postgres
+
+          - label: PostgreSQL, full HTTP APIs
+            postgres: Postgres
+            api: full-http
+    steps:
+      # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
+      # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
+      - name: "Set Go Version"
+        run: |
+          echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
+          echo "~/go/bin" >> $GITHUB_PATH
+
+      - name: "Install Complement Dependencies"
+        # We don't need to install Go because it is included on the Ubuntu 20.04 image:
+        # See https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md specifically GOROOT_1_17_X64
+        run: |
+          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+
+      - name: Run actions/checkout@v2 for dendrite
+        uses: actions/checkout@v2
+        with:
+          path: dendrite
+
+      # Attempt to check out the same branch of Complement as the PR. If it
+      # doesn't exist, fallback to main.
+      - name: Checkout complement
+        shell: bash
+        run: |
+          mkdir -p complement
+          # Attempt to use the version of complement which best matches the current
+          # build. Depending on whether this is a PR or release, etc. we need to
+          # use different fallbacks.
+          #
+          # 1. First check if there's a similarly named branch (GITHUB_HEAD_REF
+          #    for pull requests, otherwise GITHUB_REF).
+          # 2. Attempt to use the base branch, e.g. when merging into release-vX.Y
+          #    (GITHUB_BASE_REF for pull requests).
+          # 3. Use the default complement branch ("master").
+          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "master"; do
+            # Skip empty branch names and merge commits.
+            if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
+              continue
+            fi
+
+            (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
+          done
+
+      # Build initial Dendrite image
+      - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+        working-directory: dendrite
+
+      # Run Complement
+      - run: |
+          set -o pipefail &&
+          go test -v -json -tags dendrite_blacklist ./tests/... 2>&1 | gotestfmt
+        shell: bash
+        name: Run Complement Tests
+        env:
+          COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
+          API: ${{ matrix.api && 1 }}
+        working-directory: complement
+
+  integration-tests-done:
+    name: Integration tests passed
+    needs: [initial-tests-done, upgrade_test, sytest, complement]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
+    steps:
+      - name: Check integration tests passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  update-docker-images:
+    name: Update Docker images
+    permissions:
+      packages: write
+      contents: read
+    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
+    needs: [integration-tests-done]
+    uses: matrix-org/dendrite/.github/workflows/docker.yml@main
+    secrets:
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}

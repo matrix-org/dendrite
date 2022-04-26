@@ -283,11 +283,7 @@ func (w *walker) walk() util.JSONResponse {
 		if !roomExists {
 			// attempt to query this room over federation, as either we've never heard of it before
 			// or we've left it and hence are not authorised (but info may be exposed regardless)
-			fedRes, err := w.federatedRoomInfo(rv.roomID, rv.vias)
-			if err != nil {
-				util.GetLogger(w.ctx).WithError(err).WithField("room_id", rv.roomID).Errorf("failed to query federated spaces")
-				continue
-			}
+			fedRes := w.federatedRoomInfo(rv.roomID, rv.vias)
 			if fedRes != nil {
 				discoveredChildEvents = fedRes.Room.ChildrenState
 				discoveredRooms = append(discoveredRooms, fedRes.Room)
@@ -420,15 +416,15 @@ func (w *walker) publicRoomsChunk(roomID string) *gomatrixserverlib.PublicRoom {
 
 // federatedRoomInfo returns more of the spaces graph from another server. Returns nil if this was
 // unsuccessful.
-func (w *walker) federatedRoomInfo(roomID string, vias []string) (*gomatrixserverlib.MSC2946SpacesResponse, error) {
+func (w *walker) federatedRoomInfo(roomID string, vias []string) *gomatrixserverlib.MSC2946SpacesResponse {
 	// only do federated requests for client requests
 	if w.caller == nil {
-		return nil, nil
+		return nil
 	}
 	resp, ok := w.cache.GetSpaceSummary(roomID)
 	if ok {
 		util.GetLogger(w.ctx).Debugf("Returning cached response for %s", roomID)
-		return &resp, nil
+		return &resp
 	}
 	util.GetLogger(w.ctx).Debugf("Querying %s via %+v", roomID, vias)
 	ctx := context.Background()
@@ -455,9 +451,9 @@ func (w *walker) federatedRoomInfo(roomID string, vias []string) (*gomatrixserve
 		}
 		w.cache.StoreSpaceSummary(roomID, res)
 
-		return &res, nil
+		return &res
 	}
-	return nil, nil
+	return nil
 }
 
 func (w *walker) roomExists(roomID string) bool {
@@ -715,23 +711,6 @@ func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEve
 		RoomID:         ev.RoomID(),
 		OriginServerTS: ev.OriginServerTS(),
 	}
-}
-
-func eventKey(event *gomatrixserverlib.MSC2946StrippedEvent) string {
-	return event.RoomID + "|" + event.Type + "|" + event.StateKey
-}
-
-func spaceTargetStripped(event *gomatrixserverlib.MSC2946StrippedEvent) string {
-	if event.StateKey == "" {
-		return "" // no-op
-	}
-	switch event.Type {
-	case ConstSpaceParentEventType:
-		return event.StateKey
-	case ConstSpaceChildEventType:
-		return event.StateKey
-	}
-	return ""
 }
 
 func parseInt(intstr string, defaultVal int) int {

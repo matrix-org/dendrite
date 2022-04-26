@@ -16,7 +16,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"reflect"
 	"strings"
@@ -64,14 +63,13 @@ func TestLoginFromJSONReader(t *testing.T) {
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
-			var accountDB fakeAccountDB
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
 				Matrix: &config.Global{
 					ServerName: serverName,
 				},
 			}
-			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &accountDB, &userAPI, cfg)
+			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
 			if err != nil {
 				t.Fatalf("LoginFromJSONReader failed: %+v", err)
 			}
@@ -143,14 +141,13 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
-			var accountDB fakeAccountDB
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
 				Matrix: &config.Global{
 					ServerName: serverName,
 				},
 			}
-			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &accountDB, &userAPI, cfg)
+			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
@@ -161,22 +158,20 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 	}
 }
 
-type fakeAccountDB struct {
-	AccountDatabase
-}
-
-func (*fakeAccountDB) GetAccountByPassword(ctx context.Context, localpart, password string) (*uapi.Account, error) {
-	if password == "invalidpassword" {
-		return nil, sql.ErrNoRows
-	}
-
-	return &uapi.Account{}, nil
-}
-
 type fakeUserInternalAPI struct {
 	UserInternalAPIForLogin
-
+	uapi.UserAccountAPI
 	DeletedTokens []string
+}
+
+func (ua *fakeUserInternalAPI) QueryAccountByPassword(ctx context.Context, req *uapi.QueryAccountByPasswordRequest, res *uapi.QueryAccountByPasswordResponse) error {
+	if req.PlaintextPassword == "invalidpassword" {
+		res.Account = nil
+		return nil
+	}
+	res.Exists = true
+	res.Account = &uapi.Account{}
+	return nil
 }
 
 func (ua *fakeUserInternalAPI) PerformLoginTokenDeletion(ctx context.Context, req *uapi.PerformLoginTokenDeletionRequest, res *uapi.PerformLoginTokenDeletionResponse) error {

@@ -32,7 +32,6 @@ type SyncServerDatasource struct {
 	shared.Database
 	db     *sql.DB
 	writer sqlutil.Writer
-	sqlutil.PartitionOffsetStatements
 }
 
 // NewDatabase creates a new sync server database
@@ -43,9 +42,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		return nil, err
 	}
 	d.writer = sqlutil.NewDummyWriter()
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "syncapi"); err != nil {
-		return nil, err
-	}
 	accountData, err := NewPostgresAccountDataTable(d.db)
 	if err != nil {
 		return nil, err
@@ -94,6 +90,14 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 	if err != nil {
 		return nil, err
 	}
+	ignores, err := NewPostgresIgnoresTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	presence, err := NewPostgresPresenceTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
@@ -115,6 +119,8 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*SyncServerDatasource, e
 		Receipts:            receipts,
 		Memberships:         memberships,
 		NotificationData:    notificationData,
+		Ignores:             ignores,
+		Presence:            presence,
 	}
 	return &d, nil
 }

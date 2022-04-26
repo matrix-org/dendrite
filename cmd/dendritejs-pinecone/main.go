@@ -21,18 +21,13 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"os"
 	"syscall/js"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
-	"github.com/matrix-org/dendrite/eduserver"
-	"github.com/matrix-org/dendrite/eduserver/cache"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -48,6 +43,7 @@ import (
 
 	_ "github.com/matrix-org/go-sqlite3-js"
 
+	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 )
@@ -156,9 +152,10 @@ func startup() {
 	sk := generateKey()
 	pk := sk.Public().(ed25519.PublicKey)
 
-	logger := log.New(os.Stdout, "", 0)
-	pRouter := pineconeRouter.NewRouter(logger, sk, false)
-	pSessions := pineconeSessions.NewSessions(logger, pRouter)
+	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	pSessions := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
+	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pManager.AddPeer("wss://pinecone.matrix.org/public")
 
 	cfg := &config.Dendrite{}
 	cfg.Defaults(true)
@@ -193,7 +190,6 @@ func startup() {
 	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
-	eduInputAPI := eduserver.NewInternalAPI(base, cache.New(), userAPI)
 	asQuery := appservice.NewInternalAPI(
 		base, userAPI, rsAPI,
 	)
@@ -208,12 +204,11 @@ func startup() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI:  asQuery,
-		EDUInternalAPI: eduInputAPI,
-		FederationAPI:  fedSenderAPI,
-		RoomserverAPI:  rsAPI,
-		UserAPI:        userAPI,
-		KeyAPI:         keyAPI,
+		AppserviceAPI: asQuery,
+		FederationAPI: fedSenderAPI,
+		RoomserverAPI: rsAPI,
+		UserAPI:       userAPI,
+		KeyAPI:        keyAPI,
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}
@@ -232,7 +227,7 @@ func startup() {
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	p2pRouter := pSessions.HTTP().Mux()
+	p2pRouter := pSessions.Protocol("matrix").HTTP().Mux()
 	p2pRouter.Handle(httputil.PublicFederationPathPrefix, base.PublicFederationAPIMux)
 	p2pRouter.Handle(httputil.PublicMediaPathPrefix, base.PublicMediaAPIMux)
 
@@ -243,21 +238,5 @@ func startup() {
 			Mux: httpRouter,
 		}
 		s.ListenAndServe("fetch")
-	}()
-
-	// Connect to the static peer
-	go func() {
-		for {
-			if pRouter.PeerCount(pineconeRouter.PeerTypeRemote) == 0 {
-				if err := conn.ConnectToPeer(pRouter, publicPeer); err != nil {
-					logrus.WithError(err).Error("Failed to connect to static peer")
-				}
-			}
-			select {
-			case <-base.ProcessContext.Context().Done():
-				return
-			case <-time.After(time.Second * 5):
-			}
-		}
 	}()
 }

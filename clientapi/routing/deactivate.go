@@ -15,7 +15,7 @@ import (
 func Deactivate(
 	req *http.Request,
 	userInteractiveAuth *auth.UserInteractive,
-	userAPI api.UserInternalAPI,
+	accountAPI api.UserAccountAPI,
 	deviceAPI *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
@@ -40,7 +40,7 @@ func Deactivate(
 	}
 
 	var res api.PerformAccountDeactivationResponse
-	err = userAPI.PerformAccountDeactivation(ctx, &api.PerformAccountDeactivationRequest{
+	err = accountAPI.PerformAccountDeactivation(ctx, &api.PerformAccountDeactivationRequest{
 		Localpart: localpart,
 	}, &res)
 	if err != nil {

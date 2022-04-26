@@ -1,15 +1,16 @@
-# Dendrite [![Build Status](https://badge.buildkite.com/4be40938ab19f2bbc4a6c6724517353ee3ec1422e279faf374.svg?branch=master)](https://buildkite.com/matrix-dot-org/dendrite) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
+# Dendrite
+[![Build status](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml/badge.svg?event=push)](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
 Dendrite is a second-generation Matrix homeserver written in Go.
 It intends to provide an **efficient**, **reliable** and **scalable** alternative to [Synapse](https://github.com/matrix-org/synapse):
 
 - Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
 - Reliable: Implements the Matrix specification as written, using the
-   [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
-   a [brand new Go test suite](https://github.com/matrix-org/complement).
+  [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
+  a [brand new Go test suite](https://github.com/matrix-org/complement).
 - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
 
-As of October 2020, Dendrite has now entered **beta** which means:
+As of October 2020 (current [progress below](#progress)), Dendrite has now entered **beta** which means:
 
 - Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
 - Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
@@ -20,7 +21,7 @@ This does not mean:
 
 - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
 - All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'. In particular,
-   presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
+  presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
 - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
@@ -77,24 +78,21 @@ $ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --co
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
-## Progress
+## <a id="progress"></a> Progress
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of March 2022 we're at around 76% CS API coverage and 95% Federation coverage, though check
+updates with CI. As of April 2022 we're at around 83% CS API coverage and 95% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
-servers such as matrix.org reasonably well. There's a long list of features that are not implemented, notably:
-
-- Search
-- User Directory
-- Presence
+servers such as matrix.org reasonably well, although there are still some missing features (like Search).
 
 We are prioritising features that will benefit single-user homeservers first (e.g Receipts, E2E) rather
 than features that massive deployments may be interested in (User Directory, OpenID, Guests, Admin APIs, AS API).
 This means Dendrite supports amongst others:
 
 - Core room functionality (creating rooms, invites, auth rules)
-- Federation in rooms v1-v7
+- Full support for room versions 1 to 7
+- Experimental support for room versions 8 to 9
 - Backfilling locally and via federation
 - Accounts, Profiles and Devices
 - Published room lists
@@ -107,6 +105,8 @@ This means Dendrite supports amongst others:
 - Receipts
 - Push
 - Guests
+- User Directory
+- Presence
 
 ## Contributing
 

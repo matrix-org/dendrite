@@ -128,6 +128,8 @@ type QueryMembershipForUserResponse struct {
 type QueryMembershipsForRoomRequest struct {
 	// If true, only returns the membership events of "join" membership
 	JoinedOnly bool `json:"joined_only"`
+	// If true, only returns the membership events of local users
+	LocalOnly bool `json:"local_only"`
 	// ID of the room to fetch memberships from
 	RoomID string `json:"room_id"`
 	// Optional - ID of the user sending the request, for checking if the
@@ -228,6 +230,8 @@ type QueryStateAndAuthChainResponse struct {
 	// The lists will be in an arbitrary order.
 	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	// True if the queried event was rejected earlier.
+	IsRejected bool `json:"is_rejected"`
 }
 
 // QueryRoomVersionCapabilitiesRequest asks for the default room version

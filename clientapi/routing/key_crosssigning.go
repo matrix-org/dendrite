@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/util"
 )
 
@@ -36,7 +35,7 @@ type crossSigningRequest struct {
 func UploadCrossSigningDeviceKeys(
 	req *http.Request, userInteractiveAuth *auth.UserInteractive,
 	keyserverAPI api.KeyInternalAPI, device *userapi.Device,
-	accountDB userdb.Database, cfg *config.ClientAPI,
+	accountAPI userapi.UserAccountAPI, cfg *config.ClientAPI,
 ) util.JSONResponse {
 	uploadReq := &crossSigningRequest{}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
@@ -64,7 +63,7 @@ func UploadCrossSigningDeviceKeys(
 		}
 	}
 	typePassword := auth.LoginTypePassword{
-		GetAccountByPassword: accountDB.GetAccountByPassword,
+		GetAccountByPassword: accountAPI.QueryAccountByPassword,
 		Config:               cfg,
 	}
 	if _, authErr := typePassword.Login(req.Context(), &uploadReq.Auth.PasswordRequest); authErr != nil {

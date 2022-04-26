@@ -47,7 +47,7 @@ func NewOutputReadUpdateConsumer(
 		db:           store,
 		ServerName:   cfg.Matrix.ServerName,
 		durable:      cfg.Matrix.JetStream.Durable("UserAPISyncAPIReadUpdateConsumer"),
-		topic:        cfg.Matrix.JetStream.TopicFor(jetstream.OutputReadUpdate),
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
 		pgClient:     pgClient,
 		userAPI:      userAPI,
 		syncProducer: syncProducer,

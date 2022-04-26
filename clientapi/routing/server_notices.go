@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"time"
 
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -58,7 +57,6 @@ func SendServerNotice(
 	cfgClient *config.ClientAPI,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
-	accountsDB userdb.Database,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
@@ -175,7 +173,7 @@ func SendServerNotice(
 			PowerLevelContentOverride: pl,
 		}
 
-		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, accountsDB, rsAPI, asAPI, time.Now())
+		roomRes := createRoom(ctx, crReq, senderDevice, cfgClient, userAPI, rsAPI, asAPI, time.Now())
 
 		switch data := roomRes.JSON.(type) {
 		case createRoomResponse:
@@ -201,7 +199,7 @@ func SendServerNotice(
 		// we've found a room in common, check the membership
 		roomID = commonRooms[0]
 		// re-invite the user
-		res, err := sendInvite(ctx, accountsDB, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+		res, err := sendInvite(ctx, userAPI, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
 		if err != nil {
 			return res
 		}
@@ -284,7 +282,6 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 func getSenderDevice(
 	ctx context.Context,
 	userAPI userapi.UserInternalAPI,
-	accountDB userdb.Database,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse
@@ -299,8 +296,12 @@ func getSenderDevice(
 	}
 
 	// set the avatarurl for the user
-	if err = accountDB.SetAvatarURL(ctx, cfg.Matrix.ServerNotices.LocalPart, cfg.Matrix.ServerNotices.AvatarURL); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("accountDB.SetAvatarURL failed")
+	res := &userapi.PerformSetAvatarURLResponse{}
+	if err = userAPI.SetAvatarURL(ctx, &userapi.PerformSetAvatarURLRequest{
+		Localpart: cfg.Matrix.ServerNotices.LocalPart,
+		AvatarURL: cfg.Matrix.ServerNotices.AvatarURL,
+	}, res); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
 	}
 

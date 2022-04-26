@@ -27,16 +27,14 @@ import (
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
 	LoginTokenInternalAPI
+	UserProfileAPI
+	UserRegisterAPI
+	UserAccountAPI
+	UserThreePIDAPI
+	UserDeviceAPI
 
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 
-	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
-	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
-	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
-	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
-	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
-	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
-	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
 	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
@@ -44,16 +42,55 @@ type UserInternalAPI interface {
 	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
 
 	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
-	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
-	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
-	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
-	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
+}
+
+type UserDeviceAPI interface {
+	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
+	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
+	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
+	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
+	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
+}
+
+type UserDirectoryProvider interface {
+	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
+}
+
+// UserProfileAPI provides functions for getting user profiles
+type UserProfileAPI interface {
+	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
+	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
+	SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error
+	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error
+}
+
+// UserRegisterAPI defines functions for registering accounts
+type UserRegisterAPI interface {
+	QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error
+	QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error
+	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
+	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
+}
+
+// UserAccountAPI defines functions for changing an account
+type UserAccountAPI interface {
+	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
+	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
+	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
+}
+
+// UserThreePIDAPI defines functions for 3PID
+type UserThreePIDAPI interface {
+	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
+	QueryThreePIDsForLocalpart(ctx context.Context, req *QueryThreePIDsForLocalpartRequest, res *QueryThreePIDsForLocalpartResponse) error
+	PerformForgetThreePID(ctx context.Context, req *PerformForgetThreePIDRequest, res *struct{}) error
+	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -455,16 +492,16 @@ type PerformPusherDeletionRequest struct {
 
 // Pusher represents a push notification subscriber
 type Pusher struct {
-	SessionID         int64                       `json:"session_id,omitempty"`
-	PushKey           string                      `json:"pushkey"`
-	PushKeyTS         gomatrixserverlib.Timestamp `json:"pushkey_ts,omitempty"`
-	Kind              PusherKind                  `json:"kind"`
-	AppID             string                      `json:"app_id"`
-	AppDisplayName    string                      `json:"app_display_name"`
-	DeviceDisplayName string                      `json:"device_display_name"`
-	ProfileTag        string                      `json:"profile_tag"`
-	Language          string                      `json:"lang"`
-	Data              map[string]interface{}      `json:"data"`
+	SessionID         int64                  `json:"session_id,omitempty"`
+	PushKey           string                 `json:"pushkey"`
+	PushKeyTS         int64                  `json:"pushkey_ts,omitempty"`
+	Kind              PusherKind             `json:"kind"`
+	AppID             string                 `json:"app_id"`
+	AppDisplayName    string                 `json:"app_display_name"`
+	DeviceDisplayName string                 `json:"device_display_name"`
+	ProfileTag        string                 `json:"profile_tag"`
+	Language          string                 `json:"lang"`
+	Data              map[string]interface{} `json:"data"`
 }
 
 type PusherKind string
@@ -506,4 +543,56 @@ type Notification struct {
 	Read       bool                          `json:"read"`        // Required.
 	RoomID     string                        `json:"room_id"`     // Required.
 	TS         gomatrixserverlib.Timestamp   `json:"ts"`          // Required.
+}
+
+type PerformSetAvatarURLRequest struct {
+	Localpart, AvatarURL string
+}
+type PerformSetAvatarURLResponse struct{}
+
+type QueryNumericLocalpartResponse struct {
+	ID int64
+}
+
+type QueryAccountAvailabilityRequest struct {
+	Localpart string
+}
+
+type QueryAccountAvailabilityResponse struct {
+	Available bool
+}
+
+type QueryAccountByPasswordRequest struct {
+	Localpart, PlaintextPassword string
+}
+
+type QueryAccountByPasswordResponse struct {
+	Account *Account
+	Exists  bool
+}
+
+type PerformUpdateDisplayNameRequest struct {
+	Localpart, DisplayName string
+}
+
+type QueryLocalpartForThreePIDRequest struct {
+	ThreePID, Medium string
+}
+
+type QueryLocalpartForThreePIDResponse struct {
+	Localpart string
+}
+
+type QueryThreePIDsForLocalpartRequest struct {
+	Localpart string
+}
+
+type QueryThreePIDsForLocalpartResponse struct {
+	ThreePIDs []authtypes.ThreePID
+}
+
+type PerformForgetThreePIDRequest QueryLocalpartForThreePIDRequest
+
+type PerformSaveThreePIDAssociationRequest struct {
+	ThreePID, Localpart, Medium string
 }

@@ -29,7 +29,6 @@ import (
 // Database stores information needed by the federation sender
 type Database struct {
 	shared.Database
-	sqlutil.PartitionOffsetStatements
 	db     *sql.DB
 	writer sqlutil.Writer
 }
@@ -102,9 +101,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 		NotaryServerKeysJSON:     notaryKeys,
 		NotaryServerKeysMetadata: notaryKeysMetadata,
 		ServerSigningKeys:        serverSigningKeys,
-	}
-	if err = d.PartitionOffsetStatements.Prepare(d.db, d.writer, "federationsender"); err != nil {
-		return nil, err
 	}
 	return &d, nil
 }

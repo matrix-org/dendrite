@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -41,7 +42,6 @@ type messagesReq struct {
 	roomID           string
 	from             *types.TopologyToken
 	to               *types.TopologyToken
-	fromStream       *types.StreamingToken
 	device           *userapi.Device
 	wasToProvided    bool
 	backwardOrdering bool
@@ -50,7 +50,7 @@ type messagesReq struct {
 
 type messagesResp struct {
 	Start       string                          `json:"start"`
-	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: so clients can hit /messages then immediately /sync with a latest sync token
+	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
 	End         string                          `json:"end"`
 	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
 	State       []gomatrixserverlib.ClientEvent `json:"state"`
@@ -65,6 +65,7 @@ func OnIncomingMessagesRequest(
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
+	lazyLoadCache *caching.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
 
@@ -93,24 +94,13 @@ func OnIncomingMessagesRequest(
 	// Pagination tokens.
 	var fromStream *types.StreamingToken
 	fromQuery := req.URL.Query().Get("from")
+	toQuery := req.URL.Query().Get("to")
 	emptyFromSupplied := fromQuery == ""
 	if emptyFromSupplied {
 		// NOTSPEC: We will pretend they used the latest sync token if no ?from= was provided.
 		// We do this to allow clients to get messages without having to call `/sync` e.g Cerulean
 		currPos := srp.Notifier.CurrentPosition()
 		fromQuery = currPos.String()
-	}
-
-	from, err := types.NewTopologyTokenFromString(fromQuery)
-	if err != nil {
-		fs, err2 := types.NewStreamTokenFromString(fromQuery)
-		fromStream = &fs
-		if err2 != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err2.Error()),
-			}
-		}
 	}
 
 	// Direction to return events from.
@@ -125,16 +115,43 @@ func OnIncomingMessagesRequest(
 	// to have one of the two accepted values (so dir == "f" <=> !backwardOrdering).
 	backwardOrdering := (dir == "b")
 
+	from, err := types.NewTopologyTokenFromString(fromQuery)
+	if err != nil {
+		var streamToken types.StreamingToken
+		if streamToken, err = types.NewStreamTokenFromString(fromQuery); err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidArgumentValue("Invalid from parameter: " + err.Error()),
+			}
+		} else {
+			fromStream = &streamToken
+			from, err = db.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, backwardOrdering)
+			if err != nil {
+				logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+				return jsonerror.InternalServerError()
+			}
+		}
+	}
+
 	// Pagination tokens. To is optional, and its default value depends on the
 	// direction ("b" or "f").
 	var to types.TopologyToken
 	wasToProvided := true
-	if s := req.URL.Query().Get("to"); len(s) > 0 {
-		to, err = types.NewTopologyTokenFromString(s)
+	if len(toQuery) > 0 {
+		to, err = types.NewTopologyTokenFromString(toQuery)
 		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidArgumentValue("Invalid to parameter: " + err.Error()),
+			var streamToken types.StreamingToken
+			if streamToken, err = types.NewStreamTokenFromString(toQuery); err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.InvalidArgumentValue("Invalid to parameter: " + err.Error()),
+				}
+			} else {
+				to, err = db.StreamToTopologicalPosition(req.Context(), roomID, streamToken.PDUPosition, !backwardOrdering)
+				if err != nil {
+					logrus.WithError(err).Errorf("Failed to get topological position for streaming token %v", streamToken)
+					return jsonerror.InternalServerError()
+				}
 			}
 		}
 	} else {
@@ -168,7 +185,6 @@ func OnIncomingMessagesRequest(
 		roomID:           roomID,
 		from:             &from,
 		to:               &to,
-		fromStream:       fromStream,
 		wasToProvided:    wasToProvided,
 		filter:           filter,
 		backwardOrdering: backwardOrdering,
@@ -186,6 +202,10 @@ func OnIncomingMessagesRequest(
 	if filter.LazyLoadMembers {
 		membershipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
 		for _, evt := range clientEvents {
+			// Don't add membership events the client should already know about
+			if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, roomID, evt.Sender); cached {
+				continue
+			}
 			membership, err := db.GetStateEvent(req.Context(), roomID, gomatrixserverlib.MRoomMember, evt.Sender)
 			if err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to get membership event for user")
@@ -193,10 +213,11 @@ func OnIncomingMessagesRequest(
 			}
 			if membership != nil {
 				membershipToUser[evt.Sender] = membership
+				lazyLoadCache.StoreLazyLoadedUser(device, roomID, evt.Sender, membership.EventID())
 			}
 		}
 		for _, evt := range membershipToUser {
-			state = append(state, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatAll))
+			state = append(state, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatSync))
 		}
 	}
 
@@ -215,7 +236,7 @@ func OnIncomingMessagesRequest(
 		End:   end.String(),
 		State: state,
 	}
-	if emptyFromSupplied {
+	if fromStream != nil {
 		res.StartStream = fromStream.String()
 	}
 
@@ -248,20 +269,8 @@ func (r *messagesReq) retrieveEvents() (
 	clientEvents []gomatrixserverlib.ClientEvent, start,
 	end types.TopologyToken, err error,
 ) {
-	eventFilter := r.filter
-
 	// Retrieve the events from the local database.
-	var streamEvents []types.StreamEvent
-	if r.fromStream != nil {
-		toStream := r.to.StreamToken()
-		streamEvents, err = r.db.GetEventsInStreamingRange(
-			r.ctx, r.fromStream, &toStream, r.roomID, eventFilter, r.backwardOrdering,
-		)
-	} else {
-		streamEvents, err = r.db.GetEventsInTopologicalRange(
-			r.ctx, r.from, r.to, r.roomID, eventFilter.Limit, r.backwardOrdering,
-		)
-	}
+	streamEvents, err := r.db.GetEventsInTopologicalRange(r.ctx, r.from, r.to, r.roomID, r.filter, r.backwardOrdering)
 	if err != nil {
 		err = fmt.Errorf("GetEventsInRange: %w", err)
 		return

@@ -71,11 +71,14 @@ const upsertRoomStateSQL = "" +
 const deleteRoomStateByEventIDSQL = "" +
 	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
 
-const DeleteRoomStateForRoomSQL = "" +
-	"DELETE FROM syncapi_current_room_state WHERE event_id = $1"
+const deleteRoomStateForRoomSQL = "" +
+	"DELETE FROM syncapi_current_room_state WHERE room_id = $1"
 
 const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
+
+const selectRoomIDsWithAnyMembershipSQL = "" +
+	"SELECT DISTINCT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
@@ -102,14 +105,15 @@ const selectEventsWithEventIDsSQL = "" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {
-	upsertRoomStateStmt             *sql.Stmt
-	deleteRoomStateByEventIDStmt    *sql.Stmt
-	DeleteRoomStateForRoomStmt      *sql.Stmt
-	selectRoomIDsWithMembershipStmt *sql.Stmt
-	selectCurrentStateStmt          *sql.Stmt
-	selectJoinedUsersStmt           *sql.Stmt
-	selectEventsWithEventIDsStmt    *sql.Stmt
-	selectStateEventStmt            *sql.Stmt
+	upsertRoomStateStmt                *sql.Stmt
+	deleteRoomStateByEventIDStmt       *sql.Stmt
+	deleteRoomStateForRoomStmt         *sql.Stmt
+	selectRoomIDsWithMembershipStmt    *sql.Stmt
+	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
+	selectCurrentStateStmt             *sql.Stmt
+	selectJoinedUsersStmt              *sql.Stmt
+	selectEventsWithEventIDsStmt       *sql.Stmt
+	selectStateEventStmt               *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -124,10 +128,13 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
 		return nil, err
 	}
-	if s.DeleteRoomStateForRoomStmt, err = db.Prepare(DeleteRoomStateForRoomSQL); err != nil {
+	if s.deleteRoomStateForRoomStmt, err = db.Prepare(deleteRoomStateForRoomSQL); err != nil {
 		return nil, err
 	}
 	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
+		return nil, err
+	}
+	if s.selectRoomIDsWithAnyMembershipStmt, err = db.Prepare(selectRoomIDsWithAnyMembershipSQL); err != nil {
 		return nil, err
 	}
 	if s.selectCurrentStateStmt, err = db.Prepare(selectCurrentStateSQL); err != nil {
@@ -194,6 +201,31 @@ func (s *currentRoomStateStatements) SelectRoomIDsWithMembership(
 	return result, rows.Err()
 }
 
+// SelectRoomIDsWithAnyMembership returns a map of all memberships for the given user.
+func (s *currentRoomStateStatements) SelectRoomIDsWithAnyMembership(
+	ctx context.Context,
+	txn *sql.Tx,
+	userID string,
+) (map[string]string, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsWithAnyMembershipStmt)
+	rows, err := stmt.QueryContext(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsWithAnyMembership: rows.close() failed")
+
+	result := map[string]string{}
+	for rows.Next() {
+		var roomID string
+		var membership string
+		if err := rows.Scan(&roomID, &membership); err != nil {
+			return nil, err
+		}
+		result[roomID] = membership
+	}
+	return result, rows.Err()
+}
+
 // SelectCurrentState returns all the current state events for the given room.
 func (s *currentRoomStateStatements) SelectCurrentState(
 	ctx context.Context, txn *sql.Tx, roomID string,
@@ -201,9 +233,10 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
+	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	rows, err := stmt.QueryContext(ctx, roomID,
-		pq.StringArray(stateFilter.Senders),
-		pq.StringArray(stateFilter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,
@@ -229,7 +262,7 @@ func (s *currentRoomStateStatements) DeleteRoomStateByEventID(
 func (s *currentRoomStateStatements) DeleteRoomStateForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.DeleteRoomStateForRoomStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteRoomStateForRoomStmt)
 	_, err := stmt.ExecContext(ctx, roomID)
 	return err
 }

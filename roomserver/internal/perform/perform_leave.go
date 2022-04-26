@@ -91,12 +91,12 @@ func (r *Leaver) performLeaveRoomByID(
 		}
 		// check that this is not a "server notice room"
 		accData := &userapi.QueryAccountDataResponse{}
-		if err := r.UserAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
+		if err = r.UserAPI.QueryAccountData(ctx, &userapi.QueryAccountDataRequest{
 			UserID:   req.UserID,
 			RoomID:   req.RoomID,
 			DataType: "m.tag",
 		}, accData); err != nil {
-			return nil, fmt.Errorf("unable to query account data")
+			return nil, fmt.Errorf("unable to query account data: %w", err)
 		}
 
 		if roomData, ok := accData.RoomAccountData[req.RoomID]; ok {
@@ -212,10 +212,32 @@ func (r *Leaver) performFederatedRejectInvite(
 		ServerNames: []gomatrixserverlib.ServerName{domain},
 	}
 	leaveRes := fsAPI.PerformLeaveResponse{}
-	if err := r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
+	if err = r.FSAPI.PerformLeave(ctx, &leaveReq, &leaveRes); err != nil {
 		// failures in PerformLeave should NEVER stop us from telling other components like the
 		// sync API that the invite was withdrawn. Otherwise we can end up with stuck invites.
 		util.GetLogger(ctx).WithError(err).Errorf("failed to PerformLeave, still retiring invite event")
+	}
+
+	info, err := r.DB.RoomInfo(ctx, req.RoomID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("failed to get RoomInfo, still retiring invite event")
+	}
+
+	updater, err := r.DB.MembershipUpdater(ctx, req.RoomID, req.UserID, true, info.RoomVersion)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
+	}
+	if updater != nil {
+		if _, err = updater.SetToLeave(req.UserID, eventID); err != nil {
+			util.GetLogger(ctx).WithError(err).Errorf("failed to set membership to leave, still retiring invite event")
+			if err = updater.Rollback(); err != nil {
+				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback membership leave, still retiring invite event")
+			}
+		} else {
+			if err = updater.Commit(); err != nil {
+				util.GetLogger(ctx).WithError(err).Errorf("failed to commit membership update, still retiring invite event")
+			}
+		}
 	}
 
 	// Withdraw the invite, so that the sync API etc are

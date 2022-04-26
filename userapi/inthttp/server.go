@@ -347,4 +347,114 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+	internalAPIMux.Handle(PerformSetAvatarURLPath,
+		httputil.MakeInternalAPI("performSetAvatarURL", func(req *http.Request) util.JSONResponse {
+			request := api.PerformSetAvatarURLRequest{}
+			response := api.PerformSetAvatarURLResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.SetAvatarURL(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryNumericLocalpartPath,
+		httputil.MakeInternalAPI("queryNumericLocalpart", func(req *http.Request) util.JSONResponse {
+			response := api.QueryNumericLocalpartResponse{}
+			if err := s.QueryNumericLocalpart(req.Context(), &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryAccountAvailabilityPath,
+		httputil.MakeInternalAPI("queryAccountAvailability", func(req *http.Request) util.JSONResponse {
+			request := api.QueryAccountAvailabilityRequest{}
+			response := api.QueryAccountAvailabilityResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryAccountAvailability(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryAccountByPasswordPath,
+		httputil.MakeInternalAPI("queryAccountByPassword", func(req *http.Request) util.JSONResponse {
+			request := api.QueryAccountByPasswordRequest{}
+			response := api.QueryAccountByPasswordResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryAccountByPassword(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformSetDisplayNamePath,
+		httputil.MakeInternalAPI("performSetDisplayName", func(req *http.Request) util.JSONResponse {
+			request := api.PerformUpdateDisplayNameRequest{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.SetDisplayName(req.Context(), &request, &struct{}{}); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
+		}),
+	)
+	internalAPIMux.Handle(QueryLocalpartForThreePIDPath,
+		httputil.MakeInternalAPI("queryLocalpartForThreePID", func(req *http.Request) util.JSONResponse {
+			request := api.QueryLocalpartForThreePIDRequest{}
+			response := api.QueryLocalpartForThreePIDResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryLocalpartForThreePID(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(QueryThreePIDsForLocalpartPath,
+		httputil.MakeInternalAPI("queryThreePIDsForLocalpart", func(req *http.Request) util.JSONResponse {
+			request := api.QueryThreePIDsForLocalpartRequest{}
+			response := api.QueryThreePIDsForLocalpartResponse{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.QueryThreePIDsForLocalpart(req.Context(), &request, &response); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		}),
+	)
+	internalAPIMux.Handle(PerformForgetThreePIDPath,
+		httputil.MakeInternalAPI("performForgetThreePID", func(req *http.Request) util.JSONResponse {
+			request := api.PerformForgetThreePIDRequest{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformForgetThreePID(req.Context(), &request, &struct{}{}); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
+		}),
+	)
+	internalAPIMux.Handle(PerformSaveThreePIDAssociationPath,
+		httputil.MakeInternalAPI("performSaveThreePIDAssociation", func(req *http.Request) util.JSONResponse {
+			request := api.PerformSaveThreePIDAssociationRequest{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.PerformSaveThreePIDAssociation(req.Context(), &request, &struct{}{}); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
+		}),
+	)
 }

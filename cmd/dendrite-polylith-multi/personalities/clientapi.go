@@ -22,20 +22,18 @@ import (
 )
 
 func ClientAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
-	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
 	asQuery := base.AppserviceHTTPClient()
 	rsAPI := base.RoomserverHTTPClient()
 	fsAPI := base.FederationAPIHTTPClient()
-	eduInputAPI := base.EDUServerClient()
 	userAPI := base.UserAPIClient()
 	keyAPI := base.KeyServerHTTPClient()
 
 	clientapi.AddPublicRoutes(
-		base.PublicClientAPIMux, base.SynapseAdminMux, &base.Cfg.ClientAPI, accountDB, federation,
-		rsAPI, eduInputAPI, asQuery, transactions.New(), fsAPI, userAPI, keyAPI, nil,
-		&cfg.MSCs,
+		base.ProcessContext, base.PublicClientAPIMux, base.SynapseAdminMux, &base.Cfg.ClientAPI,
+		federation, rsAPI, asQuery, transactions.New(), fsAPI, userAPI, userAPI,
+		keyAPI, nil, &cfg.MSCs,
 	)
 
 	base.SetupAndServeHTTP(

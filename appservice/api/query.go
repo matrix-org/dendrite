@@ -19,11 +19,10 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -85,7 +84,7 @@ func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
 	asAPI AppServiceQueryAPI,
-	accountDB userdb.Database,
+	profileAPI userapi.UserProfileAPI,
 ) (*authtypes.Profile, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -93,10 +92,17 @@ func RetrieveUserProfile(
 	}
 
 	// Try to query the user from the local database
-	profile, err := accountDB.GetProfileByLocalpart(ctx, localpart)
-	if err != nil && err != sql.ErrNoRows {
+	res := &userapi.QueryProfileResponse{}
+	err = profileAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: userID}, res)
+	if err != nil {
 		return nil, err
-	} else if profile != nil {
+	}
+	profile := &authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: res.DisplayName,
+		AvatarURL:   res.AvatarURL,
+	}
+	if res.UserExists {
 		return profile, nil
 	}
 
@@ -113,11 +119,15 @@ func RetrieveUserProfile(
 	}
 
 	// Try to query the user from the local database again
-	profile, err = accountDB.GetProfileByLocalpart(ctx, localpart)
+	err = profileAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: userID}, res)
 	if err != nil {
 		return nil, err
 	}
 
 	// profile should not be nil at this point
-	return profile, nil
+	return &authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: res.DisplayName,
+		AvatarURL:   res.AvatarURL,
+	}, nil
 }

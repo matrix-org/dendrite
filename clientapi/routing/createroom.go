@@ -31,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -138,7 +137,7 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
-	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
+	profileAPI api.UserProfileAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	var r createRoomRequest
@@ -156,7 +155,7 @@ func CreateRoom(
 			JSON: jsonerror.InvalidArgumentValue(err.Error()),
 		}
 	}
-	return createRoom(req.Context(), r, device, cfg, accountDB, rsAPI, asAPI, evTime)
+	return createRoom(req.Context(), r, device, cfg, profileAPI, rsAPI, asAPI, evTime)
 }
 
 // createRoom implements /createRoom
@@ -165,7 +164,7 @@ func createRoom(
 	ctx context.Context,
 	r createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
-	accountDB userdb.Database, rsAPI roomserverAPI.RoomserverInternalAPI,
+	profileAPI api.UserProfileAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	evTime time.Time,
 ) util.JSONResponse {
@@ -201,7 +200,7 @@ func createRoom(
 		"roomVersion": roomVersion,
 	}).Info("Creating new room")
 
-	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, accountDB)
+	profile, err := appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("appserviceAPI.RetrieveUserProfile failed")
 		return jsonerror.InternalServerError()
@@ -520,7 +519,7 @@ func createRoom(
 		for _, invitee := range r.Invite {
 			// Build the invite event.
 			inviteEvent, err := buildMembershipEvent(
-				ctx, invitee, "", accountDB, device, gomatrixserverlib.Invite,
+				ctx, invitee, "", profileAPI, device, gomatrixserverlib.Invite,
 				roomID, true, cfg, evTime, rsAPI, asAPI,
 			)
 			if err != nil {

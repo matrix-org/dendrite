@@ -39,6 +39,7 @@ WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost
+ENV API=0
 EXPOSE 8008 8448
 
 
@@ -50,4 +51,4 @@ CMD /build/run_postgres.sh && ./generate-keys --server $SERVER_NAME --tls-cert s
  sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml && \
  sed -i 's/max_open_conns:.*$/max_open_conns: 100/g' dendrite.yaml && \
  cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
- ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}

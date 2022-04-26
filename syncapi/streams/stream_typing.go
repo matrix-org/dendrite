@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/eduserver/cache"
+	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type TypingStreamProvider struct {
 	StreamProvider
-	EDUCache *cache.EDUCache
+	EDUCache *caching.EDUCache
 }
 
 func (p *TypingStreamProvider) CompleteSync(
@@ -40,11 +40,18 @@ func (p *TypingStreamProvider) IncrementalSync(
 		if users, updated := p.EDUCache.GetTypingUsersIfUpdatedAfter(
 			roomID, int64(from),
 		); updated {
+			typingUsers := make([]string, 0, len(users))
+			for i := range users {
+				// skip ignored user events
+				if _, ok := req.IgnoredUsers.List[users[i]]; !ok {
+					typingUsers = append(typingUsers, users[i])
+				}
+			}
 			ev := gomatrixserverlib.ClientEvent{
 				Type: gomatrixserverlib.MTyping,
 			}
 			ev.Content, err = json.Marshal(map[string]interface{}{
-				"user_ids": users,
+				"user_ids": typingUsers,
 			})
 			if err != nil {
 				req.Log.WithError(err).Error("json.Marshal failed")

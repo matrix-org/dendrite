@@ -61,7 +61,7 @@ func NewOutputRoomEventConsumer(
 		queues:    queues,
 		rsAPI:     rsAPI,
 		durable:   cfg.Matrix.JetStream.Durable("FederationAPIRoomServerConsumer"),
-		topic:     cfg.Matrix.JetStream.TopicFor(jetstream.OutputRoomEvent),
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 	}
 }
 
