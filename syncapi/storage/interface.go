@@ -125,10 +125,10 @@ type Database interface {
 	// CleanSendToDeviceUpdates removes all send-to-device messages BEFORE the specified
 	// from position, preventing the send-to-device table from growing indefinitely.
 	CleanSendToDeviceUpdates(ctx context.Context, userID, deviceID string, before types.StreamPosition) (err error)
-	// GetFilter looks up the filter associated with a given local user and filter ID.
-	// Returns a filter structure. Otherwise returns an error if no such filter exists
+	// GetFilter looks up the filter associated with a given local user and filter ID
+	// and populates the target filter. Otherwise returns an error if no such filter exists
 	// or if there was an error talking to the database.
-	GetFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	GetFilter(ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string) error
 	// PutFilter puts the passed filter into the database.
 	// Returns the filterID as a string. Otherwise returns an error if something
 	// goes wrong.
