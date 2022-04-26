@@ -43,7 +43,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		To:   to,
 	}
 
-	dataTypes, err := p.DB.GetAccountDataInRange(
+	dataTypes, pos, err := p.DB.GetAccountDataInRange(
 		ctx, req.Device.UserID, r, &req.Filter.AccountData,
 	)
 	if err != nil {
@@ -95,5 +95,5 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 		}
 	}
 
-	return to
+	return pos
 }
