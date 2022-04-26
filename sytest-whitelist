@@ -714,3 +714,4 @@ Presence can be set from sync
 /state_ids returns M_NOT_FOUND for a rejected message event
 /state returns M_NOT_FOUND for a rejected state event
 /state_ids returns M_NOT_FOUND for a rejected state event
+PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
