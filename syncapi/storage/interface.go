@@ -39,6 +39,7 @@ type Database interface {
 	GetStateDeltas(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
 	RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error)
 	MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error)
+	GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error)
 
 	RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
 
