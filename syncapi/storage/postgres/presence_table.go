@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -74,12 +75,18 @@ const selectPresenceAfter = "" +
 	" FROM syncapi_presence" +
 	" WHERE id > $1"
 
+const selectRecentPresence = "" +
+	" SELECT id, user_id, presence, status_msg, last_active_ts" +
+	" FROM syncapi_presence" +
+	" WHERE last_active_ts >= $1"
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	upsertPresenceFromSyncStmt *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
 	selectMaxPresenceStmt      *sql.Stmt
 	selectPresenceAfterStmt    *sql.Stmt
+	selectRecentPresenceStmt   *sql.Stmt
 }
 
 func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
@@ -94,6 +101,7 @@ func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
 		{&s.selectPresenceForUsersStmt, selectPresenceForUserSQL},
 		{&s.selectMaxPresenceStmt, selectMaxPresenceSQL},
 		{&s.selectPresenceAfterStmt, selectPresenceAfter},
+		{&s.selectRecentPresenceStmt, selectRecentPresence},
 	}.Prepare(db)
 }
 
@@ -146,6 +154,31 @@ func (p *presenceStatements) GetPresenceAfter(
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
 
 	rows, err := stmt.QueryContext(ctx, after)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceAfter: failed to close rows")
+	for rows.Next() {
+		qryRes := &types.PresenceInternal{}
+		if err := rows.Scan(&qryRes.StreamPos, &qryRes.UserID, &qryRes.Presence, &qryRes.ClientFields.StatusMsg, &qryRes.LastActiveTS); err != nil {
+			return nil, err
+		}
+		qryRes.ClientFields.Presence = qryRes.Presence.String()
+		presences[qryRes.UserID] = qryRes
+	}
+	return presences, rows.Err()
+}
+
+// GetRecentPresence gets updates from the last five minutes.
+func (p *presenceStatements) GetRecentPresence(
+	ctx context.Context, txn *sql.Tx,
+) (presences map[string]*types.PresenceInternal, err error) {
+	presences = make(map[string]*types.PresenceInternal)
+	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
+
+	sinceTS := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute * -5))
+
+	rows, err := stmt.QueryContext(ctx, sinceTS)
 	if err != nil {
 		return nil, err
 	}

@@ -46,7 +46,44 @@ func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	presences, err := p.DB.RecentPresence(ctx)
+	if err != nil {
+		req.Log.WithError(err).Error("p.DB.RecentPresence failed")
+		return 0
+	}
+
+	for i := range presences {
+		presence := presences[i]
+		// Ignore users we don't share a room with
+		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
+			continue
+		}
+		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID
+
+		if _, known := types.PresenceFromString(presence.ClientFields.Presence); known {
+			presence.ClientFields.LastActiveAgo = presence.LastActiveAgo()
+			if presence.ClientFields.Presence == "online" {
+				currentlyActive := presence.CurrentlyActive()
+				presence.ClientFields.CurrentlyActive = &currentlyActive
+			}
+		} else {
+			presence.ClientFields.Presence = "offline"
+		}
+
+		content, err := json.Marshal(presence.ClientFields)
+		if err != nil {
+			return 0
+		}
+
+		req.Response.Presence.Events = append(req.Response.Presence.Events, gomatrixserverlib.ClientEvent{
+			Content: content,
+			Sender:  presence.UserID,
+			Type:    gomatrixserverlib.MPresence,
+		})
+		p.cache.Store(cacheKey, presence)
+	}
+
+	return p.LatestPosition(ctx)
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(
