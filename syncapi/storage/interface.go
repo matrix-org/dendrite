@@ -81,7 +81,7 @@ type Database interface {
 	// Returns a map following the format data[roomID] = []dataTypes
 	// If no data is retrieved, returns an empty map
 	// If there was an issue with the retrieval, returns an error
-	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *gomatrixserverlib.EventFilter) (map[string][]string, error)
+	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *gomatrixserverlib.EventFilter) (map[string][]string, types.StreamPosition, error)
 	// UpsertAccountData keeps track of new or updated account data, by saving the type
 	// of the new/updated data, and the user ID and room ID the data is related to (empty)
 	// room ID means the data isn't specific to any room)
