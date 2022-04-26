@@ -479,7 +479,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, nil, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/redact/{eventID}/{txnId}",
@@ -488,7 +488,8 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
+			txnID := vars["txnId"]
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, &txnID, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
