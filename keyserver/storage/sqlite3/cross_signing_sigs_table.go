@@ -33,8 +33,10 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs (
 	target_user_id TEXT NOT NULL,
 	target_key_id TEXT NOT NULL,
 	signature TEXT NOT NULL,
-	PRIMARY KEY (origin_user_id, target_user_id, target_key_id)
+	PRIMARY KEY (origin_user_id, origin_key_id, target_user_id, target_key_id)
 );
+
+CREATE INDEX IF NOT EXISTS keyserver_cross_signing_sigs_idx ON keyserver_cross_signing_sigs (origin_user_id, target_user_id, target_key_id);
 `
 
 const selectCrossSigningSigsForTargetSQL = "" +
