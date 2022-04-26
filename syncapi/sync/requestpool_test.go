@@ -34,6 +34,10 @@ func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition) 
 	return map[string]*types.PresenceInternal{}, nil
 }
 
+func (d dummyDB) RecentPresence(ctx context.Context) (map[string]*types.PresenceInternal, error) {
+	return map[string]*types.PresenceInternal{}, nil
+}
+
 func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return 0, nil
 }
