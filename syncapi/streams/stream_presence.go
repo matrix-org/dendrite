@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type PresenceStreamProvider struct {
@@ -47,15 +48,14 @@ func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	presences, latest, err := p.DB.RecentPresence(ctx)
+	latest := p.LatestPosition(ctx)
+	presences, _, err := p.DB.RecentPresence(ctx)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RecentPresence failed")
-		return 0
-	}
-	if len(presences) == 0 {
 		return latest
 	}
-	if err := p.populatePresence(ctx, req, presences, true); err != nil {
+	if err = p.populatePresence(ctx, req, presences, true); err != nil {
+		logrus.WithError(err).Errorf("Failed to populate presence")
 		return 0
 	}
 	return latest
@@ -74,7 +74,8 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	if len(presences) == 0 {
 		return to
 	}
-	if err := p.populatePresence(ctx, req, presences, false); err != nil {
+	if err = p.populatePresence(ctx, req, presences, false); err != nil {
+		logrus.WithError(err).Errorf("Failed to populate presence")
 		return from
 	}
 	return to
@@ -86,40 +87,31 @@ func (p *PresenceStreamProvider) populatePresence(
 	presences map[string]*types.PresenceInternal,
 	ignoreCache bool,
 ) error {
-	// add newly joined rooms user presences
-	if newlyJoined := joinedRooms(req.Response, req.Device.UserID); len(newlyJoined) > 0 {
-		for _, roomID := range newlyJoined {
-			room, ok := req.Response.Rooms.Join[roomID]
-			if !ok {
+	for _, room := range req.Response.Rooms.Join {
+		for _, stateEvent := range append(room.State.Events, room.Timeline.Events...) {
+			switch {
+			case stateEvent.Type != gomatrixserverlib.MRoomMember:
+				continue
+			case stateEvent.StateKey == nil:
 				continue
 			}
-			for _, stateEvent := range room.State.Events {
-				switch {
-				case stateEvent.Type != gomatrixserverlib.MRoomMember:
-					fallthrough
-				case stateEvent.StateKey == nil:
-					fallthrough
-				case *stateEvent.StateKey == "":
-					continue
-				}
-				userID := *stateEvent.StateKey
-				if _, ok := presences[userID]; ok {
-					continue
-				}
-				var err error
-				presences[userID], err = p.DB.GetPresence(ctx, userID)
-				if err != nil {
-					if err == sql.ErrNoRows {
-						continue
-					}
-					return err
-				}
+			var memberContent gomatrixserverlib.MemberContent
+			err := json.Unmarshal(stateEvent.Content, &memberContent)
+			if err != nil {
+				continue
+			}
+			if memberContent.Membership != gomatrixserverlib.Join {
+				continue
+			}
+			userID := *stateEvent.StateKey
+			presences[userID], err = p.DB.GetPresence(ctx, userID)
+			if err != nil && err != sql.ErrNoRows {
+				return err
 			}
 		}
 	}
 
-	for i := range presences {
-		presence := presences[i]
+	for _, presence := range presences {
 		// Ignore users we don't share a room with
 		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
 			continue
@@ -161,33 +153,4 @@ func (p *PresenceStreamProvider) populatePresence(
 	}
 
 	return nil
-}
-
-func joinedRooms(res *types.Response, userID string) []string {
-	var roomIDs []string
-	for roomID, join := range res.Rooms.Join {
-		// we would expect to see our join event somewhere if we newly joined the room.
-		// Normal events get put in the join section so it's not enough to know the room ID is present in 'join'.
-		newlyJoined := membershipEventPresent(join.State.Events, userID)
-		if newlyJoined {
-			roomIDs = append(roomIDs, roomID)
-			continue
-		}
-		newlyJoined = membershipEventPresent(join.Timeline.Events, userID)
-		if newlyJoined {
-			roomIDs = append(roomIDs, roomID)
-		}
-	}
-	return roomIDs
-}
-
-func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID string) bool {
-	for _, ev := range events {
-		// it's enough to know that we have our member event here, don't need to check membership content
-		// as it's implied by being in the respective section of the sync response.
-		if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
-			return true
-		}
-	}
-	return false
 }
