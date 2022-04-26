@@ -105,6 +105,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	accountDataEventFilter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
+	pos = r.Low()
 
 	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
@@ -118,7 +119,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 
 	var dataType string
 	var roomID string
-	id := r.From
+	var id types.StreamPosition
 
 	for rows.Next() {
 		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
