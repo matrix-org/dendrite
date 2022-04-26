@@ -157,7 +157,7 @@ type SendToDevice interface {
 }
 
 type Filter interface {
-	SelectFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	SelectFilter(ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string) error
 	InsertFilter(ctx context.Context, filter *gomatrixserverlib.Filter, localpart string) (filterID string, err error)
 }
 

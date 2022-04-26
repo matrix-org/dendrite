@@ -44,8 +44,8 @@ func GetFilter(
 		return jsonerror.InternalServerError()
 	}
 
-	filter, err := syncDB.GetFilter(req.Context(), localpart, filterID)
-	if err != nil {
+	filter := gomatrixserverlib.DefaultFilter()
+	if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterID); err != nil {
 		//TODO better error handling. This error message is *probably* right,
 		// but if there are obscure db errors, this will also be returned,
 		// even though it is not correct.
