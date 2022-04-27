@@ -53,6 +53,12 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 
 	// Iterate over the rooms
 	for roomID, dataTypes := range dataTypes {
+		// For a complete sync, make sure we're only including this room if
+		// that room was present in the joined rooms.
+		if from == 0 && !req.IsRoomPresent(roomID) {
+			continue
+		}
+
 		// Request the missing data from the database
 		for _, dataType := range dataTypes {
 			dataReq := userapi.QueryAccountDataRequest{
