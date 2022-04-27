@@ -65,7 +65,7 @@ const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
 
 const selectNewNumericLocalpartSQL = "" +
-	"SELECT MAX(CAST(localpart AS INT)) FROM account_accounts WHERE CAST(localpart AS INT) <> 0"
+	"SELECT COALESCE(MAX(CAST(localpart AS INT)), 0) FROM account_accounts WHERE CAST(localpart AS INT) <> 0"
 
 type accountsStatements struct {
 	db                            *sql.DB
