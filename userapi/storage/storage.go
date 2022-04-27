@@ -28,9 +28,9 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 )
 
-// NewDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
+// NewUserAPIDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (Database, error) {
+func NewUserAPIDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)

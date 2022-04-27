@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -56,8 +57,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
-
-	_ "net/http/pprof"
 )
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
@@ -273,7 +272,7 @@ func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
-	db, err := userdb.NewDatabase(
+	db, err := userdb.NewUserAPIDatabase(
 		&b.Cfg.UserAPI.AccountDatabase,
 		b.Cfg.Global.ServerName,
 		b.Cfg.UserAPI.BCryptCost,

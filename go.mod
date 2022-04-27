@@ -47,6 +47,7 @@ require (
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.8.1
+	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.14.0
 	github.com/tidwall/sjson v1.2.4
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
