@@ -346,6 +346,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		Addr:         string(externalAddr),
 		WriteTimeout: HTTPServerTimeout,
 		Handler:      externalRouter,
+		BaseContext: func(_ net.Listener) context.Context {
+			return b.ProcessContext.Context()
+		},
 	}
 	internalServ := externalServ
 
@@ -361,6 +364,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
 			Handler: h2c.NewHandler(internalRouter, internalH2S),
+			BaseContext: func(_ net.Listener) context.Context {
+				return b.ProcessContext.Context()
+			},
 		}
 	}
 
