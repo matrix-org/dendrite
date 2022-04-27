@@ -78,7 +78,7 @@ const selectDeviceByIDSQL = "" +
 	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2 ORDER BY last_seen_ts DESC"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
@@ -93,7 +93,7 @@ const deleteDevicesSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
 
 const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id = ANY($1)"
+	"SELECT device_id, localpart, display_name, last_seen_ts FROM device_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
 
 const updateDeviceLastSeen = "" +
 	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
@@ -235,15 +235,19 @@ func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []s
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
 	var devices []api.Device
+	var dev api.Device
+	var localpart string
+	var lastseents sql.NullInt64
+	var displayName sql.NullString
 	for rows.Next() {
-		var dev api.Device
-		var localpart string
-		var displayName sql.NullString
-		if err := rows.Scan(&dev.ID, &localpart, &displayName); err != nil {
+		if err := rows.Scan(&dev.ID, &localpart, &displayName, &lastseents); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {
 			dev.DisplayName = displayName.String
+		}
+		if lastseents.Valid {
+			dev.LastSeenTS = lastseents.Int64
 		}
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
@@ -262,10 +266,10 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
 
+	var dev api.Device
+	var lastseents sql.NullInt64
+	var id, displayname, ip, useragent sql.NullString
 	for rows.Next() {
-		var dev api.Device
-		var lastseents sql.NullInt64
-		var id, displayname, ip, useragent sql.NullString
 		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent)
 		if err != nil {
 			return devices, err
