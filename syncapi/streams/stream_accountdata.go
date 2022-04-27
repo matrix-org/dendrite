@@ -55,7 +55,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 	for roomID, dataTypes := range dataTypes {
 		// For a complete sync, make sure we're only including this room if
 		// that room was present in the joined rooms.
-		if from == 0 && !req.IsRoomPresent(roomID) {
+		if from == 0 && roomID != "" && !req.IsRoomPresent(roomID) {
 			continue
 		}
 
