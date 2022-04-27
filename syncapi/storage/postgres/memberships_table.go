@@ -64,7 +64,7 @@ const selectMembershipCountSQL = "" +
 	") t WHERE t.membership = $3"
 
 const selectHeroesSQL = "" +
-	"SELECT user_id FROM syncapi_memberships WHERE room_id = $1 AND user_id != $2 AND membership = ANY($3) LIMIT 5"
+	"SELECT DISTINCT user_id FROM syncapi_memberships WHERE room_id = $1 AND user_id != $2 AND membership = ANY($3) LIMIT 5"
 
 type membershipsStatements struct {
 	upsertMembershipStmt      *sql.Stmt
