@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
@@ -429,5 +431,78 @@ func Test_ThreePID(t *testing.T) {
 		threepids, err = db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
 		assert.NoError(t, err, "unable to get threepids for localpart")
 		assert.Equal(t, 0, len(threepids))
+	})
+}
+
+func Test_Notification(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser()
+	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	assert.NoError(t, err)
+	room := test.NewRoom(t, alice)
+	room2 := test.NewRoom(t, alice)
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateDatabase(t, dbType)
+		defer close()
+		// generate some dummy notifications
+		for i := 0; i < 10; i++ {
+			eventID := util.RandomString(16)
+			roomID := room.ID
+			ts := time.Now()
+			if i > 5 {
+				roomID = room2.ID
+				// create some old notifications to test DeleteOldNotifications
+				ts = ts.AddDate(0, -2, 0)
+			}
+			notification := &api.Notification{
+				Actions: []*pushrules.Action{
+					{},
+				},
+				Event: gomatrixserverlib.ClientEvent{
+					Content: gomatrixserverlib.RawJSON("{}"),
+				},
+				Read:   false,
+				RoomID: roomID,
+				TS:     gomatrixserverlib.AsTimestamp(ts),
+			}
+			err = db.InsertNotification(ctx, aliceLocalpart, eventID, int64(i+1), nil, notification)
+			assert.NoError(t, err, "unable to insert notification")
+		}
+
+		// get notifications
+		count, err := db.GetNotificationCount(ctx, aliceLocalpart, tables.AllNotifications)
+		assert.NoError(t, err, "unable to get notification count")
+		assert.Equal(t, int64(10), count)
+		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, 0, 15, tables.AllNotifications)
+		assert.NoError(t, err, "unable to get notifications")
+		assert.Equal(t, int64(10), count)
+		assert.Equal(t, 10, len(notifs))
+		// ... for a specific room
+		total, _, err := db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		assert.NoError(t, err, "unable to get notifications for room")
+		assert.Equal(t, int64(4), total)
+
+		// mark notification as read
+		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, room2.ID, 7, true)
+		assert.NoError(t, err, "unable to set notifications read")
+		assert.True(t, affected)
+
+		// this should delete 2 notifications
+		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, room2.ID, 8)
+		assert.NoError(t, err, "unable to set notifications read")
+		assert.True(t, affected)
+
+		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		assert.NoError(t, err, "unable to get notifications for room")
+		assert.Equal(t, int64(2), total)
+
+		// delete old notifications
+		err = db.DeleteOldNotifications(ctx)
+		assert.NoError(t, err)
+
+		// this should now return 0 notifications
+		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		assert.NoError(t, err, "unable to get notifications for room")
+		assert.Equal(t, int64(0), total)
 	})
 }
