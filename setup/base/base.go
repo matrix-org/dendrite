@@ -472,7 +472,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	b.WaitForShutdown()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	defer cancel()
 
 	_ = internalServ.Shutdown(ctx)
 	_ = externalServ.Shutdown(ctx)
