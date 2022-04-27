@@ -168,6 +168,10 @@ func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]stri
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
 
+func (d *Database) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
+	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, roomIDs)
+}
+
 func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
 	return d.Peeks.SelectPeekingDevices(ctx)
 }

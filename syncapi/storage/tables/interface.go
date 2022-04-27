@@ -102,6 +102,8 @@ type CurrentRoomState interface {
 	SelectRoomIDsWithAnyMembership(ctx context.Context, txn *sql.Tx, userID string) (map[string]string, error)
 	// SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
 	SelectJoinedUsers(ctx context.Context) (map[string][]string, error)
+	// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
+	SelectJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
 }
 
 // BackwardsExtremities keeps track of backwards extremities for a room.
