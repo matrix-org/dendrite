@@ -100,8 +100,8 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt    *sql.Stmt
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
-	selectJoinedUsersInRoomStmt        *sql.Stmt
-	selectStateEventStmt               *sql.Stmt
+	//selectJoinedUsersInRoomStmt        *sql.Stmt - prepared at runtime due to variadic
+	selectStateEventStmt *sql.Stmt
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
@@ -131,9 +131,9 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
 		return nil, err
 	}
-	if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
-		return nil, err
-	}
+	//if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
+	//	return nil, err
+	//}
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
 		return nil, err
 	}
