@@ -15,7 +15,6 @@
 package queue
 
 import (
-	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
@@ -105,14 +104,14 @@ func NewOutgoingQueues(
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
 		serverNames := map[gomatrixserverlib.ServerName]struct{}{}
-		if names, err := db.GetPendingPDUServerNames(context.Background()); err == nil {
+		if names, err := db.GetPendingPDUServerNames(process.Context()); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
 			}
 		} else {
 			log.WithError(err).Error("Failed to get PDU server names for destination queue hydration")
 		}
-		if names, err := db.GetPendingEDUServerNames(context.Background()); err == nil {
+		if names, err := db.GetPendingEDUServerNames(process.Context()); err == nil {
 			for _, serverName := range names {
 				serverNames[serverName] = struct{}{}
 			}
@@ -215,7 +214,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	// Check if any of the destinations are prohibited by server ACLs.
 	for destination := range destmap {
 		if api.IsServerBannedFromRoom(
-			context.TODO(),
+			oqs.process.Context(),
 			oqs.rsAPI,
 			ev.RoomID(),
 			destination,
@@ -238,7 +237,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	nid, err := oqs.db.StoreJSON(context.TODO(), string(headeredJSON))
+	nid, err := oqs.db.StoreJSON(oqs.process.Context(), string(headeredJSON))
 	if err != nil {
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
@@ -286,7 +285,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	if result := gjson.GetBytes(e.Content, "room_id"); result.Exists() {
 		for destination := range destmap {
 			if api.IsServerBannedFromRoom(
-				context.TODO(),
+				oqs.process.Context(),
 				oqs.rsAPI,
 				result.Str,
 				destination,
@@ -310,7 +309,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		return fmt.Errorf("json.Marshal: %w", err)
 	}
 
-	nid, err := oqs.db.StoreJSON(context.TODO(), string(ephemeralJSON))
+	nid, err := oqs.db.StoreJSON(oqs.process.Context(), string(ephemeralJSON))
 	if err != nil {
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
