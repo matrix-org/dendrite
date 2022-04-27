@@ -74,19 +74,7 @@ type Device interface {
 	RemoveAllDevices(ctx context.Context, localpart, exceptDeviceID string) (devices []api.Device, err error)
 }
 
-type Database interface {
-	Account
-	AccountData
-	Device
-	Profile
-	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
-	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
-	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
-	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
-	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
-	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
-
-	// Key backups
+type KeyBackup interface {
 	CreateKeyBackup(ctx context.Context, userID, algorithm string, authData json.RawMessage) (version string, err error)
 	UpdateKeyBackupAuthData(ctx context.Context, userID, version string, authData json.RawMessage) (err error)
 	DeleteKeyBackup(ctx context.Context, userID, version string) (exists bool, err error)
@@ -94,6 +82,20 @@ type Database interface {
 	UpsertBackupKeys(ctx context.Context, version, userID string, uploads []api.InternalKeyBackupSession) (count int64, etag string, err error)
 	GetBackupKeys(ctx context.Context, version, userID, filterRoomID, filterSessionID string) (result map[string]map[string]api.KeyBackupSession, err error)
 	CountBackupKeys(ctx context.Context, version, userID string) (count int64, err error)
+}
+
+type Database interface {
+	Account
+	AccountData
+	Device
+	KeyBackup
+	Profile
+	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
+	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
+	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
+	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
+	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
+	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 
 	// CreateLoginToken generates a token, stores and returns it. The lifetime is
 	// determined by the loginTokenLifetime given to the Database constructor.
