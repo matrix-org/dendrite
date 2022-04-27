@@ -105,7 +105,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	accountDataEventFilter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
-	pos = r.Low()
+	pos = r.High()
 
 	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
@@ -120,6 +120,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	var dataType string
 	var roomID string
 	var id types.StreamPosition
+	var highest types.StreamPosition
 
 	for rows.Next() {
 		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
@@ -131,9 +132,12 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		} else {
 			data[roomID] = []string{dataType}
 		}
-		if id > pos {
-			pos = id
+		if id > highest {
+			highest = id
 		}
+	}
+	if highest < pos {
+		pos = highest
 	}
 	return data, pos, rows.Err()
 }
