@@ -72,6 +72,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			req.Log.WithError(err).Error("unable to refresh notifier lists")
 			return from
 		}
+	NewlyJoinedLoop:
 		for _, roomID := range newlyJoined {
 			roomUsers := p.notifier.JoinedUsers(roomID)
 			for i := range roomUsers {
@@ -85,6 +86,9 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				if err != nil {
 					req.Log.WithError(err).Error("unable to query presence for user")
 					return from
+				}
+				if len(presences) > req.Filter.Presence.Limit {
+					break NewlyJoinedLoop
 				}
 			}
 		}
