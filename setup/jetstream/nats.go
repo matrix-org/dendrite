@@ -44,6 +44,7 @@ func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient
 			StoreDir:        string(cfg.StoragePath),
 			NoSystemAccount: true,
 			MaxPayload:      16 * 1024 * 1024,
+			NoSigs:          true,
 		})
 		if err != nil {
 			panic(err)
