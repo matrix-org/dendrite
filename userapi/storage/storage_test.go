@@ -341,3 +341,55 @@ func Test_Profile(t *testing.T) {
 		assert.Equal(t, *wantProfile, searchRes[0])
 	})
 }
+
+func Test_Pusher(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser()
+	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	assert.NoError(t, err)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		appID := util.RandomString(8)
+		var pushKeys []string
+		var gotPushers []api.Pusher
+		for i := 0; i < 2; i++ {
+			pushKey := util.RandomString(8)
+
+			wantPusher := api.Pusher{
+				PushKey:           pushKey,
+				Kind:              api.HTTPKind,
+				AppID:             appID,
+				AppDisplayName:    util.RandomString(8),
+				DeviceDisplayName: util.RandomString(8),
+				ProfileTag:        util.RandomString(8),
+				Language:          util.RandomString(2),
+			}
+			err = db.UpsertPusher(ctx, wantPusher, aliceLocalpart)
+			assert.NoError(t, err, "unable to upsert pusher")
+
+			// check it was actually persisted
+			gotPushers, err = db.GetPushers(ctx, aliceLocalpart)
+			assert.NoError(t, err, "unable to get pushers")
+			assert.Equal(t, i+1, len(gotPushers))
+			assert.Equal(t, wantPusher, gotPushers[i])
+			pushKeys = append(pushKeys, pushKey)
+		}
+
+		// remove single pusher
+		err = db.RemovePusher(ctx, appID, pushKeys[0], aliceLocalpart)
+		assert.NoError(t, err, "unable to remove pusher")
+		gotPushers, err := db.GetPushers(ctx, aliceLocalpart)
+		assert.NoError(t, err, "unable to get pushers")
+		assert.Equal(t, 1, len(gotPushers))
+
+		// remove last pusher
+		err = db.RemovePushers(ctx, appID, pushKeys[1])
+		assert.NoError(t, err, "unable to remove pusher")
+		gotPushers, err = db.GetPushers(ctx, aliceLocalpart)
+		assert.NoError(t, err, "unable to get pushers")
+		assert.Equal(t, 0, len(gotPushers))
+	})
+}

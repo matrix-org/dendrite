@@ -102,6 +102,13 @@ type OpenID interface {
 	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 }
 
+type Pusher interface {
+	UpsertPusher(ctx context.Context, p api.Pusher, localpart string) error
+	GetPushers(ctx context.Context, localpart string) ([]api.Pusher, error)
+	RemovePusher(ctx context.Context, appid, pushkey, localpart string) error
+	RemovePushers(ctx context.Context, appid, pushkey string) error
+}
+
 type Database interface {
 	Account
 	AccountData
@@ -110,6 +117,7 @@ type Database interface {
 	LoginToken
 	OpenID
 	Profile
+	Pusher
 	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
 	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
 	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
@@ -122,11 +130,6 @@ type Database interface {
 	GetNotificationCount(ctx context.Context, localpart string, filter tables.NotificationFilter) (int64, error)
 	GetRoomNotificationCounts(ctx context.Context, localpart, roomID string) (total int64, highlight int64, _ error)
 	DeleteOldNotifications(ctx context.Context) error
-
-	UpsertPusher(ctx context.Context, p api.Pusher, localpart string) error
-	GetPushers(ctx context.Context, localpart string) ([]api.Pusher, error)
-	RemovePusher(ctx context.Context, appid, pushkey, localpart string) error
-	RemovePushers(ctx context.Context, appid, pushkey string) error
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving
