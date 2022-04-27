@@ -18,11 +18,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const loginTokenLifetime = time.Minute
+
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserAPIDatabase(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, "localhost", bcrypt.MinCost, time.Minute.Milliseconds(), time.Minute, "_server")
+	}, "localhost", bcrypt.MinCost, time.Minute.Milliseconds(), loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
@@ -244,5 +246,36 @@ func Test_KeyBackup(t *testing.T) {
 		exists, err = db.DeleteKeyBackup(ctx, alice.ID, "3")
 		assert.NoError(t, err, "unable to delete key backup")
 		assert.False(t, exists)
+	})
+}
+
+func Test_LoginToken(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		// create a new token
+		wantLoginToken := &api.LoginTokenData{UserID: alice.ID}
+
+		gotMetadata, err := db.CreateLoginToken(ctx, wantLoginToken)
+		assert.NoError(t, err, "unable to create login token")
+		assert.NotNil(t, gotMetadata)
+		assert.Equal(t, time.Now().Add(loginTokenLifetime).Truncate(loginTokenLifetime), gotMetadata.Expiration.Truncate(loginTokenLifetime))
+
+		// get the new token
+		gotLoginToken, err := db.GetLoginTokenDataByToken(ctx, gotMetadata.Token)
+		assert.NoError(t, err, "unable to get login token")
+		assert.NotNil(t, gotLoginToken)
+		assert.Equal(t, wantLoginToken, gotLoginToken, "unexpected login token")
+
+		// remove the login token again
+		err = db.RemoveLoginToken(ctx, gotMetadata.Token)
+		assert.NoError(t, err, "unable to remove login token")
+
+		// check if the token was actually deleted
+		_, err = db.GetLoginTokenDataByToken(ctx, gotMetadata.Token)
+		assert.Error(t, err, "expected an error, but got none")
 	})
 }

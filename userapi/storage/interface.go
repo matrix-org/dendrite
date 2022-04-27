@@ -84,19 +84,7 @@ type KeyBackup interface {
 	CountBackupKeys(ctx context.Context, version, userID string) (count int64, err error)
 }
 
-type Database interface {
-	Account
-	AccountData
-	Device
-	KeyBackup
-	Profile
-	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
-	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
-	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
-	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
-	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
-	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
-
+type LoginToken interface {
 	// CreateLoginToken generates a token, stores and returns it. The lifetime is
 	// determined by the loginTokenLifetime given to the Database constructor.
 	CreateLoginToken(ctx context.Context, data *api.LoginTokenData) (*api.LoginTokenMetadata, error)
@@ -107,6 +95,21 @@ type Database interface {
 	// GetLoginTokenDataByToken returns the data associated with the given token.
 	// May return sql.ErrNoRows.
 	GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
+}
+
+type Database interface {
+	Account
+	AccountData
+	Device
+	KeyBackup
+	LoginToken
+	Profile
+	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
+	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
+	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
+	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
+	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
+	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 
 	InsertNotification(ctx context.Context, localpart, eventID string, pos int64, tweaks map[string]interface{}, n *api.Notification) error
 	DeleteNotificationsUpTo(ctx context.Context, localpart, roomID string, pos int64) (affected bool, err error)
