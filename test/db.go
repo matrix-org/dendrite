@@ -15,13 +15,16 @@
 package test
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
+	"regexp"
 	"testing"
 
 	"github.com/lib/pq"
@@ -39,13 +42,18 @@ func createLocalDB(dbName string) {
 		fmt.Println("Note: tests require a postgres install accessible to the current user")
 	}
 	createDB := exec.Command("createdb", dbName)
+	var outBuff, errBuff bytes.Buffer
 	if !Quiet {
-		createDB.Stdout = os.Stdout
-		createDB.Stderr = os.Stderr
+		createDB.Stdout = io.Writer(&outBuff)
+		createDB.Stderr = io.Writer(&errBuff)
 	}
 	err := createDB.Run()
 	if err != nil && !Quiet {
-		fmt.Println("createLocalDB returned error:", err)
+		// Silence the output if it's just saying the database already exists
+		match, _ := regexp.MatchString("(?m)^createdb: error: database creation failed: ERROR:  database(.*)already exists$", errBuff.String())
+		if !match {
+			fmt.Println("createLocalDB returned error:", outBuff.String(), errBuff.String(), err)
+		}
 	}
 }
 
