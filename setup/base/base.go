@@ -43,7 +43,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
-	_ "github.com/kardianos/minwinsvc"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
