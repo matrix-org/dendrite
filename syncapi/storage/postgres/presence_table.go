@@ -127,6 +127,9 @@ func (p *presenceStatements) GetPresenceForUser(
 	}
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
 	err := stmt.QueryRowContext(ctx, userID).Scan(&result.Presence, &result.ClientFields.StatusMsg, &result.LastActiveTS)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	result.ClientFields.Presence = result.Presence.String()
 	return result, err
 }

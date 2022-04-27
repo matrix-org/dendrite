@@ -16,7 +16,6 @@ package streams
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"sync"
 
@@ -80,11 +79,10 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				if _, ok := presences[roomUsers[i]]; ok {
 					continue
 				}
+				// Bear in mind that this might return nil, but at least populating
+				// a nil means that there's a map entry so we won't repeat this call.
 				presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
 				if err != nil {
-					if err == sql.ErrNoRows {
-						continue
-					}
 					req.Log.WithError(err).Error("unable to query presence for user")
 					return from
 				}
@@ -93,8 +91,10 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	}
 
 	lastPos := to
-	for i := range presences {
-		presence := presences[i]
+	for _, presence := range presences {
+		if presence == nil {
+			continue
+		}
 		// Ignore users we don't share a room with
 		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
 			continue
