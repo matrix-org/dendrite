@@ -72,7 +72,7 @@ const selectMaxPresenceSQL = "" +
 const selectPresenceAfter = "" +
 	" SELECT id, user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
-	" WHERE id > $1"
+	" WHERE id > $1 ORDER BY last_active_ts DESC LIMIT $2"
 
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
@@ -144,11 +144,12 @@ func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) 
 func (p *presenceStatements) GetPresenceAfter(
 	ctx context.Context, txn *sql.Tx,
 	after types.StreamPosition,
+	filter gomatrixserverlib.EventFilter,
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
 
-	rows, err := stmt.QueryContext(ctx, after)
+	rows, err := stmt.QueryContext(ctx, after, filter.Limit)
 	if err != nil {
 		return nil, err
 	}
