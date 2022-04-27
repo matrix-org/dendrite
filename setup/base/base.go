@@ -346,6 +346,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		Addr:         string(externalAddr),
 		WriteTimeout: HTTPServerTimeout,
 		Handler:      externalRouter,
+		BaseContext: func(_ net.Listener) context.Context {
+			return b.ProcessContext.Context()
+		},
 	}
 	internalServ := externalServ
 
@@ -361,6 +364,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
 			Handler: h2c.NewHandler(internalRouter, internalH2S),
+			BaseContext: func(_ net.Listener) context.Context {
+				return b.ProcessContext.Context()
+			},
 		}
 	}
 
@@ -463,13 +469,11 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 
 	minwinsvc.SetOnExit(b.ProcessContext.ShutdownDendrite)
-	b.WaitForShutdown()
+	<-b.ProcessContext.WaitForShutdown()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	_ = internalServ.Shutdown(ctx)
-	_ = externalServ.Shutdown(ctx)
+	logrus.Infof("Stopping HTTP listeners")
+	_ = internalServ.Shutdown(context.Background())
+	_ = externalServ.Shutdown(context.Background())
 	logrus.Infof("Stopped HTTP listeners")
 }
 

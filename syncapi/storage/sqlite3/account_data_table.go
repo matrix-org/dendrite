@@ -96,7 +96,6 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	r types.Range,
 	filter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
-	pos = r.Low()
 	data = make(map[string][]string)
 	stmt, params, err := prepareWithFilters(
 		s.db, nil, selectAccountDataInRangeSQL,
@@ -131,7 +130,9 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 			pos = id
 		}
 	}
-
+	if pos == 0 {
+		pos = r.High()
+	}
 	return data, pos, nil
 }
 
