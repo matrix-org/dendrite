@@ -25,6 +25,7 @@ require (
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
+	github.com/kardianos/minwinsvc v1.0.0 // indirect
 	github.com/lib/pq v1.10.5
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
@@ -46,6 +47,7 @@ require (
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.8.1
+	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.14.0
 	github.com/tidwall/sjson v1.2.4
 	github.com/uber/jaeger-client-go v2.30.0+incompatible

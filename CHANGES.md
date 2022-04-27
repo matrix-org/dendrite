@@ -1,5 +1,34 @@
 # Changelog
 
+## Dendrite 0.8.2 (2022-04-27)
+
+### Features
+
+* Lazy-loading has been added to the `/sync` endpoint, which should speed up syncs considerably
+* Filtering has been added to the `/messages` endpoint
+* The room summary now contains "heroes" (up to 5 users in the room) for clients to display when no room name is set
+* The existing lazy-loading caches will now be used by `/messages` and `/context` so that member events will not be sent to clients more times than necessary
+* The account data stream now uses the provided filters
+* The built-in NATS Server has been updated to version 2.8.0
+* The `/state` and `/state_ids` endpoints will now return `M_NOT_FOUND` for rejected events
+* Repeated calls to the `/redact` endpoint will now be idempotent when a transaction ID is given
+* Dendrite should now be able to run as a Windows service under Service Control Manager
+
+### Fixes
+
+* Fictitious presence updates will no longer be created for users which have not sent us presence updates, which should speed up complete syncs considerably
+* Uploading cross-signing device signatures should now be more reliable, fixing a number of bugs with cross-signing
+* All account data should now be sent properly on a complete sync, which should eliminate problems with client settings or key backups appearing to be missing
+* Account data will now be limited correctly on incremental syncs, returning the stream position of the most recent update rather than the latest stream position
+* Account data will not be sent for parted rooms, which should reduce the number of left/forgotten rooms reappearing in clients as empty rooms
+* The TURN username hash has been fixed which should help to resolve some problems when using TURN for voice calls (contributed by [fcwoknhenuxdfiyv](https://github.com/fcwoknhenuxdfiyv))
+* Push rules can no longer be modified using the account data endpoints
+* Querying account availability should now work properly in polylith deployments
+* A number of bugs with sync filters have been fixed
+* A default sync filter will now be used if the request contains a filter ID that does not exist
+* The `pushkey_ts` field is now using seconds instead of milliseconds
+* A race condition when gracefully shutting down has been fixed, so JetStream should no longer cause the process to exit before other Dendrite components are finished shutting down
+
 ## Dendrite 0.8.1 (2022-04-07)
 
 ### Fixes

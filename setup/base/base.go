@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -42,6 +43,7 @@ import (
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
 
 	"github.com/gorilla/mux"
+	"github.com/kardianos/minwinsvc"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
@@ -55,8 +57,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
-
-	_ "net/http/pprof"
 )
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
@@ -272,7 +272,7 @@ func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
 // CreateAccountsDB creates a new instance of the accounts database. Should only
 // be called once per component.
 func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
-	db, err := userdb.NewDatabase(
+	db, err := userdb.NewUserAPIDatabase(
 		&b.Cfg.UserAPI.AccountDatabase,
 		b.Cfg.Global.ServerName,
 		b.Cfg.UserAPI.BCryptCost,
@@ -346,6 +346,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		Addr:         string(externalAddr),
 		WriteTimeout: HTTPServerTimeout,
 		Handler:      externalRouter,
+		BaseContext: func(_ net.Listener) context.Context {
+			return b.ProcessContext.Context()
+		},
 	}
 	internalServ := externalServ
 
@@ -361,6 +364,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
 			Handler: h2c.NewHandler(internalRouter, internalH2S),
+			BaseContext: func(_ net.Listener) context.Context {
+				return b.ProcessContext.Context()
+			},
 		}
 	}
 
@@ -462,20 +468,22 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		}()
 	}
 
+	minwinsvc.SetOnExit(b.ProcessContext.ShutdownDendrite)
 	<-b.ProcessContext.WaitForShutdown()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	_ = internalServ.Shutdown(ctx)
-	_ = externalServ.Shutdown(ctx)
+	logrus.Infof("Stopping HTTP listeners")
+	_ = internalServ.Shutdown(context.Background())
+	_ = externalServ.Shutdown(context.Background())
 	logrus.Infof("Stopped HTTP listeners")
 }
 
 func (b *BaseDendrite) WaitForShutdown() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
+	select {
+	case <-sigs:
+	case <-b.ProcessContext.WaitForShutdown():
+	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
 	logrus.Warnf("Shutdown signal received")

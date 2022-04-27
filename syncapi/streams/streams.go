@@ -33,6 +33,7 @@ func NewSyncStreamProviders(
 		PDUStreamProvider: &PDUStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
 			lazyLoadCache:  lazyLoadCache,
+			rsAPI:          rsAPI,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
 			StreamProvider: StreamProvider{DB: d},

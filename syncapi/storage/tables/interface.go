@@ -27,7 +27,7 @@ import (
 type AccountData interface {
 	InsertAccountData(ctx context.Context, txn *sql.Tx, userID, roomID, dataType string) (pos types.StreamPosition, err error)
 	// SelectAccountDataInRange returns a map of room ID to a list of `dataType`.
-	SelectAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, err error)
+	SelectAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, pos types.StreamPosition, err error)
 	SelectMaxAccountDataID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
 
@@ -157,7 +157,7 @@ type SendToDevice interface {
 }
 
 type Filter interface {
-	SelectFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	SelectFilter(ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string) error
 	InsertFilter(ctx context.Context, filter *gomatrixserverlib.Filter, localpart string) (filterID string, err error)
 }
 
@@ -170,6 +170,7 @@ type Receipts interface {
 type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
+	SelectHeroes(ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string) (heroes []string, err error)
 }
 
 type NotificationData interface {

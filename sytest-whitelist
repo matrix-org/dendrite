@@ -681,8 +681,6 @@ GET /presence/:user_id/status fetches initial status
 PUT /presence/:user_id/status updates my presence
 Presence change reports an event to myself
 Existing members see new members' presence
-#Existing members see new member's presence
-Newly joined room includes presence in incremental sync
 Get presence for newly joined members in incremental sync
 User sees their own presence in a sync
 User sees updates to presence from other users in the incremental sync.
@@ -714,3 +712,7 @@ Presence can be set from sync
 /state_ids returns M_NOT_FOUND for a rejected message event
 /state returns M_NOT_FOUND for a rejected state event
 /state_ids returns M_NOT_FOUND for a rejected state event
+PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
+Unnamed room comes with a name summary
+Named room comes with just joined member count summary
+Room summary only has 5 heroes

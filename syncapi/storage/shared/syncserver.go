@@ -124,6 +124,10 @@ func (d *Database) MembershipCount(ctx context.Context, roomID, membership strin
 	return d.Memberships.SelectMembershipCount(ctx, nil, roomID, membership, pos)
 }
 
+func (d *Database) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
+	return d.Memberships.SelectHeroes(ctx, nil, roomID, userID, memberships)
+}
+
 func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
@@ -261,7 +265,7 @@ func (d *Database) DeletePeeks(
 func (d *Database) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
+) (map[string][]string, types.StreamPosition, error) {
 	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
 }
 
@@ -509,9 +513,9 @@ func (d *Database) StreamToTopologicalPosition(
 }
 
 func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.Filter.SelectFilter(ctx, localpart, filterID)
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
