@@ -42,6 +42,7 @@ import (
 	userdb "github.com/matrix-org/dendrite/userapi/storage"
 
 	"github.com/gorilla/mux"
+	"github.com/kardianos/minwinsvc"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
@@ -462,7 +463,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		}()
 	}
 
-	<-b.ProcessContext.WaitForShutdown()
+	minwinsvc.SetOnExit(b.ProcessContext.ShutdownDendrite)
+	b.WaitForShutdown()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -475,7 +477,10 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 func (b *BaseDendrite) WaitForShutdown() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
+	select {
+	case <-sigs:
+	case <-b.ProcessContext.WaitForShutdown():
+	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
 	logrus.Warnf("Shutdown signal received")
