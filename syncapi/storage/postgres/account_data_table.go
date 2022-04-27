@@ -119,7 +119,6 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	var dataType string
 	var roomID string
 	var id types.StreamPosition
-	var highest types.StreamPosition
 
 	for rows.Next() {
 		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
@@ -131,8 +130,8 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		} else {
 			data[roomID] = []string{dataType}
 		}
-		if id > highest {
-			highest = id
+		if id > pos {
+			pos = id
 		}
 	}
 	if pos == 0 {
