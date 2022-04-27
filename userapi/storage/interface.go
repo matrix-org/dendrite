@@ -27,7 +27,6 @@ import (
 type Profile interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
-	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error
 	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, displayName string) error
 }
@@ -42,6 +41,7 @@ type Account interface {
 	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
 	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
 	DeactivateAccount(ctx context.Context, localpart string) (err error)
+	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error
 }
 
 type AccountData interface {

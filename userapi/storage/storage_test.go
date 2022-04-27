@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -299,5 +300,44 @@ func Test_OpenID(t *testing.T) {
 		assert.NoError(t, err, "unable to get OpenID token attributes")
 		assert.Equal(t, alice.ID, attributes.UserID)
 		assert.Equal(t, expiresAtMS, attributes.ExpiresAtMS)
+	})
+}
+
+func Test_Profile(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser()
+	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	assert.NoError(t, err)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		// create account, which also creates a profile
+		_, err = db.CreateAccount(ctx, aliceLocalpart, "testing", "", api.AccountTypeAdmin)
+		assert.NoError(t, err, "failed to create account")
+
+		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart)
+		assert.NoError(t, err, "unable to get profile by localpart")
+		wantProfile := &authtypes.Profile{Localpart: aliceLocalpart}
+		assert.Equal(t, wantProfile, gotProfile)
+
+		// set avatar & displayname
+		wantProfile.DisplayName = "Alice"
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		err = db.SetDisplayName(ctx, aliceLocalpart, "Alice")
+		assert.NoError(t, err, "unable to set displayname")
+		err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		// verify profile
+		gotProfile, err = db.GetProfileByLocalpart(ctx, aliceLocalpart)
+		assert.NoError(t, err, "unable to get profile by localpart")
+		assert.Equal(t, wantProfile, gotProfile)
+
+		// search profiles
+		searchRes, err := db.SearchProfiles(ctx, "Alice", 2)
+		assert.NoError(t, err, "unable to search profiles")
+		assert.Equal(t, 1, len(searchRes))
+		assert.Equal(t, *wantProfile, searchRes[0])
 	})
 }
