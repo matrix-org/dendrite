@@ -25,6 +25,23 @@ type SyncRequest struct {
 	IgnoredUsers IgnoredUsers
 }
 
+func (r *SyncRequest) IsRoomPresent(roomID string) bool {
+	membership, ok := r.Rooms[roomID]
+	if !ok {
+		return false
+	}
+	switch membership {
+	case gomatrixserverlib.Join:
+		return true
+	case gomatrixserverlib.Invite:
+		return true
+	case gomatrixserverlib.Peek:
+		return true
+	default:
+		return false
+	}
+}
+
 type StreamProvider interface {
 	Setup()
 

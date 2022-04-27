@@ -88,6 +88,11 @@ func (s *PresenceConsumer) Start() error {
 			}
 			return
 		}
+		if presence == nil {
+			presence = &types.PresenceInternal{
+				UserID: userID,
+			}
+		}
 
 		deviceRes := api.QueryDevicesResponse{}
 		if err = s.deviceAPI.QueryDevices(s.ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
@@ -106,7 +111,9 @@ func (s *PresenceConsumer) Start() error {
 
 		m.Header.Set(jetstream.UserID, presence.UserID)
 		m.Header.Set("presence", presence.ClientFields.Presence)
-		m.Header.Set("status_msg", *presence.ClientFields.StatusMsg)
+		if presence.ClientFields.StatusMsg != nil {
+			m.Header.Set("status_msg", *presence.ClientFields.StatusMsg)
+		}
 		m.Header.Set("last_active_ts", strconv.Itoa(int(presence.LastActiveTS)))
 
 		if err = msg.RespondMsg(m); err != nil {

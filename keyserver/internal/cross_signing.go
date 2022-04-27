@@ -362,6 +362,13 @@ func (a *KeyInternalAPI) processSelfSignatures(
 		for targetKeyID, signature := range forTargetUserID {
 			switch sig := signature.CrossSigningBody.(type) {
 			case *gomatrixserverlib.CrossSigningKey:
+				for keyID := range sig.Keys {
+					split := strings.SplitN(string(keyID), ":", 2)
+					if len(split) > 1 && gomatrixserverlib.KeyID(split[1]) == targetKeyID {
+						targetKeyID = keyID // contains the ed25519: or other scheme
+						break
+					}
+				}
 				for originUserID, forOriginUserID := range sig.Signatures {
 					for originKeyID, originSig := range forOriginUserID {
 						if err := a.DB.StoreCrossSigningSigsForTarget(

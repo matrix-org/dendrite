@@ -43,7 +43,7 @@ const insertAccountDataSQL = "" +
 
 // further parameters are added by prepareWithFilters
 const selectAccountDataInRangeSQL = "" +
-	"SELECT room_id, type FROM syncapi_account_data_type" +
+	"SELECT id, room_id, type FROM syncapi_account_data_type" +
 	" WHERE user_id = $1 AND id > $2 AND id <= $3"
 
 const selectMaxAccountDataIDSQL = "" +
@@ -95,7 +95,8 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	userID string,
 	r types.Range,
 	filter *gomatrixserverlib.EventFilter,
-) (data map[string][]string, err error) {
+) (data map[string][]string, pos types.StreamPosition, err error) {
+	pos = r.Low()
 	data = make(map[string][]string)
 	stmt, params, err := prepareWithFilters(
 		s.db, nil, selectAccountDataInRangeSQL,
@@ -112,11 +113,12 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
 
-	for rows.Next() {
-		var dataType string
-		var roomID string
+	var dataType string
+	var roomID string
+	var id types.StreamPosition
 
-		if err = rows.Scan(&roomID, &dataType); err != nil {
+	for rows.Next() {
+		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
 			return
 		}
 
@@ -125,9 +127,12 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		} else {
 			data[roomID] = []string{dataType}
 		}
+		if id > pos {
+			pos = id
+		}
 	}
 
-	return data, nil
+	return data, pos, nil
 }
 
 func (s *accountDataStatements) SelectMaxAccountDataID(
