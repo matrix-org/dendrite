@@ -87,38 +87,29 @@ func (p *PresenceStreamProvider) populatePresence(
 	presences map[string]*types.PresenceInternal,
 	ignoreCache bool,
 ) error {
-	var changesMade bool
 	for _, room := range req.Response.Rooms.Join {
-		for _, stateEvent := range append(room.State.Events, room.Timeline.Events...) {
+		for _, event := range append(room.State.Events, room.Timeline.Events...) {
 			switch {
-			case stateEvent.Type != gomatrixserverlib.MRoomMember:
+			case event.StateKey == nil:
 				continue
-			case stateEvent.StateKey == nil:
+			case event.Type != gomatrixserverlib.MRoomMember:
+				continue
+			case presences[*event.StateKey] != nil:
 				continue
 			}
 			var memberContent gomatrixserverlib.MemberContent
-			err := json.Unmarshal(stateEvent.Content, &memberContent)
+			err := json.Unmarshal(event.Content, &memberContent)
 			if err != nil {
 				continue
 			}
 			if memberContent.Membership != gomatrixserverlib.Join {
 				continue
 			}
-			userID := *stateEvent.StateKey
+			userID := *event.StateKey
 			presences[userID], err = p.DB.GetPresence(ctx, userID)
 			if err != nil && err != sql.ErrNoRows {
 				return err
 			}
-			changesMade = true
-		}
-	}
-
-	if changesMade {
-		// TODO: This is expensive, but seems to be the only thing that
-		// stops sytest from racing on a couple of remote user tests.
-		if err := p.notifier.Load(ctx, p.DB); err != nil {
-			req.Log.WithError(err).Error("unable to refresh notifier lists")
-			return err
 		}
 	}
 
