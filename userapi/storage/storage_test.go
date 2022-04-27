@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
@@ -23,7 +22,10 @@ import (
 
 const loginTokenLifetime = time.Minute
 
-var openIDLifetimeMS = time.Minute.Milliseconds()
+var (
+	openIDLifetimeMS = time.Minute.Milliseconds()
+	ctx              = context.Background()
+)
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
@@ -38,7 +40,6 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 
 // Tests storing and getting account data
 func Test_AccountData(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
@@ -70,11 +71,9 @@ func Test_AccountData(t *testing.T) {
 
 // Tests the creation of accounts
 func Test_Accounts(t *testing.T) {
-	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
-		_ = close
 		alice := test.NewUser()
 		aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
@@ -102,8 +101,8 @@ func Test_Accounts(t *testing.T) {
 		// get guest account numeric aliceLocalpart
 		first, err := db.GetNewNumericLocalpart(ctx)
 		assert.NoError(t, err, "failed to get new numeric localpart")
-		// SQLite requires a new user to be created, as it doesn't have a sequence and uses the count(localpart) instead
-		_, err = db.CreateAccount(ctx, strconv.Itoa(int(first)), "testing", "", api.AccountTypeAdmin)
+		// Create a new account to verify the numeric localpart is updated
+		_, err = db.CreateAccount(ctx, "", "testing", "", api.AccountTypeGuest)
 		assert.NoError(t, err, "failed to create account")
 		second, err := db.GetNewNumericLocalpart(ctx)
 		assert.NoError(t, err)
@@ -129,7 +128,6 @@ func Test_Accounts(t *testing.T) {
 }
 
 func Test_Devices(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
@@ -162,6 +160,7 @@ func Test_Devices(t *testing.T) {
 		// Get devices
 		devices, err := db.GetDevicesByLocalpart(ctx, localpart)
 		assert.NoError(t, err, "unable to get devices by localpart")
+		assert.Equal(t, 2, len(devices))
 		deviceIDs := make([]string, 0, len(devices))
 		for _, dev := range devices {
 			deviceIDs = append(deviceIDs, dev.ID)
@@ -170,11 +169,49 @@ func Test_Devices(t *testing.T) {
 		devices2, err := db.GetDevicesByID(ctx, deviceIDs)
 		assert.NoError(t, err, "unable to get devices by id")
 		assert.Equal(t, devices, devices2)
+
+		// Update device
+		newName := "new display name"
+		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
+		assert.NoError(t, err, "unable to update device displayname")
+		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1")
+		assert.NoError(t, err, "unable to update device last seen")
+
+		deviceWithID.DisplayName = newName
+		deviceWithID.LastSeenIP = "127.0.0.1"
+		deviceWithID.LastSeenTS = int64(gomatrixserverlib.AsTimestamp(time.Now().Truncate(time.Second)))
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		assert.NoError(t, err, "unable to get device by id")
+		assert.Equal(t, 2, len(devices))
+		assert.Equal(t, deviceWithID.DisplayName, devices[0].DisplayName)
+		assert.Equal(t, deviceWithID.LastSeenIP, devices[0].LastSeenIP)
+		truncatedTime := gomatrixserverlib.Timestamp(devices[0].LastSeenTS).Time().Truncate(time.Second)
+		assert.Equal(t, gomatrixserverlib.Timestamp(deviceWithID.LastSeenTS), gomatrixserverlib.AsTimestamp(truncatedTime))
+
+		// create one more device and remove the devices step by step
+		newDeviceID := util.RandomString(16)
+		accessToken = util.RandomString(16)
+		_, err = db.CreateDevice(ctx, localpart, &newDeviceID, accessToken, nil, "", "")
+		assert.NoError(t, err, "unable to create new device")
+
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		assert.NoError(t, err, "unable to get device by id")
+		assert.Equal(t, 3, len(devices))
+
+		err = db.RemoveDevices(ctx, localpart, deviceIDs)
+		assert.NoError(t, err, "unable to remove devices")
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		assert.NoError(t, err, "unable to get device by id")
+		assert.Equal(t, 1, len(devices))
+
+		deleted, err := db.RemoveAllDevices(ctx, localpart, "")
+		assert.NoError(t, err, "unable to remove all devices")
+		assert.Equal(t, 1, len(deleted))
+		assert.Equal(t, newDeviceID, deleted[0].ID)
 	})
 }
 
 func Test_KeyBackup(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	room := test.NewRoom(t, alice)
 
@@ -254,7 +291,6 @@ func Test_KeyBackup(t *testing.T) {
 }
 
 func Test_LoginToken(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
@@ -285,7 +321,6 @@ func Test_LoginToken(t *testing.T) {
 }
 
 func Test_OpenID(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	token := util.RandomString(24)
 
@@ -306,7 +341,6 @@ func Test_OpenID(t *testing.T) {
 }
 
 func Test_Profile(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
@@ -345,7 +379,6 @@ func Test_Profile(t *testing.T) {
 }
 
 func Test_Pusher(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
@@ -397,7 +430,6 @@ func Test_Pusher(t *testing.T) {
 }
 
 func Test_ThreePID(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
@@ -435,7 +467,6 @@ func Test_ThreePID(t *testing.T) {
 }
 
 func Test_Notification(t *testing.T) {
-	ctx := context.Background()
 	alice := test.NewUser()
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
