@@ -20,11 +20,13 @@ import (
 
 const loginTokenLifetime = time.Minute
 
+var openIDLifetimeMS = time.Minute.Milliseconds()
+
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserAPIDatabase(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, "localhost", bcrypt.MinCost, time.Minute.Milliseconds(), loginTokenLifetime, "_server")
+	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
@@ -171,9 +173,8 @@ func Test_Devices(t *testing.T) {
 func Test_KeyBackup(t *testing.T) {
 	ctx := context.Background()
 	alice := test.NewUser()
-	//localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
-	//assert.NoError(t, err)
 	room := test.NewRoom(t, alice)
+
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
@@ -277,5 +278,26 @@ func Test_LoginToken(t *testing.T) {
 		// check if the token was actually deleted
 		_, err = db.GetLoginTokenDataByToken(ctx, gotMetadata.Token)
 		assert.Error(t, err, "expected an error, but got none")
+	})
+}
+
+func Test_OpenID(t *testing.T) {
+	ctx := context.Background()
+	alice := test.NewUser()
+	token := util.RandomString(24)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
+		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
+		assert.NoError(t, err, "unable to create OpenID token")
+		assert.Equal(t, expiresAtMS, expires)
+
+		attributes, err := db.GetOpenIDTokenAttributes(ctx, token)
+		assert.NoError(t, err, "unable to get OpenID token attributes")
+		assert.Equal(t, alice.ID, attributes.UserID)
+		assert.Equal(t, expiresAtMS, attributes.ExpiresAtMS)
 	})
 }

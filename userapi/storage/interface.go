@@ -97,19 +97,23 @@ type LoginToken interface {
 	GetLoginTokenDataByToken(ctx context.Context, token string) (*api.LoginTokenData, error)
 }
 
+type OpenID interface {
+	CreateOpenIDToken(ctx context.Context, token, userID string) (exp int64, err error)
+	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
+}
+
 type Database interface {
 	Account
 	AccountData
 	Device
 	KeyBackup
 	LoginToken
+	OpenID
 	Profile
 	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
 	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
 	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
 	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
-	CreateOpenIDToken(ctx context.Context, token, localpart string) (exp int64, err error)
-	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 
 	InsertNotification(ctx context.Context, localpart, eventID string, pos int64, tweaks map[string]interface{}, n *api.Notification) error
 	DeleteNotificationsUpTo(ctx context.Context, localpart, roomID string, pos int64) (affected bool, err error)
