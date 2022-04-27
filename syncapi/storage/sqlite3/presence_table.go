@@ -71,7 +71,7 @@ const selectMaxPresenceSQL = "" +
 const selectPresenceAfter = "" +
 	" SELECT id, user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
-	" WHERE id > $1 ORDER BY last_active_ts DESC LIMIT $2"
+	" WHERE id > $1 ORDER BY id DESC, last_active_ts DESC LIMIT $2"
 
 type presenceStatements struct {
 	db                         *sql.DB
