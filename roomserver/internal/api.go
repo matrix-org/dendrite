@@ -166,8 +166,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 		URSAPI: r,
 	}
 	r.Admin = &perform.Admin{
-		DB:     r.DB,
-		Leaver: r.Leaver,
+		DB:      r.DB,
+		Cfg:     r.Cfg,
+		Inputer: r.Inputer,
+		Queryer: r.Queryer,
 	}
 
 	if err := r.Inputer.Start(); err != nil {
