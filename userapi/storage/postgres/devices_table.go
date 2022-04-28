@@ -75,7 +75,7 @@ const selectDeviceByTokenSQL = "" +
 	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
-	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
+	"SELECT display_name, last_seen_ts, ip FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
 	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2 ORDER BY last_seen_ts DESC"
@@ -215,14 +215,21 @@ func (s *devicesStatements) SelectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*api.Device, error) {
 	var dev api.Device
-	var displayName sql.NullString
+	var displayName, ip sql.NullString
+	var lastseenTS sql.NullInt64
 	stmt := s.selectDeviceByIDStmt
-	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&displayName)
+	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&displayName, &lastseenTS, &ip)
 	if err == nil {
 		dev.ID = deviceID
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		if displayName.Valid {
 			dev.DisplayName = displayName.String
+		}
+		if lastseenTS.Valid {
+			dev.LastSeenTS = lastseenTS.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
 		}
 	}
 	return &dev, err

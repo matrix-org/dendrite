@@ -180,12 +180,12 @@ func Test_Devices(t *testing.T) {
 		deviceWithID.DisplayName = newName
 		deviceWithID.LastSeenIP = "127.0.0.1"
 		deviceWithID.LastSeenTS = int64(gomatrixserverlib.AsTimestamp(time.Now().Truncate(time.Second)))
-		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		gotDevice, err = db.GetDeviceByID(ctx, localpart, deviceWithID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 2, len(devices))
-		assert.Equal(t, deviceWithID.DisplayName, devices[0].DisplayName)
-		assert.Equal(t, deviceWithID.LastSeenIP, devices[0].LastSeenIP)
-		truncatedTime := gomatrixserverlib.Timestamp(devices[0].LastSeenTS).Time().Truncate(time.Second)
+		assert.Equal(t, deviceWithID.DisplayName, gotDevice.DisplayName)
+		assert.Equal(t, deviceWithID.LastSeenIP, gotDevice.LastSeenIP)
+		truncatedTime := gomatrixserverlib.Timestamp(gotDevice.LastSeenTS).Time().Truncate(time.Second)
 		assert.Equal(t, gomatrixserverlib.Timestamp(deviceWithID.LastSeenTS), gomatrixserverlib.AsTimestamp(truncatedTime))
 
 		// create one more device and remove the devices step by step
