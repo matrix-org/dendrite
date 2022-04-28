@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -72,7 +73,8 @@ const selectMaxPresenceSQL = "" +
 const selectPresenceAfter = "" +
 	" SELECT id, user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
-	" WHERE id > $1 ORDER BY id DESC, last_active_ts DESC LIMIT $2"
+	" WHERE id > $1 AND last_active_ts > $2" +
+	" ORDER BY id DESC, last_active_ts DESC LIMIT $3"
 
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
@@ -148,8 +150,8 @@ func (p *presenceStatements) GetPresenceAfter(
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
-
-	rows, err := stmt.QueryContext(ctx, after, filter.Limit)
+	afterTS := gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute * 5))
+	rows, err := stmt.QueryContext(ctx, after, afterTS, filter.Limit)
 	if err != nil {
 		return nil, err
 	}
