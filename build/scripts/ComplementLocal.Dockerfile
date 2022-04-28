@@ -32,7 +32,7 @@ RUN echo '\
 ./generate-keys --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key \n\
 ./generate-config -server $SERVER_NAME --ci > dendrite.yaml \n\
 cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates \n\
-./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
+./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
 ' > run.sh && chmod +x run.sh
 
 

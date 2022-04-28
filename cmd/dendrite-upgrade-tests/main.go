@@ -83,7 +83,7 @@ do \n\
 done \n\
  \n\
 sed -i "s/server_name: localhost/server_name: ${SERVER_NAME}/g" dendrite.yaml \n\
-./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
+./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
 ' > run_dendrite.sh && chmod +x run_dendrite.sh
 
 ENV SERVER_NAME=localhost
