@@ -89,8 +89,8 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		if !c.RecaptchaEnabled && c.RegistrationSharedSecret == "" {
 			configErrs.Add("You have enabled open registration without any verification. This is a known vector for " +
 				"spam and abuse. If you would like to allow public registration, please consider adding captcha" +
-				" or token-based verification. Otherwise this check can be removed by setting the " +
-				"`enable_registration_without_verification` config option to `true`.")
+				" or token-based verification. Otherwise this check can be removed by adding the " +
+				"`--really-enable-open-registration` parameter.")
 		}
 	}
 }
