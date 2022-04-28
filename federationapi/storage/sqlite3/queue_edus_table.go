@@ -87,10 +87,11 @@ func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 		db: db,
 	}
 	_, err = db.Exec(queueEDUsSchema)
-	if err != nil {
-		return
-	}
-	return s, sqlutil.StatementList{
+	return s, err
+}
+
+func (s *queueEDUsStatements) Prepare() error {
+	return sqlutil.StatementList{
 		{&s.insertQueueEDUStmt, insertQueueEDUSQL},
 		{&s.selectQueueEDUStmt, selectQueueEDUSQL},
 		{&s.selectQueueEDUReferenceJSONCountStmt, selectQueueEDUReferenceJSONCountSQL},
@@ -98,7 +99,7 @@ func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 		{&s.selectQueueEDUServerNamesStmt, selectQueueServerNamesSQL},
 		{&s.selectExpiredEDUsStmt, selectExpiredEDUsSQL},
 		{&s.deleteExpiredEDUsStmt, deleteExpiredEDUsSQL},
-	}.Prepare(db)
+	}.Prepare(s.db)
 }
 
 func (s *queueEDUsStatements) InsertQueueEDU(

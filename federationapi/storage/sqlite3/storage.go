@@ -87,6 +87,9 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
+	if err = queueEDUs.Prepare(); err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                       d.db,
 		ServerName:               serverName,
