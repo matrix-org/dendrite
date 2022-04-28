@@ -132,11 +132,18 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
+			roomID, ok := vars["room_id"]
+			if !ok {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.MissingArgument("Expecting room_id argument."),
+				}
+			}
 			res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
 			rsAPI.PerformAdminEvacuateRoom(
 				req.Context(),
 				&roomserverAPI.PerformAdminEvacuateRoomRequest{
-					RoomID: vars["room_id"],
+					RoomID: roomID,
 				},
 				res,
 			)
