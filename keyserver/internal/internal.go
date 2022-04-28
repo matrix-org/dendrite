@@ -319,6 +319,9 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	// JSON, add the signatures and marshal it again, for some reason?
 
 	for targetUserID, masterKey := range res.MasterKeys {
+		if masterKey.Signatures == nil {
+			masterKey.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+		}
 		for targetKeyID := range masterKey.Keys {
 			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
 			if err != nil {
