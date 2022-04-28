@@ -17,11 +17,6 @@ var (
 	serverName = gomatrixserverlib.ServerName("example.com")
 	// space separated localpart+password -> account
 	lookup = make(map[string]*api.Account)
-	device = &api.Device{
-		AccessToken: "flibble",
-		DisplayName: "My Device",
-		ID:          "device_id_goes_here",
-	}
 )
 
 type fakeAccountDatabase struct {
