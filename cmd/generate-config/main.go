@@ -91,6 +91,7 @@ func main() {
 		cfg.UserAPI.BCryptCost = bcrypt.MinCost
 		cfg.Global.JetStream.InMemory = true
 		cfg.ClientAPI.RegistrationDisabled = false
+		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 		cfg.ClientAPI.RegistrationSharedSecret = "complement"
 		cfg.Global.Presence = config.PresenceOptions{
 			EnableInbound:  true,

@@ -19,7 +19,7 @@ type ClientAPI struct {
 	// Enable registration without captcha verification or shared secret. Note: this option is *not* recommended,
 	// as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
 	// unless `registration_disabled` is set to false.
-	RegistrationWithoutVerificationEnabled bool `yaml:"-"`
+	OpenRegistrationWithoutVerificationEnabled bool `yaml:"-"`
 
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
@@ -62,11 +62,7 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RecaptchaBypassSecret = ""
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = true
-	c.RegistrationWithoutVerificationEnabled = false
-	if generate {
-		c.RegistrationDisabled = false
-		c.RegistrationWithoutVerificationEnabled = true
-	}
+	c.OpenRegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
 }
 
@@ -85,12 +81,16 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.RateLimiting.Verify(configErrs)
 
 	// Ensure there is any spam counter measure when enabling registration
-	if !c.RegistrationDisabled && !c.RegistrationWithoutVerificationEnabled {
+	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled {
 		if !c.RecaptchaEnabled && c.RegistrationSharedSecret == "" {
-			configErrs.Add("You have enabled open registration without any verification. This is a known vector for " +
-				"spam and abuse. If you would like to allow public registration, please consider adding captcha" +
-				" or token-based verification. Otherwise this check can be removed by setting the " +
-				"`enable_registration_without_verification` config option to `true`.")
+			configErrs.Add(
+				"You have tried to enable open registration without any secondary verification methods " +
+					"(such as captcha or shared secret). By enabling open registration, you are SIGNIFICANTLY " +
+					"increasing the risk that your server will be used to send spam or abuse, and may result in " +
+					"your server being banned from some rooms. If you are ABSOLUTELY CERTAIN you want to do this, " +
+					"start Dendrite with the -really-enable-open-registration command line flag. Otherwise, you " +
+					"should set the registration_disabled option in your Dendrite config.",
+			)
 		}
 	}
 }
