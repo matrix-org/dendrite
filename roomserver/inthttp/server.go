@@ -118,7 +118,7 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(RoomserverPerformAdminEvacuateRoom,
+	internalAPIMux.Handle(RoomserverPerformAdminEvacuateRoomPath,
 		httputil.MakeInternalAPI("performAdminEvacuateRoom", func(req *http.Request) util.JSONResponse {
 			var request api.PerformAdminEvacuateRoomRequest
 			var response api.PerformAdminEvacuateRoomResponse

@@ -29,17 +29,17 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath        = "/roomserver/performInvite"
-	RoomserverPerformPeekPath          = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath        = "/roomserver/performUnpeek"
-	RoomserverPerformRoomUpgradePath   = "/roomserver/performRoomUpgrade"
-	RoomserverPerformJoinPath          = "/roomserver/performJoin"
-	RoomserverPerformLeavePath         = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath      = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath       = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath   = "/roomserver/performInboundPeek"
-	RoomserverPerformForgetPath        = "/roomserver/performForget"
-	RoomserverPerformAdminEvacuateRoom = "/roomserver/performAdminEvacuateRoom"
+	RoomserverPerformInvitePath            = "/roomserver/performInvite"
+	RoomserverPerformPeekPath              = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath            = "/roomserver/performUnpeek"
+	RoomserverPerformRoomUpgradePath       = "/roomserver/performRoomUpgrade"
+	RoomserverPerformJoinPath              = "/roomserver/performJoin"
+	RoomserverPerformLeavePath             = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath          = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath           = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath            = "/roomserver/performForget"
+	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -308,7 +308,7 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateRoom")
 	defer span.Finish()
 
-	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoom
+	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoomPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 	if err != nil {
 		res.Error = &api.PerformError{
