@@ -77,15 +77,8 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	}
 
 	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
-
 	latestReq := &api.QueryLatestEventsAndStateRequest{
 		RoomID: req.RoomID,
-		StateToFetch: []gomatrixserverlib.StateKeyTuple{
-			{
-				EventType: "m.room.create",
-				StateKey:  "",
-			},
-		},
 	}
 	latestRes := &api.QueryLatestEventsAndStateResponse{}
 	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
@@ -127,7 +120,16 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, time.Now(), nil, latestRes)
+		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		if err != nil {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
+			}
+			return
+		}
+
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
