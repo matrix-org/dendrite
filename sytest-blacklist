@@ -48,4 +48,3 @@ Notifications can be viewed with GET /notifications
 # More flakey
 
 If remote user leaves room we no longer receive device updates
-Local device key changes get to remote servers
