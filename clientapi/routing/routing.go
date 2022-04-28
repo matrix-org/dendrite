@@ -122,6 +122,19 @@ func Setup(
 
 	synapseAdminRouter.Handle("/admin/evacuateRoom",
 		httputil.MakeExternalAPI("admin_evacuate_room", func(req *http.Request) util.JSONResponse {
+			device, err := getSenderDevice(context.Background(), userAPI, cfg)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden("Couldn't determine if you were an admin or not."),
+				}
+			}
+			if device.AccountType != userapi.AccountTypeAdmin {
+				return util.JSONResponse{
+					Code: http.StatusForbidden,
+					JSON: jsonerror.Forbidden("This API can only be used by admin users."),
+				}
+			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
