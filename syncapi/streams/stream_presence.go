@@ -67,9 +67,8 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	// add newly joined rooms user presences
 	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
 	if len(newlyJoined) > 0 {
-		// TODO: This refreshes all lists and is quite expensive
-		// The notifier should update the lists itself
-		if err = p.notifier.Load(ctx, p.DB); err != nil {
+		// TODO: Check if this is working better than before.
+		if err = p.notifier.LoadRooms(ctx, p.DB, newlyJoined); err != nil {
 			req.Log.WithError(err).Error("unable to refresh notifier lists")
 			return from
 		}
