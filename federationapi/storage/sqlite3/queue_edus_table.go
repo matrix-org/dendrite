@@ -42,7 +42,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
 `
 
 const insertQueueEDUSQL = "" +
-	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid)" +
+	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid, expires_at)" +
 	" VALUES ($1, $2, $3, $4)"
 
 const deleteQueueEDUsSQL = "" +
