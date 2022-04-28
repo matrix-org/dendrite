@@ -61,9 +61,10 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RecaptchaEnabled = false
 	c.RecaptchaBypassSecret = ""
 	c.RecaptchaSiteVerifyAPI = ""
-	c.RegistrationDisabled = false
+	c.RegistrationDisabled = true
 	c.RegistrationWithoutVerificationEnabled = false
 	if generate {
+		c.RegistrationDisabled = false
 		c.RegistrationWithoutVerificationEnabled = true
 	}
 	c.RateLimiting.Defaults()
