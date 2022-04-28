@@ -121,14 +121,7 @@ func Setup(
 	}
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom",
-		httputil.MakeExternalAPI("admin_evacuate_room", func(req *http.Request) util.JSONResponse {
-			device, err := getSenderDevice(context.Background(), userAPI, cfg)
-			if err != nil {
-				return util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.Forbidden("Couldn't determine if you were an admin or not."),
-				}
-			}
+		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if device.AccountType != userapi.AccountTypeAdmin {
 				return util.JSONResponse{
 					Code: http.StatusForbidden,
