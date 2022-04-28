@@ -120,7 +120,7 @@ func Setup(
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
 
-	synapseAdminRouter.Handle("/admin/evacuateRoom",
+	dendriteAdminRouter.Handle("/admin/evacuateRoom",
 		httputil.MakeExternalAPI("admin_evacuate_room", func(req *http.Request) util.JSONResponse {
 			device, err := getSenderDevice(context.Background(), userAPI, cfg)
 			if err != nil {
