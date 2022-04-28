@@ -15,6 +15,8 @@
 package routing
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -24,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -490,4 +493,28 @@ func Setup(
 			return GetOpenIDUserInfo(req, userAPI)
 		}),
 	).Methods(http.MethodGet)
+}
+
+func ErrorIfLocalServerNotInRoom(
+	ctx context.Context,
+	rsAPI api.RoomserverInternalAPI,
+	roomID string,
+) *util.JSONResponse {
+	// Check if we think we're in this room. If we aren't then
+	// we won't waste CPU cycles serving this request.
+	joinedReq := &api.QueryServerJoinedToRoomRequest{
+		RoomID: roomID,
+	}
+	joinedRes := &api.QueryServerJoinedToRoomResponse{}
+	if err := rsAPI.QueryServerJoinedToRoom(ctx, joinedReq, joinedRes); err != nil {
+		res := util.ErrorResponse(err)
+		return &res
+	}
+	if !joinedRes.IsInRoom {
+		return &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(fmt.Sprintf("This server is not joined to room %s", roomID)),
+		}
+	}
+	return nil
 }
