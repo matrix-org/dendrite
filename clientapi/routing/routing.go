@@ -48,7 +48,8 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
+	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
+	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.UserInternalAPI,
@@ -118,6 +119,29 @@ func Setup(
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
+
+	synapseAdminRouter.Handle("/admin/evacuateRoom",
+		httputil.MakeExternalAPI("admin_evacuate_room", func(req *http.Request) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
+			rsAPI.PerformAdminEvacuateRoom(
+				req.Context(),
+				&roomserverAPI.PerformAdminEvacuateRoomRequest{
+					RoomID: vars["room_id"],
+				},
+				res,
+			)
+			if err := res.Error; err != nil {
+				return err.JSONResponse()
+			}
+			return util.JSONResponse{
+				Code: 200,
+			}
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {

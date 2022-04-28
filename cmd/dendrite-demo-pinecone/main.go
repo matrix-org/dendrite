@@ -193,6 +193,7 @@ func main() {
 		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
+		base.DendriteAdminMux,
 	)
 
 	wsUpgrader := websocket.Upgrader{

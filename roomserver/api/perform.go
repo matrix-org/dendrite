@@ -214,3 +214,11 @@ type PerformRoomUpgradeResponse struct {
 	NewRoomID string
 	Error     *PerformError
 }
+
+type PerformAdminEvacuateRoomRequest struct {
+	RoomID string `json:"room_id"`
+}
+
+type PerformAdminEvacuateRoomResponse struct {
+	Error *PerformError
+}
