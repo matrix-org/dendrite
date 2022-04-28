@@ -27,10 +27,9 @@ import (
 
 // expireEDUTypes contains EDUs which can/should be expired after a given time
 // if the target server isn't reachable for some reason.
-var expireEDUTypes = map[string]struct{}{
-	gomatrixserverlib.MTyping:   {},
-	gomatrixserverlib.MPresence: {},
-	gomatrixserverlib.MReceipt:  {},
+var expireEDUTypes = map[string]time.Duration{
+	gomatrixserverlib.MTyping:   time.Minute,
+	gomatrixserverlib.MPresence: time.Minute * 10,
 }
 
 // AssociateEDUWithDestination creates an association that the
@@ -43,9 +42,9 @@ func (d *Database) AssociateEDUWithDestination(
 	eduType string,
 ) error {
 	var expiresAt *gomatrixserverlib.Timestamp
-	if _, ok := expireEDUTypes[eduType]; ok {
-		// Keep EDUs for at least one hour before deleting them
-		ts := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour))
+	if duration, ok := expireEDUTypes[eduType]; ok {
+		// Keep EDUs for at least x minutes before deleting them
+		ts := gomatrixserverlib.AsTimestamp(time.Now().Add(duration))
 		expiresAt = &ts
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
