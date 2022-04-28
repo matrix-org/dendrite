@@ -127,7 +127,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, nil, time.Now(), nil, latestRes)
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, time.Now(), nil, latestRes)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
