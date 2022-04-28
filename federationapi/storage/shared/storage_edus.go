@@ -20,9 +20,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 )
+
+// expireEDUTypes contains EDUs which can/should be expired after a given time
+// if the target server isn't reachable for some reason.
+var expireEDUTypes = map[string]struct{}{
+	gomatrixserverlib.MTyping:   {},
+	gomatrixserverlib.MPresence: {},
+	gomatrixserverlib.MReceipt:  {},
+}
 
 // AssociateEDUWithDestination creates an association that the
 // destination queues will use to determine which JSON blobs to send
@@ -33,6 +42,12 @@ func (d *Database) AssociateEDUWithDestination(
 	receipt *Receipt,
 	eduType string,
 ) error {
+	var expiresAt *gomatrixserverlib.Timestamp
+	if _, ok := expireEDUTypes[eduType]; ok {
+		// Keep EDUs for at least one hour before deleting them
+		ts := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour))
+		expiresAt = &ts
+	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationQueueEDUs.InsertQueueEDU(
 			ctx,         // context
@@ -40,6 +55,7 @@ func (d *Database) AssociateEDUWithDestination(
 			eduType,     // EDU type for coalescing
 			serverName,  // destination server name
 			receipt.nid, // NID from the federationapi_queue_json table
+			expiresAt,   // The timestamp this EDU will expire
 		); err != nil {
 			return fmt.Errorf("InsertQueueEDU: %w", err)
 		}
@@ -149,4 +165,24 @@ func (d *Database) GetPendingEDUServerNames(
 	ctx context.Context,
 ) ([]gomatrixserverlib.ServerName, error) {
 	return d.FederationQueueEDUs.SelectQueueEDUServerNames(ctx, nil)
+}
+
+// DeleteExpiredEDUs deletes expired EDUs
+func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		expiredBefore := gomatrixserverlib.AsTimestamp(time.Now())
+		jsonNIDs, err := d.FederationQueueEDUs.SelectExpiredEDUs(ctx, txn, expiredBefore)
+		if err != nil {
+			return err
+		}
+		if len(jsonNIDs) == 0 {
+			return nil
+		}
+
+		if err = d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, jsonNIDs); err != nil {
+			return err
+		}
+
+		return d.FederationQueueEDUs.DeleteExpiredEDUs(ctx, txn, expiredBefore)
+	})
 }

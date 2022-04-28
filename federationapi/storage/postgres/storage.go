@@ -84,6 +84,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadRemoveRoomsTable(m)
+	deltas.LoadAddExpiresAt(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}

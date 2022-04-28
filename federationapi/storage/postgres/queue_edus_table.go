@@ -31,7 +31,9 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_edus (
     -- The domain part of the user ID the EDU event is for.
 	server_name TEXT NOT NULL,
 	-- The JSON NID from the federationsender_queue_edus_json table.
-	json_nid BIGINT NOT NULL
+	json_nid BIGINT NOT NULL,
+	-- The expiry time of this edu, if any.
+	expires_at BIGINT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
@@ -40,7 +42,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
 
 const insertQueueEDUSQL = "" +
 	"INSERT INTO federationsender_queue_edus (edu_type, server_name, json_nid)" +
-	" VALUES ($1, $2, $3)"
+	" VALUES ($1, $2, $3, $4)"
 
 const deleteQueueEDUSQL = "" +
 	"DELETE FROM federationsender_queue_edus WHERE server_name = $1 AND json_nid = ANY($2)"
@@ -61,6 +63,12 @@ const selectQueueEDUCountSQL = "" +
 const selectQueueServerNamesSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_queue_edus"
 
+const selectExpiredEDUsSQL = "" +
+	"SELECT DISTINCT json_nid FROM federationsender_queue_edus WHERE expires_at IS NOT NULL AND expires_at <= $1"
+
+const deleteExpiredEDUsSQL = "" +
+	"DELETE FROM federationsender_queue_edus WHERE expires_at IS NOT NULL AND expires_at <= $1"
+
 type queueEDUsStatements struct {
 	db                                   *sql.DB
 	insertQueueEDUStmt                   *sql.Stmt
@@ -69,6 +77,8 @@ type queueEDUsStatements struct {
 	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
 	selectQueueEDUCountStmt              *sql.Stmt
 	selectQueueEDUServerNamesStmt        *sql.Stmt
+	selectExpiredEDUsStmt                *sql.Stmt
+	deleteExpiredEDUsStmt                *sql.Stmt
 }
 
 func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
@@ -79,25 +89,18 @@ func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 	if err != nil {
 		return
 	}
-	if s.insertQueueEDUStmt, err = s.db.Prepare(insertQueueEDUSQL); err != nil {
-		return
-	}
 	if s.deleteQueueEDUStmt, err = s.db.Prepare(deleteQueueEDUSQL); err != nil {
 		return
 	}
-	if s.selectQueueEDUStmt, err = s.db.Prepare(selectQueueEDUSQL); err != nil {
-		return
-	}
-	if s.selectQueueEDUReferenceJSONCountStmt, err = s.db.Prepare(selectQueueEDUReferenceJSONCountSQL); err != nil {
-		return
-	}
-	if s.selectQueueEDUCountStmt, err = s.db.Prepare(selectQueueEDUCountSQL); err != nil {
-		return
-	}
-	if s.selectQueueEDUServerNamesStmt, err = s.db.Prepare(selectQueueServerNamesSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertQueueEDUStmt, insertQueueEDUSQL},
+		{&s.selectQueueEDUStmt, selectQueueEDUSQL},
+		{&s.selectQueueEDUReferenceJSONCountStmt, selectQueueEDUReferenceJSONCountSQL},
+		{&s.selectQueueEDUCountStmt, selectQueueEDUCountSQL},
+		{&s.selectQueueEDUServerNamesStmt, selectQueueServerNamesSQL},
+		{&s.selectExpiredEDUsStmt, selectExpiredEDUsSQL},
+		{&s.deleteExpiredEDUsStmt, deleteExpiredEDUsSQL},
+	}.Prepare(db)
 }
 
 func (s *queueEDUsStatements) InsertQueueEDU(
@@ -106,6 +109,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	eduType string,
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
+	expiresAt *gomatrixserverlib.Timestamp,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
 	_, err := stmt.ExecContext(
@@ -113,6 +117,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 		eduType,    // the EDU type
 		serverName, // destination server name
 		nid,        // JSON blob NID
+		expiresAt,  // timestamp of expiry
 	)
 	return err
 }
@@ -146,7 +151,7 @@ func (s *queueEDUsStatements) SelectQueueEDUs(
 		}
 		result = append(result, nid)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
@@ -195,4 +200,34 @@ func (s *queueEDUsStatements) SelectQueueEDUServerNames(
 	}
 
 	return result, rows.Err()
+}
+
+func (s *queueEDUsStatements) SelectExpiredEDUs(
+	ctx context.Context, txn *sql.Tx,
+	expiredBefore gomatrixserverlib.Timestamp,
+) ([]int64, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectExpiredEDUsStmt)
+	rows, err := stmt.QueryContext(ctx, expiredBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectExpiredEDUs: rows.close() failed")
+	var result []int64
+	var nid int64
+	for rows.Next() {
+		if err = rows.Scan(&nid); err != nil {
+			return nil, err
+		}
+		result = append(result, nid)
+	}
+	return result, rows.Err()
+}
+
+func (s *queueEDUsStatements) DeleteExpiredEDUs(
+	ctx context.Context, txn *sql.Tx,
+	expiredBefore gomatrixserverlib.Timestamp,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.selectExpiredEDUsStmt)
+	_, err := stmt.ExecContext(ctx, expiredBefore)
+	return err
 }
