@@ -45,6 +45,12 @@ func GetMissingEvents(
 		}
 	}
 
+	// If we don't think we belong to this room then don't waste the effort
+	// responding to expensive requests for it.
+	if err := ErrorIfLocalServerNotInRoom(httpReq.Context(), rsAPI, roomID); err != nil {
+		return *err
+	}
+
 	var eventsResponse api.QueryMissingEventsResponse
 	if err := rsAPI.QueryMissingEvents(
 		httpReq.Context(), &api.QueryMissingEventsRequest{
