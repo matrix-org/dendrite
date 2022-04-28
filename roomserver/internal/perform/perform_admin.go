@@ -90,6 +90,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		return
 	}
 
+	prevEvents := latestRes.LatestEvents
 	for _, memberEvent := range memberEvents {
 		if memberEvent.StateKey() == nil {
 			continue
@@ -107,10 +108,11 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 		stateKey := *memberEvent.StateKey()
 		fledglingEvent := &gomatrixserverlib.EventBuilder{
-			RoomID:   req.RoomID,
-			Type:     gomatrixserverlib.MRoomMember,
-			StateKey: &stateKey,
-			Sender:   stateKey,
+			RoomID:     req.RoomID,
+			Type:       gomatrixserverlib.MRoomMember,
+			StateKey:   &stateKey,
+			Sender:     stateKey,
+			PrevEvents: prevEvents,
 		}
 
 		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
@@ -146,6 +148,9 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			SendAsServer: string(r.Cfg.Matrix.ServerName),
 		})
 		res.Affected = append(res.Affected, stateKey)
+		prevEvents = []gomatrixserverlib.EventReference{
+			event.EventReference(),
+		}
 	}
 
 	inputReq := &api.InputRoomEventsRequest{
