@@ -25,8 +25,9 @@ import (
 )
 
 var (
-	configPath = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
-	version    = flag.Bool("version", false, "Shows the current version and exits immediately.")
+	configPath                            = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
+	version                               = flag.Bool("version", false, "Shows the current version and exits immediately.")
+	enableRegistrationWithoutVerification = flag.Bool("really-enable-open-registration", false, "This allows open registration without verification (captcha, shared secret etc). (NOT RECOMMENDED)")
 )
 
 // ParseFlags parses the commandline flags and uses them to create a config.
@@ -46,6 +47,10 @@ func ParseFlags(monolith bool) *config.Dendrite {
 
 	if err != nil {
 		logrus.Fatalf("Invalid config file: %s", err)
+	}
+
+	if *enableRegistrationWithoutVerification {
+		cfg.ClientAPI.RegistrationWithoutVerificationEnabled = true
 	}
 
 	return cfg

@@ -19,7 +19,7 @@ type ClientAPI struct {
 	// Enable registration without captcha verification or shared secret. Note: this option is *not* recommended,
 	// as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
 	// unless `registration_disabled` is set to false.
-	RegistrationWithoutVerificationEnabled bool `yaml:"enable_registration_without_verification"`
+	RegistrationWithoutVerificationEnabled bool `yaml:"-"`
 
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
@@ -63,6 +63,9 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = false
 	c.RegistrationWithoutVerificationEnabled = false
+	if generate {
+		c.RegistrationWithoutVerificationEnabled = true
+	}
 	c.RateLimiting.Defaults()
 }
 
