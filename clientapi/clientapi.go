@@ -36,6 +36,7 @@ func AddPublicRoutes(
 	process *process.ProcessContext,
 	router *mux.Router,
 	synapseAdminRouter *mux.Router,
+	dendriteAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
@@ -62,7 +63,8 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, synapseAdminRouter, cfg, rsAPI, asAPI,
+		router, synapseAdminRouter, dendriteAdminRouter,
+		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg, natsClient,
