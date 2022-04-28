@@ -16,9 +16,9 @@ type ClientAPI struct {
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
 
-	// Enable registration without captcha verification or shared secret. Note: this option is *not* recommended,
-	// as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
-	// unless `registration_disabled` is set to false.
+	// Enable registration without captcha verification or shared secret.
+	// This option is populated by the -really-enable-open-registration
+	// command line parameter as it is not recommended.
 	OpenRegistrationWithoutVerificationEnabled bool `yaml:"-"`
 
 	// If set, allows registration by anyone who also has the shared
