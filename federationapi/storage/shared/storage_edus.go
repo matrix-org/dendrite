@@ -178,6 +178,9 @@ func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 		if len(jsonNIDs) == 0 {
 			return nil
 		}
+		for i := range jsonNIDs {
+			d.Cache.EvictFederationQueuedEDU(jsonNIDs[i])
+		}
 
 		if err = d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, jsonNIDs); err != nil {
 			return err
