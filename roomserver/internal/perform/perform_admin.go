@@ -77,6 +77,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	}
 
 	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
+	res.Affected = make([]string, 0, len(memberEvents))
 	latestReq := &api.QueryLatestEventsAndStateRequest{
 		RoomID: req.RoomID,
 	}
@@ -144,6 +145,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			Origin:       r.Cfg.Matrix.ServerName,
 			SendAsServer: string(r.Cfg.Matrix.ServerName),
 		})
+		res.Affected = append(res.Affected, stateKey)
 	}
 
 	inputReq := &api.InputRoomEventsRequest{

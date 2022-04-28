@@ -220,5 +220,6 @@ type PerformAdminEvacuateRoomRequest struct {
 }
 
 type PerformAdminEvacuateRoomResponse struct {
-	Error *PerformError
+	Affected []string `json:"affected"`
+	Error    *PerformError
 }

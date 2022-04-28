@@ -152,6 +152,9 @@ func Setup(
 			}
 			return util.JSONResponse{
 				Code: 200,
+				JSON: map[string]interface{}{
+					"affected": res.Affected,
+				},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
