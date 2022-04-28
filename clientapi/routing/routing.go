@@ -120,7 +120,7 @@ func Setup(
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
 
-	dendriteAdminRouter.Handle("/admin/evacuateRoom",
+	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
 		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if device.AccountType != userapi.AccountTypeAdmin {
 				return util.JSONResponse{
@@ -132,11 +132,11 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			roomID, ok := vars["room_id"]
+			roomID, ok := vars["roomID"]
 			if !ok {
 				return util.JSONResponse{
 					Code: http.StatusBadRequest,
-					JSON: jsonerror.MissingArgument("Expecting room_id argument."),
+					JSON: jsonerror.MissingArgument("Expecting room ID."),
 				}
 			}
 			res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
