@@ -94,7 +94,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		}
 	}
 
-	lastPos := to
+	lastPos := from
 	for _, presence := range presences {
 		if presence == nil {
 			continue
