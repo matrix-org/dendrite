@@ -140,7 +140,12 @@ client_api:
 
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
-  registration_disabled: false
+  registration_disabled: true
+
+  # Enable registration without captcha verification or shared secret. Note: this option is *not* recommended,
+  # as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+  # unless `registration_disabled` is set to false.
+  enable_registration_without_verification: false
 
   # If set, allows registration by anyone who knows the shared secret, regardless of
   # whether registration is otherwise disabled.

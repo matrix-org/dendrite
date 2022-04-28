@@ -15,6 +15,12 @@ type ClientAPI struct {
 	// If set disables new users from registering (except via shared
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
+
+	// Enable registration without captcha verification or shared secret. Note: this option is *not* recommended,
+	// as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+	// unless `registration_disabled` is set to false.
+	RegistrationWithoutVerificationEnabled bool `yaml:"enable_registration_without_verification"`
+
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
 	RegistrationSharedSecret string `yaml:"registration_shared_secret"`
@@ -56,6 +62,7 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RecaptchaBypassSecret = ""
 	c.RecaptchaSiteVerifyAPI = ""
 	c.RegistrationDisabled = false
+	c.RegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
 }
 
@@ -72,6 +79,16 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	}
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
+
+	// Ensure there is any spam counter measure when enabling registration
+	if !c.RegistrationDisabled && !c.RegistrationWithoutVerificationEnabled {
+		if !c.RecaptchaEnabled && c.RegistrationSharedSecret == "" {
+			configErrs.Add("You have enabled open registration without any verification. This is a known vector for " +
+				"spam and abuse. If you would like to allow public registration, please consider adding captcha" +
+				" or token-based verification. Otherwise this check can be removed by setting the " +
+				"`enable_registration_without_verification` config option to `true`.")
+		}
+	}
 }
 
 type TURN struct {
