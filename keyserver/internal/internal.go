@@ -637,7 +637,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 		for _, existingKey := range existingKeys {
 			for _, newKey := range req.DeviceKeys {
 				switch {
-				case existingKey.UserID != newKey.DeviceID:
+				case existingKey.UserID != newKey.UserID:
 					continue
 				case existingKey.DeviceID != newKey.DeviceID:
 					continue
