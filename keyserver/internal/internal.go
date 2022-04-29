@@ -634,7 +634,6 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 	var keysToStore []api.DeviceMessage
 
 	if req.OnlyDisplayNameUpdates {
-		keysToStore = append(keysToStore, existingKeys...)
 		for _, existingKey := range existingKeys {
 			for _, newKey := range req.DeviceKeys {
 				switch {
