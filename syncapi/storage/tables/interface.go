@@ -102,6 +102,8 @@ type CurrentRoomState interface {
 	SelectRoomIDsWithAnyMembership(ctx context.Context, txn *sql.Tx, userID string) (map[string]string, error)
 	// SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
 	SelectJoinedUsers(ctx context.Context) (map[string][]string, error)
+	// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
+	SelectJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
 }
 
 // BackwardsExtremities keeps track of backwards extremities for a room.
@@ -188,5 +190,5 @@ type Presence interface {
 	UpsertPresence(ctx context.Context, txn *sql.Tx, userID string, statusMsg *string, presence types.Presence, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (pos types.StreamPosition, err error)
 	GetPresenceForUser(ctx context.Context, txn *sql.Tx, userID string) (presence *types.PresenceInternal, err error)
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
-	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition) (presences map[string]*types.PresenceInternal, err error)
+	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (presences map[string]*types.PresenceInternal, err error)
 }

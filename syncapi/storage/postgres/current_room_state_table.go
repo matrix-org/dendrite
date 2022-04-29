@@ -93,6 +93,9 @@ const selectCurrentStateSQL = "" +
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+const selectJoinedUsersInRoomSQL = "" +
+	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = ANY($1)"
+
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
@@ -112,6 +115,7 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectCurrentStateStmt             *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
+	selectJoinedUsersInRoomStmt        *sql.Stmt
 	selectEventsWithEventIDsStmt       *sql.Stmt
 	selectStateEventStmt               *sql.Stmt
 }
@@ -143,6 +147,9 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
 		return nil, err
 	}
+	if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
+		return nil, err
+	}
 	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
 		return nil, err
 	}
@@ -163,9 +170,32 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
 
 	result := make(map[string][]string)
+	var roomID string
+	var userID string
 	for rows.Next() {
-		var roomID string
-		var userID string
+		if err := rows.Scan(&roomID, &userID); err != nil {
+			return nil, err
+		}
+		users := result[roomID]
+		users = append(users, userID)
+		result[roomID] = users
+	}
+	return result, rows.Err()
+}
+
+// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
+func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
+	ctx context.Context, roomIDs []string,
+) (map[string][]string, error) {
+	rows, err := s.selectJoinedUsersInRoomStmt.QueryContext(ctx, pq.StringArray(roomIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
+
+	result := make(map[string][]string)
+	var userID, roomID string
+	for rows.Next() {
 		if err := rows.Scan(&roomID, &userID); err != nil {
 			return nil, err
 		}

@@ -314,6 +314,7 @@ func (m *DendriteMonolith) Start() {
 		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
+		base.DendriteAdminMux,
 	)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()

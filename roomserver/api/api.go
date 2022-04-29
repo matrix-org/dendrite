@@ -66,6 +66,12 @@ type RoomserverInternalAPI interface {
 		res *PerformInboundPeekResponse,
 	) error
 
+	PerformAdminEvacuateRoom(
+		ctx context.Context,
+		req *PerformAdminEvacuateRoomRequest,
+		res *PerformAdminEvacuateRoomResponse,
+	)
+
 	QueryPublishedRooms(
 		ctx context.Context,
 		req *QueryPublishedRoomsRequest,

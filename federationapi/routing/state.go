@@ -101,6 +101,12 @@ func getState(
 	roomID string,
 	eventID string,
 ) (stateEvents, authEvents []*gomatrixserverlib.HeaderedEvent, errRes *util.JSONResponse) {
+	// If we don't think we belong to this room then don't waste the effort
+	// responding to expensive requests for it.
+	if err := ErrorIfLocalServerNotInRoom(ctx, rsAPI, roomID); err != nil {
+		return nil, nil, err
+	}
+
 	event, resErr := fetchEvent(ctx, rsAPI, eventID)
 	if resErr != nil {
 		return nil, nil, resErr
