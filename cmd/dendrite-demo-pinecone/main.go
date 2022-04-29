@@ -140,6 +140,8 @@ func main() {
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+	cfg.ClientAPI.RegistrationDisabled = false
+	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}
