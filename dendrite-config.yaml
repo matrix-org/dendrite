@@ -159,7 +159,7 @@ client_api:
 
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
-  registration_disabled: false
+  registration_disabled: true
 
   # Prevents new guest accounts from being created. Guest registration is also
   # disabled implicitly by setting 'registration_disabled' above.

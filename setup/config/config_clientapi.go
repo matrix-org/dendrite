@@ -17,6 +17,12 @@ type ClientAPI struct {
 	// If set disables new users from registering (except via shared
 	// secrets)
 	RegistrationDisabled bool `yaml:"registration_disabled"`
+
+	// Enable registration without captcha verification or shared secret.
+	// This option is populated by the -really-enable-open-registration
+	// command line parameter as it is not recommended.
+	OpenRegistrationWithoutVerificationEnabled bool `yaml:"-"`
+
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
 	RegistrationSharedSecret string `yaml:"registration_shared_secret"`
@@ -63,7 +69,8 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RecaptchaEnabled = false
 	c.RecaptchaBypassSecret = ""
 	c.RecaptchaSiteVerifyAPI = ""
-	c.RegistrationDisabled = false
+	c.RegistrationDisabled = true
+	c.OpenRegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
 }
 
@@ -80,6 +87,20 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	}
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
+
+	// Ensure there is any spam counter measure when enabling registration
+	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled {
+		if !c.RecaptchaEnabled {
+			configErrs.Add(
+				"You have tried to enable open registration without any secondary verification methods " +
+					"(such as reCAPTCHA). By enabling open registration, you are SIGNIFICANTLY " +
+					"increasing the risk that your server will be used to send spam or abuse, and may result in " +
+					"your server being banned from some rooms. If you are ABSOLUTELY CERTAIN you want to do this, " +
+					"start Dendrite with the -really-enable-open-registration command line flag. Otherwise, you " +
+					"should set the registration_disabled option in your Dendrite config.",
+			)
+		}
+	}
 }
 
 type TURN struct {

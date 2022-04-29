@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	userApi "github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 )
@@ -38,7 +38,7 @@ type LoginPublicKeyHandler interface {
 
 // LoginTypePublicKey implements https://matrix.org/docs/spec/client_server/..... (to be spec'ed)
 type LoginTypePublicKey struct {
-	UserAPI         userApi.UserRegisterAPI
+	UserAPI         userapi.UserRegisterAPI
 	UserInteractive *UserInteractive
 	Config          *config.ClientAPI
 }

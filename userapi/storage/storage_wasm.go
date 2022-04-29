@@ -23,7 +23,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func NewDatabase(
+func NewUserAPIDatabase(
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	bcryptCost int,

@@ -65,7 +65,7 @@ const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
 
 const selectNewNumericLocalpartSQL = "" +
-	"SELECT COUNT(localpart) FROM account_accounts"
+	"SELECT COALESCE(MAX(CAST(localpart AS INT)), 0) FROM account_accounts WHERE CAST(localpart AS INT) <> 0"
 
 type accountsStatements struct {
 	db                            *sql.DB
@@ -121,6 +121,7 @@ func (s *accountsStatements) InsertAccount(
 		UserID:       userutil.MakeUserID(localpart, s.serverName),
 		ServerName:   s.serverName,
 		AppServiceID: appserviceID,
+		AccountType:  accountType,
 	}, nil
 }
 
@@ -177,5 +178,8 @@ func (s *accountsStatements) SelectNewNumericLocalpart(
 		stmt = sqlutil.TxStmt(txn, stmt)
 	}
 	err = stmt.QueryRowContext(ctx).Scan(&id)
-	return
+	if err == sql.ErrNoRows {
+		return 1, nil
+	}
+	return id + 1, err
 }

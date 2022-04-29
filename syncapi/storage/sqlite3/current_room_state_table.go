@@ -77,6 +77,9 @@ const selectCurrentStateSQL = "" +
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+const selectJoinedUsersInRoomSQL = "" +
+	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id IN ($1)"
+
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
@@ -97,7 +100,8 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt    *sql.Stmt
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
-	selectStateEventStmt               *sql.Stmt
+	//selectJoinedUsersInRoomStmt        *sql.Stmt - prepared at runtime due to variadic
+	selectStateEventStmt *sql.Stmt
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
@@ -127,13 +131,16 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
 		return nil, err
 	}
+	//if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
+	//	return nil, err
+	//}
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-// JoinedMemberLists returns a map of room ID to a list of joined user IDs.
+// SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
 func (s *currentRoomStateStatements) SelectJoinedUsers(
 	ctx context.Context,
 ) (map[string][]string, error) {
@@ -144,9 +151,9 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
 
 	result := make(map[string][]string)
+	var roomID string
+	var userID string
 	for rows.Next() {
-		var roomID string
-		var userID string
 		if err := rows.Scan(&roomID, &userID); err != nil {
 			return nil, err
 		}
@@ -155,6 +162,40 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 		result[roomID] = users
 	}
 	return result, nil
+}
+
+// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
+func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
+	ctx context.Context, roomIDs []string,
+) (map[string][]string, error) {
+	query := strings.Replace(selectJoinedUsersInRoomSQL, "($1)", sqlutil.QueryVariadic(len(roomIDs)), 1)
+	params := make([]interface{}, 0, len(roomIDs))
+	for _, roomID := range roomIDs {
+		params = append(params, roomID)
+	}
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		return nil, fmt.Errorf("SelectJoinedUsersInRoom s.db.Prepare: %w", err)
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectJoinedUsersInRoom: stmt.close() failed")
+
+	rows, err := stmt.QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedUsersInRoom: rows.close() failed")
+
+	result := make(map[string][]string)
+	var userID, roomID string
+	for rows.Next() {
+		if err := rows.Scan(&roomID, &userID); err != nil {
+			return nil, err
+		}
+		users := result[roomID]
+		users = append(users, userID)
+		result[roomID] = users
+	}
+	return result, rows.Err()
 }
 
 // SelectRoomIDsWithMembership returns the list of room IDs which have the given user in the given membership state.

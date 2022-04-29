@@ -259,6 +259,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+	cfg.ClientAPI.RegistrationDisabled = false
+	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -314,6 +316,7 @@ func (m *DendriteMonolith) Start() {
 		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
+		base.DendriteAdminMux,
 	)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()

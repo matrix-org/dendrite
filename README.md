@@ -6,11 +6,11 @@ It intends to provide an **efficient**, **reliable** and **scalable** alternativ
 
 - Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
 - Reliable: Implements the Matrix specification as written, using the
-   [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
-   a [brand new Go test suite](https://github.com/matrix-org/complement).
+  [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
+  a [brand new Go test suite](https://github.com/matrix-org/complement).
 - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
 
-As of October 2020, Dendrite has now entered **beta** which means:
+As of October 2020 (current [progress below](#progress)), Dendrite has now entered **beta** which means:
 
 - Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
 - Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
@@ -21,7 +21,7 @@ This does not mean:
 
 - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
 - All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'. In particular,
-   presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
+  presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
 - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
@@ -74,11 +74,15 @@ $ cp dendrite-config.yaml dendrite.yaml
 
 # Build and run the server:
 $ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+
+# Create an user account (add -admin for an admin user).
+# Specify the localpart only, e.g. 'alice' for '@alice:domain.com'
+$ ./bin/create-account --config dendrite.yaml -username alice
 ```
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
-## Progress
+## <a id="progress"></a> Progress
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it

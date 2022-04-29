@@ -35,6 +35,16 @@ func JetStreamConsumer(
 	}
 	go func() {
 		for {
+			// If the parent context has given up then there's no point in
+			// carrying on doing anything, so stop the listener.
+			select {
+			case <-ctx.Done():
+				if err := sub.Unsubscribe(); err != nil {
+					logrus.WithContext(ctx).Warnf("Failed to unsubscribe %q", durable)
+				}
+				return
+			default:
+			}
 			// The context behaviour here is surprising — we supply a context
 			// so that we can interrupt the fetch if we want, but NATS will still
 			// enforce its own deadline (roughly 5 seconds by default). Therefore
@@ -65,18 +75,18 @@ func JetStreamConsumer(
 				continue
 			}
 			msg := msgs[0]
-			if err = msg.InProgress(); err != nil {
+			if err = msg.InProgress(nats.Context(ctx)); err != nil {
 				logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.InProgress: %w", err))
 				sentry.CaptureException(err)
 				continue
 			}
 			if f(ctx, msg) {
-				if err = msg.AckSync(); err != nil {
+				if err = msg.AckSync(nats.Context(ctx)); err != nil {
 					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.AckSync: %w", err))
 					sentry.CaptureException(err)
 				}
 			} else {
-				if err = msg.Nak(); err != nil {
+				if err = msg.Nak(nats.Context(ctx)); err != nil {
 					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.Nak: %w", err))
 					sentry.CaptureException(err)
 				}

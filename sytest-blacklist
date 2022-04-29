@@ -1,7 +1,3 @@
-# Blacklisted until matrix-org/dendrite#862 is reverted due to Riot bug
-
-Latest account data appears in v2 /sync
-
 # Relies on a rejected PL event which will never be accepted into the DAG
 
 # Caused by <https://github.com/matrix-org/sytest/pull/911>
@@ -52,4 +48,3 @@ Notifications can be viewed with GET /notifications
 # More flakey
 
 If remote user leaves room we no longer receive device updates
-Local device key changes get to remote servers

@@ -16,7 +16,6 @@ package streams
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"sync"
 
@@ -54,7 +53,8 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
-	presences, err := p.DB.PresenceAfter(ctx, from)
+	// We pull out a larger number than the filter asks for, since we're filtering out events later
+	presences, err := p.DB.PresenceAfter(ctx, from, gomatrixserverlib.EventFilter{Limit: 1000})
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
 		return from
@@ -67,12 +67,12 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	// add newly joined rooms user presences
 	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
 	if len(newlyJoined) > 0 {
-		// TODO: This refreshes all lists and is quite expensive
-		// The notifier should update the lists itself
-		if err = p.notifier.Load(ctx, p.DB); err != nil {
+		// TODO: Check if this is working better than before.
+		if err = p.notifier.LoadRooms(ctx, p.DB, newlyJoined); err != nil {
 			req.Log.WithError(err).Error("unable to refresh notifier lists")
 			return from
 		}
+	NewlyJoinedLoop:
 		for _, roomID := range newlyJoined {
 			roomUsers := p.notifier.JoinedUsers(roomID)
 			for i := range roomUsers {
@@ -80,21 +80,25 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				if _, ok := presences[roomUsers[i]]; ok {
 					continue
 				}
+				// Bear in mind that this might return nil, but at least populating
+				// a nil means that there's a map entry so we won't repeat this call.
 				presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
 				if err != nil {
-					if err == sql.ErrNoRows {
-						continue
-					}
 					req.Log.WithError(err).Error("unable to query presence for user")
 					return from
+				}
+				if len(presences) > req.Filter.Presence.Limit {
+					break NewlyJoinedLoop
 				}
 			}
 		}
 	}
 
-	lastPos := to
-	for i := range presences {
-		presence := presences[i]
+	lastPos := from
+	for _, presence := range presences {
+		if presence == nil {
+			continue
+		}
 		// Ignore users we don't share a room with
 		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
 			continue
@@ -135,7 +139,14 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		if presence.StreamPos > lastPos {
 			lastPos = presence.StreamPos
 		}
+		if len(req.Response.Presence.Events) == req.Filter.Presence.Limit {
+			break
+		}
 		p.cache.Store(cacheKey, presence)
+	}
+
+	if len(req.Response.Presence.Events) == 0 {
+		return to
 	}
 
 	return lastPos

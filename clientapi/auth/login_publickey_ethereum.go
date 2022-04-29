@@ -28,7 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	userApi "github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/tidwall/gjson"
 )
 
@@ -42,7 +42,7 @@ type LoginPublicKeyEthereum struct {
 	HashFields    publicKeyEthereumHashFields `json:"hashFields"`
 	HashFieldsRaw string                      // Raw base64 encoded string of MessageFields for hash verification
 
-	userAPI userApi.UserRegisterAPI
+	userAPI userapi.UserRegisterAPI
 	config  *config.ClientAPI
 }
 
@@ -63,7 +63,7 @@ type publicKeyEthereumRequiredFields struct {
 
 func CreatePublicKeyEthereumHandler(
 	reqBytes []byte,
-	userAPI userApi.UserRegisterAPI,
+	userAPI userapi.UserRegisterAPI,
 	config *config.ClientAPI,
 ) (*LoginPublicKeyEthereum, *jsonerror.MatrixError) {
 	var pk LoginPublicKeyEthereum
@@ -101,8 +101,8 @@ func (pk LoginPublicKeyEthereum) AccountExists(ctx context.Context) (string, *js
 		return "", jsonerror.Forbidden("the address is incorrect, or the account does not exist.")
 	}
 
-	res := userApi.QueryAccountAvailabilityResponse{}
-	if err := pk.userAPI.QueryAccountAvailability(ctx, &userApi.QueryAccountAvailabilityRequest{
+	res := userapi.QueryAccountAvailabilityResponse{}
+	if err := pk.userAPI.QueryAccountAvailability(ctx, &userapi.QueryAccountAvailabilityRequest{
 		Localpart: localPart,
 	}, &res); err != nil {
 		return "", jsonerror.Unknown("failed to check availability: " + err.Error())
