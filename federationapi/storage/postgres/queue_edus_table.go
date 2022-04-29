@@ -226,7 +226,7 @@ func (s *queueEDUsStatements) DeleteExpiredEDUs(
 	ctx context.Context, txn *sql.Tx,
 	expiredBefore gomatrixserverlib.Timestamp,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.selectExpiredEDUsStmt)
+	stmt := sqlutil.TxStmt(txn, s.deleteExpiredEDUsStmt)
 	_, err := stmt.ExecContext(ctx, expiredBefore)
 	return err
 }
