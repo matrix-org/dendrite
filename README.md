@@ -74,6 +74,10 @@ $ cp dendrite-config.yaml dendrite.yaml
 
 # Build and run the server:
 $ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
+
+# Create an user account (add -admin for an admin user).
+# Specify the localpart only, e.g. 'alice' for '@alice:domain.com'
+$ ./bin/create-account --config dendrite.yaml -username alice
 ```
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
