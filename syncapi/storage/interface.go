@@ -52,6 +52,9 @@ type Database interface {
 
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
+	// AllJoinedUsersInRoom returns a map of room ID to a list of all joined user IDs for a given room.
+	AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
+
 	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
 	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error)
 	// Events lookups a list of event by their event ID.
@@ -159,6 +162,6 @@ type Database interface {
 type Presence interface {
 	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
-	PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error)
+	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
 }

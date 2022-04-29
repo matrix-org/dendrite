@@ -168,6 +168,10 @@ func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]stri
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
 
+func (d *Database) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
+	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, roomIDs)
+}
+
 func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
 	return d.Peeks.SelectPeekingDevices(ctx)
 }
@@ -1056,8 +1060,8 @@ func (s *Database) GetPresence(ctx context.Context, userID string) (*types.Prese
 	return s.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceAfter(ctx, nil, after)
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceAfter(ctx, nil, after, filter)
 }
 
 func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {

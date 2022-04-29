@@ -333,6 +333,20 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	return nil
 }
 
+// LoadRooms loads the membership states required to notify users correctly.
+func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs []string) error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	roomToUsers, err := db.AllJoinedUsersInRoom(ctx, roomIDs)
+	if err != nil {
+		return err
+	}
+	n.setUsersJoinedToRooms(roomToUsers)
+
+	return nil
+}
+
 // CurrentPosition returns the current sync position
 func (n *Notifier) CurrentPosition() types.StreamingToken {
 	n.lock.RLock()
