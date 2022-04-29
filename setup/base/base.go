@@ -126,6 +126,10 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 
 	logrus.Infof("Dendrite version %s", internal.VersionString())
 
+	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
+		logrus.Warn("Open registration is enabled")
+	}
+
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")

@@ -89,6 +89,8 @@ func main() {
 		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 		cfg.MSCs.MSCs = []string{"msc2836"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
+		cfg.ClientAPI.RegistrationDisabled = false
+		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 		if err = cfg.Derive(); err != nil {
 			panic(err)
 		}
