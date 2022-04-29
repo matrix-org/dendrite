@@ -71,7 +71,7 @@ func GetUserDevices(
 		}
 
 		displayName := dev.DisplayName
-		if dev.DisplayName == "" {
+		if displayName == "" {
 			displayName = gjson.GetBytes(dev.DeviceKeys.KeyJSON, "unsigned.device_display_name").Str
 		}
 

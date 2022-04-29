@@ -632,43 +632,56 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 	}
 
 	var keysToStore []api.DeviceMessage
-	// assert that the user ID / device ID are not lying for each key
-	for _, key := range req.DeviceKeys {
-		var serverName gomatrixserverlib.ServerName
-		_, serverName, err = gomatrixserverlib.SplitID('@', key.UserID)
-		if err != nil {
-			continue // ignore invalid users
-		}
-		if serverName != a.ThisServer {
-			continue // ignore remote users
-		}
-		if len(key.KeyJSON) == 0 {
-			keysToStore = append(keysToStore, key.WithStreamID(0))
-			continue // deleted keys don't need sanity checking
-		}
-		// check that the device in question actually exists in the user
-		// API before we try and store a key for it
-		if _, ok := existingDeviceMap[key.DeviceID]; !ok {
-			continue
-		}
-		gotUserID := gjson.GetBytes(key.KeyJSON, "user_id").Str
-		gotDeviceID := gjson.GetBytes(key.KeyJSON, "device_id").Str
-		if gotUserID == key.UserID && gotDeviceID == key.DeviceID {
-			keysToStore = append(keysToStore, key.WithStreamID(0))
-			continue
-		}
-
-		res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
-			Err: fmt.Sprintf(
-				"user_id or device_id mismatch: users: %s - %s, devices: %s - %s",
-				gotUserID, key.UserID, gotDeviceID, key.DeviceID,
-			),
-		})
-	}
 
 	if req.OnlyDisplayNameUpdates {
-		// add the display name field from keysToStore into existingKeys
-		keysToStore = appendDisplayNames(existingKeys, keysToStore)
+		keysToStore = append(keysToStore, existingKeys...)
+		for _, existingKey := range existingKeys {
+			for _, newKey := range req.DeviceKeys {
+				switch {
+				case existingKey.UserID != newKey.DeviceID:
+					continue
+				case existingKey.DeviceID != newKey.DeviceID:
+					continue
+				case existingKey.DisplayName != newKey.DisplayName:
+					existingKey.DisplayName = newKey.DisplayName
+				}
+			}
+			keysToStore = append(keysToStore, existingKey)
+		}
+	} else {
+		// assert that the user ID / device ID are not lying for each key
+		for _, key := range req.DeviceKeys {
+			var serverName gomatrixserverlib.ServerName
+			_, serverName, err = gomatrixserverlib.SplitID('@', key.UserID)
+			if err != nil {
+				continue // ignore invalid users
+			}
+			if serverName != a.ThisServer {
+				continue // ignore remote users
+			}
+			if len(key.KeyJSON) == 0 {
+				keysToStore = append(keysToStore, key.WithStreamID(0))
+				continue // deleted keys don't need sanity checking
+			}
+			// check that the device in question actually exists in the user
+			// API before we try and store a key for it
+			if _, ok := existingDeviceMap[key.DeviceID]; !ok {
+				continue
+			}
+			gotUserID := gjson.GetBytes(key.KeyJSON, "user_id").Str
+			gotDeviceID := gjson.GetBytes(key.KeyJSON, "device_id").Str
+			if gotUserID == key.UserID && gotDeviceID == key.DeviceID {
+				keysToStore = append(keysToStore, key.WithStreamID(0))
+				continue
+			}
+
+			res.KeyError(key.UserID, key.DeviceID, &api.KeyError{
+				Err: fmt.Sprintf(
+					"user_id or device_id mismatch: users: %s - %s, devices: %s - %s",
+					gotUserID, key.UserID, gotDeviceID, key.DeviceID,
+				),
+			})
+		}
 	}
 
 	// store the device keys and emit changes
@@ -763,17 +776,4 @@ func emitDeviceKeyChanges(producer KeyChangeProducer, existing, new []api.Device
 		}
 	}
 	return producer.ProduceKeyChanges(keysAdded)
-}
-
-func appendDisplayNames(existing, new []api.DeviceMessage) []api.DeviceMessage {
-	for i, existingDevice := range existing {
-		for _, newDevice := range new {
-			if existingDevice.DeviceID != newDevice.DeviceID {
-				continue
-			}
-			existingDevice.DisplayName = newDevice.DisplayName
-			existing[i] = existingDevice
-		}
-	}
-	return existing
 }
