@@ -168,7 +168,7 @@ func Test_Devices(t *testing.T) {
 
 		devices2, err := db.GetDevicesByID(ctx, deviceIDs)
 		assert.NoError(t, err, "unable to get devices by id")
-		assert.Equal(t, devices, devices2)
+		assert.ElementsMatch(t, devices, devices2)
 
 		// Update device
 		newName := "new display name"
