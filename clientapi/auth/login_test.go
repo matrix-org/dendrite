@@ -66,6 +66,7 @@ func TestLoginFromJSONReader(t *testing.T) {
 		Flows:     []userInteractiveFlow{},
 		Types:     make(map[string]Type),
 		Sessions:  make(map[string][]string),
+		Params:    make(map[string]interface{}),
 	}
 
 	for _, tst := range tsts {
@@ -151,6 +152,7 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 		Flows:     []userInteractiveFlow{},
 		Types:     make(map[string]Type),
 		Sessions:  make(map[string][]string),
+		Params:    make(map[string]interface{}),
 	}
 
 	for _, tst := range tsts {
