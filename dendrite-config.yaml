@@ -10,8 +10,8 @@
 #
 # Each component with a "database" section can accept the following formats
 # for "connection_string":
-#   SQLite:     postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-#               postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
+#   SQLite:     file:filename.db
+#               file:///path/to/filename.db
 #   PostgreSQL: postgresql://user:pass@hostname/database?params=...
 #
 # SQLite is embedded into Dendrite and therefore no further prerequisites are
