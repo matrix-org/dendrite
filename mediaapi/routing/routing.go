@@ -35,7 +35,7 @@ import (
 // configResponse is the response to GET /_matrix/media/r0/config
 // https://matrix.org/docs/spec/client_server/latest#get-matrix-media-r0-config
 type configResponse struct {
-	UploadSize config.FileSizeBytes `json:"m.upload.size"`
+	UploadSize *config.FileSizeBytes `json:"m.upload.size"`
 }
 
 // Setup registers the media API HTTP handlers
@@ -73,9 +73,13 @@ func Setup(
 		if r := rateLimits.Limit(req); r != nil {
 			return *r
 		}
+		respondSize := cfg.MaxFileSizeBytes
+		if *cfg.MaxFileSizeBytes == 0 {
+			respondSize = nil
+		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: configResponse{UploadSize: *cfg.MaxFileSizeBytes},
+			JSON: configResponse{UploadSize: respondSize},
 		}
 	})
 
