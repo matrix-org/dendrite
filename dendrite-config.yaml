@@ -177,7 +177,7 @@ client_api:
     ethereum:
       enabled: false
       version: 1
-      chain_ids: [] // https://chainlist.org/
+      chain_ids: []
 
   # Whether to require reCAPTCHA for registration.
   enable_registration_captcha: false
