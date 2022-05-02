@@ -73,9 +73,8 @@ func Setup(
 		if r := rateLimits.Limit(req); r != nil {
 			return *r
 		}
-		respondSize := cfg.MaxFileSizeBytes
-		// Shouldn't be nil, as this is checked at startup.
-		if cfg.MaxFileSizeBytes != nil && *cfg.MaxFileSizeBytes == 0 {
+		respondSize := &cfg.MaxFileSizeBytes
+		if cfg.MaxFileSizeBytes == 0 {
 			respondSize = nil
 		}
 		return util.JSONResponse{
