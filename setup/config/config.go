@@ -54,7 +54,7 @@ type Dendrite struct {
 	Version int `yaml:"version"`
 
 	Global        Global        `yaml:"global"`
-	AppServiceAPI AppServiceAPI `yaml:"appservice_api"`
+	AppServiceAPI AppServiceAPI `yaml:"app_service_api"`
 	ClientAPI     ClientAPI     `yaml:"client_api"`
 	FederationAPI FederationAPI `yaml:"federation_api"`
 	KeyServer     KeyServer     `yaml:"key_server"`

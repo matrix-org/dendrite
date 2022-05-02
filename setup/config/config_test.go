@@ -63,7 +63,7 @@ global:
     display_name: "Server alerts"
     avatar: ""
     room_name: "Server Alerts"	
-appservice_api:
+app_service_api:
   internal_api:
     listen: http://localhost:7777
     connect: http://localhost:7777
