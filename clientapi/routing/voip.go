@@ -35,23 +35,20 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 	turnConfig := cfg.TURN
 
 	// TODO Guest Support
-	if len(turnConfig.URIs) == 0 || turnConfig.UserLifetime == "" {
+	if len(turnConfig.URIs) == 0 || turnConfig.UserLifetime.Seconds() == 0 {
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: struct{}{},
 		}
 	}
 
-	// Duration checked at startup, err not possible
-	duration, _ := time.ParseDuration(turnConfig.UserLifetime)
-
 	resp := gomatrix.RespTurnServer{
 		URIs: turnConfig.URIs,
-		TTL:  int(duration.Seconds()),
+		TTL:  int(turnConfig.UserLifetime.Seconds()),
 	}
 
 	if turnConfig.SharedSecret != "" {
-		expiry := time.Now().Add(duration).Unix()
+		expiry := time.Now().Add(turnConfig.UserLifetime).Unix()
 		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
 		mac := hmac.New(sha1.New, []byte(turnConfig.SharedSecret))
 		_, err := mac.Write([]byte(resp.Username))

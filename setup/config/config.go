@@ -29,7 +29,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -54,7 +54,7 @@ type Dendrite struct {
 	Version int `yaml:"version"`
 
 	Global        Global        `yaml:"global"`
-	AppServiceAPI AppServiceAPI `yaml:"app_service_api"`
+	AppServiceAPI AppServiceAPI `yaml:"appservice_api"`
 	ClientAPI     ClientAPI     `yaml:"client_api"`
 	FederationAPI FederationAPI `yaml:"federation_api"`
 	KeyServer     KeyServer     `yaml:"key_server"`

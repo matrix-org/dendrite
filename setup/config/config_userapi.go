@@ -1,6 +1,10 @@
 package config
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
+)
 
 type UserAPI struct {
 	Matrix *Global `yaml:"-"`
@@ -11,7 +15,7 @@ type UserAPI struct {
 	BCryptCost int `yaml:"bcrypt_cost"`
 
 	// The length of time an OpenID token is condidered valid in milliseconds
-	OpenIDTokenLifetimeMS int64 `yaml:"openid_token_lifetime_ms"`
+	OpenIDTokenLifetime time.Duration `yaml:"openid_token_lifetime"`
 
 	// Disable TLS validation on HTTPS calls to push gatways. NOT RECOMMENDED!
 	PushGatewayDisableTLSValidation bool `yaml:"push_gateway_disable_tls_validation"`
@@ -21,7 +25,7 @@ type UserAPI struct {
 	AccountDatabase DatabaseOptions `yaml:"account_database"`
 }
 
-const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
+var DefaultOpenIDTokenLifetime = time.Hour
 
 func (c *UserAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7781"
@@ -31,7 +35,7 @@ func (c *UserAPI) Defaults(generate bool) {
 		c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 	}
 	c.BCryptCost = bcrypt.DefaultCost
-	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
+	c.OpenIDTokenLifetime = DefaultOpenIDTokenLifetime
 }
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -39,5 +43,5 @@ func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkURL(configErrs, "user_api.internal_api.connect", string(c.InternalAPI.Connect))
 	setDatabase(c.Matrix.GlobalDatabaseOptions, &c.AccountDatabase, "userapi.db")
 	checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
-	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
+	checkPositive(configErrs, "user_api.openid_token_lifetime", c.OpenIDTokenLifetime.Milliseconds())
 }

@@ -57,7 +57,7 @@ func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
 	txn *sql.Tx,
 	token, localpart string,
-	expiresAtMS int64,
+	expiresAtMS gomatrixserverlib.Timestamp,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
 	_, err = stmt.ExecContext(ctx, token, localpart, expiresAtMS)
@@ -73,7 +73,7 @@ func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	var openIDTokenAttrs api.OpenIDTokenAttributes
 	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
 		&openIDTokenAttrs.UserID,
-		&openIDTokenAttrs.ExpiresAtMS,
+		&openIDTokenAttrs.ExpiresAt,
 	)
 	if err != nil {
 		if err != sql.ErrNoRows {

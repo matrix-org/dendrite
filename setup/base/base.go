@@ -280,7 +280,7 @@ func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
 		&b.Cfg.UserAPI.AccountDatabase,
 		b.Cfg.Global.ServerName,
 		b.Cfg.UserAPI.BCryptCost,
-		b.Cfg.UserAPI.OpenIDTokenLifetimeMS,
+		b.Cfg.UserAPI.OpenIDTokenLifetime,
 		userapi.DefaultLoginTokenLifetime,
 		b.Cfg.Global.ServerNotices.LocalPart,
 	)

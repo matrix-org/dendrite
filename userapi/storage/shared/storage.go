@@ -38,23 +38,23 @@ import (
 
 // Database represents an account database
 type Database struct {
-	DB                    *sql.DB
-	Writer                sqlutil.Writer
-	Accounts              tables.AccountsTable
-	Profiles              tables.ProfileTable
-	AccountDatas          tables.AccountDataTable
-	ThreePIDs             tables.ThreePIDTable
-	OpenIDTokens          tables.OpenIDTable
-	KeyBackups            tables.KeyBackupTable
-	KeyBackupVersions     tables.KeyBackupVersionTable
-	Devices               tables.DevicesTable
-	LoginTokens           tables.LoginTokenTable
-	Notifications         tables.NotificationTable
-	Pushers               tables.PusherTable
-	LoginTokenLifetime    time.Duration
-	ServerName            gomatrixserverlib.ServerName
-	BcryptCost            int
-	OpenIDTokenLifetimeMS int64
+	DB                  *sql.DB
+	Writer              sqlutil.Writer
+	Accounts            tables.AccountsTable
+	Profiles            tables.ProfileTable
+	AccountDatas        tables.AccountDataTable
+	ThreePIDs           tables.ThreePIDTable
+	OpenIDTokens        tables.OpenIDTable
+	KeyBackups          tables.KeyBackupTable
+	KeyBackupVersions   tables.KeyBackupVersionTable
+	Devices             tables.DevicesTable
+	LoginTokens         tables.LoginTokenTable
+	Notifications       tables.NotificationTable
+	Pushers             tables.PusherTable
+	LoginTokenLifetime  time.Duration
+	ServerName          gomatrixserverlib.ServerName
+	BcryptCost          int
+	OpenIDTokenLifetime time.Duration
 }
 
 const (
@@ -325,12 +325,12 @@ func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err
 func (d *Database) CreateOpenIDToken(
 	ctx context.Context,
 	token, localpart string,
-) (int64, error) {
-	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.OpenIDTokenLifetimeMS
+) (gomatrixserverlib.Timestamp, error) {
+	expiresAt := gomatrixserverlib.AsTimestamp(time.Now().Add(d.OpenIDTokenLifetime))
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.OpenIDTokens.InsertOpenIDToken(ctx, txn, token, localpart, expiresAtMS)
+		return d.OpenIDTokens.InsertOpenIDToken(ctx, txn, token, localpart, expiresAt)
 	})
-	return expiresAtMS, err
+	return expiresAt, err
 }
 
 // GetOpenIDTokenAttributes gets the attributes of issued an OIDC auth token

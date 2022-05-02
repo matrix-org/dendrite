@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Profile interface {
@@ -97,7 +98,7 @@ type LoginToken interface {
 }
 
 type OpenID interface {
-	CreateOpenIDToken(ctx context.Context, token, userID string) (exp int64, err error)
+	CreateOpenIDToken(ctx context.Context, token, userID string) (exp gomatrixserverlib.Timestamp, err error)
 	GetOpenIDTokenAttributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 }
 

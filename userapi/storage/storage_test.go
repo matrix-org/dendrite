@@ -20,18 +20,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const loginTokenLifetime = time.Minute
+const (
+	loginTokenLifetime = time.Minute
+	openIDLifetime     = time.Minute
+)
 
 var (
-	openIDLifetimeMS = time.Minute.Milliseconds()
-	ctx              = context.Background()
+	ctx = context.Background()
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserAPIDatabase(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
+	}, "localhost", bcrypt.MinCost, openIDLifetime, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
@@ -328,15 +330,15 @@ func Test_OpenID(t *testing.T) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 
-		expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + openIDLifetimeMS
+		expiresAt := gomatrixserverlib.AsTimestamp(time.Now().Add(openIDLifetime))
 		expires, err := db.CreateOpenIDToken(ctx, token, alice.ID)
 		assert.NoError(t, err, "unable to create OpenID token")
-		assert.Equal(t, expiresAtMS, expires)
+		assert.Equal(t, expiresAt, expires)
 
 		attributes, err := db.GetOpenIDTokenAttributes(ctx, token)
 		assert.NoError(t, err, "unable to get OpenID token attributes")
 		assert.Equal(t, alice.ID, attributes.UserID)
-		assert.Equal(t, expiresAtMS, attributes.ExpiresAtMS)
+		assert.Equal(t, expiresAt, attributes.ExpiresAt)
 	})
 }
 

@@ -27,13 +27,12 @@ func NewUserAPIDatabase(
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	bcryptCost int,
-	openIDTokenLifetimeMS int64,
-	loginTokenLifetime time.Duration,
+	openIDTokenLifetime, loginTokenLifetime time.Duration,
 	serverNoticesLocalpart string,
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetime, loginTokenLifetime, serverNoticesLocalpart)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

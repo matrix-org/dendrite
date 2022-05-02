@@ -30,7 +30,7 @@ import (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, err := sqlutil.Open(dbProperties)
 	if err != nil {
 		return nil, err
@@ -94,22 +94,22 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
 	}
 	return &shared.Database{
-		AccountDatas:          accountDataTable,
-		Accounts:              accountsTable,
-		Devices:               devicesTable,
-		KeyBackups:            keyBackupTable,
-		KeyBackupVersions:     keyBackupVersionTable,
-		LoginTokens:           loginTokenTable,
-		OpenIDTokens:          openIDTable,
-		Profiles:              profilesTable,
-		ThreePIDs:             threePIDTable,
-		Pushers:               pusherTable,
-		Notifications:         notificationsTable,
-		ServerName:            serverName,
-		DB:                    db,
-		Writer:                sqlutil.NewDummyWriter(),
-		LoginTokenLifetime:    loginTokenLifetime,
-		BcryptCost:            bcryptCost,
-		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,
+		AccountDatas:        accountDataTable,
+		Accounts:            accountsTable,
+		Devices:             devicesTable,
+		KeyBackups:          keyBackupTable,
+		KeyBackupVersions:   keyBackupVersionTable,
+		LoginTokens:         loginTokenTable,
+		OpenIDTokens:        openIDTable,
+		Profiles:            profilesTable,
+		ThreePIDs:           threePIDTable,
+		Pushers:             pusherTable,
+		Notifications:       notificationsTable,
+		ServerName:          serverName,
+		DB:                  db,
+		Writer:              sqlutil.NewDummyWriter(),
+		LoginTokenLifetime:  loginTokenLifetime,
+		BcryptCost:          bcryptCost,
+		OpenIDTokenLifetime: openIDTokenLifetimeMS,
 	}, nil
 }

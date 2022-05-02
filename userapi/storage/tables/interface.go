@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type AccountDataTable interface {
@@ -75,7 +76,7 @@ type LoginTokenTable interface {
 }
 
 type OpenIDTable interface {
-	InsertOpenIDToken(ctx context.Context, txn *sql.Tx, token, localpart string, expiresAtMS int64) (err error)
+	InsertOpenIDToken(ctx context.Context, txn *sql.Tx, token, localpart string, expiresAtMS gomatrixserverlib.Timestamp) (err error)
 	SelectOpenIDTokenAtrributes(ctx context.Context, token string) (*api.OpenIDTokenAttributes, error)
 }
 

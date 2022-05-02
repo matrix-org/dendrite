@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -64,7 +65,7 @@ func CreateOpenIDToken(
 			AccessToken:      response.Token.Token,
 			TokenType:        "Bearer",
 			MatrixServerName: string(cfg.Matrix.ServerName),
-			ExpiresIn:        response.Token.ExpiresAtMS / 1000, // convert ms to s
+			ExpiresIn:        int64(time.Until(response.Token.ExpiresAt.Time()).Seconds()),
 		},
 	}
 }

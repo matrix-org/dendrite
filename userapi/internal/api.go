@@ -464,9 +464,9 @@ func (a *UserInternalAPI) PerformOpenIDTokenCreation(ctx context.Context, req *a
 	exp, err := a.DB.CreateOpenIDToken(ctx, token, req.UserID)
 
 	res.Token = api.OpenIDToken{
-		Token:       token,
-		UserID:      req.UserID,
-		ExpiresAtMS: exp,
+		Token:     token,
+		UserID:    req.UserID,
+		ExpiresAt: exp,
 	}
 
 	return err
@@ -480,7 +480,7 @@ func (a *UserInternalAPI) QueryOpenIDToken(ctx context.Context, req *api.QueryOp
 	}
 
 	res.Sub = openIDTokenAttrs.UserID
-	res.ExpiresAtMS = openIDTokenAttrs.ExpiresAtMS
+	res.ExpiresAt = openIDTokenAttrs.ExpiresAt
 
 	return nil
 }

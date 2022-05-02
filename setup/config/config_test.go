@@ -63,7 +63,7 @@ global:
     display_name: "Server alerts"
     avatar: ""
     room_name: "Server Alerts"	
-app_service_api:
+appservice_api:
   internal_api:
     listen: http://localhost:7777
     connect: http://localhost:7777
@@ -87,20 +87,11 @@ client_api:
   recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
   turn:
-    turn_user_lifetime: ""
+    turn_user_lifetime: "1h"
     turn_uris: []
     turn_shared_secret: ""
     turn_username: ""
     turn_password: ""
-current_state_server:
-  internal_api:
-    listen: http://localhost:7782
-    connect: http://localhost:7782
-  database:
-    connection_string: file:currentstate.db
-    max_open_conns: 100
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 federation_api:
   internal_api:
     listen: http://localhost:7772

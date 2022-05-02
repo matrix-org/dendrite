@@ -50,10 +50,10 @@ func (c *AppServiceAPI) Defaults(generate bool) {
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkURL(configErrs, "app_service_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "app_service_api.internal_api.bind", string(c.InternalAPI.Connect))
+	checkURL(configErrs, "appservice_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "appservice_api.internal_api.bind", string(c.InternalAPI.Connect))
 	setDatabase(c.Matrix.GlobalDatabaseOptions, &c.Database, "appservice.db")
-	checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
+	checkNotEmpty(configErrs, "appservice_api.database.connection_string", string(c.Database.ConnectionString))
 }
 
 // ApplicationServiceNamespace is the namespace that a specific application

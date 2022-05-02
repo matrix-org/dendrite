@@ -378,8 +378,8 @@ type QueryOpenIDTokenRequest struct {
 
 // QueryOpenIDTokenResponse is the response for QueryOpenIDToken
 type QueryOpenIDTokenResponse struct {
-	Sub         string // The Matrix User ID that generated the token
-	ExpiresAtMS int64
+	Sub       string // The Matrix User ID that generated the token
+	ExpiresAt gomatrixserverlib.Timestamp
 }
 
 // Device represents a client's device (mobile, web, etc)
@@ -415,15 +415,15 @@ type Account struct {
 
 // OpenIDToken represents an OpenID token
 type OpenIDToken struct {
-	Token       string
-	UserID      string
-	ExpiresAtMS int64
+	Token     string
+	UserID    string
+	ExpiresAt gomatrixserverlib.Timestamp
 }
 
 // OpenIDTokenInfo represents the attributes associated with an issued OpenID token
 type OpenIDTokenAttributes struct {
-	UserID      string
-	ExpiresAtMS int64
+	UserID    string
+	ExpiresAt gomatrixserverlib.Timestamp
 }
 
 // UserInfo is for returning information about the user an OpenID token was issued for

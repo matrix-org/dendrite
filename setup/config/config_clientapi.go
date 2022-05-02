@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -64,6 +63,7 @@ func (c *ClientAPI) Defaults(generate bool) {
 	c.RegistrationDisabled = true
 	c.OpenRegistrationWithoutVerificationEnabled = false
 	c.RateLimiting.Defaults()
+	c.TURN.Defaults()
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -100,7 +100,7 @@ type TURN struct {
 	// Whether or not guests can request TURN credentials
 	// AllowGuests bool `yaml:"turn_allow_guests"`
 	// How long the authorization should last
-	UserLifetime string `yaml:"turn_user_lifetime"`
+	UserLifetime time.Duration `yaml:"turn_user_lifetime"`
 	// The list of TURN URIs to pass to clients
 	URIs []string `yaml:"turn_uris"`
 
@@ -115,12 +115,11 @@ type TURN struct {
 }
 
 func (c *TURN) Verify(configErrs *ConfigErrors) {
-	value := c.UserLifetime
-	if value != "" {
-		if _, err := time.ParseDuration(value); err != nil {
-			configErrs.Add(fmt.Sprintf("invalid duration for config key %q: %s", "client_api.turn.turn_user_lifetime", value))
-		}
-	}
+	checkPositive(configErrs, "cache_lifetime", int64(c.UserLifetime))
+}
+
+func (c *TURN) Defaults() {
+	c.UserLifetime = time.Hour * 24
 }
 
 type RateLimiting struct {
