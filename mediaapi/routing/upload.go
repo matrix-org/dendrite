@@ -90,7 +90,7 @@ func parseAndValidateRequest(req *http.Request, cfg *config.MediaAPI, dev *usera
 		Logger: util.GetLogger(req.Context()).WithField("Origin", cfg.Matrix.ServerName),
 	}
 
-	if resErr := r.Validate(*cfg.MaxFileSizeBytes); resErr != nil {
+	if resErr := r.Validate(cfg.MaxFileSizeBytes); resErr != nil {
 		return nil, resErr
 	}
 
@@ -148,20 +148,20 @@ func (r *uploadRequest) doUpload(
 	//   r.storeFileAndMetadata(ctx, tmpDir, ...)
 	// before you return from doUpload else we will leak a temp file. We could make this nicer with a `WithTransaction` style of
 	// nested function to guarantee either storage or cleanup.
-	if *cfg.MaxFileSizeBytes > 0 {
-		if *cfg.MaxFileSizeBytes+1 <= 0 {
+	if cfg.MaxFileSizeBytes > 0 {
+		if cfg.MaxFileSizeBytes+1 <= 0 {
 			r.Logger.WithFields(log.Fields{
-				"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
+				"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
 			}).Warnf("Configured MaxFileSizeBytes overflows int64, defaulting to %d bytes", config.DefaultMaxFileSizeBytes)
-			cfg.MaxFileSizeBytes = &config.DefaultMaxFileSizeBytes
+			cfg.MaxFileSizeBytes = config.DefaultMaxFileSizeBytes
 		}
-		reqReader = io.LimitReader(reqReader, int64(*cfg.MaxFileSizeBytes)+1)
+		reqReader = io.LimitReader(reqReader, int64(cfg.MaxFileSizeBytes)+1)
 	}
 
 	hash, bytesWritten, tmpDir, err := fileutils.WriteTempFile(ctx, reqReader, cfg.AbsBasePath)
 	if err != nil {
 		r.Logger.WithError(err).WithFields(log.Fields{
-			"MaxFileSizeBytes": *cfg.MaxFileSizeBytes,
+			"MaxFileSizeBytes": cfg.MaxFileSizeBytes,
 		}).Warn("Error while transferring file")
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -170,9 +170,9 @@ func (r *uploadRequest) doUpload(
 	}
 
 	// Check if temp file size exceeds max file size configuration
-	if *cfg.MaxFileSizeBytes > 0 && bytesWritten > types.FileSizeBytes(*cfg.MaxFileSizeBytes) {
+	if cfg.MaxFileSizeBytes > 0 && bytesWritten > types.FileSizeBytes(cfg.MaxFileSizeBytes) {
 		fileutils.RemoveDir(tmpDir, r.Logger) // delete temp file
-		return requestEntityTooLargeJSONResponse(*cfg.MaxFileSizeBytes)
+		return requestEntityTooLargeJSONResponse(cfg.MaxFileSizeBytes)
 	}
 
 	// Look up the media by the file hash. If we already have the file but under a
