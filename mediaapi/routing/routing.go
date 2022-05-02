@@ -74,7 +74,8 @@ func Setup(
 			return *r
 		}
 		respondSize := cfg.MaxFileSizeBytes
-		if *cfg.MaxFileSizeBytes == 0 {
+		// Shouldn't be nil, as this is checked at startup.
+		if cfg.MaxFileSizeBytes != nil && *cfg.MaxFileSizeBytes == 0 {
 			respondSize = nil
 		}
 		return util.JSONResponse{
