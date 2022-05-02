@@ -27,5 +27,6 @@ func (c *SyncAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !isMonolith {
 		checkURL(configErrs, "sync_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
+	setDatabase(c.Matrix.GlobalDatabaseOptions, &c.Database, "syncapi.db")
 	checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
 }

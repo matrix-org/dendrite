@@ -2,6 +2,7 @@ package config
 
 import (
 	"math/rand"
+	"path/filepath"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -63,6 +64,9 @@ type Global struct {
 
 	// ServerNotices configuration used for sending server notices
 	ServerNotices ServerNotices `yaml:"server_notices"`
+
+	// GlobalDatabaseOptions sets database options for all components.
+	GlobalDatabaseOptions DatabaseOptions `yaml:"database_options"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -207,6 +211,20 @@ func (c DatabaseOptions) MaxOpenConns() int {
 // ConnMaxLifetime returns maximum amount of time a connection may be reused
 func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
+}
+
+// setDatabase sets the connection_string for each component, if a global database_option is set.
+func setDatabase(global DatabaseOptions, componentConnection *DatabaseOptions, databaseName string) {
+	if componentConnection.ConnectionString != "" {
+		return
+	}
+	componentConnection.MaxOpenConnections = global.MaxOpenConnections
+	componentConnection.MaxIdleConnections = global.MaxIdleConnections
+	componentConnection.ConnMaxLifetimeSeconds = global.ConnMaxLifetimeSeconds
+	componentConnection.ConnectionString = global.ConnectionString
+	if global.ConnectionString != "" && global.ConnectionString.IsSQLite() {
+		componentConnection.ConnectionString = DataSource(filepath.Join(string(global.ConnectionString), databaseName))
+	}
 }
 
 type DNSCacheOptions struct {

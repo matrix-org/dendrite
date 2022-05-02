@@ -1,6 +1,8 @@
 package config
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 type FederationAPI struct {
 	Matrix *Global `yaml:"-"`
@@ -49,6 +51,7 @@ func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !isMonolith {
 		checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
+	setDatabase(c.Matrix.GlobalDatabaseOptions, &c.Database, "federationapi.db")
 	checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
 }
 

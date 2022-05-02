@@ -58,6 +58,7 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !isMonolith {
 		checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
+	setDatabase(c.Matrix.GlobalDatabaseOptions, &c.Database, "mediaapi.db")
 	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))

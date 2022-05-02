@@ -20,5 +20,6 @@ func (c *KeyServer) Defaults(generate bool) {
 func (c *KeyServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkURL(configErrs, "key_server.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "key_server.internal_api.bind", string(c.InternalAPI.Connect))
+	setDatabase(c.Matrix.GlobalDatabaseOptions, &c.Database, "keyserver.db")
 	checkNotEmpty(configErrs, "key_server.database.connection_string", string(c.Database.ConnectionString))
 }

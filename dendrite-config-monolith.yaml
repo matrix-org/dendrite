@@ -10,8 +10,8 @@
 #
 # Each component with a "database" section can accept the following formats
 # for "connection_string":
-#   SQLite:     postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-#               postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
+#   SQLite:     file:filename.db
+#               file:///path/to/filename.db
 #   PostgreSQL: postgresql://user:pass@hostname/database?params=...
 #
 # SQLite is embedded into Dendrite and therefore no further prerequisites are
@@ -87,6 +87,15 @@ global:
     # The roomname to be used when creating messages
     room_name: "Server Alerts"
 
+  # Default database connection settings for all components.
+  database_options:
+    # When a path is defined, will run in SQLite mode.
+    # use "file:." to use the current working directory, "file:/home/dendrite/db/" to specify a directory.
+    connection_string: "postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable"
+    max_open_conns: 10
+    max_idle_conns: 2
+    conn_max_lifetime: -1
+
   # Configuration for NATS JetStream
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an
@@ -132,15 +141,6 @@ global:
 
 # Configuration for the Appservice API.
 app_service_api:
-  internal_api:
-    listen: http://localhost:7777 # Only used in polylith deployments
-    connect: http://localhost:7777 # Only used in polylith deployments
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # Disable the validation of TLS certificates of appservices. This is
   # not recommended in production since it may allow appservice traffic
   # to be sent to an unverified endpoint.
@@ -151,12 +151,6 @@ app_service_api:
 
 # Configuration for the Client API.
 client_api:
-  internal_api:
-    listen: http://localhost:7771 # Only used in polylith deployments
-    connect: http://localhost:7771 # Only used in polylith deployments
-  external_api:
-    listen: http://[::]:8071
-
   # Prevents new users from being able to register on this homeserver, except when
   # using the registration shared secret below.
   registration_disabled: true
@@ -196,17 +190,6 @@ client_api:
 
 # Configuration for the Federation API.
 federation_api:
-  internal_api:
-    listen: http://localhost:7772 # Only used in polylith deployments
-    connect: http://localhost:7772 # Only used in polylith deployments
-  external_api:
-    listen: http://[::]:8072
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # How many times we will try to resend a failed transaction to a specific server. The
   # backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds etc.
   send_max_retries: 16
@@ -231,30 +214,8 @@ federation_api:
   # last resort.
   prefer_direct_fetch: false
 
-# Configuration for the Key Server (for end-to-end encryption).
-key_server:
-  internal_api:
-    listen: http://localhost:7779 # Only used in polylith deployments
-    connect: http://localhost:7779 # Only used in polylith deployments
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
 # Configuration for the Media API.
 media_api:
-  internal_api:
-    listen: http://localhost:7774 # Only used in polylith deployments
-    connect: http://localhost:7774 # Only used in polylith deployments
-  external_api:
-    listen: http://[::]:8074
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 5
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # Storage path for uploaded media. May be relative or absolute.
   base_path: ./media_store
 
@@ -288,36 +249,9 @@ mscs:
   # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
   # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
   mscs: []
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 5
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
-# Configuration for the Room Server.
-room_server:
-  internal_api:
-    listen: http://localhost:7770 # Only used in polylith deployments
-    connect: http://localhost:7770 # Only used in polylith deployments
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
 
 # Configuration for the Sync API.
 sync_api:
-  internal_api:
-    listen: http://localhost:7773 # Only used in polylith deployments
-    connect: http://localhost:7773 # Only used in polylith deployments
-  external_api:
-    listen: http://[::]:8073
-  database:
-    connection_string: postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # This option controls which HTTP header to inspect to find the real remote IP
   # address of the client. This is likely required if Dendrite is running behind
   # a reverse proxy server.
@@ -332,14 +266,6 @@ user_api:
   # CPU resources but makes it harder to brute force password hashes.
   # This value can be low if performing tests or on embedded Dendrite instances (e.g WASM builds)
   # bcrypt_cost: 10
-  internal_api:
-    listen: http://localhost:7781 # Only used in polylith deployments
-    connect: http://localhost:7781 # Only used in polylith deployments
-  account_database:
-    connection_string: "postgresql://dendriteUser:dendritePassword@localhost/dendrite?sslmode=disable"
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
   # The length of time that a token issued for a relying party from
   # /_matrix/client/r0/user/{userId}/openid/request_token endpoint
   # is considered to be valid in milliseconds.
