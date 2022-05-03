@@ -29,9 +29,7 @@ import (
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 
@@ -47,20 +45,18 @@ func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
-	process *process.ProcessContext,
-	fedRouter, keyRouter, wellKnownRouter *mux.Router,
-	cfg *config.FederationAPI,
+	base *base.BaseDendrite,
 	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	federationAPI federationAPI.FederationInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
-	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
 ) {
-
-	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	cfg := &base.Cfg.FederationAPI
+	mscCfg := &base.Cfg.MSCs
+	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -72,8 +68,11 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		fedRouter, keyRouter, wellKnownRouter, cfg, rsAPI,
-		federationAPI, keyRing,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
+		cfg,
+		rsAPI, federationAPI, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,
 	)
@@ -91,7 +90,7 @@ func NewInternalAPI(
 ) api.FederationInternalAPI {
 	cfg := &base.Cfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(&cfg.Database, base.Caches, base.Cfg.Global.ServerName)
+	federationDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}

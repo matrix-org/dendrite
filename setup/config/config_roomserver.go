@@ -20,5 +20,7 @@ func (c *RoomServer) Defaults(generate bool) {
 func (c *RoomServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkURL(configErrs, "room_server.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "room_server.internal_ap.bind", string(c.InternalAPI.Connect))
-	checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
+	}
 }
