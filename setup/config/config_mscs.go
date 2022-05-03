@@ -31,5 +31,5 @@ func (c *MSCs) Enabled(msc string) bool {
 }
 
 func (c *MSCs) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
+	//checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
 }

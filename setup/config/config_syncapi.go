@@ -27,5 +27,5 @@ func (c *SyncAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !isMonolith {
 		checkURL(configErrs, "sync_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
-	checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
+	//checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
 }
