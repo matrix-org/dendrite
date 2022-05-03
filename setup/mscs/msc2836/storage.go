@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -58,19 +59,17 @@ type DB struct {
 }
 
 // NewDatabase loads the database for msc2836
-func NewDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
+func NewDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions) (Database, error) {
 	if dbOpts.ConnectionString.IsPostgres() {
-		return newPostgresDatabase(dbOpts)
+		return newPostgresDatabase(base, dbOpts)
 	}
-	return newSQLiteDatabase(dbOpts)
+	return newSQLiteDatabase(base, dbOpts)
 }
 
-func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
-	d := DB{
-		writer: sqlutil.NewDummyWriter(),
-	}
+func newPostgresDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions) (Database, error) {
+	d := DB{}
 	var err error
-	if d.db, err = sqlutil.Open(dbOpts); err != nil {
+	if d.db, d.writer, err = base.DatabaseConnection(dbOpts, sqlutil.NewDummyWriter()); err != nil {
 		return nil, err
 	}
 	_, err = d.db.Exec(`
@@ -145,12 +144,10 @@ func newPostgresDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
 	return &d, err
 }
 
-func newSQLiteDatabase(dbOpts *config.DatabaseOptions) (Database, error) {
-	d := DB{
-		writer: sqlutil.NewExclusiveWriter(),
-	}
+func newSQLiteDatabase(base *base.BaseDendrite, dbOpts *config.DatabaseOptions) (Database, error) {
+	d := DB{}
 	var err error
-	if d.db, err = sqlutil.Open(dbOpts); err != nil {
+	if d.db, d.writer, err = base.DatabaseConnection(dbOpts, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
 	_, err = d.db.Exec(`

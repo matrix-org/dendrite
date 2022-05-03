@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -35,11 +36,11 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
-	var db *sql.DB
 	var err error
-	if db, err = sqlutil.Open(dbProperties); err != nil {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+	if err != nil {
 		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
 
@@ -59,7 +60,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err := d.prepare(db, cache); err != nil {
+	if err := d.prepare(db, writer, cache); err != nil {
 		return nil, err
 	}
 
@@ -110,7 +111,7 @@ func (d *Database) create(db *sql.DB) error {
 	return nil
 }
 
-func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
+func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
 	eventStateKeys, err := prepareEventStateKeysTable(db)
 	if err != nil {
 		return err
@@ -166,7 +167,7 @@ func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
 	d.Database = shared.Database{
 		DB:                  db,
 		Cache:               cache,
-		Writer:              sqlutil.NewDummyWriter(),
+		Writer:              writer,
 		EventTypesTable:     eventTypes,
 		EventStateKeysTable: eventStateKeys,
 		EventJSONTable:      eventJSON,

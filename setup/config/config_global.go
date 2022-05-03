@@ -34,6 +34,13 @@ type Global struct {
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
 
+	// Global pool of database connections, which is used only in monolith mode. If a
+	// component does not specify any database options of its own, then this pool of
+	// connections will be used instead. This way we don't have to manage connection
+	// counts on a per-component basis, but can instead do it for the entire monolith.
+	// In a polylith deployment, this will be ignored.
+	DatabaseOptions DatabaseOptions `yaml:"database"`
+
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
 

@@ -43,11 +43,24 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite, db storage.Database, cfg *config.UserAPI,
+	base *base.BaseDendrite, cfg *config.UserAPI,
 	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
 	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
 	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+
+	db, err := storage.NewUserAPIDatabase(
+		base,
+		&cfg.AccountDatabase,
+		cfg.Matrix.ServerName,
+		cfg.BCryptCost,
+		cfg.OpenIDTokenLifetimeMS,
+		api.DefaultLoginTokenLifetime,
+		cfg.Matrix.ServerNotices.LocalPart,
+	)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to accounts db")
+	}
 
 	syncProducer := producers.NewSyncAPI(
 		db, js,
