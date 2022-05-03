@@ -67,8 +67,7 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, csMux, ssMux, key
 		m.KeyAPI, nil,
 	)
 	mediaapi.AddPublicRoutes(
-		base, mediaMux, &m.Config.MediaAPI, &m.Config.ClientAPI.RateLimiting,
-		m.UserAPI, m.Client,
+		base, m.UserAPI, m.Client,
 	)
 	syncapi.AddPublicRoutes(
 		base, csMux, m.UserAPI, m.RoomserverAPI,
