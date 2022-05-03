@@ -144,16 +144,7 @@ func (m *DendriteMonolith) Start() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(
-		base,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-		base.DendriteAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)

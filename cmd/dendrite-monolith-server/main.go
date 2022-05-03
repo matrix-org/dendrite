@@ -143,16 +143,7 @@ func main() {
 		UserAPI:       userAPI,
 		KeyAPI:        keyAPI,
 	}
-	monolith.AddAllPublicRoutes(
-		base,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-		base.DendriteAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {
 		if err := mscs.Enable(base, &monolith); err != nil {
