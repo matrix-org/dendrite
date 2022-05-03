@@ -123,8 +123,8 @@ services:
       - internal
     restart: unless-stopped
 
-  appservice_api:
-    hostname: appservice_api
+  app_service_api:
+    hostname: app_service_api
     image: matrixdotorg/dendrite-polylith:latest
     command: appservice
     volumes:

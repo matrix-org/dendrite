@@ -131,7 +131,7 @@ global:
     cache_lifetime: "5m" # 5minutes; see https://pkg.go.dev/time@master#ParseDuration for more
 
 # Configuration for the Appservice API.
-appservice_api:
+app_service_api:
   internal_api:
     listen: http://localhost:7777 # Only used in polylith deployments
     connect: http://localhost:7777 # Only used in polylith deployments

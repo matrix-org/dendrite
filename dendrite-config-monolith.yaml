@@ -140,7 +140,7 @@ global:
     cache_lifetime: "5m" # 5minutes; see https://pkg.go.dev/time@master#ParseDuration for more
 
 # Configuration for the Appservice API.
-appservice_api:
+app_service_api:
   # Disable the validation of TLS certificates of appservices. This is
   # not recommended in production since it may allow appservice traffic
   # to be sent to an unverified endpoint.

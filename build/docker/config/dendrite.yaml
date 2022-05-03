@@ -117,10 +117,10 @@ global:
     cache_lifetime: "5m" # 5minutes; see https://pkg.go.dev/time@master#ParseDuration for more
 
 # Configuration for the Appservice API.
-appservice_api:
+app_service_api:
   internal_api:
     listen: http://0.0.0.0:7777
-    connect: http://appservice_api:7777
+    connect: http://app_service_api:7777
   database:
     connection_string: postgresql://dendrite:itsasecret@postgres/dendrite_appservice?sslmode=disable
     max_open_conns: 10
