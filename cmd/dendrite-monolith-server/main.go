@@ -71,7 +71,6 @@ func main() {
 	base := basepkg.NewBaseDendrite(cfg, "Monolith", options...)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
 	rsImpl := roomserver.NewInternalAPI(base)
@@ -104,7 +103,7 @@ func main() {
 	}
 
 	pgClient := base.PushGatewayHTTPClient()
-	userImpl := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
+	userImpl := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
 	userAPI := userImpl
 	if base.UseHTTPAPIs {
 		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
@@ -135,7 +134,6 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    base.CreateClient(),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -146,7 +144,7 @@ func main() {
 		KeyAPI:        keyAPI,
 	}
 	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
+		base,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,

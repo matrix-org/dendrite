@@ -19,14 +19,15 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewPublicRoomsServerDatabase opens a database connection.
-func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
+func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.Open(dbProperties, cache)
+		return sqlite3.Open(base, dbProperties, cache)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

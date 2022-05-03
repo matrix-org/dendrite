@@ -62,7 +62,7 @@ func NewInternalAPI(
 	js, _ := jetstream.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
-	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)
+	appserviceDB, err := storage.NewDatabase(base, &base.Cfg.AppServiceAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}

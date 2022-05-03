@@ -268,7 +268,6 @@ func (m *DendriteMonolith) Start() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
@@ -281,7 +280,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
-	m.userAPI = userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	m.userAPI = userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(m.userAPI)
 
 	asAPI := appservice.NewInternalAPI(base, m.userAPI, rsAPI)
@@ -295,7 +294,6 @@ func (m *DendriteMonolith) Start() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    conn.CreateClient(base, m.PineconeQUIC),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -309,7 +307,7 @@ func (m *DendriteMonolith) Start() {
 		ExtUserDirectoryProvider: userProvider,
 	}
 	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
+		base,
 		base.PublicClientAPIMux,
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
