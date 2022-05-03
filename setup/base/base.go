@@ -201,7 +201,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
 			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
 		}
-		if db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDummyWriter()); err != nil {
+		writer = sqlutil.NewDummyWriter()
+		if db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer); err != nil {
 			logrus.WithError(err).Panic("Failed to set up global database connections")
 		}
 		logrus.Debug("Using global database connection pool")

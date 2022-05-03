@@ -33,10 +33,19 @@ var DBTypeSQLite DBType = 1
 var DBTypePostgres DBType = 2
 
 var Quiet = false
+var Required = os.Getenv("DENDRITE_TEST_SKIP_NODB") == ""
 
-func createLocalDB(dbName string) {
+func fatalError(t *testing.T, format string, args ...interface{}) {
+	if Required {
+		t.Fatalf(format, args...)
+	} else {
+		t.Skipf(format, args...)
+	}
+}
+
+func createLocalDB(t *testing.T, dbName string) {
 	if !Quiet {
-		fmt.Println("Note: tests require a postgres install accessible to the current user")
+		t.Log("Note: tests require a postgres install accessible to the current user")
 	}
 	createDB := exec.Command("createdb", dbName)
 	if !Quiet {
@@ -44,15 +53,15 @@ func createLocalDB(dbName string) {
 		createDB.Stderr = os.Stderr
 	}
 	err := createDB.Run()
-	if err != nil && !Quiet {
-		fmt.Println("createLocalDB returned error:", err)
+	if err != nil {
+		fatalError(t, "createLocalDB returned error: %s", err)
 	}
 }
 
 func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	db, err := sql.Open("postgres", connStr+" dbname=postgres")
 	if err != nil {
-		t.Fatalf("failed to open postgres conn with connstr=%s : %s", connStr, err)
+		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
 	if err != nil {
@@ -133,7 +142,7 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 	hash := sha256.Sum256([]byte(wd))
 	dbName := fmt.Sprintf("dendrite_test_%s", hex.EncodeToString(hash[:16]))
 	if postgresDB == "" { // local server, use createdb
-		createLocalDB(dbName)
+		createLocalDB(t, dbName)
 	} else { // remote server, shell into the postgres user and CREATE DATABASE
 		createRemoteDB(t, dbName, user, connStr)
 	}

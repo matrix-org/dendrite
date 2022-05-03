@@ -15,7 +15,6 @@
 package clientapi
 
 import (
-	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -24,20 +23,15 @@ import (
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
 func AddPublicRoutes(
-	process *process.ProcessContext,
-	router *mux.Router,
-	synapseAdminRouter *mux.Router,
-	dendriteAdminRouter *mux.Router,
-	cfg *config.ClientAPI,
+	base *base.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
@@ -47,9 +41,10 @@ func AddPublicRoutes(
 	userDirectoryProvider userapi.UserDirectoryProvider,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
-	mscCfg *config.MSCs,
 ) {
-	js, natsClient := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	cfg := &base.Cfg.ClientAPI
+	mscCfg := &base.Cfg.MSCs
+	js, natsClient := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
@@ -63,7 +58,9 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		router, synapseAdminRouter, dendriteAdminRouter,
+		base.PublicClientAPIMux,
+		base.SynapseAdminMux,
+		base.DendriteAdminMux,
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
