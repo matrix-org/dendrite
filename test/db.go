@@ -33,6 +33,15 @@ var DBTypeSQLite DBType = 1
 var DBTypePostgres DBType = 2
 
 var Quiet = false
+var Required = os.Getenv("DENDRITE_SKIP_DB_TESTS") == ""
+
+func fatalError(t *testing.T, format string, args ...interface{}) {
+	if Required {
+		t.Fatalf(format, args...)
+	} else {
+		t.Skipf(format, args...)
+	}
+}
 
 func createLocalDB(t *testing.T, dbName string) {
 	if !Quiet {
@@ -45,14 +54,14 @@ func createLocalDB(t *testing.T, dbName string) {
 	}
 	err := createDB.Run()
 	if err != nil {
-		t.Skipf("createLocalDB returned error: %s", err)
+		fatalError(t, "createLocalDB returned error: %s", err)
 	}
 }
 
 func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	db, err := sql.Open("postgres", connStr+" dbname=postgres")
 	if err != nil {
-		t.Skipf("failed to open postgres conn with connstr=%s : %s", connStr, err)
+		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
 	if err != nil {
