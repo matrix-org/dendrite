@@ -102,7 +102,7 @@ func Enable(
 	base *base.BaseDendrite, rsAPI roomserver.RoomserverInternalAPI, fsAPI fs.FederationInternalAPI,
 	userAPI userapi.UserInternalAPI, keyRing gomatrixserverlib.JSONVerifier,
 ) error {
-	db, err := NewDatabase(&base.Cfg.MSCs.Database)
+	db, err := NewDatabase(base, &base.Cfg.MSCs.Database)
 	if err != nil {
 		return fmt.Errorf("cannot enable MSC2836: %w", err)
 	}

@@ -17,6 +17,7 @@ package base
 import (
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"io"
 	"net"
@@ -32,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
@@ -40,7 +42,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/process"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
@@ -81,6 +82,8 @@ type BaseDendrite struct {
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
 	DNSCache               *gomatrixserverlib.DNSCache
+	Database               *sql.DB
+	DatabaseWriter         sqlutil.Writer
 }
 
 const NoListener = ""
@@ -112,7 +115,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	}
 
 	configErrors := &config.ConfigErrors{}
-	cfg.Verify(configErrors, componentName == "Monolith") // TODO: better way?
+	isMonolith := componentName == "Monolith" // TODO: better way?
+	cfg.Verify(configErrors, isMonolith)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
 			logrus.Errorf("Configuration error: %s", err)
@@ -185,6 +189,24 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		},
 	}
 
+	// If we're in monolith mode, we'll set up a global pool of database
+	// connections. A component is welcome to use this pool if they don't
+	// have a separate database config of their own.
+	var db *sql.DB
+	var writer sqlutil.Writer
+	if cfg.Global.DatabaseOptions != nil && isMonolith {
+		switch {
+		case cfg.Global.DatabaseOptions.ConnectionString.IsSQLite():
+			writer = sqlutil.NewExclusiveWriter()
+		default:
+			writer = sqlutil.NewDummyWriter()
+		}
+		db, err = sqlutil.Open(cfg.Global.DatabaseOptions, writer)
+		if err != nil {
+			logrus.WithError(err).Panic("Failed to set up global database connections")
+		}
+	}
+
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
 	// When used in conjunction with UseEncodedPath() we get the behaviour we want when parsing
@@ -214,12 +236,27 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
 		apiHttpClient:          &apiClient,
+		Database:               db,     // monolith only
+		DatabaseWriter:         writer, // monolith only
 	}
 }
 
 // Close implements io.Closer
 func (b *BaseDendrite) Close() error {
 	return b.tracerCloser.Close()
+}
+
+// DatabaseConnection sets up a new database connection if appropriate,
+// or returns the global connection pool if not (monolith mode only).
+func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
+	if dbProperties != nil || b == nil {
+		db, err := sqlutil.Open(dbProperties, writer)
+		return db, writer, err
+	}
+	if b.Database != nil {
+		return b.Database, b.DatabaseWriter, nil
+	}
+	return nil, nil, fmt.Errorf("no database connections configured")
 }
 
 // AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
@@ -271,24 +308,6 @@ func (b *BaseDendrite) KeyServerHTTPClient() keyserverAPI.KeyInternalAPI {
 // PushGatewayHTTPClient returns a new client for interacting with (external) Push Gateways.
 func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
 	return pushgateway.NewHTTPClient(b.Cfg.UserAPI.PushGatewayDisableTLSValidation)
-}
-
-// CreateAccountsDB creates a new instance of the accounts database. Should only
-// be called once per component.
-func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
-	db, err := userdb.NewUserAPIDatabase(
-		&b.Cfg.UserAPI.AccountDatabase,
-		b.Cfg.Global.ServerName,
-		b.Cfg.UserAPI.BCryptCost,
-		b.Cfg.UserAPI.OpenIDTokenLifetimeMS,
-		userapi.DefaultLoginTokenLifetime,
-		b.Cfg.Global.ServerNotices.LocalPart,
-	)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to accounts db")
-	}
-
-	return db
 }
 
 // CreateClient creates a new client (normally used for media fetch requests).
