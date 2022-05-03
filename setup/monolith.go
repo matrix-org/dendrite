@@ -15,7 +15,6 @@
 package setup
 
 import (
-	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -52,28 +51,24 @@ type Monolith struct {
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
-func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, csMux, ssMux, keyMux, wkMux, mediaMux, synapseMux, dendriteMux *mux.Router) {
+func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 	userDirectoryProvider := m.ExtUserDirectoryProvider
 	if userDirectoryProvider == nil {
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		base.ProcessContext, csMux, synapseMux, dendriteMux, &m.Config.ClientAPI,
-		m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		base, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider, m.KeyAPI,
-		m.ExtPublicRoomsProvider, &m.Config.MSCs,
+		m.ExtPublicRoomsProvider,
 	)
 	federationapi.AddPublicRoutes(
-		base.ProcessContext, ssMux, keyMux, wkMux, &m.Config.FederationAPI,
-		m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI,
-		m.KeyAPI, &m.Config.MSCs, nil,
+		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI,
+		m.KeyAPI, nil,
 	)
 	mediaapi.AddPublicRoutes(
-		base, mediaMux, &m.Config.MediaAPI, &m.Config.ClientAPI.RateLimiting,
-		m.UserAPI, m.Client,
+		base, m.UserAPI, m.Client,
 	)
 	syncapi.AddPublicRoutes(
-		base, csMux, m.UserAPI, m.RoomserverAPI,
-		m.KeyAPI, m.FedClient, &m.Config.SyncAPI,
+		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI, m.FedClient,
 	)
 }

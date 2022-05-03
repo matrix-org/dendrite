@@ -25,8 +25,7 @@ func MediaAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	client := base.CreateClient()
 
 	mediaapi.AddPublicRoutes(
-		base, base.PublicMediaAPIMux, &base.Cfg.MediaAPI, &base.Cfg.ClientAPI.RateLimiting,
-		userAPI, client,
+		base, userAPI, client,
 	)
 
 	base.SetupAndServeHTTP(
