@@ -64,9 +64,8 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, csMux, ssMux, key
 		m.ExtPublicRoomsProvider, &m.Config.MSCs,
 	)
 	federationapi.AddPublicRoutes(
-		base.ProcessContext, ssMux, keyMux, wkMux, &m.Config.FederationAPI,
-		m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI,
-		m.KeyAPI, &m.Config.MSCs, nil,
+		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI,
+		m.KeyAPI, nil,
 	)
 	mediaapi.AddPublicRoutes(
 		base, mediaMux, &m.Config.MediaAPI, &m.Config.ClientAPI.RateLimiting,
