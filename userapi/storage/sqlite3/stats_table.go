@@ -49,6 +49,10 @@ const countUsersLastSeenAfterSQL = "" +
 	" GROUP BY localpart" +
 	" ) u"
 
+// Note on the following countR30UsersSQL and countR30UsersV2SQL: The different checks are intentional.
+// This is to ensure the values reported by Dendrite are the same as by Synapse.
+// Queries are taken from: https://github.com/matrix-org/synapse/blob/9ce51a47f6e37abd0a1275281806399d874eb026/synapse/storage/databases/main/stats.py
+
 /*
 R30Users counts the number of 30 day retained users, defined as:
 - Users who have created their accounts more than 30 days ago
@@ -81,6 +85,10 @@ SELECT platform, COUNT(*) FROM (
 	GROUP BY users.localpart, platform, users.created_ts
 	) u GROUP BY PLATFORM
 `
+
+// Note on the following countR30UsersSQL and countR30UsersV2SQL: The different checks are intentional.
+// This is to ensure the values reported are the same as Synapse reports.
+// Queries are taken from: https://github.com/matrix-org/synapse/blob/9ce51a47f6e37abd0a1275281806399d874eb026/synapse/storage/databases/main/stats.py
 
 /*
 R30UsersV2 counts the number of 30 day retained users, defined as users that:

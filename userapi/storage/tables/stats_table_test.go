@@ -35,7 +35,7 @@ func mustMakeDBs(t *testing.T, dbType test.DBType) (
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
 	}
@@ -144,7 +144,7 @@ func Test_UserStatistics(t *testing.T) {
 			}
 
 			if wantType != gotDB.Engine { // can't use DeepEqual, as the Version might differ
-				t.Errorf("UserStatistics() gotDB = %+v, want SQLite", gotDB.Engine)
+				t.Errorf("UserStatistics() got DB engine = %+v, want %s", gotDB.Engine, wantType)
 			}
 		})
 
