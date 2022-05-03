@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type AccountDataTable interface {
@@ -98,7 +97,7 @@ type ThreePIDTable interface {
 }
 
 type PusherTable interface {
-	InsertPusher(ctx context.Context, txn *sql.Tx, session_id int64, pushkey string, pushkeyTS gomatrixserverlib.Timestamp, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string) error
+	InsertPusher(ctx context.Context, txn *sql.Tx, session_id int64, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string) error
 	SelectPushers(ctx context.Context, txn *sql.Tx, localpart string) ([]api.Pusher, error)
 	DeletePusher(ctx context.Context, txn *sql.Tx, appid, pushkey, localpart string) error
 	DeletePushers(ctx context.Context, txn *sql.Tx, appid, pushkey string) error

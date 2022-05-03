@@ -90,6 +90,13 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
+	// Inform the SyncAPI about the newly created push_rules
+	if err = a.SyncProducer.SendAccountData(acc.UserID, "", "m.push_rules"); err != nil {
+		util.GetLogger(ctx).WithFields(logrus.Fields{
+			"user_id": acc.UserID,
+		}).WithError(err).Warn("failed to send account data to the SyncAPI")
+	}
+
 	if req.AccountType == api.AccountTypeGuest {
 		res.AccountCreated = true
 		res.Account = acc
@@ -653,7 +660,7 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart)
 	}
 	if req.Pusher.PushKeyTS == 0 {
-		req.Pusher.PushKeyTS = gomatrixserverlib.AsTimestamp(time.Now())
+		req.Pusher.PushKeyTS = int64(time.Now().Unix())
 	}
 	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart)
 }

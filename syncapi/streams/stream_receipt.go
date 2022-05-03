@@ -62,6 +62,12 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	}
 
 	for roomID, receipts := range receiptsByRoom {
+		// For a complete sync, make sure we're only including this room if
+		// that room was present in the joined rooms.
+		if from == 0 && !req.IsRoomPresent(roomID) {
+			continue
+		}
+
 		jr := *types.NewJoinResponse()
 		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
 			jr = existing

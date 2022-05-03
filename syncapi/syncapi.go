@@ -57,8 +57,12 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
+	lazyLoadCache, err := caching.NewLazyLoadCache()
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create lazy loading cache")
+	}
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -144,5 +148,5 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg)
+	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg, lazyLoadCache)
 }

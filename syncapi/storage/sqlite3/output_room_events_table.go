@@ -168,7 +168,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		s.db, txn, stmtSQL, inputParams,
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		nil, stateFilter.Limit, FilterOrderAsc,
+		nil, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -277,7 +277,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	// Parse content as JSON and search for an "url" key
 	containsURL := false
 	var content map[string]interface{}
-	if json.Unmarshal(event.Content(), &content) != nil {
+	if json.Unmarshal(event.Content(), &content) == nil {
 		// Set containsURL to true if url is present
 		_, containsURL = content["url"]
 	}
@@ -345,7 +345,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		nil, eventFilter.Limit+1, FilterOrderDesc,
+		nil, eventFilter.ContainsURL, eventFilter.Limit+1, FilterOrderDesc,
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -393,7 +393,7 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
-		nil, eventFilter.Limit, FilterOrderAsc,
+		nil, eventFilter.ContainsURL, eventFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -419,20 +419,27 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 // selectEvents returns the events for the given event IDs. If an event is
 // missing from the database, it will be omitted.
 func (s *outputRoomEventsStatements) SelectEvents(
-	ctx context.Context, txn *sql.Tx, eventIDs []string, preserveOrder bool,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, filter *gomatrixserverlib.RoomEventFilter, preserveOrder bool,
 ) ([]types.StreamEvent, error) {
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for i := range eventIDs {
 		iEventIDs[i] = eventIDs[i]
 	}
 	selectSQL := strings.Replace(selectEventsSQL, "($1)", sqlutil.QueryVariadic(len(eventIDs)), 1)
-	var rows *sql.Rows
-	var err error
-	if txn != nil {
-		rows, err = txn.QueryContext(ctx, selectSQL, iEventIDs...)
-	} else {
-		rows, err = s.db.QueryContext(ctx, selectSQL, iEventIDs...)
+
+	if filter == nil {
+		filter = &gomatrixserverlib.RoomEventFilter{Limit: 20}
 	}
+	stmt, params, err := prepareWithFilters(
+		s.db, txn, selectSQL, iEventIDs,
+		filter.Senders, filter.NotSenders,
+		filter.Types, filter.NotTypes,
+		nil, filter.ContainsURL, filter.Limit, FilterOrderAsc,
+	)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -527,7 +534,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 		},
 		filter.Senders, filter.NotSenders,
 		filter.Types, filter.NotTypes,
-		nil, filter.Limit, FilterOrderDesc,
+		nil, filter.ContainsURL, filter.Limit, FilterOrderDesc,
 	)
 
 	rows, err := stmt.QueryContext(ctx, params...)
@@ -563,7 +570,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		},
 		filter.Senders, filter.NotSenders,
 		filter.Types, filter.NotTypes,
-		nil, filter.Limit, FilterOrderAsc,
+		nil, filter.ContainsURL, filter.Limit, FilterOrderAsc,
 	)
 
 	rows, err := stmt.QueryContext(ctx, params...)

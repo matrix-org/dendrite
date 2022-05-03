@@ -190,7 +190,7 @@ func (d *Database) CrossSigningKeysForUser(ctx context.Context, userID string) (
 				keyID: key,
 			},
 		}
-		sigMap, err := d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, userID, keyID)
+		sigMap, err := d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, userID, userID, keyID)
 		if err != nil {
 			continue
 		}
@@ -219,8 +219,8 @@ func (d *Database) CrossSigningKeysDataForUser(ctx context.Context, userID strin
 }
 
 // CrossSigningSigsForTarget returns the signatures for a given user's key ID, if any.
-func (d *Database) CrossSigningSigsForTarget(ctx context.Context, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (types.CrossSigningSigMap, error) {
-	return d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, targetUserID, targetKeyID)
+func (d *Database) CrossSigningSigsForTarget(ctx context.Context, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID) (types.CrossSigningSigMap, error) {
+	return d.CrossSigningSigsTable.SelectCrossSigningSigsForTarget(ctx, nil, originUserID, targetUserID, targetKeyID)
 }
 
 // StoreCrossSigningKeysForUser stores the latest known cross-signing keys for a user.

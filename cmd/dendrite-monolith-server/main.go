@@ -153,6 +153,7 @@ func main() {
 		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
+		base.DendriteAdminMux,
 	)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {

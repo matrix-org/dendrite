@@ -579,21 +579,6 @@ func (d *Database) UpdateDevice(
 	})
 }
 
-// RemoveDevice revokes a device by deleting the entry in the database
-// matching with the given device ID and user ID localpart.
-// If the device doesn't exist, it will not return an error
-// If something went wrong during the deletion, it will return the SQL error.
-func (d *Database) RemoveDevice(
-	ctx context.Context, deviceID, localpart string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.Devices.DeleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
-			return err
-		}
-		return nil
-	})
-}
-
 // RemoveDevices revokes one or more devices by deleting the entry in the database
 // matching with the given device IDs and user ID localpart.
 // If the devices don't exist, it will not return an error
