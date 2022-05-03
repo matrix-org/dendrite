@@ -58,10 +58,9 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, csMux, ssMux, key
 		userDirectoryProvider = m.UserAPI
 	}
 	clientapi.AddPublicRoutes(
-		base.ProcessContext, csMux, synapseMux, dendriteMux, &m.Config.ClientAPI,
-		m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
+		base, m.FedClient, m.RoomserverAPI, m.AppserviceAPI, transactions.New(),
 		m.FederationAPI, m.UserAPI, userDirectoryProvider, m.KeyAPI,
-		m.ExtPublicRoomsProvider, &m.Config.MSCs,
+		m.ExtPublicRoomsProvider,
 	)
 	federationapi.AddPublicRoutes(
 		base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.FederationAPI,
