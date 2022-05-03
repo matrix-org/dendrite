@@ -49,7 +49,9 @@ func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !isMonolith {
 		checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
-	//checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
+	}
 }
 
 // The config for setting a proxy to use for server->server requests

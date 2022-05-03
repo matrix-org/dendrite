@@ -58,7 +58,9 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !isMonolith {
 		checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
 	}
-	//checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
+	}
 
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(c.MaxFileSizeBytes))

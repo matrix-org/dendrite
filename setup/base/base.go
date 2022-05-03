@@ -194,20 +194,22 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	// have a separate database config of their own.
 	var db *sql.DB
 	var writer sqlutil.Writer
-	if cfg.Global.DatabaseOptions.ConnectionString != "" && isMonolith {
-		switch {
-		case cfg.Global.DatabaseOptions.ConnectionString.IsSQLite():
-			writer = sqlutil.NewExclusiveWriter()
-		default:
-			writer = sqlutil.NewDummyWriter()
+	if cfg.Global.DatabaseOptions.ConnectionString != "" {
+		if isMonolith {
+			switch {
+			case cfg.Global.DatabaseOptions.ConnectionString.IsSQLite():
+				writer = sqlutil.NewExclusiveWriter()
+			default:
+				writer = sqlutil.NewDummyWriter()
+			}
+			db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer)
+			if err != nil {
+				logrus.WithError(err).Panic("Failed to set up global database connections")
+			}
+			logrus.Info("Using global database connection pool")
+		} else {
+			logrus.Panic("Using a global database connection pool is not supported in polylith deployments")
 		}
-		db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer)
-		if err != nil {
-			logrus.WithError(err).Panic("Failed to set up global database connections")
-		}
-		logrus.Info("Using global database connection pool")
-	} else {
-		logrus.Info("Not using global database connection pool")
 	}
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
@@ -250,7 +252,7 @@ func (b *BaseDendrite) Close() error {
 }
 
 // DatabaseConnection sets up a new database connection if appropriate,
-// or returns the global connection pool if not (monolith mode only).
+// or returns the global connection pool if not.
 func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
 	if dbProperties.ConnectionString != "" || b == nil {
 		db, err := sqlutil.Open(dbProperties, writer)
