@@ -51,6 +51,12 @@ func Backfill(
 		}
 	}
 
+	// If we don't think we belong to this room then don't waste the effort
+	// responding to expensive requests for it.
+	if err := ErrorIfLocalServerNotInRoom(httpReq.Context(), rsAPI, roomID); err != nil {
+		return *err
+	}
+
 	// Check if all of the required parameters are there.
 	eIDs, exists = httpReq.URL.Query()["v"]
 	if !exists {

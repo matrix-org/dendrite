@@ -31,12 +31,13 @@ func (d *Database) AssociateEDUWithDestination(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 	receipt *Receipt,
+	eduType string,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationQueueEDUs.InsertQueueEDU(
 			ctx,         // context
 			txn,         // SQL transaction
-			"",          // TODO: EDU type for coalescing
+			eduType,     // EDU type for coalescing
 			serverName,  // destination server name
 			receipt.nid, // NID from the federationapi_queue_json table
 		); err != nil {

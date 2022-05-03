@@ -124,6 +124,7 @@ func Send(
 	t := txnReq{
 		rsAPI:                  rsAPI,
 		keys:                   keys,
+		ourServerName:          cfg.Matrix.ServerName,
 		federation:             federation,
 		servers:                servers,
 		keyAPI:                 keyAPI,
@@ -183,6 +184,7 @@ type txnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI                  api.RoomserverInternalAPI
 	keyAPI                 keyapi.KeyInternalAPI
+	ourServerName          gomatrixserverlib.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
 	federation             txnFederationClient
 	roomsMu                *internal.MutexByRoom
@@ -303,6 +305,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
+// nolint:gocyclo
 func (t *txnReq) processEDUs(ctx context.Context) {
 	for _, e := range t.EDUs {
 		eduCountTotal.Inc()
@@ -318,13 +321,11 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal typing event")
 				continue
 			}
-			_, domain, err := gomatrixserverlib.SplitID('@', typingPayload.UserID)
-			if err != nil {
-				util.GetLogger(ctx).WithError(err).Debug("Failed to split domain from typing event sender")
+			if _, serverName, err := gomatrixserverlib.SplitID('@', typingPayload.UserID); err != nil {
 				continue
-			}
-			if domain != t.Origin {
-				util.GetLogger(ctx).Debugf("Dropping typing event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+			} else if serverName == t.ourServerName {
+				continue
+			} else if serverName != t.Origin {
 				continue
 			}
 			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
@@ -335,6 +336,13 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			var directPayload gomatrixserverlib.ToDeviceMessage
 			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
 				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal send-to-device events")
+				continue
+			}
+			if _, serverName, err := gomatrixserverlib.SplitID('@', directPayload.Sender); err != nil {
+				continue
+			} else if serverName == t.ourServerName {
+				continue
+			} else if serverName != t.Origin {
 				continue
 			}
 			for userID, byUser := range directPayload.Messages {
@@ -405,6 +413,13 @@ func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 		return err
 	}
 	for _, content := range payload.Push {
+		if _, serverName, err := gomatrixserverlib.SplitID('@', content.UserID); err != nil {
+			continue
+		} else if serverName == t.ourServerName {
+			continue
+		} else if serverName != t.Origin {
+			continue
+		}
 		presence, ok := syncTypes.PresenceFromString(content.Presence)
 		if !ok {
 			continue
@@ -424,7 +439,13 @@ func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverli
 		}).Debug("Failed to unmarshal signing key update")
 		return err
 	}
-
+	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
+		return nil
+	} else if serverName == t.ourServerName {
+		return nil
+	} else if serverName != t.Origin {
+		return nil
+	}
 	keys := gomatrixserverlib.CrossSigningKeys{}
 	if updatePayload.MasterKey != nil {
 		keys.MasterKey = *updatePayload.MasterKey
@@ -450,6 +471,13 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 	timestamp gomatrixserverlib.Timestamp,
 	eventIDs []string,
 ) error {
+	if _, serverName, err := gomatrixserverlib.SplitID('@', userID); err != nil {
+		return nil
+	} else if serverName == t.ourServerName {
+		return nil
+	} else if serverName != t.Origin {
+		return nil
+	}
 	// store every event
 	for _, eventID := range eventIDs {
 		if err := t.producer.SendReceipt(ctx, userID, roomID, eventID, receiptType, timestamp); err != nil {
@@ -464,6 +492,13 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 	var payload gomatrixserverlib.DeviceListUpdateEvent
 	if err := json.Unmarshal(e.Content, &payload); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal device list update event")
+		return
+	}
+	if _, serverName, err := gomatrixserverlib.SplitID('@', payload.UserID); err != nil {
+		return
+	} else if serverName == t.ourServerName {
+		return
+	} else if serverName != t.Origin {
 		return
 	}
 	var inputRes keyapi.InputDeviceListUpdateResponse

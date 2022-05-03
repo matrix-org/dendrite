@@ -25,7 +25,7 @@ echo "Installing golangci-lint..."
 
 # Make a backup of go.{mod,sum} first
 cp go.mod go.mod.bak && cp go.sum go.sum.bak
-go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.41.1
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
 
 # Run linting
 echo "Looking for lint..."
@@ -33,7 +33,7 @@ echo "Looking for lint..."
 # Capture exit code to ensure go.{mod,sum} is restored before exiting
 exit_code=0
 
-PATH="$PATH:${GOPATH:-~/go}/bin" golangci-lint run $args || exit_code=1
+PATH="$PATH:$(go env GOPATH)/bin" golangci-lint run $args || exit_code=1
 
 # Restore go.{mod,sum}
 mv go.mod.bak go.mod && mv go.sum.bak go.sum

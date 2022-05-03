@@ -97,6 +97,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-appservice.db", m.StorageDirectory))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.ClientAPI.RegistrationDisabled = false
+	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -152,6 +154,7 @@ func (m *DendriteMonolith) Start() {
 		base.PublicWellKnownAPIMux,
 		base.PublicMediaAPIMux,
 		base.SynapseAdminMux,
+		base.DendriteAdminMux,
 	)
 
 	httpRouter := mux.NewRouter()

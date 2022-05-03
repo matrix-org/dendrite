@@ -3,13 +3,17 @@ package streams
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 	"go.uber.org/atomic"
 )
 
@@ -29,6 +33,7 @@ type PDUStreamProvider struct {
 	workers atomic.Int32
 	// userID+deviceID -> lazy loading cache
 	lazyLoadCache *caching.LazyLoadCache
+	rsAPI         roomserverAPI.RoomserverInternalAPI
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -205,6 +210,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
+// nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
 	device *userapi.Device,
@@ -228,13 +234,16 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		eventFilter, true, true,
 	)
 	if err != nil {
-		return r.From, err
+		if err == sql.ErrNoRows {
+			return r.To, nil
+		}
+		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
 	prevBatch, err := p.DB.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
-		return r.From, err
+		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
 	}
 
 	// If we didn't return any events at all then don't bother doing anything else.
@@ -268,15 +277,12 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	if stateFilter.LazyLoadMembers {
-		if err != nil {
-			return r.From, err
-		}
 		delta.StateEvents, err = p.lazyLoadMembers(
 			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, delta.StateEvents,
 		)
-		if err != nil {
-			return r.From, err
+		if err != nil && err != sql.ErrNoRows {
+			return r.From, fmt.Errorf("p.lazyLoadMembers: %w", err)
 		}
 	}
 
@@ -288,16 +294,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 	}
 
-	// Work out how many members are in the room.
-	joinedCount, _ := p.DB.MembershipCount(ctx, delta.RoomID, gomatrixserverlib.Join, latestPosition)
-	invitedCount, _ := p.DB.MembershipCount(ctx, delta.RoomID, gomatrixserverlib.Invite, latestPosition)
-
 	switch delta.Membership {
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 		if hasMembershipChange {
-			jr.Summary.JoinedMemberCount = &joinedCount
-			jr.Summary.InvitedMemberCount = &invitedCount
+			p.addRoomSummary(ctx, jr, delta.RoomID, device.UserID, latestPosition)
 		}
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
@@ -330,6 +331,45 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	return latestPosition, nil
 }
 
+func (p *PDUStreamProvider) addRoomSummary(ctx context.Context, jr *types.JoinResponse, roomID, userID string, latestPosition types.StreamPosition) {
+	// Work out how many members are in the room.
+	joinedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Join, latestPosition)
+	invitedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, latestPosition)
+
+	jr.Summary.JoinedMemberCount = &joinedCount
+	jr.Summary.InvitedMemberCount = &invitedCount
+
+	fetchStates := []gomatrixserverlib.StateKeyTuple{
+		{EventType: gomatrixserverlib.MRoomName},
+		{EventType: gomatrixserverlib.MRoomCanonicalAlias},
+	}
+	// Check if the room has a name or a canonical alias
+	latestState := &roomserverAPI.QueryLatestEventsAndStateResponse{}
+	err := p.rsAPI.QueryLatestEventsAndState(ctx, &roomserverAPI.QueryLatestEventsAndStateRequest{StateToFetch: fetchStates, RoomID: roomID}, latestState)
+	if err != nil {
+		return
+	}
+	// Check if the room has a name or canonical alias, if so, return.
+	for _, ev := range latestState.StateEvents {
+		switch ev.Type() {
+		case gomatrixserverlib.MRoomName:
+			if gjson.GetBytes(ev.Content(), "name").Str != "" {
+				return
+			}
+		case gomatrixserverlib.MRoomCanonicalAlias:
+			if gjson.GetBytes(ev.Content(), "alias").Str != "" {
+				return
+			}
+		}
+	}
+	heroes, err := p.DB.GetRoomHeroes(ctx, roomID, userID, []string{"join", "invite"})
+	if err != nil {
+		return
+	}
+	sort.Strings(heroes)
+	jr.Summary.Heroes = heroes
+}
+
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
 	roomID string,
@@ -339,12 +379,16 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	wantFullState bool,
 	device *userapi.Device,
 ) (jr *types.JoinResponse, err error) {
+	jr = types.NewJoinResponse()
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
 		ctx, roomID, r, eventFilter, true, true,
 	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return jr, nil
+		}
 		return
 	}
 
@@ -410,9 +454,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		prevBatch.Decrement()
 	}
 
-	// Work out how many members are in the room.
-	joinedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Join, r.From)
-	invitedCount, _ := p.DB.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, r.From)
+	p.addRoomSummary(ctx, jr, roomID, device.UserID, r.From)
 
 	// We don't include a device here as we don't need to send down
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
@@ -428,14 +470,11 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			false, limited, stateFilter.IncludeRedundantMembers,
 			device, recentEvents, stateEvents,
 		)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}
 	}
 
-	jr = types.NewJoinResponse()
-	jr.Summary.JoinedMemberCount = &joinedCount
-	jr.Summary.InvitedMemberCount = &invitedCount
 	jr.Timeline.PrevBatch = prevBatch
 	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 	jr.Timeline.Limited = limited

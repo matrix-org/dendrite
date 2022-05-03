@@ -250,6 +250,7 @@ jobs:
       env:
         POSTGRES: ${{ matrix.postgres && 1}}
         API: ${{ matrix.api && 1 }}
+        SYTEST_BRANCH: ${{ github.head_ref }}
     steps:
       - uses: actions/checkout@v2
       - name: Run Sytest

@@ -51,4 +51,4 @@ CMD /build/run_postgres.sh && ./generate-keys --server $SERVER_NAME --tls-cert s
  sed -i "s%connection_string:.*$%connection_string: postgresql://postgres@localhost/postgres?sslmode=disable%g" dendrite.yaml && \
  sed -i 's/max_open_conns:.*$/max_open_conns: 100/g' dendrite.yaml && \
  cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
- ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+ ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}

@@ -29,16 +29,17 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath      = "/roomserver/performInvite"
-	RoomserverPerformPeekPath        = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
-	RoomserverPerformRoomUpgradePath = "/roomserver/performRoomUpgrade"
-	RoomserverPerformJoinPath        = "/roomserver/performJoin"
-	RoomserverPerformLeavePath       = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath     = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath = "/roomserver/performInboundPeek"
-	RoomserverPerformForgetPath      = "/roomserver/performForget"
+	RoomserverPerformInvitePath            = "/roomserver/performInvite"
+	RoomserverPerformPeekPath              = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath            = "/roomserver/performUnpeek"
+	RoomserverPerformRoomUpgradePath       = "/roomserver/performRoomUpgrade"
+	RoomserverPerformJoinPath              = "/roomserver/performJoin"
+	RoomserverPerformLeavePath             = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath          = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath           = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath            = "/roomserver/performForget"
+	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -291,6 +292,23 @@ func (h *httpRoomserverInternalAPI) PerformPublish(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformPublishPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
+	ctx context.Context,
+	req *api.PerformAdminEvacuateRoomRequest,
+	res *api.PerformAdminEvacuateRoomResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateRoom")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoomPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 	if err != nil {
 		res.Error = &api.PerformError{

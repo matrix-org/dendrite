@@ -127,14 +127,23 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	if !ok { // this should almost never happen
 		return
 	}
+
 	newPresence := types.PresenceInternal{
-		ClientFields: types.PresenceClientResponse{
-			Presence: presenceID.String(),
-		},
 		Presence:     presenceID,
 		UserID:       userID,
 		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
+
+	// ensure we also send the current status_msg to federated servers and not nil
+	dbPresence, err := db.GetPresence(context.Background(), userID)
+	if err != nil && err != sql.ErrNoRows {
+		return
+	}
+	if dbPresence != nil {
+		newPresence.ClientFields = dbPresence.ClientFields
+	}
+	newPresence.ClientFields.Presence = presenceID.String()
+
 	defer rp.presence.Store(userID, newPresence)
 	// avoid spamming presence updates when syncing
 	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
@@ -145,13 +154,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 		}
 	}
 
-	// ensure we also send the current status_msg to federated servers and not nil
-	dbPresence, err := db.GetPresence(context.Background(), userID)
-	if err != nil && err != sql.ErrNoRows {
-		return
-	}
-
-	if err := rp.producer.SendPresence(userID, presenceID, dbPresence.ClientFields.StatusMsg); err != nil {
+	if err := rp.producer.SendPresence(userID, presenceID, newPresence.ClientFields.StatusMsg); err != nil {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}

@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -71,7 +72,8 @@ const selectMaxPresenceSQL = "" +
 const selectPresenceAfter = "" +
 	" SELECT id, user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
-	" WHERE id > $1"
+	" WHERE id > $1 AND last_active_ts >= $2" +
+	" ORDER BY id ASC LIMIT $3"
 
 type presenceStatements struct {
 	db                         *sql.DB
@@ -142,6 +144,9 @@ func (p *presenceStatements) GetPresenceForUser(
 	}
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
 	err := stmt.QueryRowContext(ctx, userID).Scan(&result.Presence, &result.ClientFields.StatusMsg, &result.LastActiveTS)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	result.ClientFields.Presence = result.Presence.String()
 	return result, err
 }
@@ -155,12 +160,12 @@ func (p *presenceStatements) GetMaxPresenceID(ctx context.Context, txn *sql.Tx) 
 // GetPresenceAfter returns the changes presences after a given stream id
 func (p *presenceStatements) GetPresenceAfter(
 	ctx context.Context, txn *sql.Tx,
-	after types.StreamPosition,
+	after types.StreamPosition, filter gomatrixserverlib.EventFilter,
 ) (presences map[string]*types.PresenceInternal, err error) {
 	presences = make(map[string]*types.PresenceInternal)
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceAfterStmt)
-
-	rows, err := stmt.QueryContext(ctx, after)
+	afterTS := gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute * -5))
+	rows, err := stmt.QueryContext(ctx, after, afterTS, filter.Limit)
 	if err != nil {
 		return nil, err
 	}

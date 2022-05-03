@@ -124,6 +124,10 @@ func (d *Database) MembershipCount(ctx context.Context, roomID, membership strin
 	return d.Memberships.SelectMembershipCount(ctx, nil, roomID, membership, pos)
 }
 
+func (d *Database) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
+	return d.Memberships.SelectHeroes(ctx, nil, roomID, userID, memberships)
+}
+
 func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
@@ -162,6 +166,10 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
+}
+
+func (d *Database) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
+	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, roomIDs)
 }
 
 func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
@@ -261,7 +269,7 @@ func (d *Database) DeletePeeks(
 func (d *Database) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
+) (map[string][]string, types.StreamPosition, error) {
 	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
 }
 
@@ -509,9 +517,9 @@ func (d *Database) StreamToTopologicalPosition(
 }
 
 func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.Filter.SelectFilter(ctx, localpart, filterID)
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
@@ -688,6 +696,9 @@ func (d *Database) GetStateDeltas(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -705,17 +716,23 @@ func (d *Database) GetStateDeltas(
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, nil, err
 	}
 
@@ -726,6 +743,9 @@ func (d *Database) GetStateDeltas(
 			var s []types.StreamEvent
 			s, err = d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 			if err != nil {
+				if err == sql.ErrNoRows {
+					continue
+				}
 				return nil, nil, err
 			}
 			state[peek.RoomID] = s
@@ -753,6 +773,9 @@ func (d *Database) GetStateDeltas(
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
 					if err != nil {
+						if err == sql.ErrNoRows {
+							continue
+						}
 						return nil, nil, err
 					}
 					state[roomID] = s
@@ -803,6 +826,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -819,7 +845,7 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	deltas := make(map[string]types.StateDelta)
 
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, nil, err
 	}
 
@@ -828,6 +854,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 		if !peek.Deleted {
 			s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 			if stateErr != nil {
+				if stateErr == sql.ErrNoRows {
+					continue
+				}
 				return nil, nil, stateErr
 			}
 			deltas[peek.RoomID] = types.StateDelta{
@@ -841,10 +870,16 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	// Get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -869,6 +904,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	for _, joinedRoomID := range joinedRoomIDs {
 		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
 		if stateErr != nil {
+			if stateErr == sql.ErrNoRows {
+				continue
+			}
 			return nil, nil, stateErr
 		}
 		deltas[joinedRoomID] = types.StateDelta{
@@ -1022,8 +1060,8 @@ func (s *Database) GetPresence(ctx context.Context, userID string) (*types.Prese
 	return s.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceAfter(ctx, nil, after)
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceAfter(ctx, nil, after, filter)
 }
 
 func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
