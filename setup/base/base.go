@@ -236,8 +236,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
 		apiHttpClient:          &apiClient,
-		Database:               db,     // monolith only
-		DatabaseWriter:         writer, // monolith only
+		Database:               db,     // set if monolith with global connection pool only
+		DatabaseWriter:         writer, // set if monolith with global connection pool only
 	}
 }
 
@@ -246,14 +246,24 @@ func (b *BaseDendrite) Close() error {
 	return b.tracerCloser.Close()
 }
 
-// DatabaseConnection sets up a new database connection if appropriate,
-// or returns the global connection pool if not.
+// DatabaseConnection assists in setting up a database connection. It accepts
+// the database properties and a new writer for the given component. If we're
+// running in monolith mode with a global connection pool configured then we
+// will return that connection, along with the global writer, effectively
+// ignoring the options provided. Otherwise we'll open a new database connection
+// using the supplied options and writer. Note that it's possible for the pointer
+// receiver to be nil here – that's deliberate as some of the unit tests don't
+// have a BaseDendrite and just want a connection with the supplied config
+// without any pooling stuff.
 func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
 	if dbProperties.ConnectionString != "" || b == nil {
+		// Open a new database connection using the supplied config.
 		db, err := sqlutil.Open(dbProperties, writer)
 		return db, writer, err
 	}
-	if b.Database != nil {
+	if b.Database != nil && b.DatabaseWriter != nil {
+		// Ignore the supplied config and return the global pool and
+		// writer.
 		return b.Database, b.DatabaseWriter, nil
 	}
 	return nil, nil, fmt.Errorf("no database connections configured")
