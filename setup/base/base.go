@@ -195,21 +195,16 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	var db *sql.DB
 	var writer sqlutil.Writer
 	if cfg.Global.DatabaseOptions.ConnectionString != "" {
-		if isMonolith {
-			switch {
-			case cfg.Global.DatabaseOptions.ConnectionString.IsSQLite():
-				writer = sqlutil.NewExclusiveWriter()
-			default:
-				writer = sqlutil.NewDummyWriter()
-			}
-			db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer)
-			if err != nil {
-				logrus.WithError(err).Panic("Failed to set up global database connections")
-			}
-			logrus.Info("Using global database connection pool")
-		} else {
+		if !isMonolith {
 			logrus.Panic("Using a global database connection pool is not supported in polylith deployments")
 		}
+		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
+			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
+		}
+		if db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, sqlutil.NewDummyWriter()); err != nil {
+			logrus.WithError(err).Panic("Failed to set up global database connections")
+		}
+		logrus.Debug("Using global database connection pool")
 	}
 
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
