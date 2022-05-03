@@ -105,7 +105,7 @@ func NewInternalAPI(
 	}
 	time.AfterFunc(time.Minute, cleanOldNotifs)
 
-	if base.Cfg.Global.ReportStats {
+	if base.Cfg.Global.ReportStats.Enabled {
 		go util.StartPhoneHomeCollector(time.Now(), base.Cfg, db)
 	}
 

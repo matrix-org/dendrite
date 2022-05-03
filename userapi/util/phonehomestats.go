@@ -142,9 +142,9 @@ func (p *phoneHomeStats) collect() {
 		return
 	}
 
-	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStatsEndpoint, output.String())
+	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
 
-	request, err := http.NewRequest("POST", p.cfg.Global.ReportStatsEndpoint, &output)
+	request, err := http.NewRequest(http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
 		logrus.WithError(err).Error("unable to create phone home stats request")
 		return
