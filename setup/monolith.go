@@ -70,7 +70,6 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite, csMux, ssMux, key
 		base, m.UserAPI, m.Client,
 	)
 	syncapi.AddPublicRoutes(
-		base, csMux, m.UserAPI, m.RoomserverAPI,
-		m.KeyAPI, m.FedClient, &m.Config.SyncAPI,
+		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI, m.FedClient,
 	)
 }

@@ -17,14 +17,12 @@ package syncapi
 import (
 	"context"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -42,13 +40,13 @@ import (
 // component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	router *mux.Router,
 	userAPI userapi.UserInternalAPI,
 	rsAPI api.RoomserverInternalAPI,
 	keyAPI keyapi.KeyInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
-	cfg *config.SyncAPI,
 ) {
+	cfg := &base.Cfg.SyncAPI
+
 	js, natsClient := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
@@ -148,5 +146,8 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg, lazyLoadCache)
+	routing.Setup(
+		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
+		federation, rsAPI, cfg, lazyLoadCache,
+	)
 }
