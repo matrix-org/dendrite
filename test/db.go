@@ -33,7 +33,7 @@ var DBTypeSQLite DBType = 1
 var DBTypePostgres DBType = 2
 
 var Quiet = false
-var Required = os.Getenv("DENDRITE_SKIP_DB_TESTS") == ""
+var Required = os.Getenv("DENDRITE_TEST_SKIP_NODB") == ""
 
 func fatalError(t *testing.T, format string, args ...interface{}) {
 	if Required {
