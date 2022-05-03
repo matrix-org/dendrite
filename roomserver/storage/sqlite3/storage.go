@@ -39,7 +39,7 @@ type Database struct {
 func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
 	var err error
-	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
@@ -176,7 +176,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	d.Database = shared.Database{
 		DB:                  db,
 		Cache:               cache,
-		Writer:              sqlutil.NewExclusiveWriter(),
+		Writer:              writer,
 		EventsTable:         events,
 		EventTypesTable:     eventTypes,
 		EventStateKeysTable: eventStateKeys,

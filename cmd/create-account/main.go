@@ -108,6 +108,9 @@ func main() {
 		0, // TODO
 		cfg.Global.ServerNotices.LocalPart,
 	)
+	if err != nil {
+		logrus.WithError(err).Fatalln("Failed to connect to the database")
+	}
 
 	accType := api.AccountTypeUser
 	if *isAdmin {
