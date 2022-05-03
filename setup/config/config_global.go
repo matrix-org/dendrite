@@ -39,7 +39,7 @@ type Global struct {
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
 	// In a polylith deployment, this will be ignored.
-	DatabaseOptions *DatabaseOptions `yaml:"database_options"`
+	DatabaseOptions *DatabaseOptions `yaml:"database"`
 
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
