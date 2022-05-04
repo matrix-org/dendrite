@@ -39,9 +39,8 @@ import (
 // component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	userDeviceAPI userapi.UserDeviceAPI,
-	userQueryAPI userapi.QueryAccountAPI,
-	rsAPI api.RoomserverInternalAPI,
+	userAPI userapi.SyncUserAPI,
+	rsAPI api.SyncRoomserverAPI,
 	keyAPI keyapi.SyncKeyAPI,
 ) {
 	cfg := &base.Cfg.SyncAPI
@@ -59,7 +58,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to create lazy loading cache")
 	}
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userQueryAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -70,7 +69,7 @@ func AddPublicRoutes(
 		JetStream: js,
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userDeviceAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -139,14 +138,14 @@ func AddPublicRoutes(
 	presenceConsumer := consumers.NewPresenceConsumer(
 		base.ProcessContext, cfg, js, natsClient, syncDB,
 		notifier, streams.PresenceStreamProvider,
-		userDeviceAPI,
+		userAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux, requestPool, syncDB, userQueryAPI,
+		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
 		rsAPI, cfg, lazyLoadCache,
 	)
 }

@@ -45,9 +45,9 @@ import (
 type RequestPool struct {
 	db       storage.Database
 	cfg      *config.SyncAPI
-	userAPI  userapi.UserDeviceAPI
+	userAPI  userapi.SyncUserAPI
 	keyAPI   keyapi.SyncKeyAPI
-	rsAPI    roomserverAPI.RoomserverInternalAPI
+	rsAPI    roomserverAPI.SyncRoomserverAPI
 	lastseen *sync.Map
 	presence *sync.Map
 	streams  *streams.Streams
@@ -62,8 +62,8 @@ type PresencePublisher interface {
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
 	db storage.Database, cfg *config.SyncAPI,
-	userAPI userapi.UserDeviceAPI, keyAPI keyapi.SyncKeyAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI userapi.SyncUserAPI, keyAPI keyapi.SyncKeyAPI,
+	rsAPI roomserverAPI.SyncRoomserverAPI,
 	streams *streams.Streams, notifier *notifier.Notifier,
 	producer PresencePublisher,
 ) *RequestPool {

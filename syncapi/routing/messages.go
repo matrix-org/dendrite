@@ -36,7 +36,7 @@ import (
 type messagesReq struct {
 	ctx              context.Context
 	db               storage.Database
-	rsAPI            api.RoomserverInternalAPI
+	rsAPI            api.SyncRoomserverAPI
 	cfg              *config.SyncAPI
 	roomID           string
 	from             *types.TopologyToken
@@ -60,7 +60,7 @@ type messagesResp struct {
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
 	lazyLoadCache *caching.LazyLoadCache,
@@ -244,7 +244,7 @@ func OnIncomingMessagesRequest(
 	}
 }
 
-func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.RoomserverInternalAPI) (bool, error) {
+func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (bool, error) {
 	req := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
 		UserID: userID,

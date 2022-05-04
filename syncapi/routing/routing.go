@@ -36,8 +36,8 @@ import (
 // nolint: gocyclo
 func Setup(
 	csMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
-	userAPI userapi.QueryAccountAPI,
-	rsAPI api.RoomserverInternalAPI,
+	userAPI userapi.SyncUserAPI,
+	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	lazyLoadCache *caching.LazyLoadCache,
 ) {

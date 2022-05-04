@@ -42,7 +42,7 @@ type OutputKeyChangeEventConsumer struct {
 	notifier   *notifier.Notifier
 	stream     types.StreamProvider
 	serverName gomatrixserverlib.ServerName // our server name
-	rsAPI      roomserverAPI.RoomserverInternalAPI
+	rsAPI      roomserverAPI.SyncRoomserverAPI
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -52,7 +52,7 @@ func NewOutputKeyChangeEventConsumer(
 	cfg *config.SyncAPI,
 	topic string,
 	js nats.JetStreamContext,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.SyncRoomserverAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,

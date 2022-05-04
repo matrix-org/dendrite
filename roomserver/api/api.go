@@ -12,6 +12,8 @@ import (
 
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
+	SyncRoomserverAPI
+
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
 	SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing)
@@ -78,34 +80,6 @@ type RoomserverInternalAPI interface {
 		res *QueryPublishedRoomsResponse,
 	) error
 
-	// Query the latest events and state for a room from the room server.
-	QueryLatestEventsAndState(
-		ctx context.Context,
-		request *QueryLatestEventsAndStateRequest,
-		response *QueryLatestEventsAndStateResponse,
-	) error
-
-	// Query the state after a list of events in a room from the room server.
-	QueryStateAfterEvents(
-		ctx context.Context,
-		request *QueryStateAfterEventsRequest,
-		response *QueryStateAfterEventsResponse,
-	) error
-
-	// Query a list of events by event ID.
-	QueryEventsByID(
-		ctx context.Context,
-		request *QueryEventsByIDRequest,
-		response *QueryEventsByIDResponse,
-	) error
-
-	// Query the membership event for an user for a room.
-	QueryMembershipForUser(
-		ctx context.Context,
-		request *QueryMembershipForUserRequest,
-		response *QueryMembershipForUserResponse,
-	) error
-
 	// Query a list of membership events for a room
 	QueryMembershipsForRoom(
 		ctx context.Context,
@@ -157,21 +131,10 @@ type RoomserverInternalAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	// QueryRoomsForUser retrieves a list of room IDs matching the given query.
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
-	// QueryBulkStateContent does a bulk query for state event content in the given rooms.
-	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
-	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
-	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
 	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
-
-	// Query a given amount (or less) of events prior to a given set of events.
-	PerformBackfill(
-		ctx context.Context,
-		request *PerformBackfillRequest,
-		response *PerformBackfillResponse,
-	) error
 
 	// PerformForget forgets a rooms history for a specific user
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
@@ -226,5 +189,45 @@ type RoomserverInternalAPI interface {
 		ctx context.Context,
 		req *RemoveRoomAliasRequest,
 		response *RemoveRoomAliasResponse,
+	) error
+}
+
+// API functions required by the syncapi
+type SyncRoomserverAPI interface {
+	// Query the latest events and state for a room from the room server.
+	QueryLatestEventsAndState(
+		ctx context.Context,
+		request *QueryLatestEventsAndStateRequest,
+		response *QueryLatestEventsAndStateResponse,
+	) error
+	// QueryBulkStateContent does a bulk query for state event content in the given rooms.
+	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
+	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
+	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
+	// Query a list of events by event ID.
+	QueryEventsByID(
+		ctx context.Context,
+		request *QueryEventsByIDRequest,
+		response *QueryEventsByIDResponse,
+	) error
+	// Query the membership event for an user for a room.
+	QueryMembershipForUser(
+		ctx context.Context,
+		request *QueryMembershipForUserRequest,
+		response *QueryMembershipForUserResponse,
+	) error
+
+	// Query the state after a list of events in a room from the room server.
+	QueryStateAfterEvents(
+		ctx context.Context,
+		request *QueryStateAfterEventsRequest,
+		response *QueryStateAfterEventsResponse,
+	) error
+
+	// Query a given amount (or less) of events prior to a given set of events.
+	PerformBackfill(
+		ctx context.Context,
+		request *PerformBackfillRequest,
+		response *PerformBackfillResponse,
 	) error
 }

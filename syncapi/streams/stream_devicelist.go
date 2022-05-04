@@ -11,7 +11,7 @@ import (
 
 type DeviceListStreamProvider struct {
 	StreamProvider
-	rsAPI  api.RoomserverInternalAPI
+	rsAPI  api.SyncRoomserverAPI
 	keyAPI keyapi.SyncKeyAPI
 }
 
