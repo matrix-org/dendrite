@@ -27,7 +27,7 @@ func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 
 	syncapi.AddPublicRoutes(
 		base,
-		userAPI, userAPI, rsAPI,
+		userAPI, rsAPI,
 		base.KeyServerHTTPClient(),
 	)
 

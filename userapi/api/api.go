@@ -31,6 +31,7 @@ type UserInternalAPI interface {
 	UserRegisterAPI
 	UserAccountAPI
 	UserThreePIDAPI
+	QueryAcccessTokenAPI
 	SyncUserAPI
 
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
@@ -47,6 +48,10 @@ type UserInternalAPI interface {
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
+}
+
+type QueryAcccessTokenAPI interface {
+	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 }
 
 type SyncUserAPI interface {
