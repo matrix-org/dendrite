@@ -293,7 +293,6 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 ) ([]types.RoomNID, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomsWithMembershipStmt)
 	rows, err := stmt.QueryContext(ctx, membershipState, userID)
-
 	if err != nil {
 		return nil, err
 	}
