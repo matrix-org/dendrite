@@ -144,9 +144,9 @@ func (s *accountsStatements) InsertAccount(
 
 	var err error
 	if accountType != api.AccountTypeAppService {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil, accountType)
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, nil, accountType, policyVersion)
 	} else {
-		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, accountType)
+		_, err = stmt.ExecContext(ctx, localpart, createdTimeMS, hash, appserviceID, accountType, policyVersion)
 	}
 	if err != nil {
 		return nil, err
@@ -225,9 +225,10 @@ func (s *accountsStatements) SelectNewNumericLocalpart(
 func (s *accountsStatements) SelectPrivacyPolicy(
 	ctx context.Context, txn *sql.Tx, localPart string,
 ) (policy string, err error) {
+	var policyNull sql.NullString
 	stmt := sqlutil.TxStmt(txn, s.selectPrivacyPolicyStmt)
-	err = stmt.QueryRowContext(ctx, localPart).Scan(&policy)
-	return
+	err = stmt.QueryRowContext(ctx, localPart).Scan(&policyNull)
+	return policyNull.String, err
 }
 
 // batchSelectPrivacyPolicy queries all users which didn't accept the current policy version
