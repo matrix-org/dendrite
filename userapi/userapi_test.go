@@ -23,17 +23,17 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	internalTest "github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/matrix-org/dendrite/internal/httputil"
-	internalTest "github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
-	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage"
 )
 
@@ -73,6 +73,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
+	// only one DBType, since userapi.AddInternalRoutes complains about multiple prometheus counters added
 	userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
 	defer close()
 	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", api.AccountTypeUser)
@@ -151,112 +152,120 @@ func TestLoginToken(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
-		defer close()
-		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", api.AccountTypeUser)
-		if err != nil {
-			t.Fatalf("failed to make account: %s", err)
-		}
+		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+			defer close()
+			_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", api.AccountTypeUser)
+			if err != nil {
+				t.Fatalf("failed to make account: %s", err)
+			}
 
-		t.Log("Creating a login token like the SSO callback would...")
+			t.Log("Creating a login token like the SSO callback would...")
 
-		creq := api.PerformLoginTokenCreationRequest{
-			Data: api.LoginTokenData{UserID: "@auser:example.com"},
-		}
-		var cresp api.PerformLoginTokenCreationResponse
-		if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
-			t.Fatalf("PerformLoginTokenCreation failed: %v", err)
-		}
+			creq := api.PerformLoginTokenCreationRequest{
+				Data: api.LoginTokenData{UserID: "@auser:example.com"},
+			}
+			var cresp api.PerformLoginTokenCreationResponse
+			if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
+				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
+			}
 
-		if cresp.Metadata.Token == "" {
-			t.Errorf("PerformLoginTokenCreation Token: got %q, want non-empty", cresp.Metadata.Token)
-		}
-		if cresp.Metadata.Expiration.Before(time.Now()) {
-			t.Errorf("PerformLoginTokenCreation Expiration: got %v, want non-expired", cresp.Metadata.Expiration)
-		}
+			if cresp.Metadata.Token == "" {
+				t.Errorf("PerformLoginTokenCreation Token: got %q, want non-empty", cresp.Metadata.Token)
+			}
+			if cresp.Metadata.Expiration.Before(time.Now()) {
+				t.Errorf("PerformLoginTokenCreation Expiration: got %v, want non-expired", cresp.Metadata.Expiration)
+			}
 
-		t.Log("Querying the login token like /login with m.login.token would...")
+			t.Log("Querying the login token like /login with m.login.token would...")
 
-		qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
-		var qresp api.QueryLoginTokenResponse
-		if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
-			t.Fatalf("QueryLoginToken failed: %v", err)
-		}
+			qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
+			var qresp api.QueryLoginTokenResponse
+			if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
+				t.Fatalf("QueryLoginToken failed: %v", err)
+			}
 
-		if qresp.Data == nil {
-			t.Errorf("QueryLoginToken Data: got %v, want non-nil", qresp.Data)
-		} else if want := "@auser:example.com"; qresp.Data.UserID != want {
-			t.Errorf("QueryLoginToken UserID: got %q, want %q", qresp.Data.UserID, want)
-		}
+			if qresp.Data == nil {
+				t.Errorf("QueryLoginToken Data: got %v, want non-nil", qresp.Data)
+			} else if want := "@auser:example.com"; qresp.Data.UserID != want {
+				t.Errorf("QueryLoginToken UserID: got %q, want %q", qresp.Data.UserID, want)
+			}
 
-		t.Log("Deleting the login token like /login with m.login.token would...")
+			t.Log("Deleting the login token like /login with m.login.token would...")
 
-		dreq := api.PerformLoginTokenDeletionRequest{Token: cresp.Metadata.Token}
-		var dresp api.PerformLoginTokenDeletionResponse
-		if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
-			t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
-		}
+			dreq := api.PerformLoginTokenDeletionRequest{Token: cresp.Metadata.Token}
+			var dresp api.PerformLoginTokenDeletionResponse
+			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
+				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
+			}
+		})
 	})
 
 	t.Run("expiredTokenIsNotReturned", func(t *testing.T) {
-		userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, test.DBTypeSQLite)
-		defer close()
+		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, dbType)
+			defer close()
 
-		creq := api.PerformLoginTokenCreationRequest{
-			Data: api.LoginTokenData{UserID: "@auser:example.com"},
-		}
-		var cresp api.PerformLoginTokenCreationResponse
-		if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
-			t.Fatalf("PerformLoginTokenCreation failed: %v", err)
-		}
+			creq := api.PerformLoginTokenCreationRequest{
+				Data: api.LoginTokenData{UserID: "@auser:example.com"},
+			}
+			var cresp api.PerformLoginTokenCreationResponse
+			if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
+				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
+			}
 
-		qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
-		var qresp api.QueryLoginTokenResponse
-		if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
-			t.Fatalf("QueryLoginToken failed: %v", err)
-		}
+			qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
+			var qresp api.QueryLoginTokenResponse
+			if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
+				t.Fatalf("QueryLoginToken failed: %v", err)
+			}
 
-		if qresp.Data != nil {
-			t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
-		}
+			if qresp.Data != nil {
+				t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
+			}
+		})
 	})
 
 	t.Run("deleteWorks", func(t *testing.T) {
-		userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
-		defer close()
+		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+			defer close()
 
-		creq := api.PerformLoginTokenCreationRequest{
-			Data: api.LoginTokenData{UserID: "@auser:example.com"},
-		}
-		var cresp api.PerformLoginTokenCreationResponse
-		if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
-			t.Fatalf("PerformLoginTokenCreation failed: %v", err)
-		}
+			creq := api.PerformLoginTokenCreationRequest{
+				Data: api.LoginTokenData{UserID: "@auser:example.com"},
+			}
+			var cresp api.PerformLoginTokenCreationResponse
+			if err := userAPI.PerformLoginTokenCreation(ctx, &creq, &cresp); err != nil {
+				t.Fatalf("PerformLoginTokenCreation failed: %v", err)
+			}
 
-		dreq := api.PerformLoginTokenDeletionRequest{Token: cresp.Metadata.Token}
-		var dresp api.PerformLoginTokenDeletionResponse
-		if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
-			t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
-		}
+			dreq := api.PerformLoginTokenDeletionRequest{Token: cresp.Metadata.Token}
+			var dresp api.PerformLoginTokenDeletionResponse
+			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
+				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
+			}
 
-		qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
-		var qresp api.QueryLoginTokenResponse
-		if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
-			t.Fatalf("QueryLoginToken failed: %v", err)
-		}
+			qreq := api.QueryLoginTokenRequest{Token: cresp.Metadata.Token}
+			var qresp api.QueryLoginTokenResponse
+			if err := userAPI.QueryLoginToken(ctx, &qreq, &qresp); err != nil {
+				t.Fatalf("QueryLoginToken failed: %v", err)
+			}
 
-		if qresp.Data != nil {
-			t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
-		}
+			if qresp.Data != nil {
+				t.Errorf("QueryLoginToken Data: got %v, want nil", qresp.Data)
+			}
+		})
 	})
 
 	t.Run("deleteUnknownIsNoOp", func(t *testing.T) {
-		userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
-		defer close()
-		dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
-		var dresp api.PerformLoginTokenDeletionResponse
-		if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
-			t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
-		}
+		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+			userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+			defer close()
+			dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
+			var dresp api.PerformLoginTokenDeletionResponse
+			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
+				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
+			}
+		})
 	})
 }
