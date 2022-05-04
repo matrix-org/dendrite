@@ -288,37 +288,39 @@ func (c *UserConsentOptions) Defaults() {
 }
 
 func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool) {
-	if c.Enabled {
-		checkNotEmpty(configErrors, "template_dir", c.TemplateDir)
-		checkNotEmpty(configErrors, "version", c.Version)
-		checkNotEmpty(configErrors, "policy_name", c.PolicyName)
-		checkNotEmpty(configErrors, "form_secret", c.FormSecret)
-		checkNotEmpty(configErrors, "base_url", c.BaseURL)
-		if len(*configErrors) > 0 {
-			return
-		}
+	if !c.Enabled {
+		return
+	}
 
-		p, err := filepath.Abs(c.TemplateDir)
-		if err != nil {
-			configErrors.Add("unable to get template directory")
-			return
-		}
+	checkNotEmpty(configErrors, "template_dir", c.TemplateDir)
+	checkNotEmpty(configErrors, "version", c.Version)
+	checkNotEmpty(configErrors, "policy_name", c.PolicyName)
+	checkNotEmpty(configErrors, "form_secret", c.FormSecret)
+	checkNotEmpty(configErrors, "base_url", c.BaseURL)
+	if len(*configErrors) > 0 {
+		return
+	}
 
-		c.TextTemplates = textTemplate.Must(textTemplate.New("blockEventsError").Parse(c.BlockEventsError))
-		c.TextTemplates = textTemplate.Must(c.TextTemplates.New("serverNoticeTemplate").Parse(c.ServerNoticeContent.Body))
+	p, err := filepath.Abs(c.TemplateDir)
+	if err != nil {
+		configErrors.Add("unable to get template directory")
+		return
+	}
 
-		// Read all defined *.gohtml templates
-		t, err := template.ParseGlob(filepath.Join(p, "*.gohtml"))
-		if err != nil || t == nil {
-			configErrors.Add(fmt.Sprintf("unable to read consent templates: %+v", err))
-			return
-		}
-		c.Templates = t
-		// Verify we've got a template for the defined version
-		versionTemplate := c.Templates.Lookup(c.Version + ".gohtml")
-		if versionTemplate == nil {
-			configErrors.Add(fmt.Sprintf("unable to load defined '%s' policy template", c.Version))
-		}
+	c.TextTemplates = textTemplate.Must(textTemplate.New("blockEventsError").Parse(c.BlockEventsError))
+	c.TextTemplates = textTemplate.Must(c.TextTemplates.New("serverNoticeTemplate").Parse(c.ServerNoticeContent.Body))
+
+	// Read all defined *.gohtml templates
+	t, err := template.ParseGlob(filepath.Join(p, "*.gohtml"))
+	if err != nil || t == nil {
+		configErrors.Add(fmt.Sprintf("unable to read consent templates: %+v", err))
+		return
+	}
+	c.Templates = t
+	// Verify we've got a template for the defined version
+	versionTemplate := c.Templates.Lookup(c.Version + ".gohtml")
+	if versionTemplate == nil {
+		configErrors.Add(fmt.Sprintf("unable to load defined '%s' policy template", c.Version))
 	}
 }
 
