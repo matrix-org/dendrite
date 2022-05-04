@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package userapi
+package userapi_test
 
 import (
 	"context"
@@ -23,11 +23,13 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/test"
+	internalTest "github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
@@ -43,16 +45,15 @@ type apiTestOpts struct {
 	loginTokenLifetime time.Duration
 }
 
-func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, storage.Database) {
+func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (api.UserInternalAPI, storage.Database, func()) {
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	dbopts := &config.DatabaseOptions{
-		ConnectionString:   "file::memory:",
-		MaxOpenConnections: 1,
-		MaxIdleConnections: 1,
-	}
-	accountDB, err := storage.NewUserAPIDatabase(nil, dbopts, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
+	connStr, close := test.PrepareDBConnectionString(t, dbType)
+
+	accountDB, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
+		ConnectionString: config.DataSource(connStr),
+	}, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
 		t.Fatalf("failed to create account DB: %s", err)
 	}
@@ -66,13 +67,14 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts) (api.UserInternalAPI, s
 	return &internal.UserInternalAPI{
 		DB:         accountDB,
 		ServerName: cfg.Matrix.ServerName,
-	}, accountDB
+	}, accountDB, close
 }
 
 func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
-	userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
+	userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
+	defer close()
 	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", api.AccountTypeUser)
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
@@ -131,8 +133,8 @@ func TestQueryProfile(t *testing.T) {
 
 	t.Run("HTTP API", func(t *testing.T) {
 		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-		AddInternalRoutes(router, userAPI)
-		apiURL, cancel := test.ListenAndServe(t, router, false)
+		userapi.AddInternalRoutes(router, userAPI)
+		apiURL, cancel := internalTest.ListenAndServe(t, router, false)
 		defer cancel()
 		httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
 		if err != nil {
@@ -149,8 +151,8 @@ func TestLoginToken(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("tokenLoginFlow", func(t *testing.T) {
-		userAPI, accountDB := MustMakeInternalAPI(t, apiTestOpts{})
-
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
+		defer close()
 		_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", api.AccountTypeUser)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
@@ -197,7 +199,8 @@ func TestLoginToken(t *testing.T) {
 	})
 
 	t.Run("expiredTokenIsNotReturned", func(t *testing.T) {
-		userAPI, _ := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second})
+		userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{loginTokenLifetime: -1 * time.Second}, test.DBTypeSQLite)
+		defer close()
 
 		creq := api.PerformLoginTokenCreationRequest{
 			Data: api.LoginTokenData{UserID: "@auser:example.com"},
@@ -219,7 +222,8 @@ func TestLoginToken(t *testing.T) {
 	})
 
 	t.Run("deleteWorks", func(t *testing.T) {
-		userAPI, _ := MustMakeInternalAPI(t, apiTestOpts{})
+		userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
+		defer close()
 
 		creq := api.PerformLoginTokenCreationRequest{
 			Data: api.LoginTokenData{UserID: "@auser:example.com"},
@@ -247,8 +251,8 @@ func TestLoginToken(t *testing.T) {
 	})
 
 	t.Run("deleteUnknownIsNoOp", func(t *testing.T) {
-		userAPI, _ := MustMakeInternalAPI(t, apiTestOpts{})
-
+		userAPI, _, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
+		defer close()
 		dreq := api.PerformLoginTokenDeletionRequest{Token: "non-existent token"}
 		var dresp api.PerformLoginTokenDeletionResponse
 		if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
