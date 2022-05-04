@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -44,6 +45,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		// preparing statements for columns that don't exist yet
 		return nil, err
 	}
+	logrus.Info("created account_accounts table")
 	deltas.LoadIsActive(m)
 	//deltas.LoadLastSeenTSIP(m)
 	deltas.LoadAddAccountType(m)
@@ -60,6 +62,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
 	}
+	logrus.Info("prepared statements for accounts table")
 	devicesTable, err := NewSQLiteDevicesTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteDevicesTable: %w", err)

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -159,6 +160,7 @@ func (d *Database) createAccount(
 		}
 	}
 	if account, err = d.Accounts.InsertAccount(ctx, txn, localpart, hash, appserviceID, policyVersion, accountType); err != nil {
+		logrus.WithError(err).Error("d.Accounts.InsertAccount error")
 		return nil, sqlutil.ErrUserExists
 	}
 	if err = d.Profiles.InsertProfile(ctx, txn, localpart); err != nil {

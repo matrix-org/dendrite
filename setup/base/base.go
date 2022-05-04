@@ -259,6 +259,7 @@ func (b *BaseDendrite) Close() error {
 func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
 	if dbProperties.ConnectionString != "" || b == nil {
 		// Open a new database connection using the supplied config.
+		logrus.Infof("Open a new database connection using the supplied config.: %+v", dbProperties.ConnectionString)
 		db, err := sqlutil.Open(dbProperties, writer)
 		return db, writer, err
 	}
