@@ -85,13 +85,14 @@ global:
     # Whether outbound presence events are allowed, e.g. sending presence events to other servers
     enable_outbound: false
 
-  # Whether this instance sends anonymous usage stats
-  report_stats: false
+  # Configures opt-in anonymous stats reporting.
+  report_stats:
+    # Whether this instance sends anonymous usage stats
+    enabled: false
 
-  # The endpoint to report the anonymized homeserver usage statistics to.
-  # Defaults to https://matrix.org/report-usage-stats/push
-  #
-  report_stats_endpoint: https://matrix.org/report-usage-stats/push
+    # The endpoint to report the anonymized homeserver usage statistics to.
+    # Defaults to https://matrix.org/report-usage-stats/push
+    endpoint: https://matrix.org/report-usage-stats/push
 
   # Server notices allows server admins to send messages to all users.
   server_notices:
