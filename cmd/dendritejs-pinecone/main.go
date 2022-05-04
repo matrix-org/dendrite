@@ -180,7 +180,6 @@ func startup() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := conn.CreateFederationClient(base, pSessions)
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
 
@@ -189,7 +188,7 @@ func startup() {
 
 	rsAPI := roomserver.NewInternalAPI(base)
 
-	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
 	asQuery := appservice.NewInternalAPI(
@@ -201,7 +200,6 @@ func startup() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    conn.CreateClient(base, pSessions),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -214,16 +212,7 @@ func startup() {
 		//ServerKeyAPI:        serverKeyAPI,
 		ExtPublicRoomsProvider: rooms.NewPineconeRoomProvider(pRouter, pSessions, fedSenderAPI, federation),
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-		base.DendriteAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)

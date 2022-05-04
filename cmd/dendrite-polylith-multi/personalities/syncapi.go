@@ -27,10 +27,10 @@ func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	rsAPI := base.RoomserverHTTPClient()
 
 	syncapi.AddPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux, userAPI, rsAPI,
+		base,
+		userAPI, rsAPI,
 		base.KeyServerHTTPClient(),
-		federation, &cfg.SyncAPI,
+		federation,
 	)
 
 	base.SetupAndServeHTTP(

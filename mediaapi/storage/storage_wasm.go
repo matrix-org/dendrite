@@ -18,14 +18,15 @@ import (
 	"fmt"
 
 	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // Open opens a postgres database.
-func NewMediaAPIDatasource(dbProperties *config.DatabaseOptions) (Database, error) {
+func NewMediaAPIDatasource(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties)
+		return sqlite3.NewDatabase(base, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

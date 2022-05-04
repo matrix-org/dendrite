@@ -13,7 +13,7 @@ import (
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewMediaAPIDatasource(&config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
