@@ -56,7 +56,8 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 		db:         statsDB,
 		isMonolith: cfg.IsMonolith,
 		client: &http.Client{
-			Timeout: time.Second * 30,
+			Timeout:   time.Second * 30,
+			Transport: http.DefaultTransport,
 		},
 	}
 
@@ -90,7 +91,7 @@ func (p *phoneHomeStats) collect() {
 	// cpu and memory usage information
 	err := getMemoryStats(p)
 	if err != nil {
-		logrus.WithError(err).Error("unable to get memory/cpu stats, using defaults")
+		logrus.WithError(err).Warn("unable to get memory/cpu stats, using defaults")
 	}
 
 	// configuration information
@@ -118,7 +119,7 @@ func (p *phoneHomeStats) collect() {
 	// user stats and DB engine
 	userStats, db, err := p.db.UserStatistics(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("unable to query userstats, using default values")
+		logrus.WithError(err).Warn("unable to query userstats, using default values")
 	}
 	p.stats["database_engine"] = db.Engine
 	p.stats["database_server_version"] = db.Version
@@ -138,22 +139,22 @@ func (p *phoneHomeStats) collect() {
 
 	output := bytes.Buffer{}
 	if err = json.NewEncoder(&output).Encode(p.stats); err != nil {
-		logrus.WithError(err).Error("unable to encode stats")
+		logrus.WithError(err).Error("unable to encode anonymous stats")
 		return
 	}
 
 	logrus.Infof("Reporting stats to %s: %s", p.cfg.Global.ReportStats.Endpoint, output.String())
 
-	request, err := http.NewRequest(http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
-		logrus.WithError(err).Error("unable to create phone home stats request")
+		logrus.WithError(err).Error("unable to create anonymous stats request")
 		return
 	}
 	request.Header.Set("User-Agent", "Dendrite/"+internal.VersionString())
 
 	_, err = p.client.Do(request)
 	if err != nil {
-		logrus.WithError(err).Warn("unable to send phone home stats")
+		logrus.WithError(err).Error("unable to send anonymous stats")
 		return
 	}
 }
