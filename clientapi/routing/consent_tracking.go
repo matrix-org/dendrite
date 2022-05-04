@@ -22,7 +22,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
@@ -156,7 +155,7 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 			continue
 		}
 		userID := fmt.Sprintf("@%s:%s", localpart, cfgClient.Matrix.ServerName)
-		data["ConsentURL"], err = buildConsentURI(cfgClient, userID)
+		data["ConsentURL"], err = consentOpts.ConsentURL(userID)
 		if err != nil {
 			logrus.WithError(err).WithField("userID", userID).Error("unable to construct consentURI")
 			continue
@@ -197,24 +196,6 @@ func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.Rooms
 	if sentMessages > 0 {
 		logrus.Infof("Sent messages to %d users", sentMessages)
 	}
-}
-
-func buildConsentURI(cfgClient *config.ClientAPI, userID string) (string, error) {
-	consentOpts := cfgClient.Matrix.UserConsentOptions
-
-	mac := hmac.New(sha256.New, []byte(consentOpts.FormSecret))
-	_, err := mac.Write([]byte(userID))
-	if err != nil {
-		return "", err
-	}
-	userMAC := mac.Sum(nil)
-
-	params := url.Values{}
-	params.Add("u", userID)
-	params.Add("h", string(userMAC))
-	params.Add("v", consentOpts.Version)
-
-	return fmt.Sprintf("%s/_matrix/client/consent?%s", cfgClient.Matrix.UserConsentOptions.BaseURL, params.Encode()), nil
 }
 
 func validHMAC(username, userHMAC, secret string) (bool, error) {

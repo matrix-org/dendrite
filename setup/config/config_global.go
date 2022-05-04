@@ -1,9 +1,13 @@
 package config
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"math/rand"
+	"net/url"
 	"path/filepath"
 	textTemplate "text/template"
 	"time"
@@ -322,6 +326,23 @@ func (c *UserConsentOptions) Verify(configErrors *ConfigErrors, isMonolith bool)
 	if versionTemplate == nil {
 		configErrors.Add(fmt.Sprintf("unable to load defined '%s' policy template", c.Version))
 	}
+}
+
+// ConsentURL constructs the URL shown to users to accept the TOS
+func (c *UserConsentOptions) ConsentURL(userID string) (string, error) {
+	mac := hmac.New(sha256.New, []byte(c.FormSecret))
+	_, err := mac.Write([]byte(userID))
+	if err != nil {
+		return "", err
+	}
+	userMAC := hex.EncodeToString(mac.Sum(nil))
+
+	params := url.Values{}
+	params.Add("u", userID)
+	params.Add("h", userMAC)
+	params.Add("v", c.Version)
+
+	return fmt.Sprintf("%s/_matrix/client/consent?%s", c.BaseURL, params.Encode()), nil
 }
 
 // PresenceOptions defines possible configurations for presence events.

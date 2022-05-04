@@ -17,15 +17,11 @@ package httputil
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -138,7 +134,7 @@ func checkConsent(ctx context.Context, userID string, userAPI userapi.UserIntern
 
 	// user hasn't accepted any policy, block access.
 	if userConsentCfg.Version != res.PolicyVersion {
-		uri, err := getConsentURL(userID, userConsentCfg)
+		uri, err := userConsentCfg.ConsentURL(userID)
 		if err != nil {
 			return &util.JSONResponse{
 				Code: http.StatusInternalServerError,
@@ -164,23 +160,6 @@ func checkConsent(ctx context.Context, userID string, userAPI userapi.UserIntern
 		}
 	}
 	return nil
-}
-
-// getConsentURL constructs the URL shown to users to accept the TOS
-func getConsentURL(userID string, config config.UserConsentOptions) (string, error) {
-	mac := hmac.New(sha256.New, []byte(config.FormSecret))
-	_, err := mac.Write([]byte(userID))
-	if err != nil {
-		return "", err
-	}
-	hmac := hex.EncodeToString(mac.Sum(nil))
-
-	params := url.Values{}
-	params.Add("u", userID)
-	params.Add("h", string(hmac))
-	params.Add("v", config.Version)
-
-	return fmt.Sprintf("%s/_matrix/client/consent?%s", config.BaseURL, params.Encode()), nil
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.
