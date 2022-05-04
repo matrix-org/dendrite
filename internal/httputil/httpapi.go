@@ -49,7 +49,7 @@ type BasicAuth struct {
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string, userAPI userapi.UserInternalAPI,
+	metricsName string, userAPI userapi.QueryAccountAPI,
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {

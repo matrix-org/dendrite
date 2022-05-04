@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -40,10 +39,10 @@ import (
 // component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
+	userDeviceAPI userapi.UserDeviceAPI,
+	userQueryAPI userapi.QueryAccountAPI,
 	rsAPI api.RoomserverInternalAPI,
-	keyAPI keyapi.KeyInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	keyAPI keyapi.SyncKeyAPI,
 ) {
 	cfg := &base.Cfg.SyncAPI
 
@@ -60,7 +59,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to create lazy loading cache")
 	}
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userQueryAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -71,7 +70,7 @@ func AddPublicRoutes(
 		JetStream: js,
 	}
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
+	requestPool := sync.NewRequestPool(syncDB, cfg, userDeviceAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -85,7 +84,7 @@ func AddPublicRoutes(
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		base.ProcessContext, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		js, keyAPI, rsAPI, syncDB, notifier,
+		js, rsAPI, syncDB, notifier,
 		streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
@@ -140,14 +139,14 @@ func AddPublicRoutes(
 	presenceConsumer := consumers.NewPresenceConsumer(
 		base.ProcessContext, cfg, js, natsClient, syncDB,
 		notifier, streams.PresenceStreamProvider,
-		userAPI,
+		userDeviceAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		federation, rsAPI, cfg, lazyLoadCache,
+		base.PublicClientAPIMux, requestPool, syncDB, userQueryAPI,
+		rsAPI, cfg, lazyLoadCache,
 	)
 }

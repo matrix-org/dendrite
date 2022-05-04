@@ -25,8 +25,8 @@ type Streams struct {
 }
 
 func NewSyncStreamProviders(
-	d storage.Database, userAPI userapi.UserInternalAPI,
-	rsAPI rsapi.RoomserverInternalAPI, keyAPI keyapi.KeyInternalAPI,
+	d storage.Database, userAPI userapi.QueryAccountAPI,
+	rsAPI rsapi.RoomserverInternalAPI, keyAPI keyapi.SyncKeyAPI,
 	eduCache *caching.EDUCache, lazyLoadCache *caching.LazyLoadCache, notifier *notifier.Notifier,
 ) *Streams {
 	streams := &Streams{

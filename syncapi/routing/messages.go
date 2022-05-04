@@ -37,7 +37,6 @@ type messagesReq struct {
 	ctx              context.Context
 	db               storage.Database
 	rsAPI            api.RoomserverInternalAPI
-	federation       *gomatrixserverlib.FederationClient
 	cfg              *config.SyncAPI
 	roomID           string
 	from             *types.TopologyToken
@@ -61,7 +60,6 @@ type messagesResp struct {
 // See: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-client-r0-rooms-roomid-messages
 func OnIncomingMessagesRequest(
 	req *http.Request, db storage.Database, roomID string, device *userapi.Device,
-	federation *gomatrixserverlib.FederationClient,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
@@ -180,7 +178,6 @@ func OnIncomingMessagesRequest(
 		ctx:              req.Context(),
 		db:               db,
 		rsAPI:            rsAPI,
-		federation:       federation,
 		cfg:              cfg,
 		roomID:           roomID,
 		from:             &from,

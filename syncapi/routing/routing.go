@@ -36,7 +36,7 @@ import (
 // nolint: gocyclo
 func Setup(
 	csMux *mux.Router, srp *sync.RequestPool, syncDB storage.Database,
-	userAPI userapi.UserInternalAPI, federation *gomatrixserverlib.FederationClient,
+	userAPI userapi.QueryAccountAPI,
 	rsAPI api.RoomserverInternalAPI,
 	cfg *config.SyncAPI,
 	lazyLoadCache *caching.LazyLoadCache,
@@ -53,7 +53,7 @@ func Setup(
 		if err != nil {
 			return util.ErrorResponse(err)
 		}
-		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], device, federation, rsAPI, cfg, srp, lazyLoadCache)
+		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], device, rsAPI, cfg, srp, lazyLoadCache)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/user/{userId}/filter",

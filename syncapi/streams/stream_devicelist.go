@@ -12,7 +12,7 @@ import (
 type DeviceListStreamProvider struct {
 	StreamProvider
 	rsAPI  api.RoomserverInternalAPI
-	keyAPI keyapi.KeyInternalAPI
+	keyAPI keyapi.SyncKeyAPI
 }
 
 func (p *DeviceListStreamProvider) CompleteSync(

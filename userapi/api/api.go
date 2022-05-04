@@ -32,6 +32,7 @@ type UserInternalAPI interface {
 	UserAccountAPI
 	UserThreePIDAPI
 	UserDeviceAPI
+	QueryAccountAPI
 
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 
@@ -42,12 +43,16 @@ type UserInternalAPI interface {
 	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
 
 	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
-	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
-	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
+}
+
+type QueryAccountAPI interface {
+	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 }
 
 type UserDeviceAPI interface {
