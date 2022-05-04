@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -103,6 +104,10 @@ func NewInternalAPI(
 		time.AfterFunc(time.Hour, cleanOldNotifs)
 	}
 	time.AfterFunc(time.Minute, cleanOldNotifs)
+
+	if base.Cfg.Global.ReportStats.Enabled {
+		go util.StartPhoneHomeCollector(time.Now(), base.Cfg, db)
+	}
 
 	return userAPI
 }

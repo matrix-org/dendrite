@@ -210,7 +210,7 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
-	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr); err != nil {
+	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
 		return fmt.Errorf("a.DeviceDB.UpdateDeviceLastSeen: %w", err)
 	}
 	return nil

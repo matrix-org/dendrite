@@ -182,6 +182,7 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 		UserID:     device.UserID,
 		DeviceID:   device.ID,
 		RemoteAddr: remoteAddr,
+		UserAgent:  req.UserAgent(),
 	}
 	lsres := &userapi.PerformLastSeenUpdateResponse{}
 	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
