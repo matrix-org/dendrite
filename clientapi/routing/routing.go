@@ -191,11 +191,9 @@ func Setup(
 			// start a new go routine to send messages about consent
 			go sendServerNoticeForConsent(userAPI, rsAPI, &cfg.Matrix.ServerNotices, cfg, serverNotificationSender, asAPI)
 		}
-		publicAPIMux.Handle("/consent",
-			httputil.MakeHTMLAPI("consent", func(writer http.ResponseWriter, request *http.Request) *util.JSONResponse {
-				return consent(writer, request, userAPI, cfg)
-			}),
-		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
+		publicAPIMux.HandleFunc("/consent", func(writer http.ResponseWriter, request *http.Request) {
+			consent(writer, request, userAPI, cfg)
+		}).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
 
 	consentRequiredCheck := httputil.WithConsentCheck(cfg.Matrix.UserConsentOptions, userAPI)
