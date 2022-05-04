@@ -466,7 +466,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			}
 			err := s.QueryPolicyVersion(req.Context(), &request, &response)
 			if err != nil {
-				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
+				return util.ErrorResponse(err)
 			}
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
