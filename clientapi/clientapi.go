@@ -38,7 +38,7 @@ func AddPublicRoutes(
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.ClientFederationAPI,
 	userAPI userapi.ClientUserAPI,
-	userDirectoryProvider userapi.UserDirectoryProvider,
+	userDirectoryProvider userapi.QuerySearchProfilesAPI,
 	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {

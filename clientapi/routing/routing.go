@@ -53,7 +53,7 @@ func Setup(
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.ClientUserAPI,
-	userDirectoryProvider userapi.UserDirectoryProvider,
+	userDirectoryProvider userapi.QuerySearchProfilesAPI,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,

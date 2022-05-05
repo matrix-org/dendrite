@@ -26,34 +26,33 @@ import (
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
-	UserProfileAPI
-	QueryAcccessTokenAPI
-
 	AppserviceUserAPI
 	SyncUserAPI
 	ClientUserAPI
 	MediaUserAPI
+	FederationUserAPI
 
-	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+	QuerySearchProfilesAPI // used by p2p demos
 }
 
-type QueryAcccessTokenAPI interface {
-	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
-}
-
-type UserLoginAPI interface {
-	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
-}
-
+// api functions required by the appservice api
 type AppserviceUserAPI interface {
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
 }
 
+// api functions required by the media api
 type MediaUserAPI interface {
 	QueryAcccessTokenAPI
 }
 
+// api functions required by the federation api
+type FederationUserAPI interface {
+	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
+	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
+}
+
+// api functions required by the sync api
 type SyncUserAPI interface {
 	QueryAcccessTokenAPI
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
@@ -63,6 +62,7 @@ type SyncUserAPI interface {
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 }
 
+// api functions required by the client api
 type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
@@ -97,14 +97,18 @@ type ClientUserAPI interface {
 	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
 }
 
-type UserDirectoryProvider interface {
+// custom api functions required by pinecone / p2p demos
+type QuerySearchProfilesAPI interface {
 	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
 }
 
-// UserProfileAPI provides functions for getting user profiles
-type UserProfileAPI interface {
-	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
-	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
+// common function for creating authenticated endpoints (used in client/media/sync api)
+type QueryAcccessTokenAPI interface {
+	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
+}
+
+type UserLoginAPI interface {
+	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
 }
 
 type PerformKeyBackupRequest struct {

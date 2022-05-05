@@ -58,7 +58,7 @@ func CreateInvitesFrom3PIDInvites(
 	req *http.Request, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
 	federation *gomatrixserverlib.FederationClient,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -206,7 +206,7 @@ func createInviteFrom3PIDInvite(
 	ctx context.Context, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
 	inv invite, federation *gomatrixserverlib.FederationClient,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 ) (*gomatrixserverlib.Event, error) {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
