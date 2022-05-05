@@ -202,7 +202,7 @@ func (w *worker) _next() {
 			return
 		}
 
-	case context.DeadlineExceeded:
+	case context.DeadlineExceeded, context.Canceled:
 		// The context exceeded, so we've been waiting for more than a
 		// minute for activity in this room. At this point we will shut
 		// down the subscriber to free up resources. It'll get started
