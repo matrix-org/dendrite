@@ -70,6 +70,9 @@ type Global struct {
 
 	// ServerNotices configuration used for sending server notices
 	ServerNotices ServerNotices `yaml:"server_notices"`
+
+	// ReportStats configures opt-in anonymous stats reporting.
+	ReportStats ReportStats `yaml:"report_stats"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -86,6 +89,7 @@ func (c *Global) Defaults(generate bool) {
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(generate)
+	c.ReportStats.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -97,6 +101,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.Sentry.Verify(configErrs, isMonolith)
 	c.DNSCache.Verify(configErrs, isMonolith)
 	c.ServerNotices.Verify(configErrs, isMonolith)
+	c.ReportStats.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -162,6 +167,26 @@ func (c *ServerNotices) Defaults(generate bool) {
 }
 
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
+
+// ReportStats configures opt-in anonymous stats reporting.
+type ReportStats struct {
+	// Enabled configures anonymous usage stats of the server
+	Enabled bool `yaml:"enabled"`
+
+	// Endpoint the endpoint to report stats to
+	Endpoint string `yaml:"endpoint"`
+}
+
+func (c *ReportStats) Defaults() {
+	c.Enabled = false
+	c.Endpoint = "https://matrix.org/report-usage-stats/push"
+}
+
+func (c *ReportStats) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	if c.Enabled {
+		checkNotEmpty(configErrs, "global.report_stats.endpoint", c.Endpoint)
+	}
+}
 
 // The configuration to use for Sentry error reporting
 type Sentry struct {

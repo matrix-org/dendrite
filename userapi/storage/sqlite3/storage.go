@@ -95,6 +95,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
 	}
+	statsTable, err := NewSQLiteStatsTable(db, serverName)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
+	}
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
 		Accounts:              accountsTable,
@@ -107,6 +111,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		ThreePIDs:             threePIDTable,
 		Pushers:               pusherTable,
 		Notifications:         notificationsTable,
+		Stats:                 statsTable,
 		ServerName:            serverName,
 		DB:                    db,
 		Writer:                writer,
