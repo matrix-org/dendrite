@@ -12,10 +12,6 @@ import (
 
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
-	InputRoomEventsAPI
-	QueryLatestEventsAndStateAPI
-	QueryEventsAPI
-
 	SyncRoomserverAPI
 	AppserviceRoomserverAPI
 	ClientRoomserverAPI
@@ -28,83 +24,14 @@ type RoomserverInternalAPI interface {
 	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
 	SetUserAPI(userAPI userapi.UserInternalAPI)
 
-	PerformInvite(
-		ctx context.Context,
-		req *PerformInviteRequest,
-		res *PerformInviteResponse,
-	) error
-
-	PerformJoin(
-		ctx context.Context,
-		req *PerformJoinRequest,
-		res *PerformJoinResponse,
-	)
-
-	PerformLeave(
-		ctx context.Context,
-		req *PerformLeaveRequest,
-		res *PerformLeaveResponse,
-	) error
-
-	PerformPeek(
-		ctx context.Context,
-		req *PerformPeekRequest,
-		res *PerformPeekResponse,
-	)
-
-	PerformUnpeek(
-		ctx context.Context,
-		req *PerformUnpeekRequest,
-		res *PerformUnpeekResponse,
-	)
-
-	PerformPublish(
-		ctx context.Context,
-		req *PerformPublishRequest,
-		res *PerformPublishResponse,
-	)
-
 	// QueryAuthChain returns the entire auth chain for the event IDs given.
 	// The response includes the events in the request.
 	// Omits without error for any missing auth events. There will be no duplicates.
+	// Used in MSC2836.
 	QueryAuthChain(
 		ctx context.Context,
 		req *QueryAuthChainRequest,
 		res *QueryAuthChainResponse,
-	) error
-
-	// QueryRoomsForUser retrieves a list of room IDs matching the given query.
-	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
-
-	// PerformRoomUpgrade upgrades a room to a newer version
-	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
-
-	// Asks for the default room version as preferred by the server.
-	QueryRoomVersionCapabilities(
-		ctx context.Context,
-		req *QueryRoomVersionCapabilitiesRequest,
-		res *QueryRoomVersionCapabilitiesResponse,
-	) error
-
-	// Asks for the room version for a given room.
-	QueryRoomVersionForRoom(
-		ctx context.Context,
-		req *QueryRoomVersionForRoomRequest,
-		res *QueryRoomVersionForRoomResponse,
-	) error
-
-	// Set a room alias
-	SetRoomAlias(
-		ctx context.Context,
-		req *SetRoomAliasRequest,
-		res *SetRoomAliasResponse,
-	) error
-
-	// Get the room ID for an alias
-	GetRoomIDForAlias(
-		ctx context.Context,
-		req *GetRoomIDForAliasRequest,
-		res *GetRoomIDForAliasResponse,
 	) error
 
 	// Get the user ID of the creator of an alias
@@ -112,13 +39,6 @@ type RoomserverInternalAPI interface {
 		ctx context.Context,
 		req *GetCreatorIDForAliasRequest,
 		res *GetCreatorIDForAliasResponse,
-	) error
-
-	// Remove a room alias
-	RemoveRoomAlias(
-		ctx context.Context,
-		req *RemoveRoomAliasRequest,
-		res *RemoveRoomAliasResponse,
 	) error
 }
 
