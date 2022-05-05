@@ -95,7 +95,7 @@ func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQuery
 }
 
 // SetUserAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI

@@ -177,7 +177,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	}
 }
 
-func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	r.Leaver.UserAPI = userAPI
 }
 

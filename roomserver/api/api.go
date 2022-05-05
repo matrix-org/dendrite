@@ -22,7 +22,7 @@ type RoomserverInternalAPI interface {
 	// interdependencies between the roomserver and other input APIs
 	SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing)
 	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
-	SetUserAPI(userAPI userapi.UserInternalAPI)
+	SetUserAPI(userAPI userapi.RoomserverUserAPI)
 
 	// QueryAuthChain returns the entire auth chain for the event IDs given.
 	// The response includes the events in the request.

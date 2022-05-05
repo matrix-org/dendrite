@@ -27,7 +27,7 @@ func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQuer
 	t.Impl.SetAppserviceAPI(asAPI)
 }
 
-func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	t.Impl.SetUserAPI(userAPI)
 }
 
