@@ -30,7 +30,7 @@ import (
 )
 
 const userDailyVisitsSchema = `
-CREATE TABLE IF NOT EXISTS user_daily_visits (
+CREATE TABLE IF NOT EXISTS userapi_daily_visits (
     localpart TEXT NOT NULL,
 	device_id TEXT NOT NULL,
 	timestamp BIGINT NOT NULL,
@@ -38,9 +38,9 @@ CREATE TABLE IF NOT EXISTS user_daily_visits (
 );
 
 -- Device IDs and timestamp must be unique for a given user per day
-CREATE UNIQUE INDEX IF NOT EXISTS localpart_device_timestamp_idx ON user_daily_visits(localpart, device_id, timestamp);
-CREATE INDEX IF NOT EXISTS timestamp_idx ON user_daily_visits(timestamp);
-CREATE INDEX IF NOT EXISTS localpart_timestamp_idx ON user_daily_visits(localpart, timestamp);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_daily_visits_localpart_device_timestamp_idx ON userapi_daily_visits(localpart, device_id, timestamp);
+CREATE INDEX IF NOT EXISTS userapi_daily_visits_timestamp_idx ON userapi_daily_visits(timestamp);
+CREATE INDEX IF NOT EXISTS userapi_daily_visits_localpart_timestamp_idx ON userapi_daily_visits(localpart, timestamp);
 `
 
 const countUsersLastSeenAfterSQL = "" +
@@ -116,7 +116,7 @@ FROM
 				WHEN LOWER(user_agent) LIKE '%%mozilla%%' OR LOWER(user_agent) LIKE '%%gecko%%' THEN 'web'
 				ELSE 'unknown'
 			END as client_type
-		FROM user_daily_visits
+		FROM userapi_daily_visits
 		WHERE timestamp > $1 AND timestamp < $2
 		GROUP BY localpart, client_type
 		HAVING max(timestamp) - min(timestamp) > $3
@@ -145,11 +145,11 @@ SELECT user_type, COUNT(*) AS count FROM (
 
 // account_type 1 = users; 3 = admins
 const updateUserDailyVisitsSQL = `
-INSERT INTO user_daily_visits(localpart, device_id, timestamp, user_agent)
+INSERT INTO userapi_daily_visits(localpart, device_id, timestamp, user_agent)
 	SELECT u.localpart, u.device_id, $1, MAX(u.user_agent)
 	FROM device_devices AS u
 	LEFT JOIN (
-		SELECT localpart, device_id, timestamp FROM user_daily_visits
+		SELECT localpart, device_id, timestamp FROM userapi_daily_visits
 		WHERE timestamp = $1
 	) udv
 	ON u.localpart = udv.localpart AND u.device_id = udv.device_id
