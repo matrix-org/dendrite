@@ -53,7 +53,7 @@ func init() {
 }
 
 type testRoomserverAPI struct {
-	api.FederationRoomserverAPITrace
+	api.RoomserverInternalAPITrace
 	inputRoomEvents           []api.InputRoomEvent
 	queryStateAfterEvents     func(*api.QueryStateAfterEventsRequest) api.QueryStateAfterEventsResponse
 	queryEventsByID           func(req *api.QueryEventsByIDRequest) api.QueryEventsByIDResponse

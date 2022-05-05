@@ -51,7 +51,7 @@ func AddPublicRoutes(
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	federationAPI federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	keyAPI keyserverAPI.FederationKeyAPI,
 	servers federationAPI.ServersInRoomProvider,
 ) {
 	cfg := &base.Cfg.FederationAPI

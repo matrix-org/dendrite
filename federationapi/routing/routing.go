@@ -52,7 +52,7 @@ func Setup(
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	userAPI userapi.FederationUserAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	keyAPI keyserverAPI.FederationKeyAPI,
 	mscCfg *config.MSCs,
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
