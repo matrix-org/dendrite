@@ -265,6 +265,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
 	}
 
+	defer rp.updateLastSeen(req, device)
+	rp.updatePresence(req.Context(), rp.db, req.FormValue("set_presence"), device.UserID)
+
 	if syncReq.Since.IsEmpty() {
 		// Complete sync
 		syncReq.Response.NextBatch = types.StreamingToken{
@@ -337,9 +340,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			),
 		}
 	}
-
-	rp.updateLastSeen(req, device)
-	rp.updatePresence(req.Context(), rp.db, req.FormValue("set_presence"), device.UserID)
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
