@@ -12,19 +12,19 @@ import (
 
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
+	InputRoomEventsAPI
+	QueryLatestEventsAndStateAPI
+	QueryEventsAPI
+
 	SyncRoomserverAPI
+	AppserviceRoomserverAPI
+	ClientRoomserverAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
 	SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing)
 	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
 	SetUserAPI(userAPI userapi.UserInternalAPI)
-
-	InputRoomEvents(
-		ctx context.Context,
-		request *InputRoomEventsRequest,
-		response *InputRoomEventsResponse,
-	)
 
 	PerformInvite(
 		ctx context.Context,
@@ -68,44 +68,31 @@ type RoomserverInternalAPI interface {
 		res *PerformInboundPeekResponse,
 	) error
 
-	PerformAdminEvacuateRoom(
-		ctx context.Context,
-		req *PerformAdminEvacuateRoomRequest,
-		res *PerformAdminEvacuateRoomResponse,
-	)
-
 	QueryPublishedRooms(
 		ctx context.Context,
 		req *QueryPublishedRoomsRequest,
 		res *QueryPublishedRoomsResponse,
 	) error
 
-	// Query a list of membership events for a room
-	QueryMembershipsForRoom(
-		ctx context.Context,
-		request *QueryMembershipsForRoomRequest,
-		response *QueryMembershipsForRoomResponse,
-	) error
-
 	// Query if we think we're still in a room.
 	QueryServerJoinedToRoom(
 		ctx context.Context,
-		request *QueryServerJoinedToRoomRequest,
-		response *QueryServerJoinedToRoomResponse,
+		req *QueryServerJoinedToRoomRequest,
+		res *QueryServerJoinedToRoomResponse,
 	) error
 
 	// Query whether a server is allowed to see an event
 	QueryServerAllowedToSeeEvent(
 		ctx context.Context,
-		request *QueryServerAllowedToSeeEventRequest,
-		response *QueryServerAllowedToSeeEventResponse,
+		req *QueryServerAllowedToSeeEventRequest,
+		res *QueryServerAllowedToSeeEventResponse,
 	) error
 
 	// Query missing events for a room from roomserver
 	QueryMissingEvents(
 		ctx context.Context,
-		request *QueryMissingEventsRequest,
-		response *QueryMissingEventsResponse,
+		req *QueryMissingEventsRequest,
+		res *QueryMissingEventsResponse,
 	) error
 
 	// Query to get state and auth chain for a (potentially hypothetical) event.
@@ -113,8 +100,8 @@ type RoomserverInternalAPI interface {
 	// the state and auth chain to return.
 	QueryStateAndAuthChain(
 		ctx context.Context,
-		request *QueryStateAndAuthChainRequest,
-		response *QueryStateAndAuthChainResponse,
+		req *QueryStateAndAuthChainRequest,
+		res *QueryStateAndAuthChainResponse,
 	) error
 
 	// QueryAuthChain returns the entire auth chain for the event IDs given.
@@ -122,22 +109,14 @@ type RoomserverInternalAPI interface {
 	// Omits without error for any missing auth events. There will be no duplicates.
 	QueryAuthChain(
 		ctx context.Context,
-		request *QueryAuthChainRequest,
-		response *QueryAuthChainResponse,
+		req *QueryAuthChainRequest,
+		res *QueryAuthChainResponse,
 	) error
 
-	// QueryCurrentState retrieves the requested state events. If state events are not found, they will be missing from
-	// the response.
-	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	// QueryRoomsForUser retrieves a list of room IDs matching the given query.
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
-	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
-	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
-
-	// PerformForget forgets a rooms history for a specific user
-	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 
 	// PerformRoomUpgrade upgrades a room to a newer version
 	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
@@ -145,89 +124,164 @@ type RoomserverInternalAPI interface {
 	// Asks for the default room version as preferred by the server.
 	QueryRoomVersionCapabilities(
 		ctx context.Context,
-		request *QueryRoomVersionCapabilitiesRequest,
-		response *QueryRoomVersionCapabilitiesResponse,
+		req *QueryRoomVersionCapabilitiesRequest,
+		res *QueryRoomVersionCapabilitiesResponse,
 	) error
 
 	// Asks for the room version for a given room.
 	QueryRoomVersionForRoom(
 		ctx context.Context,
-		request *QueryRoomVersionForRoomRequest,
-		response *QueryRoomVersionForRoomResponse,
+		req *QueryRoomVersionForRoomRequest,
+		res *QueryRoomVersionForRoomResponse,
 	) error
 
 	// Set a room alias
 	SetRoomAlias(
 		ctx context.Context,
 		req *SetRoomAliasRequest,
-		response *SetRoomAliasResponse,
+		res *SetRoomAliasResponse,
 	) error
 
 	// Get the room ID for an alias
 	GetRoomIDForAlias(
 		ctx context.Context,
 		req *GetRoomIDForAliasRequest,
-		response *GetRoomIDForAliasResponse,
-	) error
-
-	// Get all known aliases for a room ID
-	GetAliasesForRoomID(
-		ctx context.Context,
-		req *GetAliasesForRoomIDRequest,
-		response *GetAliasesForRoomIDResponse,
+		res *GetRoomIDForAliasResponse,
 	) error
 
 	// Get the user ID of the creator of an alias
 	GetCreatorIDForAlias(
 		ctx context.Context,
 		req *GetCreatorIDForAliasRequest,
-		response *GetCreatorIDForAliasResponse,
+		res *GetCreatorIDForAliasResponse,
 	) error
 
 	// Remove a room alias
 	RemoveRoomAlias(
 		ctx context.Context,
 		req *RemoveRoomAliasRequest,
-		response *RemoveRoomAliasResponse,
+		res *RemoveRoomAliasResponse,
 	) error
+}
+
+type InputRoomEventsAPI interface {
+	InputRoomEvents(
+		ctx context.Context,
+		req *InputRoomEventsRequest,
+		res *InputRoomEventsResponse,
+	)
+}
+
+// Query the latest events and state for a room from the room server.
+type QueryLatestEventsAndStateAPI interface {
+	QueryLatestEventsAndState(ctx context.Context, req *QueryLatestEventsAndStateRequest, res *QueryLatestEventsAndStateResponse) error
+}
+
+// QueryBulkStateContent does a bulk query for state event content in the given rooms.
+type QueryBulkStateContentAPI interface {
+	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
+}
+
+type QueryEventsAPI interface {
+	// Query a list of events by event ID.
+	QueryEventsByID(
+		ctx context.Context,
+		req *QueryEventsByIDRequest,
+		res *QueryEventsByIDResponse,
+	) error
+	// QueryCurrentState retrieves the requested state events. If state events are not found, they will be missing from
+	// the response.
+	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 }
 
 // API functions required by the syncapi
 type SyncRoomserverAPI interface {
-	// Query the latest events and state for a room from the room server.
-	QueryLatestEventsAndState(
-		ctx context.Context,
-		request *QueryLatestEventsAndStateRequest,
-		response *QueryLatestEventsAndStateResponse,
-	) error
-	// QueryBulkStateContent does a bulk query for state event content in the given rooms.
-	QueryBulkStateContent(ctx context.Context, req *QueryBulkStateContentRequest, res *QueryBulkStateContentResponse) error
+	QueryLatestEventsAndStateAPI
+	QueryBulkStateContentAPI
 	// QuerySharedUsers returns a list of users who share at least 1 room in common with the given user.
 	QuerySharedUsers(ctx context.Context, req *QuerySharedUsersRequest, res *QuerySharedUsersResponse) error
 	// Query a list of events by event ID.
 	QueryEventsByID(
 		ctx context.Context,
-		request *QueryEventsByIDRequest,
-		response *QueryEventsByIDResponse,
+		req *QueryEventsByIDRequest,
+		res *QueryEventsByIDResponse,
 	) error
 	// Query the membership event for an user for a room.
 	QueryMembershipForUser(
 		ctx context.Context,
-		request *QueryMembershipForUserRequest,
-		response *QueryMembershipForUserResponse,
+		req *QueryMembershipForUserRequest,
+		res *QueryMembershipForUserResponse,
 	) error
 
 	// Query the state after a list of events in a room from the room server.
 	QueryStateAfterEvents(
 		ctx context.Context,
-		request *QueryStateAfterEventsRequest,
-		response *QueryStateAfterEventsResponse,
+		req *QueryStateAfterEventsRequest,
+		res *QueryStateAfterEventsResponse,
 	) error
 
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(
 		ctx context.Context,
-		request *PerformBackfillRequest,
-		response *PerformBackfillResponse,
+		req *PerformBackfillRequest,
+		res *PerformBackfillResponse,
 	) error
+}
+
+type AppserviceRoomserverAPI interface {
+	// Query a list of events by event ID.
+	QueryEventsByID(
+		ctx context.Context,
+		req *QueryEventsByIDRequest,
+		res *QueryEventsByIDResponse,
+	) error
+	// Query a list of membership events for a room
+	QueryMembershipsForRoom(
+		ctx context.Context,
+		req *QueryMembershipsForRoomRequest,
+		res *QueryMembershipsForRoomResponse,
+	) error
+	// Get all known aliases for a room ID
+	GetAliasesForRoomID(
+		ctx context.Context,
+		req *GetAliasesForRoomIDRequest,
+		res *GetAliasesForRoomIDResponse,
+	) error
+}
+
+type ClientRoomserverAPI interface {
+	InputRoomEventsAPI
+	QueryLatestEventsAndStateAPI
+	QueryBulkStateContentAPI
+	QueryEventsAPI
+	QueryMembershipForUser(ctx context.Context, req *QueryMembershipForUserRequest, res *QueryMembershipForUserResponse) error
+	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
+	QueryStateAfterEvents(ctx context.Context, req *QueryStateAfterEventsRequest, res *QueryStateAfterEventsResponse) error
+	// QueryKnownUsers returns a list of users that we know about from our joined rooms.
+	QueryKnownUsers(ctx context.Context, req *QueryKnownUsersRequest, res *QueryKnownUsersResponse) error
+	QueryRoomVersionForRoom(ctx context.Context, req *QueryRoomVersionForRoomRequest, res *QueryRoomVersionForRoomResponse) error
+	QueryPublishedRooms(ctx context.Context, req *QueryPublishedRoomsRequest, res *QueryPublishedRoomsResponse) error
+	QueryRoomVersionCapabilities(ctx context.Context, req *QueryRoomVersionCapabilitiesRequest, res *QueryRoomVersionCapabilitiesResponse) error
+
+	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
+	GetAliasesForRoomID(ctx context.Context, req *GetAliasesForRoomIDRequest, res *GetAliasesForRoomIDResponse) error
+
+	// PerformRoomUpgrade upgrades a room to a newer version
+	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
+	PerformAdminEvacuateRoom(
+		ctx context.Context,
+		req *PerformAdminEvacuateRoomRequest,
+		res *PerformAdminEvacuateRoomResponse,
+	)
+	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse)
+	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse)
+	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
+	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse)
+	PerformLeave(ctx context.Context, req *PerformLeaveRequest, res *PerformLeaveResponse) error
+	PerformPublish(ctx context.Context, req *PerformPublishRequest, res *PerformPublishResponse)
+	// PerformForget forgets a rooms history for a specific user
+	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
+	SetRoomAlias(ctx context.Context, req *SetRoomAliasRequest, res *SetRoomAliasResponse) error
+	RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
 }

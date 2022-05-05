@@ -26,7 +26,7 @@ import (
 // GetCapabilities returns information about the server's supported feature set
 // and other relevant capabilities to an authenticated user.
 func GetCapabilities(
-	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
+	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	roomVersionsQueryReq := roomserverAPI.QueryRoomVersionCapabilitiesRequest{}
 	roomVersionsQueryRes := roomserverAPI.QueryRoomVersionCapabilitiesResponse{}

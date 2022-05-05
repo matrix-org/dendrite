@@ -42,6 +42,7 @@ func (e *FederationClientError) Error() string {
 type FederationInternalAPI interface {
 	FederationClient
 	gomatrixserverlib.KeyDatabase
+	ClientFederationAPI
 
 	KeyRing() *gomatrixserverlib.KeyRing
 
@@ -98,6 +99,10 @@ type FederationInternalAPI interface {
 		request *PerformBroadcastEDURequest,
 		response *PerformBroadcastEDUResponse,
 	) error
+}
+
+type ClientFederationAPI interface {
+	QueryJoinedHostServerNamesInRoom(ctx context.Context, request *QueryJoinedHostServerNamesInRoomRequest, response *QueryJoinedHostServerNamesInRoomResponse) error
 }
 
 type QueryServerKeysRequest struct {

@@ -28,19 +28,25 @@ import (
 
 type KeyInternalAPI interface {
 	SyncKeyAPI
+	ClientKeyAPI
 	// SetUserAPI assigns a user API to query when extracting device names.
 	SetUserAPI(i userapi.UserInternalAPI)
 	// InputDeviceListUpdate from a federated server EDU
 	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
-	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
-	// PerformClaimKeys claims one-time keys for use in pre-key messages
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
+
 	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
-	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
-	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
 	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
+}
+
+// API functions required by the clientapi
+type ClientKeyAPI interface {
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
+	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
+	// PerformClaimKeys claims one-time keys for use in pre-key messages
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
 // API functions required by the syncapi

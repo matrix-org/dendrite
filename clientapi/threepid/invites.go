@@ -86,7 +86,7 @@ var (
 func CheckAndProcessInvite(
 	ctx context.Context,
 	device *userapi.Device, body *MembershipRequest, cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI, db userapi.UserProfileAPI,
+	rsAPI api.ClientRoomserverAPI, db userapi.ClientUserAPI,
 	roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
@@ -136,7 +136,7 @@ func CheckAndProcessInvite(
 // Returns an error if a check or a request failed.
 func queryIDServer(
 	ctx context.Context,
-	db userapi.UserProfileAPI, cfg *config.ClientAPI, device *userapi.Device,
+	userAPI userapi.ClientUserAPI, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (lookupRes *idServerLookupResponse, storeInviteRes *idServerStoreInviteResponse, err error) {
 	if err = isTrusted(body.IDServer, cfg); err != nil {
@@ -152,7 +152,7 @@ func queryIDServer(
 	if lookupRes.MXID == "" {
 		// No Matrix ID matches with the given 3PID, ask the server to store the
 		// invite and return a token
-		storeInviteRes, err = queryIDServerStoreInvite(ctx, db, cfg, device, body, roomID)
+		storeInviteRes, err = queryIDServerStoreInvite(ctx, userAPI, cfg, device, body, roomID)
 		return
 	}
 
@@ -163,7 +163,7 @@ func queryIDServer(
 	if lookupRes.NotBefore > now || now > lookupRes.NotAfter {
 		// If the current timestamp isn't in the time frame in which the association
 		// is known to be valid, re-run the query
-		return queryIDServer(ctx, db, cfg, device, body, roomID)
+		return queryIDServer(ctx, userAPI, cfg, device, body, roomID)
 	}
 
 	// Check the request signatures and send an error if one isn't valid
@@ -205,7 +205,7 @@ func queryIDServerLookup(ctx context.Context, body *MembershipRequest) (*idServe
 // Returns an error if the request failed to send or if the response couldn't be parsed.
 func queryIDServerStoreInvite(
 	ctx context.Context,
-	db userapi.UserProfileAPI, cfg *config.ClientAPI, device *userapi.Device,
+	userAPI userapi.ClientUserAPI, cfg *config.ClientAPI, device *userapi.Device,
 	body *MembershipRequest, roomID string,
 ) (*idServerStoreInviteResponse, error) {
 	// Retrieve the sender's profile to get their display name
@@ -217,7 +217,7 @@ func queryIDServerStoreInvite(
 	var profile *authtypes.Profile
 	if serverName == cfg.Matrix.ServerName {
 		res := &userapi.QueryProfileResponse{}
-		err = db.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
+		err = userAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +337,7 @@ func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
 	device *userapi.Device, roomID string, cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) error {
 	builder := &gomatrixserverlib.EventBuilder{
