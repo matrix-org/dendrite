@@ -31,7 +31,8 @@ type UserInternalAPI interface {
 	UserRegisterAPI
 	UserAccountAPI
 	UserThreePIDAPI
-	UserDeviceAPI
+	QueryAcccessTokenAPI
+	SyncUserAPI
 
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 
@@ -42,15 +43,20 @@ type UserInternalAPI interface {
 	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
 
 	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
-	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
-	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
 	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 }
 
-type UserDeviceAPI interface {
+type QueryAcccessTokenAPI interface {
+	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
+}
+
+type SyncUserAPI interface {
+	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
 	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
 	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
