@@ -23,7 +23,7 @@ func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.RoomserverFede
 	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }
 
-func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 	t.Impl.SetAppserviceAPI(asAPI)
 }
 

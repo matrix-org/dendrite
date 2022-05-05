@@ -91,7 +91,7 @@ func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.Roomserver
 }
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 }
 
 // SetUserAPI no-ops in HTTP client mode as there is no chicken/egg scenario
