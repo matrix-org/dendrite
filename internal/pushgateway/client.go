@@ -3,31 +3,28 @@ package pushgateway
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
 
 type httpClient struct {
-	hc *http.Client
+	hc *gomatrixserverlib.Client
 }
 
 // NewHTTPClient creates a new Push Gateway client.
 func NewHTTPClient(disableTLSValidation bool) Client {
-	hc := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: disableTLSValidation,
-			},
-		},
+	return &httpClient{
+		hc: gomatrixserverlib.NewClient(
+			gomatrixserverlib.WithTimeout(time.Second*30),
+			gomatrixserverlib.WithKeepAlives(false),
+			gomatrixserverlib.WithSkipVerify(disableTLSValidation),
+		),
 	}
-	return &httpClient{hc: hc}
 }
 
 func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest, resp *NotifyResponse) error {
@@ -44,7 +41,7 @@ func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest,
 	}
 	hreq.Header.Set("Content-Type", "application/json")
 
-	hresp, err := h.hc.Do(hreq)
+	hresp, err := h.hc.DoHTTPRequest(ctx, hreq)
 	if err != nil {
 		return err
 	}

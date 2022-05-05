@@ -39,7 +39,7 @@ type phoneHomeStats struct {
 	cfg        *config.Dendrite
 	db         storage.Statistics
 	isMonolith bool
-	client     *http.Client
+	client     *gomatrixserverlib.Client
 }
 
 type timestampToRUUsage struct {
@@ -55,10 +55,9 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 		cfg:        cfg,
 		db:         statsDB,
 		isMonolith: cfg.IsMonolith,
-		client: &http.Client{
-			Timeout:   time.Second * 30,
-			Transport: http.DefaultTransport,
-		},
+		client: gomatrixserverlib.NewClient(
+			gomatrixserverlib.WithTimeout(time.Second * 30),
+		),
 	}
 
 	// start initial run after 5min
@@ -152,8 +151,7 @@ func (p *phoneHomeStats) collect() {
 	}
 	request.Header.Set("User-Agent", "Dendrite/"+internal.VersionString())
 
-	_, err = p.client.Do(request)
-	if err != nil {
+	if _, err = p.client.DoHTTPRequest(ctx, request); err != nil {
 		logrus.WithError(err).Error("unable to send anonymous stats")
 		return
 	}

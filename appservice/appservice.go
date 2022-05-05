@@ -16,8 +16,6 @@ package appservice
 
 import (
 	"context"
-	"crypto/tls"
-	"net/http"
 	"sync"
 	"time"
 
@@ -36,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
@@ -50,15 +49,12 @@ func NewInternalAPI(
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 ) appserviceAPI.AppServiceQueryAPI {
-	client := &http.Client{
-		Timeout: time.Second * 30,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: base.Cfg.AppServiceAPI.DisableTLSValidation,
-			},
-		},
-	}
+	client := gomatrixserverlib.NewClient(
+		gomatrixserverlib.WithTimeout(time.Second*30),
+		gomatrixserverlib.WithKeepAlives(false),
+		gomatrixserverlib.WithSkipVerify(base.Cfg.AppServiceAPI.DisableTLSValidation),
+	)
+
 	js, _ := jetstream.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
