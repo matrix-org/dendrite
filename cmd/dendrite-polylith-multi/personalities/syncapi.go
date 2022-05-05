@@ -22,7 +22,6 @@ import (
 
 func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
-	federation := base.CreateFederationClient()
 
 	rsAPI := base.RoomserverHTTPClient()
 
@@ -30,7 +29,6 @@ func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 		base,
 		userAPI, rsAPI,
 		base.KeyServerHTTPClient(),
-		federation,
 	)
 
 	base.SetupAndServeHTTP(

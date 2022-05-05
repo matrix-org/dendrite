@@ -27,6 +27,7 @@ import (
 )
 
 type KeyInternalAPI interface {
+	SyncKeyAPI
 	// SetUserAPI assigns a user API to query when extracting device names.
 	SetUserAPI(i userapi.UserInternalAPI)
 	// InputDeviceListUpdate from a federated server EDU
@@ -38,10 +39,14 @@ type KeyInternalAPI interface {
 	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
 	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
-	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
-	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
 	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
+}
+
+// API functions required by the syncapi
+type SyncKeyAPI interface {
+	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
+	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server

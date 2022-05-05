@@ -41,7 +41,7 @@ type PresenceConsumer struct {
 	db            storage.Database
 	stream        types.StreamProvider
 	notifier      *notifier.Notifier
-	deviceAPI     api.UserDeviceAPI
+	deviceAPI     api.SyncUserAPI
 	cfg           *config.SyncAPI
 }
 
@@ -55,7 +55,7 @@ func NewPresenceConsumer(
 	db storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
-	deviceAPI api.UserDeviceAPI,
+	deviceAPI api.SyncUserAPI,
 ) *PresenceConsumer {
 	return &PresenceConsumer{
 		ctx:           process.Context(),

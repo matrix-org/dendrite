@@ -42,7 +42,7 @@ type ContextRespsonse struct {
 
 func Context(
 	req *http.Request, device *userapi.Device,
-	rsAPI roomserver.RoomserverInternalAPI,
+	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
 	lazyLoadCache *caching.LazyLoadCache,
