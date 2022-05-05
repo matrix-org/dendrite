@@ -137,7 +137,7 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
-	profileAPI api.UserProfileAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	var r createRoomRequest
@@ -164,7 +164,7 @@ func createRoom(
 	ctx context.Context,
 	r createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
-	profileAPI api.UserProfileAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	evTime time.Time,
 ) util.JSONResponse {

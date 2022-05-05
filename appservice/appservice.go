@@ -47,8 +47,8 @@ func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQuer
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI userapi.AppserviceUserAPI,
+	rsAPI roomserverAPI.AppserviceRoomserverAPI,
 ) appserviceAPI.AppServiceQueryAPI {
 	client := &http.Client{
 		Timeout: time.Second * 30,
@@ -117,7 +117,7 @@ func NewInternalAPI(
 // `sender_localpart` field of each application service if it doesn't
 // exist already
 func generateAppServiceAccount(
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.AppserviceUserAPI,
 	as config.ApplicationService,
 ) error {
 	var accRes userapi.PerformAccountCreationResponse

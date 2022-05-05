@@ -13,6 +13,7 @@ import (
 // RoomserverInputAPI is used to write events to the room server.
 type RoomserverInternalAPI interface {
 	SyncRoomserverAPI
+	AppserviceRoomserverAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -78,13 +79,6 @@ type RoomserverInternalAPI interface {
 		ctx context.Context,
 		req *QueryPublishedRoomsRequest,
 		res *QueryPublishedRoomsResponse,
-	) error
-
-	// Query a list of membership events for a room
-	QueryMembershipsForRoom(
-		ctx context.Context,
-		request *QueryMembershipsForRoomRequest,
-		response *QueryMembershipsForRoomResponse,
 	) error
 
 	// Query if we think we're still in a room.
@@ -170,13 +164,6 @@ type RoomserverInternalAPI interface {
 		response *GetRoomIDForAliasResponse,
 	) error
 
-	// Get all known aliases for a room ID
-	GetAliasesForRoomID(
-		ctx context.Context,
-		req *GetAliasesForRoomIDRequest,
-		response *GetAliasesForRoomIDResponse,
-	) error
-
 	// Get the user ID of the creator of an alias
 	GetCreatorIDForAlias(
 		ctx context.Context,
@@ -229,5 +216,26 @@ type SyncRoomserverAPI interface {
 		ctx context.Context,
 		request *PerformBackfillRequest,
 		response *PerformBackfillResponse,
+	) error
+}
+
+type AppserviceRoomserverAPI interface {
+	// Query a list of events by event ID.
+	QueryEventsByID(
+		ctx context.Context,
+		request *QueryEventsByIDRequest,
+		response *QueryEventsByIDResponse,
+	) error
+	// Query a list of membership events for a room
+	QueryMembershipsForRoom(
+		ctx context.Context,
+		request *QueryMembershipsForRoomRequest,
+		response *QueryMembershipsForRoomResponse,
+	) error
+	// Get all known aliases for a room ID
+	GetAliasesForRoomID(
+		ctx context.Context,
+		req *GetAliasesForRoomIDRequest,
+		response *GetAliasesForRoomIDResponse,
 	) error
 }

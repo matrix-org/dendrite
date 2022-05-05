@@ -52,7 +52,7 @@ func Setup(
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.UserDirectoryProvider,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
@@ -897,7 +897,7 @@ func Setup(
 			if resErr := clientutil.UnmarshalJSONRequest(req, &postContent); resErr != nil {
 				return *resErr
 			}
-			return *SearchUserDirectory(
+			return SearchUserDirectory(
 				req.Context(),
 				device,
 				userAPI,

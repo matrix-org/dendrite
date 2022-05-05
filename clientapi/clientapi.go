@@ -37,7 +37,7 @@ func AddPublicRoutes(
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.FederationInternalAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.UserDirectoryProvider,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
