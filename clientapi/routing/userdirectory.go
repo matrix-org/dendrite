@@ -36,7 +36,7 @@ func SearchUserDirectory(
 	device *userapi.Device,
 	userAPI userapi.ClientUserAPI,
 	rsAPI api.ClientRoomserverAPI,
-	provider userapi.UserDirectoryProvider,
+	provider userapi.QuerySearchProfilesAPI,
 	serverName gomatrixserverlib.ServerName,
 	searchString string,
 	limit int,

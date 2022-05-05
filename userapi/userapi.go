@@ -44,8 +44,8 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.UserAPI,
-	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
-	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
+	appServices []config.ApplicationService, keyAPI keyapi.UserKeyAPI,
+	rsAPI rsapi.UserRoomserverAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
 	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 

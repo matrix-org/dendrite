@@ -19,10 +19,12 @@ type RoomserverInternalAPI interface {
 	SyncRoomserverAPI
 	AppserviceRoomserverAPI
 	ClientRoomserverAPI
+	UserRoomserverAPI
+	FederationRoomserverAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
-	SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing)
+	SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing)
 	SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI)
 	SetUserAPI(userAPI userapi.UserInternalAPI)
 
@@ -62,48 +64,6 @@ type RoomserverInternalAPI interface {
 		res *PerformPublishResponse,
 	)
 
-	PerformInboundPeek(
-		ctx context.Context,
-		req *PerformInboundPeekRequest,
-		res *PerformInboundPeekResponse,
-	) error
-
-	QueryPublishedRooms(
-		ctx context.Context,
-		req *QueryPublishedRoomsRequest,
-		res *QueryPublishedRoomsResponse,
-	) error
-
-	// Query if we think we're still in a room.
-	QueryServerJoinedToRoom(
-		ctx context.Context,
-		req *QueryServerJoinedToRoomRequest,
-		res *QueryServerJoinedToRoomResponse,
-	) error
-
-	// Query whether a server is allowed to see an event
-	QueryServerAllowedToSeeEvent(
-		ctx context.Context,
-		req *QueryServerAllowedToSeeEventRequest,
-		res *QueryServerAllowedToSeeEventResponse,
-	) error
-
-	// Query missing events for a room from roomserver
-	QueryMissingEvents(
-		ctx context.Context,
-		req *QueryMissingEventsRequest,
-		res *QueryMissingEventsResponse,
-	) error
-
-	// Query to get state and auth chain for a (potentially hypothetical) event.
-	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
-	// the state and auth chain to return.
-	QueryStateAndAuthChain(
-		ctx context.Context,
-		req *QueryStateAndAuthChainRequest,
-		res *QueryStateAndAuthChainResponse,
-	) error
-
 	// QueryAuthChain returns the entire auth chain for the event IDs given.
 	// The response includes the events in the request.
 	// Omits without error for any missing auth events. There will be no duplicates.
@@ -115,8 +75,6 @@ type RoomserverInternalAPI interface {
 
 	// QueryRoomsForUser retrieves a list of room IDs matching the given query.
 	QueryRoomsForUser(ctx context.Context, req *QueryRoomsForUserRequest, res *QueryRoomsForUserResponse) error
-	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
-	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
 
 	// PerformRoomUpgrade upgrades a room to a newer version
 	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
@@ -284,4 +242,36 @@ type ClientRoomserverAPI interface {
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 	SetRoomAlias(ctx context.Context, req *SetRoomAliasRequest, res *SetRoomAliasResponse) error
 	RemoveRoomAlias(ctx context.Context, req *RemoveRoomAliasRequest, res *RemoveRoomAliasResponse) error
+}
+
+type UserRoomserverAPI interface {
+	QueryLatestEventsAndStateAPI
+	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
+	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+}
+
+type FederationRoomserverAPI interface {
+	InputRoomEventsAPI
+	QueryLatestEventsAndStateAPI
+	QueryBulkStateContentAPI
+	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
+	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
+	QueryRoomVersionForRoom(ctx context.Context, req *QueryRoomVersionForRoomRequest, res *QueryRoomVersionForRoomResponse) error
+	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
+	QueryEventsByID(ctx context.Context, req *QueryEventsByIDRequest, res *QueryEventsByIDResponse) error
+	// Query to get state and auth chain for a (potentially hypothetical) event.
+	// Takes lists of PrevEventIDs and AuthEventsIDs and uses them to calculate
+	// the state and auth chain to return.
+	QueryStateAndAuthChain(ctx context.Context, req *QueryStateAndAuthChainRequest, res *QueryStateAndAuthChainResponse) error
+	// Query if we think we're still in a room.
+	QueryServerJoinedToRoom(ctx context.Context, req *QueryServerJoinedToRoomRequest, res *QueryServerJoinedToRoomResponse) error
+	QueryPublishedRooms(ctx context.Context, req *QueryPublishedRoomsRequest, res *QueryPublishedRoomsResponse) error
+	// Query missing events for a room from roomserver
+	QueryMissingEvents(ctx context.Context, req *QueryMissingEventsRequest, res *QueryMissingEventsResponse) error
+	// Query whether a server is allowed to see an event
+	QueryServerAllowedToSeeEvent(ctx context.Context, req *QueryServerAllowedToSeeEventRequest, res *QueryServerAllowedToSeeEventResponse) error
+	PerformInboundPeek(ctx context.Context, req *PerformInboundPeekRequest, res *PerformInboundPeekResponse) error
+	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
+	// Query a given amount (or less) of events prior to a given set of events.
+	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
 }

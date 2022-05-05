@@ -82,7 +82,7 @@ type Inputer struct {
 	JetStream            nats.JetStreamContext
 	Durable              nats.SubOpt
 	ServerName           gomatrixserverlib.ServerName
-	FSAPI                fedapi.FederationInternalAPI
+	FSAPI                fedapi.RoomserverFederationAPI
 	KeyRing              gomatrixserverlib.JSONVerifier
 	ACLs                 *acls.ServerACLs
 	InputRoomEventTopic  string
