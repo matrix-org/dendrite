@@ -33,13 +33,6 @@ type RoomserverInternalAPI interface {
 		req *QueryAuthChainRequest,
 		res *QueryAuthChainResponse,
 	) error
-
-	// Get the user ID of the creator of an alias
-	GetCreatorIDForAlias(
-		ctx context.Context,
-		req *GetCreatorIDForAliasRequest,
-		res *GetCreatorIDForAliasResponse,
-	) error
 }
 
 type InputRoomEventsAPI interface {

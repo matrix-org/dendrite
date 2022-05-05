@@ -293,16 +293,6 @@ func (t *RoomserverInternalAPITrace) GetAliasesForRoomID(
 	return err
 }
 
-func (t *RoomserverInternalAPITrace) GetCreatorIDForAlias(
-	ctx context.Context,
-	req *GetCreatorIDForAliasRequest,
-	res *GetCreatorIDForAliasResponse,
-) error {
-	err := t.Impl.GetCreatorIDForAlias(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("GetCreatorIDForAlias req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
 func (t *RoomserverInternalAPITrace) RemoveRoomAlias(
 	ctx context.Context,
 	req *RemoveRoomAliasRequest,

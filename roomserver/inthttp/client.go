@@ -137,19 +137,6 @@ func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
-// GetCreatorIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) GetCreatorIDForAlias(
-	ctx context.Context,
-	request *api.GetCreatorIDForAliasRequest,
-	response *api.GetCreatorIDForAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetCreatorIDForAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetCreatorIDForAliasPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
 // RemoveRoomAlias implements RoomserverAliasAPI
 func (h *httpRoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
