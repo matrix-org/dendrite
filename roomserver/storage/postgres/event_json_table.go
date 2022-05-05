@@ -59,12 +59,12 @@ type eventJSONStatements struct {
 	bulkSelectEventJSONStmt *sql.Stmt
 }
 
-func createEventJSONTable(db *sql.DB) error {
+func CreateEventJSONTable(db *sql.DB) error {
 	_, err := db.Exec(eventJSONSchema)
 	return err
 }
 
-func prepareEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
+func PrepareEventJSONTable(db *sql.DB) (tables.EventJSON, error) {
 	s := &eventJSONStatements{}
 
 	return s, sqlutil.StatementList{
