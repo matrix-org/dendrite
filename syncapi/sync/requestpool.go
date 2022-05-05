@@ -212,6 +212,8 @@ var waitingSyncRequests = prometheus.NewGauge(
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
+	currentPos := rp.Notifier.CurrentPosition()
+
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
@@ -235,8 +237,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
-
-	currentPos := rp.Notifier.CurrentPosition()
 
 	if !rp.shouldReturnImmediately(syncReq, currentPos) {
 		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
@@ -262,7 +262,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 		case <-userStreamListener.GetNotifyChannel(syncReq.Since):
 			syncReq.Log.Debugln("Responding to sync after wake-up")
-			currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+			currentPos = userStreamListener.GetSyncPosition()
 		}
 	} else {
 		syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
