@@ -57,7 +57,7 @@ func Setup(
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
-	federationSender federationAPI.FederationInternalAPI,
+	federationSender federationAPI.ClientFederationAPI,
 	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,

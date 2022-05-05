@@ -32,6 +32,7 @@ type UserInternalAPI interface {
 	AppserviceUserAPI
 	SyncUserAPI
 	ClientUserAPI
+	MediaUserAPI
 
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 }
@@ -47,6 +48,10 @@ type UserLoginAPI interface {
 type AppserviceUserAPI interface {
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
+}
+
+type MediaUserAPI interface {
+	QueryAcccessTokenAPI
 }
 
 type SyncUserAPI interface {

@@ -26,7 +26,7 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the MediaAPI component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.MediaUserAPI,
 	client *gomatrixserverlib.Client,
 ) {
 	cfg := &base.Cfg.MediaAPI
