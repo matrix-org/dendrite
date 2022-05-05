@@ -53,8 +53,8 @@ func createLocalDB(t *testing.T, dbName string) {
 		createDB.Stderr = os.Stderr
 	}
 	err := createDB.Run()
-	if err != nil {
-		fatalError(t, "createLocalDB returned error: %s", err)
+	if err != nil && !Quiet {
+		fmt.Println("createLocalDB returned error:", err)
 	}
 }
 
