@@ -118,7 +118,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			beforeCount := publisher.count
-			rp.updatePresence(db, tt.args.presence, tt.args.userID)
+			rp.updatePresence(context.Background(), db, tt.args.presence, tt.args.userID)
 			if tt.wantIncrease && publisher.count <= beforeCount {
 				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
 			}

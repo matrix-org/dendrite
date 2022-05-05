@@ -105,7 +105,7 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 		rp.presence.Range(func(key interface{}, v interface{}) bool {
 			p := v.(types.PresenceInternal)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
-				rp.updatePresence(db, types.PresenceUnavailable.String(), p.UserID)
+				rp.updatePresence(context.Background(), db, types.PresenceUnavailable.String(), p.UserID)
 				rp.presence.Delete(key)
 			}
 			return true
@@ -115,7 +115,7 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 }
 
 // updatePresence sends presence updates to the SyncAPI and FederationAPI
-func (rp *RequestPool) updatePresence(db storage.Presence, presence string, userID string) {
+func (rp *RequestPool) updatePresence(ctx context.Context, db storage.Presence, presence string, userID string) {
 	if !rp.cfg.Matrix.Presence.EnableOutbound {
 		return
 	}
@@ -135,7 +135,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	}
 
 	// ensure we also send the current status_msg to federated servers and not nil
-	dbPresence, err := db.GetPresence(context.Background(), userID)
+	dbPresence, err := db.GetPresence(ctx, userID)
 	if err != nil && err != sql.ErrNoRows {
 		return
 	}
@@ -212,6 +212,8 @@ var waitingSyncRequests = prometheus.NewGauge(
 // called in a dedicated goroutine for this request. This function will block the goroutine
 // until a response is ready, or it times out.
 func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.Device) util.JSONResponse {
+	currentPos := rp.Notifier.CurrentPosition()
+
 	// Extract values from request
 	syncReq, err := newSyncRequest(req, *device, rp.db)
 	if err != nil {
@@ -230,15 +232,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	activeSyncRequests.Inc()
 	defer activeSyncRequests.Dec()
 
-	rp.updateLastSeen(req, device)
-	rp.updatePresence(rp.db, req.FormValue("set_presence"), device.UserID)
-
-	waitingSyncRequests.Inc()
-	defer waitingSyncRequests.Dec()
-
-	currentPos := rp.Notifier.CurrentPosition()
-
 	if !rp.shouldReturnImmediately(syncReq, currentPos) {
+		waitingSyncRequests.Inc()
+		defer waitingSyncRequests.Dec()
+
 		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
 		defer timer.Stop()
 
@@ -340,6 +337,9 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			),
 		}
 	}
+
+	rp.updateLastSeen(req, device)
+	rp.updatePresence(req.Context(), rp.db, req.FormValue("set_presence"), device.UserID)
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
