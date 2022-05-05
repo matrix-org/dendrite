@@ -35,7 +35,7 @@ import (
 type Inviter struct {
 	DB      storage.Database
 	Cfg     *config.RoomServer
-	FSAPI   federationAPI.FederationInternalAPI
+	FSAPI   federationAPI.RoomserverFederationAPI
 	Inputer *input.Inputer
 }
 

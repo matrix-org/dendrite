@@ -48,7 +48,7 @@ type UserInternalAPI struct {
 	ServerName           gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
-	KeyAPI      keyapi.KeyInternalAPI
+	KeyAPI      keyapi.UserKeyAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {

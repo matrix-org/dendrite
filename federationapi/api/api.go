@@ -14,17 +14,13 @@ import (
 // implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
 // this interface are of type FederationClientError
 type FederationClient interface {
-	gomatrixserverlib.BackfillClient
 	gomatrixserverlib.FederatedStateClient
 	GetUserDevices(ctx context.Context, s gomatrixserverlib.ServerName, userID string) (res gomatrixserverlib.RespUserDevices, err error)
 	ClaimKeys(ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res gomatrixserverlib.RespClaimKeys, err error)
 	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
-	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 	MSC2836EventRelationships(ctx context.Context, dst gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error)
 	MSC2946Spaces(ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool) (res gomatrixserverlib.MSC2946SpacesResponse, err error)
 	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
-	GetEventAuth(ctx context.Context, s gomatrixserverlib.ServerName, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (res gomatrixserverlib.RespEventAuth, err error)
-	LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
 // FederationClientError is returned from FederationClient methods in the event of a problem.
@@ -43,17 +39,10 @@ type FederationInternalAPI interface {
 	FederationClient
 	gomatrixserverlib.KeyDatabase
 	ClientFederationAPI
-
-	KeyRing() *gomatrixserverlib.KeyRing
+	RoomserverFederationAPI
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 
-	// PerformDirectoryLookup looks up a remote room ID from a room alias.
-	PerformDirectoryLookup(
-		ctx context.Context,
-		request *PerformDirectoryLookupRequest,
-		response *PerformDirectoryLookupResponse,
-	) error
 	// Query the server names of the joined hosts in a room.
 	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
 	// containing only the server names (without information for membership events).
@@ -62,30 +51,6 @@ type FederationInternalAPI interface {
 		ctx context.Context,
 		request *QueryJoinedHostServerNamesInRoomRequest,
 		response *QueryJoinedHostServerNamesInRoomResponse,
-	) error
-	// Handle an instruction to make_join & send_join with a remote server.
-	PerformJoin(
-		ctx context.Context,
-		request *PerformJoinRequest,
-		response *PerformJoinResponse,
-	)
-	// Handle an instruction to peek a room on a remote server.
-	PerformOutboundPeek(
-		ctx context.Context,
-		request *PerformOutboundPeekRequest,
-		response *PerformOutboundPeekResponse,
-	) error
-	// Handle an instruction to make_leave & send_leave with a remote server.
-	PerformLeave(
-		ctx context.Context,
-		request *PerformLeaveRequest,
-		response *PerformLeaveResponse,
-	) error
-	// Handle sending an invite to a remote server.
-	PerformInvite(
-		ctx context.Context,
-		request *PerformInviteRequest,
-		response *PerformInviteResponse,
 	) error
 	// Notifies the federation sender that these servers may be online and to retry sending messages.
 	PerformServersAlive(
@@ -103,6 +68,31 @@ type FederationInternalAPI interface {
 
 type ClientFederationAPI interface {
 	QueryJoinedHostServerNamesInRoom(ctx context.Context, request *QueryJoinedHostServerNamesInRoomRequest, response *QueryJoinedHostServerNamesInRoomResponse) error
+}
+
+type RoomserverFederationAPI interface {
+	gomatrixserverlib.BackfillClient
+	gomatrixserverlib.FederatedStateClient
+	KeyRing() *gomatrixserverlib.KeyRing
+
+	// PerformDirectoryLookup looks up a remote room ID from a room alias.
+	PerformDirectoryLookup(ctx context.Context, request *PerformDirectoryLookupRequest, response *PerformDirectoryLookupResponse) error
+	// Handle an instruction to make_join & send_join with a remote server.
+	PerformJoin(ctx context.Context, request *PerformJoinRequest, response *PerformJoinResponse)
+	// Handle an instruction to make_leave & send_leave with a remote server.
+	PerformLeave(ctx context.Context, request *PerformLeaveRequest, response *PerformLeaveResponse) error
+	// Handle sending an invite to a remote server.
+	PerformInvite(ctx context.Context, request *PerformInviteRequest, response *PerformInviteResponse) error
+	// Handle an instruction to peek a room on a remote server.
+	PerformOutboundPeek(ctx context.Context, request *PerformOutboundPeekRequest, response *PerformOutboundPeekResponse) error
+	// Query the server names of the joined hosts in a room.
+	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
+	// containing only the server names (without information for membership events).
+	// The response will include this server if they are joined to the room.
+	QueryJoinedHostServerNamesInRoom(ctx context.Context, request *QueryJoinedHostServerNamesInRoomRequest, response *QueryJoinedHostServerNamesInRoomResponse) error
+	GetEventAuth(ctx context.Context, s gomatrixserverlib.ServerName, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (res gomatrixserverlib.RespEventAuth, err error)
+	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
+	LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
 type QueryServerKeysRequest struct {

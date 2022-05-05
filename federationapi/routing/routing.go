@@ -47,7 +47,7 @@ import (
 func Setup(
 	fedMux, keyMux, wkMux *mux.Router,
 	cfg *config.FederationAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI federationAPI.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
@@ -497,7 +497,7 @@ func Setup(
 
 func ErrorIfLocalServerNotInRoom(
 	ctx context.Context,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) *util.JSONResponse {
 	// Check if we think we're in this room. If we aren't then

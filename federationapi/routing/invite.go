@@ -35,7 +35,7 @@ func InviteV2(
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	inviteReq := gomatrixserverlib.InviteV2Request{}
@@ -72,7 +72,7 @@ func InviteV1(
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 	roomVer := gomatrixserverlib.RoomVersionV1
@@ -110,7 +110,7 @@ func processInvite(
 	roomID string,
 	eventID string,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 ) util.JSONResponse {
 

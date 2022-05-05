@@ -29,12 +29,13 @@ import (
 type KeyInternalAPI interface {
 	SyncKeyAPI
 	ClientKeyAPI
+	UserKeyAPI
+
 	// SetUserAPI assigns a user API to query when extracting device names.
 	SetUserAPI(i userapi.UserInternalAPI)
 	// InputDeviceListUpdate from a federated server EDU
 	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
 
-	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
 	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 }
@@ -47,6 +48,12 @@ type ClientKeyAPI interface {
 	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
+}
+
+// API functions required by the userapi
+type UserKeyAPI interface {
+	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
+	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
 }
 
 // API functions required by the syncapi
