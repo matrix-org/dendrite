@@ -35,7 +35,7 @@ func SearchUserDirectory(
 	ctx context.Context,
 	device *userapi.Device,
 	userAPI userapi.ClientUserAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	provider userapi.UserDirectoryProvider,
 	serverName gomatrixserverlib.ServerName,
 	searchString string,

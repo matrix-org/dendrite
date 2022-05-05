@@ -11,7 +11,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserverAPI.RoomserverInternalAPI) util.JSONResponse {
+func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	if device.AccountType != userapi.AccountTypeAdmin {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,

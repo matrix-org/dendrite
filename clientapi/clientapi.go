@@ -33,13 +33,13 @@ import (
 func AddPublicRoutes(
 	base *base.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.FederationInternalAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.UserDirectoryProvider,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 ) {
 	cfg := &base.Cfg.ClientAPI

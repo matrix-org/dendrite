@@ -34,7 +34,7 @@ type crossSigningRequest struct {
 
 func UploadCrossSigningDeviceKeys(
 	req *http.Request, userInteractiveAuth *auth.UserInteractive,
-	keyserverAPI api.KeyInternalAPI, device *userapi.Device,
+	keyserverAPI api.ClientKeyAPI, device *userapi.Device,
 	accountAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 ) util.JSONResponse {
 	uploadReq := &crossSigningRequest{}
@@ -105,7 +105,7 @@ func UploadCrossSigningDeviceKeys(
 	}
 }
 
-func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
 	uploadReq := &api.PerformUploadDeviceSignaturesRequest{}
 	uploadRes := &api.PerformUploadDeviceSignaturesResponse{}
 

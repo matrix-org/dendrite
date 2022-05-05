@@ -137,7 +137,7 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
-	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	var r createRoomRequest
@@ -164,7 +164,7 @@ func createRoom(
 	ctx context.Context,
 	r createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
-	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	evTime time.Time,
 ) util.JSONResponse {
@@ -531,24 +531,22 @@ func createRoom(
 				gomatrixserverlib.NewInviteV2StrippedState(inviteEvent.Event),
 			)
 			// Send the invite event to the roomserver.
-			err = roomserverAPI.SendInvite(
-				ctx,
-				rsAPI,
-				inviteEvent.Headered(roomVersion),
-				inviteStrippedState,   // invite room state
-				cfg.Matrix.ServerName, // send as server
-				nil,                   // transaction ID
-			)
-			switch e := err.(type) {
-			case *roomserverAPI.PerformError:
-				return e.JSONResponse()
-			case nil:
-			default:
-				util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInvite failed")
+			var inviteRes roomserverAPI.PerformInviteResponse
+			event := inviteEvent.Headered(roomVersion)
+			if err := rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
+				Event:           event,
+				InviteRoomState: inviteStrippedState,
+				RoomVersion:     event.RoomVersion,
+				SendAsServer:    string(cfg.Matrix.ServerName),
+			}, &inviteRes); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: jsonerror.InternalServerError(),
 				}
+			}
+			if inviteRes.Error != nil {
+				return inviteRes.Error.JSONResponse()
 			}
 		}
 	}

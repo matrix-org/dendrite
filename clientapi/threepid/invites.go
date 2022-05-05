@@ -86,7 +86,7 @@ var (
 func CheckAndProcessInvite(
 	ctx context.Context,
 	device *userapi.Device, body *MembershipRequest, cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI, db userapi.ClientUserAPI,
+	rsAPI api.ClientRoomserverAPI, db userapi.ClientUserAPI,
 	roomID string,
 	evTime time.Time,
 ) (inviteStoredOnIDServer bool, err error) {
@@ -337,7 +337,7 @@ func emit3PIDInviteEvent(
 	ctx context.Context,
 	body *MembershipRequest, res *idServerStoreInviteResponse,
 	device *userapi.Device, roomID string, cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) error {
 	builder := &gomatrixserverlib.EventBuilder{

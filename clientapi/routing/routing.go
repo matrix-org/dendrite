@@ -50,7 +50,7 @@ import (
 func Setup(
 	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.UserDirectoryProvider,
@@ -58,7 +58,7 @@ func Setup(
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
 	federationSender federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
@@ -325,7 +325,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation)
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

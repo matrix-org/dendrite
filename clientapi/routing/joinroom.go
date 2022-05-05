@@ -29,7 +29,7 @@ import (
 func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	profileAPI api.ClientUserAPI,
 	roomIDOrAlias string,
 ) util.JSONResponse {

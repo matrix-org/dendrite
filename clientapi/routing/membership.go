@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -40,7 +41,7 @@ var errMissingUserID = errors.New("'user_id' must be supplied")
 func SendBan(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
@@ -83,7 +84,7 @@ func SendBan(
 func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID, membership, reason string, cfg *config.ClientAPI, targetUserID string, evTime time.Time,
 	roomVer gomatrixserverlib.RoomVersion,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI) util.JSONResponse {
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceQueryAPI) util.JSONResponse {
 
 	event, err := buildMembershipEvent(
 		ctx, targetUserID, reason, profileAPI, device, membership,
@@ -126,7 +127,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 func SendKick(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
@@ -166,7 +167,7 @@ func SendKick(
 func SendUnban(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, roomVer, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
@@ -201,7 +202,7 @@ func SendUnban(
 func SendInvite(
 	req *http.Request, profileAPI userapi.ClientUserAPI, device *userapi.Device,
 	roomID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	body, evTime, _, reqErr := extractRequestData(req, roomID, rsAPI)
 	if reqErr != nil {
@@ -237,7 +238,7 @@ func sendInvite(
 	device *userapi.Device,
 	roomID, userID, reason string,
 	cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI, evTime time.Time,
 ) (util.JSONResponse, error) {
 	event, err := buildMembershipEvent(
@@ -259,28 +260,27 @@ func sendInvite(
 		return jsonerror.InternalServerError(), err
 	}
 
-	err = roomserverAPI.SendInvite(
-		ctx, rsAPI,
-		event,
-		nil, // ask the roomserver to draw up invite room state for us
-		cfg.Matrix.ServerName,
-		nil,
-	)
-	switch e := err.(type) {
-	case *roomserverAPI.PerformError:
-		return e.JSONResponse(), err
-	case nil:
-		return util.JSONResponse{
-			Code: http.StatusOK,
-			JSON: struct{}{},
-		}, nil
-	default:
-		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInvite failed")
+	var inviteRes api.PerformInviteResponse
+	if err := rsAPI.PerformInvite(ctx, &api.PerformInviteRequest{
+		Event:           event,
+		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
+		RoomVersion:     event.RoomVersion,
+		SendAsServer:    string(cfg.Matrix.ServerName),
+	}, &inviteRes); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
 		}, err
 	}
+	if inviteRes.Error != nil {
+		return inviteRes.Error.JSONResponse(), inviteRes.Error
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}, nil
 }
 
 func buildMembershipEvent(
@@ -289,7 +289,7 @@ func buildMembershipEvent(
 	device *userapi.Device,
 	membership, roomID string, isDirect bool,
 	cfg *config.ClientAPI, evTime time.Time,
-	rsAPI roomserverAPI.RoomserverInternalAPI, asAPI appserviceAPI.AppServiceQueryAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI, asAPI appserviceAPI.AppServiceQueryAPI,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	profile, err := loadProfile(ctx, targetUserID, cfg, profileAPI, asAPI)
 	if err != nil {
@@ -344,7 +344,7 @@ func loadProfile(
 	return profile, err
 }
 
-func extractRequestData(req *http.Request, roomID string, rsAPI roomserverAPI.RoomserverInternalAPI) (
+func extractRequestData(req *http.Request, roomID string, rsAPI roomserverAPI.ClientRoomserverAPI) (
 	body *threepid.MembershipRequest, evTime time.Time, roomVer gomatrixserverlib.RoomVersion, resErr *util.JSONResponse,
 ) {
 	verReq := roomserverAPI.QueryRoomVersionForRoomRequest{RoomID: roomID}
@@ -379,7 +379,7 @@ func checkAndProcessThreepid(
 	device *userapi.Device,
 	body *threepid.MembershipRequest,
 	cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	profileAPI userapi.ClientUserAPI,
 	roomID string,
 	evTime time.Time,
@@ -418,7 +418,7 @@ func checkAndProcessThreepid(
 	return
 }
 
-func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID, roomID string) *util.JSONResponse {
+func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.ClientRoomserverAPI, userID, roomID string) *util.JSONResponse {
 	tuple := gomatrixserverlib.StateKeyTuple{
 		EventType: gomatrixserverlib.MRoomMember,
 		StateKey:  userID,
@@ -457,7 +457,7 @@ func checkMemberInRoom(ctx context.Context, rsAPI roomserverAPI.RoomserverIntern
 
 func SendForget(
 	req *http.Request, device *userapi.Device,
-	roomID string, rsAPI roomserverAPI.RoomserverInternalAPI,
+	roomID string, rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	ctx := req.Context()
 	logger := util.GetLogger(ctx).WithField("roomID", roomID).WithField("userID", device.UserID)

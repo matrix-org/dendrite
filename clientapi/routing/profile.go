@@ -92,7 +92,7 @@ func GetAvatarURL(
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
 	req *http.Request, profileAPI userapi.ClientUserAPI,
-	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
+	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -221,7 +221,7 @@ func GetDisplayName(
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
 	req *http.Request, profileAPI userapi.ClientUserAPI,
-	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
+	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -366,7 +366,7 @@ func buildMembershipEvents(
 	ctx context.Context,
 	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
-	evTime time.Time, rsAPI api.RoomserverInternalAPI,
+	evTime time.Time, rsAPI api.ClientRoomserverAPI,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	evs := []*gomatrixserverlib.HeaderedEvent{}
 

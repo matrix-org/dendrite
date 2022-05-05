@@ -152,7 +152,7 @@ type fullyReadEvent struct {
 // SaveReadMarker implements POST /rooms/{roomId}/read_markers
 func SaveReadMarker(
 	req *http.Request,
-	userAPI api.ClientUserAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	syncProducer *producers.SyncAPIProducer, device *api.Device, roomID string,
 ) util.JSONResponse {
 	// Verify that the user is a member of this room
