@@ -9,7 +9,7 @@
   * If open registration is enabled but this command line flag is not passed, Dendrite will fail to start up
 * Dendrite now supports phone-home statistic reporting
   * These statistics include things like the number of registered and active users, some configuration options and platform/environment details, to help us to understand how Dendrite is used
-  * This is not enabled by default — it must be enabled in the `report_stats` section of the config file
+  * This is not enabled by default — it must be enabled in the `global.report_stats` section of the config file
 * Monolith installations can now be configured with a single global database connection pool (in `global.database` in the config) rather than having to configure each component separately
   * This also means that you no longer need to balance connection counts between different components, as they will share the same larger pool
   * Specific components can override the global database settings by specifying their own `database` block
