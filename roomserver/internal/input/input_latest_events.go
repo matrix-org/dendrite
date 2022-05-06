@@ -325,11 +325,12 @@ func (u *latestEventsUpdater) calculateLatest(
 		}
 	}
 
-	// Start off with our new event.
+	// Start off with our new unreferenced event. We're reusing the backing
+	// array here rather than allocating a new one.
 	u.latest = append(u.latest[:0], newStateAndRef)
 
 	// If our new event references any of the existing forward extremities
-	// then they are no longer good candidates.
+	// then they are no longer forward extremities, so remove them.
 	for _, prevEventID := range newEvent.PrevEventIDs() {
 		delete(existingRefs, prevEventID)
 	}
