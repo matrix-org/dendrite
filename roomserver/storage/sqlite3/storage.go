@@ -83,7 +83,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := createEventTypesTable(db); err != nil {
 		return err
 	}
-	if err := createEventJSONTable(db); err != nil {
+	if err := CreateEventJSONTable(db); err != nil {
 		return err
 	}
 	if err := createEventsTable(db); err != nil {
@@ -129,7 +129,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	eventJSON, err := prepareEventJSONTable(db)
+	eventJSON, err := PrepareEventJSONTable(db)
 	if err != nil {
 		return err
 	}

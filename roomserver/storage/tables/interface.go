@@ -10,9 +10,8 @@ import (
 )
 
 type EventJSONPair struct {
-	EventNID    types.EventNID
-	RoomVersion gomatrixserverlib.RoomVersion
-	EventJSON   []byte
+	EventNID  types.EventNID
+	EventJSON []byte
 }
 
 type EventJSON interface {
