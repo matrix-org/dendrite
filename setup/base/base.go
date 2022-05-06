@@ -115,6 +115,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 			useHTTPAPIs = true
 		case PolylithMode:
 			isMonolith = false
+			useHTTPAPIs = true
 		}
 	}
 
