@@ -23,7 +23,6 @@ const (
 	FederationAPIPerformLeaveRequestPath           = "/federationapi/performLeaveRequest"
 	FederationAPIPerformInviteRequestPath          = "/federationapi/performInviteRequest"
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
-	FederationAPIPerformServersAlivePath           = "/federationapi/performServersAlive"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
@@ -94,18 +93,6 @@ func (h *httpFederationInternalAPI) PerformOutboundPeek(
 	defer span.Finish()
 
 	apiURL := h.federationAPIURL + FederationAPIPerformOutboundPeekRequestPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-func (h *httpFederationInternalAPI) PerformServersAlive(
-	ctx context.Context,
-	request *api.PerformServersAliveRequest,
-	response *api.PerformServersAliveResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformServersAlive")
-	defer span.Finish()
-
-	apiURL := h.federationAPIURL + FederationAPIPerformServersAlivePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
