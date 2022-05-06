@@ -63,7 +63,7 @@ func OnIncomingMessagesRequest(
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	srp *sync.RequestPool,
-	lazyLoadCache *caching.LazyLoadCache,
+	lazyLoadCache caching.LazyLoadCache,
 ) util.JSONResponse {
 	var err error
 
