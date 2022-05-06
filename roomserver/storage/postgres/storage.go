@@ -68,7 +68,7 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 }
 
 func (d *Database) create(db *sql.DB) error {
-	if err := createEventStateKeysTable(db); err != nil {
+	if err := CreateEventStateKeysTable(db); err != nil {
 		return err
 	}
 	if err := createEventTypesTable(db); err != nil {
@@ -112,7 +112,7 @@ func (d *Database) create(db *sql.DB) error {
 }
 
 func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
-	eventStateKeys, err := prepareEventStateKeysTable(db)
+	eventStateKeys, err := PrepareEventStateKeysTable(db)
 	if err != nil {
 		return err
 	}

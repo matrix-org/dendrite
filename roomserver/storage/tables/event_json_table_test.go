@@ -15,7 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 )
 
-func mustCreateTable(t *testing.T, dbType test.DBType) (tables.EventJSON, func()) {
+func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSON, func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
@@ -48,7 +48,7 @@ func mustCreateTable(t *testing.T, dbType test.DBType) (tables.EventJSON, func()
 
 func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateTable(t, dbType)
+		tab, close := mustCreateEventJSONTable(t, dbType)
 		defer close()
 		// create some dummy data
 		for i := 0; i < 10; i++ {
