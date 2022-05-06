@@ -34,7 +34,7 @@ type openIDTokenResponse struct {
 // can supply to an OpenID Relying Party to verify their identity
 func CreateOpenIDToken(
 	req *http.Request,
-	userAPI api.UserInternalAPI,
+	userAPI api.ClientUserAPI,
 	device *api.Device,
 	userID string,
 	cfg *config.ClientAPI,

@@ -38,7 +38,7 @@ import (
 type Joiner struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
-	FSAPI      fsAPI.FederationInternalAPI
+	FSAPI      fsAPI.RoomserverFederationAPI
 	RSAPI      rsAPI.RoomserverInternalAPI
 	DB         storage.Database
 

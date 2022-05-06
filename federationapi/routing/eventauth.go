@@ -26,7 +26,7 @@ import (
 func GetEventAuth(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
 ) util.JSONResponse {

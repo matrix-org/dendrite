@@ -34,13 +34,13 @@ type UserDirectoryResponse struct {
 func SearchUserDirectory(
 	ctx context.Context,
 	device *userapi.Device,
-	userAPI userapi.UserInternalAPI,
-	rsAPI api.RoomserverInternalAPI,
-	provider userapi.UserDirectoryProvider,
+	userAPI userapi.ClientUserAPI,
+	rsAPI api.ClientRoomserverAPI,
+	provider userapi.QuerySearchProfilesAPI,
 	serverName gomatrixserverlib.ServerName,
 	searchString string,
 	limit int,
-) *util.JSONResponse {
+) util.JSONResponse {
 	if limit < 10 {
 		limit = 10
 	}
@@ -58,8 +58,7 @@ func SearchUserDirectory(
 	}
 	userRes := &userapi.QuerySearchProfilesResponse{}
 	if err := provider.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
-		errRes := util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
-		return &errRes
+		return util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
 	}
 
 	for _, user := range userRes.Profiles {
@@ -94,8 +93,7 @@ func SearchUserDirectory(
 		}
 		stateRes := &api.QueryKnownUsersResponse{}
 		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil && err != sql.ErrNoRows {
-			errRes := util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
-			return &errRes
+			return util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 		}
 
 		for _, user := range stateRes.Users {
@@ -114,7 +112,7 @@ func SearchUserDirectory(
 		response.Results = append(response.Results, result)
 	}
 
-	return &util.JSONResponse{
+	return util.JSONResponse{
 		Code: 200,
 		JSON: response,
 	}

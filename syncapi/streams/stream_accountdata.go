@@ -10,7 +10,7 @@ import (
 
 type AccountDataStreamProvider struct {
 	StreamProvider
-	userAPI userapi.UserInternalAPI
+	userAPI userapi.SyncUserAPI
 }
 
 func (p *AccountDataStreamProvider) Setup() {

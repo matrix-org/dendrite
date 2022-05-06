@@ -43,7 +43,7 @@ type RoomserverInternalAPI struct {
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	ServerACLs             *acls.ServerACLs
-	fsAPI                  fsAPI.FederationInternalAPI
+	fsAPI                  fsAPI.RoomserverFederationAPI
 	asAPI                  asAPI.AppServiceQueryAPI
 	NATSClient             *nats.Conn
 	JetStream              nats.JetStreamContext
@@ -87,7 +87,7 @@ func NewRoomserverAPI(
 // SetFederationInputAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 

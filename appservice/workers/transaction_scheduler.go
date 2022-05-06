@@ -42,7 +42,7 @@ var (
 // size), then send that off to the AS's /transactions/{txnID} endpoint. It also
 // handles exponentially backing off in case the AS isn't currently available.
 func SetupTransactionWorkers(
-	client *http.Client,
+	client *gomatrixserverlib.Client,
 	appserviceDB storage.Database,
 	workerStates []types.ApplicationServiceWorkerState,
 ) error {
@@ -58,7 +58,7 @@ func SetupTransactionWorkers(
 
 // worker is a goroutine that sends any queued events to the application service
 // it is given.
-func worker(client *http.Client, db storage.Database, ws types.ApplicationServiceWorkerState) {
+func worker(client *gomatrixserverlib.Client, db storage.Database, ws types.ApplicationServiceWorkerState) {
 	log.WithFields(log.Fields{
 		"appservice": ws.AppService.ID,
 	}).Info("Starting application service")
@@ -200,7 +200,7 @@ func createTransaction(
 // send sends events to an application service. Returns an error if an OK was not
 // received back from the application service or the request timed out.
 func send(
-	client *http.Client,
+	client *gomatrixserverlib.Client,
 	appservice config.ApplicationService,
 	txnID int,
 	transaction []byte,
@@ -213,7 +213,7 @@ func send(
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := client.DoHTTPRequest(context.TODO(), req)
 	if err != nil {
 		return err
 	}

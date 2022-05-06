@@ -37,7 +37,7 @@ import (
 type PineconeUserProvider struct {
 	r         *pineconeRouter.Router
 	s         *pineconeSessions.Sessions
-	userAPI   userapi.UserProfileAPI
+	userAPI   userapi.QuerySearchProfilesAPI
 	fedClient *gomatrixserverlib.FederationClient
 }
 
@@ -46,7 +46,7 @@ const PublicURL = "/_matrix/p2p/profiles"
 func NewPineconeUserProvider(
 	r *pineconeRouter.Router,
 	s *pineconeSessions.Sessions,
-	userAPI userapi.UserProfileAPI,
+	userAPI userapi.QuerySearchProfilesAPI,
 	fedClient *gomatrixserverlib.FederationClient,
 ) *PineconeUserProvider {
 	p := &PineconeUserProvider{

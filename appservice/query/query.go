@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +33,7 @@ const userIDExistsPath = "/users/"
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
-	HTTPClient *http.Client
+	HTTPClient *gomatrixserverlib.Client
 	Cfg        *config.Dendrite
 }
 
@@ -64,9 +65,8 @@ func (a *AppServiceQueryAPI) RoomAliasExists(
 			if err != nil {
 				return err
 			}
-			req = req.WithContext(ctx)
 
-			resp, err := a.HTTPClient.Do(req)
+			resp, err := a.HTTPClient.DoHTTPRequest(ctx, req)
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()
@@ -130,7 +130,7 @@ func (a *AppServiceQueryAPI) UserIDExists(
 			if err != nil {
 				return err
 			}
-			resp, err := a.HTTPClient.Do(req.WithContext(ctx))
+			resp, err := a.HTTPClient.DoHTTPRequest(ctx, req)
 			if resp != nil {
 				defer func() {
 					err = resp.Body.Close()

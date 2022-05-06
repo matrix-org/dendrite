@@ -47,7 +47,7 @@ type Monolith struct {
 
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
-	ExtUserDirectoryProvider userapi.UserDirectoryProvider
+	ExtUserDirectoryProvider userapi.QuerySearchProfilesAPI
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router
@@ -69,6 +69,6 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 		base, m.UserAPI, m.Client,
 	)
 	syncapi.AddPublicRoutes(
-		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI, m.FedClient,
+		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI,
 	)
 }

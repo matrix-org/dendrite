@@ -39,7 +39,7 @@ var ErrRoomNoExists = errors.New("room does not exist")
 func QueryAndBuildEvent(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder, cfg *config.Global, evTime time.Time,
-	rsAPI api.RoomserverInternalAPI, queryRes *api.QueryLatestEventsAndStateResponse,
+	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	if queryRes == nil {
 		queryRes = &api.QueryLatestEventsAndStateResponse{}
@@ -80,7 +80,7 @@ func BuildEvent(
 func queryRequiredEventsForBuilder(
 	ctx context.Context,
 	builder *gomatrixserverlib.EventBuilder,
-	rsAPI api.RoomserverInternalAPI, queryRes *api.QueryLatestEventsAndStateResponse,
+	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.StateNeeded, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {

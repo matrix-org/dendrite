@@ -40,8 +40,8 @@ type upgradeRoomResponse struct {
 func UpgradeRoom(
 	req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI,
-	roomID string, profileAPI userapi.UserProfileAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	roomID string, profileAPI userapi.ClientUserAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 ) util.JSONResponse {
 	var r upgradeRoomRequest

@@ -33,7 +33,7 @@ type PDUStreamProvider struct {
 	workers atomic.Int32
 	// userID+deviceID -> lazy loading cache
 	lazyLoadCache *caching.LazyLoadCache
-	rsAPI         roomserverAPI.RoomserverInternalAPI
+	rsAPI         roomserverAPI.SyncRoomserverAPI
 }
 
 func (p *PDUStreamProvider) worker() {
