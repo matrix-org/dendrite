@@ -140,7 +140,7 @@ func (s *accountsStatements) InsertAccount(
 	ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID, policyVersion string, accountType api.AccountType,
 ) (*api.Account, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
-	stmt := s.insertAccountStmt
+	stmt := sqlutil.TxStmt(txn, s.insertAccountStmt)
 
 	var err error
 	if accountType != api.AccountTypeAppService {
