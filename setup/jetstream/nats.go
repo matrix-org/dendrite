@@ -29,6 +29,13 @@ func PrepareForTests() (*process.ProcessContext, nats.JetStreamContext, *nats.Co
 	return pc, js, jc
 }
 
+func DeleteAllStreams(js nats.JetStreamContext, cfg *config.JetStream) {
+	for _, stream := range streams { // streams are defined in streams.go
+		name := cfg.Prefixed(stream.Name)
+		js.DeleteStream(name)
+	}
+}
+
 func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {

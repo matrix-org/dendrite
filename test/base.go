@@ -16,6 +16,7 @@ package test
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"strings"
@@ -28,6 +29,10 @@ import (
 func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(false)
+	cfg.Global.JetStream.InMemory = true
+	// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
+	// the file system event with InMemory=true :(
+	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
 
 	switch dbType {
 	case DBTypePostgres:
