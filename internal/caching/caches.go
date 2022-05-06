@@ -1,6 +1,8 @@
 package caching
 
-import "time"
+import (
+	"time"
+)
 
 // Caches contains a set of references to caches. They may be
 // different implementations as long as they satisfy the Cache
@@ -13,6 +15,7 @@ type Caches struct {
 	RoomInfos          Cache // RoomInfoCache
 	FederationEvents   Cache // FederationEventsCache
 	SpaceSummaryRooms  Cache // SpaceSummaryRoomsCache
+	LazyLoading        Cache // LazyLoadCache
 }
 
 // Cache is the interface that an implementation must satisfy.

@@ -39,7 +39,7 @@ func Setup(
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
-	lazyLoadCache *caching.LazyLoadCache,
+	lazyLoadCache caching.LazyLoadCache,
 ) {
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
