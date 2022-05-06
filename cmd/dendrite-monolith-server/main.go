@@ -89,6 +89,7 @@ func main() {
 	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, base.Caches, nil, false,
 	)
+	fsImplAPI := fsAPI
 	if base.UseHTTPAPIs {
 		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationAPIHTTPClient()
@@ -138,7 +139,10 @@ func main() {
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI: asAPI, FederationAPI: fsAPI,
+		AppserviceAPI: asAPI,
+		// always use the concrete impl here even in -http mode because adding public routes
+		// must be done on the concrete impl not an HTTP client else fedapi will call itself
+		FederationAPI: fsImplAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
 		KeyAPI:        keyAPI,

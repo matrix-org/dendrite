@@ -38,7 +38,7 @@ import (
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
-func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQueryAPI) {
+func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI) {
 	inthttp.AddRoutes(queryAPI, router)
 }
 
@@ -48,7 +48,7 @@ func NewInternalAPI(
 	base *base.BaseDendrite,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.AppserviceRoomserverAPI,
-) appserviceAPI.AppServiceQueryAPI {
+) appserviceAPI.AppServiceInternalAPI {
 	client := gomatrixserverlib.NewClient(
 		gomatrixserverlib.WithTimeout(time.Second*30),
 		gomatrixserverlib.WithKeepAlives(false),

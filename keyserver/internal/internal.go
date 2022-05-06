@@ -38,12 +38,12 @@ type KeyInternalAPI struct {
 	DB         storage.Database
 	ThisServer gomatrixserverlib.ServerName
 	FedClient  fedsenderapi.FederationClient
-	UserAPI    userapi.UserInternalAPI
+	UserAPI    userapi.KeyserverUserAPI
 	Producer   *producers.KeyChange
 	Updater    *DeviceListUpdater
 }
 
-func (a *KeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
+func (a *KeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
 	a.UserAPI = i
 }
 

@@ -38,7 +38,7 @@ type Leaver struct {
 	Cfg     *config.RoomServer
 	DB      storage.Database
 	FSAPI   fsAPI.RoomserverFederationAPI
-	UserAPI userapi.UserInternalAPI
+	UserAPI userapi.RoomserverUserAPI
 	Inputer *input.Inputer
 }
 

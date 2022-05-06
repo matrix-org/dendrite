@@ -58,7 +58,7 @@ func SendServerNotice(
 	cfgClient *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
 	rsAPI api.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
 	txnID *string,

@@ -270,8 +270,8 @@ func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, 
 	return nil, nil, fmt.Errorf("no database connections configured")
 }
 
-// AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
-func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
+// AppserviceHTTPClient returns the AppServiceInternalAPI for hitting the appservice component over HTTP.
+func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceInternalAPI {
 	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")

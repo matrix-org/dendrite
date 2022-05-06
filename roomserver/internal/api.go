@@ -44,7 +44,7 @@ type RoomserverInternalAPI struct {
 	KeyRing                gomatrixserverlib.JSONVerifier
 	ServerACLs             *acls.ServerACLs
 	fsAPI                  fsAPI.RoomserverFederationAPI
-	asAPI                  asAPI.AppServiceQueryAPI
+	asAPI                  asAPI.AppServiceInternalAPI
 	NATSClient             *nats.Conn
 	JetStream              nats.JetStreamContext
 	Durable                string
@@ -177,11 +177,11 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	}
 }
 
-func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	r.Leaver.UserAPI = userAPI
 }
 
-func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 	r.asAPI = asAPI
 }
 
