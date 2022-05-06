@@ -50,15 +50,15 @@ import (
 func Setup(
 	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	userAPI userapi.UserInternalAPI,
-	userDirectoryProvider userapi.UserDirectoryProvider,
+	userAPI userapi.ClientUserAPI,
+	userDirectoryProvider userapi.QuerySearchProfilesAPI,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
-	federationSender federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	federationSender federationAPI.ClientFederationAPI,
+	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
@@ -343,7 +343,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation)
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}, consentRequiredCheck),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -915,7 +915,7 @@ func Setup(
 			if resErr := clientutil.UnmarshalJSONRequest(req, &postContent); resErr != nil {
 				return *resErr
 			}
-			return *SearchUserDirectory(
+			return SearchUserDirectory(
 				req.Context(),
 				device,
 				userAPI,

@@ -56,8 +56,8 @@ func SendServerNotice(
 	req *http.Request,
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
-	rsAPI api.RoomserverInternalAPI,
+	userAPI userapi.ClientUserAPI,
+	rsAPI api.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
@@ -91,12 +91,12 @@ func SendServerNotice(
 func sendServerNotice(
 	ctx context.Context,
 	serverNoticeRequest sendServerNoticeRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,
 	asAPI appserviceAPI.AppServiceQueryAPI,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 	txnID *string,
 	device *userapi.Device,
 	txnCache *transactions.Cache,
@@ -272,7 +272,7 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 // It returns an userapi.Device, which is used for building the event
 func getSenderDevice(
 	ctx context.Context,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse

@@ -74,3 +74,46 @@ If you are running with `GODEBUG=madvdontneed=1` and still see hugely inflated m
 ### Dendrite is running out of PostgreSQL database connections
 
 You may need to revisit the connection limit of your PostgreSQL server and/or make changes to the `max_connections` lines in your Dendrite configuration. Be aware that each Dendrite component opens its own database connections and has its own connection limit, even in monolith mode!
+
+### What is being reported when enabling anonymous stats?
+
+If anonymous stats reporting is enabled, the following data is send to the defined endpoint.
+
+```json
+{
+    "cpu_average": 0,
+    "daily_active_users": 97,
+    "daily_e2ee_messages": 0,
+    "daily_messages": 0,
+    "daily_sent_e2ee_messages": 0,
+    "daily_sent_messages": 0,
+    "daily_user_type_bridged": 2,
+    "daily_user_type_native": 97,
+    "database_engine": "Postgres",
+    "database_server_version": "11.14 (Debian 11.14-0+deb10u1)",
+    "federation_disabled": false,
+    "go_arch": "amd64",
+    "go_os": "linux",
+    "go_version": "go1.16.13",
+    "homeserver": "localhost:8800",
+    "log_level": "trace",
+    "memory_rss": 93452,
+    "monolith": true,
+    "monthly_active_users": 97,
+    "nats_embedded": true,
+    "nats_in_memory": true,
+    "num_cpu": 8,
+    "num_go_routine": 203,
+    "r30v2_users_all": 0,
+    "r30v2_users_android": 0,
+    "r30v2_users_electron": 0,
+    "r30v2_users_ios": 0,
+    "r30v2_users_web": 0,
+    "timestamp": 1651741851,
+    "total_nonbridged_users": 97,
+    "total_room_count": 0,
+    "total_users": 99,
+    "uptime_seconds": 30,
+    "version": "0.8.2"
+}
+```

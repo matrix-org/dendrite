@@ -129,7 +129,7 @@ func consent(writer http.ResponseWriter, req *http.Request, userAPI userapi.User
 	}
 }
 
-func sendServerNoticeForConsent(userAPI userapi.UserInternalAPI, rsAPI api.RoomserverInternalAPI,
+func sendServerNoticeForConsent(userAPI userapi.ClientUserAPI, rsAPI api.ClientRoomserverAPI,
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,

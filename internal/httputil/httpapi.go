@@ -55,7 +55,7 @@ type BasicAuth struct {
 type AuthAPICheck func(ctx context.Context, device *userapi.Device) *util.JSONResponse
 
 // WithConsentCheck checks that a user has given his consent.
-func WithConsentCheck(options config.UserConsentOptions, api userapi.UserInternalAPI) AuthAPICheck {
+func WithConsentCheck(options config.UserConsentOptions, api userapi.QueryPolicyVersionAPI) AuthAPICheck {
 	return func(ctx context.Context, device *userapi.Device) *util.JSONResponse {
 		if !options.Enabled {
 			return nil
@@ -66,8 +66,7 @@ func WithConsentCheck(options config.UserConsentOptions, api userapi.UserInterna
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string,
-	userAPI userapi.UserInternalAPI,
+	metricsName string, userAPI userapi.QueryAcccessTokenAPI,
 	f func(*http.Request, *userapi.Device) util.JSONResponse, checks ...AuthAPICheck,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -115,7 +114,7 @@ func MakeAuthAPI(
 	return MakeExternalAPI(metricsName, h)
 }
 
-func checkConsent(ctx context.Context, userID string, userAPI userapi.UserInternalAPI, userConsentCfg config.UserConsentOptions) *util.JSONResponse {
+func checkConsent(ctx context.Context, userID string, userAPI userapi.QueryPolicyVersionAPI, userConsentCfg config.UserConsentOptions) *util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return nil

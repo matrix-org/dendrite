@@ -40,7 +40,7 @@ type threePIDsResponse struct {
 // RequestEmailToken implements:
 //     POST /account/3pid/email/requestToken
 //     POST /register/email/requestToken
-func RequestEmailToken(req *http.Request, threePIDAPI api.UserThreePIDAPI, cfg *config.ClientAPI) util.JSONResponse {
+func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *config.ClientAPI) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr
@@ -90,7 +90,7 @@ func RequestEmailToken(req *http.Request, threePIDAPI api.UserThreePIDAPI, cfg *
 
 // CheckAndSave3PIDAssociation implements POST /account/3pid
 func CheckAndSave3PIDAssociation(
-	req *http.Request, threePIDAPI api.UserThreePIDAPI, device *api.Device,
+	req *http.Request, threePIDAPI api.ClientUserAPI, device *api.Device,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	var body threepid.EmailAssociationCheckRequest
@@ -158,7 +158,7 @@ func CheckAndSave3PIDAssociation(
 
 // GetAssociated3PIDs implements GET /account/3pid
 func GetAssociated3PIDs(
-	req *http.Request, threepidAPI api.UserThreePIDAPI, device *api.Device,
+	req *http.Request, threepidAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
@@ -182,7 +182,7 @@ func GetAssociated3PIDs(
 }
 
 // Forget3PID implements POST /account/3pid/delete
-func Forget3PID(req *http.Request, threepidAPI api.UserThreePIDAPI) util.JSONResponse {
+func Forget3PID(req *http.Request, threepidAPI api.ClientUserAPI) util.JSONResponse {
 	var body authtypes.ThreePID
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
 		return *reqErr

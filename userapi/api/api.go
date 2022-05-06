@@ -26,80 +26,103 @@ import (
 
 // UserInternalAPI is the internal API for information about users and devices.
 type UserInternalAPI interface {
-	LoginTokenInternalAPI
-	UserProfileAPI
-	UserRegisterAPI
-	UserAccountAPI
-	UserThreePIDAPI
-	UserDeviceAPI
-	UserConsentPolicyAPI
+	AppserviceUserAPI
+	SyncUserAPI
+	ClientUserAPI
+	MediaUserAPI
+	FederationUserAPI
 
-	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
+	QuerySearchProfilesAPI // used by p2p demos
+}
 
-	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
-	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
-	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
-	PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *struct{}) error
-	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
+// api functions required by the appservice api
+type AppserviceUserAPI interface {
+	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
+	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
+}
 
-	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
-	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
-	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+// api functions required by the media api
+type MediaUserAPI interface {
+	QueryAcccessTokenAPI
+}
+
+// api functions required by the federation api
+type FederationUserAPI interface {
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
-	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
-	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
-	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
-	SelectServerNoticeRoomID(ctx context.Context, req *QueryServerNoticeRoomRequest, res *QueryServerNoticeRoomResponse) (err error)
-	UpdateServerNoticeRoomID(ctx context.Context, req *UpdateServerNoticeRoomRequest, res *UpdateServerNoticeRoomResponse) (err error)
+	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 }
 
-type UserConsentPolicyAPI interface {
-	QueryOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyRequest, res *QueryOutdatedPolicyResponse) error
-	PerformUpdatePolicyVersion(ctx context.Context, req *UpdatePolicyVersionRequest, res *UpdatePolicyVersionResponse) error
-	QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error
-}
-
-type UserDeviceAPI interface {
-	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
+// api functions required by the sync api
+type SyncUserAPI interface {
+	QueryAcccessTokenAPI
+	QueryPolicyVersionAPI
+	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 	PerformLastSeenUpdate(ctx context.Context, req *PerformLastSeenUpdateRequest, res *PerformLastSeenUpdateResponse) error
 	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
 }
 
-type UserDirectoryProvider interface {
-	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
-}
-
-// UserProfileAPI provides functions for getting user profiles
-type UserProfileAPI interface {
-	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
-	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
-	SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error
-	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error
-}
-
-// UserRegisterAPI defines functions for registering accounts
-type UserRegisterAPI interface {
+// api functions required by the client api
+type ClientUserAPI interface {
+	QueryAcccessTokenAPI
+	LoginTokenInternalAPI
+	UserLoginAPI
+	UserConsentPolicyAPI
 	QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error
+	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
+	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
+	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryPushers(ctx context.Context, req *QueryPushersRequest, res *QueryPushersResponse) error
+	QueryPushRules(ctx context.Context, req *QueryPushRulesRequest, res *QueryPushRulesResponse) error
 	QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
-}
-
-// UserAccountAPI defines functions for changing an account
-type UserAccountAPI interface {
+	PerformDeviceUpdate(ctx context.Context, req *PerformDeviceUpdateRequest, res *PerformDeviceUpdateResponse) error
+	PerformDeviceDeletion(ctx context.Context, req *PerformDeviceDeletionRequest, res *PerformDeviceDeletionResponse) error
 	PerformPasswordUpdate(ctx context.Context, req *PerformPasswordUpdateRequest, res *PerformPasswordUpdateResponse) error
+	PerformPusherDeletion(ctx context.Context, req *PerformPusherDeletionRequest, res *struct{}) error
+	PerformPusherSet(ctx context.Context, req *PerformPusherSetRequest, res *struct{}) error
+	PerformPushRulesPut(ctx context.Context, req *PerformPushRulesPutRequest, res *struct{}) error
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
-	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
-}
+	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
+	SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error
+	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error
+	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
+	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
+	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
 
-// UserThreePIDAPI defines functions for 3PID
-type UserThreePIDAPI interface {
-	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
 	QueryThreePIDsForLocalpart(ctx context.Context, req *QueryThreePIDsForLocalpartRequest, res *QueryThreePIDsForLocalpartResponse) error
+	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
 	PerformForgetThreePID(ctx context.Context, req *PerformForgetThreePIDRequest, res *struct{}) error
 	PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error
+	SelectServerNoticeRoomID(ctx context.Context, req *QueryServerNoticeRoomRequest, res *QueryServerNoticeRoomResponse) (err error)
+	UpdateServerNoticeRoomID(ctx context.Context, req *UpdateServerNoticeRoomRequest, res *UpdateServerNoticeRoomResponse) (err error)
+}
+
+type UserConsentPolicyAPI interface {
+	QueryPolicyVersionAPI
+	QueryOutdatedPolicy(ctx context.Context, req *QueryOutdatedPolicyRequest, res *QueryOutdatedPolicyResponse) error
+	PerformUpdatePolicyVersion(ctx context.Context, req *UpdatePolicyVersionRequest, res *UpdatePolicyVersionResponse) error
+}
+
+type QueryPolicyVersionAPI interface {
+	QueryPolicyVersion(ctx context.Context, req *QueryPolicyVersionRequest, res *QueryPolicyVersionResponse) error
+}
+
+// custom api functions required by pinecone / p2p demos
+type QuerySearchProfilesAPI interface {
+	QuerySearchProfiles(ctx context.Context, req *QuerySearchProfilesRequest, res *QuerySearchProfilesResponse) error
+}
+
+// common function for creating authenticated endpoints (used in client/media/sync api)
+type QueryAcccessTokenAPI interface {
+	QueryAccessToken(ctx context.Context, req *QueryAccessTokenRequest, res *QueryAccessTokenResponse) error
+}
+
+type UserLoginAPI interface {
+	QueryAccountByPassword(ctx context.Context, req *QueryAccountByPasswordRequest, res *QueryAccountByPasswordResponse) error
 }
 
 type PerformKeyBackupRequest struct {
@@ -329,6 +352,7 @@ type PerformLastSeenUpdateRequest struct {
 	UserID     string
 	DeviceID   string
 	RemoteAddr string
+	UserAgent  string
 }
 
 // PerformLastSeenUpdateResponse is the response for PerformLastSeenUpdate.

@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -40,10 +39,9 @@ import (
 // component.
 func AddPublicRoutes(
 	base *base.BaseDendrite,
-	userAPI userapi.UserInternalAPI,
-	rsAPI api.RoomserverInternalAPI,
-	keyAPI keyapi.KeyInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	userAPI userapi.SyncUserAPI,
+	rsAPI api.SyncRoomserverAPI,
+	keyAPI keyapi.SyncKeyAPI,
 ) {
 	cfg := &base.Cfg.SyncAPI
 
@@ -85,7 +83,7 @@ func AddPublicRoutes(
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		base.ProcessContext, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		js, keyAPI, rsAPI, syncDB, notifier,
+		js, rsAPI, syncDB, notifier,
 		streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
@@ -148,6 +146,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		federation, rsAPI, cfg, lazyLoadCache,
+		rsAPI, cfg, lazyLoadCache,
 	)
 }

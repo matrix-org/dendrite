@@ -78,6 +78,8 @@ type Dendrite struct {
 
 	// Any information derived from the configuration options for later use.
 	Derived Derived `yaml:"-"`
+
+	IsMonolith bool `yaml:"-"`
 }
 
 // TODO: Kill Derived
@@ -210,6 +212,7 @@ func loadConfig(
 ) (*Dendrite, error) {
 	var c Dendrite
 	c.Defaults(false)
+	c.IsMonolith = monolithic
 
 	var err error
 	if err = yaml.Unmarshal(configData, &c); err != nil {

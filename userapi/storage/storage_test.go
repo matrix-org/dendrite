@@ -174,7 +174,7 @@ func Test_Devices(t *testing.T) {
 		newName := "new display name"
 		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
 		assert.NoError(t, err, "unable to update device displayname")
-		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1")
+		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1", "Element Web")
 		assert.NoError(t, err, "unable to update device last seen")
 
 		deviceWithID.DisplayName = newName

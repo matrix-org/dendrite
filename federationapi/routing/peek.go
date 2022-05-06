@@ -29,7 +29,7 @@ func Peek(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID, peekID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {

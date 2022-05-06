@@ -48,7 +48,7 @@ func Setup(
 	cfg *config.MediaAPI,
 	rateLimit *config.RateLimiting,
 	db storage.Database,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.MediaUserAPI,
 	client *gomatrixserverlib.Client,
 ) {
 	rateLimits := httputil.NewRateLimits(rateLimit)

@@ -45,9 +45,9 @@ import (
 type RequestPool struct {
 	db       storage.Database
 	cfg      *config.SyncAPI
-	userAPI  userapi.UserInternalAPI
-	keyAPI   keyapi.KeyInternalAPI
-	rsAPI    roomserverAPI.RoomserverInternalAPI
+	userAPI  userapi.SyncUserAPI
+	keyAPI   keyapi.SyncKeyAPI
+	rsAPI    roomserverAPI.SyncRoomserverAPI
 	lastseen *sync.Map
 	presence *sync.Map
 	streams  *streams.Streams
@@ -62,8 +62,8 @@ type PresencePublisher interface {
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
 	db storage.Database, cfg *config.SyncAPI,
-	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI userapi.SyncUserAPI, keyAPI keyapi.SyncKeyAPI,
+	rsAPI roomserverAPI.SyncRoomserverAPI,
 	streams *streams.Streams, notifier *notifier.Notifier,
 	producer PresencePublisher,
 ) *RequestPool {
@@ -182,6 +182,7 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 		UserID:     device.UserID,
 		DeviceID:   device.ID,
 		RemoteAddr: remoteAddr,
+		UserAgent:  req.UserAgent(),
 	}
 	lsres := &userapi.PerformLastSeenUpdateResponse{}
 	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck

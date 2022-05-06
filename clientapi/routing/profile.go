@@ -35,7 +35,7 @@ import (
 
 // GetProfile implements GET /profile/{userID}
 func GetProfile(
-	req *http.Request, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -64,7 +64,7 @@ func GetProfile(
 
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
-	req *http.Request, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -91,8 +91,8 @@ func GetAvatarURL(
 
 // SetAvatarURL implements PUT /profile/{userID}/avatar_url
 func SetAvatarURL(
-	req *http.Request, profileAPI userapi.UserProfileAPI,
-	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
+	req *http.Request, profileAPI userapi.ClientUserAPI,
+	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -193,7 +193,7 @@ func SetAvatarURL(
 
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
-	req *http.Request, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
+	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -220,8 +220,8 @@ func GetDisplayName(
 
 // SetDisplayName implements PUT /profile/{userID}/displayname
 func SetDisplayName(
-	req *http.Request, profileAPI userapi.UserProfileAPI,
-	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.RoomserverInternalAPI,
+	req *http.Request, profileAPI userapi.ClientUserAPI,
+	device *userapi.Device, userID string, cfg *config.ClientAPI, rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	if userID != device.UserID {
 		return util.JSONResponse{
@@ -325,7 +325,7 @@ func SetDisplayName(
 // Returns an error when something goes wrong or specifically
 // eventutil.ErrProfileNoExists when the profile doesn't exist.
 func getProfile(
-	ctx context.Context, profileAPI userapi.UserProfileAPI, cfg *config.ClientAPI,
+	ctx context.Context, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 	userID string,
 	asAPI appserviceAPI.AppServiceQueryAPI,
 	federation *gomatrixserverlib.FederationClient,
@@ -366,7 +366,7 @@ func buildMembershipEvents(
 	ctx context.Context,
 	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
-	evTime time.Time, rsAPI api.RoomserverInternalAPI,
+	evTime time.Time, rsAPI api.ClientRoomserverAPI,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	evs := []*gomatrixserverlib.HeaderedEvent{}
 

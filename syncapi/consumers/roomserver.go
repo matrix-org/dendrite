@@ -38,7 +38,7 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.SyncAPI
-	rsAPI        api.RoomserverInternalAPI
+	rsAPI        api.SyncRoomserverAPI
 	jetstream    nats.JetStreamContext
 	durable      string
 	topic        string
@@ -58,7 +58,7 @@ func NewOutputRoomEventConsumer(
 	notifier *notifier.Notifier,
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.SyncRoomserverAPI,
 	producer *producers.UserAPIStreamEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{

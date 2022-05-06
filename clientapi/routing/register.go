@@ -517,7 +517,7 @@ func validateApplicationService(
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 func Register(
 	req *http.Request,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	defer req.Body.Close() // nolint: errcheck
@@ -613,7 +613,7 @@ func handleGuestRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
 		return util.JSONResponse{
@@ -678,7 +678,7 @@ func handleRegistrationFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 	accessToken string,
 	accessTokenErr error,
 ) util.JSONResponse {
@@ -769,7 +769,7 @@ func handleApplicationServiceRegistration(
 	req *http.Request,
 	r registerRequest,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -812,7 +812,7 @@ func checkAndCompleteFlow(
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		policyVersion := ""
@@ -843,7 +843,7 @@ func checkAndCompleteFlow(
 // not all
 func completeRegistration(
 	ctx context.Context,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 	username, password, appserviceID, ipAddr, userAgent, sessionID, policyVersion string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
@@ -1003,7 +1003,7 @@ type availableResponse struct {
 func RegisterAvailable(
 	req *http.Request,
 	cfg *config.ClientAPI,
-	registerAPI userapi.UserRegisterAPI,
+	registerAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	username := req.URL.Query().Get("username")
 
@@ -1051,7 +1051,7 @@ func RegisterAvailable(
 	}
 }
 
-func handleSharedSecretRegistration(userAPI userapi.UserInternalAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+func handleSharedSecretRegistration(userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
 	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
 	if err != nil {
 		return util.JSONResponse{

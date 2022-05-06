@@ -18,12 +18,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
@@ -45,7 +43,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		// preparing statements for columns that don't exist yet
 		return nil, err
 	}
-	logrus.Info("created account_accounts table")
 	deltas.LoadIsActive(m)
 	//deltas.LoadLastSeenTSIP(m)
 	deltas.LoadAddAccountType(m)
@@ -62,7 +59,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
 	}
-	logrus.Info("prepared statements for accounts table")
 	devicesTable, err := NewSQLiteDevicesTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteDevicesTable: %w", err)
@@ -99,6 +95,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
 	}
+	statsTable, err := NewSQLiteStatsTable(db, serverName)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
+	}
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
 		Accounts:              accountsTable,
@@ -111,6 +111,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		ThreePIDs:             threePIDTable,
 		Pushers:               pusherTable,
 		Notifications:         notificationsTable,
+		Stats:                 statsTable,
 		ServerName:            serverName,
 		DB:                    db,
 		Writer:                writer,
