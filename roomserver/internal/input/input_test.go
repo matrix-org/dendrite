@@ -53,6 +53,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	db, err := storage.Open(
+		nil,
 		&config.DatabaseOptions{
 			ConnectionString:   "",
 			MaxOpenConnections: 1,

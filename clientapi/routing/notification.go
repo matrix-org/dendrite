@@ -27,7 +27,7 @@ import (
 // GetNotifications handles /_matrix/client/r0/notifications
 func GetNotifications(
 	req *http.Request, device *userapi.Device,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	var limit int64
 	if limitStr := req.URL.Query().Get("limit"); limitStr != "" {

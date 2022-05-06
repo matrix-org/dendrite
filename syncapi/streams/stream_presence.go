@@ -145,6 +145,10 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		p.cache.Store(cacheKey, presence)
 	}
 
+	if len(req.Response.Presence.Events) == 0 {
+		return to
+	}
+
 	return lastPos
 }
 

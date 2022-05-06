@@ -354,20 +354,6 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		}),
 	)
 	internalAPIMux.Handle(
-		RoomserverGetCreatorIDForAliasPath,
-		httputil.MakeInternalAPI("GetCreatorIDForAlias", func(req *http.Request) util.JSONResponse {
-			var request api.GetCreatorIDForAliasRequest
-			var response api.GetCreatorIDForAliasResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := r.GetCreatorIDForAlias(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
 		RoomserverGetAliasesForRoomIDPath,
 		httputil.MakeInternalAPI("getAliasesForRoomID", func(req *http.Request) util.JSONResponse {
 			var request api.GetAliasesForRoomIDRequest

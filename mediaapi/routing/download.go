@@ -551,7 +551,7 @@ func (r *downloadRequest) getRemoteFile(
 			// If we do not have a record, we need to fetch the remote file first and then respond from the local file
 			err := r.fetchRemoteFileAndStoreMetadata(
 				ctx, client,
-				cfg.AbsBasePath, *cfg.MaxFileSizeBytes, db,
+				cfg.AbsBasePath, cfg.MaxFileSizeBytes, db,
 				cfg.ThumbnailSizes, activeThumbnailGeneration,
 				cfg.MaxThumbnailGenerators,
 			)

@@ -55,7 +55,7 @@ type keyBackupSessionResponse struct {
 
 // Create a new key backup. Request must contain a `keyBackupVersion`. Returns a `keyBackupVersionCreateResponse`.
 // Implements  POST /_matrix/client/r0/room_keys/version
-func CreateKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device) util.JSONResponse {
+func CreateKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device) util.JSONResponse {
 	var kb keyBackupVersion
 	resErr := httputil.UnmarshalJSONRequest(req, &kb)
 	if resErr != nil {
@@ -89,7 +89,7 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, 
 
 // KeyBackupVersion returns the key backup version specified. If `version` is empty, the latest `keyBackupVersionResponse` is returned.
 // Implements GET  /_matrix/client/r0/room_keys/version and GET /_matrix/client/r0/room_keys/version/{version}
-func KeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string) util.JSONResponse {
+func KeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
 	var queryResp userapi.QueryKeyBackupResponse
 	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
 		UserID:  device.UserID,
@@ -118,7 +118,7 @@ func KeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device
 
 // Modify the auth data of a key backup. Version must not be empty. Request must contain a `keyBackupVersion`
 // Implements PUT  /_matrix/client/r0/room_keys/version/{version}
-func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string) util.JSONResponse {
+func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
 	var kb keyBackupVersion
 	resErr := httputil.UnmarshalJSONRequest(req, &kb)
 	if resErr != nil {
@@ -159,7 +159,7 @@ func ModifyKeyBackupVersionAuthData(req *http.Request, userAPI userapi.UserInter
 
 // Delete a version of key backup. Version must not be empty. If the key backup was previously deleted, will return 200 OK.
 // Implements DELETE  /_matrix/client/r0/room_keys/version/{version}
-func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string) util.JSONResponse {
+func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
 	var performKeyBackupResp userapi.PerformKeyBackupResponse
 	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
 		UserID:       device.UserID,
@@ -194,7 +194,7 @@ func DeleteKeyBackupVersion(req *http.Request, userAPI userapi.UserInternalAPI, 
 
 // Upload a bunch of session keys for a given `version`.
 func UploadBackupKeys(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version string, keys *keyBackupSessionRequest,
+	req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string, keys *keyBackupSessionRequest,
 ) util.JSONResponse {
 	var performKeyBackupResp userapi.PerformKeyBackupResponse
 	if err := userAPI.PerformKeyBackup(req.Context(), &userapi.PerformKeyBackupRequest{
@@ -230,7 +230,7 @@ func UploadBackupKeys(
 
 // Get keys from a given backup version. Response returned varies depending on if roomID and sessionID are set.
 func GetBackupKeys(
-	req *http.Request, userAPI userapi.UserInternalAPI, device *userapi.Device, version, roomID, sessionID string,
+	req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version, roomID, sessionID string,
 ) util.JSONResponse {
 	var queryResp userapi.QueryKeyBackupResponse
 	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{

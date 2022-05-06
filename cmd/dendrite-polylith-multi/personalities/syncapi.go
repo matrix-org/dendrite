@@ -22,15 +22,13 @@ import (
 
 func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
-	federation := base.CreateFederationClient()
 
 	rsAPI := base.RoomserverHTTPClient()
 
 	syncapi.AddPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux, userAPI, rsAPI,
+		base,
+		userAPI, rsAPI,
 		base.KeyServerHTTPClient(),
-		federation, &cfg.SyncAPI,
 	)
 
 	base.SetupAndServeHTTP(

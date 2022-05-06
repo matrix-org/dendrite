@@ -29,10 +29,9 @@ func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	keyRing := fsAPI.KeyRing()
 
 	federationapi.AddPublicRoutes(
-		base.ProcessContext, base.PublicFederationAPIMux, base.PublicKeyAPIMux, base.PublicWellKnownAPIMux,
-		&base.Cfg.FederationAPI, userAPI, federation, keyRing,
-		rsAPI, fsAPI, keyAPI,
-		&base.Cfg.MSCs, nil,
+		base,
+		userAPI, federation, keyRing,
+		rsAPI, fsAPI, keyAPI, nil,
 	)
 
 	federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)

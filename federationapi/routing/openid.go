@@ -30,7 +30,7 @@ type openIDUserInfoResponse struct {
 // GetOpenIDUserInfo implements GET /_matrix/federation/v1/openid/userinfo
 func GetOpenIDUserInfo(
 	httpReq *http.Request,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 ) util.JSONResponse {
 	token := httpReq.URL.Query().Get("access_token")
 	if len(token) == 0 {

@@ -22,6 +22,7 @@ import (
 	// Import postgres database driver
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -35,13 +36,12 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions) (*Database, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*Database, error) {
 	var result Database
 	var err error
-	if result.db, err = sqlutil.Open(dbProperties); err != nil {
+	if result.db, result.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
 		return nil, err
 	}
-	result.writer = sqlutil.NewDummyWriter()
 	if err = result.prepare(); err != nil {
 		return nil, err
 	}

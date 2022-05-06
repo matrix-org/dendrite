@@ -36,12 +36,11 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	}
 
 	maxSize := config.FileSizeBytes(8)
-	unlimitedSize := config.FileSizeBytes(0)
 	logger := log.New().WithField("mediaapi", "test")
 	testdataPath := filepath.Join(wd, "./testdata")
 
 	cfg := &config.MediaAPI{
-		MaxFileSizeBytes:  &maxSize,
+		MaxFileSizeBytes:  maxSize,
 		BasePath:          config.Path(testdataPath),
 		AbsBasePath:       config.Path(testdataPath),
 		DynamicThumbnails: false,
@@ -51,7 +50,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	_ = os.Mkdir(testdataPath, os.ModePerm)
 	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
 
-	db, err := storage.NewMediaAPIDatasource(&config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(nil, &config.DatabaseOptions{
 		ConnectionString:       "file::memory:?cache=shared",
 		MaxOpenConnections:     100,
 		MaxIdleConnections:     2,
@@ -124,7 +123,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 				ctx:       context.Background(),
 				reqReader: strings.NewReader("test test test"),
 				cfg: &config.MediaAPI{
-					MaxFileSizeBytes:  &unlimitedSize,
+					MaxFileSizeBytes:  config.FileSizeBytes(0),
 					BasePath:          config.Path(testdataPath),
 					AbsBasePath:       config.Path(testdataPath),
 					DynamicThumbnails: false,

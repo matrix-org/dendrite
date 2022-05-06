@@ -28,7 +28,7 @@ import (
 // GetPushers handles /_matrix/client/r0/pushers
 func GetPushers(
 	req *http.Request, device *userapi.Device,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	var queryRes userapi.QueryPushersResponse
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
@@ -57,7 +57,7 @@ func GetPushers(
 // The behaviour of this endpoint varies depending on the values in the JSON body.
 func SetPusher(
 	req *http.Request, device *userapi.Device,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {

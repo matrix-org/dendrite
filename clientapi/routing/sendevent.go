@@ -70,7 +70,7 @@ func SendEvent(
 	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
@@ -207,7 +207,7 @@ func generateSendEvent(
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request

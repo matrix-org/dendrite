@@ -26,7 +26,7 @@ import (
 func PeekRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomIDOrAlias string,
 ) util.JSONResponse {
 	// if this is a remote roomIDOrAlias, we have to ask the roomserver (or federation sender?) to
@@ -79,7 +79,7 @@ func PeekRoomByIDOrAlias(
 func UnpeekRoomByID(
 	req *http.Request,
 	device *api.Device,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
 	unpeekReq := roomserverAPI.PerformUnpeekRequest{

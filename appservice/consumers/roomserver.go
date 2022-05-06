@@ -37,7 +37,7 @@ type OutputRoomEventConsumer struct {
 	durable      string
 	topic        string
 	asDB         storage.Database
-	rsAPI        api.RoomserverInternalAPI
+	rsAPI        api.AppserviceRoomserverAPI
 	serverName   string
 	workerStates []types.ApplicationServiceWorkerState
 }
@@ -49,7 +49,7 @@ func NewOutputRoomEventConsumer(
 	cfg *config.Dendrite,
 	js nats.JetStreamContext,
 	appserviceDB storage.Database,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.AppserviceRoomserverAPI,
 	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{

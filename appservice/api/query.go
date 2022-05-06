@@ -26,6 +26,23 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+// AppServiceInternalAPI is used to query user and room alias data from application
+// services
+type AppServiceInternalAPI interface {
+	// Check whether a room alias exists within any application service namespaces
+	RoomAliasExists(
+		ctx context.Context,
+		req *RoomAliasExistsRequest,
+		resp *RoomAliasExistsResponse,
+	) error
+	// Check whether a user ID exists within any application service namespaces
+	UserIDExists(
+		ctx context.Context,
+		req *UserIDExistsRequest,
+		resp *UserIDExistsResponse,
+	) error
+}
+
 // RoomAliasExistsRequest is a request to an application service
 // about whether a room alias exists
 type RoomAliasExistsRequest struct {
@@ -60,31 +77,14 @@ type UserIDExistsResponse struct {
 	UserIDExists bool `json:"exists"`
 }
 
-// AppServiceQueryAPI is used to query user and room alias data from application
-// services
-type AppServiceQueryAPI interface {
-	// Check whether a room alias exists within any application service namespaces
-	RoomAliasExists(
-		ctx context.Context,
-		req *RoomAliasExistsRequest,
-		resp *RoomAliasExistsResponse,
-	) error
-	// Check whether a user ID exists within any application service namespaces
-	UserIDExists(
-		ctx context.Context,
-		req *UserIDExistsRequest,
-		resp *UserIDExistsResponse,
-	) error
-}
-
 // RetrieveUserProfile is a wrapper that queries both the local database and
 // application services for a given user's profile
 // TODO: Remove this, it's called from federationapi and clientapi but is a pure function
 func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
-	asAPI AppServiceQueryAPI,
-	profileAPI userapi.UserProfileAPI,
+	asAPI AppServiceInternalAPI,
+	profileAPI userapi.ClientUserAPI,
 ) (*authtypes.Profile, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
