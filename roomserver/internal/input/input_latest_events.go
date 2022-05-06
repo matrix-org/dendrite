@@ -316,40 +316,29 @@ func (u *latestEventsUpdater) calculateLatest(
 	// Then let's see if any of the existing forward extremities now
 	// have entries in the previous events table. If they do then we
 	// will no longer include them as forward extremities.
-	existingPrevs := make(map[string]struct{})
-	for _, l := range existingRefs {
+	for k, l := range existingRefs {
 		referenced, err := u.updater.IsReferenced(l.EventReference)
 		if err != nil {
 			return false, fmt.Errorf("u.updater.IsReferenced: %w", err)
 		} else if referenced {
-			existingPrevs[l.EventID] = struct{}{}
+			delete(existingRefs, k)
 		}
 	}
 
-	// Include our new event in the extremities.
-	newLatest := []types.StateAtEventAndReference{newStateAndRef}
+	// Start off with our new event.
+	u.latest = append(u.latest[:0], newStateAndRef)
 
-	// Then run through and see if the other extremities are still valid.
-	// If our new event references them then they are no longer good
-	// candidates.
+	// If our new event references any of the existing forward extremities
+	// then they are no longer good candidates.
 	for _, prevEventID := range newEvent.PrevEventIDs() {
-		delete(existingRefs, prevEventID)
-	}
-
-	// Ensure that we don't add any candidate forward extremities from
-	// the old set that are, themselves, referenced by the old set of
-	// forward extremities. This shouldn't happen but guards against
-	// the possibility anyway.
-	for prevEventID := range existingPrevs {
 		delete(existingRefs, prevEventID)
 	}
 
 	// Then re-add any old extremities that are still valid after all.
 	for _, old := range existingRefs {
-		newLatest = append(newLatest, *old)
+		u.latest = append(u.latest, *old)
 	}
 
-	u.latest = newLatest
 	return true, nil
 }
 
