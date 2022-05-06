@@ -84,6 +84,7 @@ type BaseDendrite struct {
 	DNSCache               *gomatrixserverlib.DNSCache
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
+	EnableMetrics          bool
 }
 
 const NoListener = ""
@@ -94,7 +95,7 @@ const HTTPClientTimeout = time.Second * 30
 type BaseDendriteOptions int
 
 const (
-	NoCacheMetrics BaseDendriteOptions = iota
+	DisableMetrics BaseDendriteOptions = iota
 	UseHTTPAPIs
 	PolylithMode
 )
@@ -105,12 +106,12 @@ const (
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
 	platformSanityChecks()
 	useHTTPAPIs := false
-	cacheMetrics := true
+	enableMetrics := true
 	isMonolith := true
 	for _, opt := range options {
 		switch opt {
-		case NoCacheMetrics:
-			cacheMetrics = false
+		case DisableMetrics:
+			enableMetrics = false
 		case UseHTTPAPIs:
 			useHTTPAPIs = true
 		case PolylithMode:
@@ -158,7 +159,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		}
 	}
 
-	cache, err := caching.NewInMemoryLRUCache(cacheMetrics)
+	cache, err := caching.NewInMemoryLRUCache(enableMetrics)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
@@ -243,6 +244,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		apiHttpClient:          &apiClient,
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
+		EnableMetrics:          enableMetrics,
 	}
 }
 
