@@ -39,7 +39,7 @@ type Monolith struct {
 	Client    *gomatrixserverlib.Client
 	FedClient *gomatrixserverlib.FederationClient
 
-	AppserviceAPI appserviceAPI.AppServiceQueryAPI
+	AppserviceAPI appserviceAPI.AppServiceInternalAPI
 	FederationAPI federationAPI.FederationInternalAPI
 	RoomserverAPI roomserverAPI.RoomserverInternalAPI
 	UserAPI       userapi.UserInternalAPI

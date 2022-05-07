@@ -96,6 +96,7 @@ type BaseDendriteOptions int
 const (
 	NoCacheMetrics BaseDendriteOptions = iota
 	UseHTTPAPIs
+	PolylithMode
 )
 
 // NewBaseDendrite creates a new instance to be used by a component.
@@ -105,17 +106,20 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	platformSanityChecks()
 	useHTTPAPIs := false
 	cacheMetrics := true
+	isMonolith := true
 	for _, opt := range options {
 		switch opt {
 		case NoCacheMetrics:
 			cacheMetrics = false
 		case UseHTTPAPIs:
 			useHTTPAPIs = true
+		case PolylithMode:
+			isMonolith = false
+			useHTTPAPIs = true
 		}
 	}
 
 	configErrors := &config.ConfigErrors{}
-	isMonolith := componentName == "Monolith" // TODO: better way?
 	cfg.Verify(configErrors, isMonolith)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
@@ -270,8 +274,8 @@ func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, 
 	return nil, nil, fmt.Errorf("no database connections configured")
 }
 
-// AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
-func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
+// AppserviceHTTPClient returns the AppServiceInternalAPI for hitting the appservice component over HTTP.
+func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceInternalAPI {
 	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")

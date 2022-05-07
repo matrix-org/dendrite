@@ -37,7 +37,7 @@ import (
 func GetProfile(
 	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 	userID string,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
@@ -65,7 +65,7 @@ func GetProfile(
 // GetAvatarURL implements GET /profile/{userID}/avatar_url
 func GetAvatarURL(
 	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
-	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
@@ -194,7 +194,7 @@ func SetAvatarURL(
 // GetDisplayName implements GET /profile/{userID}/displayname
 func GetDisplayName(
 	req *http.Request, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
-	userID string, asAPI appserviceAPI.AppServiceQueryAPI,
+	userID string, asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
 	profile, err := getProfile(req.Context(), profileAPI, cfg, userID, asAPI, federation)
@@ -327,7 +327,7 @@ func SetDisplayName(
 func getProfile(
 	ctx context.Context, profileAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 	userID string,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) (*authtypes.Profile, error) {
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)

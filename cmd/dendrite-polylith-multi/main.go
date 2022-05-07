@@ -71,8 +71,8 @@ func main() {
 
 	logrus.Infof("Starting %q component", component)
 
-	base := base.NewBaseDendrite(cfg, component) // TODO
-	defer base.Close()                           // nolint: errcheck
+	base := base.NewBaseDendrite(cfg, component, base.PolylithMode) // TODO
+	defer base.Close()                                              // nolint: errcheck
 
 	go start(base, cfg)
 	base.WaitForShutdown()

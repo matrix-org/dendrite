@@ -83,7 +83,7 @@ func Send(
 	txnID gomatrixserverlib.TransactionID,
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
-	keyAPI keyapi.KeyInternalAPI,
+	keyAPI keyapi.FederationKeyAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation *gomatrixserverlib.FederationClient,
 	mu *internal.MutexByRoom,
@@ -183,7 +183,7 @@ func Send(
 type txnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI                  api.FederationRoomserverAPI
-	keyAPI                 keyapi.KeyInternalAPI
+	keyAPI                 keyapi.FederationKeyAPI
 	ourServerName          gomatrixserverlib.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
 	federation             txnFederationClient

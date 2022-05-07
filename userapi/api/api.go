@@ -31,6 +31,8 @@ type UserInternalAPI interface {
 	ClientUserAPI
 	MediaUserAPI
 	FederationUserAPI
+	RoomserverUserAPI
+	KeyserverUserAPI
 
 	QuerySearchProfilesAPI // used by p2p demos
 }
@@ -39,6 +41,15 @@ type UserInternalAPI interface {
 type AppserviceUserAPI interface {
 	PerformAccountCreation(ctx context.Context, req *PerformAccountCreationRequest, res *PerformAccountCreationResponse) error
 	PerformDeviceCreation(ctx context.Context, req *PerformDeviceCreationRequest, res *PerformDeviceCreationResponse) error
+}
+
+type KeyserverUserAPI interface {
+	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
+	QueryDeviceInfos(ctx context.Context, req *QueryDeviceInfosRequest, res *QueryDeviceInfosResponse) error
+}
+
+type RoomserverUserAPI interface {
+	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
 }
 
 // api functions required by the media api
