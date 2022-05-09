@@ -133,7 +133,7 @@ func sendServerNoticeForConsent(userAPI userapi.ClientUserAPI, rsAPI api.ClientR
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 ) {
 	res := &userapi.QueryOutdatedPolicyResponse{}
 	if err := userAPI.QueryOutdatedPolicy(context.Background(), &userapi.QueryOutdatedPolicyRequest{

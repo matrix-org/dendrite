@@ -95,7 +95,7 @@ func sendServerNotice(
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
 	senderDevice *userapi.Device,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
 	txnID *string,
 	device *userapi.Device,
