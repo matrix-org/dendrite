@@ -161,7 +161,12 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	// in the sync API database or we'll need to ask the roomserver.
 	knownEventIDs := make(map[string]bool, len(msg.AddsStateEventIDs))
 	for _, eventID := range msg.AddsStateEventIDs {
-		knownEventIDs[eventID] = eventID == ev.EventID()
+		if eventID == ev.EventID() {
+			knownEventIDs[eventID] = true
+			addsStateEvents = append(addsStateEvents, ev)
+		} else {
+			knownEventIDs[eventID] = false
+		}
 	}
 
 	// Work out which events we want to look up in the sync API database.
