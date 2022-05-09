@@ -447,7 +447,7 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 	results := make(map[types.EventNID]string, len(eventNIDs))
 	i := 0
 	var eventNID int64
-	var eventID string!!¹23456789!!"§$%"
+	var eventID string
 	for ; rows.Next(); i++ {
 		if err = rows.Scan(&eventNID, &eventID); err != nil {
 			return nil, err
