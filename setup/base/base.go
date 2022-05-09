@@ -41,6 +41,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 
 	"github.com/gorilla/mux"
@@ -77,6 +78,7 @@ type BaseDendrite struct {
 	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
+	NATS                   *jetstream.NATSInstance
 	UseHTTPAPIs            bool
 	apiHttpClient          *http.Client
 	Cfg                    *config.Dendrite
@@ -240,6 +242,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+		NATS:                   &jetstream.NATSInstance{},
 		apiHttpClient:          &apiClient,
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
