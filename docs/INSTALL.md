@@ -55,6 +55,14 @@ or by specifying the `store_dir` option in the the `jetstream` configuration.
 
 ## Configuration
 
+* For Windows installations only: scripts refer to an environment
+  variable `DENDRITE_HOME` which we assume set as follows
+  ```cmd
+  set DENDRITE_HOME=C:\ProgramData\Dendrite
+  ```
+  That path MUST exist and be assigned a specific ACL if Dendrite is to
+  be run as a service under a specific user.
+
 ### PostgreSQL database setup
 
 Assuming that PostgreSQL 12 (or later) is installed:
@@ -106,29 +114,41 @@ Each Dendrite installation requires:
 * A unique Matrix signing private key
 * A valid and trusted TLS certificate and private key
 
+#### Matrix signing private key
+
 To generate a Matrix signing private key:
 
 * On Linux, or UNIX-like systems
-
-```bash
-./bin/generate-keys --private-key matrix_key.pem
-```
-
+  ```bash
+  ./bin/generate-keys --private-key matrix_key.pem
+  ```
 * On Windows
+  ```dos
+  bin\generate-keys.exe --private-key "%DENDRITE_HOME%\matrix_key.pem"
+  ```
 
-```dos
-bin\generate-keys.exe --private-key C:\ProgramData\Dendrite\matrix_key.pem
-```
+> **WARNING:** Make sure take a safe backup of this key! You will likely
+> need it if you want to reinstall Dendrite, or any other Matrix
+> homeserver, on the same domain name in the future. If you lose this
+> key, you may have trouble joining federated rooms.
 
-**WARNING:** Make sure take a safe backup of this key! You will likely need it if you want to reinstall Dendrite, or
-any other Matrix homeserver, on the same domain name in the future. If you lose this key, you may have trouble joining
-federated rooms.
+#### TLS certificate and private key
 
-For testing, you can generate a self-signed certificate and key, although this will not work for public federation:
+> The management of SSL/TLS certificates is best delegated to special
+> tools such as reverse proxies (see nginx, caddy etc.).
 
-```bash
-./bin/generate-keys --tls-cert server.crt --tls-key server.key
-```
+For *testing*, you can generate a self-signed certificate and key, although this will not work for public federation:
+
+* On Linux, or UNIX-like systems
+  ```bash
+  ./bin/generate-keys --tls-cert server.crt --tls-key server.key
+  ```
+* On Windows
+  ```dos
+  bin\generate-keys.exe ^
+    --tls-cert "%DENDRITE_HOME%\server.crt" ^
+    --tls-key "%DENDRITE_HOME%\server.key"
+  ```
 
 If you have server keys from an older Synapse instance,
 [convert them](serverkeyformat.md#converting-synapse-keys) to Dendrite's PEM
@@ -158,36 +178,61 @@ then configuring `key_perspectives` (like `matrix.org` in the sample) can
 help to improve reliability considerably by allowing your homeserver to fetch
 public keys for dead homeservers from somewhere else.
 
-**WARNING:** Dendrite supports running all components from the same database in
-PostgreSQL mode, but this is **NOT** a supported configuration with SQLite. When
-using SQLite, all components **MUST** use their own database file.
+> **WARNING:** Dendrite supports running all components from the same database
+> in PostgreSQL mode, but this is **NOT** a supported configuration with SQLite.
+> When using SQLite, all components **MUST** use their own database file.
 
-## Starting a monolith server
+## Starting Dendrite
+
+### Starting a monolith server
 
 The monolith server can be started as shown below. By default it listens for
-HTTP connections on port 8008, so you can configure your Matrix client to use
+HTTP connections on port **8008**, so you can configure your Matrix client to use
 `http://servername:8008` as the server:
 
-```bash
-./bin/dendrite-monolith-server
-```
+* On Linux, or UNIX-like systems
+  ```bash
+  ./bin/dendrite-monolith-server
+  ```
+* On Windows
+  * in user application mode
+    ```dos
+    bin\dendrite-monolith-server.exe -config="%DENDRITE_HOME%\dendrite.yaml"
+    ```
+  * in service mode (all parameters are set when the service is defined)
+    ```dos
+    sc start dendrite
+    ```
 
 If you set `--tls-cert` and `--tls-key` as shown below, it will also listen
-for HTTPS connections on port 8448:
+for HTTPS connections on port **8448**:
 
-```bash
-./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
-```
+* On Linux, or UNIX-like systems
+  ```bash
+  ./bin/dendrite-monolith-server --tls-cert=server.crt --tls-key=server.key
+  ```
+* On Windows
+  * in user application mode
+    ```dos
+    bin\dendrite-monolith-server.exe ^
+      -config="%DENDRITE_HOME%\dendrite.yaml" ^
+      --tls-cert="%DENDRITE_HOME%\server.crt" ^
+      --tls-key="%DENDRITE_HOME%\server.key"
+    ```
+  * in service mode (all parameters are set when the service is defined)
+    ```dos
+    sc start dendrite
+    ```
 
 If the `jetstream` section of the configuration contains no `addresses` but does
 contain a `store_dir`, Dendrite will start up a built-in NATS JetStream node
 automatically, eliminating the need to run a separate NATS server.
 
-## Starting a polylith deployment
+### Starting a polylith deployment
 
 The following contains scripts which will run all the required processes in order to point a Matrix client at Dendrite.
 
-### nginx (or other reverse proxy)
+#### nginx (or other reverse proxy)
 
 This is what your clients and federated hosts will talk to. It must forward
 requests onto the correct API server based on URL:
@@ -199,7 +244,7 @@ requests onto the correct API server based on URL:
 
 See `docs/nginx/polylith-sample.conf` for a sample configuration.
 
-### Client API server
+#### Client API server
 
 This is what implements CS API endpoints. Clients talk to this via the proxy in
 order to send messages, create and join rooms, etc.
@@ -208,7 +253,7 @@ order to send messages, create and join rooms, etc.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml clientapi
 ```
 
-### Sync server
+#### Sync server
 
 This is what implements `/sync` requests. Clients talk to this via the proxy
 in order to receive messages.
@@ -217,7 +262,7 @@ in order to receive messages.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml syncapi
 ```
 
-### Media server
+#### Media server
 
 This implements `/media` requests. Clients talk to this via the proxy in
 order to upload and retrieve media.
@@ -226,7 +271,7 @@ order to upload and retrieve media.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml mediaapi
 ```
 
-### Federation API server
+#### Federation API server
 
 This implements the federation API. Servers talk to this via the proxy in
 order to send transactions.  This is only required if you want to support
@@ -236,12 +281,12 @@ federation.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml federationapi
 ```
 
-### Internal components
+#### Internal components
 
 This refers to components that are not directly spoken to by clients. They are only
 contacted by other components. This includes the following components.
 
-#### Room server
+##### Room server
 
 This is what implements the room DAG. Clients do not talk to this.
 
@@ -249,7 +294,7 @@ This is what implements the room DAG. Clients do not talk to this.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml roomserver
 ```
 
-#### Appservice server
+##### Appservice server
 
 This sends events from the network to [application
 services](https://matrix.org/docs/spec/application_service/unstable.html)
@@ -260,7 +305,7 @@ application services on your homeserver.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml appservice
 ```
 
-#### Key server
+##### Key server
 
 This manages end-to-end encryption keys for users.
 
@@ -268,7 +313,7 @@ This manages end-to-end encryption keys for users.
 ./bin/dendrite-polylith-multi --config=dendrite.yaml keyserver
 ```
 
-#### User server
+##### User server
 
 This manages user accounts, device access tokens and user account data,
 amongst other things.
