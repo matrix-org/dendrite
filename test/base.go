@@ -30,14 +30,14 @@ func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()
 	var cfg config.Dendrite
 	cfg.Defaults(false)
 	cfg.Global.JetStream.InMemory = true
-	// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
-	// the file system event with InMemory=true :(
-	cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
 
 	switch dbType {
 	case DBTypePostgres:
 		cfg.Global.Defaults(true)   // autogen a signing key
 		cfg.MediaAPI.Defaults(true) // autogen a media path
+		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
+		// the file system event with InMemory=true :(
+		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
 		connStr, close := PrepareDBConnectionString(t, dbType)
 		cfg.Global.DatabaseOptions = config.DatabaseOptions{
 			ConnectionString:       config.DataSource(connStr),
@@ -48,6 +48,9 @@ func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
 	case DBTypeSQLite:
 		cfg.Defaults(true) // sets a sqlite db per component
+		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
+		// the file system event with InMemory=true :(
+		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), func() {
 			// cleanup db files. This risks getting out of sync as we add more database strings :(
 			dbFiles := []config.DataSource{

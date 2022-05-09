@@ -29,7 +29,6 @@ NextEvent:
 	for _, eventID := range req.EventIDs {
 		for _, r := range s.rooms {
 			for _, ev := range r.Events() {
-				fmt.Println(ev.EventID())
 				if ev.EventID() == eventID {
 					res.Events = append(res.Events, ev)
 					continue NextEvent
@@ -82,11 +81,9 @@ type syncKeyAPI struct {
 }
 
 func TestSyncAPI(t *testing.T) {
-	testSync(t, test.DBTypePostgres)
-	/*
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			testSync(t, dbType)
-		}) */
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testSync(t, dbType)
+	})
 }
 
 func testSync(t *testing.T, dbType test.DBType) {
@@ -119,9 +116,8 @@ func testSync(t *testing.T, dbType test.DBType) {
 			},
 		}))
 	}
-	test.MustPublishMsgs(t, jsctx, msgs...)
-
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
+	test.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
 		name            string
@@ -155,7 +151,7 @@ func testSync(t *testing.T, dbType test.DBType) {
 		},
 	}
 	// TODO: find a better way
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	for _, tc := range testCases {
 		w := httptest.NewRecorder()
@@ -171,6 +167,13 @@ func testSync(t *testing.T, dbType test.DBType) {
 			if len(res.Rooms.Join) != len(tc.wantJoinedRooms) {
 				t.Errorf("%s: got %v joined rooms, want %v.\nResponse: %+v", tc.name, len(res.Rooms.Join), len(tc.wantJoinedRooms), res)
 			}
+			t.Logf("res: %+v", res.Rooms.Join[room.ID])
+
+			gotEventIDs := make([]string, len(res.Rooms.Join[room.ID].Timeline.Events))
+			for i, ev := range res.Rooms.Join[room.ID].Timeline.Events {
+				gotEventIDs[i] = ev.EventID
+			}
+			test.AssertEventIDsEqual(t, gotEventIDs, room.Events())
 		}
 	}
 }
