@@ -1,6 +1,11 @@
 # Installing Dendrite
 
-Dendrite can be run in one of two configurations:
+> Be advised that Dendrite is still in development and it's not recommended for
+> use in production environments just yet!
+
+## Dendrite Running Mode
+
+Dendrite can be run in one of two configurations ("*mode*"):
 
 * **Monolith mode**: All components run in the same process. In this mode,
    it is possible to run an in-process [NATS Server](https://github.com/nats-io/nats-server)
@@ -14,56 +19,37 @@ Dendrite can be run in one of two configurations:
   comes with a cost. API calls are expensive and therefore a polylith deployment may end up using
   disproportionately more resources for a smaller number of users compared to a monolith deployment.
 
-In almost all cases, it is **recommended to run in monolith mode with PostgreSQL databases**.
+> In almost all cases, it is **recommended to run in monolith mode with PostgreSQL databases**.
 
-Regardless of whether you are running in polylith or monolith mode, each Dendrite component that
+Regardless of whether you are running in *polylith* or *monolith* mode, each Dendrite component that
 requires storage has its own database connections. Both Postgres and SQLite are supported and can
 be mixed-and-matched across components as needed in the configuration file.
 
-Be advised that Dendrite is still in development and it's not recommended for
-use in production environments just yet!
-
 ## Requirements
 
-Dendrite requires:
-
-* Go 1.16 or higher
-* PostgreSQL 12 or higher (if using PostgreSQL databases, not needed for SQLite)
-
-If you want to run a polylith deployment, you also need:
-
-* A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
-
-If you want to build it on Windows, you need `gcc` in the path:
-
-* [MinGW-w64](https://www.mingw-w64.org/)
-
-## Building Dendrite
-
-Start by cloning the code:
-
-```bash
-git clone https://github.com/matrix-org/dendrite
-cd dendrite
-```
-
-Then build it:
-
-* Linux or UNIX-like systems:
-  ```bash
-  ./build.sh
-  ```
-
-* Windows:
-  ```dos
-  build.cmd
-  ```
+* Monolith Dendrite requires:
+  * if using PostgreSQL database(s)
+    * PostgreSQL 12 or higher
+  * if using SQLite databases
+    * ...
+* Polylith Dendrite requires:
+  * if using PostgreSQL database(s)
+    * PostgreSQL 12 or higher
+    * A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
+  * if using SQLite databases
+    * A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
 
 ## Install NATS Server
 
+> An independent NATS server is *only **required** for installation of
+> Dentrite in polylith mode*. Dendrite in monolith mode uses, by
+> default, an in-process NATS server, but there is no reason
+> why an external one should not be used, if for example it is already
+> available on the machine where Dendrite will be installed.
+
 Follow the [NATS Server installation instructions](https://docs.nats.io/running-a-nats-service/introduction/installation) and then [start your NATS deployment](https://docs.nats.io/running-a-nats-service/introduction/running).
 
-JetStream must be enabled, either by passing the `-js` flag to `nats-server`,
+JetStream **must** be enabled, either by passing the `-js` flag to `nats-server`,
 or by specifying the `store_dir` option in the the `jetstream` configuration.
 
 ## Configuration
@@ -106,7 +92,7 @@ On macOS, omit `sudo -u postgres` from the below commands.
 
 ### SQLite database setup
 
-**WARNING:** SQLite is suitable for small experimental deployments only and should not be used in production - use PostgreSQL instead for any user-facing federating installation!
+> **WARNING:** SQLite is suitable for small experimental deployments only and should not be used in production - use PostgreSQL instead for any user-facing federating installation!
 
 Dendrite can use the built-in SQLite database engine for small setups.
 The SQLite databases do not need to be pre-built - Dendrite will
