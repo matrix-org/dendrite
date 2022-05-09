@@ -154,35 +154,20 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
-	addsStateEvents := []*gomatrixserverlib.HeaderedEvent{}
+	addsStateEvents, missingEventIDs := msg.NeededStateEventIDs()
 
 	// Work out the list of events we need to find out about. Either
 	// they will be the event supplied in the request, we will find it
 	// in the sync API database or we'll need to ask the roomserver.
 	knownEventIDs := make(map[string]bool, len(msg.AddsStateEventIDs))
-	for _, eventID := range msg.AddsStateEventIDs {
-		if eventID == ev.EventID() {
-			knownEventIDs[eventID] = true
-			addsStateEvents = append(addsStateEvents, ev)
-		} else {
-			knownEventIDs[eventID] = false
-		}
-	}
-
-	// Work out which events we want to look up in the sync API database.
-	// At this stage the only event that should be excluded is the event
-	// supplied in the request, if it appears in the adds_state_event_ids.
-	missingEventIDs := make([]string, 0, len(msg.AddsStateEventIDs))
-	for eventID, known := range knownEventIDs {
-		if !known {
-			missingEventIDs = append(missingEventIDs, eventID)
-		}
+	for _, eventID := range missingEventIDs {
+		knownEventIDs[eventID] = false
 	}
 
 	// Look the events up in the database. If we know them, add them into
 	// the set of adds state events.
 	if len(missingEventIDs) > 0 {
-		alreadyKnown, err := s.db.Events(ctx, msg.AddsStateEventIDs)
+		alreadyKnown, err := s.db.Events(ctx, missingEventIDs)
 		if err != nil {
 			return fmt.Errorf("s.db.Events: %w", err)
 		}
