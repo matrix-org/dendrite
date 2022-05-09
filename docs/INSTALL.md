@@ -27,16 +27,16 @@ be mixed-and-matched across components as needed in the configuration file.
 
 ## Requirements
 
-* Monolith Dendrite requires:
-  * if using PostgreSQL database(s)
+* **Monolith Dendrite** requires:
+  * if using **PostgreSQL** database(s)
     * PostgreSQL 12 or higher
-  * if using SQLite databases
+  * if using **SQLite** databases
     * ...
-* Polylith Dendrite requires:
-  * if using PostgreSQL database(s)
+* **Polylith Dendrite** requires:
+  * if using **PostgreSQL** database(s)
     * PostgreSQL 12 or higher
     * A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
-  * if using SQLite databases
+  * if using **SQLite** databases
     * A standalone [NATS Server](https://github.com/nats-io/nats-server) deployment with JetStream enabled
 
 ## Install NATS Server
@@ -44,8 +44,9 @@ be mixed-and-matched across components as needed in the configuration file.
 > An independent NATS server is *only **required** for installation of
 > Dentrite in polylith mode*. Dendrite in monolith mode uses, by
 > default, an in-process NATS server, but there is no reason
-> why an external one should not be used, if for example it is already
-> available on the machine where Dendrite will be installed.
+> why an external one should not be used, if for example if NATS is
+> already installed on a machine that is visible and accessible from
+> the machine where Dendrite will be installed.
 
 Follow the [NATS Server installation instructions](https://docs.nats.io/running-a-nats-service/introduction/installation) and then [start your NATS deployment](https://docs.nats.io/running-a-nats-service/introduction/running).
 
@@ -107,8 +108,16 @@ Each Dendrite installation requires:
 
 To generate a Matrix signing private key:
 
+* On Linux, or UNIX-like systems
+
 ```bash
 ./bin/generate-keys --private-key matrix_key.pem
+```
+
+* On Windows
+
+```dos
+bin\generate-keys.exe --private-key C:\ProgramData\Dendrite\matrix_key.pem
 ```
 
 **WARNING:** Make sure take a safe backup of this key! You will likely need it if you want to reinstall Dendrite, or
