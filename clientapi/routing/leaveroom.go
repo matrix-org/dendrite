@@ -26,7 +26,7 @@ import (
 func LeaveRoomByID(
 	req *http.Request,
 	device *api.Device,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
 	// Prepare to ask the roomserver to perform the room join.

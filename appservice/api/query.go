@@ -84,7 +84,7 @@ func RetrieveUserProfile(
 	ctx context.Context,
 	userID string,
 	asAPI AppServiceQueryAPI,
-	profileAPI userapi.UserProfileAPI,
+	profileAPI userapi.ClientUserAPI,
 ) (*authtypes.Profile, error) {
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

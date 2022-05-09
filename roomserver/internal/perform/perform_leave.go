@@ -37,7 +37,7 @@ import (
 type Leaver struct {
 	Cfg     *config.RoomServer
 	DB      storage.Database
-	FSAPI   fsAPI.FederationInternalAPI
+	FSAPI   fsAPI.RoomserverFederationAPI
 	UserAPI userapi.UserInternalAPI
 	Inputer *input.Inputer
 }

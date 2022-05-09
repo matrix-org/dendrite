@@ -34,7 +34,7 @@ type getMissingEventRequest struct {
 func GetMissingEvents(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
 	var gme getMissingEventRequest

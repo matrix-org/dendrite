@@ -49,7 +49,7 @@ func AddPublicRoutes(
 	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	federationAPI federationAPI.FederationInternalAPI,
 	keyAPI keyserverAPI.KeyInternalAPI,
 	servers federationAPI.ServersInRoomProvider,

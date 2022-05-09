@@ -31,7 +31,6 @@ type getEventRequest struct {
 	roomID         string
 	eventID        string
 	cfg            *config.ClientAPI
-	federation     *gomatrixserverlib.FederationClient
 	requestedEvent *gomatrixserverlib.Event
 }
 
@@ -43,8 +42,7 @@ func GetEvent(
 	roomID string,
 	eventID string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	eventsReq := api.QueryEventsByIDRequest{
 		EventIDs: []string{eventID},
@@ -72,7 +70,6 @@ func GetEvent(
 		roomID:         roomID,
 		eventID:        eventID,
 		cfg:            cfg,
-		federation:     federation,
 		requestedEvent: requestedEvent,
 	}
 

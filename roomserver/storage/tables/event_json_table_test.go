@@ -3,7 +3,6 @@ package tables_test
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -12,8 +11,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
-
 	"github.com/matrix-org/dendrite/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSON, func()) {
@@ -22,64 +21,42 @@ func mustCreateEventJSONTable(t *testing.T, dbType test.DBType) (tables.EventJSO
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
-
-	var (
-		tab tables.EventJSON
-	)
+	assert.NoError(t, err)
+	var tab tables.EventJSON
 	switch dbType {
 	case test.DBTypePostgres:
 		err = postgres.CreateEventJSONTable(db)
-		if err != nil {
-			t.Fatalf("failed to create table: %v", err)
-		}
+		assert.NoError(t, err)
 		tab, err = postgres.PrepareEventJSONTable(db)
-		if err != nil {
-			t.Fatalf("failed to prepare statements: %v", err)
-		}
 	case test.DBTypeSQLite:
 		err = sqlite3.CreateEventJSONTable(db)
-		if err != nil {
-			t.Fatalf("failed to create table: %v", err)
-		}
+		assert.NoError(t, err)
 		tab, err = sqlite3.PrepareEventJSONTable(db)
-		if err != nil {
-			t.Fatalf("failed to prepare statements: %v", err)
-		}
 	}
-	if err != nil {
-		t.Fatalf("failed to make new table: %s", err)
-	}
+	assert.NoError(t, err)
+
 	return tab, close
 }
 
-func TestEventJSONTable(t *testing.T) {
-	ctx := context.Background()
+func Test_EventJSONTable(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, close := mustCreateEventJSONTable(t, dbType)
 		defer close()
-		// insert some dummy data
+		// create some dummy data
 		for i := 0; i < 10; i++ {
-			err := tab.InsertEventJSON(ctx, nil, types.EventNID(i), []byte(fmt.Sprintf(`{"value": %d }`, i)))
-			if err != nil {
-				t.Fatalf("failed to insert event json: %v", err)
-			}
+			err := tab.InsertEventJSON(
+				context.Background(), nil, types.EventNID(i),
+				[]byte(fmt.Sprintf(`{"value":%d"}`, i)),
+			)
+			assert.NoError(t, err)
 		}
-		// and fetch them again
-		eventJSONPair, err := tab.BulkSelectEventJSON(ctx, nil, types.EventNIDs{1, 2, 3, 4, 5})
-		if err != nil {
-			t.Fatalf("failed to get event json: %v", err)
-		}
-		if len(eventJSONPair) != 5 {
-			t.Fatalf("expected 5 events, got %d", len(eventJSONPair))
-		}
-		for _, x := range eventJSONPair {
-			want := []byte(fmt.Sprintf(`{"value": %d }`, x.EventNID))
-			if !reflect.DeepEqual(x.EventJSON, want) {
-				t.Fatalf("unexpected eventJSON %v, want %v", string(x.EventJSON), string(want))
-			}
+		// select a subset of the data
+		values, err := tab.BulkSelectEventJSON(context.Background(), nil, []types.EventNID{1, 2, 3, 4, 5})
+		assert.NoError(t, err)
+		assert.Equal(t, 5, len(values))
+		for i, v := range values {
+			assert.Equal(t, v.EventNID, types.EventNID(i+1))
+			assert.Equal(t, []byte(fmt.Sprintf(`{"value":%d"}`, i+1)), v.EventJSON)
 		}
 	})
 }

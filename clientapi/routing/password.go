@@ -28,7 +28,7 @@ type newPasswordAuth struct {
 
 func Password(
 	req *http.Request,
-	userAPI api.UserInternalAPI,
+	userAPI api.ClientUserAPI,
 	device *api.Device,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {

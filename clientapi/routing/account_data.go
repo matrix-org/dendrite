@@ -33,7 +33,7 @@ import (
 
 // GetAccountData implements GET /user/{userId}/[rooms/{roomid}/]account_data/{type}
 func GetAccountData(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 	userID string, roomID string, dataType string,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -76,7 +76,7 @@ func GetAccountData(
 
 // SaveAccountData implements PUT /user/{userId}/[rooms/{roomId}/]account_data/{type}
 func SaveAccountData(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 	userID string, roomID string, dataType string, syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if userID != device.UserID {
@@ -152,7 +152,7 @@ type fullyReadEvent struct {
 // SaveReadMarker implements POST /rooms/{roomId}/read_markers
 func SaveReadMarker(
 	req *http.Request,
-	userAPI api.UserInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
 	syncProducer *producers.SyncAPIProducer, device *api.Device, roomID string,
 ) util.JSONResponse {
 	// Verify that the user is a member of this room

@@ -47,7 +47,7 @@ type Monolith struct {
 
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
-	ExtUserDirectoryProvider userapi.UserDirectoryProvider
+	ExtUserDirectoryProvider userapi.QuerySearchProfilesAPI
 }
 
 // AddAllPublicRoutes attaches all public paths to the given router

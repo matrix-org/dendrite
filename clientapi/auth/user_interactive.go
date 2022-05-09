@@ -110,7 +110,7 @@ type UserInteractive struct {
 	Sessions map[string][]string
 }
 
-func NewUserInteractive(userAccountAPI api.UserAccountAPI, cfg *config.ClientAPI) *UserInteractive {
+func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) *UserInteractive {
 	typePassword := &LoginTypePassword{
 		GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
 		Config:               cfg,
