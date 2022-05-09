@@ -44,7 +44,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.ClientAPI
 	mscCfg := &base.Cfg.MSCs
-	js, natsClient := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
