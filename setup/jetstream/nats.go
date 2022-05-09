@@ -25,7 +25,7 @@ type NATSInstance struct {
 func DeleteAllStreams(js nats.JetStreamContext, cfg *config.JetStream) {
 	for _, stream := range streams { // streams are defined in streams.go
 		name := cfg.Prefixed(stream.Name)
-		js.DeleteStream(name)
+		_ = js.DeleteStream(name)
 	}
 }
 
