@@ -100,7 +100,7 @@ func testSync(t *testing.T, dbType test.DBType) {
 	base, close := test.CreateBaseDendrite(t, dbType)
 	defer close()
 
-	jsctx, _ := jetstream.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	var msgs []*nats.Msg
 	for _, ev := range room.Events() {
