@@ -41,6 +41,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 
 	"github.com/gorilla/mux"
@@ -77,6 +78,7 @@ type BaseDendrite struct {
 	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
+	NATS                   *jetstream.NATSInstance
 	UseHTTPAPIs            bool
 	apiHttpClient          *http.Client
 	Cfg                    *config.Dendrite
@@ -96,6 +98,7 @@ type BaseDendriteOptions int
 const (
 	NoCacheMetrics BaseDendriteOptions = iota
 	UseHTTPAPIs
+	PolylithMode
 )
 
 // NewBaseDendrite creates a new instance to be used by a component.
@@ -105,17 +108,20 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	platformSanityChecks()
 	useHTTPAPIs := false
 	cacheMetrics := true
+	isMonolith := true
 	for _, opt := range options {
 		switch opt {
 		case NoCacheMetrics:
 			cacheMetrics = false
 		case UseHTTPAPIs:
 			useHTTPAPIs = true
+		case PolylithMode:
+			isMonolith = false
+			useHTTPAPIs = true
 		}
 	}
 
 	configErrors := &config.ConfigErrors{}
-	isMonolith := componentName == "Monolith" // TODO: better way?
 	cfg.Verify(configErrors, isMonolith)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
@@ -236,6 +242,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+		NATS:                   &jetstream.NATSInstance{},
 		apiHttpClient:          &apiClient,
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
@@ -271,8 +278,8 @@ func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, 
 	return nil, nil, fmt.Errorf("no database connections configured")
 }
 
-// AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
-func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
+// AppserviceHTTPClient returns the AppServiceInternalAPI for hitting the appservice component over HTTP.
+func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceInternalAPI {
 	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")

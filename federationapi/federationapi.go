@@ -50,13 +50,13 @@ func AddPublicRoutes(
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
-	federationAPI federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	fedAPI federationAPI.FederationInternalAPI,
+	keyAPI keyserverAPI.FederationKeyAPI,
 	servers federationAPI.ServersInRoomProvider,
 ) {
 	cfg := &base.Cfg.FederationAPI
 	mscCfg := &base.Cfg.MSCs
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -67,12 +67,23 @@ func AddPublicRoutes(
 		UserAPI:                userAPI,
 	}
 
+	// the federationapi component is a bit unique in that it attaches public routes AND serves
+	// internal APIs (because it used to be 2 components: the 2nd being fedsender). As a result,
+	// the constructor shape is a bit wonky in that it is not valid to AddPublicRoutes without a
+	// concrete impl of FederationInternalAPI as the public routes and the internal API _should_
+	// be the same thing now.
+	f, ok := fedAPI.(*internal.FederationInternalAPI)
+	if !ok {
+		panic("federationapi.AddPublicRoutes called with a FederationInternalAPI impl which was not " +
+			"FederationInternalAPI. This is a programming error.")
+	}
+
 	routing.Setup(
 		base.PublicFederationAPIMux,
 		base.PublicKeyAPIMux,
 		base.PublicWellKnownAPIMux,
 		cfg,
-		rsAPI, federationAPI, keyRing,
+		rsAPI, f, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,
 	)
@@ -104,7 +115,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,

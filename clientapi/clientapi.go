@@ -34,7 +34,7 @@ func AddPublicRoutes(
 	base *base.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	transactionsCache *transactions.Cache,
 	fsAPI federationAPI.ClientFederationAPI,
 	userAPI userapi.ClientUserAPI,
@@ -44,7 +44,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.ClientAPI
 	mscCfg := &base.Cfg.MSCs
-	js, natsClient := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,

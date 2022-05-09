@@ -45,7 +45,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.SyncAPI
 
-	js, natsClient := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {
@@ -53,12 +53,8 @@ func AddPublicRoutes(
 	}
 
 	eduCache := caching.NewTypingCache()
-	lazyLoadCache, err := caching.NewLazyLoadCache()
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to create lazy loading cache")
-	}
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, base.Caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -146,6 +142,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, lazyLoadCache,
+		rsAPI, cfg, base.Caches,
 	)
 }

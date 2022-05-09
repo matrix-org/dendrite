@@ -564,20 +564,6 @@ func (r *FederationInternalAPI) PerformInvite(
 }
 
 // PerformServersAlive implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformServersAlive(
-	ctx context.Context,
-	request *api.PerformServersAliveRequest,
-	response *api.PerformServersAliveResponse,
-) (err error) {
-	for _, srv := range request.Servers {
-		_ = r.db.RemoveServerFromBlacklist(srv)
-		r.queues.RetryServer(srv)
-	}
-
-	return nil
-}
-
-// PerformServersAlive implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformBroadcastEDU(
 	ctx context.Context,
 	request *api.PerformBroadcastEDURequest,
@@ -600,16 +586,16 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 	if err = r.queues.SendEDU(edu, r.cfg.Matrix.ServerName, destinations); err != nil {
 		return fmt.Errorf("r.queues.SendEDU: %w", err)
 	}
-
-	wakeReq := &api.PerformServersAliveRequest{
-		Servers: destinations,
-	}
-	wakeRes := &api.PerformServersAliveResponse{}
-	if err := r.PerformServersAlive(ctx, wakeReq, wakeRes); err != nil {
-		return fmt.Errorf("r.PerformServersAlive: %w", err)
-	}
+	r.MarkServersAlive(destinations)
 
 	return nil
+}
+
+func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
+	for _, srv := range destinations {
+		_ = r.db.RemoveServerFromBlacklist(srv)
+		r.queues.RetryServer(srv)
+	}
 }
 
 func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {

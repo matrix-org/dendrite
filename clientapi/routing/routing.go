@@ -51,7 +51,7 @@ func Setup(
 	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	userAPI userapi.ClientUserAPI,
 	userDirectoryProvider userapi.QuerySearchProfilesAPI,
 	federation *gomatrixserverlib.FederationClient,

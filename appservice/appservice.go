@@ -32,13 +32,12 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
-func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQueryAPI) {
+func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI) {
 	inthttp.AddRoutes(queryAPI, router)
 }
 
@@ -48,14 +47,14 @@ func NewInternalAPI(
 	base *base.BaseDendrite,
 	userAPI userapi.AppserviceUserAPI,
 	rsAPI roomserverAPI.AppserviceRoomserverAPI,
-) appserviceAPI.AppServiceQueryAPI {
+) appserviceAPI.AppServiceInternalAPI {
 	client := gomatrixserverlib.NewClient(
 		gomatrixserverlib.WithTimeout(time.Second*30),
 		gomatrixserverlib.WithKeepAlives(false),
 		gomatrixserverlib.WithSkipVerify(base.Cfg.AppServiceAPI.DisableTLSValidation),
 	)
 
-	js, _ := jetstream.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
 	appserviceDB, err := storage.NewDatabase(base, &base.Cfg.AppServiceAPI.Database)

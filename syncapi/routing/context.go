@@ -45,7 +45,7 @@ func Context(
 	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
-	lazyLoadCache *caching.LazyLoadCache,
+	lazyLoadCache caching.LazyLoadCache,
 ) util.JSONResponse {
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -155,7 +155,7 @@ func applyLazyLoadMembers(
 	filter *gomatrixserverlib.RoomEventFilter,
 	eventsAfter, eventsBefore []gomatrixserverlib.ClientEvent,
 	state []*gomatrixserverlib.HeaderedEvent,
-	lazyLoadCache *caching.LazyLoadCache,
+	lazyLoadCache caching.LazyLoadCache,
 ) []*gomatrixserverlib.HeaderedEvent {
 	if filter == nil || !filter.LazyLoadMembers {
 		return state

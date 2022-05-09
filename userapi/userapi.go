@@ -47,7 +47,7 @@ func NewInternalAPI(
 	appServices []config.ApplicationService, keyAPI keyapi.UserKeyAPI,
 	rsAPI rsapi.UserRoomserverAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	db, err := storage.NewUserAPIDatabase(
 		base,
