@@ -97,9 +97,9 @@ func (s *eventJSONStatements) BulkSelectEventJSON(
 	// We might get fewer results than NIDs so we adjust the length of the slice before returning it.
 	results := make([]tables.EventJSONPair, len(eventNIDs))
 	i := 0
+	var eventNID int64
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		var eventNID int64
 		if err := rows.Scan(&eventNID, &result.EventJSON); err != nil {
 			return nil, err
 		}
