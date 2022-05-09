@@ -3,7 +3,6 @@ package syncapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,22 +21,6 @@ import (
 type syncRoomserverAPI struct {
 	rsapi.SyncRoomserverAPI
 	rooms []*test.Room
-}
-
-func (s *syncRoomserverAPI) QueryEventsByID(ctx context.Context, req *rsapi.QueryEventsByIDRequest, res *rsapi.QueryEventsByIDResponse) error {
-NextEvent:
-	for _, eventID := range req.EventIDs {
-		for _, r := range s.rooms {
-			for _, ev := range r.Events() {
-				if ev.EventID() == eventID {
-					res.Events = append(res.Events, ev)
-					continue NextEvent
-				}
-			}
-		}
-	}
-	fmt.Println("QueryEventsByID", req.EventIDs, " returning ", len(res.Events))
-	return nil
 }
 
 func (s *syncRoomserverAPI) QueryLatestEventsAndState(ctx context.Context, req *rsapi.QueryLatestEventsAndStateRequest, res *rsapi.QueryLatestEventsAndStateResponse) error {
