@@ -10,30 +10,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// FederationClient is a subset of gomatrixserverlib.FederationClient functions which the fedsender
-// implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
-// this interface are of type FederationClientError
-type FederationClient interface {
-	gomatrixserverlib.FederatedStateClient
-	GetUserDevices(ctx context.Context, s gomatrixserverlib.ServerName, userID string) (res gomatrixserverlib.RespUserDevices, err error)
-	ClaimKeys(ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res gomatrixserverlib.RespClaimKeys, err error)
-	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
-	MSC2836EventRelationships(ctx context.Context, dst gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error)
-	MSC2946Spaces(ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool) (res gomatrixserverlib.MSC2946SpacesResponse, err error)
-	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
-}
-
-// FederationClientError is returned from FederationClient methods in the event of a problem.
-type FederationClientError struct {
-	Err         string
-	RetryAfter  time.Duration
-	Blacklisted bool
-}
-
-func (e *FederationClientError) Error() string {
-	return fmt.Sprintf("%s - (retry_after=%s, blacklisted=%v)", e.Err, e.RetryAfter.String(), e.Blacklisted)
-}
-
 // FederationInternalAPI is used to query information from the federation sender.
 type FederationInternalAPI interface {
 	FederationClient
@@ -43,22 +19,7 @@ type FederationInternalAPI interface {
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 
-	// Query the server names of the joined hosts in a room.
-	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
-	// containing only the server names (without information for membership events).
-	// The response will include this server if they are joined to the room.
-	QueryJoinedHostServerNamesInRoom(
-		ctx context.Context,
-		request *QueryJoinedHostServerNamesInRoomRequest,
-		response *QueryJoinedHostServerNamesInRoomResponse,
-	) error
-	// Notifies the federation sender that these servers may be online and to retry sending messages.
-	PerformServersAlive(
-		ctx context.Context,
-		request *PerformServersAliveRequest,
-		response *PerformServersAliveResponse,
-	) error
-	// Broadcasts an EDU to all servers in rooms we are joined to.
+	// Broadcasts an EDU to all servers in rooms we are joined to. Used in the yggdrasil demos.
 	PerformBroadcastEDU(
 		ctx context.Context,
 		request *PerformBroadcastEDURequest,
@@ -67,6 +28,10 @@ type FederationInternalAPI interface {
 }
 
 type ClientFederationAPI interface {
+	// Query the server names of the joined hosts in a room.
+	// Unlike QueryJoinedHostsInRoom, this function returns a de-duplicated slice
+	// containing only the server names (without information for membership events).
+	// The response will include this server if they are joined to the room.
 	QueryJoinedHostServerNamesInRoom(ctx context.Context, request *QueryJoinedHostServerNamesInRoomRequest, response *QueryJoinedHostServerNamesInRoomResponse) error
 }
 
@@ -93,6 +58,30 @@ type RoomserverFederationAPI interface {
 	GetEventAuth(ctx context.Context, s gomatrixserverlib.ServerName, roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string) (res gomatrixserverlib.RespEventAuth, err error)
 	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
 	LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
+}
+
+// FederationClient is a subset of gomatrixserverlib.FederationClient functions which the fedsender
+// implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
+// this interface are of type FederationClientError
+type FederationClient interface {
+	gomatrixserverlib.FederatedStateClient
+	GetUserDevices(ctx context.Context, s gomatrixserverlib.ServerName, userID string) (res gomatrixserverlib.RespUserDevices, err error)
+	ClaimKeys(ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string) (res gomatrixserverlib.RespClaimKeys, err error)
+	QueryKeys(ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string) (res gomatrixserverlib.RespQueryKeys, err error)
+	MSC2836EventRelationships(ctx context.Context, dst gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error)
+	MSC2946Spaces(ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool) (res gomatrixserverlib.MSC2946SpacesResponse, err error)
+	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
+}
+
+// FederationClientError is returned from FederationClient methods in the event of a problem.
+type FederationClientError struct {
+	Err         string
+	RetryAfter  time.Duration
+	Blacklisted bool
+}
+
+func (e *FederationClientError) Error() string {
+	return fmt.Sprintf("%s - (retry_after=%s, blacklisted=%v)", e.Err, e.RetryAfter.String(), e.Blacklisted)
 }
 
 type QueryServerKeysRequest struct {
@@ -172,13 +161,6 @@ type PerformInviteRequest struct {
 
 type PerformInviteResponse struct {
 	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
-}
-
-type PerformServersAliveRequest struct {
-	Servers []gomatrixserverlib.ServerName
-}
-
-type PerformServersAliveResponse struct {
 }
 
 // QueryJoinedHostServerNamesInRoomRequest is a request to QueryJoinedHostServerNames

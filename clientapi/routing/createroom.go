@@ -138,7 +138,7 @@ func CreateRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 ) util.JSONResponse {
 	var r createRoomRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
@@ -165,7 +165,7 @@ func createRoom(
 	r createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
 	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	evTime time.Time,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we

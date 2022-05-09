@@ -42,7 +42,7 @@ func UpgradeRoom(
 	cfg *config.ClientAPI,
 	roomID string, profileAPI userapi.ClientUserAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 ) util.JSONResponse {
 	var r upgradeRoomRequest
 	if rErr := httputil.UnmarshalJSONRequest(req, &r); rErr != nil {
