@@ -61,6 +61,10 @@ func Test_EventTypesTable(t *testing.T) {
 		_, err = tab.InsertEventTypeNID(ctx, nil, eventType)
 		assert.Error(t, err)
 
+		// This should return an error, as this eventType does not exist
+		_, err = tab.SelectEventTypeNID(ctx, nil, "dummyEventType13")
+		assert.Error(t, err)
+
 		eventTypeNIDs, err := tab.BulkSelectEventTypeNID(ctx, nil, []string{"dummyEventType0", "dummyEventType3"})
 		assert.NoError(t, err)
 		// verify that BulkSelectEventTypeNID and InsertEventTypeNID return the same values
