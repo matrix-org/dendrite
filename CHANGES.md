@@ -19,6 +19,7 @@
 * A number of component interfaces have been refactored for cleanliness and developer ease
 * Event auth errors in the log should now be much more useful, including the reason for the event failures
 * The forward extremity calculation in the roomserver has been simplified
+* A new index has been added to the one-time keys table in the keyserver which should speed up key count lookups
 
 ### Fixes
 
@@ -32,6 +33,8 @@
 * The media `/config` endpoint will no longer return a maximum upload size field if it is configured to be unlimited in the Dendrite config
 * The server notices room will no longer produce "User is already joined to the room" errors
 * Consumer errors will no longer flood the logs during a graceful shutdown
+* Sync API and federation API consumers will no longer unnecessarily query added state events matching the one in the output event
+* The Sync API will no longer unnecessarily track invites for remote users
 
 ## Dendrite 0.8.2 (2022-04-27)
 
