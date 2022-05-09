@@ -457,11 +457,13 @@ func (s *eventStatements) BulkSelectEventReference(
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventReference: rows.close() failed")
 	results := make([]gomatrixserverlib.EventReference, len(eventNIDs))
 	i := 0
+	var eventSHA []byte
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		if err = rows.Scan(&result.EventID, &result.EventSHA256); err != nil {
+		if err = rows.Scan(&result.EventID, &eventSHA); err != nil {
 			return nil, err
 		}
+		result.EventSHA256 = eventSHA
 	}
 	if i != len(eventNIDs) {
 		return nil, fmt.Errorf("storage: event NIDs missing from the database (%d != %d)", i, len(eventNIDs))
