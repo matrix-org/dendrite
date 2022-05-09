@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS keyserver_one_time_keys (
 	-- Clobber based on 4-uple of user/device/key/algorithm.
     CONSTRAINT keyserver_one_time_keys_unique UNIQUE (user_id, device_id, key_id, algorithm)
 );
+
+CREATE INDEX IF NOT EXISTS keyserver_one_time_keys_idx ON keyserver_one_time_keys (user_id, device_id);
 `
 
 const upsertKeysSQL = "" +

@@ -45,7 +45,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.SyncAPI
 
-	js, natsClient := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {

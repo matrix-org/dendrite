@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/nats-io/nats.go"
 )
 
 func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()) {
@@ -75,4 +76,15 @@ func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()
 		t.Fatalf("unknown db type: %v", dbType)
 	}
 	return nil, nil
+}
+
+func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nats.Conn) {
+	if cfg == nil {
+		cfg = &config.Dendrite{}
+		cfg.Defaults(true)
+	}
+	cfg.Global.JetStream.InMemory = true
+	base := base.NewBaseDendrite(cfg, "Tests")
+	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
+	return base, js, jc
 }
