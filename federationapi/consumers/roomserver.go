@@ -166,6 +166,9 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
 			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
 		}
+		if len(eventsRes.Events) != len(missingEventIDs) {
+			return fmt.Errorf("missing state events")
+		}
 		addsStateEvents = append(addsStateEvents, eventsRes.Events...)
 	}
 
