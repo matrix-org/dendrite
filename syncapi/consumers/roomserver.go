@@ -327,9 +327,11 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) {
 	if msg.Event.StateKey() == nil {
-		log.WithFields(log.Fields{
-			"event": string(msg.Event.JSON()),
-		}).Panicf("roomserver output log: invite has no state key")
+		return
+	}
+	if _, serverName, err := gomatrixserverlib.SplitID('@', *msg.Event.StateKey()); err != nil {
+		return
+	} else if serverName != s.cfg.Matrix.ServerName {
 		return
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
