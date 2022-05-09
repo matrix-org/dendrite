@@ -77,7 +77,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateEventJSONTable(db); err != nil {
 		return err
 	}
-	if err := createEventsTable(db); err != nil {
+	if err := CreateEventsTable(db); err != nil {
 		return err
 	}
 	if err := createRoomsTable(db); err != nil {
@@ -124,7 +124,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	events, err := prepareEventsTable(db)
+	events, err := PrepareEventsTable(db)
 	if err != nil {
 		return err
 	}

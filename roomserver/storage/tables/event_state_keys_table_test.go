@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateEventStateKeysTable(t *testing.T, dbType test.DBType) (tables.EventStateKeys, func()) {
@@ -20,27 +21,19 @@ func mustCreateEventStateKeysTable(t *testing.T, dbType test.DBType) (tables.Eve
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	assert.NoError(t, err)
 	var tab tables.EventStateKeys
 	switch dbType {
 	case test.DBTypePostgres:
 		err = postgres.CreateEventStateKeysTable(db)
-		if err != nil {
-			t.Fatalf("failed to create EventJSON table: %s", err)
-		}
+		assert.NoError(t, err)
 		tab, err = postgres.PrepareEventStateKeysTable(db)
 	case test.DBTypeSQLite:
 		err = sqlite3.CreateEventStateKeysTable(db)
-		if err != nil {
-			t.Fatalf("failed to create EventJSON table: %s", err)
-		}
+		assert.NoError(t, err)
 		tab, err = sqlite3.PrepareEventStateKeysTable(db)
 	}
-	if err != nil {
-		t.Fatalf("failed to create table: %s", err)
-	}
+	assert.NoError(t, err)
 
 	return tab, close
 }
@@ -55,37 +48,26 @@ func Test_EventStateKeysTable(t *testing.T) {
 		// create some dummy data
 		for i := 0; i < 10; i++ {
 			stateKey := fmt.Sprintf("@user%d:localhost", i)
-			if stateKeyNID, err = tab.InsertEventStateKeyNID(
+			stateKeyNID, err = tab.InsertEventStateKeyNID(
 				ctx, nil, stateKey,
-			); err != nil {
-				t.Fatalf("unable to insert eventJSON: %s", err)
-			}
+			)
+			assert.NoError(t, err)
 			gotEventStateKey, err = tab.SelectEventStateKeyNID(ctx, nil, stateKey)
-			if err != nil {
-				t.Fatalf("failed to get eventStateKeyNID: %s", err)
-			}
-			if stateKeyNID != gotEventStateKey {
-				t.Fatalf("expected eventStateKey %d, but got %d", stateKeyNID, gotEventStateKey)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, stateKeyNID, gotEventStateKey)
 		}
 		stateKeyNIDsMap, err := tab.BulkSelectEventStateKeyNID(ctx, nil, []string{"@user0:localhost", "@user1:localhost"})
-		if err != nil {
-			t.Fatalf("failed to get EventStateKeyNIDs: %s", err)
-		}
+		assert.NoError(t, err)
 		wantStateKeyNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDsMap))
 		for _, nid := range stateKeyNIDsMap {
 			wantStateKeyNIDs = append(wantStateKeyNIDs, nid)
 		}
 		stateKeyNIDs, err := tab.BulkSelectEventStateKey(ctx, nil, wantStateKeyNIDs)
-		if err != nil {
-			t.Fatalf("failed to get EventStateKeyNIDs: %s", err)
-		}
+		assert.NoError(t, err)
 		// verify that BulkSelectEventStateKeyNID and BulkSelectEventStateKey return the same values
 		for userID, nid := range stateKeyNIDsMap {
 			if v, ok := stateKeyNIDs[nid]; ok {
-				if v != userID {
-					t.Fatalf("userID does not match: %s != %s", userID, v)
-				}
+				assert.Equal(t, v, userID)
 			} else {
 				t.Fatalf("unable to find %d in result set", nid)
 			}

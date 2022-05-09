@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateEventTypesTable(t *testing.T, dbType test.DBType) (tables.EventTypes, func()) {
@@ -20,27 +21,19 @@ func mustCreateEventTypesTable(t *testing.T, dbType test.DBType) (tables.EventTy
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
-	if err != nil {
-		t.Fatalf("failed to open db: %s", err)
-	}
+	assert.NoError(t, err)
 	var tab tables.EventTypes
 	switch dbType {
 	case test.DBTypePostgres:
 		err = postgres.CreateEventTypesTable(db)
-		if err != nil {
-			t.Fatalf("failed to create EventJSON table: %s", err)
-		}
+		assert.NoError(t, err)
 		tab, err = postgres.PrepareEventTypesTable(db)
 	case test.DBTypeSQLite:
 		err = sqlite3.CreateEventTypesTable(db)
-		if err != nil {
-			t.Fatalf("failed to create EventJSON table: %s", err)
-		}
+		assert.NoError(t, err)
 		tab, err = sqlite3.PrepareEventTypesTable(db)
 	}
-	if err != nil {
-		t.Fatalf("failed to create table: %s", err)
-	}
+	assert.NoError(t, err)
 
 	return tab, close
 }
@@ -63,23 +56,15 @@ func Test_EventTypesTable(t *testing.T) {
 			}
 			eventTypeMap[eventType] = eventTypeNID
 			gotEventTypeNID, err = tab.SelectEventTypeNID(ctx, nil, eventType)
-			if err != nil {
-				t.Fatalf("failed to get EventTypeNID: %s", err)
-			}
-			if eventTypeNID != gotEventTypeNID {
-				t.Fatalf("expected eventTypeNID %d, but got %d", eventTypeNID, gotEventTypeNID)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, eventTypeNID, gotEventTypeNID)
 		}
 		eventTypeNIDs, err := tab.BulkSelectEventTypeNID(ctx, nil, []string{"dummyEventType0", "dummyEventType3"})
-		if err != nil {
-			t.Fatalf("failed to get EventStateKeyNIDs: %s", err)
-		}
+		assert.NoError(t, err)
 		// verify that BulkSelectEventTypeNID and InsertEventTypeNID return the same values
 		for eventType, nid := range eventTypeNIDs {
 			if v, ok := eventTypeMap[eventType]; ok {
-				if v != nid {
-					t.Fatalf("EventTypeNID does not match: %d != %d", nid, v)
-				}
+				assert.Equal(t, v, nid)
 			} else {
 				t.Fatalf("unable to find %d in result set", nid)
 			}
