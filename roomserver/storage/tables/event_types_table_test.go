@@ -49,16 +49,18 @@ func Test_EventTypesTable(t *testing.T) {
 		eventTypeMap := make(map[string]types.EventTypeNID)
 		for i := 0; i < 10; i++ {
 			eventType := fmt.Sprintf("dummyEventType%d", i)
-			if eventTypeNID, err = tab.InsertEventTypeNID(
-				ctx, nil, eventType,
-			); err != nil {
-				t.Fatalf("unable to insert eventJSON: %s", err)
-			}
+			eventTypeNID, err = tab.InsertEventTypeNID(ctx, nil, eventType)
+			assert.NoError(t, err)
 			eventTypeMap[eventType] = eventTypeNID
 			gotEventTypeNID, err = tab.SelectEventTypeNID(ctx, nil, eventType)
 			assert.NoError(t, err)
 			assert.Equal(t, eventTypeNID, gotEventTypeNID)
 		}
+		// This should fail, since the dummyEventType0 already exists
+		eventType := fmt.Sprintf("dummyEventType%d", 0)
+		_, err = tab.InsertEventTypeNID(ctx, nil, eventType)
+		assert.Error(t, err)
+
 		eventTypeNIDs, err := tab.BulkSelectEventTypeNID(ctx, nil, []string{"dummyEventType0", "dummyEventType3"})
 		assert.NoError(t, err)
 		// verify that BulkSelectEventTypeNID and InsertEventTypeNID return the same values

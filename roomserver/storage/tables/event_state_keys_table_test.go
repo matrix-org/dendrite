@@ -48,14 +48,17 @@ func Test_EventStateKeysTable(t *testing.T) {
 		// create some dummy data
 		for i := 0; i < 10; i++ {
 			stateKey := fmt.Sprintf("@user%d:localhost", i)
-			stateKeyNID, err = tab.InsertEventStateKeyNID(
-				ctx, nil, stateKey,
-			)
+			stateKeyNID, err = tab.InsertEventStateKeyNID(ctx, nil, stateKey)
 			assert.NoError(t, err)
 			gotEventStateKey, err = tab.SelectEventStateKeyNID(ctx, nil, stateKey)
 			assert.NoError(t, err)
 			assert.Equal(t, stateKeyNID, gotEventStateKey)
 		}
+		// This should fail, since @user0:localhost already exists
+		stateKey := fmt.Sprintf("@user%d:localhost", 0)
+		_, err = tab.InsertEventStateKeyNID(ctx, nil, stateKey)
+		assert.Error(t, err)
+
 		stateKeyNIDsMap, err := tab.BulkSelectEventStateKeyNID(ctx, nil, []string{"@user0:localhost", "@user1:localhost"})
 		assert.NoError(t, err)
 		wantStateKeyNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDsMap))
