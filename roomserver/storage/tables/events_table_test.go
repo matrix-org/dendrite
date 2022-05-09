@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,10 +48,10 @@ func Test_EventsTable(t *testing.T) {
 		// create some dummy data
 		eventIDs := make([]string, 0, len(room.Events()))
 		wantStateAtEvent := make([]types.StateAtEvent, 0, len(room.Events()))
+		wantEventReferences := make([]gomatrixserverlib.EventReference, 0, len(room.Events()))
+		wantStateAtEventAndRefs := make([]types.StateAtEventAndReference, 0, len(room.Events()))
 		for _, ev := range room.Events() {
-			eventIDs = append(eventIDs, ev.EventID())
-
-			eventNID, snapNID, err := tab.InsertEvent(ctx, nil, 1, 1, 1, ev.EventID(), []byte(""), nil, 0, false)
+			eventNID, snapNID, err := tab.InsertEvent(ctx, nil, 1, 1, 1, ev.EventID(), ev.EventReference().EventSHA256, nil, ev.Depth(), false)
 			assert.NoError(t, err)
 			gotEventNID, gotSnapNID, err := tab.SelectEvent(ctx, nil, ev.EventID())
 			assert.NoError(t, err)
@@ -60,9 +61,32 @@ func Test_EventsTable(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, eventID, ev.EventID())
 
-			wantStateAtEvent = append(wantStateAtEvent, types.StateAtEvent{
+			// The events shouldn't be sent to output yet
+			sentToOutput, err := tab.SelectEventSentToOutput(ctx, nil, gotEventNID)
+			assert.NoError(t, err)
+			assert.False(t, sentToOutput)
+
+			err = tab.UpdateEventSentToOutput(ctx, nil, gotEventNID)
+			assert.NoError(t, err)
+
+			// Now they should be sent to output
+			sentToOutput, err = tab.SelectEventSentToOutput(ctx, nil, gotEventNID)
+			assert.NoError(t, err)
+			assert.True(t, sentToOutput)
+
+			eventIDs = append(eventIDs, ev.EventID())
+			wantEventReferences = append(wantEventReferences, ev.EventReference())
+
+			// Set the stateSnapshot to 2 for some events to verify they are returned later
+			stateSnapshot := 0
+			if eventNID < 3 {
+				stateSnapshot = 2
+				err = tab.UpdateEventState(ctx, nil, eventNID, 2)
+				assert.NoError(t, err)
+			}
+			stateAtEvent := types.StateAtEvent{
 				Overwrite:              false,
-				BeforeStateSnapshotNID: 0,
+				BeforeStateSnapshotNID: types.StateSnapshotNID(stateSnapshot),
 				IsRejected:             false,
 				StateEntry: types.StateEntry{
 					EventNID: eventNID,
@@ -71,6 +95,11 @@ func Test_EventsTable(t *testing.T) {
 						EventStateKeyNID: 1,
 					},
 				},
+			}
+			wantStateAtEvent = append(wantStateAtEvent, stateAtEvent)
+			wantStateAtEventAndRefs = append(wantStateAtEventAndRefs, types.StateAtEventAndReference{
+				StateAtEvent:   stateAtEvent,
+				EventReference: ev.EventReference(),
 			})
 		}
 
@@ -86,6 +115,13 @@ func Test_EventsTable(t *testing.T) {
 		// somehow SQLite doesn't return the values ordered as requested by the query
 		assert.ElementsMatch(t, stateEvents, stateEvents2)
 
+		roomNIDs, err := tab.SelectRoomNIDsForEventNIDs(ctx, nil, nids)
+		assert.NoError(t, err)
+		// We only inserted one room, so the RoomNID should be the same for all evendNIDs
+		for _, roomNID := range roomNIDs {
+			assert.Equal(t, types.RoomNID(1), roomNID)
+		}
+
 		stateAtEvent, err := tab.BulkSelectStateAtEventByID(ctx, nil, eventIDs)
 		assert.NoError(t, err)
 		assert.Equal(t, len(eventIDs), len(stateAtEvent))
@@ -96,5 +132,26 @@ func Test_EventsTable(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("%+v", evendNIDMap)
 		assert.Equal(t, len(evendNIDMap), len(nids))
+
+		nidMap, err := tab.BulkSelectEventNID(ctx, nil, eventIDs)
+		assert.NoError(t, err)
+		// check that we got all expected eventNIDs
+		for _, eventID := range eventIDs {
+			_, ok := nidMap[eventID]
+			assert.True(t, ok)
+		}
+
+		references, err := tab.BulkSelectEventReference(ctx, nil, nids)
+		assert.NoError(t, err)
+		assert.Equal(t, wantEventReferences, references)
+
+		stateAndRefs, err := tab.BulkSelectStateAtEventAndReference(ctx, nil, nids)
+		assert.NoError(t, err)
+		assert.Equal(t, wantStateAtEventAndRefs, stateAndRefs)
+
+		// check we get the expected event depth
+		maxDepth, err := tab.SelectMaxEventDepth(ctx, nil, nids)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(len(room.Events())+1), maxDepth)
 	})
 }
