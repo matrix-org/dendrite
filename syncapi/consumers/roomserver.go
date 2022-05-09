@@ -156,12 +156,20 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ev := msg.Event
 
 	addsStateEvents := []*gomatrixserverlib.HeaderedEvent{}
-	foundEventIDs := map[string]bool{}
+	missingAddStateEventIDs := make([]string, 0, len(msg.AddsStateEventIDs))
+	foundEventIDs := map[string]bool{
+		msg.Event.EventID(): true,
+	}
 	if len(msg.AddsStateEventIDs) > 0 {
 		for _, eventID := range msg.AddsStateEventIDs {
-			foundEventIDs[eventID] = false
+			if _, ok := foundEventIDs[eventID]; !ok {
+				foundEventIDs[eventID] = false
+				missingAddStateEventIDs = append(missingAddStateEventIDs, eventID)
+			}
 		}
-		foundEvents, err := s.db.Events(ctx, msg.AddsStateEventIDs)
+	}
+	if len(missingAddStateEventIDs) > 0 {
+		foundEvents, err := s.db.Events(ctx, missingAddStateEventIDs)
 		if err != nil {
 			return fmt.Errorf("s.db.Events: %w", err)
 		}
