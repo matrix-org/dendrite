@@ -63,12 +63,12 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func createStateBlockTable(db *sql.DB) error {
+func CreateStateBlockTable(db *sql.DB) error {
 	_, err := db.Exec(stateDataSchema)
 	return err
 }
 
-func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
 		db: db,
 	}
@@ -84,9 +84,9 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
-	nids := types.EventNIDs{} // zero slice to not store 'null' in the DB
-	for _, e := range entries {
-		nids = append(nids, e.EventNID)
+	nids := make(types.EventNIDs, entries.Len())
+	for i := range entries {
+		nids[i] = entries[i].EventNID
 	}
 	js, err := json.Marshal(nids)
 	if err != nil {
@@ -121,13 +121,13 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
+	var stateBlockNID types.StateBlockNID
+	var result json.RawMessage
+	var r []types.EventNID
 	for ; rows.Next(); i++ {
-		var stateBlockNID types.StateBlockNID
-		var result json.RawMessage
 		if err = rows.Scan(&stateBlockNID, &result); err != nil {
 			return nil, err
 		}
-		r := []types.EventNID{}
 		if err = json.Unmarshal(result, &r); err != nil {
 			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}

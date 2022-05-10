@@ -92,7 +92,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateRoomsTable(db); err != nil {
 		return err
 	}
-	if err := createStateBlockTable(db); err != nil {
+	if err := CreateStateBlockTable(db); err != nil {
 		return err
 	}
 	if err := createStateSnapshotTable(db); err != nil {
@@ -141,7 +141,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	stateBlock, err := prepareStateBlockTable(db)
+	stateBlock, err := PrepareStateBlockTable(db)
 	if err != nil {
 		return err
 	}

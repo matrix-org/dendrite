@@ -70,12 +70,12 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func createStateBlockTable(db *sql.DB) error {
+func CreateStateBlockTable(db *sql.DB) error {
 	_, err := db.Exec(stateDataSchema)
 	return err
 }
 
-func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{}
 
 	return s, sqlutil.StatementList{
@@ -89,9 +89,9 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
-	var nids types.EventNIDs
-	for _, e := range entries {
-		nids = append(nids, e.EventNID)
+	nids := make(types.EventNIDs, entries.Len())
+	for i := range entries {
+		nids[i] = entries[i].EventNID
 	}
 	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
 	err = stmt.QueryRowContext(
@@ -112,15 +112,15 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
+	var stateBlockNID types.StateBlockNID
+	var result pq.Int64Array
 	for ; rows.Next(); i++ {
-		var stateBlockNID types.StateBlockNID
-		var result pq.Int64Array
 		if err = rows.Scan(&stateBlockNID, &result); err != nil {
 			return nil, err
 		}
-		r := []types.EventNID{}
-		for _, e := range result {
-			r = append(r, types.EventNID(e))
+		r := make([]types.EventNID, len(result))
+		for x := range result {
+			r[x] = types.EventNID(result[x])
 		}
 		results[i] = r
 	}
