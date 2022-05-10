@@ -1,3 +1,8 @@
+--- 
+title: Code Style
+parent: Development
+---
+
 # Code Style
 
 In addition to standard Go code style (`gofmt`, `goimports`), we use `golangci-lint`
@@ -16,8 +21,7 @@ The linters can be run using [build/scripts/find-lint.sh](/build/scripts/find-li
 (see file for docs) or as part of a build/test/lint cycle using
 [build/scripts/build-test-lint.sh](/build/scripts/build-test-lint.sh).
 
-
-## Labels
+##  Labels
 
 In addition to `TODO` and `FIXME` we also use `NOTSPEC` to identify deviations
 from the Matrix specification.
@@ -43,7 +47,6 @@ logger.WithFields(logrus.Fields{
 This is useful when logging to systems that natively understand log fields, as
 it allows people to search and process the fields without having to parse the
 log message.
-
 
 ## Visual Studio Code
 

@@ -1,3 +1,8 @@
+---
+title: Setup
+parent: Opentracing
+---
+
 ## OpenTracing Setup
 
 ![Trace when sending an event into a room](/docs/tracing/jaeger.png)
@@ -9,6 +14,7 @@ This document explains how to set up Jaeger locally on a single machine.
 ### Set up the Jaeger backend
 
 The [easiest way](https://www.jaegertracing.io/docs/1.18/getting-started/) is to use the all-in-one Docker image:
+
 ```
 $ docker run -d --name jaeger \
   -e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
@@ -26,6 +32,7 @@ $ docker run -d --name jaeger \
 ### Configuring Dendrite to talk to Jaeger
 
 Modify your config to look like: (this will send every single span to Jaeger which will be slow on large instances, but for local testing it's fine)
+
 ```
 tracing:
   enabled: true
@@ -40,10 +47,11 @@ tracing:
 ```
 
 then run the monolith server with `--api true` to use polylith components which do tracing spans:
+
 ```
-$ ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml --api true
+./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml --api true
 ```
 
 ### Checking traces
 
-Visit http://localhost:16686 to see traces under `DendriteMonolith`.
+Visit <http://localhost:16686> to see traces under `DendriteMonolith`.

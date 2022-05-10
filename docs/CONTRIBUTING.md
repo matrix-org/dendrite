@@ -1,3 +1,8 @@
+---
+title: Contributing
+parent: Development
+---
+
 # Contributing to Dendrite
 
 Everyone is welcome to contribute to Dendrite! We aim to make it as easy as
@@ -16,13 +21,13 @@ We use [golangci-lint](https://github.com/golangci/golangci-lint) to lint
 Dendrite which can be executed via:
 
 ```
-$ golangci-lint run
+golangci-lint run
 ```
 
 We also have unit tests which we run via:
 
 ```
-$ go test ./...
+go test ./...
 ```
 
 ## Continuous Integration
@@ -63,7 +68,6 @@ passing tests.
 
 If these two steps report no problems, the code should be able to pass the CI
 tests.
-
 
 ## Picking Things To Do
 

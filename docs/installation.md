@@ -1,6 +1,7 @@
 ---
 title: Installation
 has_children: true
+nav_order: 2
 ---
 
 # Installing Dendrite
@@ -20,13 +21,6 @@ Dendrite can be run in one of two configurations:
   disproportionately more resources for a smaller number of users compared to a monolith deployment.
 
 In almost all cases, it is **recommended to run in monolith mode with PostgreSQL databases**.
-
-Regardless of whether you are running in polylith or monolith mode, each Dendrite component that
-requires storage has its own database connections. Both Postgres and SQLite are supported and can
-be mixed-and-matched across components as needed in the configuration file.
-
-Be advised that Dendrite is still in development and it's not recommended for
-use in production environments just yet!
 
 ## Requirements
 
