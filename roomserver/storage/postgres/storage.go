@@ -80,7 +80,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateEventsTable(db); err != nil {
 		return err
 	}
-	if err := createRoomsTable(db); err != nil {
+	if err := CreateRoomsTable(db); err != nil {
 		return err
 	}
 	if err := createStateBlockTable(db); err != nil {
@@ -128,7 +128,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	rooms, err := prepareRoomsTable(db)
+	rooms, err := PrepareRoomsTable(db)
 	if err != nil {
 		return err
 	}

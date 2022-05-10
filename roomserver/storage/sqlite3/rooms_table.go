@@ -86,12 +86,12 @@ type roomStatements struct {
 	selectRoomIDsStmt  *sql.Stmt
 }
 
-func createRoomsTable(db *sql.DB) error {
+func CreateRoomsTable(db *sql.DB) error {
 	_, err := db.Exec(roomsSchema)
 	return err
 }
 
-func prepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
+func PrepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
 	s := &roomStatements{
 		db: db,
 	}
@@ -116,8 +116,8 @@ func (s *roomStatements) SelectRoomIDs(ctx context.Context, txn *sql.Tx) ([]stri
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomIDsStmt: rows.close() failed")
 	var roomIDs []string
+	var roomID string
 	for rows.Next() {
-		var roomID string
 		if err = rows.Scan(&roomID); err != nil {
 			return nil, err
 		}
@@ -241,9 +241,9 @@ func (s *roomStatements) SelectRoomVersionsForRoomNIDs(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomVersionsForRoomNIDsStmt: rows.close() failed")
 	result := make(map[types.RoomNID]gomatrixserverlib.RoomVersion)
+	var roomNID types.RoomNID
+	var roomVersion gomatrixserverlib.RoomVersion
 	for rows.Next() {
-		var roomNID types.RoomNID
-		var roomVersion gomatrixserverlib.RoomVersion
 		if err = rows.Scan(&roomNID, &roomVersion); err != nil {
 			return nil, err
 		}
@@ -270,8 +270,8 @@ func (s *roomStatements) BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roo
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomIDsStmt: rows.close() failed")
 	var roomIDs []string
+	var roomID string
 	for rows.Next() {
-		var roomID string
 		if err = rows.Scan(&roomID); err != nil {
 			return nil, err
 		}
@@ -298,8 +298,8 @@ func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, ro
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectRoomNIDsStmt: rows.close() failed")
 	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
 	for rows.Next() {
-		var roomNID types.RoomNID
 		if err = rows.Scan(&roomNID); err != nil {
 			return nil, err
 		}
