@@ -113,7 +113,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreatePublishedTable(db); err != nil {
 		return err
 	}
-	if err := createRedactionsTable(db); err != nil {
+	if err := CreateRedactionsTable(db); err != nil {
 		return err
 	}
 
@@ -169,7 +169,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	redactions, err := prepareRedactionsTable(db)
+	redactions, err := PrepareRedactionsTable(db)
 	if err != nil {
 		return err
 	}
