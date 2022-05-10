@@ -268,7 +268,7 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	sort.Sort(tuples)
 	eventTypeNIDArray, eventStateKeyNIDArray := tuples.TypesAndStateKeysAsArrays()
 	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateEventByNIDStmt)
-	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs), eventTypeNIDArray, eventStateKeyNIDArray)
+	rows, err := stmt.QueryContext(ctx, eventNIDsAsArray(eventNIDs), pq.Int64Array(eventTypeNIDArray), pq.Int64Array(eventStateKeyNIDArray))
 	if err != nil {
 		return nil, err
 	}
