@@ -101,7 +101,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateMembershipTable(db); err != nil {
 		return err
 	}
-	if err := createPublishedTable(db); err != nil {
+	if err := CreatePublishedTable(db); err != nil {
 		return err
 	}
 	if err := createRedactionsTable(db); err != nil {
@@ -156,7 +156,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	published, err := preparePublishedTable(db)
+	published, err := PreparePublishedTable(db)
 	if err != nil {
 		return err
 	}
