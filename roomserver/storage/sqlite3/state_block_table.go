@@ -123,11 +123,11 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	i := 0
 	var stateBlockNID types.StateBlockNID
 	var result json.RawMessage
-	var r []types.EventNID
 	for ; rows.Next(); i++ {
 		if err = rows.Scan(&stateBlockNID, &result); err != nil {
 			return nil, err
 		}
+		var r []types.EventNID
 		if err = json.Unmarshal(result, &r); err != nil {
 			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}
