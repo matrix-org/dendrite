@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -142,35 +141,3 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	}
 	return results, err
 }
-
-type stateKeyTupleSorter []types.StateKeyTuple
-
-func (s stateKeyTupleSorter) Len() int           { return len(s) }
-func (s stateKeyTupleSorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
-func (s stateKeyTupleSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
-// Check whether a tuple is in the list. Assumes that the list is sorted.
-func (s stateKeyTupleSorter) contains(value types.StateKeyTuple) bool {
-	i := sort.Search(len(s), func(i int) bool { return !s[i].LessThan(value) })
-	return i < len(s) && s[i] == value
-}
-
-// List the unique eventTypeNIDs and eventStateKeyNIDs.
-// Assumes that the list is sorted.
-func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs []int64, eventStateKeyNIDs []int64) {
-	eventTypeNIDs = make([]int64, len(s))
-	eventStateKeyNIDs = make([]int64, len(s))
-	for i := range s {
-		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
-		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
-	}
-	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
-	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
-	return
-}
-
-type int64Sorter []int64
-
-func (s int64Sorter) Len() int           { return len(s) }
-func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
-func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

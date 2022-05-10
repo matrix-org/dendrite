@@ -19,7 +19,9 @@ import (
 	"encoding/json"
 	"sort"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -95,6 +97,38 @@ func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 	}
 	return a.EventStateKeyNID < b.EventStateKeyNID
 }
+
+type StateKeyTupleSorter []StateKeyTuple
+
+func (s StateKeyTupleSorter) Len() int           { return len(s) }
+func (s StateKeyTupleSorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
+func (s StateKeyTupleSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+// Check whether a tuple is in the list. Assumes that the list is sorted.
+func (s StateKeyTupleSorter) contains(value StateKeyTuple) bool {
+	i := sort.Search(len(s), func(i int) bool { return !s[i].LessThan(value) })
+	return i < len(s) && s[i] == value
+}
+
+// List the unique eventTypeNIDs and eventStateKeyNIDs.
+// Assumes that the list is sorted.
+func (s StateKeyTupleSorter) TypesAndStateKeysAsArrays() (eventTypeNIDs pq.Int64Array, eventStateKeyNIDs pq.Int64Array) {
+	eventTypeNIDs = make(pq.Int64Array, len(s))
+	eventStateKeyNIDs = make(pq.Int64Array, len(s))
+	for i := range s {
+		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
+		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
+	}
+	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
+	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
+	return
+}
+
+type int64Sorter []int64
+
+func (s int64Sorter) Len() int           { return len(s) }
+func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // A StateEntry is an entry in the room state of a matrix room.
 type StateEntry struct {
