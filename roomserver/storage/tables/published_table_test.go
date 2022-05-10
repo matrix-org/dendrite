@@ -64,5 +64,16 @@ func TestPublishedTable(t *testing.T) {
 		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
+
+		// test an actual upsert
+		room := test.NewRoom(t, alice)
+		err = tab.UpsertRoomPublished(ctx, nil, room.ID, true)
+		assert.NoError(t, err)
+		err = tab.UpsertRoomPublished(ctx, nil, room.ID, false)
+		assert.NoError(t, err)
+		// should now be false, due to the upsert
+		publishedRes, err := tab.SelectPublishedFromRoomID(ctx, nil, room.ID)
+		assert.NoError(t, err)
+		assert.False(t, publishedRes)
 	})
 }

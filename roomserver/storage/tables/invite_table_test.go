@@ -44,45 +44,47 @@ func TestInviteTable(t *testing.T) {
 		tab, close := mustCreateInviteTable(t, dbType)
 		defer close()
 		eventID1 := util.RandomString(16)
-		newInvite, err := tab.InsertInviteEvent(ctx, nil, eventID1, 1, 1, 2, []byte(""))
+		roomNID := types.RoomNID(1)
+		targetUserNID, senderUserNID := types.EventStateKeyNID(1), types.EventStateKeyNID(2)
+		newInvite, err := tab.InsertInviteEvent(ctx, nil, eventID1, roomNID, targetUserNID, senderUserNID, []byte(""))
 		assert.NoError(t, err)
 		assert.True(t, newInvite)
 
 		// Try adding the same invite again
-		newInvite, err = tab.InsertInviteEvent(ctx, nil, eventID1, 1, 1, 2, []byte(""))
+		newInvite, err = tab.InsertInviteEvent(ctx, nil, eventID1, roomNID, targetUserNID, senderUserNID, []byte(""))
 		assert.NoError(t, err)
 		assert.False(t, newInvite)
 
 		// Add another invite for this room
 		eventID2 := util.RandomString(16)
-		newInvite, err = tab.InsertInviteEvent(ctx, nil, eventID2, 1, 1, 2, []byte(""))
+		newInvite, err = tab.InsertInviteEvent(ctx, nil, eventID2, roomNID, targetUserNID, senderUserNID, []byte(""))
 		assert.NoError(t, err)
 		assert.True(t, newInvite)
 
 		// Add another invite for a different user
 		eventID := util.RandomString(16)
-		newInvite, err = tab.InsertInviteEvent(ctx, nil, eventID, 3, 1, 2, []byte(""))
+		newInvite, err = tab.InsertInviteEvent(ctx, nil, eventID, types.RoomNID(3), targetUserNID, senderUserNID, []byte(""))
 		assert.NoError(t, err)
 		assert.True(t, newInvite)
 
-		stateKeyNIDs, eventIDs, err := tab.SelectInviteActiveForUserInRoom(ctx, nil, 1, 1)
+		stateKeyNIDs, eventIDs, err := tab.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{eventID1, eventID2}, eventIDs)
 		assert.Equal(t, []types.EventStateKeyNID{2, 2}, stateKeyNIDs)
 
 		// retire the invite
-		retiredEventIDs, err := tab.UpdateInviteRetired(ctx, nil, 1, 1)
+		retiredEventIDs, err := tab.UpdateInviteRetired(ctx, nil, roomNID, targetUserNID)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{eventID1, eventID2}, retiredEventIDs)
 
 		// This should now be empty
-		stateKeyNIDs, eventIDs, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, 1, 1)
+		stateKeyNIDs, eventIDs, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 		assert.NoError(t, err)
 		assert.Empty(t, eventIDs)
 		assert.Empty(t, stateKeyNIDs)
 
 		// Non-existent targetUserNID
-		stateKeyNIDs, eventIDs, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, 10, 1)
+		stateKeyNIDs, eventIDs, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, types.EventStateKeyNID(10), roomNID)
 		assert.NoError(t, err)
 		assert.Empty(t, stateKeyNIDs)
 		assert.Empty(t, eventIDs)
