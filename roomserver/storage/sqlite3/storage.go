@@ -98,7 +98,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := createStateSnapshotTable(db); err != nil {
 		return err
 	}
-	if err := createPrevEventsTable(db); err != nil {
+	if err := CreatePrevEventsTable(db); err != nil {
 		return err
 	}
 	if err := createRoomAliasesTable(db); err != nil {
@@ -149,7 +149,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	prevEvents, err := preparePrevEventsTable(db)
+	prevEvents, err := PreparePrevEventsTable(db)
 	if err != nil {
 		return err
 	}
