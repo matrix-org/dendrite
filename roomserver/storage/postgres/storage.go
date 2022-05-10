@@ -86,7 +86,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateStateBlockTable(db); err != nil {
 		return err
 	}
-	if err := createStateSnapshotTable(db); err != nil {
+	if err := CreateStateSnapshotTable(db); err != nil {
 		return err
 	}
 	if err := createPrevEventsTable(db); err != nil {
@@ -136,7 +136,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := prepareStateSnapshotTable(db)
+	stateSnapshot, err := PrepareStateSnapshotTable(db)
 	if err != nil {
 		return err
 	}
