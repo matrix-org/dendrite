@@ -65,11 +65,13 @@ func NewRequestPool(
 	userAPI userapi.SyncUserAPI, keyAPI keyapi.SyncKeyAPI,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	streams *streams.Streams, notifier *notifier.Notifier,
-	producer PresencePublisher,
+	producer PresencePublisher, enableMetrics bool,
 ) *RequestPool {
-	prometheus.MustRegister(
-		activeSyncRequests, waitingSyncRequests,
-	)
+	if enableMetrics {
+		prometheus.MustRegister(
+			activeSyncRequests, waitingSyncRequests,
+		)
+	}
 	rp := &RequestPool{
 		db:       db,
 		cfg:      cfg,

@@ -154,41 +154,61 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
+	addsStateEvents, missingEventIDs := msg.NeededStateEventIDs()
 
-	addsStateEvents := []*gomatrixserverlib.HeaderedEvent{}
-	foundEventIDs := map[string]bool{}
-	if len(msg.AddsStateEventIDs) > 0 {
-		for _, eventID := range msg.AddsStateEventIDs {
-			foundEventIDs[eventID] = false
-		}
-		foundEvents, err := s.db.Events(ctx, msg.AddsStateEventIDs)
+	// Work out the list of events we need to find out about. Either
+	// they will be the event supplied in the request, we will find it
+	// in the sync API database or we'll need to ask the roomserver.
+	knownEventIDs := make(map[string]bool, len(msg.AddsStateEventIDs))
+	for _, eventID := range missingEventIDs {
+		knownEventIDs[eventID] = false
+	}
+
+	// Look the events up in the database. If we know them, add them into
+	// the set of adds state events.
+	if len(missingEventIDs) > 0 {
+		alreadyKnown, err := s.db.Events(ctx, missingEventIDs)
 		if err != nil {
 			return fmt.Errorf("s.db.Events: %w", err)
 		}
-		for _, event := range foundEvents {
-			foundEventIDs[event.EventID()] = true
+		for _, knownEvent := range alreadyKnown {
+			knownEventIDs[knownEvent.EventID()] = true
+			addsStateEvents = append(addsStateEvents, knownEvent)
 		}
-		eventsReq := &api.QueryEventsByIDRequest{}
+	}
+
+	// Now work out if there are any remaining events we don't know. For
+	// these we will need to ask the roomserver for help.
+	missingEventIDs = missingEventIDs[:0]
+	for eventID, known := range knownEventIDs {
+		if !known {
+			missingEventIDs = append(missingEventIDs, eventID)
+		}
+	}
+
+	// Ask the roomserver and add in the rest of the results into the set.
+	// Finally, work out if there are any more events missing.
+	if len(missingEventIDs) > 0 {
+		eventsReq := &api.QueryEventsByIDRequest{
+			EventIDs: missingEventIDs,
+		}
 		eventsRes := &api.QueryEventsByIDResponse{}
-		for eventID, found := range foundEventIDs {
-			if !found {
-				eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
-			}
-		}
-		if err = s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
+		if err := s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
 			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
 		}
 		for _, event := range eventsRes.Events {
-			eventID := event.EventID()
-			foundEvents = append(foundEvents, event)
-			foundEventIDs[eventID] = true
+			addsStateEvents = append(addsStateEvents, event)
+			knownEventIDs[event.EventID()] = true
 		}
-		for eventID, found := range foundEventIDs {
+
+		// This should never happen because this would imply that the
+		// roomserver has sent us adds_state_event_ids for events that it
+		// also doesn't know about, but let's just be sure.
+		for eventID, found := range knownEventIDs {
 			if !found {
 				return fmt.Errorf("event %s is missing", eventID)
 			}
 		}
-		addsStateEvents = foundEvents
 	}
 
 	ev, err := s.updateStateEvent(ev)
@@ -327,9 +347,11 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) {
 	if msg.Event.StateKey() == nil {
-		log.WithFields(log.Fields{
-			"event": string(msg.Event.JSON()),
-		}).Panicf("roomserver output log: invite has no state key")
+		return
+	}
+	if _, serverName, err := gomatrixserverlib.SplitID('@', *msg.Event.StateKey()); err != nil {
+		return
+	} else if serverName != s.cfg.Matrix.ServerName {
 		return
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
