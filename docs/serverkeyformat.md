@@ -1,3 +1,8 @@
+---
+title: Server Key Format
+parent: Administration
+---
+
 # Server Key Format
 
 Dendrite stores the server signing key in the PEM format with the following structure.
