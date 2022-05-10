@@ -89,22 +89,22 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateStateSnapshotTable(db); err != nil {
 		return err
 	}
-	if err := createPrevEventsTable(db); err != nil {
+	if err := CreatePrevEventsTable(db); err != nil {
 		return err
 	}
 	if err := CreateRoomAliasesTable(db); err != nil {
 		return err
 	}
-	if err := createInvitesTable(db); err != nil {
+	if err := CreateInvitesTable(db); err != nil {
 		return err
 	}
-	if err := createMembershipTable(db); err != nil {
+	if err := CreateMembershipTable(db); err != nil {
 		return err
 	}
-	if err := createPublishedTable(db); err != nil {
+	if err := CreatePublishedTable(db); err != nil {
 		return err
 	}
-	if err := createRedactionsTable(db); err != nil {
+	if err := CreateRedactionsTable(db); err != nil {
 		return err
 	}
 
@@ -140,7 +140,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	prevEvents, err := preparePrevEventsTable(db)
+	prevEvents, err := PreparePrevEventsTable(db)
 	if err != nil {
 		return err
 	}
@@ -148,19 +148,19 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	invites, err := prepareInvitesTable(db)
+	invites, err := PrepareInvitesTable(db)
 	if err != nil {
 		return err
 	}
-	membership, err := prepareMembershipTable(db)
+	membership, err := PrepareMembershipTable(db)
 	if err != nil {
 		return err
 	}
-	published, err := preparePublishedTable(db)
+	published, err := PreparePublishedTable(db)
 	if err != nil {
 		return err
 	}
-	redactions, err := prepareRedactionsTable(db)
+	redactions, err := PrepareRedactionsTable(db)
 	if err != nil {
 		return err
 	}
