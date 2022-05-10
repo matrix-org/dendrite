@@ -101,7 +101,7 @@ func (d *Database) create(db *sql.DB) error {
 	if err := createPrevEventsTable(db); err != nil {
 		return err
 	}
-	if err := createRoomAliasesTable(db); err != nil {
+	if err := CreateRoomAliasesTable(db); err != nil {
 		return err
 	}
 	if err := createInvitesTable(db); err != nil {
@@ -153,7 +153,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	roomAliases, err := prepareRoomAliasesTable(db)
+	roomAliases, err := PrepareRoomAliasesTable(db)
 	if err != nil {
 		return err
 	}

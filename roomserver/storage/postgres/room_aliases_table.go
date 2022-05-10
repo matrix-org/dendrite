@@ -61,12 +61,12 @@ type roomAliasesStatements struct {
 	deleteRoomAliasStmt          *sql.Stmt
 }
 
-func createRoomAliasesTable(db *sql.DB) error {
+func CreateRoomAliasesTable(db *sql.DB) error {
 	_, err := db.Exec(roomAliasesSchema)
 	return err
 }
 
-func prepareRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
+func PrepareRoomAliasesTable(db *sql.DB) (tables.RoomAliases, error) {
 	s := &roomAliasesStatements{}
 
 	return s, sqlutil.StatementList{
@@ -108,8 +108,8 @@ func (s *roomAliasesStatements) SelectAliasesFromRoomID(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAliasesFromRoomID: rows.close() failed")
 
 	var aliases []string
+	var alias string
 	for rows.Next() {
-		var alias string
 		if err = rows.Scan(&alias); err != nil {
 			return nil, err
 		}
