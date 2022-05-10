@@ -1,0 +1,10 @@
+title: Dendrite
+description: >-
+  Second-generation Matrix homeserver written in Go!
+baseurl: "/dendrite" # the subpath of your site, e.g. /blog
+url: ""
+twitter_username: matrixdotorg
+github_username: matrix-org
+remote_theme: just-the-docs/just-the-docs
+plugins:
+  - jekyll-feed
