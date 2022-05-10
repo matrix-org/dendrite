@@ -49,6 +49,11 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   transaction_id TEXT,
   exclude_from_sync BOOL NOT NULL DEFAULT FALSE
 );
+
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events (type);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_sender_idx ON syncapi_output_room_events (sender);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events (room_id);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON syncapi_output_room_events (exclude_from_sync);
 `
 
 const insertEventSQL = "" +
