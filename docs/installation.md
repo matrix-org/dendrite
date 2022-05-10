@@ -1,3 +1,8 @@
+---
+title: Installation
+has_children: true
+---
+
 # Installing Dendrite
 
 Dendrite can be run in one of two configurations:
@@ -50,11 +55,13 @@ cd dendrite
 Then build it:
 
 * Linux or UNIX-like systems:
+
   ```bash
   ./build.sh
   ```
 
 * Windows:
+
   ```dos
   build.cmd
   ```
