@@ -19,7 +19,7 @@ sections:
 
 First of all, you will need to configure the server name of your Matrix homeserver.
 This must match the domain name that you have selected whilst [configuring the domain
-name delegation](2_domainname.md).
+name delegation](domainname).
 
 In the `global` section, set the `server_name` to your delegated domain name:
 
@@ -31,7 +31,7 @@ global:
 
 ## Server signing keys
 
-Next, you should tell Dendrite where to find your [server signing keys](4_signingkey.md).
+Next, you should tell Dendrite where to find your [server signing keys](signingkeys).
 
 In the `global` section, set the `private_key` to the path to your server signing key:
 
@@ -81,7 +81,7 @@ one address in the `addresses` field.
 
 ## Database connections
 
-Configuring database connections varies based on the [database configuration](3_database.md)
+Configuring database connections varies based on the [database configuration](database)
 that you chose.
 
 ### Global connection pool (monolith with a single PostgreSQL database only)
