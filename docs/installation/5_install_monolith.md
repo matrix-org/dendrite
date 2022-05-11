@@ -8,19 +8,14 @@ permalink: /installation/install/monolith
 
 # Installing as a monolith
 
-On UNIX systems, the `build.sh` script will build all variants of Dendrite.
+You can install the Dendrite monolith binary into `$GOPATH/bin` by using `go install`:
 
-```bash
-./build.sh
+```sh
+go install ./cmd/dendrite-monolith-server
 ```
 
-The `bin` directory will contain the built binaries.
+Alternatively, you can specify a custom path for the binary to be written to using `go build`:
 
-For monolith deployments, the relevant binary is the `dendrite-monolith-server`
-binary.
-
-Copy the `./bin/dendrite-monolith-server` into a relevant system path, for example:
-
-```bash
-cp ./bin/dendrite-monolith-server /usr/local/bin/
+```sh
+go build -o /usr/local/bin/ ./cmd/dendrite-monolith-server
 ```

@@ -56,16 +56,16 @@ For either configuration, you will want to:
 
 ### Connection strings
 
-Connection strings for PostgreSQL databases take the following form:
+The format of connection strings for PostgreSQL databases is described in the [PostgreSQL libpq manual](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). Note that Dendrite only
+supports the "Connection URIs" format and **will not** work with the "Keyword/Value Connection
+string" format.
 
+Example supported connection strings take the format:
+
+* `postgresql://user:pass@hostname/database?options=...`
 * `postgres://user:pass@hostname/database?options=...`
 
-For example, if you have a role called `dendrite` with the password `foobarbaz`, a database named
-`dendrite` running on the same local machine, your connection string will be
-`postgres://dendrite:foobarbaz@localhost/dendrite`.
-
-If you need to disable SSL/TLS on the database connection, you can append `?sslmode=disable` to
-the end of the connection string.
+If you need to disable SSL/TLS on the database connection, you may need to append `?sslmode=disable` to the end of the connection string.
 
 ### Role creation
 

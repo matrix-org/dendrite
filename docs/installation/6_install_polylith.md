@@ -8,20 +8,17 @@ permalink: /installation/install/polylith
 
 # Installing as a polylith
 
-On UNIX systems, the `build.sh` script will build all variants of Dendrite.
+You can install the Dendrite polylith binary into `$GOPATH/bin` by using `go install`:
 
 ```sh
-./build.sh
+go install ./cmd/dendrite-polylith-multi
 ```
 
-The `bin` directory will contain the built binaries.
+Alternatively, you can specify a custom path for the binary to be written to using `go build`:
 
-For polylith deployments, the relevant binary is the `dendrite-polylith-multi`
-binary, which is a "multi-personality" binary which can run as any of the components
-depending on the supplied command line parameters.
-
-Copy the `./bin/dendrite-polylith-multi` into a relevant system path, for example:
-
-```bash
-cp ./bin/dendrite-polylith-multi /usr/local/bin/
+```sh
+go install -o /usr/local/bin/ ./cmd/dendrite-polylith-multi
 ```
+
+The `dendrite-polylith-multi` binary is a "multi-personality" binary which can run as
+any of the components depending on the supplied command line parameters.
