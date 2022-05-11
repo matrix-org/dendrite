@@ -97,7 +97,7 @@ To save waiting for CI to finish after every commit, it is ideal to run the
 checks locally before pushing, fixing errors first. This also saves other people
 time as only so many PRs can be tested at a given time.
 
-To execute what Buildkite tests, first run `./build/scripts/build-test-lint.sh`; this
+To execute what CI tests, first run `./build/scripts/build-test-lint.sh`; this
 script will build the code, lint it, and run `go test ./...` with race condition
 checking enabled. If something needs to be changed, fix it and then run the
 script again until it no longer complains. Be warned that the linting can take a
