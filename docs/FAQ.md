@@ -3,7 +3,7 @@ title: FAQ
 nav_order: 1
 ---
 
-# Frequently Asked Questions
+# FAQ
 
 ## Is Dendrite stable?
 
