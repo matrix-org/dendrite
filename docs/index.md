@@ -12,7 +12,7 @@ many Matrix features are already supported.
 This site aims to include relevant documentation to help you to get started with and
 run Dendrite. Check out the following sections:
 
-* **[Installation](INSTALL.md)** for building and deploying your own Dendrite homeserver
+* **[Installation](installation.md)** for building and deploying your own Dendrite homeserver
 * **[Administration](administration.md)** for managing an existing Dendrite deployment
 * **[Development](development.md)** for developing against Dendrite
 
