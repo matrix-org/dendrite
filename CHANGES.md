@@ -1,5 +1,13 @@
 # Changelog
 
+## Dendrite 0.8.4 (2022-05-10)
+
+### Fixes
+
+* Fixes a regression introduced in the previous version where appservices, push and phone-home statistics would not work over plain HTTP
+* Adds missing indexes to the sync API output events table, which should significantly improve `/sync` performance and reduce database CPU usage
+* Building Dendrite with the `bimg` thumbnailer should now work again (contributed by [database64128](https://github.com/database64128))
+
 ## Dendrite 0.8.3 (2022-05-09)
 
 ### Features

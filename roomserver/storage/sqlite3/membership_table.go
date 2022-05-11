@@ -136,12 +136,12 @@ type membershipStatements struct {
 	selectServerInRoomStmt                          *sql.Stmt
 }
 
-func createMembershipTable(db *sql.DB) error {
+func CreateMembershipTable(db *sql.DB) error {
 	_, err := db.Exec(membershipSchema)
 	return err
 }
 
-func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
+func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{
 		db: db,
 	}
@@ -212,8 +212,8 @@ func (s *membershipStatements) SelectMembershipsFromRoom(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
 
+	var eNID types.EventNID
 	for rows.Next() {
-		var eNID types.EventNID
 		if err = rows.Scan(&eNID); err != nil {
 			return
 		}
@@ -239,8 +239,8 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
 
+	var eNID types.EventNID
 	for rows.Next() {
-		var eNID types.EventNID
 		if err = rows.Scan(&eNID); err != nil {
 			return
 		}
@@ -275,8 +275,8 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithMembership: rows.close() failed")
 	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
 	for rows.Next() {
-		var roomNID types.RoomNID
 		if err := rows.Scan(&roomNID); err != nil {
 			return nil, err
 		}
@@ -307,9 +307,9 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
 	result := make(map[types.EventStateKeyNID]int)
+	var userID types.EventStateKeyNID
+	var count int
 	for rows.Next() {
-		var userID types.EventStateKeyNID
-		var count int
 		if err := rows.Scan(&userID, &count); err != nil {
 			return nil, err
 		}
@@ -326,12 +326,12 @@ func (s *membershipStatements) SelectKnownUsers(ctx context.Context, txn *sql.Tx
 	}
 	result := []string{}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
+	var resUserID string
 	for rows.Next() {
-		var userID string
-		if err := rows.Scan(&userID); err != nil {
+		if err := rows.Scan(&resUserID); err != nil {
 			return nil, err
 		}
-		result = append(result, userID)
+		result = append(result, resUserID)
 	}
 	return result, rows.Err()
 }

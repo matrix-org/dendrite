@@ -68,9 +68,15 @@ func OnIncomingMessagesRequest(
 	var err error
 
 	// check if the user has already forgotten about this room
-	isForgotten, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
+	isForgotten, roomExists, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
 	if err != nil {
 		return jsonerror.InternalServerError()
+	}
+	if !roomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
 	}
 
 	if isForgotten {
@@ -244,17 +250,17 @@ func OnIncomingMessagesRequest(
 	}
 }
 
-func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (bool, error) {
+func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (forgotten bool, exists bool, err error) {
 	req := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
 		UserID: userID,
 	}
 	resp := api.QueryMembershipForUserResponse{}
 	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
-		return false, err
+		return false, false, err
 	}
 
-	return resp.IsRoomForgotten, nil
+	return resp.IsRoomForgotten, resp.RoomExists, nil
 }
 
 // retrieveEvents retrieves events from the local database for a request on
