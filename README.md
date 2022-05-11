@@ -1,4 +1,5 @@
 # Dendrite
+
 [![Build status](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml/badge.svg?event=push)](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
 
 Dendrite is a second-generation Matrix homeserver written in Go.
@@ -52,7 +53,7 @@ The [Federation Tester](https://federationtester.matrix.org) can be used to veri
 
 ## Get started
 
-If you wish to build a fully-federating Dendrite instance, see [INSTALL.md](docs/INSTALL.md). For running in Docker, see [build/docker](build/docker).
+If you wish to build a fully-federating Dendrite instance, see [the Installation documentation](docs/installation). For running in Docker, see [build/docker](build/docker).
 
 The following instructions are enough to get Dendrite started as a non-federating test deployment using self-signed certificates and SQLite databases:
 
