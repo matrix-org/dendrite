@@ -12,12 +12,12 @@ many Matrix features are already supported.
 This site aims to include relevant documentation to help you to get started with and
 run Dendrite. Check out the following sections:
 
-* **[Frequently asked questions](FAQ.md)** before you get started with Dendrite
 * **[Installation](INSTALL.md)** for building and deploying your own Dendrite homeserver
 * **[Administration](administration.md)** for managing an existing Dendrite deployment
 * **[Development](development.md)** for developing against Dendrite
 
-You can also join us in our Matrix rooms dedicated to Dendrite:
+You can also join us in our Matrix rooms dedicated to Dendrite, but please check first that
+your question hasn't already been [answered in the FAQ](FAQ.md):
 
 * **[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org)** for general project discussion and support
 * **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** for chat on Dendrite development specifically
