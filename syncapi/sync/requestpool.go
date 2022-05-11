@@ -250,6 +250,13 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		giveup := func() util.JSONResponse {
 			syncReq.Log.Debugln("Responding to sync since client gave up or timeout was reached")
 			syncReq.Response.NextBatch = syncReq.Since
+
+			// The request timed out and wasn't woken up by the streams, advance NextBatch to avoid hitting
+			// /sync and returning immediately
+			if !timer.Stop() {
+				syncReq.Log.Traceln("Advancing next batch, as request wasn't woken by streams")
+				syncReq.Response.NextBatch = rp.Notifier.CurrentPosition()
+			}
 			// We should always try to include OTKs in sync responses, otherwise clients might upload keys
 			// even if that's not required. See also:
 			// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
