@@ -3,6 +3,7 @@ title: Installing as a monolith
 parent: Installation
 has_toc: true
 nav_order: 5
+permalink: /installation/install/monolith
 ---
 
 # Installing as a monolith

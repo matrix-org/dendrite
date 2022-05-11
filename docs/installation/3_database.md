@@ -2,6 +2,7 @@
 title: Preparing database storage
 parent: Installation
 nav_order: 3
+permalink: /installation/database
 ---
 
 # Preparing database storage

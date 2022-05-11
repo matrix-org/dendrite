@@ -1,8 +1,10 @@
 ---
 title: Development
 has_children: true
+permalink: /development
 ---
 
 # Development
 
-The documents in this section will be useful when developing against Dendrite.
+This section contains documentation that may be useful when helping to develop
+Dendrite.

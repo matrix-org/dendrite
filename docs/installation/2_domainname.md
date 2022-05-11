@@ -2,6 +2,7 @@
 title: Setting up the domain
 parent: Installation
 nav_order: 2
+permalink: /installation/domainname
 ---
 
 # Setting up the domain

@@ -2,6 +2,7 @@
 title: Planning your installation
 parent: Installation
 nav_order: 1
+permalink: /installation/planning
 ---
 
 # Planning your installation

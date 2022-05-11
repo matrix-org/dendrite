@@ -1,6 +1,7 @@
 --- 
 title: Code Style
 parent: Development
+permalink: /development/codestyle
 ---
 
 # Code Style

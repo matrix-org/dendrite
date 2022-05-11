@@ -2,6 +2,7 @@
 title: Populate the configuration
 parent: Installation
 nav_order: 7
+permalink: /installation/configuration
 ---
 
 # Populate the configuration

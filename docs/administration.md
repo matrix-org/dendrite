@@ -2,8 +2,9 @@
 title: Administration
 has_children: yes
 nav_order: 4
+permalink: /administration
 ---
 
 # Administration
 
-Section on managing your Dendrite server.
+This section contains documentation on managing your existing Dendrite deployment.

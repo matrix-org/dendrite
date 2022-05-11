@@ -1,6 +1,7 @@
 ---
 title: SyTest
 parent: Development
+permalink: /development/sytest
 ---
 
 # SyTest

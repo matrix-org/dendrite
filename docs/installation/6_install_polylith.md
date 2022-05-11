@@ -3,6 +3,7 @@ title: Installing as a polylith
 parent: Installation
 has_toc: true
 nav_order: 6
+permalink: /installation/install/polylith
 ---
 
 # Installing as a polylith

@@ -1,6 +1,7 @@
 ---
 title: Profiling
 parent: Development
+permalink: /development/profiling
 ---
 
 # Profiling Dendrite
