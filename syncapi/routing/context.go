@@ -73,6 +73,12 @@ func Context(
 		logrus.WithError(err).Error("unable to query membership")
 		return jsonerror.InternalServerError()
 	}
+	if !membershipRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
+	}
 
 	stateFilter := gomatrixserverlib.StateFilter{
 		Limit:                   100,
