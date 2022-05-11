@@ -122,6 +122,7 @@ type QueryMembershipForUserResponse struct {
 	Membership string `json:"membership"`
 	// True if the user asked to forget this room.
 	IsRoomForgotten bool `json:"is_room_forgotten"`
+	RoomExists      bool `json:"room_exists"`
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
