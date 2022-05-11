@@ -248,7 +248,15 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		defer userStreamListener.Close()
 
 		giveup := func() util.JSONResponse {
+			syncReq.Log.Debugln("Responding to sync since client gave up or timeout was reached")
 			syncReq.Response.NextBatch = syncReq.Since
+			// We should always try to include OTKs in sync responses, otherwise clients might upload keys
+			// even if that's not required. See also:
+			// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
+			err = internal.DeviceOTKCounts(syncReq.Context, rp.keyAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
+			if err != nil {
+				syncReq.Log.WithError(err).Error("failed to get OTK counts")
+			}
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: syncReq.Response,
