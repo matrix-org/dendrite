@@ -15,3 +15,5 @@ aux_links_new_tab: true
 sass:
   sass_dir: _sass
   style: compressed
+exclude:
+  - INSTALL.md
