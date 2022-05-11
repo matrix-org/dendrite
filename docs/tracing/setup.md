@@ -1,17 +1,17 @@
 ---
 title: Setup
-parent: Opentracing
+parent: OpenTracing
 grand_parent: Development
 permalink: /development/opentracing/setup
 ---
 
-## OpenTracing Setup
+# OpenTracing Setup
 
 Dendrite uses [Jaeger](https://www.jaegertracing.io/) for tracing between microservices.
 Tracing shows the nesting of logical spans which provides visibility on how the microservices interact.
 This document explains how to set up Jaeger locally on a single machine.
 
-### Set up the Jaeger backend
+## Set up the Jaeger backend
 
 The [easiest way](https://www.jaegertracing.io/docs/1.18/getting-started/) is to use the all-in-one Docker image:
 
@@ -29,7 +29,7 @@ $ docker run -d --name jaeger \
   jaegertracing/all-in-one:1.18
 ```
 
-### Configuring Dendrite to talk to Jaeger
+## Configuring Dendrite to talk to Jaeger
 
 Modify your config to look like: (this will send every single span to Jaeger which will be slow on large instances, but for local testing it's fine)
 
@@ -52,6 +52,6 @@ then run the monolith server with `--api true` to use polylith components which 
 ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml --api true
 ```
 
-### Checking traces
+## Checking traces
 
 Visit <http://localhost:16686> to see traces under `DendriteMonolith`.

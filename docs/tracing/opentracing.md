@@ -1,12 +1,11 @@
 ---
-title: Opentracing
+title: OpenTracing
 has_children: true
 parent: Development
 permalink: /development/opentracing
 ---
 
-Opentracing
-===========
+# OpenTracing
 
 Dendrite extensively uses the [opentracing.io](http://opentracing.io) framework
 to trace work across the different logical components.
