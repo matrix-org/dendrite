@@ -56,6 +56,12 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
 	}
+	if !stateRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
+	}
 
 	// Look at the room state and see if we have a history visibility event
 	// that marks the room as world-readable. If we don't then we assume that

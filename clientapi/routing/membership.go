@@ -188,6 +188,12 @@ func SendUnban(
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
+	if !queryRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
+	}
 	// unban is only valid if the user is currently banned
 	if queryRes.Membership != "ban" {
 		return util.JSONResponse{
@@ -470,6 +476,12 @@ func SendForget(
 	if err != nil {
 		logger.WithError(err).Error("QueryMembershipForUser: could not query membership for user")
 		return jsonerror.InternalServerError()
+	}
+	if !membershipRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
 	}
 	if membershipRes.IsInRoom {
 		return util.JSONResponse{
