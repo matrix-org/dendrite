@@ -40,8 +40,8 @@ does. If there are statements that are not obvious, please comment what they do.
 
 We also have some special tags which we use for searchability. These are:
 
-* `// TODO:` for places where a future review, rewrite or refactor is likely required
-* `// FIXME:` for places where we know there is an outstanding bug that needs a fix
+* `// TODO:` for places where a future review, rewrite or refactor is likely required;
+* `// FIXME:` for places where we know there is an outstanding bug that needs a fix;
 * `// NOTSPEC:` for places where the behaviour specifically does not match what the
   [Matrix Specification](https://spec.matrix.org/) prescribes, along with a description
   of *why* that is the case.

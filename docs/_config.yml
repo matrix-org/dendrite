@@ -8,3 +8,7 @@ github_username: matrix-org
 remote_theme: just-the-docs/just-the-docs
 plugins:
   - jekyll-feed
+aux_links:
+  "GitHub":
+    - "//github.com/matrix-org/dendrite"
+aux_links_new_tab: true

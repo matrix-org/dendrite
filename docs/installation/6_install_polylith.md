@@ -17,7 +17,7 @@ go install ./cmd/dendrite-polylith-multi
 Alternatively, you can specify a custom path for the binary to be written to using `go build`:
 
 ```sh
-go install -o /usr/local/bin/ ./cmd/dendrite-polylith-multi
+go build -o /usr/local/bin/ ./cmd/dendrite-polylith-multi
 ```
 
 The `dendrite-polylith-multi` binary is a "multi-personality" binary which can run as
