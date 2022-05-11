@@ -22,3 +22,12 @@ go build -o /usr/local/bin/ ./cmd/dendrite-polylith-multi
 
 The `dendrite-polylith-multi` binary is a "multi-personality" binary which can run as
 any of the components depending on the supplied command line parameters.
+
+## Reverse proxy
+
+Polylith deployments require a reverse proxy in order to ensure that requests are
+sent to the correct endpoint. You must ensure that a suitable reverse proxy is installed
+and configured.
+
+A [sample configuration file](https://github.com/matrix-org/dendrite/blob/main/docs/nginx/polylith-sample.conf)
+is provided for [NGINX](https://www.nginx.com).

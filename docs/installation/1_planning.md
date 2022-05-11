@@ -97,6 +97,13 @@ enabled.
 To do so, follow the [NATS Server installation instructions](https://docs.nats.io/running-a-nats-service/introduction/installation) and then [start your NATS deployment](https://docs.nats.io/running-a-nats-service/introduction/running). JetStream must be enabled, either by passing the `-js` flag to `nats-server`,
 or by specifying the `store_dir` option in the the `jetstream` configuration.
 
+### Reverse proxy (polylith deployments)
+
+Polylith deployments require a reverse proxy, such as [NGINX](https://www.nginx.com) or
+[HAProxy](http://www.haproxy.org). Configuring those is not covered in this documentation,
+although a [sample configuration for NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx/polylith-sample.conf)
+is provided.
+
 ### Windows
 
 Finally, if you want to build Dendrite on Windows, you will need need `gcc` in the path. The best
