@@ -1,6 +1,7 @@
 ---
 title: Setup
 parent: Opentracing
+permalink: /development/opentracing/setup
 ---
 
 ## OpenTracing Setup

@@ -1,6 +1,7 @@
 ---
 title: Contributing
 parent: Development
+permalink: /development/contributing
 ---
 
 # Contributing to Dendrite

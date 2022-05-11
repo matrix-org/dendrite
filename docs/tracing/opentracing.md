@@ -1,7 +1,8 @@
 ---
-title: OpenTracing
+title: Opentracing
 has_children: true
 parent: Development
+permalink: /development/opentracing
 ---
 
 Opentracing
