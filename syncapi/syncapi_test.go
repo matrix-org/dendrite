@@ -167,12 +167,9 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 // Tests what happens when we create a room and then /sync before all events from /createRoom have
 // been sent to the syncapi
 func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
-	testSyncAPICreateRoomSyncEarly(t, test.DBTypePostgres)
-	/*
-		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-			testSyncAPICreateRoomSyncEarly(t, dbType)
-		})
-	*/
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testSyncAPICreateRoomSyncEarly(t, dbType)
+	})
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
