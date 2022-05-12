@@ -39,23 +39,23 @@ import (
 
 // Database represents an account database
 type Database struct {
-	DB                    *sql.DB
-	Writer                sqlutil.Writer
-	Accounts              tables.AccountsTable
-	Profiles              tables.ProfileTable
-	AccountDatas          tables.AccountDataTable
-	ThreePIDs             tables.ThreePIDTable
-	OpenIDTokens          tables.OpenIDTable
-	KeyBackups            tables.KeyBackupTable
-	KeyBackupVersions     tables.KeyBackupVersionTable
-	Devices               tables.DevicesTable
-	LoginTokens           tables.LoginTokenTable
-	Notifications         tables.NotificationTable
-	Pushers               tables.PusherTable
-	Stats                 tables.StatsTable
-	LoginTokenLifetime    time.Duration
-	ServerName            gomatrixserverlib.ServerName
-	BcryptCost            int
+	DB                  *sql.DB
+	Writer              sqlutil.Writer
+	Accounts            tables.AccountsTable
+	Profiles            tables.ProfileTable
+	AccountDatas        tables.AccountDataTable
+	ThreePIDs           tables.ThreePIDTable
+	OpenIDTokens        tables.OpenIDTable
+	KeyBackups          tables.KeyBackupTable
+	KeyBackupVersions   tables.KeyBackupVersionTable
+	Devices             tables.DevicesTable
+	LoginTokens         tables.LoginTokenTable
+	Notifications       tables.NotificationTable
+	Pushers             tables.PusherTable
+	Stats               tables.StatsTable
+	LoginTokenLifetime  time.Duration
+	ServerName          gomatrixserverlib.ServerName
+	BcryptCost          int
 	OpenIDTokenLifetime time.Duration
 }
 
