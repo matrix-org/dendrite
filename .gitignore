@@ -73,3 +73,6 @@ complement/
 docs/_site
 
 media_store/
+
+# Debug
+**/__debug_bin

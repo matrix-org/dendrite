@@ -614,6 +614,10 @@ func Register(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
 		}
+
+	case r.Auth.Type == authtypes.LoginTypePublicKey && cfg.PublicKeyAuthentication.Enabled():
+		// Skip checks here. Will be validated later.
+
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
@@ -632,7 +636,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
+	return handleRegistrationFlow(req, reqBody, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }
 
 func handleGuestRegistration(
@@ -701,6 +705,7 @@ func handleGuestRegistration(
 // nolint: gocyclo
 func handleRegistrationFlow(
 	req *http.Request,
+	reqBody []byte,
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
@@ -760,6 +765,18 @@ func handleRegistrationFlow(
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+
+	case authtypes.LoginTypePublicKey:
+		isCompleted, authType, err := handlePublicKeyRegistration(cfg, reqBody, userAPI)
+		if err != nil {
+			return *err
+		}
+
+		if isCompleted {
+			sessions.addCompletedSessionStage(sessionID, authType)
+		} else {
+			newPublicKeyAuthSession(&r)
+		}
 
 	case "":
 		// An empty auth type means that we want to fetch the available

@@ -11,4 +11,9 @@ const (
 	LoginTypeRecaptcha          = "m.login.recaptcha"
 	LoginTypeApplicationService = "m.login.application_service"
 	LoginTypeToken              = "m.login.token"
+	LoginTypePublicKey          = "m.login.publickey"
+)
+
+const (
+	LoginTypePublicKeyEthereum = "m.login.publickey.ethereum"
 )
