@@ -115,7 +115,7 @@ type TURN struct {
 }
 
 func (c *TURN) Verify(configErrs *ConfigErrors) {
-	checkPositive(configErrs, "cache_lifetime", int64(c.UserLifetime))
+	checkPositive(configErrs, "turn_user_lifetime", int64(c.UserLifetime))
 }
 
 func (c *TURN) Defaults() {

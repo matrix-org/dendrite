@@ -44,5 +44,5 @@ func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	}
-	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetime.Milliseconds())
+	checkPositive(configErrs, "user_api.openid_token_lifetime", c.OpenIDTokenLifetime.Milliseconds())
 }
