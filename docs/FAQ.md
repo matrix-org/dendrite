@@ -58,7 +58,7 @@ Bridges known to work (as of v0.5.1):
 * [Signal](https://docs.mau.fi/bridges/python/signal/index.html)
 * [probably all other mautrix bridges](https://docs.mau.fi/bridges/)
 
-Remember to add the config file(s) to the `app_service_api` [config](https://github.com/matrix-org/dendrite/blob/de38be469a23813921d01bef3e14e95faab2a59e/dendrite-config.yaml#L130-L131).
+Remember to add the config file(s) to the `app_service_api` section of the config file.
 
 ## Is it possible to prevent communication with the outside world?
 
