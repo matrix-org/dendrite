@@ -7,11 +7,13 @@ permalink: /installation/configuration
 
 # Populate the configuration
 
-The configuration file is used to configure Dendrite. A sample configuration file,
-called [`dendrite-config.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-config.yaml),
-is present in the top level of the Dendrite repository.
+The configuration file is used to configure Dendrite. Sample configuration files are
+present in the top level of the Dendrite repository:
 
-You will need to duplicate this file, calling it `dendrite.yaml` for example, and then
+* [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml)
+* [`dendrite-sample.polylith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+
+You will need to duplicate the sample, calling it `dendrite.yaml` for example, and then
 tailor it to your installation. At a minimum, you will need to populate the following
 sections:
 
