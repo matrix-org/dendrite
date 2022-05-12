@@ -246,7 +246,7 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
 // Returns the login that was verified for additional checks if required.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"
