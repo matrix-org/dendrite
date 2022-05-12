@@ -237,7 +237,7 @@ func (u *latestEventsUpdater) latestState() error {
 	// include the new event from the input path, depending on whether
 	// it is a forward extremity or not.
 	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
-	for i := range u.latest {
+	for i := range append(u.latest, u.oldLatest...) {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
 
