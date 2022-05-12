@@ -300,10 +300,10 @@ func Test_UserStatistics(t *testing.T) {
 				},
 				R30UsersV2: map[string]int64{
 					"ios":      0,
-					"android":  1,
-					"web":      1,
+					"android":  0,
+					"web":      0,
 					"electron": 0,
-					"all":      2,
+					"all":      0,
 				},
 				AllUsers:        6,
 				NonBridgedUsers: 5,
