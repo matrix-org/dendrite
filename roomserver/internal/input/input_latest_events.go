@@ -236,8 +236,10 @@ func (u *latestEventsUpdater) latestState() error {
 	// Get a list of the current latest events. This may or may not
 	// include the new event from the input path, depending on whether
 	// it is a forward extremity or not.
-	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
-	for i := range append(u.latest, u.oldLatest...) {
+	combinedExtremities := types.StateAtEventAndReferences(append(u.latest, u.oldLatest...))
+	util.Unique(combinedExtremities)
+	latestStateAtEvents := make([]types.StateAtEvent, len(combinedExtremities))
+	for i := range combinedExtremities {
 		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
 
