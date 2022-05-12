@@ -54,7 +54,7 @@ type ClientAPI struct {
 	PasswordAuthenticationDisabled bool `yaml:"password_authentication_disabled"`
 
 	// Public key authentication
-	PublicKeyAuthentication publicKeyAuthentication `yaml:"public_key_authentication"`
+	PublicKeyAuthentication PublicKeyAuthentication `yaml:"public_key_authentication"`
 }
 
 func (c *ClientAPI) Defaults(generate bool) {
