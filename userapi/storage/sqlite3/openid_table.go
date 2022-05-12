@@ -57,10 +57,10 @@ func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
 	txn *sql.Tx,
 	token, localpart string,
-	expiresAtMS gomatrixserverlib.Timestamp,
+	expiresAt gomatrixserverlib.Timestamp,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
-	_, err = stmt.ExecContext(ctx, token, localpart, expiresAtMS)
+	_, err = stmt.ExecContext(ctx, token, localpart, expiresAt)
 	return
 }
 

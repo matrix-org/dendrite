@@ -31,7 +31,7 @@ import (
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetime, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
 	if err != nil {
 		return nil, err
@@ -116,6 +116,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		Writer:              writer,
 		LoginTokenLifetime:  loginTokenLifetime,
 		BcryptCost:          bcryptCost,
-		OpenIDTokenLifetime: openIDTokenLifetimeMS,
+		OpenIDTokenLifetime: openIDTokenLifetime,
 	}, nil
 }
