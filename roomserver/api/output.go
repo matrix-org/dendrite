@@ -163,6 +163,19 @@ type OutputNewRoomEvent struct {
 	TransactionID *TransactionID `json:"transaction_id,omitempty"`
 }
 
+func (o *OutputNewRoomEvent) NeededStateEventIDs() ([]*gomatrixserverlib.HeaderedEvent, []string) {
+	addsStateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, 1)
+	missingEventIDs := make([]string, 0, len(o.AddsStateEventIDs))
+	for _, eventID := range o.AddsStateEventIDs {
+		if eventID != o.Event.EventID() {
+			missingEventIDs = append(missingEventIDs, eventID)
+		} else {
+			addsStateEvents = append(addsStateEvents, o.Event)
+		}
+	}
+	return addsStateEvents, missingEventIDs
+}
+
 // An OutputOldRoomEvent is written when the roomserver receives an old event.
 // This will typically happen as a result of getting either missing events
 // or backfilling. Downstream components may wish to send these events to

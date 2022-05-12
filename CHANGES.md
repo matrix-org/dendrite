@@ -1,5 +1,49 @@
 # Changelog
 
+## Dendrite 0.8.4 (2022-05-10)
+
+### Fixes
+
+* Fixes a regression introduced in the previous version where appservices, push and phone-home statistics would not work over plain HTTP
+* Adds missing indexes to the sync API output events table, which should significantly improve `/sync` performance and reduce database CPU usage
+* Building Dendrite with the `bimg` thumbnailer should now work again (contributed by [database64128](https://github.com/database64128))
+
+## Dendrite 0.8.3 (2022-05-09)
+
+### Features
+
+* Open registration is now harder to enable, which should reduce the chance that Dendrite servers will be used to conduct spam or abuse attacks
+  * Dendrite will only enable open registration if you pass the `--really-enable-open-registration` command line flag at startup
+  * If open registration is enabled but this command line flag is not passed, Dendrite will fail to start up
+* Dendrite now supports phone-home statistic reporting
+  * These statistics include things like the number of registered and active users, some configuration options and platform/environment details, to help us to understand how Dendrite is used
+  * This is not enabled by default — it must be enabled in the `global.report_stats` section of the config file
+* Monolith installations can now be configured with a single global database connection pool (in `global.database` in the config) rather than having to configure each component separately
+  * This also means that you no longer need to balance connection counts between different components, as they will share the same larger pool
+  * Specific components can override the global database settings by specifying their own `database` block
+  * To use only the global pool, you must configure `global.database` and then remove the `database` block from all of the component sections of the config file
+* A new admin API endpoint `/_dendrite/admin/evacuateRoom/{roomID}` has been added, allowing server admins to forcefully part all local users from a given room
+* The sync notifier now only loads members for the relevant rooms, which should reduce CPU usage and load on the database
+* A number of component interfaces have been refactored for cleanliness and developer ease
+* Event auth errors in the log should now be much more useful, including the reason for the event failures
+* The forward extremity calculation in the roomserver has been simplified
+* A new index has been added to the one-time keys table in the keyserver which should speed up key count lookups
+
+### Fixes
+
+* Dendrite will no longer process events for rooms where there are no local users joined, which should help to reduce CPU and RAM usage
+* A bug has been fixed in event auth when changing the user levels in `m.room.power_levels` events
+* Usernames should no longer be duplicated when no room name is set
+* Device display names should now be correctly propagated over federation
+* A panic when uploading cross-signing signatures has been fixed
+* Presence is now correctly limited in `/sync` based on the filters
+* The presence stream position returned by `/sync` will now be correct if no presence events were returned
+* The media `/config` endpoint will no longer return a maximum upload size field if it is configured to be unlimited in the Dendrite config
+* The server notices room will no longer produce "User is already joined to the room" errors
+* Consumer errors will no longer flood the logs during a graceful shutdown
+* Sync API and federation API consumers will no longer unnecessarily query added state events matching the one in the output event
+* The Sync API will no longer unnecessarily track invites for remote users
+
 ## Dendrite 0.8.2 (2022-04-27)
 
 ### Features

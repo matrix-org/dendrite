@@ -183,7 +183,7 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserver
 	return c.getMissingEvents(missing)
 }
 
-func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
+func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
 	t := &txnReq{
 		rsAPI:      rsAPI,
 		keys:       &test.NopJSONVerifier{},

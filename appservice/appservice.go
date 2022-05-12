@@ -34,12 +34,11 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
-func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceQueryAPI) {
+func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI) {
 	inthttp.AddRoutes(queryAPI, router)
 }
 
@@ -49,7 +48,7 @@ func NewInternalAPI(
 	base *base.BaseDendrite,
 	userAPI userapi.UserInternalAPI,
 	rsAPI roomserverAPI.RoomserverInternalAPI,
-) appserviceAPI.AppServiceQueryAPI {
+) appserviceAPI.AppServiceInternalAPI {
 	client := &http.Client{
 		Timeout: time.Second * 30,
 		Transport: &http.Transport{
@@ -57,12 +56,13 @@ func NewInternalAPI(
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: base.Cfg.AppServiceAPI.DisableTLSValidation,
 			},
+			Proxy: http.ProxyFromEnvironment,
 		},
 	}
-	js, _ := jetstream.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 
 	// Create a connection to the appservice postgres DB
-	appserviceDB, err := storage.NewDatabase(&base.Cfg.AppServiceAPI.Database)
+	appserviceDB, err := storage.NewDatabase(base, &base.Cfg.AppServiceAPI.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to appservice db")
 	}
@@ -117,7 +117,7 @@ func NewInternalAPI(
 // `sender_localpart` field of each application service if it doesn't
 // exist already
 func generateAppServiceAccount(
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.AppserviceUserAPI,
 	as config.ApplicationService,
 ) error {
 	var accRes userapi.PerformAccountCreationResponse

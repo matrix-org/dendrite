@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
@@ -30,12 +31,12 @@ import (
 
 // NewUserAPIDatabase opens a new Postgres or Sqlite database (based on dataSourceName scheme)
 // and sets postgres connection parameters
-func NewUserAPIDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetime, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (Database, error) {
+func NewUserAPIDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetime, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetime, loginTokenLifetime, serverNoticesLocalpart)
+		return sqlite3.NewDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetime, loginTokenLifetime, serverNoticesLocalpart)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetime, loginTokenLifetime, serverNoticesLocalpart)
+		return postgres.NewDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetime, loginTokenLifetime, serverNoticesLocalpart)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

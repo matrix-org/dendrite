@@ -11,7 +11,7 @@ import (
 )
 
 // AddRoutes adds the AppServiceQueryAPI handlers to the http.ServeMux.
-func AddRoutes(a api.AppServiceQueryAPI, internalAPIMux *mux.Router) {
+func AddRoutes(a api.AppServiceInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
 		AppServiceRoomAliasExistsPath,
 		httputil.MakeInternalAPI("appserviceRoomAliasExists", func(req *http.Request) util.JSONResponse {

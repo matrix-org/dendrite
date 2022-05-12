@@ -96,7 +96,7 @@ const selectDevicesByIDSQL = "" +
 	"SELECT device_id, localpart, display_name, last_seen_ts FROM device_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
 
 const updateDeviceLastSeen = "" +
-	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND device_id = $5"
 
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
@@ -304,9 +304,9 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	return devices, rows.Err()
 }
 
-func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr string) error {
+func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr, userAgent string) error {
 	lastSeenTs := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
-	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, localpart, deviceID)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, userAgent, localpart, deviceID)
 	return err
 }

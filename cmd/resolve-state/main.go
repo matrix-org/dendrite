@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 
-	roomserverDB, err := storage.Open(&cfg.RoomServer.Database, cache)
+	roomserverDB, err := storage.Open(nil, &cfg.RoomServer.Database, cache)
 	if err != nil {
 		panic(err)
 	}

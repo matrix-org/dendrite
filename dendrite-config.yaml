@@ -54,6 +54,16 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
+  # Global database connection pool, for PostgreSQL monolith deployments only. If
+  # this section is populated then you can omit the "database" blocks in all other
+  # sections. For polylith deployments, or monolith deployments using SQLite databases,
+  # you must configure the "database" block for each component instead.
+  # database:
+  #   connection_string: postgres://user:pass@hostname/database?sslmode=disable
+  #   max_open_conns: 100
+  #   max_idle_conns: 5
+  #   conn_max_lifetime: -1
+
   # The server name to delegate server-server communications to, with optional port
   # e.g. localhost:443
   well_known_server_name: ""
@@ -74,6 +84,15 @@ global:
     enable_inbound: false
     # Whether outbound presence events are allowed, e.g. sending presence events to other servers
     enable_outbound: false
+
+  # Configures opt-in anonymous stats reporting.
+  report_stats:
+    # Whether this instance sends anonymous usage stats
+    enabled: false
+
+    # The endpoint to report the anonymized homeserver usage statistics to.
+    # Defaults to https://matrix.org/report-usage-stats/push
+    endpoint: https://matrix.org/report-usage-stats/push
 
   # Server notices allows server admins to send messages to all users.
   server_notices:

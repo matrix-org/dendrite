@@ -2,7 +2,6 @@ package config
 
 import (
 	"math/rand"
-	"path/filepath"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,6 +34,13 @@ type Global struct {
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
 
+	// Global pool of database connections, which is used only in monolith mode. If a
+	// component does not specify any database options of its own, then this pool of
+	// connections will be used instead. This way we don't have to manage connection
+	// counts on a per-component basis, but can instead do it for the entire monolith.
+	// In a polylith deployment, this will be ignored.
+	DatabaseOptions DatabaseOptions `yaml:"database"`
+
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
 
@@ -65,8 +71,8 @@ type Global struct {
 	// ServerNotices configuration used for sending server notices
 	ServerNotices ServerNotices `yaml:"server_notices"`
 
-	// GlobalDatabaseOptions sets database options for all components.
-	GlobalDatabaseOptions DatabaseOptions `yaml:"database_options"`
+	// ReportStats configures opt-in anonymous stats reporting.
+	ReportStats ReportStats `yaml:"report_stats"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -83,6 +89,7 @@ func (c *Global) Defaults(generate bool) {
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(generate)
+	c.ReportStats.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -94,6 +101,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.Sentry.Verify(configErrs, isMonolith)
 	c.DNSCache.Verify(configErrs, isMonolith)
 	c.ServerNotices.Verify(configErrs, isMonolith)
+	c.ReportStats.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -160,6 +168,26 @@ func (c *ServerNotices) Defaults(generate bool) {
 
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
+// ReportStats configures opt-in anonymous stats reporting.
+type ReportStats struct {
+	// Enabled configures anonymous usage stats of the server
+	Enabled bool `yaml:"enabled"`
+
+	// Endpoint the endpoint to report stats to
+	Endpoint string `yaml:"endpoint"`
+}
+
+func (c *ReportStats) Defaults() {
+	c.Enabled = false
+	c.Endpoint = "https://matrix.org/report-usage-stats/push"
+}
+
+func (c *ReportStats) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	if c.Enabled {
+		checkNotEmpty(configErrs, "global.report_stats.endpoint", c.Endpoint)
+	}
+}
+
 // The configuration to use for Sentry error reporting
 type Sentry struct {
 	Enabled bool `yaml:"enabled"`
@@ -211,20 +239,6 @@ func (c DatabaseOptions) MaxOpenConns() int {
 // ConnMaxLifetime returns maximum amount of time a connection may be reused
 func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
 	return time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
-}
-
-// setDatabase sets the connection_string for each component, if a global database_option is set.
-func setDatabase(global DatabaseOptions, componentConnection *DatabaseOptions, databaseName string) {
-	if componentConnection.ConnectionString != "" {
-		return
-	}
-	componentConnection.MaxOpenConnections = global.MaxOpenConnections
-	componentConnection.MaxIdleConnections = global.MaxIdleConnections
-	componentConnection.ConnMaxLifetimeSeconds = global.ConnMaxLifetimeSeconds
-	componentConnection.ConnectionString = global.ConnectionString
-	if global.ConnectionString != "" && global.ConnectionString.IsSQLite() {
-		componentConnection.ConnectionString = DataSource(filepath.Join(string(global.ConnectionString), databaseName))
-	}
 }
 
 type DNSCacheOptions struct {

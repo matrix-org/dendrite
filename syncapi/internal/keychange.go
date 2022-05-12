@@ -29,7 +29,7 @@ import (
 const DeviceListLogName = "dl"
 
 // DeviceOTKCounts adds one-time key counts to the /sync response
-func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, deviceID string, res *types.Response) error {
+func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
 	var queryRes keyapi.QueryOneTimeKeysResponse
 	keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
 		UserID:   userID,
@@ -46,7 +46,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.KeyInternalAPI, userID, 
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
 func DeviceListCatchup(
-	ctx context.Context, keyAPI keyapi.KeyInternalAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
+	ctx context.Context, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
 	userID string, res *types.Response, from, to types.StreamPosition,
 ) (newPos types.StreamPosition, hasNew bool, err error) {
 
@@ -130,7 +130,7 @@ func DeviceListCatchup(
 
 // TrackChangedUsers calculates the values of device_lists.changed|left in the /sync response.
 func TrackChangedUsers(
-	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
+	ctx context.Context, rsAPI roomserverAPI.SyncRoomserverAPI, userID string, newlyJoinedRooms, newlyLeftRooms []string,
 ) (changed, left []string, err error) {
 	// process leaves first, then joins afterwards so if we join/leave/join/leave we err on the side of including users.
 
@@ -216,7 +216,7 @@ func TrackChangedUsers(
 }
 
 func filterSharedUsers(
-	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, userID string, usersWithChangedKeys []string,
+	ctx context.Context, rsAPI roomserverAPI.SyncRoomserverAPI, userID string, usersWithChangedKeys []string,
 ) (map[string]int, []string) {
 	var result []string
 	var sharedUsersRes roomserverAPI.QuerySharedUsersResponse

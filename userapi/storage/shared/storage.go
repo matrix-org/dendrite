@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
@@ -38,22 +39,23 @@ import (
 
 // Database represents an account database
 type Database struct {
-	DB                  *sql.DB
-	Writer              sqlutil.Writer
-	Accounts            tables.AccountsTable
-	Profiles            tables.ProfileTable
-	AccountDatas        tables.AccountDataTable
-	ThreePIDs           tables.ThreePIDTable
-	OpenIDTokens        tables.OpenIDTable
-	KeyBackups          tables.KeyBackupTable
-	KeyBackupVersions   tables.KeyBackupVersionTable
-	Devices             tables.DevicesTable
-	LoginTokens         tables.LoginTokenTable
-	Notifications       tables.NotificationTable
-	Pushers             tables.PusherTable
-	LoginTokenLifetime  time.Duration
-	ServerName          gomatrixserverlib.ServerName
-	BcryptCost          int
+	DB                    *sql.DB
+	Writer                sqlutil.Writer
+	Accounts              tables.AccountsTable
+	Profiles              tables.ProfileTable
+	AccountDatas          tables.AccountDataTable
+	ThreePIDs             tables.ThreePIDTable
+	OpenIDTokens          tables.OpenIDTable
+	KeyBackups            tables.KeyBackupTable
+	KeyBackupVersions     tables.KeyBackupVersionTable
+	Devices               tables.DevicesTable
+	LoginTokens           tables.LoginTokenTable
+	Notifications         tables.NotificationTable
+	Pushers               tables.PusherTable
+	Stats                 tables.StatsTable
+	LoginTokenLifetime    time.Duration
+	ServerName            gomatrixserverlib.ServerName
+	BcryptCost            int
 	OpenIDTokenLifetime time.Duration
 }
 
@@ -611,10 +613,10 @@ func (d *Database) RemoveAllDevices(
 	return
 }
 
-// UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
-func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
+// UpdateDeviceLastSeen updates a last seen timestamp and the ip address.
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
+		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr, userAgent)
 	})
 }
 
@@ -755,4 +757,9 @@ func (d *Database) RemovePushers(
 	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
 		return d.Pushers.DeletePushers(ctx, txn, appid, pushkey)
 	})
+}
+
+// UserStatistics populates types.UserStatistics, used in reports.
+func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error) {
+	return d.Stats.UserStatistics(ctx, nil)
 }

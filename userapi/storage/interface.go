@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -68,7 +69,7 @@ type Device interface {
 	// Returns the device on success.
 	CreateDevice(ctx context.Context, localpart string, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
 	UpdateDevice(ctx context.Context, localpart, deviceID string, displayName *string) error
-	UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error
+	UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error
 	RemoveDevices(ctx context.Context, localpart string, devices []string) error
 	// RemoveAllDevices deleted all devices for this user. Returns the devices deleted.
 	RemoveAllDevices(ctx context.Context, localpart, exceptDeviceID string) (devices []api.Device, err error)
@@ -136,7 +137,12 @@ type Database interface {
 	OpenID
 	Profile
 	Pusher
+	Statistics
 	ThreePID
+}
+
+type Statistics interface {
+	UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

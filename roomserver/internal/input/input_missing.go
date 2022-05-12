@@ -44,7 +44,7 @@ type missingStateReq struct {
 	roomInfo        *types.RoomInfo
 	inputer         *Inputer
 	keys            gomatrixserverlib.JSONVerifier
-	federation      fedapi.FederationInternalAPI
+	federation      fedapi.RoomserverFederationAPI
 	roomsMu         *internal.MutexByRoom
 	servers         []gomatrixserverlib.ServerName
 	hadEvents       map[string]bool

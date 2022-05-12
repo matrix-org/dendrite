@@ -20,12 +20,13 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/mediaapi/storage/shared"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase opens a postgres database.
-func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, err := sqlutil.Open(dbProperties)
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +42,6 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 		MediaRepository: mediaRepo,
 		Thumbnails:      thumbnails,
 		DB:              db,
-		Writer:          sqlutil.NewExclusiveWriter(),
+		Writer:          writer,
 	}, nil
 }

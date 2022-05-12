@@ -40,7 +40,7 @@ type redactionResponse struct {
 
 func SendRedaction(
 	req *http.Request, device *userapi.Device, roomID, eventID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 	txnID *string,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {

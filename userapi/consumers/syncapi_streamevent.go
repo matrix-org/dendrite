@@ -29,7 +29,7 @@ type OutputStreamEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.UserAPI
 	userAPI      api.UserInternalAPI
-	rsAPI        rsapi.RoomserverInternalAPI
+	rsAPI        rsapi.UserRoomserverAPI
 	jetstream    nats.JetStreamContext
 	durable      string
 	db           storage.Database
@@ -45,7 +45,7 @@ func NewOutputStreamEventConsumer(
 	store storage.Database,
 	pgClient pushgateway.Client,
 	userAPI api.UserInternalAPI,
-	rsAPI rsapi.RoomserverInternalAPI,
+	rsAPI rsapi.UserRoomserverAPI,
 	syncProducer *producers.SyncAPI,
 ) *OutputStreamEventConsumer {
 	return &OutputStreamEventConsumer{
@@ -455,7 +455,7 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 
 type ruleSetEvalContext struct {
 	ctx      context.Context
-	rsAPI    rsapi.RoomserverInternalAPI
+	rsAPI    rsapi.UserRoomserverAPI
 	mem      *localMembership
 	roomID   string
 	roomSize int

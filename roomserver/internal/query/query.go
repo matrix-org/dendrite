@@ -169,8 +169,10 @@ func (r *Queryer) QueryMembershipForUser(
 		return err
 	}
 	if info == nil {
-		return fmt.Errorf("QueryMembershipForUser: unknown room %s", request.RoomID)
+		response.RoomExists = false
+		return nil
 	}
+	response.RoomExists = true
 
 	membershipEventNID, stillInRoom, isRoomforgotten, err := r.DB.GetMembership(ctx, info.RoomNID, request.UserID)
 	if err != nil {

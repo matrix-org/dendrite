@@ -31,7 +31,7 @@ var (
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(&config.DatabaseOptions{
+	db, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetime, loginTokenLifetime, "_server")
 	if err != nil {
@@ -176,7 +176,7 @@ func Test_Devices(t *testing.T) {
 		newName := "new display name"
 		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
 		assert.NoError(t, err, "unable to update device displayname")
-		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1")
+		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1", "Element Web")
 		assert.NoError(t, err, "unable to update device last seen")
 
 		deviceWithID.DisplayName = newName

@@ -29,8 +29,8 @@ import (
 func JoinRoomByIDOrAlias(
 	req *http.Request,
 	device *api.Device,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	profileAPI api.UserProfileAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	profileAPI api.ClientUserAPI,
 	roomIDOrAlias string,
 ) util.JSONResponse {
 	// Prepare to ask the roomserver to perform the room join.
