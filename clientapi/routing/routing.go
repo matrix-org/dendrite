@@ -66,7 +66,7 @@ func Setup(
 	prometheus.MustRegister(amtRegUsers, sendEventDuration)
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
-	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
+	userInteractiveAuth := auth.NewUserInteractive(userAPI, userAPI, cfg)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
@@ -599,7 +599,7 @@ func Setup(
 			if r := rateLimits.Limit(req, nil); r != nil {
 				return *r
 			}
-			return Login(req, userAPI, cfg)
+			return Login(req, userAPI, userInteractiveAuth, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
