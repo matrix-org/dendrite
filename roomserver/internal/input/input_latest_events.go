@@ -240,7 +240,7 @@ func (u *latestEventsUpdater) latestState() error {
 	util.Unique(combinedExtremities)
 	latestStateAtEvents := make([]types.StateAtEvent, len(combinedExtremities))
 	for i := range combinedExtremities {
-		latestStateAtEvents[i] = u.latest[i].StateAtEvent
+		latestStateAtEvents[i] = combinedExtremities[i].StateAtEvent
 	}
 
 	// Takes the NIDs of the latest events and creates a state snapshot
