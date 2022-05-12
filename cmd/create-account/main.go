@@ -100,7 +100,10 @@ func main() {
 		}
 	}
 
-	b := base.NewBaseDendrite(cfg, "", base.CreateAccountMode)
+	// avoid warning about open registration
+	cfg.ClientAPI.RegistrationDisabled = true
+
+	b := base.NewBaseDendrite(cfg, "")
 	defer b.Close() // nolint: errcheck
 
 	accountDB, err := storage.NewUserAPIDatabase(
