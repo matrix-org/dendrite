@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/sirupsen/logrus"
@@ -99,8 +100,11 @@ func main() {
 		}
 	}
 
+	b := base.NewBaseDendrite(cfg, "", base.CreateAccountMode)
+	defer b.Close() // nolint: errcheck
+
 	accountDB, err := storage.NewUserAPIDatabase(
-		nil,
+		b,
 		&cfg.UserAPI.AccountDatabase,
 		cfg.Global.ServerName,
 		cfg.UserAPI.BCryptCost,

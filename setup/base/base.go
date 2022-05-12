@@ -100,6 +100,7 @@ const (
 	DisableMetrics BaseDendriteOptions = iota
 	UseHTTPAPIs
 	PolylithMode
+	CreateAccountMode
 )
 
 // NewBaseDendrite creates a new instance to be used by a component.
@@ -110,6 +111,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	useHTTPAPIs := false
 	enableMetrics := true
 	isMonolith := true
+	createAccountMode := false
 	for _, opt := range options {
 		switch opt {
 		case DisableMetrics:
@@ -119,6 +121,9 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		case PolylithMode:
 			isMonolith = false
 			useHTTPAPIs = true
+		case CreateAccountMode:
+			createAccountMode = true
+			cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 		}
 	}
 
@@ -137,7 +142,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 
 	logrus.Infof("Dendrite version %s", internal.VersionString())
 
-	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
+	if !createAccountMode && !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
 		logrus.Warn("Open registration is enabled")
 	}
 
