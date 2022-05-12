@@ -38,7 +38,7 @@ const maxBackfillServers = 5
 type Backfiller struct {
 	ServerName gomatrixserverlib.ServerName
 	DB         storage.Database
-	FSAPI      federationAPI.FederationInternalAPI
+	FSAPI      federationAPI.RoomserverFederationAPI
 	KeyRing    gomatrixserverlib.JSONVerifier
 
 	// The servers which should be preferred above other servers when backfilling
@@ -228,7 +228,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
 	db           storage.Database
-	fsAPI        federationAPI.FederationInternalAPI
+	fsAPI        federationAPI.RoomserverFederationAPI
 	thisServer   gomatrixserverlib.ServerName
 	preferServer map[gomatrixserverlib.ServerName]bool
 	bwExtrems    map[string][]string
@@ -240,7 +240,7 @@ type backfillRequester struct {
 }
 
 func newBackfillRequester(
-	db storage.Database, fsAPI federationAPI.FederationInternalAPI, thisServer gomatrixserverlib.ServerName,
+	db storage.Database, fsAPI federationAPI.RoomserverFederationAPI, thisServer gomatrixserverlib.ServerName,
 	bwExtrems map[string][]string, preferServers []gomatrixserverlib.ServerName,
 ) *backfillRequester {
 	preferServer := make(map[gomatrixserverlib.ServerName]bool)

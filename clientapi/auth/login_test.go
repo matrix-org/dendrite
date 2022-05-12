@@ -176,8 +176,8 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 
 type fakeUserInternalAPI struct {
 	UserInternalAPIForLogin
-	uapi.UserAccountAPI
-	uapi.UserRegisterAPI
+	uapi.UserLoginAPI
+	uapi.ClientUserAPI
 	DeletedTokens []string
 }
 
@@ -193,6 +193,10 @@ func (ua *fakeUserInternalAPI) QueryAccountByPassword(ctx context.Context, req *
 
 func (ua *fakeUserInternalAPI) PerformLoginTokenDeletion(ctx context.Context, req *uapi.PerformLoginTokenDeletionRequest, res *uapi.PerformLoginTokenDeletionResponse) error {
 	ua.DeletedTokens = append(ua.DeletedTokens, req.Token)
+	return nil
+}
+
+func (ua *fakeUserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *uapi.PerformLoginTokenCreationRequest, res *uapi.PerformLoginTokenCreationResponse) error {
 	return nil
 }
 

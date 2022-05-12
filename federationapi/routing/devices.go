@@ -26,7 +26,7 @@ import (
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	keyAPI keyapi.KeyInternalAPI,
+	keyAPI keyapi.FederationKeyAPI,
 	userID string,
 ) util.JSONResponse {
 	var res keyapi.QueryDeviceMessagesResponse

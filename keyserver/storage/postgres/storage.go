@@ -18,13 +18,14 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
 // NewDatabase creates a new sync server database
-func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
 	var err error
-	db, err := sqlutil.Open(dbProperties)
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	}
 	d := &shared.Database{
 		DB:                    db,
-		Writer:                sqlutil.NewDummyWriter(),
+		Writer:                writer,
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,

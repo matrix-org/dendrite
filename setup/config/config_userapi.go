@@ -37,6 +37,8 @@ func (c *UserAPI) Defaults(generate bool) {
 func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkURL(configErrs, "user_api.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "user_api.internal_api.connect", string(c.InternalAPI.Connect))
-	checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
+	}
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
 }

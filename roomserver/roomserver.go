@@ -45,12 +45,12 @@ func NewInternalAPI(
 		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
 	}
 
-	roomserverDB, err := storage.Open(&cfg.Database, base.Caches)
+	roomserverDB, err := storage.Open(base, &cfg.Database, base.Caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
 	}
 
-	js, nc := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nc := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	return internal.NewRoomserverAPI(
 		base.ProcessContext, cfg, roomserverDB, js, nc,

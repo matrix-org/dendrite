@@ -37,7 +37,7 @@ func GenerateThumbnails(
 	mediaMetadata *types.MediaMetadata,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
-	db *storage.Database,
+	db storage.Database,
 	logger *log.Entry,
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
@@ -49,7 +49,7 @@ func GenerateThumbnails(
 	for _, config := range configs {
 		// Note: createThumbnail does locking based on activeThumbnailGeneration
 		busy, err = createThumbnail(
-			ctx, src, img, config, mediaMetadata, activeThumbnailGeneration,
+			ctx, src, img, types.ThumbnailSize(config), mediaMetadata, activeThumbnailGeneration,
 			maxThumbnailGenerators, db, logger,
 		)
 		if err != nil {
@@ -71,7 +71,7 @@ func GenerateThumbnail(
 	mediaMetadata *types.MediaMetadata,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
-	db *storage.Database,
+	db storage.Database,
 	logger *log.Entry,
 ) (busy bool, errorReturn error) {
 	buffer, err := bimg.Read(string(src))
@@ -109,7 +109,7 @@ func createThumbnail(
 	mediaMetadata *types.MediaMetadata,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 	maxThumbnailGenerators int,
-	db *storage.Database,
+	db storage.Database,
 	logger *log.Entry,
 ) (busy bool, errorReturn error) {
 	logger = logger.WithFields(log.Fields{

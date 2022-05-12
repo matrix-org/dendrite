@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -55,9 +56,9 @@ func SendServerNotice(
 	req *http.Request,
 	cfgNotices *config.ServerNotices,
 	cfgClient *config.ClientAPI,
-	userAPI userapi.UserInternalAPI,
-	rsAPI api.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	userAPI userapi.ClientUserAPI,
+	rsAPI api.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	device *userapi.Device,
 	senderDevice *userapi.Device,
 	txnID *string,
@@ -95,29 +96,16 @@ func SendServerNotice(
 	// get rooms for specified user
 	allUserRooms := []string{}
 	userRooms := api.QueryRoomsForUserResponse{}
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         r.UserID,
-		WantMembership: "join",
-	}, &userRooms); err != nil {
-		return util.ErrorResponse(err)
+	// Get rooms the user is either joined, invited or has left.
+	for _, membership := range []string{"join", "invite", "leave"} {
+		if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
+			UserID:         r.UserID,
+			WantMembership: membership,
+		}, &userRooms); err != nil {
+			return util.ErrorResponse(err)
+		}
+		allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
 	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	// get invites for specified user
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         r.UserID,
-		WantMembership: "invite",
-	}, &userRooms); err != nil {
-		return util.ErrorResponse(err)
-	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
-	// get left rooms for specified user
-	if err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
-		UserID:         r.UserID,
-		WantMembership: "leave",
-	}, &userRooms); err != nil {
-		return util.ErrorResponse(err)
-	}
-	allUserRooms = append(allUserRooms, userRooms.RoomIDs...)
 
 	// get rooms of the sender
 	senderUserID := fmt.Sprintf("@%s:%s", cfgNotices.LocalPart, cfgClient.Matrix.ServerName)
@@ -145,7 +133,7 @@ func SendServerNotice(
 
 	var (
 		roomID      string
-		roomVersion = gomatrixserverlib.RoomVersionV6
+		roomVersion = version.DefaultRoomVersion()
 	)
 
 	// create a new room for the user
@@ -194,14 +182,21 @@ func SendServerNotice(
 			// if we didn't get a createRoomResponse, we probably received an error, so return that.
 			return roomRes
 		}
-
 	} else {
 		// we've found a room in common, check the membership
 		roomID = commonRooms[0]
-		// re-invite the user
-		res, err := sendInvite(ctx, userAPI, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+		membershipRes := api.QueryMembershipForUserResponse{}
+		err := rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{UserID: r.UserID, RoomID: roomID}, &membershipRes)
 		if err != nil {
-			return res
+			util.GetLogger(ctx).WithError(err).Error("unable to query membership for user")
+			return jsonerror.InternalServerError()
+		}
+		if !membershipRes.IsInRoom {
+			// re-invite the user
+			res, err := sendInvite(ctx, userAPI, senderDevice, roomID, r.UserID, "Server notice room", cfgClient, rsAPI, asAPI, time.Now())
+			if err != nil {
+				return res
+			}
 		}
 	}
 
@@ -281,7 +276,7 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 // It returns an userapi.Device, which is used for building the event
 func getSenderDevice(
 	ctx context.Context,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
 	var accRes userapi.PerformAccountCreationResponse

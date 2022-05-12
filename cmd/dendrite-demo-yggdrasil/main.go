@@ -104,7 +104,6 @@ func main() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := ygg.CreateFederationClient(base)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
@@ -117,7 +116,7 @@ func main() {
 	)
 	rsAPI := rsComponent
 
-	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
@@ -130,7 +129,6 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    ygg.CreateClient(base),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -144,16 +142,7 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-		base.DendriteAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 	if err := mscs.Enable(base, &monolith); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")
 	}

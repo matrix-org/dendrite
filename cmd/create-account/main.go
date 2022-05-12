@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/term"
 )
@@ -99,8 +100,24 @@ func main() {
 		}
 	}
 
-	b := base.NewBaseDendrite(cfg, "Monolith")
-	accountDB := b.CreateAccountsDB()
+	// avoid warning about open registration
+	cfg.ClientAPI.RegistrationDisabled = true
+
+	b := base.NewBaseDendrite(cfg, "")
+	defer b.Close() // nolint: errcheck
+
+	accountDB, err := storage.NewUserAPIDatabase(
+		b,
+		&cfg.UserAPI.AccountDatabase,
+		cfg.Global.ServerName,
+		cfg.UserAPI.BCryptCost,
+		cfg.UserAPI.OpenIDTokenLifetimeMS,
+		0, // TODO
+		cfg.Global.ServerNotices.LocalPart,
+	)
+	if err != nil {
+		logrus.WithError(err).Fatalln("Failed to connect to the database")
+	}
 
 	accType := api.AccountTypeUser
 	if *isAdmin {

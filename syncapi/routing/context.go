@@ -42,10 +42,10 @@ type ContextRespsonse struct {
 
 func Context(
 	req *http.Request, device *userapi.Device,
-	rsAPI roomserver.RoomserverInternalAPI,
+	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
-	lazyLoadCache *caching.LazyLoadCache,
+	lazyLoadCache caching.LazyLoadCache,
 ) util.JSONResponse {
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -72,6 +72,12 @@ func Context(
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to query membership")
 		return jsonerror.InternalServerError()
+	}
+	if !membershipRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
 	}
 
 	stateFilter := gomatrixserverlib.StateFilter{
@@ -155,7 +161,7 @@ func applyLazyLoadMembers(
 	filter *gomatrixserverlib.RoomEventFilter,
 	eventsAfter, eventsBefore []gomatrixserverlib.ClientEvent,
 	state []*gomatrixserverlib.HeaderedEvent,
-	lazyLoadCache *caching.LazyLoadCache,
+	lazyLoadCache caching.LazyLoadCache,
 ) []*gomatrixserverlib.HeaderedEvent {
 	if filter == nil || !filter.LazyLoadMembers {
 		return state

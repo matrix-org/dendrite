@@ -33,7 +33,7 @@ import (
 func Backfill(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	cfg *config.FederationAPI,
 ) util.JSONResponse {

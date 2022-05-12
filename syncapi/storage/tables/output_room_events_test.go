@@ -21,7 +21,7 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	})
+	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
 	}

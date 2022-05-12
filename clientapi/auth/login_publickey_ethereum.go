@@ -42,7 +42,7 @@ type LoginPublicKeyEthereum struct {
 	HashFields    publicKeyEthereumHashFields `json:"hashFields"`
 	HashFieldsRaw string                      // Raw base64 encoded string of MessageFields for hash verification
 
-	userAPI userapi.UserRegisterAPI
+	userAPI userapi.ClientUserAPI
 	config  *config.ClientAPI
 }
 
@@ -63,7 +63,7 @@ type publicKeyEthereumRequiredFields struct {
 
 func CreatePublicKeyEthereumHandler(
 	reqBytes []byte,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 	config *config.ClientAPI,
 ) (*LoginPublicKeyEthereum, *jsonerror.MatrixError) {
 	var pk LoginPublicKeyEthereum

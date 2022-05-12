@@ -51,7 +51,7 @@ type AccountDatabase interface {
 // Note: For an AS user, AS dummy device is returned.
 // On failure returns an JSON error response which can be sent to the client.
 func VerifyUserFromRequest(
-	req *http.Request, userAPI api.UserInternalAPI,
+	req *http.Request, userAPI api.QueryAcccessTokenAPI,
 ) (*api.Device, *util.JSONResponse) {
 	// Try to find the Application Service user
 	token, err := ExtractAccessToken(req)

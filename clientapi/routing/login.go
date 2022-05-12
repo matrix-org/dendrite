@@ -59,7 +59,7 @@ func publicKeyLogin(f *flows) {
 // Login implements GET and POST /login
 func Login(
 	req *http.Request,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.ClientUserAPI,
 	userInteractiveAuth *auth.UserInteractive,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
@@ -93,7 +93,7 @@ func Login(
 }
 
 func completeAuth(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.UserInternalAPI, login *auth.Login,
+	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.ClientUserAPI, login *auth.Login,
 	ipAddr, userAgent string,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()

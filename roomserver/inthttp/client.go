@@ -87,15 +87,15 @@ func NewRoomserverClient(
 }
 
 // SetFederationInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 }
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 }
 
 // SetUserAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
@@ -134,19 +134,6 @@ func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// GetCreatorIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) GetCreatorIDForAlias(
-	ctx context.Context,
-	request *api.GetCreatorIDForAliasRequest,
-	response *api.GetCreatorIDForAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetCreatorIDForAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetCreatorIDForAliasPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 

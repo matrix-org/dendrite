@@ -55,10 +55,10 @@ var (
 
 // CreateInvitesFrom3PIDInvites implements POST /_matrix/federation/v1/3pid/onbind
 func CreateInvitesFrom3PIDInvites(
-	req *http.Request, rsAPI api.RoomserverInternalAPI,
+	req *http.Request, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
 	federation *gomatrixserverlib.FederationClient,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 ) util.JSONResponse {
 	var body invites
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {
@@ -105,7 +105,7 @@ func ExchangeThirdPartyInvite(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	roomID string,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
 	federation *gomatrixserverlib.FederationClient,
 ) util.JSONResponse {
@@ -203,10 +203,10 @@ func ExchangeThirdPartyInvite(
 // Returns an error if there was a problem building the event or fetching the
 // necessary data to do so.
 func createInviteFrom3PIDInvite(
-	ctx context.Context, rsAPI api.RoomserverInternalAPI,
+	ctx context.Context, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
 	inv invite, federation *gomatrixserverlib.FederationClient,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.FederationUserAPI,
 ) (*gomatrixserverlib.Event, error) {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: inv.RoomID}
 	verRes := api.QueryRoomVersionForRoomResponse{}
@@ -270,7 +270,7 @@ func createInviteFrom3PIDInvite(
 // Returns an error if something failed during the process.
 func buildMembershipEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, rsAPI api.RoomserverInternalAPI,
+	builder *gomatrixserverlib.EventBuilder, rsAPI api.FederationRoomserverAPI,
 	cfg *config.FederationAPI,
 ) (*gomatrixserverlib.Event, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)

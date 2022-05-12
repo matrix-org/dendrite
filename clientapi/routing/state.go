@@ -41,7 +41,7 @@ type stateEventInStateResp struct {
 // TODO: Check if the user is in the room. If not, check if the room's history
 // is publicly visible. Current behaviour is returning an empty array if the
 // user cannot see the room's history.
-func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI api.RoomserverInternalAPI, roomID string) util.JSONResponse {
+func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI api.ClientRoomserverAPI, roomID string) util.JSONResponse {
 	var worldReadable bool
 	var wantLatestState bool
 
@@ -55,6 +55,12 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 	}, &stateRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("queryAPI.QueryLatestEventsAndState failed")
 		return jsonerror.InternalServerError()
+	}
+	if !stateRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
 	}
 
 	// Look at the room state and see if we have a history visibility event
@@ -162,7 +168,7 @@ func OnIncomingStateRequest(ctx context.Context, device *userapi.Device, rsAPI a
 // is then (by default) we return the content, otherwise a 404.
 // If eventFormat=true, sends the whole event else just the content.
 func OnIncomingStateTypeRequest(
-	ctx context.Context, device *userapi.Device, rsAPI api.RoomserverInternalAPI,
+	ctx context.Context, device *userapi.Device, rsAPI api.ClientRoomserverAPI,
 	roomID, evType, stateKey string, eventFormat bool,
 ) util.JSONResponse {
 	var worldReadable bool

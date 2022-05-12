@@ -36,7 +36,7 @@ func newPublicKeyAuthSession(request *registerRequest) {
 func handlePublicKeyRegistration(
 	cfg *config.ClientAPI,
 	reqBytes []byte,
-	userAPI userapi.UserRegisterAPI,
+	userAPI userapi.ClientUserAPI,
 ) (bool, authtypes.LoginType, *util.JSONResponse) {
 	if !cfg.PublicKeyAuthentication.Enabled() {
 		return false, "", &util.JSONResponse{

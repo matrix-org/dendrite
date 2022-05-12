@@ -1,8 +1,14 @@
+---
+title: Profiling
+parent: Development
+permalink: /development/profiling
+---
+
 # Profiling Dendrite
 
 If you are running into problems with Dendrite using excessive resources (e.g. CPU or RAM) then you can use the profiler to work out what is happening.
 
-Dendrite contains an embedded profiler called `pprof`, which is a part of the standard Go toolchain. 
+Dendrite contains an embedded profiler called `pprof`, which is a part of the standard Go toolchain.
 
 ## Enable the profiler
 
@@ -16,7 +22,7 @@ If pprof has been enabled successfully, a log line at startup will show that ppr
 
 ```
 WARN[2020-12-03T13:32:33.669405000Z] [/Users/neilalexander/Desktop/dendrite/internal/log.go:87] SetupPprof
-	 Starting pprof on localhost:65432
+  Starting pprof on localhost:65432
 ```
 
 All examples from this point forward assume `PPROFLISTEN=localhost:65432` but you may need to adjust as necessary for your setup.

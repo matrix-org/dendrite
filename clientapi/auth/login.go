@@ -36,13 +36,12 @@ import (
 func LoginFromJSONReader(
 	ctx context.Context,
 	r io.Reader,
-	useraccountAPI uapi.UserAccountAPI,
+	useraccountAPI uapi.UserLoginAPI,
 	userAPI UserInternalAPIForLogin,
-	userRegisterAPI uapi.UserRegisterAPI,
+	clientUserAPI uapi.ClientUserAPI,
 	userInteractiveAuth *UserInteractive,
 	cfg *config.ClientAPI,
 ) (*Login, LoginCleanupFunc, *util.JSONResponse) {
-
 	reqBytes, err := ioutil.ReadAll(r)
 	if err != nil {
 		err := &util.JSONResponse{
@@ -77,7 +76,7 @@ func LoginFromJSONReader(
 		}
 	case header.Type == authtypes.LoginTypePublicKey && cfg.PublicKeyAuthentication.Enabled():
 		typ = &LoginTypePublicKey{
-			UserAPI:         userRegisterAPI,
+			UserAPI:         clientUserAPI,
 			UserInteractive: userInteractiveAuth,
 			Config:          cfg,
 		}

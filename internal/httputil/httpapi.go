@@ -15,7 +15,6 @@
 package httputil
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,15 +22,10 @@ import (
 	"net/http/httputil"
 	"os"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/clientapi/auth"
-	federationapiAPI "github.com/matrix-org/dendrite/federationapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -49,7 +43,7 @@ type BasicAuth struct {
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
-	metricsName string, userAPI userapi.UserInternalAPI,
+	metricsName string, userAPI userapi.QueryAcccessTokenAPI,
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
@@ -224,79 +218,6 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 			http.HandlerFunc(withSpan),
 		),
 	)
-}
-
-// MakeFedAPI makes an http.Handler that checks matrix federation authentication.
-func MakeFedAPI(
-	metricsName string,
-	serverName gomatrixserverlib.ServerName,
-	keyRing gomatrixserverlib.JSONVerifier,
-	wakeup *FederationWakeups,
-	f func(*http.Request, *gomatrixserverlib.FederationRequest, map[string]string) util.JSONResponse,
-) http.Handler {
-	h := func(req *http.Request) util.JSONResponse {
-		fedReq, errResp := gomatrixserverlib.VerifyHTTPRequest(
-			req, time.Now(), serverName, keyRing,
-		)
-		if fedReq == nil {
-			return errResp
-		}
-		// add the user to Sentry, if enabled
-		hub := sentry.GetHubFromContext(req.Context())
-		if hub != nil {
-			hub.Scope().SetTag("origin", string(fedReq.Origin()))
-			hub.Scope().SetTag("uri", fedReq.RequestURI())
-		}
-		defer func() {
-			if r := recover(); r != nil {
-				if hub != nil {
-					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
-				}
-				// re-panic to return the 500
-				panic(r)
-			}
-		}()
-		go wakeup.Wakeup(req.Context(), fedReq.Origin())
-		vars, err := URLDecodeMapValues(mux.Vars(req))
-		if err != nil {
-			return util.MatrixErrorResponse(400, "M_UNRECOGNISED", "badly encoded query params")
-		}
-
-		jsonRes := f(req, fedReq, vars)
-		// do not log 4xx as errors as they are client fails, not server fails
-		if hub != nil && jsonRes.Code >= 500 {
-			hub.Scope().SetExtra("response", jsonRes)
-			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
-		}
-		return jsonRes
-	}
-	return MakeExternalAPI(metricsName, h)
-}
-
-type FederationWakeups struct {
-	FsAPI   federationapiAPI.FederationInternalAPI
-	origins sync.Map
-}
-
-func (f *FederationWakeups) Wakeup(ctx context.Context, origin gomatrixserverlib.ServerName) {
-	key, keyok := f.origins.Load(origin)
-	if keyok {
-		lastTime, ok := key.(time.Time)
-		if ok && time.Since(lastTime) < time.Minute {
-			return
-		}
-	}
-	aliveReq := federationapiAPI.PerformServersAliveRequest{
-		Servers: []gomatrixserverlib.ServerName{origin},
-	}
-	aliveRes := federationapiAPI.PerformServersAliveResponse{}
-	if err := f.FsAPI.PerformServersAlive(ctx, &aliveReq, &aliveRes); err != nil {
-		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-			"origin": origin,
-		}).Warn("incoming federation request failed to notify server alive")
-	} else {
-		f.origins.Store(origin, time.Now())
-	}
 }
 
 // WrapHandlerInBasicAuth adds basic auth to a handler. Only used for /metrics

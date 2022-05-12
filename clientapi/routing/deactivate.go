@@ -15,7 +15,7 @@ import (
 func Deactivate(
 	req *http.Request,
 	userInteractiveAuth *auth.UserInteractive,
-	accountAPI api.UserAccountAPI,
+	accountAPI api.ClientUserAPI,
 	deviceAPI *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()

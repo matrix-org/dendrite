@@ -25,6 +25,7 @@ func NewHTTPClient(disableTLSValidation bool) Client {
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: disableTLSValidation,
 			},
+			Proxy: http.ProxyFromEnvironment,
 		},
 	}
 	return &httpClient{hc: hc}

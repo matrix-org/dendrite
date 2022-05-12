@@ -50,7 +50,7 @@ func Test_uploadRequest_doUpload(t *testing.T) {
 	_ = os.Mkdir(testdataPath, os.ModePerm)
 	defer fileutils.RemoveDir(types.Path(testdataPath), nil)
 
-	db, err := storage.NewMediaAPIDatasource(&config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(nil, &config.DatabaseOptions{
 		ConnectionString:       "file::memory:?cache=shared",
 		MaxOpenConnections:     100,
 		MaxIdleConnections:     2,

@@ -19,15 +19,15 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
-func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }
 
-func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 	t.Impl.SetAppserviceAPI(asAPI)
 }
 
-func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	t.Impl.SetUserAPI(userAPI)
 }
 
@@ -290,16 +290,6 @@ func (t *RoomserverInternalAPITrace) GetAliasesForRoomID(
 ) error {
 	err := t.Impl.GetAliasesForRoomID(ctx, req, res)
 	util.GetLogger(ctx).WithError(err).Infof("GetAliasesForRoomID req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
-func (t *RoomserverInternalAPITrace) GetCreatorIDForAlias(
-	ctx context.Context,
-	req *GetCreatorIDForAliasRequest,
-	res *GetCreatorIDForAliasResponse,
-) error {
-	err := t.Impl.GetCreatorIDForAlias(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("GetCreatorIDForAlias req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

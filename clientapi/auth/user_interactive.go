@@ -112,8 +112,8 @@ type UserInteractive struct {
 }
 
 func NewUserInteractive(
-	userAccountAPI api.UserAccountAPI,
-	userRegisterAPI api.UserRegisterAPI,
+	userAccountAPI api.UserLoginAPI,
+	clientUserAPI api.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) *UserInteractive {
 	userInteractive := UserInteractive{
@@ -134,7 +134,7 @@ func NewUserInteractive(
 
 	if cfg.PublicKeyAuthentication.Enabled() {
 		typePublicKey := &LoginTypePublicKey{
-			userRegisterAPI,
+			clientUserAPI,
 			&userInteractive,
 			cfg,
 		}

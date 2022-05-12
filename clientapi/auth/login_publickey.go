@@ -38,7 +38,7 @@ type LoginPublicKeyHandler interface {
 
 // LoginTypePublicKey implements https://matrix.org/docs/spec/client_server/..... (to be spec'ed)
 type LoginTypePublicKey struct {
-	UserAPI         userapi.UserRegisterAPI
+	UserAPI         userapi.ClientUserAPI
 	UserInteractive *UserInteractive
 	Config          *config.ClientAPI
 }

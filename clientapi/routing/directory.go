@@ -46,8 +46,8 @@ func DirectoryRoom(
 	roomAlias string,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	fedSenderAPI federationAPI.FederationInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	fedSenderAPI federationAPI.ClientFederationAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', roomAlias)
 	if err != nil {
@@ -117,7 +117,7 @@ func SetLocalAlias(
 	device *userapi.Device,
 	alias string,
 	cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	_, domain, err := gomatrixserverlib.SplitID('#', alias)
 	if err != nil {
@@ -199,7 +199,7 @@ func RemoveLocalAlias(
 	req *http.Request,
 	device *userapi.Device,
 	alias string,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	queryReq := roomserverAPI.RemoveRoomAliasRequest{
 		Alias:  alias,
@@ -237,7 +237,7 @@ type roomVisibility struct {
 
 // GetVisibility implements GET /directory/list/room/{roomID}
 func GetVisibility(
-	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
+	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
 	var res roomserverAPI.QueryPublishedRoomsResponse
@@ -265,7 +265,7 @@ func GetVisibility(
 // SetVisibility implements PUT /directory/list/room/{roomID}
 // TODO: Allow admin users to edit the room visibility
 func SetVisibility(
-	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI, dev *userapi.Device,
+	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, dev *userapi.Device,
 	roomID string,
 ) util.JSONResponse {
 	resErr := checkMemberInRoom(req.Context(), rsAPI, dev.UserID, roomID)

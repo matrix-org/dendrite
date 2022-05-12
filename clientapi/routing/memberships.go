@@ -55,7 +55,7 @@ type databaseJoinedMember struct {
 func GetMemberships(
 	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
 	_ *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	queryReq := api.QueryMembershipsForRoomRequest{
 		JoinedOnly: joinedOnly,
@@ -100,7 +100,7 @@ func GetMemberships(
 func GetJoinedRooms(
 	req *http.Request,
 	device *userapi.Device,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 ) util.JSONResponse {
 	var res api.QueryRoomsForUserResponse
 	err := rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{

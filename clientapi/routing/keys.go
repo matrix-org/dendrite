@@ -31,7 +31,7 @@ type uploadKeysRequest struct {
 	OneTimeKeys map[string]json.RawMessage `json:"one_time_keys"`
 }
 
-func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
 	var r uploadKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -100,7 +100,7 @@ func (r *queryKeysRequest) GetTimeout() time.Duration {
 	return time.Duration(r.Timeout) * time.Millisecond
 }
 
-func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+func QueryKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
 	var r queryKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -138,7 +138,7 @@ func (r *claimKeysRequest) GetTimeout() time.Duration {
 	return time.Duration(r.TimeoutMS) * time.Millisecond
 }
 
-func ClaimKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
+func ClaimKeys(req *http.Request, keyAPI api.ClientKeyAPI) util.JSONResponse {
 	var r claimKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {

@@ -50,7 +50,7 @@ type devicesDeleteJSON struct {
 
 // GetDeviceByID handles /devices/{deviceID}
 func GetDeviceByID(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	var queryRes api.QueryDevicesResponse
@@ -88,7 +88,7 @@ func GetDeviceByID(
 
 // GetDevicesByLocalpart handles /devices
 func GetDevicesByLocalpart(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	var queryRes api.QueryDevicesResponse
 	err := userAPI.QueryDevices(req.Context(), &api.QueryDevicesRequest{
@@ -118,7 +118,7 @@ func GetDevicesByLocalpart(
 
 // UpdateDeviceByID handles PUT on /devices/{deviceID}
 func UpdateDeviceByID(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 
@@ -161,7 +161,7 @@ func UpdateDeviceByID(
 
 // DeleteDeviceById handles DELETE requests to /devices/{deviceId}
 func DeleteDeviceById(
-	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userInteractiveAuth *auth.UserInteractive, userAPI api.ClientUserAPI, device *api.Device,
 	deviceID string,
 ) util.JSONResponse {
 	var (
@@ -242,7 +242,7 @@ func DeleteDeviceById(
 
 // DeleteDevices handles POST requests to /delete_devices
 func DeleteDevices(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
 	payload := devicesDeleteJSON{}

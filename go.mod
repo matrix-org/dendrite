@@ -20,13 +20,15 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
 	github.com/kardianos/minwinsvc v1.0.0
 	github.com/lib/pq v1.10.5
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220408160933-cf558306b56f
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220509120958-8d818048c34c
 	github.com/matrix-org/pinecone v0.0.0-20220408153826-2999ea29ed48
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.10
@@ -42,16 +44,17 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
-	github.com/tidwall/gjson v1.14.0
+	github.com/tidwall/gjson v1.14.1
 	github.com/tidwall/sjson v1.2.4
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.3
 	go.uber.org/atomic v1.9.0
-	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29
+	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122
 	golang.org/x/image v0.0.0-20220321031419-a8550c1d254a
 	golang.org/x/mobile v0.0.0-20220407111146-e579adbbc4a2
 	golang.org/x/net v0.0.0-20220407224826-aac1ed45d8e3
+	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
@@ -76,9 +79,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
-	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
 	github.com/klauspost/compress v1.14.4 // indirect
 	github.com/lucas-clemente/quic-go v0.26.0 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
@@ -105,7 +106,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/sys v0.0.0-20220406163625-3f8b81556e12 // indirect
 	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	golang.org/x/tools v0.1.8-0.20211022200916-316ba0b74098 // indirect

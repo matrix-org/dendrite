@@ -64,7 +64,8 @@ func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.Header
 func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	if len(gotEventIDs) != len(wants) {
-		t.Fatalf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
+		t.Errorf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
+		return
 	}
 	for i := range wants {
 		w := wants[i].EventID()

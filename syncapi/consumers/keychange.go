@@ -42,8 +42,7 @@ type OutputKeyChangeEventConsumer struct {
 	notifier   *notifier.Notifier
 	stream     types.StreamProvider
 	serverName gomatrixserverlib.ServerName // our server name
-	rsAPI      roomserverAPI.RoomserverInternalAPI
-	keyAPI     api.KeyInternalAPI
+	rsAPI      roomserverAPI.SyncRoomserverAPI
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -53,8 +52,7 @@ func NewOutputKeyChangeEventConsumer(
 	cfg *config.SyncAPI,
 	topic string,
 	js nats.JetStreamContext,
-	keyAPI api.KeyInternalAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.SyncRoomserverAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
@@ -66,7 +64,6 @@ func NewOutputKeyChangeEventConsumer(
 		topic:      topic,
 		db:         store,
 		serverName: cfg.Matrix.ServerName,
-		keyAPI:     keyAPI,
 		rsAPI:      rsAPI,
 		notifier:   notifier,
 		stream:     stream,

@@ -27,21 +27,45 @@ import (
 )
 
 type KeyInternalAPI interface {
+	SyncKeyAPI
+	ClientKeyAPI
+	FederationKeyAPI
+	UserKeyAPI
+
 	// SetUserAPI assigns a user API to query when extracting device names.
-	SetUserAPI(i userapi.UserInternalAPI)
-	// InputDeviceListUpdate from a federated server EDU
-	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
+	SetUserAPI(i userapi.KeyserverUserAPI)
+}
+
+// API functions required by the clientapi
+type ClientKeyAPI interface {
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
-	// PerformClaimKeys claims one-time keys for use in pre-key messages
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
-	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
 	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
 	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
+	// PerformClaimKeys claims one-time keys for use in pre-key messages
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
+}
+
+// API functions required by the userapi
+type UserKeyAPI interface {
+	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
+	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
+}
+
+// API functions required by the syncapi
+type SyncKeyAPI interface {
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
-	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
+}
+
+type FederationKeyAPI interface {
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
+	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
+	// InputDeviceListUpdate from a federated server EDU
+	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
 
 // KeyError is returned if there was a problem performing/querying the server
