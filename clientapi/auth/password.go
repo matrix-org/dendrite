@@ -107,3 +107,12 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	}
 	return &r.Login, nil
 }
+
+func (t *LoginTypePassword) AddFLows(userInteractive *UserInteractive) {
+	flow := userInteractiveFlow{
+		Stages: []string{t.Name()},
+	}
+
+	userInteractive.Flows = append(userInteractive.Flows, flow)
+	userInteractive.Types[t.Name()] = t
+}
