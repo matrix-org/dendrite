@@ -242,7 +242,7 @@ func (u *latestEventsUpdater) latestState() error {
 	// possible malicious actors) can't completely corrupt the room state
 	// away from what it was before.
 	combinedExtremities := types.StateAtEventAndReferences(append(u.oldLatest, u.latest...))
-	util.SortAndUnique(combinedExtremities)
+	combinedExtremities = combinedExtremities[:util.SortAndUnique(combinedExtremities)]
 	latestStateAtEvents := make([]types.StateAtEvent, len(combinedExtremities))
 	for i := range combinedExtremities {
 		latestStateAtEvents[i] = combinedExtremities[i].StateAtEvent
