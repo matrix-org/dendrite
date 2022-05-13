@@ -4,7 +4,7 @@
 
 ### Features
 
-* New living documentation now lives at <https://matrix-org.github.io/dendrite/>
+* New living documentation now lives at <https://matrix-org.github.io/dendrite/>, featuring new installation instructions
 * The built-in NATS Server has been updated to version 2.8.2
 
 ### Fixes
