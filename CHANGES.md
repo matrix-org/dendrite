@@ -1,5 +1,20 @@
 # Changelog
 
+## Dendrite 0.8.5 (2022-05-13)
+
+### Features
+
+* New living documentation available at <https://matrix-org.github.io/dendrite/>, including new installation instructions
+* The built-in NATS Server has been updated to version 2.8.2
+
+### Fixes
+
+* Monolith deployments will no longer panic at startup if given a config file that does not include the `internal_api` and `external_api` options
+* State resolution v2 now correctly identifies other events related to power events, which should fix some event auth issues
+* The latest events updater will no longer implicitly trust the new forward extremities when calculating the current room state, which may help to avoid some state resets
+* The one-time key count is now correctly returned in `/sync` even if the request otherwise timed out, which should reduce the chance that unnecessary one-time keys will be uploaded by clients
+* The `create-account` tool should now work properly when the database is configured using the global connection pool
+
 ## Dendrite 0.8.4 (2022-05-10)
 
 ### Fixes

@@ -225,7 +225,7 @@ func (m *DendriteMonolith) Start() {
 		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	m.listener, err = net.Listen("tcp", ":65432")
+	m.listener, err = net.Listen("tcp", "localhost:65432")
 	if err != nil {
 		panic(err)
 	}

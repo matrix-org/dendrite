@@ -18,6 +18,7 @@ package types
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/blake2b"
@@ -164,6 +165,20 @@ func (s StateAtEvent) IsStateEvent() bool {
 type StateAtEventAndReference struct {
 	StateAtEvent
 	gomatrixserverlib.EventReference
+}
+
+type StateAtEventAndReferences []StateAtEventAndReference
+
+func (s StateAtEventAndReferences) Less(a, b int) bool {
+	return strings.Compare(s[a].EventID, s[b].EventID) < 0
+}
+
+func (s StateAtEventAndReferences) Len() int {
+	return len(s)
+}
+
+func (s StateAtEventAndReferences) Swap(a, b int) {
+	s[a], s[b] = s[b], s[a]
 }
 
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
