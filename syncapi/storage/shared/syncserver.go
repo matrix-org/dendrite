@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -50,6 +52,7 @@ type Database struct {
 	NotificationData    tables.NotificationData
 	Ignores             tables.Ignores
 	Presence            tables.Presence
+	FTS                 *fulltext.Search
 }
 
 func (d *Database) readOnlySnapshot(ctx context.Context) (*sql.Tx, error) {
@@ -390,6 +393,30 @@ func (d *Database) WriteEvent(
 
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
+
+	e := fulltext.IndexElement{
+		EventID: ev.EventID(),
+		Type:    ev.Type(),
+		RoomID:  ev.RoomID(),
+	}
+
+	switch ev.Type() {
+	case "m.room.message":
+		e.Content = gjson.GetBytes(ev.Content(), "body").String()
+	case gomatrixserverlib.MRoomName:
+		e.Content = gjson.GetBytes(ev.Content(), "name").String()
+	case gomatrixserverlib.MRoomTopic:
+		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
+	case gomatrixserverlib.MRoomRedaction:
+		if err := d.FTS.DeleteElement(ev.Redacts()); err != nil {
+			logrus.WithError(err).Warn("failed to delete entry from fulltext index")
+		}
+	}
+	if e.Content != "" {
+		if err := d.FTS.IndexElement(e); err != nil {
+			logrus.WithError(err).Warn("failed to write to fulltext index")
+		}
+	}
 
 	return pduPosition, returnErr
 }

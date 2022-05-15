@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"database/sql"
 
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -36,7 +37,7 @@ type SyncServerDatasource struct {
 
 // NewDatabase creates a new sync server database
 // nolint: gocyclo
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, fts *fulltext.Search) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
@@ -45,6 +46,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err = d.prepare(dbProperties); err != nil {
 		return nil, err
 	}
+	d.FTS = fts
 	return &d, nil
 }
 

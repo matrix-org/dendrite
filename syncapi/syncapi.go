@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/sirupsen/logrus"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -47,7 +48,12 @@ func AddPublicRoutes(
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
+	fts, err := fulltext.New("./fts.bleve")
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to create full text")
+	}
+
+	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database, fts)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -142,6 +148,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches,
+		rsAPI, cfg, base.Caches, fts,
 	)
 }
