@@ -408,12 +408,12 @@ func (d *Database) WriteEvent(
 	case gomatrixserverlib.MRoomTopic:
 		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
 	case gomatrixserverlib.MRoomRedaction:
-		if err := d.FTS.DeleteElement(ev.Redacts()); err != nil {
+		if err := d.FTS.Delete(ev.Redacts()); err != nil {
 			logrus.WithError(err).Warn("failed to delete entry from fulltext index")
 		}
 	}
 	if e.Content != "" {
-		if err := d.FTS.IndexElement(e); err != nil {
+		if err := d.FTS.Index(e); err != nil {
 			logrus.WithError(err).Warn("failed to write to fulltext index")
 		}
 	}

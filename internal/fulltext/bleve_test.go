@@ -35,7 +35,7 @@ func TestSearch(t *testing.T) {
 		Content: "lorem ipsum",
 	}
 
-	if err = fts.IndexElement(e); err != nil {
+	if err = fts.Index(e); err != nil {
 		t.Fatal("failed to index element", err)
 	}
 
@@ -47,7 +47,7 @@ func TestSearch(t *testing.T) {
 		Content: "lorem ipsum",
 	}
 
-	if err = fts.IndexElement(e); err != nil {
+	if err = fts.Index(e); err != nil {
 		t.Fatal("failed to index element", err)
 	}
 
@@ -61,7 +61,7 @@ func TestSearch(t *testing.T) {
 	}
 
 	// remove element
-	if err = fts.DeleteElement(eventID); err != nil {
+	if err = fts.Delete(eventID); err != nil {
 		t.Fatal(err)
 	}
 

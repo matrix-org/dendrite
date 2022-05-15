@@ -4,10 +4,12 @@ import (
 	"github.com/blevesearch/bleve/v2"
 )
 
+// Search contains all existing bleve.Index
 type Search struct {
-	Index bleve.Index
+	MessageIndex bleve.Index
 }
 
+// IndexElement describes the layout of an element to index
 type IndexElement struct {
 	EventID string
 	Type    string
@@ -15,32 +17,37 @@ type IndexElement struct {
 	Content string
 }
 
+// New opens a new/existing fulltext index
 func New(path string) (*Search, error) {
 	fts := &Search{}
 	var err error
-	fts.Index, err = openIndex(path)
+	fts.MessageIndex, err = openIndex(path)
 	if err != nil {
 		return nil, err
 	}
 	return fts, nil
 }
 
+// Close closes the fulltext index
 func (f *Search) Close() error {
-	return f.Index.Close()
+	return f.MessageIndex.Close()
 }
 
-func (f *Search) IndexElement(e IndexElement) error {
-	return f.Index.Index(e.EventID, e)
+// Index indexes a given element
+func (f *Search) Index(e IndexElement) error {
+	return f.MessageIndex.Index(e.EventID, e)
 }
 
-func (f *Search) DeleteElement(eventID string) error {
-	return f.Index.Delete(eventID)
+// Delete deletes an indexed element by the eventID
+func (f *Search) Delete(eventID string) error {
+	return f.MessageIndex.Delete(eventID)
 }
 
+// Search searches the index given a search term
 func (f *Search) Search(term string) (*bleve.SearchResult, error) {
 	qry := bleve.NewQueryStringQuery(term)
 	search := bleve.NewSearchRequest(qry)
-	return f.Index.Search(search)
+	return f.MessageIndex.Search(search)
 }
 
 func openIndex(path string) (bleve.Index, error) {

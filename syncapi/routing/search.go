@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -54,14 +55,7 @@ func Search(req *http.Request, device *api.Device, fts *fulltext.Search) util.JS
 type SearchRequest struct {
 	SearchCategories struct {
 		RoomEvents struct {
-			Filter struct {
-				NotRooms   []interface{} `json:"not_rooms"`
-				NotSenders []interface{} `json:"not_senders"`
-				NotTypes   []interface{} `json:"not_types"`
-				Rooms      []interface{} `json:"rooms"`
-				Senders    []interface{} `json:"senders"`
-				Types      []interface{} `json:"types"`
-			} `json:"filter"`
+			Filter    gomatrixserverlib.StateFilter `json:"filter"`
 			Groupings struct {
 				GroupBy []struct {
 					Key string `json:"key"`
