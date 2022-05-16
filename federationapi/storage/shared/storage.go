@@ -63,7 +63,7 @@ func (r *Receipt) String() string {
 // this isn't a duplicate message.
 func (d *Database) UpdateRoom(
 	ctx context.Context,
-	roomID, oldEventID, newEventID string,
+	roomID string,
 	addHosts []types.JoinedHost,
 	removeHosts []string,
 ) (joinedHosts []types.JoinedHost, err error) {

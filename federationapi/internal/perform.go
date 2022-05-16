@@ -247,7 +247,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
 	logrus.WithField("hosts", joinedHosts).WithField("room", roomID).Info("Joined federated room with hosts")
-	if _, err = r.db.UpdateRoom(context.Background(), roomID, "", event.EventID(), joinedHosts, nil); err != nil {
+	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil); err != nil {
 		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
 
