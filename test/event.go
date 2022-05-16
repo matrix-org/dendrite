@@ -64,6 +64,12 @@ func WithPrivateKey(pkey ed25519.PrivateKey) eventModifier {
 	}
 }
 
+func WithOrigin(origin gomatrixserverlib.ServerName) eventModifier {
+	return func(e *eventMods) {
+		e.origin = origin
+	}
+}
+
 // Reverse a list of events
 func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))

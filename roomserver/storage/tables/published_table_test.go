@@ -38,7 +38,7 @@ func mustCreatePublishedTable(t *testing.T, dbType test.DBType) (tab tables.Publ
 
 func TestPublishedTable(t *testing.T) {
 	ctx := context.Background()
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, close := mustCreatePublishedTable(t, dbType)

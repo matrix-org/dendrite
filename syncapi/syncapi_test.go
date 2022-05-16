@@ -87,7 +87,7 @@ func TestSyncAPIAccessTokens(t *testing.T) {
 }
 
 func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
+	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -174,7 +174,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
+	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
 		ID:          "ALICEID",

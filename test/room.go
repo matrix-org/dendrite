@@ -15,7 +15,6 @@
 package test
 
 import (
-	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
@@ -35,12 +34,6 @@ var (
 	PresetTrustedPrivateChat Preset = 3
 
 	roomIDCounter = int64(0)
-
-	KeyID      = gomatrixserverlib.KeyID("ed25519:test")
-	PrivateKey = ed25519.NewKeyFromSeed([]byte{
-		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-		17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-	})
 )
 
 type Room struct {
@@ -58,10 +51,11 @@ type Room struct {
 func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 	t.Helper()
 	counter := atomic.AddInt64(&roomIDCounter, 1)
-
-	// set defaults then let roomModifiers override
+	if creator.srvName == "" {
+		t.Fatalf("NewRoom: creator doesn't belong to a server: %+v", *creator)
+	}
 	r := &Room{
-		ID:           fmt.Sprintf("!%d:localhost", counter),
+		ID:           fmt.Sprintf("!%d:%s", counter, creator.srvName),
 		creator:      creator,
 		authEvents:   gomatrixserverlib.NewAuthEvents(nil),
 		preset:       PresetPublicChat,
@@ -108,16 +102,21 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 		joinRule.JoinRule = "public"
 		hisVis.HistoryVisibility = "shared"
 	}
+	var mods []eventModifier
+	if r.creator.keyID != "" && r.creator.privKey != nil {
+		mods = append(mods, WithKeyID(r.creator.keyID), WithPrivateKey(r.creator.privKey), WithOrigin(r.creator.srvName))
+	}
+
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomCreate, map[string]interface{}{
 		"creator":      r.creator.ID,
 		"room_version": r.Version,
-	}, WithStateKey(""))
+	}, append(mods, WithStateKey(""))...)
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomMember, map[string]interface{}{
 		"membership": "join",
-	}, WithStateKey(r.creator.ID))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomPowerLevels, plContent, WithStateKey(""))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomJoinRules, joinRule, WithStateKey(""))
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomHistoryVisibility, hisVis, WithStateKey(""))
+	}, append(mods, WithStateKey(r.creator.ID))...)
+	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomPowerLevels, plContent, append(mods, WithStateKey(""))...)
+	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomJoinRules, joinRule, append(mods, WithStateKey(""))...)
+	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomHistoryVisibility, hisVis, append(mods, WithStateKey(""))...)
 }
 
 // Create an event in this room but do not insert it. Does not modify the room in any way (depth, fwd extremities, etc) so is thread-safe.
@@ -132,16 +131,16 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	}
 
 	if mod.privKey == nil {
-		mod.privKey = PrivateKey
+		t.Fatalf("CreateEvent[%s]: missing private key", eventType)
 	}
 	if mod.keyID == "" {
-		mod.keyID = KeyID
+		t.Fatalf("CreateEvent[%s]: missing key ID", eventType)
 	}
 	if mod.originServerTS.IsZero() {
 		mod.originServerTS = time.Now()
 	}
 	if mod.origin == "" {
-		mod.origin = gomatrixserverlib.ServerName("localhost")
+		t.Fatalf("CreateEvent[%s]: missing origin", eventType)
 	}
 
 	var unsigned gomatrixserverlib.RawJSON
