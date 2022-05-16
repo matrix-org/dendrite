@@ -126,6 +126,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationapi_queue_json table
 		event.Type,
+		nil, // this will use the default expireEDUTypes map
 	); err != nil {
 		logrus.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
