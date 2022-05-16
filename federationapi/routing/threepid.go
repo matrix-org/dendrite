@@ -167,6 +167,10 @@ func ExchangeThirdPartyInvite(
 	// Ask the requesting server to sign the newly created event so we know it
 	// acknowledged it
 	inviteReq, err := gomatrixserverlib.NewInviteV2Request(event.Headered(verRes.RoomVersion), nil)
+	if err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
+		return jsonerror.InternalServerError()
+	}
 	signedEvent, err := federation.SendInviteV2(httpReq.Context(), request.Origin(), inviteReq)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
