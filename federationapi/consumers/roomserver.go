@@ -164,7 +164,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		addsStateEvents = append(addsStateEvents, eventsRes.Events...)
 	}
 
-	addsJoinedHosts, err := joinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(addsStateEvents))
+	addsJoinedHosts, err := JoinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(addsStateEvents))
 	if err != nil {
 		return err
 	}
@@ -238,7 +238,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		return nil, err
 	}
 
-	combinedAddsJoinedHosts, err := joinedHostsFromEvents(combinedAddsEvents)
+	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(combinedAddsEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -284,10 +284,10 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	return result, nil
 }
 
-// joinedHostsFromEvents turns a list of state events into a list of joined hosts.
+// JoinedHostsFromEvents turns a list of state events into a list of joined hosts.
 // This errors if one of the events was invalid.
 // It should be impossible for an invalid event to get this far in the pipeline.
-func joinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, error) {
+func JoinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, error) {
 	var joinedHosts []types.JoinedHost
 	for _, ev := range evs {
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {
