@@ -8,12 +8,24 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/internal"
-	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 )
+
+/*
+func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testSyncAPICreateRoomSyncEarly(t, dbType)
+	})
+}
+
+func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
+	user := test.NewUser()
+	room := test.NewRoom(t, user)
+} */
 
 // Tests that event IDs with '/' in them (escaped as %2F) are correctly passed to the right handler and don't 404.
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.
@@ -86,7 +98,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		}
 		gerr, ok := err.(gomatrix.HTTPError)
 		if !ok {
-			t.Errorf("failed to cast response error as gomatrix.HTTPError")
+			t.Errorf("failed to cast response error as gomatrix.HTTPError: %s", err)
 			continue
 		}
 		t.Logf("Error: %+v", gerr)

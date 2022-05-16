@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
+package testrig
 
 import (
 	"errors"
@@ -24,22 +24,23 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/nats-io/nats.go"
 )
 
-func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()) {
+func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(false)
 	cfg.Global.JetStream.InMemory = true
 
 	switch dbType {
-	case DBTypePostgres:
+	case test.DBTypePostgres:
 		cfg.Global.Defaults(true)   // autogen a signing key
 		cfg.MediaAPI.Defaults(true) // autogen a media path
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
-		connStr, close := PrepareDBConnectionString(t, dbType)
+		connStr, close := test.PrepareDBConnectionString(t, dbType)
 		cfg.Global.DatabaseOptions = config.DatabaseOptions{
 			ConnectionString:       config.DataSource(connStr),
 			MaxOpenConnections:     10,
@@ -47,7 +48,7 @@ func CreateBaseDendrite(t *testing.T, dbType DBType) (*base.BaseDendrite, func()
 			ConnMaxLifetimeSeconds: 60,
 		}
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
-	case DBTypeSQLite:
+	case test.DBTypeSQLite:
 		cfg.Defaults(true) // sets a sqlite db per component
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
