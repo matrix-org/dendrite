@@ -102,21 +102,17 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 		joinRule.JoinRule = "public"
 		hisVis.HistoryVisibility = "shared"
 	}
-	var mods []eventModifier
-	if r.creator.keyID != "" && r.creator.privKey != nil {
-		mods = append(mods, WithKeyID(r.creator.keyID), WithPrivateKey(r.creator.privKey), WithOrigin(r.creator.srvName))
-	}
 
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomCreate, map[string]interface{}{
 		"creator":      r.creator.ID,
 		"room_version": r.Version,
-	}, append(mods, WithStateKey(""))...)
+	}, WithStateKey(""))
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomMember, map[string]interface{}{
 		"membership": "join",
-	}, append(mods, WithStateKey(r.creator.ID))...)
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomPowerLevels, plContent, append(mods, WithStateKey(""))...)
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomJoinRules, joinRule, append(mods, WithStateKey(""))...)
-	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomHistoryVisibility, hisVis, append(mods, WithStateKey(""))...)
+	}, WithStateKey(r.creator.ID))
+	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomPowerLevels, plContent, WithStateKey(""))
+	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomJoinRules, joinRule, WithStateKey(""))
+	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomHistoryVisibility, hisVis, WithStateKey(""))
 }
 
 // Create an event in this room but do not insert it. Does not modify the room in any way (depth, fwd extremities, etc) so is thread-safe.
@@ -131,16 +127,16 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	}
 
 	if mod.privKey == nil {
-		t.Fatalf("CreateEvent[%s]: missing private key", eventType)
+		mod.privKey = creator.privKey
 	}
 	if mod.keyID == "" {
-		t.Fatalf("CreateEvent[%s]: missing key ID", eventType)
+		mod.keyID = creator.keyID
 	}
 	if mod.originServerTS.IsZero() {
 		mod.originServerTS = time.Now()
 	}
 	if mod.origin == "" {
-		t.Fatalf("CreateEvent[%s]: missing origin", eventType)
+		mod.origin = creator.srvName
 	}
 
 	var unsigned gomatrixserverlib.RawJSON
