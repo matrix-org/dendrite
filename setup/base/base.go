@@ -41,6 +41,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 
 	"github.com/gorilla/mux"
@@ -77,6 +78,7 @@ type BaseDendrite struct {
 	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
+	NATS                   *jetstream.NATSInstance
 	UseHTTPAPIs            bool
 	apiHttpClient          *http.Client
 	Cfg                    *config.Dendrite
@@ -84,6 +86,7 @@ type BaseDendrite struct {
 	DNSCache               *gomatrixserverlib.DNSCache
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
+	EnableMetrics          bool
 }
 
 const NoListener = ""
@@ -94,7 +97,7 @@ const HTTPClientTimeout = time.Second * 30
 type BaseDendriteOptions int
 
 const (
-	NoCacheMetrics BaseDendriteOptions = iota
+	DisableMetrics BaseDendriteOptions = iota
 	UseHTTPAPIs
 	PolylithMode
 )
@@ -105,12 +108,12 @@ const (
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
 	platformSanityChecks()
 	useHTTPAPIs := false
-	cacheMetrics := true
+	enableMetrics := true
 	isMonolith := true
 	for _, opt := range options {
 		switch opt {
-		case NoCacheMetrics:
-			cacheMetrics = false
+		case DisableMetrics:
+			enableMetrics = false
 		case UseHTTPAPIs:
 			useHTTPAPIs = true
 		case PolylithMode:
@@ -158,7 +161,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		}
 	}
 
-	cache, err := caching.NewInMemoryLRUCache(cacheMetrics)
+	cache, err := caching.NewInMemoryLRUCache(enableMetrics)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
@@ -240,9 +243,11 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+		NATS:                   &jetstream.NATSInstance{},
 		apiHttpClient:          &apiClient,
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
+		EnableMetrics:          enableMetrics,
 	}
 }
 

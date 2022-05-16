@@ -58,7 +58,7 @@ func AddPublicRoutes(
 ) {
 	cfg := &base.Cfg.FederationAPI
 	mscCfg := &base.Cfg.MSCs
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -117,7 +117,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,

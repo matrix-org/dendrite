@@ -1,3 +1,9 @@
+---
+title: SyTest
+parent: Development
+permalink: /development/sytest
+---
+
 # SyTest
 
 Dendrite uses [SyTest](https://github.com/matrix-org/sytest) for its
@@ -43,6 +49,7 @@ source code. The test results TAP file and homeserver logging output will go to
 add any tests to `sytest-whitelist`.
 
 When debugging, the following Docker `run` options may also be useful:
+
 * `-v /path/to/sytest/:/sytest/`: Use your local SyTest repository at
   `/path/to/sytest` instead of pulling from GitHub. This is useful when you want
   to speed things up or make modifications to SyTest.
@@ -58,6 +65,7 @@ When debugging, the following Docker `run` options may also be useful:
 
 The docker command also supports a single positional argument for the test file to
 run, so you can run a single `.pl` file rather than the whole test suite. For example:
+
 ```
 docker run --rm --name sytest -v "/Users/kegan/github/sytest:/sytest"
 -v "/Users/kegan/github/dendrite:/src" -v "/Users/kegan/logs:/logs"
@@ -118,7 +126,7 @@ POSTGRES=1 ./run-tests.pl -I Dendrite::Monolith -d ../dendrite/bin -W ../dendrit
 where `tee` lets you see the results while they're being piped to the file, and
 `POSTGRES=1` enables testing with PostgeSQL. If the `POSTGRES` environment
 variable is not set or is set to 0, SyTest will fall back to SQLite 3. For more
-flags and options, see https://github.com/matrix-org/sytest#running.
+flags and options, see <https://github.com/matrix-org/sytest#running>.
 
 Once the tests are complete, run the helper script to see if you need to add
 any newly passing test names to `sytest-whitelist` in the project's root

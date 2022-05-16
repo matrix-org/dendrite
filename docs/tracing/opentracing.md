@@ -1,5 +1,11 @@
-Opentracing
-===========
+---
+title: OpenTracing
+has_children: true
+parent: Development
+permalink: /development/opentracing
+---
+
+# OpenTracing
 
 Dendrite extensively uses the [opentracing.io](http://opentracing.io) framework
 to trace work across the different logical components.
@@ -23,7 +29,6 @@ This is useful to see where the time is being spent processing a request on a
 component. However, opentracing allows tracking of spans across components. This
 makes it possible to see exactly what work goes into processing a request:
 
-
 ```
 Component 1       |<─────────────────── HTTP ────────────────────>|
                      |<──────────────── RPC ─────────────────>|
@@ -39,7 +44,6 @@ deserialized span as the parent).
 
 A collection of spans that are related is called a trace.
 
-
 Spans are passed through the code via contexts, rather than manually. It is
 therefore important that all spans that are created are immediately added to the
 current context. Thankfully the opentracing library gives helper functions for
@@ -53,11 +57,11 @@ defer span.Finish()
 This will create a new span, adding any span already in `ctx` as a parent to the
 new span.
 
-
 Adding Information
 ------------------
 
 Opentracing allows adding information to a trace via three mechanisms:
+
 - "tags" ─ A span can be tagged with a key/value pair. This is typically
   information that relates to the span, e.g. for spans created for incoming HTTP
   requests could include the request path and response codes as tags, spans for
@@ -69,11 +73,9 @@ Opentracing allows adding information to a trace via three mechanisms:
   inspecting the traces, but can be used to add context to logs or tags in child
   spans.
 
-
 See
 [specification.md](https://github.com/opentracing/specification/blob/master/specification.md)
 for some of the common tags and log fields used.
-
 
 Span Relationships
 ------------------
@@ -85,7 +87,6 @@ parent span cannot complete until all child spans are completed.
 A second relation type is `followsFrom`, where the parent has no dependence on
 the child span. This usually indicates some sort of fire and forget behaviour,
 e.g. adding a message to a pipeline or inserting into a kafka topic.
-
 
 Jaeger
 ------
@@ -99,6 +100,7 @@ giving a UI for viewing and interacting with traces.
 To enable jaeger a `Tracer` object must be instansiated from the config (as well
 as having a jaeger server running somewhere, usually locally). A `Tracer` does
 several things:
+
 - Decides which traces to save and send to the server. There are multiple
   schemes for doing this, with a simple example being to save a certain fraction
   of traces.

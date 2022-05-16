@@ -41,6 +41,10 @@ _testmain.go
 *.test
 *.prof
 *.wasm
+*.aar
+*.jar
+*.framework
+*.xcframework
 
 # Generated keys
 *.pem
@@ -64,5 +68,8 @@ test/wasm/node_modules
 
 # Ignore complement folder when running locally
 complement/
+
+# Stuff from GitHub Pages
+docs/_site
 
 media_store/

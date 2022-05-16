@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS keyserver_one_time_keys (
 	-- Clobber based on 4-uple of user/device/key/algorithm.
     UNIQUE (user_id, device_id, key_id, algorithm)
 );
+
+CREATE INDEX IF NOT EXISTS keyserver_one_time_keys_idx ON keyserver_one_time_keys (user_id, device_id);
 `
 
 const upsertKeysSQL = "" +
@@ -50,7 +52,9 @@ const selectKeysSQL = "" +
 	"SELECT key_id, algorithm, key_json FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2"
 
 const selectKeysCountSQL = "" +
-	"SELECT algorithm, COUNT(key_id) FROM keyserver_one_time_keys WHERE user_id=$1 AND device_id=$2 GROUP BY algorithm"
+	"SELECT algorithm, COUNT(key_id) FROM " +
+	" (SELECT algorithm, key_id FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 LIMIT 100)" +
+	" x GROUP BY algorithm"
 
 const deleteOneTimeKeySQL = "" +
 	"DELETE FROM keyserver_one_time_keys WHERE user_id = $1 AND device_id = $2 AND algorithm = $3 AND key_id = $4"
