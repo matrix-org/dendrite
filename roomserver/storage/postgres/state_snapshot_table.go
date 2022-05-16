@@ -77,12 +77,12 @@ type stateSnapshotStatements struct {
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
 }
 
-func createStateSnapshotTable(db *sql.DB) error {
+func CreateStateSnapshotTable(db *sql.DB) error {
 	_, err := db.Exec(stateSnapshotSchema)
 	return err
 }
 
-func prepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
+func PrepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 	s := &stateSnapshotStatements{}
 
 	return s, sqlutil.StatementList{
@@ -95,12 +95,10 @@ func (s *stateSnapshotStatements) InsertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, nids types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
 	nids = nids[:util.SortAndUnique(nids)]
-	var id int64
-	err = sqlutil.TxStmt(txn, s.insertStateStmt).QueryRowContext(ctx, nids.Hash(), int64(roomNID), stateBlockNIDsAsArray(nids)).Scan(&id)
+	err = sqlutil.TxStmt(txn, s.insertStateStmt).QueryRowContext(ctx, nids.Hash(), int64(roomNID), stateBlockNIDsAsArray(nids)).Scan(&stateNID)
 	if err != nil {
 		return 0, err
 	}
-	stateNID = types.StateSnapshotNID(id)
 	return
 }
 
@@ -119,9 +117,9 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	defer rows.Close() // nolint: errcheck
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
+	var stateBlockNIDs pq.Int64Array
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		var stateBlockNIDs pq.Int64Array
 		if err = rows.Scan(&result.StateSnapshotNID, &stateBlockNIDs); err != nil {
 			return nil, err
 		}
