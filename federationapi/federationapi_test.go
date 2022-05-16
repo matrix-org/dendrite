@@ -8,6 +8,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/internal"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
@@ -15,17 +16,31 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-/*
-func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
+type fedRoomserverAPI struct {
+	api.FederationRoomserverAPI
+}
+
+// Regression test to make sure that /send_join is updating the destination hosts synchronously and
+// isn't relying on the roomserver.
+func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		testSyncAPICreateRoomSyncEarly(t, dbType)
+		testFederationAPIJoinThenKeyUpdate(t, dbType)
 	})
 }
 
-func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
-	room := test.NewRoom(t, user)
-} */
+func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
+	/*
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
+		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+
+		user := test.NewUser()
+		room := test.NewRoom(t, user)
+
+		fsapi := federationapi.NewInternalAPI(base, mockClient, fedRoomserverAPI{}, base.Caches, nil, false)
+	*/
+}
 
 // Tests that event IDs with '/' in them (escaped as %2F) are correctly passed to the right handler and don't 404.
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.

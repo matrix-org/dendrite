@@ -39,7 +39,7 @@ type OutgoingQueues struct {
 	db          storage.Database
 	process     *process.ProcessContext
 	disabled    bool
-	rsAPI       api.RoomserverInternalAPI
+	rsAPI       api.FederationRoomserverAPI
 	origin      gomatrixserverlib.ServerName
 	client      *gomatrixserverlib.FederationClient
 	statistics  *statistics.Statistics
@@ -86,7 +86,7 @@ func NewOutgoingQueues(
 	disabled bool,
 	origin gomatrixserverlib.ServerName,
 	client *gomatrixserverlib.FederationClient,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
 	signing *SigningInfo,
 ) *OutgoingQueues {

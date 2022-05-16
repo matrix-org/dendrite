@@ -94,7 +94,7 @@ func AddPublicRoutes(
 func NewInternalAPI(
 	base *base.BaseDendrite,
 	federation *gomatrixserverlib.FederationClient,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *caching.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,

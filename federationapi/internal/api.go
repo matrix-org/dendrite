@@ -25,7 +25,7 @@ type FederationInternalAPI struct {
 	db         storage.Database
 	cfg        *config.FederationAPI
 	statistics *statistics.Statistics
-	rsAPI      roomserverAPI.RoomserverInternalAPI
+	rsAPI      roomserverAPI.FederationRoomserverAPI
 	federation *gomatrixserverlib.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
@@ -34,7 +34,7 @@ type FederationInternalAPI struct {
 
 func NewFederationInternalAPI(
 	db storage.Database, cfg *config.FederationAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	federation *gomatrixserverlib.FederationClient,
 	statistics *statistics.Statistics,
 	caches *caching.Caches,

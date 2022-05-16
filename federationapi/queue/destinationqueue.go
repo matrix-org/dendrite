@@ -49,7 +49,7 @@ type destinationQueue struct {
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            *SigningInfo
-	rsAPI              api.RoomserverInternalAPI
+	rsAPI              api.FederationRoomserverAPI
 	client             *gomatrixserverlib.FederationClient // federation client
 	origin             gomatrixserverlib.ServerName        // origin of requests
 	destination        gomatrixserverlib.ServerName        // destination of requests

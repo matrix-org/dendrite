@@ -36,7 +36,7 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx       context.Context
 	cfg       *config.FederationAPI
-	rsAPI     api.RoomserverInternalAPI
+	rsAPI     api.FederationRoomserverAPI
 	jetstream nats.JetStreamContext
 	durable   string
 	db        storage.Database
@@ -51,7 +51,7 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:       process.Context(),

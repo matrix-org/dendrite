@@ -39,7 +39,7 @@ type KeyChangeConsumer struct {
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 	serverName gomatrixserverlib.ServerName
-	rsAPI      roomserverAPI.RoomserverInternalAPI
+	rsAPI      roomserverAPI.FederationRoomserverAPI
 	topic      string
 }
 
@@ -50,7 +50,7 @@ func NewKeyChangeConsumer(
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 ) *KeyChangeConsumer {
 	return &KeyChangeConsumer{
 		ctx:        process.Context(),
