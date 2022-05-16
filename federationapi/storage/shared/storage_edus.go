@@ -25,9 +25,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// expireEDUTypes contains EDUs which can/should be expired after a given time
+// defaultExpiry for EDUs if not listed below
+var defaultExpiry = time.Hour * 24
+
+// defaultExpireEDUTypes contains EDUs which can/should be expired after a given time
 // if the target server isn't reachable for some reason.
-var expireEDUTypes = map[string]time.Duration{
+var defaultExpireEDUTypes = map[string]time.Duration{
 	gomatrixserverlib.MTyping:   time.Minute,
 	gomatrixserverlib.MPresence: time.Minute * 10,
 }
@@ -40,12 +43,15 @@ func (d *Database) AssociateEDUWithDestination(
 	serverName gomatrixserverlib.ServerName,
 	receipt *Receipt,
 	eduType string,
+	expireEDUTypes map[string]time.Duration,
 ) error {
-	var expiresAt *gomatrixserverlib.Timestamp
+	if expireEDUTypes == nil {
+		expireEDUTypes = defaultExpireEDUTypes
+	}
+	expiresAt := gomatrixserverlib.AsTimestamp(time.Now().Add(defaultExpiry))
 	if duration, ok := expireEDUTypes[eduType]; ok {
 		// Keep EDUs for at least x minutes before deleting them
-		ts := gomatrixserverlib.AsTimestamp(time.Now().Add(duration))
-		expiresAt = &ts
+		expiresAt = gomatrixserverlib.AsTimestamp(time.Now().Add(duration))
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if err := d.FederationQueueEDUs.InsertQueueEDU(

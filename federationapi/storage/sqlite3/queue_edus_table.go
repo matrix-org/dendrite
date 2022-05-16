@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_edus (
 	-- The JSON NID from the federationsender_queue_edus_json table.
 	json_nid BIGINT NOT NULL,
 	-- The expiry time of this edu, if any.
-	expires_at BIGINT
+	expires_at BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
@@ -108,7 +108,7 @@ func (s *queueEDUsStatements) InsertQueueEDU(
 	eduType string,
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
-	expiresAt *gomatrixserverlib.Timestamp,
+	expiresAt gomatrixserverlib.Timestamp,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.insertQueueEDUStmt)
 	_, err := stmt.ExecContext(
