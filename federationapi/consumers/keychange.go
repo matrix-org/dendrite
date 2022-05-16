@@ -128,6 +128,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	}
 
 	if len(destinations) == 0 {
+		logger.WithField("num_rooms", len(queryRes.RoomIDs)).Debug("user is in no federated rooms")
 		return true
 	}
 	// Pack the EDU and marshal it
