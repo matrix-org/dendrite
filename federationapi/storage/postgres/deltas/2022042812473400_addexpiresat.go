@@ -17,8 +17,10 @@ package deltas
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func LoadAddExpiresAt(m *sqlutil.Migrations) {
@@ -26,9 +28,13 @@ func LoadAddExpiresAt(m *sqlutil.Migrations) {
 }
 
 func upAddexpiresat(tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER TABLE federationsender_queue_edus ADD COLUMN IF NOT EXISTS expires_at BIGINT DEFAULT NULL;")
+	_, err := tx.Exec("ALTER TABLE federationsender_queue_edus ADD COLUMN IF NOT EXISTS expires_at BIGINT NOT NULL DEFAULT 0;")
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
+	_, err = tx.Exec("UPDATE federationsender_queue_edus SET expires_at = $1", gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour*24)))
+	if err != nil {
+		return fmt.Errorf("failed to update queue_edus: %w", err)
 	}
 	return nil
 }
