@@ -74,5 +74,19 @@ func TestStateBlockTable(t *testing.T) {
 		// try to get a StateBlockNID which does not exist
 		_, err = tab.BulkSelectStateBlockEntries(ctx, nil, types.StateBlockNIDs{5})
 		assert.Error(t, err)
+
+		// This should return an error, since we can only retrieve 1 StateBlock
+		_, err = tab.BulkSelectStateBlockEntries(ctx, nil, types.StateBlockNIDs{1, 5})
+		assert.Error(t, err)
+
+		for i := 0; i < 65555; i++ {
+			entry := types.StateEntry{
+				EventNID: types.EventNID(i),
+			}
+			entries2 = append(entries2, entry)
+		}
+		stateBlockNID, err = tab.BulkInsertStateData(ctx, nil, entries2)
+		assert.NoError(t, err)
+		assert.Equal(t, types.StateBlockNID(3), stateBlockNID)
 	})
 }

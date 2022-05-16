@@ -108,7 +108,7 @@ func PrepareRoomsTable(db *sql.DB) (tables.Rooms, error) {
 	}.Prepare(db)
 }
 
-func (s *roomStatements) SelectRoomIDs(ctx context.Context, txn *sql.Tx) ([]string, error) {
+func (s *roomStatements) SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectRoomIDsStmt)
 	rows, err := stmt.QueryContext(ctx)
 	if err != nil {

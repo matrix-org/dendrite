@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,9 +48,18 @@ func TestRoomsTable(t *testing.T) {
 		wantRoomNID, err := tab.InsertRoomNID(ctx, nil, room.ID, room.Version)
 		assert.NoError(t, err)
 
+		// Create dummy room
+		_, err = tab.InsertRoomNID(ctx, nil, util.RandomString(16), room.Version)
+		assert.NoError(t, err)
+
 		gotRoomNID, err := tab.SelectRoomNID(ctx, nil, room.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, wantRoomNID, gotRoomNID)
+
+		// Ensure non existent roomNID errors
+		roomNID, err := tab.SelectRoomNID(ctx, nil, "!doesnotexist:localhost")
+		assert.Error(t, err)
+		assert.Equal(t, types.RoomNID(0), roomNID)
 
 		roomInfo, err := tab.SelectRoomInfo(ctx, nil, room.ID)
 		assert.NoError(t, err)
@@ -60,8 +70,12 @@ func TestRoomsTable(t *testing.T) {
 			IsStub:           true, // there are no latestEventNIDs
 		}, roomInfo)
 
+		roomInfo, err = tab.SelectRoomInfo(ctx, nil, "!doesnotexist:localhost")
+		assert.NoError(t, err)
+		assert.Nil(t, roomInfo)
+
 		// There are no rooms with latestEventNIDs yet
-		roomIDs, err := tab.SelectRoomIDs(ctx, nil)
+		roomIDs, err := tab.SelectRoomIDsWithEvents(ctx, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(roomIDs))
 
@@ -81,8 +95,10 @@ func TestRoomsTable(t *testing.T) {
 		assert.Equal(t, []types.RoomNID{wantRoomNID}, roomNIDs)
 
 		wantEventNIDs := []types.EventNID{1, 2, 3}
+		lastEventSentNID := types.EventNID(3)
+		stateSnapshotNID := types.StateSnapshotNID(1)
 		// make the room "usable"
-		err = tab.UpdateLatestEventNIDs(ctx, nil, wantRoomNID, wantEventNIDs, 3, 1)
+		err = tab.UpdateLatestEventNIDs(ctx, nil, wantRoomNID, wantEventNIDs, lastEventSentNID, stateSnapshotNID)
 		assert.NoError(t, err)
 
 		roomInfo, err = tab.SelectRoomInfo(ctx, nil, room.ID)

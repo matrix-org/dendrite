@@ -38,16 +38,20 @@ func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.Ro
 func TestRoomAliasesTable(t *testing.T) {
 	alice := test.NewUser()
 	room := test.NewRoom(t, alice)
+	room2 := test.NewRoom(t, alice)
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, close := mustCreateRoomAliasesTable(t, dbType)
 		defer close()
-		alias, alias2 := "#alias:localhost", "#alias2:localhost"
+		alias, alias2, alias3 := "#alias:localhost", "#alias2:localhost", "#alias3:localhost"
 		// insert aliases
 		err := tab.InsertRoomAlias(ctx, nil, alias, room.ID, alice.ID)
 		assert.NoError(t, err)
 
 		err = tab.InsertRoomAlias(ctx, nil, alias2, room.ID, alice.ID)
+		assert.NoError(t, err)
+
+		err = tab.InsertRoomAlias(ctx, nil, alias3, room2.ID, alice.ID)
 		assert.NoError(t, err)
 
 		// verify we can get the roomID for the alias
@@ -64,6 +68,10 @@ func TestRoomAliasesTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "", creator)
 
+		roomID, err = tab.SelectRoomIDFromAlias(ctx, nil, "#doesntexist:localhost")
+		assert.NoError(t, err)
+		assert.Equal(t, "", roomID)
+
 		// get all aliases for a room
 		aliases, err := tab.SelectAliasesFromRoomID(ctx, nil, room.ID)
 		assert.NoError(t, err)
@@ -79,6 +87,10 @@ func TestRoomAliasesTable(t *testing.T) {
 
 		// deleting the same alias should be a no-op
 		err = tab.DeleteRoomAlias(ctx, nil, alias2)
+		assert.NoError(t, err)
+
+		// Delete non-existent alias should be a no-op
+		err = tab.DeleteRoomAlias(ctx, nil, "#doesntexist:localhost")
 		assert.NoError(t, err)
 	})
 }

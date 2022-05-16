@@ -75,5 +75,12 @@ func TestStateSnapshotTable(t *testing.T) {
 		// check we get an error if the state snapshot does not exist
 		_, err = tab.BulkSelectStateBlockNIDs(ctx, nil, []types.StateSnapshotNID{2})
 		assert.Error(t, err)
+
+		// create a second snapshot
+		for i := 0; i < 65555; i++ {
+			stateBlockNIDs2 = append(stateBlockNIDs2, types.StateBlockNID(i))
+		}
+		_, err = tab.InsertState(ctx, nil, 1, stateBlockNIDs2)
+		assert.NoError(t, err)
 	})
 }
