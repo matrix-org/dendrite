@@ -52,6 +52,18 @@ func WithUnsigned(unsigned interface{}) eventModifier {
 	}
 }
 
+func WithKeyID(keyID gomatrixserverlib.KeyID) eventModifier {
+	return func(e *eventMods) {
+		e.keyID = keyID
+	}
+}
+
+func WithPrivateKey(pkey ed25519.PrivateKey) eventModifier {
+	return func(e *eventMods) {
+		e.privKey = pkey
+	}
+}
+
 // Reverse a list of events
 func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))

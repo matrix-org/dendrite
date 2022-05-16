@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
@@ -50,20 +51,20 @@ type destinationQueue struct {
 	process            *process.ProcessContext
 	signing            *SigningInfo
 	rsAPI              api.FederationRoomserverAPI
-	client             *gomatrixserverlib.FederationClient // federation client
-	origin             gomatrixserverlib.ServerName        // origin of requests
-	destination        gomatrixserverlib.ServerName        // destination of requests
-	running            atomic.Bool                         // is the queue worker running?
-	backingOff         atomic.Bool                         // true if we're backing off
-	overflowed         atomic.Bool                         // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
-	statistics         *statistics.ServerStatistics        // statistics about this remote server
-	transactionIDMutex sync.Mutex                          // protects transactionID
-	transactionID      gomatrixserverlib.TransactionID     // last transaction ID if retrying, or "" if last txn was successful
-	notify             chan struct{}                       // interrupts idle wait pending PDUs/EDUs
-	pendingPDUs        []*queuedPDU                        // PDUs waiting to be sent
-	pendingEDUs        []*queuedEDU                        // EDUs waiting to be sent
-	pendingMutex       sync.RWMutex                        // protects pendingPDUs and pendingEDUs
-	interruptBackoff   chan bool                           // interrupts backoff
+	client             fedapi.FederationClient         // federation client
+	origin             gomatrixserverlib.ServerName    // origin of requests
+	destination        gomatrixserverlib.ServerName    // destination of requests
+	running            atomic.Bool                     // is the queue worker running?
+	backingOff         atomic.Bool                     // true if we're backing off
+	overflowed         atomic.Bool                     // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
+	statistics         *statistics.ServerStatistics    // statistics about this remote server
+	transactionIDMutex sync.Mutex                      // protects transactionID
+	transactionID      gomatrixserverlib.TransactionID // last transaction ID if retrying, or "" if last txn was successful
+	notify             chan struct{}                   // interrupts idle wait pending PDUs/EDUs
+	pendingPDUs        []*queuedPDU                    // PDUs waiting to be sent
+	pendingEDUs        []*queuedEDU                    // EDUs waiting to be sent
+	pendingMutex       sync.RWMutex                    // protects pendingPDUs and pendingEDUs
+	interruptBackoff   chan bool                       // interrupts backoff
 }
 
 // Send event adds the event to the pending queue for the destination.

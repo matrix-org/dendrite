@@ -93,7 +93,7 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	federation *gomatrixserverlib.FederationClient,
+	federation api.FederationClient,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *caching.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
