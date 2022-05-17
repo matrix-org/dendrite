@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -86,7 +87,7 @@ func TestSyncAPIAccessTokens(t *testing.T) {
 }
 
 func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
+	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -96,14 +97,14 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	base, close := test.CreateBaseDendrite(t, dbType)
+	base, close := testrig.CreateBaseDendrite(t, dbType)
 	defer close()
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	msgs := toNATSMsgs(t, base, room.Events())
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
-	test.MustPublishMsgs(t, jsctx, msgs...)
+	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
 		name            string
@@ -173,7 +174,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
+	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -183,7 +184,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	base, close := test.CreateBaseDendrite(t, dbType)
+	base, close := testrig.CreateBaseDendrite(t, dbType)
 	defer close()
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
@@ -198,7 +199,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	sinceTokens := make([]string, len(msgs))
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
 	for i, msg := range msgs {
-		test.MustPublishMsgs(t, jsctx, msg)
+		testrig.MustPublishMsgs(t, jsctx, msg)
 		time.Sleep(100 * time.Millisecond)
 		w := httptest.NewRecorder()
 		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -262,7 +263,7 @@ func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input []*gomatrixserverli
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = test.NewOutputEventMsg(t, base, ev.RoomID(), api.OutputEvent{
+		result[i] = testrig.NewOutputEventMsg(t, base, ev.RoomID(), api.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

@@ -38,7 +38,7 @@ func mustCreateRoomsTable(t *testing.T, dbType test.DBType) (tab tables.Rooms, c
 }
 
 func TestRoomsTable(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {

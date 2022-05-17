@@ -39,7 +39,7 @@ type KeyChangeConsumer struct {
 	db         storage.Database
 	queues     *queue.OutgoingQueues
 	serverName gomatrixserverlib.ServerName
-	rsAPI      roomserverAPI.RoomserverInternalAPI
+	rsAPI      roomserverAPI.FederationRoomserverAPI
 	topic      string
 }
 
@@ -50,7 +50,7 @@ func NewKeyChangeConsumer(
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 ) *KeyChangeConsumer {
 	return &KeyChangeConsumer{
 		ctx:        process.Context(),
@@ -120,6 +120,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		logger.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
 	}
+	logrus.Infof("DEBUG: %v joined rooms for user %v", queryRes.RoomIDs, m.UserID)
 	// send this key change to all servers who share rooms with this user.
 	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
 	if err != nil {
@@ -128,6 +129,9 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	}
 
 	if len(destinations) == 0 {
+		logger.WithField("num_rooms", len(queryRes.RoomIDs)).Debug("user is in no federated rooms")
+		destinations, err = t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, false)
+		logrus.Infof("GetJoinedHostsForRooms exclude self=false -> %v %v", destinations, err)
 		return true
 	}
 	// Pack the EDU and marshal it

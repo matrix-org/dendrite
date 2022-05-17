@@ -36,7 +36,7 @@ func mustCreateRoomAliasesTable(t *testing.T, dbType test.DBType) (tab tables.Ro
 }
 
 func TestRoomAliasesTable(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
 	ctx := context.Background()

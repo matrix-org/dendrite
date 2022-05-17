@@ -38,7 +38,7 @@ func mustCreatePreviousEventsTable(t *testing.T, dbType test.DBType) (tab tables
 
 func TestPreviousEventsTable(t *testing.T) {
 	ctx := context.Background()
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, close := mustCreatePreviousEventsTable(t, dbType)

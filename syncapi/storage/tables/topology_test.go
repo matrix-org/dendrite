@@ -40,7 +40,7 @@ func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.D
 
 func TestTopologyTable(t *testing.T) {
 	ctx := context.Background()
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, db, close := newTopologyTable(t, dbType)
