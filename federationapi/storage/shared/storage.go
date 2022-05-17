@@ -73,7 +73,7 @@ func (d *Database) UpdateRoom(
 			// If the event is a create event then we'll delete all of the existing
 			// data for the room. The only reason that a create event would be replayed
 			// to us in this way is if we're about to receive the entire room state.
-			if err := d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
+			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
 			}
 		}
