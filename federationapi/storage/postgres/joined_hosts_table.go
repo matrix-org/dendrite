@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 const joinedHostsSchema = `
@@ -112,7 +111,6 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 	roomID, eventID string,
 	serverName gomatrixserverlib.ServerName,
 ) error {
-	logrus.Debugf("FederationJoinedHosts: INSERT %v %v %v", roomID, eventID, serverName)
 	stmt := sqlutil.TxStmt(txn, s.insertJoinedHostsStmt)
 	_, err := stmt.ExecContext(ctx, roomID, eventID, serverName)
 	return err
@@ -121,7 +119,6 @@ func (s *joinedHostsStatements) InsertJoinedHosts(
 func (s *joinedHostsStatements) DeleteJoinedHosts(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) error {
-	logrus.Debugf("FederationJoinedHosts: DELETE WITH EVENTS %v", eventIDs)
 	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsStmt)
 	_, err := stmt.ExecContext(ctx, pq.StringArray(eventIDs))
 	return err
@@ -130,7 +127,6 @@ func (s *joinedHostsStatements) DeleteJoinedHosts(
 func (s *joinedHostsStatements) DeleteJoinedHostsForRoom(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	logrus.Debugf("FederationJoinedHosts: DELETE ALL IN ROOM %v", roomID)
 	stmt := sqlutil.TxStmt(txn, s.deleteJoinedHostsForRoomStmt)
 	_, err := stmt.ExecContext(ctx, roomID)
 	return err
@@ -211,7 +207,6 @@ func joinedHostsFromStmt(
 			ServerName:    gomatrixserverlib.ServerName(serverName),
 		})
 	}
-	logrus.Debugf("FederationJoinedHosts: SELECT %v => %+v", roomID, result)
 
 	return result, rows.Err()
 }

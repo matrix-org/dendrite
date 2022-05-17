@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/queue"
@@ -166,7 +165,6 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 	// expressed as a delta against the current state.
 	// TODO(#290): handle EventIDMismatchError and recover the current state by
 	// talking to the roomserver
-	logrus.Infof("room %s adds joined hosts: %v removes %v", ore.Event.RoomID(), addsJoinedHosts, ore.RemovesStateEventIDs)
 	oldJoinedHosts, err := s.db.UpdateRoom(
 		s.ctx,
 		ore.Event.RoomID(),
