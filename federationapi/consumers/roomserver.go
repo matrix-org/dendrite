@@ -90,15 +90,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
 		ev := output.NewRoomEvent.Event
-
-		if output.NewRoomEvent.RewritesState {
-			if err := s.db.PurgeRoomState(s.ctx, ev.RoomID()); err != nil {
-				log.WithError(err).Errorf("roomserver output log: purge room state failure")
-				return false
-			}
-		}
-
-		if err := s.processMessage(*output.NewRoomEvent); err != nil {
+		if err := s.processMessage(*output.NewRoomEvent, output.NewRoomEvent.RewritesState); err != nil {
 			// panic rather than continue with an inconsistent database
 			log.WithFields(log.Fields{
 				"event_id":   ev.EventID(),
@@ -146,7 +138,7 @@ func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPee
 
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
-func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
+func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rewritesState bool) error {
 	addsStateEvents, missingEventIDs := ore.NeededStateEventIDs()
 
 	// Ask the roomserver and add in the rest of the results into the set.
@@ -180,6 +172,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 		ore.Event.RoomID(),
 		addsJoinedHosts,
 		ore.RemovesStateEventIDs,
+		rewritesState, // if we're re-writing state, nuke all joined hosts before adding
 	)
 	if err != nil {
 		return err
