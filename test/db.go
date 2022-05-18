@@ -44,7 +44,7 @@ func fatalError(t *testing.T, format string, args ...interface{}) {
 }
 
 func createLocalDB(t *testing.T, dbName string) {
-	if _, err := exec.LookPath("createdb"); err != nil && !Quiet {
+	if _, err := exec.LookPath("createdb"); err != nil {
 		fatalError(t, "Note: tests require a postgres install accessible to the current user")
 		return
 	}
