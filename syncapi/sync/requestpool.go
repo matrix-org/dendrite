@@ -253,6 +253,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 
 	// loop until we get some data
 	for {
+		startTime := time.Now()
 		currentPos := rp.Notifier.CurrentPosition()
 
 		// if the since token matches the current positions, wait via the notifier
@@ -380,6 +381,10 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			//   they weren't always doing, resulting in flakey tests.
 			if !syncReq.Response.HasUpdates() {
 				syncReq.Since = currentPos
+				syncReq.Timeout = syncReq.Timeout - time.Since(startTime)
+				if syncReq.Timeout < 0 {
+					syncReq.Timeout = 0
+				}
 				continue
 			}
 		}
