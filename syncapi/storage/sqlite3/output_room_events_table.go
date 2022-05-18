@@ -114,7 +114,7 @@ const selectContextAfterEventSQL = "" +
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
-const selectSearchSQL = "SELECT event_id, headered_event_json FROM syncapi_output_room_events WHERE type = ANY($1) LIMIT $2 OFFSET $3 ORDER BY id ASC"
+const selectSearchSQL = "SELECT event_id, headered_event_json FROM syncapi_output_room_events WHERE type IN ($1) LIMIT $2 OFFSET $3 ORDER BY id ASC"
 
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
@@ -126,7 +126,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt       *sql.Stmt
 	selectContextBeforeEventStmt *sql.Stmt
 	selectContextAfterEventStmt  *sql.Stmt
-	selectSearchStmt             *sql.Stmt
+	//selectSearchStmt             *sql.Stmt - prepared at runtime
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Events, error) {
@@ -146,7 +146,7 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-		{&s.selectSearchStmt, selectSearchSQL},
+		//{&s.selectSearchStmt, selectSearchSQL}, - prepared at runtime
 	}.Prepare(db)
 }
 
@@ -619,7 +619,20 @@ func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs [
 }
 
 func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, offset int64, types []string) ([]gomatrixserverlib.HeaderedEvent, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, types, limit, offset)
+	params := make([]interface{}, len(types))
+	for i := range types {
+		params[i] = types[i]
+	}
+	params = append(params, limit)
+	params = append(params, offset)
+	selectSQL := strings.Replace(selectSearchSQL, "($1)", sqlutil.QueryVariadic(len(types)), 1)
+
+	stmt, err := s.db.Prepare(selectSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectEvents: stmt.close() failed")
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}

@@ -20,7 +20,6 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -37,7 +36,7 @@ type SyncServerDatasource struct {
 }
 
 // NewDatabase creates a new sync server database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, fts *fulltext.Search) (*SyncServerDatasource, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*SyncServerDatasource, error) {
 	var d SyncServerDatasource
 	var err error
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
@@ -122,7 +121,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		NotificationData:    notificationData,
 		Ignores:             ignores,
 		Presence:            presence,
-		FTS:                 fts,
 	}
 	return &d, nil
 }
