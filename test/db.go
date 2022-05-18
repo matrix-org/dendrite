@@ -44,8 +44,9 @@ func fatalError(t *testing.T, format string, args ...interface{}) {
 }
 
 func createLocalDB(t *testing.T, dbName string) {
-	if !Quiet {
-		t.Log("Note: tests require a postgres install accessible to the current user")
+	if _, err := exec.LookPath("createdb"); err != nil && !Quiet {
+		fatalError(t, "Note: tests require a postgres install accessible to the current user")
+		return
 	}
 	createDB := exec.Command("createdb", dbName)
 	if !Quiet {
@@ -54,7 +55,7 @@ func createLocalDB(t *testing.T, dbName string) {
 	}
 	err := createDB.Run()
 	if err != nil && !Quiet {
-		fatalError(t, "createLocalDB returned error: %s", err)
+		fmt.Println(t, "createLocalDB returned error: %s", err)
 	}
 }
 
