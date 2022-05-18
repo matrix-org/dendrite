@@ -53,7 +53,7 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to create full text")
 	}
 
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database, fts)
+	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
@@ -104,6 +104,7 @@ func AddPublicRoutes(
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
 		streams.InviteStreamProvider, rsAPI, userAPIStreamEventProducer,
+		fts,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
