@@ -75,6 +75,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	result, err := fts.Search(
 		searchReq.SearchCategories.RoomEvents.SearchTerm,
 		rooms,
+		[]string{},
 		searchReq.SearchCategories.RoomEvents.Filter.Limit,
 		nextBatch,
 		orderByTime,

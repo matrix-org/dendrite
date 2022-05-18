@@ -19,7 +19,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -396,10 +395,11 @@ func (d *Database) WriteEvent(
 	})
 
 	e := fulltext.IndexElement{
-		EventID: ev.EventID(),
-		RoomID:  ev.RoomID(),
-		Time:    time.Now(),
+		EventID:        ev.EventID(),
+		RoomID:         ev.RoomID(),
+		StreamPosition: int64(pduPosition),
 	}
+	e.SetContentType(ev.Type())
 
 	switch ev.Type() {
 	case "m.room.message":

@@ -15,32 +15,42 @@
 package fulltext
 
 import (
-	"strings"
-	"time"
-
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
 	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Search contains all existing bleve.Index
 type Search struct {
-	MessageIndex bleve.Index
+	FulltextIndex bleve.Index
 }
 
 // IndexElement describes the layout of an element to index
 type IndexElement struct {
-	EventID string    `json:"event_id,omitempty"`
-	RoomID  string    `json:"room_id,omitempty"`
-	Content string    `json:"content,omitempty"`
-	Time    time.Time `json:"timestamp,omitempty"`
+	EventID        string
+	RoomID         string
+	Content        string
+	ContentType    string
+	StreamPosition int64
+}
+
+// SetContentType sets i.ContentType given an identifier
+func (i *IndexElement) SetContentType(v string) {
+	switch v {
+	case "m.room.message":
+		i.ContentType = "content.body"
+	case gomatrixserverlib.MRoomName:
+		i.ContentType = "content.name"
+	case gomatrixserverlib.MRoomTopic:
+		i.ContentType = "content.topic"
+	}
 }
 
 // New opens a new/existing fulltext index
-func New(path string) (*Search, error) {
-	fts := &Search{}
-	var err error
-	fts.MessageIndex, err = openIndex(path)
+func New(path string) (fts *Search, err error) {
+	fts = &Search{}
+	fts.FulltextIndex, err = openIndex(path)
 	if err != nil {
 		return nil, err
 	}
@@ -49,17 +59,17 @@ func New(path string) (*Search, error) {
 
 // Close closes the fulltext index
 func (f *Search) Close() error {
-	return f.MessageIndex.Close()
+	return f.FulltextIndex.Close()
 }
 
-// Index indexes a given element
+// FulltextIndex indexes a given element
 func (f *Search) Index(e IndexElement) error {
-	return f.MessageIndex.Index(e.EventID, e)
+	return f.FulltextIndex.Index(e.EventID, e)
 }
 
 // BatchIndex indexes the given elements
 func (f *Search) BatchIndex(elements []IndexElement) error {
-	batch := f.MessageIndex.NewBatch()
+	batch := f.FulltextIndex.NewBatch()
 
 	for _, element := range elements {
 		err := batch.Index(element.EventID, element)
@@ -67,40 +77,54 @@ func (f *Search) BatchIndex(elements []IndexElement) error {
 			return err
 		}
 	}
-	return f.MessageIndex.Batch(batch)
+	return f.FulltextIndex.Batch(batch)
 }
 
 // Delete deletes an indexed element by the eventID
 func (f *Search) Delete(eventID string) error {
-	return f.MessageIndex.Delete(eventID)
+	return f.FulltextIndex.Delete(eventID)
 }
 
-// Search searches the index given a search term
-func (f *Search) Search(term string, roomIDs []string, limit, from int, orderByTime bool) (*bleve.SearchResult, error) {
-	terms := strings.Split(term, " ")
-
+// Search searches the index given a search term, roomIDs and keys.
+func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, orderByStreamPos bool) (*bleve.SearchResult, error) {
 	qry := bleve.NewConjunctionQuery()
-	for _, t := range terms {
-		qry.AddQuery(bleve.NewQueryStringQuery(t))
-	}
+	termQuery := bleve.NewBooleanQuery()
 
+	matchQuery := bleve.NewMatchQuery(term)
+	matchQuery.SetField("Content")
+	termQuery.AddMust(matchQuery)
+	qry.AddQuery(termQuery)
+
+	roomQuery := bleve.NewBooleanQuery()
 	for _, roomID := range roomIDs {
 		roomSearch := bleve.NewMatchQuery(roomID)
-		roomSearch.SetField("room_id")
-		roomSearch.SetOperator(query.MatchQueryOperatorAnd)
-		qry.AddQuery(roomSearch)
+		roomSearch.SetField("RoomID")
+		roomSearch.SetOperator(query.MatchQueryOperatorOr)
+		roomQuery.AddShould(roomSearch)
+	}
+	if len(roomIDs) > 0 {
+		qry.AddQuery(roomQuery)
+	}
+	keyQuery := bleve.NewBooleanQuery()
+	for _, key := range keys {
+		keySearch := bleve.NewMatchQuery(key)
+		keySearch.SetField("ContentType")
+		keySearch.SetOperator(query.MatchQueryOperatorOr)
+		keyQuery.AddShould(keySearch)
+	}
+	if len(keys) > 0 {
+		keyQuery.SetMinShould(1)
+		qry.AddQuery(keyQuery)
 	}
 
-	s := bleve.NewSearchRequest(qry)
-	s.Size = limit
-	s.From = from
+	s := bleve.NewSearchRequestOptions(qry, limit, from, false)
 
 	s.SortBy([]string{"_score"})
-	if orderByTime {
-		s.SortBy([]string{"-timestamp"})
+	if orderByStreamPos {
+		s.SortBy([]string{"-StreamPosition"})
 	}
 
-	return f.MessageIndex.Search(s)
+	return f.FulltextIndex.Search(s)
 }
 
 func openIndex(path string) (bleve.Index, error) {
@@ -112,43 +136,21 @@ func openIndex(path string) (bleve.Index, error) {
 	enFieldMapping.Analyzer = en.AnalyzerName
 
 	eventMapping := bleve.NewDocumentMapping()
+	eventMapping.AddFieldMappingsAt("Content", enFieldMapping)
+	eventMapping.AddFieldMappingsAt("StreamPosition", bleve.NewNumericFieldMapping())
 
-	eventMapping.AddFieldMappingsAt("content", enFieldMapping)
-	eventMapping.AddFieldMappingsAt("room_id", bleve.NewTextFieldMapping())
-
-	idMapping := bleve.NewTextFieldMapping()
-	idMapping.IncludeInAll = false
-	idMapping.Index = false
-	idMapping.IncludeTermVectors = false
-	idMapping.SkipFreqNorm = true
-	eventMapping.AddFieldMappingsAt("event_id", idMapping)
+	idFieldMapping := bleve.NewKeywordFieldMapping()
+	eventMapping.AddFieldMappingsAt("ContentType", idFieldMapping)
+	eventMapping.AddFieldMappingsAt("RoomID", idFieldMapping)
+	eventMapping.AddFieldMappingsAt("EventID", idFieldMapping)
 
 	mapping := bleve.NewIndexMapping()
-	mapping.AddDocumentMapping("event", eventMapping)
-	mapping.DefaultType = "event"
-	mapping.TypeField = "type"
-	mapping.DefaultAnalyzer = "en"
+	mapping.AddDocumentMapping("Event", eventMapping)
+	mapping.DefaultType = "Event"
 
 	index, err := bleve.New(path, mapping)
 	if err != nil {
 		return nil, err
 	}
 	return index, nil
-}
-
-type IndexElements []IndexElement
-
-// Len implements sort.Interface
-func (ie IndexElements) Len() int {
-	return len(ie)
-}
-
-// Less implements sort.Interface
-func (ie IndexElements) Less(i, j int) bool {
-	return ie[i].Time.After(ie[j].Time)
-}
-
-// Swap implements sort.Interface
-func (ie IndexElements) Swap(i, j int) {
-	ie[i], ie[j] = ie[j], ie[i]
 }
