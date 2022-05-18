@@ -55,7 +55,7 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserver
 
 func TestWriteEvents(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		alice := test.NewUser()
+		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		db, close := MustCreateDatabase(t, dbType)
 		defer close()
@@ -68,7 +68,7 @@ func TestRecentEventsPDU(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		alice := test.NewUser()
+		alice := test.NewUser(t)
 		// dummy room to make sure SQL queries are filtering on room ID
 		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
 
@@ -171,7 +171,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		alice := test.NewUser()
+		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		for i := 0; i < 10; i++ {
 			r.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("hi %d", i)})

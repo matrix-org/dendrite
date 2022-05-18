@@ -24,7 +24,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	internalTest "github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
@@ -135,7 +134,7 @@ func TestQueryProfile(t *testing.T) {
 	t.Run("HTTP API", func(t *testing.T) {
 		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
 		userapi.AddInternalRoutes(router, userAPI)
-		apiURL, cancel := internalTest.ListenAndServe(t, router, false)
+		apiURL, cancel := test.ListenAndServe(t, router, false)
 		defer cancel()
 		httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
 		if err != nil {

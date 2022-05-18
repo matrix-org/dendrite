@@ -80,19 +80,19 @@ func (d *Database) create(db *sql.DB) error {
 	if err := CreateEventsTable(db); err != nil {
 		return err
 	}
-	if err := createRoomsTable(db); err != nil {
+	if err := CreateRoomsTable(db); err != nil {
 		return err
 	}
-	if err := createStateBlockTable(db); err != nil {
+	if err := CreateStateBlockTable(db); err != nil {
 		return err
 	}
-	if err := createStateSnapshotTable(db); err != nil {
+	if err := CreateStateSnapshotTable(db); err != nil {
 		return err
 	}
 	if err := CreatePrevEventsTable(db); err != nil {
 		return err
 	}
-	if err := createRoomAliasesTable(db); err != nil {
+	if err := CreateRoomAliasesTable(db); err != nil {
 		return err
 	}
 	if err := CreateInvitesTable(db); err != nil {
@@ -128,15 +128,15 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	rooms, err := prepareRoomsTable(db)
+	rooms, err := PrepareRoomsTable(db)
 	if err != nil {
 		return err
 	}
-	stateBlock, err := prepareStateBlockTable(db)
+	stateBlock, err := PrepareStateBlockTable(db)
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := prepareStateSnapshotTable(db)
+	stateSnapshot, err := PrepareStateSnapshotTable(db)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	roomAliases, err := prepareRoomAliasesTable(db)
+	roomAliases, err := PrepareRoomAliasesTable(db)
 	if err != nil {
 		return err
 	}

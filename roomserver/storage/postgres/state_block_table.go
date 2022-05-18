@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
@@ -71,12 +70,12 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func createStateBlockTable(db *sql.DB) error {
+func CreateStateBlockTable(db *sql.DB) error {
 	_, err := db.Exec(stateDataSchema)
 	return err
 }
 
-func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{}
 
 	return s, sqlutil.StatementList{
@@ -90,9 +89,9 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
-	var nids types.EventNIDs
-	for _, e := range entries {
-		nids = append(nids, e.EventNID)
+	nids := make(types.EventNIDs, entries.Len())
+	for i := range entries {
+		nids[i] = entries[i].EventNID
 	}
 	stmt := sqlutil.TxStmt(txn, s.insertStateDataStmt)
 	err = stmt.QueryRowContext(
@@ -113,15 +112,15 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
+	var stateBlockNID types.StateBlockNID
+	var result pq.Int64Array
 	for ; rows.Next(); i++ {
-		var stateBlockNID types.StateBlockNID
-		var result pq.Int64Array
 		if err = rows.Scan(&stateBlockNID, &result); err != nil {
 			return nil, err
 		}
-		r := []types.EventNID{}
-		for _, e := range result {
-			r = append(r, types.EventNID(e))
+		r := make([]types.EventNID, len(result))
+		for x := range result {
+			r[x] = types.EventNID(result[x])
 		}
 		results[i] = r
 	}
@@ -141,35 +140,3 @@ func stateBlockNIDsAsArray(stateBlockNIDs []types.StateBlockNID) pq.Int64Array {
 	}
 	return pq.Int64Array(nids)
 }
-
-type stateKeyTupleSorter []types.StateKeyTuple
-
-func (s stateKeyTupleSorter) Len() int           { return len(s) }
-func (s stateKeyTupleSorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
-func (s stateKeyTupleSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
-// Check whether a tuple is in the list. Assumes that the list is sorted.
-func (s stateKeyTupleSorter) contains(value types.StateKeyTuple) bool {
-	i := sort.Search(len(s), func(i int) bool { return !s[i].LessThan(value) })
-	return i < len(s) && s[i] == value
-}
-
-// List the unique eventTypeNIDs and eventStateKeyNIDs.
-// Assumes that the list is sorted.
-func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs pq.Int64Array, eventStateKeyNIDs pq.Int64Array) {
-	eventTypeNIDs = make(pq.Int64Array, len(s))
-	eventStateKeyNIDs = make(pq.Int64Array, len(s))
-	for i := range s {
-		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
-		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
-	}
-	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
-	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
-	return
-}
-
-type int64Sorter []int64
-
-func (s int64Sorter) Len() int           { return len(s) }
-func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
-func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
