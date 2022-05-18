@@ -15,9 +15,10 @@
 package fulltext
 
 import (
+	"strings"
+
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
-	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -90,16 +91,18 @@ func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, or
 	qry := bleve.NewConjunctionQuery()
 	termQuery := bleve.NewBooleanQuery()
 
-	matchQuery := bleve.NewMatchQuery(term)
-	matchQuery.SetField("Content")
-	termQuery.AddMust(matchQuery)
+	terms := strings.Split(term, " ")
+	for _, term := range terms {
+		matchQuery := bleve.NewMatchQuery(term)
+		matchQuery.SetField("Content")
+		termQuery.AddMust(matchQuery)
+	}
 	qry.AddQuery(termQuery)
 
 	roomQuery := bleve.NewBooleanQuery()
 	for _, roomID := range roomIDs {
 		roomSearch := bleve.NewMatchQuery(roomID)
 		roomSearch.SetField("RoomID")
-		roomSearch.SetOperator(query.MatchQueryOperatorOr)
 		roomQuery.AddShould(roomSearch)
 	}
 	if len(roomIDs) > 0 {
@@ -109,16 +112,14 @@ func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, or
 	for _, key := range keys {
 		keySearch := bleve.NewMatchQuery(key)
 		keySearch.SetField("ContentType")
-		keySearch.SetOperator(query.MatchQueryOperatorOr)
 		keyQuery.AddShould(keySearch)
 	}
 	if len(keys) > 0 {
-		keyQuery.SetMinShould(1)
 		qry.AddQuery(keyQuery)
 	}
 
 	s := bleve.NewSearchRequestOptions(qry, limit, from, false)
-
+	s.Fields = []string{"*"}
 	s.SortBy([]string{"_score"})
 	if orderByStreamPos {
 		s.SortBy([]string{"-StreamPosition"})
