@@ -381,11 +381,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			//   they weren't always doing, resulting in flakey tests.
 			if !syncReq.Response.HasUpdates() {
 				syncReq.Since = currentPos
-				syncReq.Timeout = syncReq.Timeout - time.Since(startTime)
-				if syncReq.Timeout < 0 {
-					syncReq.Timeout = 0
+				// do not loop again if the ?timeout= is 0 as that means "return immediately"
+				if syncReq.Timeout > 0 {
+					syncReq.Timeout = syncReq.Timeout - time.Since(startTime)
+					if syncReq.Timeout < 0 {
+						syncReq.Timeout = 0
+					}
+					continue
 				}
-				continue
 			}
 		}
 
