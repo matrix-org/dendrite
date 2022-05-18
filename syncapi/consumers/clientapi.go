@@ -19,9 +19,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -33,19 +36,23 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	topic      string
-	db         storage.Database
-	stream     types.StreamProvider
-	notifier   *notifier.Notifier
-	serverName gomatrixserverlib.ServerName
-	producer   *producers.UserAPIReadProducer
+	ctx          context.Context
+	jetstream    nats.JetStreamContext
+	nats         *nats.Conn
+	durable      string
+	topic        string
+	topicReIndex string
+	db           storage.Database
+	stream       types.StreamProvider
+	notifier     *notifier.Notifier
+	serverName   gomatrixserverlib.ServerName
+	producer     *producers.UserAPIReadProducer
+	fts          *fulltext.Search
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
@@ -53,26 +60,86 @@ func NewOutputClientDataConsumer(
 	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
+	nats *nats.Conn,
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 	producer *producers.UserAPIReadProducer,
+	fts *fulltext.Search,
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
-		db:         store,
-		notifier:   notifier,
-		stream:     stream,
-		serverName: cfg.Matrix.ServerName,
-		producer:   producer,
+		ctx:          process.Context(),
+		jetstream:    js,
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
+		topicReIndex: cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex),
+		durable:      cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
+		nats:         nats,
+		db:           store,
+		notifier:     notifier,
+		stream:       stream,
+		serverName:   cfg.Matrix.ServerName,
+		producer:     producer,
+		fts:          fts,
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
+	_, err := s.nats.Subscribe(s.topicReIndex, func(msg *nats.Msg) {
+		if err := msg.Ack(); err != nil {
+			return
+		}
+		ctx := context.Background()
+		logrus.Debugf("Starting to index events")
+		var offset int
+		start := time.Now()
+		count := 0
+		for {
+			evs, err := s.db.ReIndex(ctx, 1000, int64(offset))
+			if err != nil {
+				logrus.WithError(err).Errorf("unable to get events to index")
+				return
+			}
+			if len(evs) == 0 {
+				break
+			}
+			logrus.Debugf("Indexing %d events", len(evs))
+			elements := make([]fulltext.IndexElement, 0, len(evs))
+
+			for _, ev := range evs {
+				e := fulltext.IndexElement{
+					EventID: ev.EventID(),
+					RoomID:  ev.RoomID(),
+				}
+
+				switch ev.Type() {
+				case "m.room.message":
+					e.Content = gjson.GetBytes(ev.Content(), "body").String()
+				case gomatrixserverlib.MRoomName:
+					e.Content = gjson.GetBytes(ev.Content(), "name").String()
+				case gomatrixserverlib.MRoomTopic:
+					e.Content = gjson.GetBytes(ev.Content(), "topic").String()
+				default:
+					continue
+				}
+
+				if strings.TrimSpace(e.Content) == "" {
+					continue
+				}
+				elements = append(elements, e)
+			}
+			if err = s.fts.BatchIndex(elements); err != nil {
+				logrus.WithError(err).Error("unable to index events")
+				continue
+			}
+			offset += len(evs)
+			count += len(elements)
+		}
+		logrus.Debugf("Indexed %d events in %v", count, time.Since(start))
+	})
+	if err != nil {
+		return err
+	}
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
 		nats.DeliverAll(), nats.ManualAck(),

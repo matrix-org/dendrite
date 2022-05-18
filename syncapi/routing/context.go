@@ -33,11 +33,11 @@ import (
 
 type ContextRespsonse struct {
 	End          string                          `json:"end"`
-	Event        gomatrixserverlib.ClientEvent   `json:"event"`
+	Event        *gomatrixserverlib.ClientEvent  `json:"event,omitempty"`
 	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after,omitempty"`
 	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before,omitempty"`
 	Start        string                          `json:"start"`
-	State        []gomatrixserverlib.ClientEvent `json:"state"`
+	State        []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
 }
 
 func Context(
@@ -139,8 +139,9 @@ func Context(
 	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatAll)
 	newState := applyLazyLoadMembers(device, filter, eventsAfterClient, eventsBeforeClient, state, lazyLoadCache)
 
+	ev := gomatrixserverlib.HeaderedToClientEvent(&requestedEvent, gomatrixserverlib.FormatAll)
 	response := ContextRespsonse{
-		Event:        gomatrixserverlib.HeaderedToClientEvent(&requestedEvent, gomatrixserverlib.FormatAll),
+		Event:        &ev,
 		EventsAfter:  eventsAfterClient,
 		EventsBefore: eventsBeforeClient,
 		State:        gomatrixserverlib.HeaderedToClientEvents(newState, gomatrixserverlib.FormatAll),

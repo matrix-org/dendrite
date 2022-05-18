@@ -100,7 +100,7 @@ func Setup(
 
 	v3mux.Handle("/search",
 		httputil.MakeAuthAPI("search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return Search(req, device, fts)
+			return Search(req, device, syncDB, fts, req.FormValue("next_batch"))
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 }

@@ -164,6 +164,8 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+const selectSearchSQL = "SELECT event_id, headered_event_json FROM syncapi_output_room_events WHERE type = ANY($1) ORDER BY id ASC LIMIT $2 OFFSET $3"
+
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -178,6 +180,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
+	selectSearchStmt              *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -200,6 +203,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.selectSearchStmt, selectSearchSQL},
 	}.Prepare(db)
 }
 
@@ -614,6 +618,29 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			TransactionID:   transactionID,
 			ExcludeFromSync: excludeFromSync,
 		})
+	}
+	return result, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, offset int64, types []string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, pq.StringArray(types), limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var result []gomatrixserverlib.HeaderedEvent
+	var eventID string
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result = append(result, ev)
 	}
 	return result, rows.Err()
 }

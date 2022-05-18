@@ -48,7 +48,7 @@ func AddPublicRoutes(
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	fts, err := fulltext.New("./fts.bleve")
+	fts, err := fulltext.New("/work/fts.bleve")
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to create full text")
 	}
@@ -101,8 +101,8 @@ func AddPublicRoutes(
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.AccountDataStreamProvider,
-		userAPIReadUpdateProducer,
+		base.ProcessContext, cfg, js, natsClient, syncDB, notifier, streams.AccountDataStreamProvider,
+		userAPIReadUpdateProducer, fts,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")

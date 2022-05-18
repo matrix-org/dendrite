@@ -114,6 +114,8 @@ const selectContextAfterEventSQL = "" +
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
+const selectSearchSQL = "SELECT event_id, headered_event_json FROM syncapi_output_room_events WHERE type = ANY($1) LIMIT $2 OFFSET $3 ORDER BY id ASC"
+
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
 	streamIDStatements           *StreamIDStatements
@@ -124,6 +126,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt       *sql.Stmt
 	selectContextBeforeEventStmt *sql.Stmt
 	selectContextAfterEventStmt  *sql.Stmt
+	selectSearchStmt             *sql.Stmt
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Events, error) {
@@ -143,6 +146,7 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.selectSearchStmt, selectSearchSQL},
 	}.Prepare(db)
 }
 
@@ -612,4 +616,27 @@ func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs [
 		}
 	}
 	return
+}
+
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, offset int64, types []string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, types, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var result []gomatrixserverlib.HeaderedEvent
+	var eventID string
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result = append(result, ev)
+	}
+	return result, rows.Err()
 }

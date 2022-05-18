@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -396,8 +397,8 @@ func (d *Database) WriteEvent(
 
 	e := fulltext.IndexElement{
 		EventID: ev.EventID(),
-		Type:    ev.Type(),
 		RoomID:  ev.RoomID(),
+		Time:    time.Now(),
 	}
 
 	switch ev.Type() {
@@ -413,6 +414,7 @@ func (d *Database) WriteEvent(
 		}
 	}
 	if e.Content != "" {
+		logrus.Debugf("Indexing element: %+v", e)
 		if err := d.FTS.Index(e); err != nil {
 			logrus.WithError(err).Warn("failed to write to fulltext index")
 		}
@@ -1077,6 +1079,14 @@ func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.Ig
 
 func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
 	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
+}
+
+func (s *Database) ReIndex(ctx context.Context, limit, offset int64) ([]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.ReIndex(ctx, nil, limit, offset, []string{
+		gomatrixserverlib.MRoomName,
+		gomatrixserverlib.MRoomTopic,
+		"m.room.message",
+	})
 }
 
 func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
