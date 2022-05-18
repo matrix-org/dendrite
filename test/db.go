@@ -63,6 +63,9 @@ func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	if err != nil {
 		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
+	if err = db.Ping(); err != nil {
+		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
+	}
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
 	if err != nil {
 		pqErr, ok := err.(*pq.Error)
