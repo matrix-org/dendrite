@@ -350,6 +350,19 @@ type Response struct {
 	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
 }
 
+func (r *Response) HasUpdates() bool {
+	// purposefully exclude DeviceListsOTKCount as we always include them
+	return (len(r.AccountData.Events) > 0 ||
+		len(r.Presence.Events) > 0 ||
+		len(r.Rooms.Invite) > 0 ||
+		len(r.Rooms.Join) > 0 ||
+		len(r.Rooms.Leave) > 0 ||
+		len(r.Rooms.Peek) > 0 ||
+		len(r.ToDevice.Events) > 0 ||
+		len(r.DeviceLists.Changed) > 0 ||
+		len(r.DeviceLists.Left) > 0)
+}
+
 // NewResponse creates an empty response with initialised maps.
 func NewResponse() *Response {
 	res := Response{}
