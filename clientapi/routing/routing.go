@@ -126,6 +126,12 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	dendriteAdminRouter.Handle("/admin/fulltext/reindex",
+		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminReindex(req, cfg, device, natsClient)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
