@@ -18,7 +18,8 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/analysis/lang/en"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -49,9 +50,9 @@ func (i *IndexElement) SetContentType(v string) {
 }
 
 // New opens a new/existing fulltext index
-func New(path string) (fts *Search, err error) {
+func New(cfg config.Fulltext) (fts *Search, err error) {
 	fts = &Search{}
-	fts.FulltextIndex, err = openIndex(path)
+	fts.FulltextIndex, err = openIndex(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -128,30 +129,38 @@ func (f *Search) Search(term string, roomIDs, keys []string, limit, from int, or
 	return f.FulltextIndex.Search(s)
 }
 
-func openIndex(path string) (bleve.Index, error) {
-	if index, err := bleve.Open(path); err == nil {
+func openIndex(cfg config.Fulltext) (bleve.Index, error) {
+	m := getMapping(cfg)
+	if cfg.InMemory {
+		return bleve.NewMemOnly(m)
+	}
+	if index, err := bleve.Open(string(cfg.IndexPath)); err == nil {
 		return index, nil
 	}
 
+	index, err := bleve.New(string(cfg.IndexPath), m)
+	if err != nil {
+		return nil, err
+	}
+	return index, nil
+}
+
+func getMapping(cfg config.Fulltext) *mapping.IndexMappingImpl {
 	enFieldMapping := bleve.NewTextFieldMapping()
-	enFieldMapping.Analyzer = en.AnalyzerName
+	enFieldMapping.Analyzer = cfg.Language
 
 	eventMapping := bleve.NewDocumentMapping()
 	eventMapping.AddFieldMappingsAt("Content", enFieldMapping)
 	eventMapping.AddFieldMappingsAt("StreamPosition", bleve.NewNumericFieldMapping())
 
+	// Index entries as is
 	idFieldMapping := bleve.NewKeywordFieldMapping()
 	eventMapping.AddFieldMappingsAt("ContentType", idFieldMapping)
 	eventMapping.AddFieldMappingsAt("RoomID", idFieldMapping)
 	eventMapping.AddFieldMappingsAt("EventID", idFieldMapping)
 
-	mapping := bleve.NewIndexMapping()
-	mapping.AddDocumentMapping("Event", eventMapping)
-	mapping.DefaultType = "Event"
-
-	index, err := bleve.New(path, mapping)
-	if err != nil {
-		return nil, err
-	}
-	return index, nil
+	indexMapping := bleve.NewIndexMapping()
+	indexMapping.AddDocumentMapping("Event", eventMapping)
+	indexMapping.DefaultType = "Event"
+	return indexMapping
 }

@@ -19,13 +19,20 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 func mustOpenIndex(t *testing.T, tempDir string) *fulltext.Search {
 	t.Helper()
-	fts, err := fulltext.New(tempDir)
+	cfg := config.Fulltext{}
+	cfg.Defaults(true)
+	if tempDir != "" {
+		cfg.IndexPath = config.Path(tempDir)
+		cfg.InMemory = false
+	}
+	fts, err := fulltext.New(cfg)
 	if err != nil {
 		t.Fatal("failed to open fulltext index:", err)
 	}
@@ -93,7 +100,7 @@ func TestOpen(t *testing.T) {
 }
 
 func TestIndex(t *testing.T) {
-	fts := mustOpenIndex(t, t.TempDir())
+	fts := mustOpenIndex(t, "")
 	defer fts.Close()
 
 	// add some data
@@ -117,7 +124,7 @@ func TestIndex(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	fts := mustOpenIndex(t, t.TempDir())
+	fts := mustOpenIndex(t, "")
 	defer fts.Close()
 	eventIDs, roomIDs := mustAddTestData(t, fts, 0)
 	res1, err := fts.Search("lorem", roomIDs[:1], nil, 50, 0, false)
@@ -213,7 +220,7 @@ func TestSearch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := mustOpenIndex(t, t.TempDir())
+			f := mustOpenIndex(t, "")
 			eventIDs, roomIDs := mustAddTestData(t, f, 0)
 			var searchRooms []string
 			for _, x := range tt.args.roomIndex {
