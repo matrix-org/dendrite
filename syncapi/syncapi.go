@@ -18,7 +18,6 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/sirupsen/logrus"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -47,11 +46,6 @@ func AddPublicRoutes(
 	cfg := &base.Cfg.SyncAPI
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
-
-	fts, err := fulltext.New("/work/fts.bleve")
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to create full text")
-	}
 
 	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {
@@ -104,7 +98,7 @@ func AddPublicRoutes(
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
 		streams.InviteStreamProvider, rsAPI, userAPIStreamEventProducer,
-		fts,
+		base.Fulltext,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
@@ -112,7 +106,7 @@ func AddPublicRoutes(
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
 		base.ProcessContext, cfg, js, natsClient, syncDB, notifier, streams.AccountDataStreamProvider,
-		userAPIReadUpdateProducer, fts,
+		userAPIReadUpdateProducer, base.Fulltext,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -149,6 +143,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches, fts,
+		rsAPI, cfg, base.Caches, base.Fulltext,
 	)
 }

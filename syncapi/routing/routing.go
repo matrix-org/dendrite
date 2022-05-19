@@ -18,6 +18,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -100,6 +101,12 @@ func Setup(
 
 	v3mux.Handle("/search",
 		httputil.MakeAuthAPI("search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if !cfg.Fulltext.Enabled {
+				return util.JSONResponse{
+					Code: http.StatusNotImplemented,
+					JSON: jsonerror.Unknown("Search has been disabled by the server administrator."),
+				}
+			}
 			return Search(req, device, syncDB, fts, req.FormValue("next_batch"))
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

@@ -53,6 +53,7 @@ type OutputClientDataConsumer struct {
 	serverName   gomatrixserverlib.ServerName
 	producer     *producers.UserAPIReadProducer
 	fts          *fulltext.Search
+	cfg          *config.SyncAPI
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
@@ -80,6 +81,7 @@ func NewOutputClientDataConsumer(
 		serverName:   cfg.Matrix.ServerName,
 		producer:     producer,
 		fts:          fts,
+		cfg:          cfg,
 	}
 }
 
@@ -89,13 +91,18 @@ func (s *OutputClientDataConsumer) Start() error {
 		if err := msg.Ack(); err != nil {
 			return
 		}
+		if !s.cfg.Fulltext.Enabled {
+			logrus.Warn("Fulltext indexing is disabled")
+			return
+		}
 		ctx := context.Background()
 		logrus.Debugf("Starting to index events")
 		var offset int
 		start := time.Now()
 		count := 0
+		var id int64 = 0
 		for {
-			evs, err := s.db.ReIndex(ctx, 1000, int64(offset))
+			evs, err := s.db.ReIndex(ctx, 1000, id)
 			if err != nil {
 				logrus.WithError(err).Errorf("unable to get events to index")
 				return
@@ -106,11 +113,14 @@ func (s *OutputClientDataConsumer) Start() error {
 			logrus.Debugf("Indexing %d events", len(evs))
 			elements := make([]fulltext.IndexElement, 0, len(evs))
 
-			for _, ev := range evs {
+			for streamPos, ev := range evs {
+				id = streamPos
 				e := fulltext.IndexElement{
-					EventID: ev.EventID(),
-					RoomID:  ev.RoomID(),
+					EventID:        ev.EventID(),
+					RoomID:         ev.RoomID(),
+					StreamPosition: streamPos,
 				}
+				e.SetContentType(ev.Type())
 
 				switch ev.Type() {
 				case "m.room.message":

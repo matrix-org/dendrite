@@ -59,9 +59,32 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	rooms := joinedRooms
+	if len(joinedRooms) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("User not joined to any rooms."),
+		}
+	}
+	joinedRoomsMap := make(map[string]struct{}, len(joinedRooms))
+	for _, roomID := range joinedRooms {
+		joinedRoomsMap[roomID] = struct{}{}
+	}
+	rooms := []string{}
 	if searchReq.SearchCategories.RoomEvents.Filter.Rooms != nil {
-		rooms = append(*searchReq.SearchCategories.RoomEvents.Filter.Rooms, joinedRooms...)
+		for _, roomID := range *searchReq.SearchCategories.RoomEvents.Filter.Rooms {
+			if _, ok := joinedRoomsMap[roomID]; ok {
+				rooms = append(rooms, roomID)
+			}
+		}
+	} else {
+		rooms = joinedRooms
+	}
+
+	if len(rooms) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("User not allowed to search in this room(s)."),
+		}
 	}
 
 	logrus.Debugf("Searching FTS for rooms %v - %s", rooms, searchReq.SearchCategories.RoomEvents.SearchTerm)
