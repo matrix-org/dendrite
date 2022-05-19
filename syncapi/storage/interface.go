@@ -157,7 +157,7 @@ type Database interface {
 
 	IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
-	ReIndex(ctx context.Context, limit, offset int64) ([]gomatrixserverlib.HeaderedEvent, error)
+	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
 }
 
 type Presence interface {

@@ -1051,8 +1051,8 @@ func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, igno
 	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
 }
 
-func (s *Database) ReIndex(ctx context.Context, limit, offset int64) ([]gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.ReIndex(ctx, nil, limit, offset, []string{
+func (s *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
 		gomatrixserverlib.MRoomName,
 		gomatrixserverlib.MRoomTopic,
 		"m.room.message",

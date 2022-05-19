@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -17,20 +16,16 @@ import (
 var ctx = context.Background()
 
 func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	fts, err := fulltext.New(t.TempDir())
-	if err != nil {
-		t.Fatal("failed to create full text")
-	}
+
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewSyncServerDatasource(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, fts)
+	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
 	return db, func() {
 		close()
-		fts.Close()
 	}
 }
 

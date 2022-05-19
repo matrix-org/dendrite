@@ -114,7 +114,7 @@ const selectContextAfterEventSQL = "" +
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
-const selectSearchSQL = "SELECT event_id, headered_event_json FROM syncapi_output_room_events WHERE type IN ($1) LIMIT $2 OFFSET $3 ORDER BY id ASC"
+const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE type IN ($1) AND id > $2 LIMIT $3 ORDER BY id ASC"
 
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
@@ -618,13 +618,13 @@ func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs [
 	return
 }
 
-func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, offset int64, types []string) ([]gomatrixserverlib.HeaderedEvent, error) {
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
 	params := make([]interface{}, len(types))
 	for i := range types {
 		params[i] = types[i]
 	}
+	params = append(params, afterID)
 	params = append(params, limit)
-	params = append(params, offset)
 	selectSQL := strings.Replace(selectSearchSQL, "($1)", sqlutil.QueryVariadic(len(types)), 1)
 
 	stmt, err := s.db.Prepare(selectSQL)
@@ -638,18 +638,19 @@ func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, l
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
 
-	var result []gomatrixserverlib.HeaderedEvent
 	var eventID string
+	var id int64
+	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
 	for rows.Next() {
 		var ev gomatrixserverlib.HeaderedEvent
 		var eventBytes []byte
-		if err = rows.Scan(&eventID, &eventBytes); err != nil {
+		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
 			return nil, err
 		}
 		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
 			return nil, err
 		}
-		result = append(result, ev)
+		result[id] = ev
 	}
 	return result, rows.Err()
 }
