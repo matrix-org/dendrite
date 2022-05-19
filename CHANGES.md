@@ -1,5 +1,93 @@
 # Changelog
 
+## Dendrite 0.8.5 (2022-05-13)
+
+### Features
+
+* New living documentation available at <https://matrix-org.github.io/dendrite/>, including new installation instructions
+* The built-in NATS Server has been updated to version 2.8.2
+
+### Fixes
+
+* Monolith deployments will no longer panic at startup if given a config file that does not include the `internal_api` and `external_api` options
+* State resolution v2 now correctly identifies other events related to power events, which should fix some event auth issues
+* The latest events updater will no longer implicitly trust the new forward extremities when calculating the current room state, which may help to avoid some state resets
+* The one-time key count is now correctly returned in `/sync` even if the request otherwise timed out, which should reduce the chance that unnecessary one-time keys will be uploaded by clients
+* The `create-account` tool should now work properly when the database is configured using the global connection pool
+
+## Dendrite 0.8.4 (2022-05-10)
+
+### Fixes
+
+* Fixes a regression introduced in the previous version where appservices, push and phone-home statistics would not work over plain HTTP
+* Adds missing indexes to the sync API output events table, which should significantly improve `/sync` performance and reduce database CPU usage
+* Building Dendrite with the `bimg` thumbnailer should now work again (contributed by [database64128](https://github.com/database64128))
+
+## Dendrite 0.8.3 (2022-05-09)
+
+### Features
+
+* Open registration is now harder to enable, which should reduce the chance that Dendrite servers will be used to conduct spam or abuse attacks
+  * Dendrite will only enable open registration if you pass the `--really-enable-open-registration` command line flag at startup
+  * If open registration is enabled but this command line flag is not passed, Dendrite will fail to start up
+* Dendrite now supports phone-home statistic reporting
+  * These statistics include things like the number of registered and active users, some configuration options and platform/environment details, to help us to understand how Dendrite is used
+  * This is not enabled by default — it must be enabled in the `global.report_stats` section of the config file
+* Monolith installations can now be configured with a single global database connection pool (in `global.database` in the config) rather than having to configure each component separately
+  * This also means that you no longer need to balance connection counts between different components, as they will share the same larger pool
+  * Specific components can override the global database settings by specifying their own `database` block
+  * To use only the global pool, you must configure `global.database` and then remove the `database` block from all of the component sections of the config file
+* A new admin API endpoint `/_dendrite/admin/evacuateRoom/{roomID}` has been added, allowing server admins to forcefully part all local users from a given room
+* The sync notifier now only loads members for the relevant rooms, which should reduce CPU usage and load on the database
+* A number of component interfaces have been refactored for cleanliness and developer ease
+* Event auth errors in the log should now be much more useful, including the reason for the event failures
+* The forward extremity calculation in the roomserver has been simplified
+* A new index has been added to the one-time keys table in the keyserver which should speed up key count lookups
+
+### Fixes
+
+* Dendrite will no longer process events for rooms where there are no local users joined, which should help to reduce CPU and RAM usage
+* A bug has been fixed in event auth when changing the user levels in `m.room.power_levels` events
+* Usernames should no longer be duplicated when no room name is set
+* Device display names should now be correctly propagated over federation
+* A panic when uploading cross-signing signatures has been fixed
+* Presence is now correctly limited in `/sync` based on the filters
+* The presence stream position returned by `/sync` will now be correct if no presence events were returned
+* The media `/config` endpoint will no longer return a maximum upload size field if it is configured to be unlimited in the Dendrite config
+* The server notices room will no longer produce "User is already joined to the room" errors
+* Consumer errors will no longer flood the logs during a graceful shutdown
+* Sync API and federation API consumers will no longer unnecessarily query added state events matching the one in the output event
+* The Sync API will no longer unnecessarily track invites for remote users
+
+## Dendrite 0.8.2 (2022-04-27)
+
+### Features
+
+* Lazy-loading has been added to the `/sync` endpoint, which should speed up syncs considerably
+* Filtering has been added to the `/messages` endpoint
+* The room summary now contains "heroes" (up to 5 users in the room) for clients to display when no room name is set
+* The existing lazy-loading caches will now be used by `/messages` and `/context` so that member events will not be sent to clients more times than necessary
+* The account data stream now uses the provided filters
+* The built-in NATS Server has been updated to version 2.8.0
+* The `/state` and `/state_ids` endpoints will now return `M_NOT_FOUND` for rejected events
+* Repeated calls to the `/redact` endpoint will now be idempotent when a transaction ID is given
+* Dendrite should now be able to run as a Windows service under Service Control Manager
+
+### Fixes
+
+* Fictitious presence updates will no longer be created for users which have not sent us presence updates, which should speed up complete syncs considerably
+* Uploading cross-signing device signatures should now be more reliable, fixing a number of bugs with cross-signing
+* All account data should now be sent properly on a complete sync, which should eliminate problems with client settings or key backups appearing to be missing
+* Account data will now be limited correctly on incremental syncs, returning the stream position of the most recent update rather than the latest stream position
+* Account data will not be sent for parted rooms, which should reduce the number of left/forgotten rooms reappearing in clients as empty rooms
+* The TURN username hash has been fixed which should help to resolve some problems when using TURN for voice calls (contributed by [fcwoknhenuxdfiyv](https://github.com/fcwoknhenuxdfiyv))
+* Push rules can no longer be modified using the account data endpoints
+* Querying account availability should now work properly in polylith deployments
+* A number of bugs with sync filters have been fixed
+* A default sync filter will now be used if the request contains a filter ID that does not exist
+* The `pushkey_ts` field is now using seconds instead of milliseconds
+* A race condition when gracefully shutting down has been fixed, so JetStream should no longer cause the process to exit before other Dendrite components are finished shutting down
+
 ## Dendrite 0.8.1 (2022-04-07)
 
 ### Fixes

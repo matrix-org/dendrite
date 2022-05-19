@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/consumers"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
@@ -75,7 +76,7 @@ func (r *FederationInternalAPI) PerformJoin(
 	seenSet := make(map[gomatrixserverlib.ServerName]bool)
 	var uniqueList []gomatrixserverlib.ServerName
 	for _, srv := range request.ServerNames {
-		if seenSet[srv] {
+		if seenSet[srv] || srv == r.cfg.Matrix.ServerName {
 			continue
 		}
 		seenSet[srv] = true
@@ -233,6 +234,21 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	)
 	if err != nil {
 		return fmt.Errorf("respSendJoin.Check: %w", err)
+	}
+
+	// We need to immediately update our list of joined hosts for this room now as we are technically
+	// joined. We must do this synchronously: we cannot rely on the roomserver output events as they
+	// will happen asyncly. If we don't update this table, you can end up with bad failure modes like
+	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
+	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
+	// The events are trusted now as we performed auth checks above.
+	joinedHosts, err := consumers.JoinedHostsFromEvents(respState.StateEvents.TrustedEvents(respMakeJoin.RoomVersion, false))
+	if err != nil {
+		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
+	}
+	logrus.WithField("hosts", joinedHosts).WithField("room", roomID).Info("Joined federated room with hosts")
+	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
+		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
 
 	// If we successfully performed a send_join above then the other
@@ -564,20 +580,6 @@ func (r *FederationInternalAPI) PerformInvite(
 }
 
 // PerformServersAlive implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformServersAlive(
-	ctx context.Context,
-	request *api.PerformServersAliveRequest,
-	response *api.PerformServersAliveResponse,
-) (err error) {
-	for _, srv := range request.Servers {
-		_ = r.db.RemoveServerFromBlacklist(srv)
-		r.queues.RetryServer(srv)
-	}
-
-	return nil
-}
-
-// PerformServersAlive implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformBroadcastEDU(
 	ctx context.Context,
 	request *api.PerformBroadcastEDURequest,
@@ -600,16 +602,16 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 	if err = r.queues.SendEDU(edu, r.cfg.Matrix.ServerName, destinations); err != nil {
 		return fmt.Errorf("r.queues.SendEDU: %w", err)
 	}
-
-	wakeReq := &api.PerformServersAliveRequest{
-		Servers: destinations,
-	}
-	wakeRes := &api.PerformServersAliveResponse{}
-	if err := r.PerformServersAlive(ctx, wakeReq, wakeRes); err != nil {
-		return fmt.Errorf("r.PerformServersAlive: %w", err)
-	}
+	r.MarkServersAlive(destinations)
 
 	return nil
+}
+
+func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
+	for _, srv := range destinations {
+		_ = r.db.RemoveServerFromBlacklist(srv)
+		r.queues.RetryServer(srv)
+	}
 }
 
 func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {
@@ -664,7 +666,7 @@ func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder
 
 // FederatedAuthProvider is an auth chain provider which fetches events from the server provided
 func federatedAuthProvider(
-	ctx context.Context, federation *gomatrixserverlib.FederationClient,
+	ctx context.Context, federation api.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, server gomatrixserverlib.ServerName,
 ) gomatrixserverlib.AuthChainProvider {
 	// A list of events that we have retried, if they were not included in

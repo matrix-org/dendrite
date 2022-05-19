@@ -10,9 +10,8 @@ import (
 )
 
 type EventJSONPair struct {
-	EventNID    types.EventNID
-	RoomVersion gomatrixserverlib.RoomVersion
-	EventJSON   []byte
+	EventNID  types.EventNID
+	EventJSON []byte
 }
 
 type EventJSON interface {
@@ -36,7 +35,8 @@ type EventStateKeys interface {
 
 type Events interface {
 	InsertEvent(
-		ctx context.Context, txn *sql.Tx, i types.RoomNID, j types.EventTypeNID, k types.EventStateKeyNID, eventID string,
+		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventTypeNID types.EventTypeNID,
+		eventStateKeyNID types.EventStateKeyNID, eventID string,
 		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
@@ -72,7 +72,7 @@ type Rooms interface {
 	UpdateLatestEventNIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID, stateSnapshotNID types.StateSnapshotNID) error
 	SelectRoomVersionsForRoomNIDs(ctx context.Context, txn *sql.Tx, roomNID []types.RoomNID) (map[types.RoomNID]gomatrixserverlib.RoomVersion, error)
 	SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error)
-	SelectRoomIDs(ctx context.Context, txn *sql.Tx) ([]string, error)
+	SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error)
 	BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error)
 	BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error)
 }

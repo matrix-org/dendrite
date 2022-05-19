@@ -29,4 +29,4 @@ EXPOSE 8008 8448
 CMD ./generate-keys --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
  ./generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
  cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
- ./dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+ ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}

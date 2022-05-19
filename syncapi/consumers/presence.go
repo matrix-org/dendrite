@@ -41,7 +41,7 @@ type PresenceConsumer struct {
 	db            storage.Database
 	stream        types.StreamProvider
 	notifier      *notifier.Notifier
-	deviceAPI     api.UserDeviceAPI
+	deviceAPI     api.SyncUserAPI
 	cfg           *config.SyncAPI
 }
 
@@ -55,7 +55,7 @@ func NewPresenceConsumer(
 	db storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
-	deviceAPI api.UserDeviceAPI,
+	deviceAPI api.SyncUserAPI,
 ) *PresenceConsumer {
 	return &PresenceConsumer{
 		ctx:           process.Context(),
@@ -88,6 +88,11 @@ func (s *PresenceConsumer) Start() error {
 			}
 			return
 		}
+		if presence == nil {
+			presence = &types.PresenceInternal{
+				UserID: userID,
+			}
+		}
 
 		deviceRes := api.QueryDevicesResponse{}
 		if err = s.deviceAPI.QueryDevices(s.ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
@@ -106,7 +111,9 @@ func (s *PresenceConsumer) Start() error {
 
 		m.Header.Set(jetstream.UserID, presence.UserID)
 		m.Header.Set("presence", presence.ClientFields.Presence)
-		m.Header.Set("status_msg", *presence.ClientFields.StatusMsg)
+		if presence.ClientFields.StatusMsg != nil {
+			m.Header.Set("status_msg", *presence.ClientFields.StatusMsg)
+		}
 		m.Header.Set("last_active_ts", strconv.Itoa(int(presence.LastActiveTS)))
 
 		if err = msg.RespondMsg(m); err != nil {
@@ -131,8 +138,11 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	presence := msg.Header.Get("presence")
 	timestamp := msg.Header.Get("last_active_ts")
 	fromSync, _ := strconv.ParseBool(msg.Header.Get("from_sync"))
-
 	logrus.Debugf("syncAPI received presence event: %+v", msg.Header)
+
+	if fromSync { // do not process local presence changes; we already did this synchronously.
+		return true
+	}
 
 	ts, err := strconv.Atoi(timestamp)
 	if err != nil {
@@ -144,15 +154,19 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 		newMsg := msg.Header.Get("status_msg")
 		statusMsg = &newMsg
 	}
-	// OK is already checked, so no need to do it again
+	// already checked, so no need to check error
 	p, _ := types.PresenceFromString(presence)
-	pos, err := s.db.UpdatePresence(ctx, userID, p, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
-	if err != nil {
-		return true
-	}
 
+	s.EmitPresence(ctx, userID, p, statusMsg, ts, fromSync)
+	return true
+}
+
+func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
+	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
+	if err != nil {
+		logrus.WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")
+		return
+	}
 	s.stream.Advance(pos)
 	s.notifier.OnNewPresence(types.StreamingToken{PresencePosition: pos}, userID)
-
-	return true
 }

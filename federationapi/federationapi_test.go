@@ -3,16 +3,249 @@ package federationapi_test
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/federationapi"
-	"github.com/matrix-org/dendrite/internal/test"
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/internal"
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
 )
+
+type fedRoomserverAPI struct {
+	rsapi.FederationRoomserverAPI
+	inputRoomEvents   func(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse)
+	queryRoomsForUser func(ctx context.Context, req *rsapi.QueryRoomsForUserRequest, res *rsapi.QueryRoomsForUserResponse) error
+}
+
+// PerformJoin will call this function
+func (f *fedRoomserverAPI) InputRoomEvents(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
+	if f.inputRoomEvents == nil {
+		return
+	}
+	f.inputRoomEvents(ctx, req, res)
+}
+
+// keychange consumer calls this
+func (f *fedRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *rsapi.QueryRoomsForUserRequest, res *rsapi.QueryRoomsForUserResponse) error {
+	if f.queryRoomsForUser == nil {
+		return nil
+	}
+	return f.queryRoomsForUser(ctx, req, res)
+}
+
+// TODO: This struct isn't generic, only works for TestFederationAPIJoinThenKeyUpdate
+type fedClient struct {
+	api.FederationClient
+	allowJoins []*test.Room
+	keys       map[gomatrixserverlib.ServerName]struct {
+		key   ed25519.PrivateKey
+		keyID gomatrixserverlib.KeyID
+	}
+	t       *testing.T
+	sentTxn bool
+}
+
+func (f *fedClient) GetServerKeys(ctx context.Context, matrixServer gomatrixserverlib.ServerName) (gomatrixserverlib.ServerKeys, error) {
+	fmt.Println("GetServerKeys:", matrixServer)
+	var keys gomatrixserverlib.ServerKeys
+	var keyID gomatrixserverlib.KeyID
+	var pkey ed25519.PrivateKey
+	for srv, data := range f.keys {
+		if srv == matrixServer {
+			pkey = data.key
+			keyID = data.keyID
+			break
+		}
+	}
+	if pkey == nil {
+		return keys, nil
+	}
+
+	keys.ServerName = matrixServer
+	keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(10 * time.Hour))
+	publicKey := pkey.Public().(ed25519.PublicKey)
+	keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
+		keyID: {
+			Key: gomatrixserverlib.Base64Bytes(publicKey),
+		},
+	}
+	toSign, err := json.Marshal(keys.ServerKeyFields)
+	if err != nil {
+		return keys, err
+	}
+
+	keys.Raw, err = gomatrixserverlib.SignJSON(
+		string(matrixServer), keyID, pkey, toSign,
+	)
+	if err != nil {
+		return keys, err
+	}
+
+	return keys, nil
+}
+
+func (f *fedClient) MakeJoin(ctx context.Context, s gomatrixserverlib.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMakeJoin, err error) {
+	for _, r := range f.allowJoins {
+		if r.ID == roomID {
+			res.RoomVersion = r.Version
+			res.JoinEvent = gomatrixserverlib.EventBuilder{
+				Sender:     userID,
+				RoomID:     roomID,
+				Type:       "m.room.member",
+				StateKey:   &userID,
+				Content:    gomatrixserverlib.RawJSON([]byte(`{"membership":"join"}`)),
+				PrevEvents: r.ForwardExtremities(),
+			}
+			var needed gomatrixserverlib.StateNeeded
+			needed, err = gomatrixserverlib.StateNeededForEventBuilder(&res.JoinEvent)
+			if err != nil {
+				f.t.Errorf("StateNeededForEventBuilder: %v", err)
+				return
+			}
+			res.JoinEvent.AuthEvents = r.MustGetAuthEventRefsForEvent(f.t, needed)
+			return
+		}
+	}
+	return
+}
+func (f *fedClient) SendJoin(ctx context.Context, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res gomatrixserverlib.RespSendJoin, err error) {
+	for _, r := range f.allowJoins {
+		if r.ID == event.RoomID() {
+			r.InsertEvent(f.t, event.Headered(r.Version))
+			f.t.Logf("Join event: %v", event.EventID())
+			res.StateEvents = gomatrixserverlib.NewEventJSONsFromHeaderedEvents(r.CurrentState())
+			res.AuthEvents = gomatrixserverlib.NewEventJSONsFromHeaderedEvents(r.Events())
+		}
+	}
+	return
+}
+
+func (f *fedClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error) {
+	for _, edu := range t.EDUs {
+		if edu.Type == gomatrixserverlib.MDeviceListUpdate {
+			f.sentTxn = true
+		}
+	}
+	f.t.Logf("got /send")
+	return
+}
+
+// Regression test to make sure that /send_join is updating the destination hosts synchronously and
+// isn't relying on the roomserver.
+func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testFederationAPIJoinThenKeyUpdate(t, dbType)
+	})
+}
+
+func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
+	base, close := testrig.CreateBaseDendrite(t, dbType)
+	base.Cfg.FederationAPI.PreferDirectFetch = true
+	defer close()
+	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+
+	serverA := gomatrixserverlib.ServerName("server.a")
+	serverAKeyID := gomatrixserverlib.KeyID("ed25519:servera")
+	serverAPrivKey := test.PrivateKeyA
+	creator := test.NewUser(t, test.WithSigningServer(serverA, serverAKeyID, serverAPrivKey))
+
+	myServer := base.Cfg.Global.ServerName
+	myServerKeyID := base.Cfg.Global.KeyID
+	myServerPrivKey := base.Cfg.Global.PrivateKey
+	joiningUser := test.NewUser(t, test.WithSigningServer(myServer, myServerKeyID, myServerPrivKey))
+	fmt.Printf("creator: %v joining user: %v\n", creator.ID, joiningUser.ID)
+	room := test.NewRoom(t, creator)
+
+	rsapi := &fedRoomserverAPI{
+		inputRoomEvents: func(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
+			if req.Asynchronous {
+				t.Errorf("InputRoomEvents from PerformJoin MUST be synchronous")
+			}
+		},
+		queryRoomsForUser: func(ctx context.Context, req *rsapi.QueryRoomsForUserRequest, res *rsapi.QueryRoomsForUserResponse) error {
+			if req.UserID == joiningUser.ID && req.WantMembership == "join" {
+				res.RoomIDs = []string{room.ID}
+				return nil
+			}
+			return fmt.Errorf("unexpected queryRoomsForUser: %+v", *req)
+		},
+	}
+	fc := &fedClient{
+		allowJoins: []*test.Room{room},
+		t:          t,
+		keys: map[gomatrixserverlib.ServerName]struct {
+			key   ed25519.PrivateKey
+			keyID gomatrixserverlib.KeyID
+		}{
+			serverA: {
+				key:   serverAPrivKey,
+				keyID: serverAKeyID,
+			},
+			myServer: {
+				key:   myServerPrivKey,
+				keyID: myServerKeyID,
+			},
+		},
+	}
+	fsapi := federationapi.NewInternalAPI(base, fc, rsapi, base.Caches, nil, false)
+
+	var resp api.PerformJoinResponse
+	fsapi.PerformJoin(context.Background(), &api.PerformJoinRequest{
+		RoomID:      room.ID,
+		UserID:      joiningUser.ID,
+		ServerNames: []gomatrixserverlib.ServerName{serverA},
+	}, &resp)
+	if resp.JoinedVia != serverA {
+		t.Errorf("PerformJoin: joined via %v want %v", resp.JoinedVia, serverA)
+	}
+	if resp.LastError != nil {
+		t.Fatalf("PerformJoin: returned error: %+v", *resp.LastError)
+	}
+
+	// Inject a keyserver key change event and ensure we try to send it out. If we don't, then the
+	// federationapi is incorrectly waiting for an output room event to arrive to update the joined
+	// hosts table.
+	key := keyapi.DeviceMessage{
+		Type: keyapi.TypeDeviceKeyUpdate,
+		DeviceKeys: &keyapi.DeviceKeys{
+			UserID:      joiningUser.ID,
+			DeviceID:    "MY_DEVICE",
+			DisplayName: "BLARGLE",
+			KeyJSON:     []byte(`{}`),
+		},
+	}
+	b, err := json.Marshal(key)
+	if err != nil {
+		t.Fatalf("Failed to marshal device message: %s", err)
+	}
+
+	msg := &nats.Msg{
+		Subject: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		Header:  nats.Header{},
+		Data:    b,
+	}
+	msg.Header.Set(jetstream.UserID, key.UserID)
+
+	testrig.MustPublishMsgs(t, jsctx, msg)
+	time.Sleep(500 * time.Millisecond)
+	if !fc.sentTxn {
+		t.Fatalf("did not send device list update")
+	}
+}
 
 // Tests that event IDs with '/' in them (escaped as %2F) are correctly passed to the right handler and don't 404.
 // Relevant for v3 rooms and a cause of flakey sytests as the IDs are randomly generated.
@@ -27,10 +260,9 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	keyRing := &test.NopJSONVerifier{}
-	fsAPI := base.FederationAPIHTTPClient()
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(base.ProcessContext, base.PublicFederationAPIMux, base.PublicKeyAPIMux, base.PublicWellKnownAPIMux, &cfg.FederationAPI, nil, nil, keyRing, nil, fsAPI, nil, &cfg.MSCs, nil)
+	federationapi.AddPublicRoutes(base, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, nil)
 	baseURL, cancel := test.ListenAndServe(t, base.PublicFederationAPIMux, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
@@ -86,7 +318,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 		}
 		gerr, ok := err.(gomatrix.HTTPError)
 		if !ok {
-			t.Errorf("failed to cast response error as gomatrix.HTTPError")
+			t.Errorf("failed to cast response error as gomatrix.HTTPError: %s", err)
 			continue
 		}
 		t.Logf("Error: %+v", gerr)

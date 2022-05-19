@@ -59,18 +59,6 @@ type GetAliasesForRoomIDResponse struct {
 	Aliases []string `json:"aliases"`
 }
 
-// GetCreatorIDForAliasRequest is a request to GetCreatorIDForAlias
-type GetCreatorIDForAliasRequest struct {
-	// The alias we want to find the creator of
-	Alias string `json:"alias"`
-}
-
-// GetCreatorIDForAliasResponse is a response to GetCreatorIDForAlias
-type GetCreatorIDForAliasResponse struct {
-	// The user ID of the alias creator
-	UserID string `json:"user_id"`
-}
-
 // RemoveRoomAliasRequest is a request to RemoveRoomAlias
 type RemoveRoomAliasRequest struct {
 	// ID of the user removing the alias

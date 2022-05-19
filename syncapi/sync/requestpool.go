@@ -45,31 +45,38 @@ import (
 type RequestPool struct {
 	db       storage.Database
 	cfg      *config.SyncAPI
-	userAPI  userapi.UserInternalAPI
-	keyAPI   keyapi.KeyInternalAPI
-	rsAPI    roomserverAPI.RoomserverInternalAPI
+	userAPI  userapi.SyncUserAPI
+	keyAPI   keyapi.SyncKeyAPI
+	rsAPI    roomserverAPI.SyncRoomserverAPI
 	lastseen *sync.Map
 	presence *sync.Map
 	streams  *streams.Streams
 	Notifier *notifier.Notifier
 	producer PresencePublisher
+	consumer PresenceConsumer
 }
 
 type PresencePublisher interface {
 	SendPresence(userID string, presence types.Presence, statusMsg *string) error
 }
 
+type PresenceConsumer interface {
+	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool)
+}
+
 // NewRequestPool makes a new RequestPool
 func NewRequestPool(
 	db storage.Database, cfg *config.SyncAPI,
-	userAPI userapi.UserInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	userAPI userapi.SyncUserAPI, keyAPI keyapi.SyncKeyAPI,
+	rsAPI roomserverAPI.SyncRoomserverAPI,
 	streams *streams.Streams, notifier *notifier.Notifier,
-	producer PresencePublisher,
+	producer PresencePublisher, consumer PresenceConsumer, enableMetrics bool,
 ) *RequestPool {
-	prometheus.MustRegister(
-		activeSyncRequests, waitingSyncRequests,
-	)
+	if enableMetrics {
+		prometheus.MustRegister(
+			activeSyncRequests, waitingSyncRequests,
+		)
+	}
 	rp := &RequestPool{
 		db:       db,
 		cfg:      cfg,
@@ -81,6 +88,7 @@ func NewRequestPool(
 		streams:  streams,
 		Notifier: notifier,
 		producer: producer,
+		consumer: consumer,
 	}
 	go rp.cleanLastSeen()
 	go rp.cleanPresence(db, time.Minute*5)
@@ -127,14 +135,23 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	if !ok { // this should almost never happen
 		return
 	}
+
 	newPresence := types.PresenceInternal{
-		ClientFields: types.PresenceClientResponse{
-			Presence: presenceID.String(),
-		},
 		Presence:     presenceID,
 		UserID:       userID,
 		LastActiveTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
+
+	// ensure we also send the current status_msg to federated servers and not nil
+	dbPresence, err := db.GetPresence(context.Background(), userID)
+	if err != nil && err != sql.ErrNoRows {
+		return
+	}
+	if dbPresence != nil {
+		newPresence.ClientFields = dbPresence.ClientFields
+	}
+	newPresence.ClientFields.Presence = presenceID.String()
+
 	defer rp.presence.Store(userID, newPresence)
 	// avoid spamming presence updates when syncing
 	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
@@ -145,16 +162,17 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 		}
 	}
 
-	// ensure we also send the current status_msg to federated servers and not nil
-	dbPresence, err := db.GetPresence(context.Background(), userID)
-	if err != nil && err != sql.ErrNoRows {
-		return
-	}
-
-	if err := rp.producer.SendPresence(userID, presenceID, dbPresence.ClientFields.StatusMsg); err != nil {
+	if err := rp.producer.SendPresence(userID, presenceID, newPresence.ClientFields.StatusMsg); err != nil {
 		logrus.WithError(err).Error("Unable to publish presence message from sync")
 		return
 	}
+
+	// now synchronously update our view of the world. It's critical we do this before calculating
+	// the /sync response else we may not return presence: online immediately.
+	rp.consumer.EmitPresence(
+		context.Background(), userID, presenceID, newPresence.ClientFields.StatusMsg,
+		int(gomatrixserverlib.AsTimestamp(time.Now())), true,
+	)
 }
 
 func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device) {
@@ -179,6 +197,7 @@ func (rp *RequestPool) updateLastSeen(req *http.Request, device *userapi.Device)
 		UserID:     device.UserID,
 		DeviceID:   device.ID,
 		RemoteAddr: remoteAddr,
+		UserAgent:  req.UserAgent(),
 	}
 	lsres := &userapi.PerformLastSeenUpdateResponse{}
 	go rp.userAPI.PerformLastSeenUpdate(req.Context(), lsreq, lsres) // nolint:errcheck
@@ -232,114 +251,151 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
 
-	currentPos := rp.Notifier.CurrentPosition()
+	// loop until we get some data
+	for {
+		startTime := time.Now()
+		currentPos := rp.Notifier.CurrentPosition()
 
-	if !rp.shouldReturnImmediately(syncReq, currentPos) {
-		timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
-		defer timer.Stop()
+		// if the since token matches the current positions, wait via the notifier
+		if !rp.shouldReturnImmediately(syncReq, currentPos) {
+			timer := time.NewTimer(syncReq.Timeout) // case of timeout=0 is handled above
+			defer timer.Stop()
 
-		userStreamListener := rp.Notifier.GetListener(*syncReq)
-		defer userStreamListener.Close()
+			userStreamListener := rp.Notifier.GetListener(*syncReq)
+			defer userStreamListener.Close()
 
-		giveup := func() util.JSONResponse {
-			syncReq.Response.NextBatch = syncReq.Since
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: syncReq.Response,
+			giveup := func() util.JSONResponse {
+				syncReq.Log.Debugln("Responding to sync since client gave up or timeout was reached")
+				syncReq.Response.NextBatch = syncReq.Since
+				// We should always try to include OTKs in sync responses, otherwise clients might upload keys
+				// even if that's not required. See also:
+				// https://github.com/matrix-org/synapse/blob/29f06704b8871a44926f7c99e73cf4a978fb8e81/synapse/rest/client/sync.py#L276-L281
+				// Only try to get OTKs if the context isn't already done.
+				if syncReq.Context.Err() == nil {
+					err = internal.DeviceOTKCounts(syncReq.Context, rp.keyAPI, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Response)
+					if err != nil && err != context.Canceled {
+						syncReq.Log.WithError(err).Warn("failed to get OTK counts")
+					}
+				}
+				return util.JSONResponse{
+					Code: http.StatusOK,
+					JSON: syncReq.Response,
+				}
+			}
+
+			select {
+			case <-syncReq.Context.Done(): // Caller gave up
+				return giveup()
+
+			case <-timer.C: // Timeout reached
+				return giveup()
+
+			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
+				syncReq.Log.Debugln("Responding to sync after wake-up")
+				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+			}
+		} else {
+			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
+		}
+
+		if syncReq.Since.IsEmpty() {
+			// Complete sync
+			syncReq.Response.NextBatch = types.StreamingToken{
+				PDUPosition: rp.streams.PDUStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				TypingPosition: rp.streams.TypingStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				ReceiptPosition: rp.streams.ReceiptStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				InvitePosition: rp.streams.InviteStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				AccountDataPosition: rp.streams.AccountDataStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				NotificationDataPosition: rp.streams.NotificationDataStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+				PresencePosition: rp.streams.PresenceStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
+			}
+		} else {
+			// Incremental sync
+			syncReq.Response.NextBatch = types.StreamingToken{
+				PDUPosition: rp.streams.PDUStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.PDUPosition, currentPos.PDUPosition,
+				),
+				TypingPosition: rp.streams.TypingStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.TypingPosition, currentPos.TypingPosition,
+				),
+				ReceiptPosition: rp.streams.ReceiptStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
+				),
+				InvitePosition: rp.streams.InviteStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.InvitePosition, currentPos.InvitePosition,
+				),
+				SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
+				),
+				AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
+				),
+				NotificationDataPosition: rp.streams.NotificationDataStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
+				),
+				DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
+				),
+				PresencePosition: rp.streams.PresenceStreamProvider.IncrementalSync(
+					syncReq.Context, syncReq,
+					syncReq.Since.PresencePosition, currentPos.PresencePosition,
+				),
+			}
+			// it's possible for there to be no updates for this user even though since < current pos,
+			// e.g busy servers with a quiet user. In this scenario, we don't want to return a no-op
+			// response immediately, so let's try this again but pretend they bumped their since token.
+			// If the incremental sync was processed very quickly then we expect the next loop to block
+			// with a notifier, but if things are slow it's entirely possible that currentPos is no
+			// longer the current position so we will hit this code path again. We need to do this and
+			// not return a no-op response because:
+			// - It's an inefficient use of bandwidth.
+			// - Some sytests which test 'waking up' sync rely on some sync requests to block, which
+			//   they weren't always doing, resulting in flakey tests.
+			if !syncReq.Response.HasUpdates() {
+				syncReq.Since = currentPos
+				// do not loop again if the ?timeout= is 0 as that means "return immediately"
+				if syncReq.Timeout > 0 {
+					syncReq.Timeout = syncReq.Timeout - time.Since(startTime)
+					if syncReq.Timeout < 0 {
+						syncReq.Timeout = 0
+					}
+					continue
+				}
 			}
 		}
 
-		select {
-		case <-syncReq.Context.Done(): // Caller gave up
-			return giveup()
-
-		case <-timer.C: // Timeout reached
-			return giveup()
-
-		case <-userStreamListener.GetNotifyChannel(syncReq.Since):
-			syncReq.Log.Debugln("Responding to sync after wake-up")
-			currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: syncReq.Response,
 		}
-	} else {
-		syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
-	}
-
-	if syncReq.Since.IsEmpty() {
-		// Complete sync
-		syncReq.Response.NextBatch = types.StreamingToken{
-			PDUPosition: rp.streams.PDUStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			TypingPosition: rp.streams.TypingStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			ReceiptPosition: rp.streams.ReceiptStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			InvitePosition: rp.streams.InviteStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			AccountDataPosition: rp.streams.AccountDataStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			NotificationDataPosition: rp.streams.NotificationDataStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-			PresencePosition: rp.streams.PresenceStreamProvider.CompleteSync(
-				syncReq.Context, syncReq,
-			),
-		}
-	} else {
-		// Incremental sync
-		syncReq.Response.NextBatch = types.StreamingToken{
-			PDUPosition: rp.streams.PDUStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.PDUPosition, currentPos.PDUPosition,
-			),
-			TypingPosition: rp.streams.TypingStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.TypingPosition, currentPos.TypingPosition,
-			),
-			ReceiptPosition: rp.streams.ReceiptStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
-			),
-			InvitePosition: rp.streams.InviteStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.InvitePosition, currentPos.InvitePosition,
-			),
-			SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
-			),
-			AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
-			),
-			NotificationDataPosition: rp.streams.NotificationDataStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
-			),
-			DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
-			),
-			PresencePosition: rp.streams.PresenceStreamProvider.IncrementalSync(
-				syncReq.Context, syncReq,
-				syncReq.Since.PresencePosition, currentPos.PresencePosition,
-			),
-		}
-	}
-
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: syncReq.Response,
 	}
 }
 

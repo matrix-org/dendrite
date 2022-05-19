@@ -60,7 +60,7 @@ type httpKeyInternalAPI struct {
 	httpClient *http.Client
 }
 
-func (h *httpKeyInternalAPI) SetUserAPI(i userapi.UserInternalAPI) {
+func (h *httpKeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
 	// no-op: doesn't need it
 }
 func (h *httpKeyInternalAPI) InputDeviceListUpdate(

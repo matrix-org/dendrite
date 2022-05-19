@@ -48,7 +48,7 @@ type UserInternalAPI struct {
 	ServerName           gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
-	KeyAPI      keyapi.KeyInternalAPI
+	KeyAPI      keyapi.UserKeyAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -88,6 +88,13 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 			AccountType:  req.AccountType,
 		}
 		return nil
+	}
+
+	// Inform the SyncAPI about the newly created push_rules
+	if err = a.SyncProducer.SendAccountData(acc.UserID, "", "m.push_rules"); err != nil {
+		util.GetLogger(ctx).WithFields(logrus.Fields{
+			"user_id": acc.UserID,
+		}).WithError(err).Warn("failed to send account data to the SyncAPI")
 	}
 
 	if req.AccountType == api.AccountTypeGuest {
@@ -203,7 +210,7 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
-	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr); err != nil {
+	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
 		return fmt.Errorf("a.DeviceDB.UpdateDeviceLastSeen: %w", err)
 	}
 	return nil

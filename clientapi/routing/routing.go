@@ -48,16 +48,17 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, synapseAdminRouter *mux.Router, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
-	userAPI userapi.UserInternalAPI,
-	userDirectoryProvider userapi.UserDirectoryProvider,
+	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
+	cfg *config.ClientAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
+	userAPI userapi.ClientUserAPI,
+	userDirectoryProvider userapi.QuerySearchProfilesAPI,
 	federation *gomatrixserverlib.FederationClient,
 	syncProducer *producers.SyncAPIProducer,
 	transactionsCache *transactions.Cache,
-	federationSender federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
+	federationSender federationAPI.ClientFederationAPI,
+	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
@@ -118,6 +119,12 @@ func Setup(
 			}),
 		).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 	}
+
+	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
+		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateRoom(req, device, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
@@ -318,7 +325,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, federation)
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
@@ -479,7 +486,7 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, nil, nil)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/redact/{eventID}/{txnId}",
@@ -488,7 +495,8 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
+			txnID := vars["txnId"]
+			return SendRedaction(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI, &txnID, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
@@ -889,7 +897,7 @@ func Setup(
 			if resErr := clientutil.UnmarshalJSONRequest(req, &postContent); resErr != nil {
 				return *resErr
 			}
-			return *SearchUserDirectory(
+			return SearchUserDirectory(
 				req.Context(),
 				device,
 				userAPI,

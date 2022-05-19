@@ -37,11 +37,11 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
+	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.KeyserverFederationAPI,
 ) api.KeyInternalAPI {
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	db, err := storage.NewDatabase(&cfg.Database)
+	db, err := storage.NewDatabase(base, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}

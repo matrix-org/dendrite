@@ -89,6 +89,8 @@ func main() {
 		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 		cfg.MSCs.MSCs = []string{"msc2836"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
+		cfg.ClientAPI.RegistrationDisabled = false
+		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 		if err = cfg.Derive(); err != nil {
 			panic(err)
 		}
@@ -102,7 +104,6 @@ func main() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := ygg.CreateFederationClient(base)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
@@ -115,7 +116,7 @@ func main() {
 	)
 	rsAPI := rsComponent
 
-	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
@@ -128,7 +129,6 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    ygg.CreateClient(base),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -142,15 +142,7 @@ func main() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 	if err := mscs.Enable(base, &monolith); err != nil {
 		logrus.WithError(err).Fatalf("Failed to enable MSCs")
 	}

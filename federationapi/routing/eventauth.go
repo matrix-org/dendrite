@@ -26,10 +26,16 @@ import (
 func GetEventAuth(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
 ) util.JSONResponse {
+	// If we don't think we belong to this room then don't waste the effort
+	// responding to expensive requests for it.
+	if err := ErrorIfLocalServerNotInRoom(ctx, rsAPI, roomID); err != nil {
+		return *err
+	}
+
 	event, resErr := fetchEvent(ctx, rsAPI, eventID)
 	if resErr != nil {
 		return *resErr

@@ -13,7 +13,7 @@ import (
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewMediaAPIDatasource(&config.DatabaseOptions{
+	db, err := storage.NewMediaAPIDatasource(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
@@ -123,11 +123,19 @@ func TestThumbnailsStorage(t *testing.T) {
 				t.Fatalf("expected %d stored thumbnail metadata, got %d", len(thumbnails), len(gotMediadatas))
 			}
 			for i := range gotMediadatas {
-				if !reflect.DeepEqual(thumbnails[i].MediaMetadata, gotMediadatas[i].MediaMetadata) {
-					t.Fatalf("expected metadata %+v, got %v", thumbnails[i].MediaMetadata, gotMediadatas[i].MediaMetadata)
+				// metadata may be returned in a different order than it was stored, perform a search
+				metaDataMatches := func() bool {
+					for _, t := range thumbnails {
+						if reflect.DeepEqual(t.MediaMetadata, gotMediadatas[i].MediaMetadata) && reflect.DeepEqual(t.ThumbnailSize, gotMediadatas[i].ThumbnailSize) {
+							return true
+						}
+					}
+					return false
 				}
-				if !reflect.DeepEqual(thumbnails[i].ThumbnailSize, gotMediadatas[i].ThumbnailSize) {
-					t.Fatalf("expected metadata %+v, got %v", thumbnails[i].ThumbnailSize, gotMediadatas[i].ThumbnailSize)
+
+				if !metaDataMatches() {
+					t.Fatalf("expected metadata %+v, got %+v", thumbnails[i].MediaMetadata, gotMediadatas[i].MediaMetadata)
+
 				}
 			}
 		})

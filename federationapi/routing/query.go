@@ -30,9 +30,9 @@ import (
 // RoomAliasToID converts the queried alias into a room ID and returns it
 func RoomAliasToID(
 	httpReq *http.Request,
-	federation *gomatrixserverlib.FederationClient,
+	federation federationAPI.FederationClient,
 	cfg *config.FederationAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	senderAPI federationAPI.FederationInternalAPI,
 ) util.JSONResponse {
 	roomAlias := httpReq.FormValue("room_alias")

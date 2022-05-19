@@ -34,22 +34,24 @@ func (c *FederationAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7772"
 	c.InternalAPI.Connect = "http://localhost:7772"
 	c.ExternalAPI.Listen = "http://[::]:8072"
+	c.FederationMaxRetries = 16
+	c.DisableTLSValidation = false
 	c.Database.Defaults(10)
 	if generate {
 		c.Database.ConnectionString = "file:federationapi.db"
 	}
-
-	c.FederationMaxRetries = 16
-	c.DisableTLSValidation = false
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
+	}
+	if isMonolith { // polylith required configs below
+		return
+	}
+	checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
 	checkURL(configErrs, "federation_api.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "federation_api.internal_api.connect", string(c.InternalAPI.Connect))
-	if !isMonolith {
-		checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
-	}
-	checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
 }
 
 // The config for setting a proxy to use for server->server requests

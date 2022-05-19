@@ -79,12 +79,12 @@ type eventTypeStatements struct {
 	bulkSelectEventTypeNIDStmt *sql.Stmt
 }
 
-func createEventTypesTable(db *sql.DB) error {
+func CreateEventTypesTable(db *sql.DB) error {
 	_, err := db.Exec(eventTypesSchema)
 	return err
 }
 
-func prepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
+func PrepareEventTypesTable(db *sql.DB) (tables.EventTypes, error) {
 	s := &eventTypeStatements{
 		db: db,
 	}
@@ -139,9 +139,9 @@ func (s *eventTypeStatements) BulkSelectEventTypeNID(
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventTypeNID: rows.close() failed")
 
 	result := make(map[string]types.EventTypeNID, len(eventTypes))
+	var eventType string
+	var eventTypeNID int64
 	for rows.Next() {
-		var eventType string
-		var eventTypeNID int64
 		if err := rows.Scan(&eventType, &eventTypeNID); err != nil {
 			return nil, err
 		}

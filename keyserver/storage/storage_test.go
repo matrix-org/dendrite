@@ -22,7 +22,7 @@ func MustCreateDatabase(t *testing.T) (Database, func()) {
 		log.Fatal(err)
 	}
 	t.Logf("Database %s", tmpfile.Name())
-	db, err := NewDatabase(&config.DatabaseOptions{
+	db, err := NewDatabase(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(fmt.Sprintf("file://%s", tmpfile.Name())),
 	})
 	if err != nil {

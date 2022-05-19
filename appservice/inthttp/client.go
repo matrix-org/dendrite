@@ -29,7 +29,7 @@ type httpAppServiceQueryAPI struct {
 func NewAppserviceClient(
 	appserviceURL string,
 	httpClient *http.Client,
-) (api.AppServiceQueryAPI, error) {
+) (api.AppServiceInternalAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewRoomserverAliasAPIHTTP: httpClient is <nil>")
 	}

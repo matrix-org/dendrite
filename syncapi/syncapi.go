@@ -17,17 +17,14 @@ package syncapi
 import (
 	"context"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/syncapi/consumers"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -41,28 +38,23 @@ import (
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
 // component.
 func AddPublicRoutes(
-	process *process.ProcessContext,
-	router *mux.Router,
-	userAPI userapi.UserInternalAPI,
-	rsAPI api.RoomserverInternalAPI,
-	keyAPI keyapi.KeyInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
-	cfg *config.SyncAPI,
+	base *base.BaseDendrite,
+	userAPI userapi.SyncUserAPI,
+	rsAPI api.SyncRoomserverAPI,
+	keyAPI keyapi.SyncKeyAPI,
 ) {
-	js, natsClient := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	cfg := &base.Cfg.SyncAPI
 
-	syncDB, err := storage.NewSyncServerDatasource(&cfg.Database)
+	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+
+	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
 	eduCache := caching.NewTypingCache()
-	lazyLoadCache, err := caching.NewLazyLoadCache()
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to create lazy loading cache")
-	}
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, lazyLoadCache, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, base.Caches, notifier)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -72,8 +64,17 @@ func AddPublicRoutes(
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		JetStream: js,
 	}
+	presenceConsumer := consumers.NewPresenceConsumer(
+		base.ProcessContext, cfg, js, natsClient, syncDB,
+		notifier, streams.PresenceStreamProvider,
+		userAPI,
+	)
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer)
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer, presenceConsumer, base.EnableMetrics)
+
+	if err = presenceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start presence consumer")
+	}
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -86,8 +87,8 @@ func AddPublicRoutes(
 	}
 
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
-		process, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		js, keyAPI, rsAPI, syncDB, notifier,
+		base.ProcessContext, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		js, rsAPI, syncDB, notifier,
 		streams.DeviceListStreamProvider,
 	)
 	if err = keyChangeConsumer.Start(); err != nil {
@@ -95,7 +96,7 @@ func AddPublicRoutes(
 	}
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
-		process, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
 		streams.InviteStreamProvider, rsAPI, userAPIStreamEventProducer,
 	)
 	if err = roomConsumer.Start(); err != nil {
@@ -103,7 +104,7 @@ func AddPublicRoutes(
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		process, cfg, js, syncDB, notifier, streams.AccountDataStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, notifier, streams.AccountDataStreamProvider,
 		userAPIReadUpdateProducer,
 	)
 	if err = clientConsumer.Start(); err != nil {
@@ -111,42 +112,36 @@ func AddPublicRoutes(
 	}
 
 	notificationConsumer := consumers.NewOutputNotificationDataConsumer(
-		process, cfg, js, syncDB, notifier, streams.NotificationDataStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, notifier, streams.NotificationDataStreamProvider,
 	)
 	if err = notificationConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start notification data consumer")
 	}
 
 	typingConsumer := consumers.NewOutputTypingEventConsumer(
-		process, cfg, js, eduCache, notifier, streams.TypingStreamProvider,
+		base.ProcessContext, cfg, js, eduCache, notifier, streams.TypingStreamProvider,
 	)
 	if err = typingConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start typing consumer")
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		process, cfg, js, syncDB, notifier, streams.SendToDeviceStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, notifier, streams.SendToDeviceStreamProvider,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
-		process, cfg, js, syncDB, notifier, streams.ReceiptStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, notifier, streams.ReceiptStreamProvider,
 		userAPIReadUpdateProducer,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
 	}
 
-	presenceConsumer := consumers.NewPresenceConsumer(
-		process, cfg, js, natsClient, syncDB,
-		notifier, streams.PresenceStreamProvider,
-		userAPI,
+	routing.Setup(
+		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
+		rsAPI, cfg, base.Caches,
 	)
-	if err = presenceConsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start presence consumer")
-	}
-
-	routing.Setup(router, requestPool, syncDB, userAPI, federation, rsAPI, cfg, lazyLoadCache)
 }

@@ -24,7 +24,7 @@ import (
 
 // Logout handles POST /logout
 func Logout(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	var performRes api.PerformDeviceDeletionResponse
 	err := userAPI.PerformDeviceDeletion(req.Context(), &api.PerformDeviceDeletionRequest{
@@ -44,7 +44,7 @@ func Logout(
 
 // LogoutAll handles POST /logout/all
 func LogoutAll(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
 	var performRes api.PerformDeviceDeletionResponse
 	err := userAPI.PerformDeviceDeletion(req.Context(), &api.PerformDeviceDeletionRequest{

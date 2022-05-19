@@ -34,7 +34,7 @@ func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID, userID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
@@ -165,7 +165,7 @@ func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {

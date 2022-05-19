@@ -11,8 +11,8 @@ import (
 
 type DeviceListStreamProvider struct {
 	StreamProvider
-	rsAPI  api.RoomserverInternalAPI
-	keyAPI keyapi.KeyInternalAPI
+	rsAPI  api.SyncRoomserverAPI
+	keyAPI keyapi.SyncKeyAPI
 }
 
 func (p *DeviceListStreamProvider) CompleteSync(

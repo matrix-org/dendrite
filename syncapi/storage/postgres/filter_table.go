@@ -73,21 +73,20 @@ func NewPostgresFilterTable(db *sql.DB) (tables.Filter, error) {
 }
 
 func (s *filterStatements) SelectFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
 	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Unmarshal JSON into Filter struct
-	filter := gomatrixserverlib.DefaultFilter()
-	if err = json.Unmarshal(filterData, &filter); err != nil {
-		return nil, err
+	if err = json.Unmarshal(filterData, &target); err != nil {
+		return err
 	}
-	return &filter, nil
+	return nil
 }
 
 func (s *filterStatements) InsertFilter(

@@ -71,7 +71,6 @@ func main() {
 	base := basepkg.NewBaseDendrite(cfg, "Monolith", options...)
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := base.CreateFederationClient()
 
 	rsImpl := roomserver.NewInternalAPI(base)
@@ -90,6 +89,7 @@ func main() {
 	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, base.Caches, nil, false,
 	)
+	fsImplAPI := fsAPI
 	if base.UseHTTPAPIs {
 		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
 		fsAPI = base.FederationAPIHTTPClient()
@@ -104,7 +104,7 @@ func main() {
 	}
 
 	pgClient := base.PushGatewayHTTPClient()
-	userImpl := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
+	userImpl := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
 	userAPI := userImpl
 	if base.UseHTTPAPIs {
 		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
@@ -135,25 +135,19 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    base.CreateClient(),
 		FedClient: federation,
 		KeyRing:   keyRing,
 
-		AppserviceAPI: asAPI, FederationAPI: fsAPI,
+		AppserviceAPI: asAPI,
+		// always use the concrete impl here even in -http mode because adding public routes
+		// must be done on the concrete impl not an HTTP client else fedapi will call itself
+		FederationAPI: fsImplAPI,
 		RoomserverAPI: rsAPI,
 		UserAPI:       userAPI,
 		KeyAPI:        keyAPI,
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	if len(base.Cfg.MSCs.MSCs) > 0 {
 		if err := mscs.Enable(base, &monolith); err != nil {

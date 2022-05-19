@@ -33,7 +33,7 @@ import (
 func Backfill(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	cfg *config.FederationAPI,
 ) util.JSONResponse {
@@ -49,6 +49,12 @@ func Backfill(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("Bad room ID: " + err.Error()),
 		}
+	}
+
+	// If we don't think we belong to this room then don't waste the effort
+	// responding to expensive requests for it.
+	if err := ErrorIfLocalServerNotInRoom(httpReq.Context(), rsAPI, roomID); err != nil {
+		return *err
 	}
 
 	// Check if all of the required parameters are there.

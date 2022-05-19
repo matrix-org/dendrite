@@ -23,7 +23,7 @@ type MediaAPI struct {
 	// The maximum file size in bytes that is allowed to be stored on this server.
 	// Note: if max_file_size_bytes is set to 0, the size is unlimited.
 	// Note: if max_file_size_bytes is not set, it will default to 10485760 (10MB)
-	MaxFileSizeBytes *FileSizeBytes `yaml:"max_file_size_bytes,omitempty"`
+	MaxFileSizeBytes FileSizeBytes `yaml:"max_file_size_bytes,omitempty"`
 
 	// Whether to dynamically generate thumbnails on-the-fly if the requested resolution is not already generated
 	DynamicThumbnails bool `yaml:"dynamic_thumbnails"`
@@ -42,30 +42,31 @@ func (c *MediaAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7774"
 	c.InternalAPI.Connect = "http://localhost:7774"
 	c.ExternalAPI.Listen = "http://[::]:8074"
+	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
+	c.MaxThumbnailGenerators = 10
 	c.Database.Defaults(5)
 	if generate {
 		c.Database.ConnectionString = "file:mediaapi.db"
 		c.BasePath = "./media_store"
 	}
-
-	c.MaxFileSizeBytes = &DefaultMaxFileSizeBytes
-	c.MaxThumbnailGenerators = 10
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))
-	if !isMonolith {
-		checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 	}
-	checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
-
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
-	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(*c.MaxFileSizeBytes))
+	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
 
 	for i, size := range c.ThumbnailSizes {
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].width", i), int64(size.Width))
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].height", i), int64(size.Height))
 	}
+	if isMonolith { // polylith required configs below
+		return
+	}
+	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))
+	checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
 }

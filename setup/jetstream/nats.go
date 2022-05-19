@@ -17,54 +17,55 @@ import (
 	natsclient "github.com/nats-io/nats.go"
 )
 
-var natsServer *natsserver.Server
-var natsServerMutex sync.Mutex
-
-func PrepareForTests() (*process.ProcessContext, nats.JetStreamContext, *nats.Conn) {
-	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
-	cfg.Global.JetStream.InMemory = true
-	pc := process.NewProcessContext()
-	js, jc := Prepare(pc, &cfg.Global.JetStream)
-	return pc, js, jc
+type NATSInstance struct {
+	*natsserver.Server
+	sync.Mutex
 }
 
-func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
+func DeleteAllStreams(js nats.JetStreamContext, cfg *config.JetStream) {
+	for _, stream := range streams { // streams are defined in streams.go
+		name := cfg.Prefixed(stream.Name)
+		_ = js.DeleteStream(name)
+	}
+}
+
+func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
 		return setupNATS(process, cfg, nil)
 	}
-	natsServerMutex.Lock()
-	if natsServer == nil {
+	s.Lock()
+	if s.Server == nil {
 		var err error
-		natsServer, err = natsserver.NewServer(&natsserver.Options{
+		s.Server, err = natsserver.NewServer(&natsserver.Options{
 			ServerName:      "monolith",
 			DontListen:      true,
 			JetStream:       true,
 			StoreDir:        string(cfg.StoragePath),
 			NoSystemAccount: true,
 			MaxPayload:      16 * 1024 * 1024,
+			NoSigs:          true,
 		})
 		if err != nil {
 			panic(err)
 		}
-		natsServer.ConfigureLogger()
+		s.ConfigureLogger()
 		go func() {
 			process.ComponentStarted()
-			natsServer.Start()
+			s.Start()
 		}()
 		go func() {
 			<-process.WaitForShutdown()
-			natsServer.Shutdown()
-			natsServer.WaitForShutdown()
+			s.Shutdown()
+			s.WaitForShutdown()
 			process.ComponentFinished()
 		}()
 	}
-	natsServerMutex.Unlock()
-	if !natsServer.ReadyForConnections(time.Second * 10) {
+	s.Unlock()
+	if !s.ReadyForConnections(time.Second * 10) {
 		logrus.Fatalln("NATS did not start in time")
 	}
-	nc, err := natsclient.Connect("", natsclient.InProcessServer(natsServer))
+	nc, err := natsclient.Connect("", natsclient.InProcessServer(s))
 	if err != nil {
 		logrus.Fatalln("Failed to create NATS client")
 	}

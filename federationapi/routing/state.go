@@ -27,7 +27,7 @@ import (
 func GetState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -50,7 +50,7 @@ func GetState(
 func GetStateIDs(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 ) util.JSONResponse {
 	eventID, err := parseEventIDParam(request)
@@ -97,10 +97,16 @@ func parseEventIDParam(
 func getState(
 	ctx context.Context,
 	request *gomatrixserverlib.FederationRequest,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID string,
 	eventID string,
 ) (stateEvents, authEvents []*gomatrixserverlib.HeaderedEvent, errRes *util.JSONResponse) {
+	// If we don't think we belong to this room then don't waste the effort
+	// responding to expensive requests for it.
+	if err := ErrorIfLocalServerNotInRoom(ctx, rsAPI, roomID); err != nil {
+		return nil, nil, err
+	}
+
 	event, resErr := fetchEvent(ctx, rsAPI, eventID)
 	if resErr != nil {
 		return nil, nil, resErr
@@ -127,6 +133,13 @@ func getState(
 	if err != nil {
 		resErr := util.ErrorResponse(err)
 		return nil, nil, &resErr
+	}
+
+	if response.IsRejected {
+		return nil, nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Event not found"),
+		}
 	}
 
 	if !response.RoomExists {

@@ -50,7 +50,7 @@ type filter struct {
 
 // GetPostPublicRooms implements GET and POST /publicRooms
 func GetPostPublicRooms(
-	req *http.Request, rsAPI roomserverAPI.RoomserverInternalAPI,
+	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	federation *gomatrixserverlib.FederationClient,
 	cfg *config.ClientAPI,
@@ -91,7 +91,7 @@ func GetPostPublicRooms(
 }
 
 func publicRooms(
-	ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.RoomserverInternalAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
+	ctx context.Context, request PublicRoomReq, rsAPI roomserverAPI.ClientRoomserverAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
 ) (*gomatrixserverlib.RespPublicRooms, error) {
 
 	response := gomatrixserverlib.RespPublicRooms{
@@ -229,7 +229,7 @@ func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int16) (
 }
 
 func refreshPublicRoomCache(
-	ctx context.Context, rsAPI roomserverAPI.RoomserverInternalAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
+	ctx context.Context, rsAPI roomserverAPI.ClientRoomserverAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
 ) []gomatrixserverlib.PublicRoom {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()

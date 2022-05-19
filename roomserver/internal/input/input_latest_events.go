@@ -233,12 +233,19 @@ func (u *latestEventsUpdater) latestState() error {
 		}
 	}
 
-	// Get a list of the current latest events. This may or may not
-	// include the new event from the input path, depending on whether
-	// it is a forward extremity or not.
-	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
-	for i := range u.latest {
-		latestStateAtEvents[i] = u.latest[i].StateAtEvent
+	// Take the old set of extremities and the new set of extremities and
+	// mash them together into a list. This may or may not include the new event
+	// from the input path, depending on whether it became a forward extremity
+	// or not. We'll then run state resolution across all of them to determine
+	// the new current state of the room. Including the old extremities here
+	// ensures that new forward extremities with bad state snapshots (from
+	// possible malicious actors) can't completely corrupt the room state
+	// away from what it was before.
+	combinedExtremities := types.StateAtEventAndReferences(append(u.oldLatest, u.latest...))
+	combinedExtremities = combinedExtremities[:util.SortAndUnique(combinedExtremities)]
+	latestStateAtEvents := make([]types.StateAtEvent, len(combinedExtremities))
+	for i := range combinedExtremities {
+		latestStateAtEvents[i] = combinedExtremities[i].StateAtEvent
 	}
 
 	// Takes the NIDs of the latest events and creates a state snapshot
@@ -316,40 +323,30 @@ func (u *latestEventsUpdater) calculateLatest(
 	// Then let's see if any of the existing forward extremities now
 	// have entries in the previous events table. If they do then we
 	// will no longer include them as forward extremities.
-	existingPrevs := make(map[string]struct{})
-	for _, l := range existingRefs {
+	for k, l := range existingRefs {
 		referenced, err := u.updater.IsReferenced(l.EventReference)
 		if err != nil {
 			return false, fmt.Errorf("u.updater.IsReferenced: %w", err)
 		} else if referenced {
-			existingPrevs[l.EventID] = struct{}{}
+			delete(existingRefs, k)
 		}
 	}
 
-	// Include our new event in the extremities.
-	newLatest := []types.StateAtEventAndReference{newStateAndRef}
+	// Start off with our new unreferenced event. We're reusing the backing
+	// array here rather than allocating a new one.
+	u.latest = append(u.latest[:0], newStateAndRef)
 
-	// Then run through and see if the other extremities are still valid.
-	// If our new event references them then they are no longer good
-	// candidates.
+	// If our new event references any of the existing forward extremities
+	// then they are no longer forward extremities, so remove them.
 	for _, prevEventID := range newEvent.PrevEventIDs() {
-		delete(existingRefs, prevEventID)
-	}
-
-	// Ensure that we don't add any candidate forward extremities from
-	// the old set that are, themselves, referenced by the old set of
-	// forward extremities. This shouldn't happen but guards against
-	// the possibility anyway.
-	for prevEventID := range existingPrevs {
 		delete(existingRefs, prevEventID)
 	}
 
 	// Then re-add any old extremities that are still valid after all.
 	for _, old := range existingRefs {
-		newLatest = append(newLatest, *old)
+		u.latest = append(u.latest, *old)
 	}
 
-	u.latest = newLatest
 	return true, nil
 }
 

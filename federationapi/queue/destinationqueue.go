@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
@@ -49,21 +50,21 @@ type destinationQueue struct {
 	db                 storage.Database
 	process            *process.ProcessContext
 	signing            *SigningInfo
-	rsAPI              api.RoomserverInternalAPI
-	client             *gomatrixserverlib.FederationClient // federation client
-	origin             gomatrixserverlib.ServerName        // origin of requests
-	destination        gomatrixserverlib.ServerName        // destination of requests
-	running            atomic.Bool                         // is the queue worker running?
-	backingOff         atomic.Bool                         // true if we're backing off
-	overflowed         atomic.Bool                         // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
-	statistics         *statistics.ServerStatistics        // statistics about this remote server
-	transactionIDMutex sync.Mutex                          // protects transactionID
-	transactionID      gomatrixserverlib.TransactionID     // last transaction ID if retrying, or "" if last txn was successful
-	notify             chan struct{}                       // interrupts idle wait pending PDUs/EDUs
-	pendingPDUs        []*queuedPDU                        // PDUs waiting to be sent
-	pendingEDUs        []*queuedEDU                        // EDUs waiting to be sent
-	pendingMutex       sync.RWMutex                        // protects pendingPDUs and pendingEDUs
-	interruptBackoff   chan bool                           // interrupts backoff
+	rsAPI              api.FederationRoomserverAPI
+	client             fedapi.FederationClient         // federation client
+	origin             gomatrixserverlib.ServerName    // origin of requests
+	destination        gomatrixserverlib.ServerName    // destination of requests
+	running            atomic.Bool                     // is the queue worker running?
+	backingOff         atomic.Bool                     // true if we're backing off
+	overflowed         atomic.Bool                     // the queues exceed maxPDUsInMemory/maxEDUsInMemory, so we should consult the database for more
+	statistics         *statistics.ServerStatistics    // statistics about this remote server
+	transactionIDMutex sync.Mutex                      // protects transactionID
+	transactionID      gomatrixserverlib.TransactionID // last transaction ID if retrying, or "" if last txn was successful
+	notify             chan struct{}                   // interrupts idle wait pending PDUs/EDUs
+	pendingPDUs        []*queuedPDU                    // PDUs waiting to be sent
+	pendingEDUs        []*queuedEDU                    // EDUs waiting to be sent
+	pendingMutex       sync.RWMutex                    // protects pendingPDUs and pendingEDUs
+	interruptBackoff   chan bool                       // interrupts backoff
 }
 
 // Send event adds the event to the pending queue for the destination.
@@ -78,7 +79,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 	// this destination queue. We'll then be able to retrieve the PDU
 	// later.
 	if err := oq.db.AssociatePDUWithDestination(
-		context.TODO(),
+		oq.process.Context(),
 		"",             // TODO: remove this, as we don't need to persist the transaction ID
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationapi_queue_json table
@@ -122,9 +123,10 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 	// this destination queue. We'll then be able to retrieve the PDU
 	// later.
 	if err := oq.db.AssociateEDUWithDestination(
-		context.TODO(),
+		oq.process.Context(),
 		oq.destination, // the destination server name
 		receipt,        // NIDs from federationapi_queue_json table
+		event.Type,
 	); err != nil {
 		logrus.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
 		return
@@ -176,7 +178,7 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 	// Check to see if there's anything to do for this server
 	// in the database.
 	retrieved := false
-	ctx := context.Background()
+	ctx := oq.process.Context()
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 
@@ -269,6 +271,9 @@ func (oq *destinationQueue) backgroundSend() {
 			// The worker is idle so stop the goroutine. It'll get
 			// restarted automatically the next time we have an event to
 			// send.
+			return
+		case <-oq.process.Context().Done():
+			// The parent process is shutting down, so stop.
 			return
 		}
 
@@ -419,13 +424,13 @@ func (oq *destinationQueue) nextTransaction(
 		// Clean up the transaction in the database.
 		if pduReceipts != nil {
 			//logrus.Infof("Cleaning PDUs %q", pduReceipt.String())
-			if err = oq.db.CleanPDUs(context.Background(), oq.destination, pduReceipts); err != nil {
+			if err = oq.db.CleanPDUs(oq.process.Context(), oq.destination, pduReceipts); err != nil {
 				logrus.WithError(err).Errorf("Failed to clean PDUs for server %q", t.Destination)
 			}
 		}
 		if eduReceipts != nil {
 			//logrus.Infof("Cleaning EDUs %q", eduReceipt.String())
-			if err = oq.db.CleanEDUs(context.Background(), oq.destination, eduReceipts); err != nil {
+			if err = oq.db.CleanEDUs(oq.process.Context(), oq.destination, eduReceipts); err != nil {
 				logrus.WithError(err).Errorf("Failed to clean EDUs for server %q", t.Destination)
 			}
 		}

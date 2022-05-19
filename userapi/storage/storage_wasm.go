@@ -18,12 +18,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func NewDatabase(
+func NewUserAPIDatabase(
+	base *base.BaseDendrite,
 	dbProperties *config.DatabaseOptions,
 	serverName gomatrixserverlib.ServerName,
 	bcryptCost int,
@@ -33,7 +35,7 @@ func NewDatabase(
 ) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
+		return sqlite3.NewDatabase(base, dbProperties, serverName, bcryptCost, openIDTokenLifetimeMS, loginTokenLifetime, serverNoticesLocalpart)
 	case dbProperties.ConnectionString.IsPostgres():
 		return nil, fmt.Errorf("can't use Postgres implementation")
 	default:

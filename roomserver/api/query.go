@@ -122,6 +122,7 @@ type QueryMembershipForUserResponse struct {
 	Membership string `json:"membership"`
 	// True if the user asked to forget this room.
 	IsRoomForgotten bool `json:"is_room_forgotten"`
+	RoomExists      bool `json:"room_exists"`
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -230,6 +231,8 @@ type QueryStateAndAuthChainResponse struct {
 	// The lists will be in an arbitrary order.
 	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	// True if the queried event was rejected earlier.
+	IsRejected bool `json:"is_rejected"`
 }
 
 // QueryRoomVersionCapabilitiesRequest asks for the default room version

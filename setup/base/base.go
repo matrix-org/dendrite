@@ -17,10 +17,12 @@ package base
 import (
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
@@ -38,10 +41,11 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	userdb "github.com/matrix-org/dendrite/userapi/storage"
 
 	"github.com/gorilla/mux"
+	"github.com/kardianos/minwinsvc"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
@@ -55,8 +59,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/sirupsen/logrus"
-
-	_ "net/http/pprof"
 )
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
@@ -76,11 +78,15 @@ type BaseDendrite struct {
 	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
+	NATS                   *jetstream.NATSInstance
 	UseHTTPAPIs            bool
 	apiHttpClient          *http.Client
 	Cfg                    *config.Dendrite
 	Caches                 *caching.Caches
 	DNSCache               *gomatrixserverlib.DNSCache
+	Database               *sql.DB
+	DatabaseWriter         sqlutil.Writer
+	EnableMetrics          bool
 }
 
 const NoListener = ""
@@ -91,8 +97,9 @@ const HTTPClientTimeout = time.Second * 30
 type BaseDendriteOptions int
 
 const (
-	NoCacheMetrics BaseDendriteOptions = iota
+	DisableMetrics BaseDendriteOptions = iota
 	UseHTTPAPIs
+	PolylithMode
 )
 
 // NewBaseDendrite creates a new instance to be used by a component.
@@ -101,18 +108,22 @@ const (
 func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
 	platformSanityChecks()
 	useHTTPAPIs := false
-	cacheMetrics := true
+	enableMetrics := true
+	isMonolith := true
 	for _, opt := range options {
 		switch opt {
-		case NoCacheMetrics:
-			cacheMetrics = false
+		case DisableMetrics:
+			enableMetrics = false
 		case UseHTTPAPIs:
+			useHTTPAPIs = true
+		case PolylithMode:
+			isMonolith = false
 			useHTTPAPIs = true
 		}
 	}
 
 	configErrors := &config.ConfigErrors{}
-	cfg.Verify(configErrors, componentName == "Monolith") // TODO: better way?
+	cfg.Verify(configErrors, isMonolith)
 	if len(*configErrors) > 0 {
 		for _, err := range *configErrors {
 			logrus.Errorf("Configuration error: %s", err)
@@ -125,6 +136,10 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	internal.SetupPprof()
 
 	logrus.Infof("Dendrite version %s", internal.VersionString())
+
+	if !cfg.ClientAPI.RegistrationDisabled && cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled {
+		logrus.Warn("Open registration is enabled")
+	}
 
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
@@ -146,7 +161,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		}
 	}
 
-	cache, err := caching.NewInMemoryLRUCache(cacheMetrics)
+	cache, err := caching.NewInMemoryLRUCache(enableMetrics)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}
@@ -181,6 +196,25 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		},
 	}
 
+	// If we're in monolith mode, we'll set up a global pool of database
+	// connections. A component is welcome to use this pool if they don't
+	// have a separate database config of their own.
+	var db *sql.DB
+	var writer sqlutil.Writer
+	if cfg.Global.DatabaseOptions.ConnectionString != "" {
+		if !isMonolith {
+			logrus.Panic("Using a global database connection pool is not supported in polylith deployments")
+		}
+		if cfg.Global.DatabaseOptions.ConnectionString.IsSQLite() {
+			logrus.Panic("Using a global database connection pool is not supported with SQLite databases")
+		}
+		writer = sqlutil.NewDummyWriter()
+		if db, err = sqlutil.Open(&cfg.Global.DatabaseOptions, writer); err != nil {
+			logrus.WithError(err).Panic("Failed to set up global database connections")
+		}
+		logrus.Debug("Using global database connection pool")
+	}
+
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
 	// When used in conjunction with UseEncodedPath() we get the behaviour we want when parsing
@@ -209,7 +243,11 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
+		NATS:                   &jetstream.NATSInstance{},
 		apiHttpClient:          &apiClient,
+		Database:               db,     // set if monolith with global connection pool only
+		DatabaseWriter:         writer, // set if monolith with global connection pool only
+		EnableMetrics:          enableMetrics,
 	}
 }
 
@@ -218,8 +256,31 @@ func (b *BaseDendrite) Close() error {
 	return b.tracerCloser.Close()
 }
 
-// AppserviceHTTPClient returns the AppServiceQueryAPI for hitting the appservice component over HTTP.
-func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceQueryAPI {
+// DatabaseConnection assists in setting up a database connection. It accepts
+// the database properties and a new writer for the given component. If we're
+// running in monolith mode with a global connection pool configured then we
+// will return that connection, along with the global writer, effectively
+// ignoring the options provided. Otherwise we'll open a new database connection
+// using the supplied options and writer. Note that it's possible for the pointer
+// receiver to be nil here – that's deliberate as some of the unit tests don't
+// have a BaseDendrite and just want a connection with the supplied config
+// without any pooling stuff.
+func (b *BaseDendrite) DatabaseConnection(dbProperties *config.DatabaseOptions, writer sqlutil.Writer) (*sql.DB, sqlutil.Writer, error) {
+	if dbProperties.ConnectionString != "" || b == nil {
+		// Open a new database connection using the supplied config.
+		db, err := sqlutil.Open(dbProperties, writer)
+		return db, writer, err
+	}
+	if b.Database != nil && b.DatabaseWriter != nil {
+		// Ignore the supplied config and return the global pool and
+		// writer.
+		return b.Database, b.DatabaseWriter, nil
+	}
+	return nil, nil, fmt.Errorf("no database connections configured")
+}
+
+// AppserviceHTTPClient returns the AppServiceInternalAPI for hitting the appservice component over HTTP.
+func (b *BaseDendrite) AppserviceHTTPClient() appserviceAPI.AppServiceInternalAPI {
 	a, err := asinthttp.NewAppserviceClient(b.Cfg.AppServiceURL(), b.apiHttpClient)
 	if err != nil {
 		logrus.WithError(err).Panic("CreateHTTPAppServiceAPIs failed")
@@ -269,24 +330,6 @@ func (b *BaseDendrite) PushGatewayHTTPClient() pushgateway.Client {
 	return pushgateway.NewHTTPClient(b.Cfg.UserAPI.PushGatewayDisableTLSValidation)
 }
 
-// CreateAccountsDB creates a new instance of the accounts database. Should only
-// be called once per component.
-func (b *BaseDendrite) CreateAccountsDB() userdb.Database {
-	db, err := userdb.NewDatabase(
-		&b.Cfg.UserAPI.AccountDatabase,
-		b.Cfg.Global.ServerName,
-		b.Cfg.UserAPI.BCryptCost,
-		b.Cfg.UserAPI.OpenIDTokenLifetimeMS,
-		userapi.DefaultLoginTokenLifetime,
-		b.Cfg.Global.ServerNotices.LocalPart,
-	)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to accounts db")
-	}
-
-	return db
-}
-
 // CreateClient creates a new client (normally used for media fetch requests).
 // Should only be called once per component.
 func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
@@ -297,6 +340,7 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 	}
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationAPI.DisableTLSValidation),
+		gomatrixserverlib.WithWellKnownSRVLookups(true),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
@@ -346,6 +390,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		Addr:         string(externalAddr),
 		WriteTimeout: HTTPServerTimeout,
 		Handler:      externalRouter,
+		BaseContext: func(_ net.Listener) context.Context {
+			return b.ProcessContext.Context()
+		},
 	}
 	internalServ := externalServ
 
@@ -361,6 +408,9 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
 			Handler: h2c.NewHandler(internalRouter, internalH2S),
+			BaseContext: func(_ net.Listener) context.Context {
+				return b.ProcessContext.Context()
+			},
 		}
 	}
 
@@ -462,20 +512,22 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		}()
 	}
 
+	minwinsvc.SetOnExit(b.ProcessContext.ShutdownDendrite)
 	<-b.ProcessContext.WaitForShutdown()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	_ = internalServ.Shutdown(ctx)
-	_ = externalServ.Shutdown(ctx)
+	logrus.Infof("Stopping HTTP listeners")
+	_ = internalServ.Shutdown(context.Background())
+	_ = externalServ.Shutdown(context.Background())
 	logrus.Infof("Stopped HTTP listeners")
 }
 
 func (b *BaseDendrite) WaitForShutdown() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
+	select {
+	case <-sigs:
+	case <-b.ProcessContext.WaitForShutdown():
+	}
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 
 	logrus.Warnf("Shutdown signal received")

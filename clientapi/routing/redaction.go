@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/transactions"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -39,11 +40,20 @@ type redactionResponse struct {
 
 func SendRedaction(
 	req *http.Request, device *userapi.Device, roomID, eventID string, cfg *config.ClientAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	txnID *string,
+	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	resErr := checkMemberInRoom(req.Context(), rsAPI, device.UserID, roomID)
 	if resErr != nil {
 		return *resErr
+	}
+
+	if txnID != nil {
+		// Try to fetch response from transactionsCache
+		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
+			return *res
+		}
 	}
 
 	ev := roomserverAPI.GetEvent(req.Context(), rsAPI, eventID)
@@ -124,10 +134,18 @@ func SendRedaction(
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
 		return jsonerror.InternalServerError()
 	}
-	return util.JSONResponse{
+
+	res := util.JSONResponse{
 		Code: 200,
 		JSON: redactionResponse{
 			EventID: e.EventID(),
 		},
 	}
+
+	// Add response to transactionsCache
+	if txnID != nil {
+		txnCache.AddTransaction(device.AccessToken, *txnID, &res)
+	}
+
+	return res
 }

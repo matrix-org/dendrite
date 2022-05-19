@@ -38,7 +38,7 @@ type SyncAPIProducer struct {
 	TopicPresenceEvent     string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
-	UserAPI                userapi.UserInternalAPI
+	UserAPI                userapi.ClientUserAPI
 }
 
 // SendData sends account data to the sync API server

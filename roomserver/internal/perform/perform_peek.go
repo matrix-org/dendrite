@@ -33,7 +33,7 @@ import (
 type Peeker struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
-	FSAPI      fsAPI.FederationInternalAPI
+	FSAPI      fsAPI.RoomserverFederationAPI
 	DB         storage.Database
 
 	Inputer *input.Inputer

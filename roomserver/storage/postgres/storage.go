@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
@@ -35,11 +36,11 @@ type Database struct {
 }
 
 // Open a postgres database.
-func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
+func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (*Database, error) {
 	var d Database
-	var db *sql.DB
 	var err error
-	if db, err = sqlutil.Open(dbProperties); err != nil {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
+	if err != nil {
 		return nil, fmt.Errorf("sqlutil.Open: %w", err)
 	}
 
@@ -68,7 +69,7 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err := d.prepare(db, cache); err != nil {
+	if err := d.prepare(db, writer, cache); err != nil {
 		return nil, err
 	}
 
@@ -76,106 +77,106 @@ func Open(dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) 
 }
 
 func (d *Database) create(db *sql.DB) error {
-	if err := createEventStateKeysTable(db); err != nil {
+	if err := CreateEventStateKeysTable(db); err != nil {
 		return err
 	}
-	if err := createEventTypesTable(db); err != nil {
+	if err := CreateEventTypesTable(db); err != nil {
 		return err
 	}
-	if err := createEventJSONTable(db); err != nil {
+	if err := CreateEventJSONTable(db); err != nil {
 		return err
 	}
-	if err := createEventsTable(db); err != nil {
+	if err := CreateEventsTable(db); err != nil {
 		return err
 	}
-	if err := createRoomsTable(db); err != nil {
+	if err := CreateRoomsTable(db); err != nil {
 		return err
 	}
-	if err := createStateBlockTable(db); err != nil {
+	if err := CreateStateBlockTable(db); err != nil {
 		return err
 	}
-	if err := createStateSnapshotTable(db); err != nil {
+	if err := CreateStateSnapshotTable(db); err != nil {
 		return err
 	}
-	if err := createPrevEventsTable(db); err != nil {
+	if err := CreatePrevEventsTable(db); err != nil {
 		return err
 	}
-	if err := createRoomAliasesTable(db); err != nil {
+	if err := CreateRoomAliasesTable(db); err != nil {
 		return err
 	}
-	if err := createInvitesTable(db); err != nil {
+	if err := CreateInvitesTable(db); err != nil {
 		return err
 	}
-	if err := createMembershipTable(db); err != nil {
+	if err := CreateMembershipTable(db); err != nil {
 		return err
 	}
-	if err := createPublishedTable(db); err != nil {
+	if err := CreatePublishedTable(db); err != nil {
 		return err
 	}
-	if err := createRedactionsTable(db); err != nil {
+	if err := CreateRedactionsTable(db); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (d *Database) prepare(db *sql.DB, cache caching.RoomServerCaches) error {
-	eventStateKeys, err := prepareEventStateKeysTable(db)
+func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.RoomServerCaches) error {
+	eventStateKeys, err := PrepareEventStateKeysTable(db)
 	if err != nil {
 		return err
 	}
-	eventTypes, err := prepareEventTypesTable(db)
+	eventTypes, err := PrepareEventTypesTable(db)
 	if err != nil {
 		return err
 	}
-	eventJSON, err := prepareEventJSONTable(db)
+	eventJSON, err := PrepareEventJSONTable(db)
 	if err != nil {
 		return err
 	}
-	events, err := prepareEventsTable(db)
+	events, err := PrepareEventsTable(db)
 	if err != nil {
 		return err
 	}
-	rooms, err := prepareRoomsTable(db)
+	rooms, err := PrepareRoomsTable(db)
 	if err != nil {
 		return err
 	}
-	stateBlock, err := prepareStateBlockTable(db)
+	stateBlock, err := PrepareStateBlockTable(db)
 	if err != nil {
 		return err
 	}
-	stateSnapshot, err := prepareStateSnapshotTable(db)
+	stateSnapshot, err := PrepareStateSnapshotTable(db)
 	if err != nil {
 		return err
 	}
-	prevEvents, err := preparePrevEventsTable(db)
+	prevEvents, err := PreparePrevEventsTable(db)
 	if err != nil {
 		return err
 	}
-	roomAliases, err := prepareRoomAliasesTable(db)
+	roomAliases, err := PrepareRoomAliasesTable(db)
 	if err != nil {
 		return err
 	}
-	invites, err := prepareInvitesTable(db)
+	invites, err := PrepareInvitesTable(db)
 	if err != nil {
 		return err
 	}
-	membership, err := prepareMembershipTable(db)
+	membership, err := PrepareMembershipTable(db)
 	if err != nil {
 		return err
 	}
-	published, err := preparePublishedTable(db)
+	published, err := PreparePublishedTable(db)
 	if err != nil {
 		return err
 	}
-	redactions, err := prepareRedactionsTable(db)
+	redactions, err := PrepareRedactionsTable(db)
 	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{
 		DB:                  db,
 		Cache:               cache,
-		Writer:              sqlutil.NewDummyWriter(),
+		Writer:              writer,
 		EventTypesTable:     eventTypes,
 		EventStateKeysTable: eventStateKeys,
 		EventJSONTable:      eventJSON,

@@ -52,6 +52,24 @@ func WithUnsigned(unsigned interface{}) eventModifier {
 	}
 }
 
+func WithKeyID(keyID gomatrixserverlib.KeyID) eventModifier {
+	return func(e *eventMods) {
+		e.keyID = keyID
+	}
+}
+
+func WithPrivateKey(pkey ed25519.PrivateKey) eventModifier {
+	return func(e *eventMods) {
+		e.privKey = pkey
+	}
+}
+
+func WithOrigin(origin gomatrixserverlib.ServerName) eventModifier {
+	return func(e *eventMods) {
+		e.origin = origin
+	}
+}
+
 // Reverse a list of events
 func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
 	out := make([]*gomatrixserverlib.HeaderedEvent, len(in))
@@ -64,7 +82,8 @@ func Reversed(in []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.Header
 func AssertEventIDsEqual(t *testing.T, gotEventIDs []string, wants []*gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
 	if len(gotEventIDs) != len(wants) {
-		t.Fatalf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
+		t.Errorf("length mismatch: got %d events, want %d", len(gotEventIDs), len(wants))
+		return
 	}
 	for i := range wants {
 		w := wants[i].EventID()

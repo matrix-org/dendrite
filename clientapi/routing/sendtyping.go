@@ -32,7 +32,7 @@ type typingContentJSON struct {
 // sends the typing events to client API typingProducer
 func SendTyping(
 	req *http.Request, device *userapi.Device, roomID string,
-	userID string, rsAPI roomserverAPI.RoomserverInternalAPI,
+	userID string, rsAPI roomserverAPI.ClientRoomserverAPI,
 	syncProducer *producers.SyncAPIProducer,
 ) util.JSONResponse {
 	if device.UserID != userID {

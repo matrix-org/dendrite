@@ -97,6 +97,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-appservice.db", m.StorageDirectory))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/tmp", m.StorageDirectory))
+	cfg.ClientAPI.RegistrationDisabled = false
+	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -105,7 +107,6 @@ func (m *DendriteMonolith) Start() {
 	m.processContext = base.ProcessContext
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := ygg.CreateFederationClient(base)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
@@ -118,7 +119,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
-	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
@@ -130,7 +131,6 @@ func (m *DendriteMonolith) Start() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    ygg.CreateClient(base),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -144,15 +144,7 @@ func (m *DendriteMonolith) Start() {
 			ygg, fsAPI, federation,
 		),
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)

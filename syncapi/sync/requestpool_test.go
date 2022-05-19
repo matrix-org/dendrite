@@ -30,12 +30,18 @@ func (d dummyDB) GetPresence(ctx context.Context, userID string) (*types.Presenc
 	return &types.PresenceInternal{}, nil
 }
 
-func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
+func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
 	return map[string]*types.PresenceInternal{}, nil
 }
 
 func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return 0, nil
+}
+
+type dummyConsumer struct{}
+
+func (d dummyConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
+
 }
 
 func TestRequestPool_updatePresence(t *testing.T) {
@@ -45,6 +51,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		sleep    time.Duration
 	}
 	publisher := &dummyPublisher{}
+	consumer := &dummyConsumer{}
 	syncMap := sync.Map{}
 
 	tests := []struct {
@@ -101,6 +108,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	rp := &RequestPool{
 		presence: &syncMap,
 		producer: publisher,
+		consumer: consumer,
 		cfg: &config.SyncAPI{
 			Matrix: &config.Global{
 				JetStream: config.JetStream{

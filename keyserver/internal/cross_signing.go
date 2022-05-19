@@ -362,6 +362,13 @@ func (a *KeyInternalAPI) processSelfSignatures(
 		for targetKeyID, signature := range forTargetUserID {
 			switch sig := signature.CrossSigningBody.(type) {
 			case *gomatrixserverlib.CrossSigningKey:
+				for keyID := range sig.Keys {
+					split := strings.SplitN(string(keyID), ":", 2)
+					if len(split) > 1 && gomatrixserverlib.KeyID(split[1]) == targetKeyID {
+						targetKeyID = keyID // contains the ed25519: or other scheme
+						break
+					}
+				}
 				for originUserID, forOriginUserID := range sig.Signatures {
 					for originKeyID, originSig := range forOriginUserID {
 						if err := a.DB.StoreCrossSigningSigsForTarget(
@@ -455,10 +462,10 @@ func (a *KeyInternalAPI) processOtherSignatures(
 func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 	ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse,
 ) {
-	for userID := range req.UserToDevices {
-		keys, err := a.DB.CrossSigningKeysForUser(ctx, userID)
+	for targetUserID := range req.UserToDevices {
+		keys, err := a.DB.CrossSigningKeysForUser(ctx, targetUserID)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to get cross-signing keys for user %q", userID)
+			logrus.WithError(err).Errorf("Failed to get cross-signing keys for user %q", targetUserID)
 			continue
 		}
 
@@ -469,9 +476,9 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 				break
 			}
 
-			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, userID, keyID)
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, keyID)
 			if err != nil && err != sql.ErrNoRows {
-				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", userID, keyID)
+				logrus.WithError(err).Errorf("Failed to get cross-signing signatures for user %q key %q", targetUserID, keyID)
 				continue
 			}
 
@@ -491,7 +498,7 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 					case req.UserID != "" && originUserID == req.UserID:
 						// Include signatures that we created
 						appendSignature(originUserID, originKeyID, signature)
-					case originUserID == userID:
+					case originUserID == targetUserID:
 						// Include signatures that were created by the person whose key
 						// we are processing
 						appendSignature(originUserID, originKeyID, signature)
@@ -501,13 +508,13 @@ func (a *KeyInternalAPI) crossSigningKeysFromDatabase(
 
 			switch keyType {
 			case gomatrixserverlib.CrossSigningKeyPurposeMaster:
-				res.MasterKeys[userID] = key
+				res.MasterKeys[targetUserID] = key
 
 			case gomatrixserverlib.CrossSigningKeyPurposeSelfSigning:
-				res.SelfSigningKeys[userID] = key
+				res.SelfSigningKeys[targetUserID] = key
 
 			case gomatrixserverlib.CrossSigningKeyPurposeUserSigning:
-				res.UserSigningKeys[userID] = key
+				res.UserSigningKeys[targetUserID] = key
 			}
 		}
 	}
@@ -546,7 +553,8 @@ func (a *KeyInternalAPI) QuerySignatures(ctx context.Context, req *api.QuerySign
 		}
 
 		for _, targetKeyID := range forTargetUser {
-			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, targetUserID, targetKeyID)
+			// Get own signatures only.
+			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, targetUserID, targetUserID, targetKeyID)
 			if err != nil && err != sql.ErrNoRows {
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("a.DB.CrossSigningSigsForTarget: %s", err),

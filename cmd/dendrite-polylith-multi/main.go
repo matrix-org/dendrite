@@ -31,7 +31,7 @@ import (
 type entrypoint func(base *base.BaseDendrite, cfg *config.Dendrite)
 
 func main() {
-	cfg := setup.ParseFlags(true)
+	cfg := setup.ParseFlags(false)
 
 	component := ""
 	if flag.NFlag() > 0 {
@@ -71,8 +71,8 @@ func main() {
 
 	logrus.Infof("Starting %q component", component)
 
-	base := base.NewBaseDendrite(cfg, component) // TODO
-	defer base.Close()                           // nolint: errcheck
+	base := base.NewBaseDendrite(cfg, component, base.PolylithMode) // TODO
+	defer base.Close()                                              // nolint: errcheck
 
 	go start(base, cfg)
 	base.WaitForShutdown()

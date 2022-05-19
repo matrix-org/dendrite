@@ -27,7 +27,7 @@ import (
 type AccountData interface {
 	InsertAccountData(ctx context.Context, txn *sql.Tx, userID, roomID, dataType string) (pos types.StreamPosition, err error)
 	// SelectAccountDataInRange returns a map of room ID to a list of `dataType`.
-	SelectAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, err error)
+	SelectAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataEventFilter *gomatrixserverlib.EventFilter) (data map[string][]string, pos types.StreamPosition, err error)
 	SelectMaxAccountDataID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
 
@@ -102,6 +102,8 @@ type CurrentRoomState interface {
 	SelectRoomIDsWithAnyMembership(ctx context.Context, txn *sql.Tx, userID string) (map[string]string, error)
 	// SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
 	SelectJoinedUsers(ctx context.Context) (map[string][]string, error)
+	// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
+	SelectJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
 }
 
 // BackwardsExtremities keeps track of backwards extremities for a room.
@@ -157,7 +159,7 @@ type SendToDevice interface {
 }
 
 type Filter interface {
-	SelectFilter(ctx context.Context, localpart string, filterID string) (*gomatrixserverlib.Filter, error)
+	SelectFilter(ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string) error
 	InsertFilter(ctx context.Context, filter *gomatrixserverlib.Filter, localpart string) (filterID string, err error)
 }
 
@@ -170,6 +172,7 @@ type Receipts interface {
 type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
+	SelectHeroes(ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string) (heroes []string, err error)
 }
 
 type NotificationData interface {
@@ -187,5 +190,5 @@ type Presence interface {
 	UpsertPresence(ctx context.Context, txn *sql.Tx, userID string, statusMsg *string, presence types.Presence, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (pos types.StreamPosition, err error)
 	GetPresenceForUser(ctx context.Context, txn *sql.Tx, userID string) (presence *types.PresenceInternal, err error)
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
-	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition) (presences map[string]*types.PresenceInternal, err error)
+	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (presences map[string]*types.PresenceInternal, err error)
 }

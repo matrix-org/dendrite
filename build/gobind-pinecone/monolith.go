@@ -225,7 +225,7 @@ func (m *DendriteMonolith) Start() {
 		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	m.listener, err = net.Listen("tcp", ":65432")
+	m.listener, err = net.Listen("tcp", "localhost:65432")
 	if err != nil {
 		panic(err)
 	}
@@ -259,6 +259,8 @@ func (m *DendriteMonolith) Start() {
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+	cfg.ClientAPI.RegistrationDisabled = false
+	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	if err := cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -266,7 +268,6 @@ func (m *DendriteMonolith) Start() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	accountDB := base.CreateAccountsDB()
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
@@ -279,7 +280,7 @@ func (m *DendriteMonolith) Start() {
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
-	m.userAPI = userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	m.userAPI = userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(m.userAPI)
 
 	asAPI := appservice.NewInternalAPI(base, m.userAPI, rsAPI)
@@ -293,7 +294,6 @@ func (m *DendriteMonolith) Start() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    conn.CreateClient(base, m.PineconeQUIC),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -306,15 +306,7 @@ func (m *DendriteMonolith) Start() {
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	httpRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)

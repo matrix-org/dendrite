@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,11 +43,24 @@ func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite, db storage.Database, cfg *config.UserAPI,
-	appServices []config.ApplicationService, keyAPI keyapi.KeyInternalAPI,
-	rsAPI rsapi.RoomserverInternalAPI, pgClient pushgateway.Client,
+	base *base.BaseDendrite, cfg *config.UserAPI,
+	appServices []config.ApplicationService, keyAPI keyapi.UserKeyAPI,
+	rsAPI rsapi.UserRoomserverAPI, pgClient pushgateway.Client,
 ) api.UserInternalAPI {
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+
+	db, err := storage.NewUserAPIDatabase(
+		base,
+		&cfg.AccountDatabase,
+		cfg.Matrix.ServerName,
+		cfg.BCryptCost,
+		cfg.OpenIDTokenLifetimeMS,
+		api.DefaultLoginTokenLifetime,
+		cfg.Matrix.ServerNotices.LocalPart,
+	)
+	if err != nil {
+		logrus.WithError(err).Panicf("failed to connect to accounts db")
+	}
 
 	syncProducer := producers.NewSyncAPI(
 		db, js,
@@ -90,6 +104,10 @@ func NewInternalAPI(
 		time.AfterFunc(time.Hour, cleanOldNotifs)
 	}
 	time.AfterFunc(time.Minute, cleanOldNotifs)
+
+	if base.Cfg.Global.ReportStats.Enabled {
+		go util.StartPhoneHomeCollector(time.Now(), base.Cfg, db)
+	}
 
 	return userAPI
 }

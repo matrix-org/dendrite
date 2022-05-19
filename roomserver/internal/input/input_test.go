@@ -10,9 +10,9 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 )
@@ -21,11 +21,11 @@ var js nats.JetStreamContext
 var jc *nats.Conn
 
 func TestMain(m *testing.M) {
-	var pc *process.ProcessContext
-	pc, js, jc = jetstream.PrepareForTests()
+	var b *base.BaseDendrite
+	b, js, jc = testrig.Base(nil)
 	code := m.Run()
-	pc.ShutdownDendrite()
-	pc.WaitForComponentsToFinish()
+	b.ShutdownDendrite()
+	b.WaitForComponentsToFinish()
 	os.Exit(code)
 }
 
@@ -53,6 +53,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	db, err := storage.Open(
+		nil,
 		&config.DatabaseOptions{
 			ConnectionString:   "",
 			MaxOpenConnections: 1,

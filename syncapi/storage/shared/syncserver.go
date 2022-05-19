@@ -124,6 +124,10 @@ func (d *Database) MembershipCount(ctx context.Context, roomID, membership strin
 	return d.Memberships.SelectMembershipCount(ctx, nil, roomID, membership, pos)
 }
 
+func (d *Database) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
+	return d.Memberships.SelectHeroes(ctx, nil, roomID, userID, memberships)
+}
+
 func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, nil, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
@@ -162,6 +166,10 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
+}
+
+func (d *Database) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
+	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, roomIDs)
 }
 
 func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
@@ -261,7 +269,7 @@ func (d *Database) DeletePeeks(
 func (d *Database) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
+) (map[string][]string, types.StreamPosition, error) {
 	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
 }
 
@@ -509,9 +517,9 @@ func (d *Database) StreamToTopologicalPosition(
 }
 
 func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.Filter.SelectFilter(ctx, localpart, filterID)
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
@@ -1052,8 +1060,8 @@ func (s *Database) GetPresence(ctx context.Context, userID string) (*types.Prese
 	return s.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceAfter(ctx, nil, after)
+func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return s.Presence.GetPresenceAfter(ctx, nil, after, filter)
 }
 
 func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {

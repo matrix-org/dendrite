@@ -22,10 +22,13 @@ func (c *SyncAPI) Defaults(generate bool) {
 }
 
 func (c *SyncAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkURL(configErrs, "sync_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "sync_api.internal_api.bind", string(c.InternalAPI.Connect))
-	if !isMonolith {
-		checkURL(configErrs, "sync_api.external_api.listen", string(c.ExternalAPI.Listen))
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
 	}
-	checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
+	if isMonolith { // polylith required configs below
+		return
+	}
+	checkURL(configErrs, "sync_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "sync_api.internal_api.connect", string(c.InternalAPI.Connect))
+	checkURL(configErrs, "sync_api.external_api.listen", string(c.ExternalAPI.Listen))
 }

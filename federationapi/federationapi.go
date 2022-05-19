@@ -29,9 +29,7 @@ import (
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
 
@@ -47,20 +45,18 @@ func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(
-	process *process.ProcessContext,
-	fedRouter, keyRouter, wellKnownRouter *mux.Router,
-	cfg *config.FederationAPI,
+	base *base.BaseDendrite,
 	userAPI userapi.UserInternalAPI,
 	federation *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	federationAPI federationAPI.FederationInternalAPI,
-	keyAPI keyserverAPI.KeyInternalAPI,
-	mscCfg *config.MSCs,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
+	fedAPI federationAPI.FederationInternalAPI,
+	keyAPI keyserverAPI.FederationKeyAPI,
 	servers federationAPI.ServersInRoomProvider,
 ) {
-
-	js, _ := jetstream.Prepare(process, &cfg.Matrix.JetStream)
+	cfg := &base.Cfg.FederationAPI
+	mscCfg := &base.Cfg.MSCs
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -71,9 +67,23 @@ func AddPublicRoutes(
 		UserAPI:                userAPI,
 	}
 
+	// the federationapi component is a bit unique in that it attaches public routes AND serves
+	// internal APIs (because it used to be 2 components: the 2nd being fedsender). As a result,
+	// the constructor shape is a bit wonky in that it is not valid to AddPublicRoutes without a
+	// concrete impl of FederationInternalAPI as the public routes and the internal API _should_
+	// be the same thing now.
+	f, ok := fedAPI.(*internal.FederationInternalAPI)
+	if !ok {
+		panic("federationapi.AddPublicRoutes called with a FederationInternalAPI impl which was not " +
+			"FederationInternalAPI. This is a programming error.")
+	}
+
 	routing.Setup(
-		fedRouter, keyRouter, wellKnownRouter, cfg, rsAPI,
-		federationAPI, keyRing,
+		base.PublicFederationAPIMux,
+		base.PublicKeyAPIMux,
+		base.PublicWellKnownAPIMux,
+		cfg,
+		rsAPI, f, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,
 	)
@@ -83,15 +93,15 @@ func AddPublicRoutes(
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite,
-	federation *gomatrixserverlib.FederationClient,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
+	federation api.FederationClient,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 	caches *caching.Caches,
 	keyRing *gomatrixserverlib.KeyRing,
 	resetBlacklist bool,
 ) api.FederationInternalAPI {
 	cfg := &base.Cfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(&cfg.Database, base.Caches, base.Cfg.Global.ServerName)
+	federationDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.ServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
@@ -105,7 +115,7 @@ func NewInternalAPI(
 		FailuresUntilBlacklist: cfg.FederationMaxRetries,
 	}
 
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,

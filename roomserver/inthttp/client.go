@@ -29,16 +29,17 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath      = "/roomserver/performInvite"
-	RoomserverPerformPeekPath        = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath      = "/roomserver/performUnpeek"
-	RoomserverPerformRoomUpgradePath = "/roomserver/performRoomUpgrade"
-	RoomserverPerformJoinPath        = "/roomserver/performJoin"
-	RoomserverPerformLeavePath       = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath    = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath     = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath = "/roomserver/performInboundPeek"
-	RoomserverPerformForgetPath      = "/roomserver/performForget"
+	RoomserverPerformInvitePath            = "/roomserver/performInvite"
+	RoomserverPerformPeekPath              = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath            = "/roomserver/performUnpeek"
+	RoomserverPerformRoomUpgradePath       = "/roomserver/performRoomUpgrade"
+	RoomserverPerformJoinPath              = "/roomserver/performJoin"
+	RoomserverPerformLeavePath             = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath          = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath           = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath            = "/roomserver/performForget"
+	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -86,15 +87,15 @@ func NewRoomserverClient(
 }
 
 // SetFederationInputAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (h *httpRoomserverInternalAPI) SetFederationAPI(fsAPI fsInputAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 }
 
 // SetAppserviceAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (h *httpRoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 }
 
 // SetUserAPI no-ops in HTTP client mode as there is no chicken/egg scenario
-func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (h *httpRoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 }
 
 // SetRoomAlias implements RoomserverAliasAPI
@@ -133,19 +134,6 @@ func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-}
-
-// GetCreatorIDForAlias implements RoomserverAliasAPI
-func (h *httpRoomserverInternalAPI) GetCreatorIDForAlias(
-	ctx context.Context,
-	request *api.GetCreatorIDForAliasRequest,
-	response *api.GetCreatorIDForAliasResponse,
-) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetCreatorIDForAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetCreatorIDForAliasPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
 }
 
@@ -291,6 +279,23 @@ func (h *httpRoomserverInternalAPI) PerformPublish(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformPublishPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
+	ctx context.Context,
+	req *api.PerformAdminEvacuateRoomRequest,
+	res *api.PerformAdminEvacuateRoomResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateRoom")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoomPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 	if err != nil {
 		res.Error = &api.PerformError{
