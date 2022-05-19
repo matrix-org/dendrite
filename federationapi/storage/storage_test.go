@@ -8,11 +8,12 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	b, baseClose := test.CreateBaseDendrite(t, dbType)
+	b, baseClose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewDatabase(b, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
