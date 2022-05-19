@@ -43,7 +43,7 @@ func Test_AccountData(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
-		alice := test.NewUser()
+		alice := test.NewUser(t)
 		localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
 
@@ -74,7 +74,7 @@ func Test_Accounts(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
-		alice := test.NewUser()
+		alice := test.NewUser(t)
 		aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
 
@@ -128,7 +128,7 @@ func Test_Accounts(t *testing.T) {
 }
 
 func Test_Devices(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 	deviceID := util.RandomString(8)
@@ -212,7 +212,7 @@ func Test_Devices(t *testing.T) {
 }
 
 func Test_KeyBackup(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -291,7 +291,7 @@ func Test_KeyBackup(t *testing.T) {
 }
 
 func Test_LoginToken(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
@@ -321,7 +321,7 @@ func Test_LoginToken(t *testing.T) {
 }
 
 func Test_OpenID(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	token := util.RandomString(24)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -341,7 +341,7 @@ func Test_OpenID(t *testing.T) {
 }
 
 func Test_Profile(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
@@ -379,7 +379,7 @@ func Test_Profile(t *testing.T) {
 }
 
 func Test_Pusher(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
@@ -430,7 +430,7 @@ func Test_Pusher(t *testing.T) {
 }
 
 func Test_ThreePID(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
@@ -467,7 +467,7 @@ func Test_ThreePID(t *testing.T) {
 }
 
 func Test_Notification(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 	room := test.NewRoom(t, alice)

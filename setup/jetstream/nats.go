@@ -13,12 +13,20 @@ import (
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	natsclient "github.com/nats-io/nats.go"
 )
 
 type NATSInstance struct {
 	*natsserver.Server
 	sync.Mutex
+}
+
+func DeleteAllStreams(js nats.JetStreamContext, cfg *config.JetStream) {
+	for _, stream := range streams { // streams are defined in streams.go
+		name := cfg.Prefixed(stream.Name)
+		_ = js.DeleteStream(name)
+	}
 }
 
 func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {

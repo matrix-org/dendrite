@@ -48,7 +48,7 @@ const selectRedactionInfoByEventBeingRedactedSQL = "" +
 	" WHERE redacts_event_id = $1"
 
 const markRedactionValidatedSQL = "" +
-	" UPDATE roomserver_redactions SET validated = $2 WHERE redaction_event_id = $1"
+	" UPDATE roomserver_redactions SET validated = $1 WHERE redaction_event_id = $2"
 
 type redactionStatements struct {
 	db                                          *sql.DB
@@ -58,12 +58,12 @@ type redactionStatements struct {
 	markRedactionValidatedStmt                  *sql.Stmt
 }
 
-func createRedactionsTable(db *sql.DB) error {
+func CreateRedactionsTable(db *sql.DB) error {
 	_, err := db.Exec(redactionsSchema)
 	return err
 }
 
-func prepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
+func PrepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 	s := &redactionStatements{
 		db: db,
 	}
@@ -118,6 +118,6 @@ func (s *redactionStatements) MarkRedactionValidated(
 	ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.markRedactionValidatedStmt)
-	_, err := stmt.ExecContext(ctx, redactionEventID, validated)
+	_, err := stmt.ExecContext(ctx, validated, redactionEventID)
 	return err
 }

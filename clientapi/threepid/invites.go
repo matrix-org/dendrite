@@ -231,7 +231,7 @@ func queryIDServerStoreInvite(
 		profile = &authtypes.Profile{}
 	}
 
-	client := gomatrixserverlib.NewClient()
+	client := http.Client{}
 
 	data := url.Values{}
 	data.Add("medium", body.Medium)
@@ -253,7 +253,7 @@ func queryIDServerStoreInvite(
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.DoHTTPRequest(ctx, req)
+	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}

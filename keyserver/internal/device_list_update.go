@@ -84,7 +84,7 @@ type DeviceListUpdater struct {
 	db          DeviceListUpdaterDatabase
 	api         DeviceListUpdaterAPI
 	producer    KeyChangeProducer
-	fedClient   fedsenderapi.FederationClient
+	fedClient   fedsenderapi.KeyserverFederationAPI
 	workerChans []chan gomatrixserverlib.ServerName
 
 	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
@@ -127,7 +127,7 @@ type KeyChangeProducer interface {
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
 	db DeviceListUpdaterDatabase, api DeviceListUpdaterAPI, producer KeyChangeProducer,
-	fedClient fedsenderapi.FederationClient, numWorkers int,
+	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
 		userIDToMutex:  make(map[string]*sync.Mutex),

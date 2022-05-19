@@ -36,9 +36,10 @@ func (c *JetStream) Defaults(generate bool) {
 }
 
 func (c *JetStream) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	if isMonolith { // polylith required configs below
+		return
+	}
 	// If we are running in a polylith deployment then we need at least
 	// one NATS JetStream server to talk to.
-	if !isMonolith {
-		checkNotZero(configErrs, "global.jetstream.addresses", int64(len(c.Addresses)))
-	}
+	checkNotZero(configErrs, "global.jetstream.addresses", int64(len(c.Addresses)))
 }

@@ -20,7 +20,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -64,12 +63,12 @@ type stateBlockStatements struct {
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
 }
 
-func createStateBlockTable(db *sql.DB) error {
+func CreateStateBlockTable(db *sql.DB) error {
 	_, err := db.Exec(stateDataSchema)
 	return err
 }
 
-func prepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
+func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
 		db: db,
 	}
@@ -85,9 +84,9 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
 	entries = entries[:util.SortAndUnique(entries)]
-	nids := types.EventNIDs{} // zero slice to not store 'null' in the DB
-	for _, e := range entries {
-		nids = append(nids, e.EventNID)
+	nids := make(types.EventNIDs, entries.Len())
+	for i := range entries {
+		nids[i] = entries[i].EventNID
 	}
 	js, err := json.Marshal(nids)
 	if err != nil {
@@ -122,13 +121,13 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
+	var stateBlockNID types.StateBlockNID
+	var result json.RawMessage
 	for ; rows.Next(); i++ {
-		var stateBlockNID types.StateBlockNID
-		var result json.RawMessage
 		if err = rows.Scan(&stateBlockNID, &result); err != nil {
 			return nil, err
 		}
-		r := []types.EventNID{}
+		var r []types.EventNID
 		if err = json.Unmarshal(result, &r); err != nil {
 			return nil, fmt.Errorf("json.Unmarshal: %w", err)
 		}
@@ -142,35 +141,3 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	}
 	return results, err
 }
-
-type stateKeyTupleSorter []types.StateKeyTuple
-
-func (s stateKeyTupleSorter) Len() int           { return len(s) }
-func (s stateKeyTupleSorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
-func (s stateKeyTupleSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
-// Check whether a tuple is in the list. Assumes that the list is sorted.
-func (s stateKeyTupleSorter) contains(value types.StateKeyTuple) bool {
-	i := sort.Search(len(s), func(i int) bool { return !s[i].LessThan(value) })
-	return i < len(s) && s[i] == value
-}
-
-// List the unique eventTypeNIDs and eventStateKeyNIDs.
-// Assumes that the list is sorted.
-func (s stateKeyTupleSorter) typesAndStateKeysAsArrays() (eventTypeNIDs []int64, eventStateKeyNIDs []int64) {
-	eventTypeNIDs = make([]int64, len(s))
-	eventStateKeyNIDs = make([]int64, len(s))
-	for i := range s {
-		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
-		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
-	}
-	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
-	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
-	return
-}
-
-type int64Sorter []int64
-
-func (s int64Sorter) Len() int           { return len(s) }
-func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
-func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }

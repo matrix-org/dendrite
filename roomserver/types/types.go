@@ -18,8 +18,10 @@ package types
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -96,6 +98,38 @@ func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 	return a.EventStateKeyNID < b.EventStateKeyNID
 }
 
+type StateKeyTupleSorter []StateKeyTuple
+
+func (s StateKeyTupleSorter) Len() int           { return len(s) }
+func (s StateKeyTupleSorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
+func (s StateKeyTupleSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+// Check whether a tuple is in the list. Assumes that the list is sorted.
+func (s StateKeyTupleSorter) contains(value StateKeyTuple) bool {
+	i := sort.Search(len(s), func(i int) bool { return !s[i].LessThan(value) })
+	return i < len(s) && s[i] == value
+}
+
+// List the unique eventTypeNIDs and eventStateKeyNIDs.
+// Assumes that the list is sorted.
+func (s StateKeyTupleSorter) TypesAndStateKeysAsArrays() (eventTypeNIDs []int64, eventStateKeyNIDs []int64) {
+	eventTypeNIDs = make([]int64, len(s))
+	eventStateKeyNIDs = make([]int64, len(s))
+	for i := range s {
+		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
+		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
+	}
+	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
+	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
+	return
+}
+
+type int64Sorter []int64
+
+func (s int64Sorter) Len() int           { return len(s) }
+func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 // A StateEntry is an entry in the room state of a matrix room.
 type StateEntry struct {
 	StateKeyTuple
@@ -164,6 +198,20 @@ func (s StateAtEvent) IsStateEvent() bool {
 type StateAtEventAndReference struct {
 	StateAtEvent
 	gomatrixserverlib.EventReference
+}
+
+type StateAtEventAndReferences []StateAtEventAndReference
+
+func (s StateAtEventAndReferences) Less(a, b int) bool {
+	return strings.Compare(s[a].EventID, s[b].EventID) < 0
+}
+
+func (s StateAtEventAndReferences) Len() int {
+	return len(s)
+}
+
+func (s StateAtEventAndReferences) Swap(a, b int) {
+	s[a], s[b] = s[b], s[a]
 }
 
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
