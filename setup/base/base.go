@@ -149,7 +149,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	}
 
 	var fts *fulltext.Search
-	if cfg.SyncAPI.Fulltext.Enabled {
+	isSyncOrMonolith := componentName == "syncapi" || isMonolith
+	if cfg.SyncAPI.Fulltext.Enabled && isSyncOrMonolith {
 		fts, err = fulltext.New(cfg.SyncAPI.Fulltext)
 		if err != nil {
 			logrus.WithError(err).Panicf("failed to create full text")
