@@ -35,8 +35,9 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 
 	switch dbType {
 	case test.DBTypePostgres:
-		cfg.Global.Defaults(true)   // autogen a signing key
-		cfg.MediaAPI.Defaults(true) // autogen a media path
+		cfg.Global.Defaults(true)           // autogen a signing key
+		cfg.MediaAPI.Defaults(true)         // autogen a media path
+		cfg.SyncAPI.Fulltext.Defaults(true) // use in memory fts
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
@@ -85,6 +86,7 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 		cfg.Defaults(true)
 	}
 	cfg.Global.JetStream.InMemory = true
+	cfg.SyncAPI.Fulltext.InMemory = true
 	base := base.NewBaseDendrite(cfg, "Tests")
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
