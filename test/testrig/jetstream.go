@@ -1,4 +1,4 @@
-package test
+package testrig
 
 import (
 	"encoding/json"

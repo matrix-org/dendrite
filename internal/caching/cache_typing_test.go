@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/test"
+	"github.com/matrix-org/dendrite/test"
 )
 
 func TestEDUCache(t *testing.T) {

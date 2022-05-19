@@ -54,7 +54,7 @@ func Setup(
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI *fedInternal.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
-	federation *gomatrixserverlib.FederationClient,
+	federation federationAPI.FederationClient,
 	userAPI userapi.FederationUserAPI,
 	keyAPI keyserverAPI.FederationKeyAPI,
 	mscCfg *config.MSCs,

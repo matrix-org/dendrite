@@ -44,8 +44,9 @@ func fatalError(t *testing.T, format string, args ...interface{}) {
 }
 
 func createLocalDB(t *testing.T, dbName string) {
-	if !Quiet {
-		t.Log("Note: tests require a postgres install accessible to the current user")
+	if _, err := exec.LookPath("createdb"); err != nil {
+		fatalError(t, "Note: tests require a postgres install accessible to the current user")
+		return
 	}
 	createDB := exec.Command("createdb", dbName)
 	if !Quiet {
@@ -61,6 +62,9 @@ func createLocalDB(t *testing.T, dbName string) {
 func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 	db, err := sql.Open("postgres", connStr+" dbname=postgres")
 	if err != nil {
+		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
+	}
+	if err = db.Ping(); err != nil {
 		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))

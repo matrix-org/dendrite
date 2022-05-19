@@ -64,8 +64,17 @@ func AddPublicRoutes(
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		JetStream: js,
 	}
+	presenceConsumer := consumers.NewPresenceConsumer(
+		base.ProcessContext, cfg, js, natsClient, syncDB,
+		notifier, streams.PresenceStreamProvider,
+		userAPI,
+	)
 
-	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer, base.EnableMetrics)
+	requestPool := sync.NewRequestPool(syncDB, cfg, userAPI, keyAPI, rsAPI, streams, notifier, federationPresenceProducer, presenceConsumer, base.EnableMetrics)
+
+	if err = presenceConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start presence consumer")
+	}
 
 	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
 		JetStream: js,
@@ -129,15 +138,6 @@ func AddPublicRoutes(
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
-	}
-
-	presenceConsumer := consumers.NewPresenceConsumer(
-		base.ProcessContext, cfg, js, natsClient, syncDB,
-		notifier, streams.PresenceStreamProvider,
-		userAPI,
-	)
-	if err = presenceConsumer.Start(); err != nil {
-		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
 	routing.Setup(
