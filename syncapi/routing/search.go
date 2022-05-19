@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -109,10 +110,11 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	}
 	logrus.Debugf("Search took %s", result.Took)
 
-	results := []Results{}
+	results := []Result{}
 
 	wantEvents := make([]string, len(result.Hits))
 	eventScore := make(map[string]*search.DocumentMatch)
+
 	for _, hit := range result.Hits {
 		logrus.Debugf("%+v\n", hit.Fields)
 		wantEvents = append(wantEvents, hit.ID)
@@ -129,6 +131,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		return jsonerror.InternalServerError()
 	}
 
+	groups := make(map[string]RoomResult)
+	knownUsersProfiles := make(map[string]ProfileInfo)
 	for _, event := range evs {
 		id, _, err := syncDB.SelectContextEvent(ctx, event.RoomID(), event.EventID())
 		if err != nil {
@@ -148,27 +152,40 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			return jsonerror.InternalServerError()
 		}
 
-		results = append(results, Results{
-			Context: ContextRespsonse{
+		profileInfos := make(map[string]ProfileInfo)
+		for _, ev := range append(eventsBefore, eventsAfter...) {
+			profile, ok := knownUsersProfiles[event.Sender()]
+			if !ok {
+				stateEvent, err := syncDB.GetStateEvent(ctx, ev.RoomID(), gomatrixserverlib.MRoomMember, ev.Sender())
+				if err != nil {
+					logrus.WithError(err).WithField("user_id", event.Sender()).Warn("failed to query userprofile")
+					continue
+				}
+				if stateEvent == nil {
+					continue
+				}
+				profile = ProfileInfo{
+					AvatarURL:   gjson.GetBytes(stateEvent.Content(), "avatar_url").Str,
+					DisplayName: gjson.GetBytes(stateEvent.Content(), "displayname").Str,
+				}
+				knownUsersProfiles[event.Sender()] = profile
+			}
+			profileInfos[ev.Sender()] = profile
+		}
+
+		r := gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll)
+		results = append(results, Result{
+			Context: SearchContextResponse{
 				EventsAfter:  gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatSync),
 				EventsBefore: gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatSync),
+				ProfileInfo:  profileInfos,
 			},
-			Rank: eventScore[event.EventID()].Score,
-			Result: Result{
-				Content: Content{
-					Body:          gjson.GetBytes(event.Content(), "body").Str,
-					Format:        gjson.GetBytes(event.Content(), "format").Str,
-					FormattedBody: gjson.GetBytes(event.Content(), "formatted_body").Str,
-					Msgtype:       gjson.GetBytes(event.Content(), "msgtype").Str,
-				},
-				EventID:        event.EventID(),
-				OriginServerTs: event.OriginServerTS(),
-				RoomID:         event.RoomID(),
-				Sender:         event.Sender(),
-				Type:           event.Type(),
-				Unsigned:       event.Unsigned(),
-			},
+			Rank:   eventScore[event.EventID()].Score,
+			Result: r,
 		})
+		roomGroup := groups[event.RoomID()]
+		roomGroup.Results = append(roomGroup.Results, event.EventID())
+		groups[event.RoomID()] = roomGroup
 	}
 
 	nb := ""
@@ -179,10 +196,11 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	res := SearchResponse{
 		SearchCategories: SearchCategories{
 			RoomEvents: RoomEvents{
-				Count:     int(result.Total),
-				Groups:    Groups{},
-				Results:   results,
-				NextBatch: nb,
+				Count:      int(result.Total),
+				Groups:     Groups{RoomID: groups},
+				Results:    results,
+				NextBatch:  nb,
+				Highlights: strings.Split(searchReq.SearchCategories.RoomEvents.SearchTerm, " "),
 			},
 		},
 	}
@@ -222,40 +240,37 @@ type RoomResult struct {
 	Order     int      `json:"order"`
 	Results   []string `json:"results"`
 }
-type RoomID struct {
-	Room RoomResult
-}
+
 type Groups struct {
-	RoomID RoomID `json:"room_id"`
-}
-type Content struct {
-	Body          string `json:"body"`
-	Format        string `json:"format"`
-	FormattedBody string `json:"formatted_body"`
-	Msgtype       string `json:"msgtype"`
+	RoomID map[string]RoomResult `json:"room_id"`
 }
 
 type Result struct {
-	Content        Content                     `json:"content"`
-	EventID        string                      `json:"event_id"`
-	OriginServerTs gomatrixserverlib.Timestamp `json:"origin_server_ts"`
-	RoomID         string                      `json:"room_id"`
-	Sender         string                      `json:"sender"`
-	Type           string                      `json:"type"`
-	Unsigned       []byte                      `json:"unsigned,omitempty"`
+	Context SearchContextResponse         `json:"context"`
+	Rank    float64                       `json:"rank"`
+	Result  gomatrixserverlib.ClientEvent `json:"result"`
 }
-type Results struct {
-	Context ContextRespsonse `json:"context"`
-	Rank    float64          `json:"rank"`
-	Result  Result           `json:"result"`
+
+type SearchContextResponse struct {
+	End          string                          `json:"end"` // TODO
+	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after"`
+	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before"`
+	Start        string                          `json:"start"`        // TODO
+	ProfileInfo  map[string]ProfileInfo          `json:"profile_info"` // TODO
+}
+
+type ProfileInfo struct {
+	AvatarURL   string `json:"avatar_url"`   // TODO
+	DisplayName string `json:"display_name"` // TODO
 }
 
 type RoomEvents struct {
-	Count      int       `json:"count"`
-	Groups     Groups    `json:"groups"`
-	Highlights []string  `json:"highlights"`
-	NextBatch  string    `json:"next_batch"`
-	Results    []Results `json:"results"`
+	Count      int      `json:"count"`
+	Groups     Groups   `json:"groups"`
+	Highlights []string `json:"highlights"`
+	NextBatch  string   `json:"next_batch"`
+	Results    []Result `json:"results"`
+	State      struct{} `json:"state"` // TODO
 }
 type SearchCategories struct {
 	RoomEvents RoomEvents `json:"room_events"`
