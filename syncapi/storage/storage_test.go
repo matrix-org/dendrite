@@ -24,9 +24,7 @@ func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, func() {
-		close()
-	}
+	return db, close
 }
 
 func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
