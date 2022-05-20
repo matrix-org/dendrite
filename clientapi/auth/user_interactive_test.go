@@ -187,3 +187,32 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		}
 	}
 }
+
+func TestUserInteractive_AddCompletedStage(t *testing.T) {
+	tests := []struct {
+		name      string
+		sessionID string
+	}{
+		{
+			name:      "first user",
+			sessionID: util.RandomString(8),
+		},
+		{
+			name:      "second user",
+			sessionID: util.RandomString(8),
+		},
+		{
+			name:      "third user",
+			sessionID: util.RandomString(8),
+		},
+	}
+	u := setup()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if len(u.Sessions[tt.sessionID]) > 0 {
+				t.Fatalf("expected 0 completed stages, got %d", len(u.Sessions[tt.sessionID]))
+			}
+			u.AddCompletedStage(tt.sessionID, "")
+		})
+	}
+}
