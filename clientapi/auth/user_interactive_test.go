@@ -207,10 +207,16 @@ func TestUserInteractive_AddCompletedStage(t *testing.T) {
 		},
 	}
 	u := setup()
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if len(u.Sessions[tt.sessionID]) > 0 {
-				t.Fatalf("expected 0 completed stages, got %d", len(u.Sessions[tt.sessionID]))
+			_, resp := u.Verify(ctx, []byte("{}"), nil)
+			challenge, ok := resp.JSON.(Challenge)
+			if !ok {
+				t.Fatalf("expected a Challenge, got %T", resp.JSON)
+			}
+			if len(challenge.Completed) > 0 {
+				t.Fatalf("expected 0 completed stages, got %d", len(challenge.Completed))
 			}
 			u.AddCompletedStage(tt.sessionID, "")
 		})
