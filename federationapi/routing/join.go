@@ -103,6 +103,15 @@ func MakeJoin(
 		}
 	}
 
+	// Check if the restricted join is allowed. If the room doesn't
+	// support restricted joins then this is effectively a no-op.
+	if res, rerr := checkRestrictedJoin(httpReq, rsAPI, verRes.RoomVersion, roomID, userID); rerr != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("checkRestrictedJoin failed")
+		return jsonerror.InternalServerError()
+	} else if res != nil {
+		return *res
+	}
+
 	// Try building an event for the server
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
@@ -355,6 +364,41 @@ func SendJoin(
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
 		},
+	}
+}
+
+func checkRestrictedJoin(
+	httpReq *http.Request,
+	rsAPI api.FederationRoomserverAPI,
+	roomVersion gomatrixserverlib.RoomVersion,
+	roomID, userID string,
+) (*util.JSONResponse, error) {
+	if allowRestricted, err := roomVersion.AllowRestrictedJoinsInEventAuth(); err != nil {
+		return nil, err
+	} else if !allowRestricted {
+		return nil, nil
+	}
+	req := &api.QueryRestrictedJoinAllowedRequest{
+		RoomID: roomID,
+		UserID: userID,
+	}
+	res := &api.QueryRestrictedJoinAllowedResponse{}
+	if err := rsAPI.QueryRestrictedJoinAllowed(httpReq.Context(), req, res); err != nil {
+		return nil, err
+	}
+	switch {
+	case !res.Resident:
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnableToAuthoriseJoin("This server cannot authorise the join."),
+		}, nil
+	case !res.Allowed:
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You are not joined to any matching rooms."),
+		}, nil
+	default:
+		return nil, nil
 	}
 }
 
