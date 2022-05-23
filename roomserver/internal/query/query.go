@@ -790,6 +790,10 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if joinRules.JoinRule != gomatrixserverlib.Restricted {
 		return nil
 	}
+	// Start off by populating the "resident" flag in the response. If we
+	// come across any rooms in the request that are missing, we will unset
+	// the flag.
+	res.Resident = true
 	// Step through the join rules and see if the user matches any of them.
 	for _, rule := range joinRules.Allow {
 		// We only understand "m.room_membership" rules at this point in
@@ -800,21 +804,17 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		// See if the room exists. If it doesn't exist or if it's a stub
 		// room entry then we can't check memberships.
 		targetRoomInfo, err := r.DB.RoomInfo(ctx, rule.RoomID)
-		if err != nil {
-			continue
-		}
-		if targetRoomInfo == nil || targetRoomInfo.IsStub {
+		if err != nil || targetRoomInfo == nil || targetRoomInfo.IsStub {
+			res.Resident = false
 			continue
 		}
 		// First of all work out if *we* are still in the room, otherwise
 		// it's possible that the memberships will be out of date.
 		isIn, err := r.DB.GetLocalServerInRoom(ctx, targetRoomInfo.RoomNID)
-		if err != nil {
-			continue
-		}
-		if !isIn {
-			// We aren't in the room, so we can no longer tell if the room
+		if err != nil || !isIn {
+			// If we aren't in the room, we can no longer tell if the room
 			// memberships are up-to-date.
+			res.Resident = false
 			continue
 		}
 		// At this point we're happy that we are in the room, so now let's
@@ -825,6 +825,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		}
 		// If the user is in the room then we will allow the membership.
 		if isIn {
+			res.Resident = true
 			res.Allowed = true
 			return nil
 		}
