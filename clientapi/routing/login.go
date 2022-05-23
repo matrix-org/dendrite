@@ -59,6 +59,10 @@ func passwordLogin() []stage {
 }
 
 func ssoLogin(cfg *config.ClientAPI) []stage {
+	if !cfg.Login.SSO.Enabled {
+		return nil
+	}
+
 	var idps []identityProvider
 	for _, idp := range cfg.Login.SSO.Providers {
 		brand := idp.Brand
@@ -87,6 +91,18 @@ func ssoLogin(cfg *config.ClientAPI) []stage {
 	}
 }
 
+func tokenLogin(cfg *config.ClientAPI) []stage {
+	if !cfg.Login.LoginTokenEnabled() {
+		return nil
+	}
+
+	return []stage{
+		{
+			Type: authtypes.LoginTypeToken,
+		},
+	}
+}
+
 // Login implements GET and POST /login
 func Login(
 	req *http.Request, userAPI userapi.ClientUserAPI,
@@ -94,9 +110,8 @@ func Login(
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
 		allFlows := passwordLogin()
-		if cfg.Login.SSO.Enabled {
-			allFlows = append(allFlows, ssoLogin(cfg)...)
-		}
+		allFlows = append(allFlows, ssoLogin(cfg)...)
+		allFlows = append(allFlows, tokenLogin(cfg)...)
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: flows{Flows: allFlows},

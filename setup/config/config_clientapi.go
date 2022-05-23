@@ -103,6 +103,12 @@ type Login struct {
 	SSO SSO `yaml:"sso"`
 }
 
+// LoginTokenEnabled returns whether any login type uses
+// authtypes.LoginTypeToken.
+func (l *Login) LoginTokenEnabled() bool {
+	return l.SSO.Enabled
+}
+
 func (l *Login) Verify(configErrs *ConfigErrors) {
 	l.SSO.Verify(configErrs)
 }

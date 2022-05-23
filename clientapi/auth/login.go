@@ -62,6 +62,14 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 			Config:               cfg,
 		}
 	case authtypes.LoginTypeToken:
+		if !cfg.Login.LoginTokenEnabled() {
+			err := util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidArgumentValue("disabled login type: " + header.Type),
+			}
+			return nil, nil, &err
+		}
+
 		typ = &LoginTypeToken{
 			UserAPI: userAPI,
 			Config:  cfg,
