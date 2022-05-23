@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -174,6 +175,7 @@ func MakeJoin(
 // SendJoin implements the /send_join API
 // The make-join send-join dance makes much more sense as a single
 // flow so the cyclomatic complexity is high:
+// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -327,8 +329,34 @@ func SendJoin(
 		}
 	}
 
+	// If the membership content contains a user ID for a server that is not
+	// ours then we should kick it back.
+	var memberContent gomatrixserverlib.MemberContent
+	if err := json.Unmarshal(event.Content(), &memberContent); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	}
+	if memberContent.AuthorisedVia != "" {
+		_, domain, err := gomatrixserverlib.SplitID('@', memberContent.AuthorisedVia)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(fmt.Sprintf("The authorising username %q is invalid.", memberContent.AuthorisedVia)),
+			}
+		}
+		if domain != cfg.Matrix.ServerName {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(fmt.Sprintf("The authorising username %q does not belong to this server.", memberContent.AuthorisedVia)),
+			}
+		}
+	}
+
 	// Sign the membership event. This is required for restricted joins to work
-	// in the case that the authorised via user is one of our own users.
+	// in the case that the authorised via user is one of our own users. It also
+	// doesn't hurt to do it even if it isn't a restricted join.
 	signed := event.Sign(
 		string(cfg.Matrix.ServerName),
 		cfg.Matrix.KeyID,
