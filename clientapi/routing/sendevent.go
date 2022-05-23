@@ -104,6 +104,13 @@ func SendEvent(
 		return *resErr
 	}
 
+	// If we're sending a membership update, make sure to strip the authorised
+	// via key if it is present, otherwise other servers won't be able to auth
+	// the event if the room is set to the "restricted" join rule.
+	if eventType == gomatrixserverlib.MRoomMember {
+		delete(r, "join_authorised_by_users_server")
+	}
+
 	evTime, err := httputil.ParseTSParam(req)
 	if err != nil {
 		return util.JSONResponse{
