@@ -165,9 +165,9 @@ func SSOCallback(
 		return util.RedirectResponse(result.RedirectURL)
 	}
 
-	id, err := verifyThirdPartyUserIdentifier(ctx, userAPI, result.Identifier, cfg.Matrix.ServerName)
+	id, err := verifySSOUserIdentifier(ctx, userAPI, result.Identifier, cfg.Matrix.ServerName)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier.String()).Error("failed to find user")
+		util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.Forbidden("ID not associated with a local account"),
@@ -176,7 +176,7 @@ func SSOCallback(
 	if id == nil {
 		// The user doesn't exist.
 		// TODO: let the user select a localpart and register an account.
-		util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier.String()).Error("failed to find user")
+		util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
 			Code: http.StatusNotImplemented,
 			JSON: jsonerror.Forbidden("SSO registration not implemented"),
@@ -204,7 +204,7 @@ func SSOCallback(
 type userAPIForSSO interface {
 	uapi.LoginTokenInternalAPI
 
-	QueryLocalpartForThreePID(ctx context.Context, req *uapi.QueryLocalpartForThreePIDRequest, res *uapi.QueryLocalpartForThreePIDResponse) error
+	QueryLocalpartForSSO(ctx context.Context, req *uapi.QueryLocalpartForSSORequest, res *uapi.QueryLocalpartForSSOResponse) error
 }
 
 // getProvider looks up the given provider in the
@@ -254,16 +254,17 @@ func parseNonce(s string) (redirectURL *url.URL, _ error) {
 	return u, nil
 }
 
-// verifyThirdPartyUserIdentifier resolves a ThirdPartyIdentifier to a
+// verifySSOUserIdentifier resolves an sso.UserIdentifier to a
 // UserIdentifier using the User API. Returns nil if there is no
 // associated user.
-func verifyThirdPartyUserIdentifier(ctx context.Context, userAPI userAPIForSSO, id *userutil.ThirdPartyIdentifier, serverName gomatrixserverlib.ServerName) (*userutil.UserIdentifier, error) {
-	req := &uapi.QueryLocalpartForThreePIDRequest{
-		ThreePID: id.Address,
-		Medium:   string(id.Medium),
+func verifySSOUserIdentifier(ctx context.Context, userAPI userAPIForSSO, id *sso.UserIdentifier, serverName gomatrixserverlib.ServerName) (*userutil.UserIdentifier, error) {
+	req := &uapi.QueryLocalpartForSSORequest{
+		Namespace: id.Namespace,
+		Issuer:    id.Issuer,
+		Subject:   id.Subject,
 	}
-	var res uapi.QueryLocalpartForThreePIDResponse
-	if err := userAPI.QueryLocalpartForThreePID(ctx, req, &res); err != nil {
+	var res uapi.QueryLocalpartForSSOResponse
+	if err := userAPI.QueryLocalpartForSSO(ctx, req, &res); err != nil {
 		return nil, err
 	}
 	if res.Localpart == "" {

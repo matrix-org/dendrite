@@ -18,8 +18,8 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type IdentityProvider interface {
@@ -37,7 +37,7 @@ type IdentityProviderRequest struct {
 
 type CallbackResult struct {
 	RedirectURL     string
-	Identifier      *userutil.ThirdPartyIdentifier
+	Identifier      *UserIdentifier
 	SuggestedUserID string
 }
 
@@ -54,4 +54,9 @@ func GetIdentityProvider(t IdentityProviderType) IdentityProvider {
 	default:
 		return nil
 	}
+}
+
+type UserIdentifier struct {
+	Namespace       uapi.SSOIssuerNamespace
+	Issuer, Subject string
 }

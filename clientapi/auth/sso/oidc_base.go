@@ -26,7 +26,7 @@ import (
 	"text/template"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/clientapi/userutil"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/tidwall/gjson"
 )
 
@@ -161,7 +161,7 @@ func (p *baseOIDCIdentityProvider) getOIDCAccessToken(ctx context.Context, req *
 	return resp.AccessToken, nil
 }
 
-func (p *baseOIDCIdentityProvider) getUserInfo(ctx context.Context, req *IdentityProviderRequest, oidcAccessToken string) (*userutil.ThirdPartyIdentifier, string, error) {
+func (p *baseOIDCIdentityProvider) getUserInfo(ctx context.Context, req *IdentityProviderRequest, oidcAccessToken string) (ssoUser *UserIdentifier, suggestedUserID string, _ error) {
 	u, err := p.UserInfoURL.Execute(map[string]interface{}{
 		"Config": req.System,
 	}, nil)
@@ -187,34 +187,44 @@ func (p *baseOIDCIdentityProvider) getUserInfo(ctx context.Context, req *Identit
 		return nil, "", err
 	}
 
-	var email string
-	var suggestedUserID string
-	switch ctype {
-	case "application/json":
-		body, err := ioutil.ReadAll(hresp.Body)
-		if err != nil {
-			return nil, "", err
-		}
-
-		emailRes := gjson.GetBytes(body, p.UserInfoEmailPath)
-		if !emailRes.Exists() {
-			return nil, "", fmt.Errorf("no email in user info response body")
-		}
-		email = emailRes.String()
-
-		// This is optional.
-		userIDRes := gjson.GetBytes(body, p.UserInfoSuggestedUserIDPath)
-		suggestedUserID = userIDRes.String()
-
-	default:
+	if ctype != "application/json" {
 		return nil, "", fmt.Errorf("got unknown content type %q for user info", ctype)
 	}
 
-	if email == "" {
-		return nil, "", fmt.Errorf("no email address in user info")
+	body, err := ioutil.ReadAll(hresp.Body)
+	if err != nil {
+		return nil, "", err
 	}
 
-	return &userutil.ThirdPartyIdentifier{Medium: "email", Address: email}, suggestedUserID, nil
+	issRes := gjson.GetBytes(body, "iss")
+	if !issRes.Exists() {
+		return nil, "", fmt.Errorf("no iss in user info response body")
+	}
+	iss := issRes.String()
+
+	subRes := gjson.GetBytes(body, "sub")
+	if !subRes.Exists() {
+		return nil, "", fmt.Errorf("no sub in user info response body")
+	}
+	sub := subRes.String()
+
+	if iss == "" {
+		return nil, "", fmt.Errorf("no iss in user info")
+	}
+
+	if sub == "" {
+		return nil, "", fmt.Errorf("no sub in user info")
+	}
+
+	// This is optional.
+	userIDRes := gjson.GetBytes(body, p.UserInfoSuggestedUserIDPath)
+	suggestedUserID = userIDRes.String()
+
+	return &UserIdentifier{
+		Namespace: uapi.OIDCNamespace,
+		Issuer:    iss,
+		Subject:   sub,
+	}, suggestedUserID, nil
 }
 
 type urlTemplate struct {
