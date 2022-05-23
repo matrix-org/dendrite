@@ -824,10 +824,34 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		if err != nil {
 			continue
 		}
-		// If the user is in the room then we will allow the membership.
-		if isIn {
+		// If the user is not in the room then we will skip them.
+		if !isIn {
+			continue
+		}
+		// The user is in the room, so now we will need to authorise the
+		// join using the user ID of one of our own users in the room. Pick
+		// one.
+		joinNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, targetRoomInfo.RoomNID, true, true)
+		if err != nil || len(joinNIDs) == 0 {
+			// There should always be more than one join NID at this point
+			// because we are gated behind GetLocalServerInRoom, but y'know,
+			// sometimes strange things happen.
+			continue
+		}
+		// For each of the joined users, let's see if we can get a valid
+		// membership event.
+		for _, joinNID := range joinNIDs {
+			events, err := r.DB.Events(ctx, []types.EventNID{joinNID})
+			if err != nil || len(events) != 1 {
+				continue
+			}
+			event := events[0]
+			if event.Type() != gomatrixserverlib.MRoomMember || event.StateKey() == nil {
+				continue // shouldn't happen
+			}
 			res.Resident = true
 			res.Allowed = true
+			res.AuthorisedVia = *event.StateKey()
 			return nil
 		}
 	}

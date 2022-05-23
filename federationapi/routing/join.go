@@ -105,7 +105,8 @@ func MakeJoin(
 
 	// Check if the restricted join is allowed. If the room doesn't
 	// support restricted joins then this is effectively a no-op.
-	if res, rerr := checkRestrictedJoin(httpReq, rsAPI, verRes.RoomVersion, roomID, userID); rerr != nil {
+	res, authorisedVia, err := checkRestrictedJoin(httpReq, rsAPI, verRes.RoomVersion, roomID, userID)
+	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("checkRestrictedJoin failed")
 		return jsonerror.InternalServerError()
 	} else if res != nil {
@@ -119,8 +120,11 @@ func MakeJoin(
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Join})
-	if err != nil {
+	content := gomatrixserverlib.MemberContent{
+		Membership:    gomatrixserverlib.Join,
+		AuthorisedVia: authorisedVia,
+	}
+	if err = builder.SetContent(content); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
 		return jsonerror.InternalServerError()
 	}
@@ -372,11 +376,11 @@ func checkRestrictedJoin(
 	rsAPI api.FederationRoomserverAPI,
 	roomVersion gomatrixserverlib.RoomVersion,
 	roomID, userID string,
-) (*util.JSONResponse, error) {
+) (*util.JSONResponse, string, error) {
 	if allowRestricted, err := roomVersion.AllowRestrictedJoinsInEventAuth(); err != nil {
-		return nil, err
+		return nil, "", err
 	} else if !allowRestricted {
-		return nil, nil
+		return nil, "", nil
 	}
 	req := &api.QueryRestrictedJoinAllowedRequest{
 		RoomID: roomID,
@@ -384,13 +388,13 @@ func checkRestrictedJoin(
 	}
 	res := &api.QueryRestrictedJoinAllowedResponse{}
 	if err := rsAPI.QueryRestrictedJoinAllowed(httpReq.Context(), req, res); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	switch {
 	case !res.Restricted:
 		// The join rules for the room don't restrict membership.
-		return nil, nil
+		return nil, "", nil
 
 	case !res.Resident:
 		// The join rules restrict membership but our server isn't currently
@@ -401,7 +405,7 @@ func checkRestrictedJoin(
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnableToAuthoriseJoin("This server cannot authorise the join."),
-		}, nil
+		}, "", nil
 
 	case !res.Allowed:
 		// The join rules restrict membership, our server is in the relevant
@@ -410,13 +414,15 @@ func checkRestrictedJoin(
 		return &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("You are not joined to any matching rooms."),
-		}, nil
+		}, "", nil
 
 	default:
 		// The join rules restrict membership, our server is in the relevant
 		// rooms and the user was allowed to join because they belong to one
-		// of the allowed rooms.
-		return nil, nil
+		// of the allowed rooms. We now need to pick one of our own local users
+		// from within the room to use as the authorising user ID, so that it
+		// can be referred to from within the membership content.
+		return nil, res.AuthorisedVia, nil
 	}
 }
 

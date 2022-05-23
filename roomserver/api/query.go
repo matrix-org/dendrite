@@ -354,9 +354,10 @@ type QueryRestrictedJoinAllowedRequest struct {
 }
 
 type QueryRestrictedJoinAllowedResponse struct {
-	Restricted bool `json:"restricted"` // Is the room membership restricted?
-	Resident   bool `json:"resident"`   // Is our homeserver in the relevant rooms?
-	Allowed    bool `json:"allowed"`    // Is the join allowed by the rules?
+	Restricted    bool   `json:"restricted"`               // Is the room membership restricted?
+	Resident      bool   `json:"resident"`                 // Is our homeserver in the relevant rooms?
+	Allowed       bool   `json:"allowed"`                  // Is the join allowed by the rules?
+	AuthorisedVia string `json:"authorised_via,omitempty"` // The user that authorises the join
 }
 
 // MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
