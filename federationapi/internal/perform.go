@@ -166,7 +166,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if content == nil {
 		content = map[string]interface{}{}
 	}
-	content["membership"] = "join"
+	_ = json.Unmarshal(respMakeJoin.JoinEvent.Content, &content)
+	content["membership"] = gomatrixserverlib.Join
 	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
 		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
 	}
