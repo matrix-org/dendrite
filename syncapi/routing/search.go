@@ -121,8 +121,12 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		eventScore[hit.ID] = hit
 	}
 
+	// Filter on m.room.message, as otherwise we also get events like m.reaction
+	// which "breaks" displaying results in Element Web.
+	types := []string{"m.room.message"}
 	roomFilter := &gomatrixserverlib.RoomEventFilter{
 		Rooms: &rooms,
+		Types: &types,
 	}
 
 	evs, err := syncDB.Events(ctx, wantEvents)
