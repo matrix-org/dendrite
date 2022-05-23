@@ -52,6 +52,7 @@ type Database struct {
 	LoginTokens           tables.LoginTokenTable
 	Notifications         tables.NotificationTable
 	Pushers               tables.PusherTable
+	SSOs                  tables.SSOTable
 	Stats                 tables.StatsTable
 	LoginTokenLifetime    time.Duration
 	ServerName            gomatrixserverlib.ServerName
@@ -223,6 +224,35 @@ func (d *Database) GetNewNumericLocalpart(
 func (d *Database) hashPassword(plaintext string) (hash string, err error) {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), d.BcryptCost)
 	return string(hashBytes), err
+}
+
+var ErrSSOInUse = errors.New("this SSO account is already in use")
+
+func (d *Database) SaveSSOAssociation(ctx context.Context, namespace, iss, sub, localpart string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		user, err := d.SSOs.SelectLocalpartForSSO(
+			ctx, txn, namespace, iss, sub,
+		)
+		if err != nil {
+			return err
+		}
+
+		if len(user) > 0 {
+			return Err3PIDInUse
+		}
+
+		return d.SSOs.InsertSSO(ctx, txn, namespace, iss, sub, localpart)
+	})
+}
+
+func (d *Database) RemoveSSOAssociation(ctx context.Context, namespace, iss, sub string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.SSOs.DeleteSSO(ctx, txn, namespace, iss, sub)
+	})
+}
+
+func (d *Database) GetLocalpartForSSO(ctx context.Context, namespace, iss, sub string) (string, error) {
+	return d.SSOs.SelectLocalpartForSSO(ctx, nil, namespace, iss, sub)
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

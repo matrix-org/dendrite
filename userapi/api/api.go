@@ -77,6 +77,7 @@ type SyncUserAPI interface {
 type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
+	SSOAPI
 	UserLoginAPI
 	QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
