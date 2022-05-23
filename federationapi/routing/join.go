@@ -386,18 +386,36 @@ func checkRestrictedJoin(
 	if err := rsAPI.QueryRestrictedJoinAllowed(httpReq.Context(), req, res); err != nil {
 		return nil, err
 	}
+
 	switch {
+	case !res.Restricted:
+		// The join rules for the room don't restrict membership.
+		return nil, nil
+
 	case !res.Resident:
+		// The join rules restrict membership but our server isn't currently
+		// joined to all of the allowed rooms, so we can't actually decide
+		// whether or not to allow the user to join. This error code should
+		// tell the joining server to try joining via another resident server
+		// instead.
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.UnableToAuthoriseJoin("This server cannot authorise the join."),
 		}, nil
+
 	case !res.Allowed:
+		// The join rules restrict membership, our server is in the relevant
+		// rooms and the user wasn't joined to join any of the allowed rooms
+		// and therefore can't join this room.
 		return &util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("You are not joined to any matching rooms."),
 		}, nil
+
 	default:
+		// The join rules restrict membership, our server is in the relevant
+		// rooms and the user was allowed to join because they belong to one
+		// of the allowed rooms.
 		return nil, nil
 	}
 }

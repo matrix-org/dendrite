@@ -787,7 +787,8 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
 	// If the join rule isn't "restricted" then there's nothing more to do.
-	if joinRules.JoinRule != gomatrixserverlib.Restricted {
+	res.Restricted = joinRules.JoinRule == gomatrixserverlib.Restricted
+	if !res.Restricted {
 		return nil
 	}
 	// Start off by populating the "resident" flag in the response. If we
