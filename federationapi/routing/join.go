@@ -327,6 +327,14 @@ func SendJoin(
 		}
 	}
 
+	// Sign the membership event. This is required for restricted joins to work
+	// in the case that the authorised via user is one of our own users.
+	signed := event.Sign(
+		string(cfg.Matrix.ServerName),
+		cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey,
+	)
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
@@ -336,7 +344,7 @@ func SendJoin(
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
-					Event:         event.Headered(stateAndAuthChainResponse.RoomVersion),
+					Event:         signed.Headered(stateAndAuthChainResponse.RoomVersion),
 					SendAsServer:  string(cfg.Matrix.ServerName),
 					TransactionID: nil,
 				},
@@ -367,6 +375,7 @@ func SendJoin(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
+			Event:       &signed,
 		},
 	}
 }
