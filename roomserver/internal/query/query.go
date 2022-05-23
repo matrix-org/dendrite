@@ -16,6 +16,7 @@ package query
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -755,5 +756,78 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 		hchain[i] = chain[i].Headered(chain[i].Version())
 	}
 	res.AuthChain = hchain
+	return nil
+}
+
+func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse) error {
+	// Look up if we know anything about the room. If it doesn't exist
+	// or is a stub entry then we can't do anything.
+	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	if err != nil {
+		return fmt.Errorf("r.DB.RoomInfo: %w", err)
+	}
+	if roomInfo == nil || roomInfo.IsStub {
+		return fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
+	}
+	// If the room version doesn't allow restricted joins then don't
+	// try to process any further.
+	allowRestrictedJoins, err := roomInfo.RoomVersion.AllowRestrictedJoinsInEventAuth()
+	if err != nil {
+		return fmt.Errorf("roomInfo.RoomVersion.AllowRestrictedJoinsInEventAuth: %w", err)
+	} else if !allowRestrictedJoins {
+		return nil
+	}
+	// Get the join rules to work out if the join rule is "restricted".
+	joinRulesEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, gomatrixserverlib.MRoomJoinRules, "")
+	if err != nil {
+		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+	}
+	var joinRules gomatrixserverlib.JoinRuleContent
+	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
+	// If the join rule isn't "restricted" then there's nothing more to do.
+	if joinRules.JoinRule != gomatrixserverlib.Restricted {
+		return nil
+	}
+	// Step through the join rules and see if the user matches any of them.
+	for _, rule := range joinRules.Allow {
+		// We only understand "m.room_membership" rules at this point in
+		// time, so skip any rule that doesn't match those.
+		if rule.Type != gomatrixserverlib.MRoomMembership {
+			continue
+		}
+		// See if the room exists. If it doesn't exist or if it's a stub
+		// room entry then we can't check memberships.
+		targetRoomInfo, err := r.DB.RoomInfo(ctx, rule.RoomID)
+		if err != nil {
+			continue
+		}
+		if targetRoomInfo == nil || targetRoomInfo.IsStub {
+			continue
+		}
+		// First of all work out if *we* are still in the room, otherwise
+		// it's possible that the memberships will be out of date.
+		isIn, err := r.DB.GetLocalServerInRoom(ctx, targetRoomInfo.RoomNID)
+		if err != nil {
+			continue
+		}
+		if !isIn {
+			// We aren't in the room, so we can no longer tell if the room
+			// memberships are up-to-date.
+			continue
+		}
+		// At this point we're happy that we are in the room, so now let's
+		// see if the target user is in the room.
+		_, isIn, _, err = r.DB.GetMembership(ctx, targetRoomInfo.RoomNID, req.UserID)
+		if err != nil {
+			continue
+		}
+		// If the user is in the room then we will allow the membership.
+		if isIn {
+			res.Allowed = true
+			return nil
+		}
+	}
 	return nil
 }

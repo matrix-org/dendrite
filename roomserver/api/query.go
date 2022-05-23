@@ -348,6 +348,15 @@ type QueryServerBannedFromRoomResponse struct {
 	Banned bool `json:"banned"`
 }
 
+type QueryRestrictedJoinAllowedRequest struct {
+	UserID string `json:"user_id"`
+	RoomID string `json:"room_id"`
+}
+
+type QueryRestrictedJoinAllowedResponse struct {
+	Allowed bool `json:"allowed"`
+}
+
 // MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
 func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
 	se := make(map[string]string)
