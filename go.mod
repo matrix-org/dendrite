@@ -11,6 +11,7 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/blevesearch/bleve/v2 v2.3.2
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/containerd/containerd v1.6.2 // indirect
 	github.com/docker/docker v20.10.14+incompatible
