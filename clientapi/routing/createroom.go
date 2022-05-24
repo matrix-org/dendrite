@@ -245,7 +245,9 @@ func createRoom(
 	case presetTrustedPrivateChat:
 		joinRuleContent.JoinRule = gomatrixserverlib.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
-		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
+		for _, invitee := range r.Invite {
+			powerLevelContent.Users[invitee] = 100
+		}
 	case presetPublicChat:
 		joinRuleContent.JoinRule = gomatrixserverlib.Public
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
