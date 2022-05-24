@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/sso"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -36,11 +35,11 @@ import (
 func SSORedirect(
 	req *http.Request,
 	idpID string,
-	cfg *config.ClientAPI,
+	auth *sso.Authenticator,
 ) util.JSONResponse {
-	if !cfg.Login.SSO.Enabled {
+	if auth == nil {
 		return util.JSONResponse{
-			Code: http.StatusNotImplemented,
+			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("authentication method disabled"),
 		}
 	}
@@ -60,28 +59,9 @@ func SSORedirect(
 		}
 	}
 
-	if idpID == "" {
-		// Check configuration if the client didn't provide an ID.
-		idpID = cfg.Login.SSO.DefaultProviderID
-	}
-	if idpID == "" && len(cfg.Login.SSO.Providers) > 0 {
-		// Fall back to the first provider. If there are no providers, getProvider("") will fail.
-		idpID = cfg.Login.SSO.Providers[0].ID
-	}
-	idpCfg, idpType := getProvider(cfg, idpID)
-	if idpType == nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("unknown identity provider"),
-		}
-	}
-
-	idpReq := &sso.IdentityProviderRequest{
-		System:        idpCfg,
-		CallbackURL:   req.URL.ResolveReference(&url.URL{Path: "../callback", RawQuery: url.Values{"provider": []string{idpID}}.Encode()}).String(),
-		DendriteNonce: formatNonce(redirectURL),
-	}
-	u, err := idpType.AuthorizationURL(req.Context(), idpReq)
+	callbackURL := req.URL.ResolveReference(&url.URL{Path: "../callback", RawQuery: url.Values{"provider": []string{idpID}}.Encode()})
+	nonce := formatNonce(redirectURL)
+	u, err := auth.AuthorizationURL(req.Context(), idpID, callbackURL.String(), nonce)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -92,7 +72,7 @@ func SSORedirect(
 	resp := util.RedirectResponse(u)
 	resp.Headers["Set-Cookie"] = (&http.Cookie{
 		Name:     "oidc_nonce",
-		Value:    idpReq.DendriteNonce,
+		Value:    nonce,
 		Expires:  time.Now().Add(10 * time.Minute),
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
@@ -105,8 +85,16 @@ func SSORedirect(
 func SSOCallback(
 	req *http.Request,
 	userAPI userAPIForSSO,
-	cfg *config.ClientAPI,
+	auth *sso.Authenticator,
+	serverName gomatrixserverlib.ServerName,
 ) util.JSONResponse {
+	if auth == nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("authentication method disabled"),
+		}
+	}
+
 	ctx := req.Context()
 
 	query := req.URL.Query()
@@ -115,13 +103,6 @@ func SSOCallback(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("provider parameter missing"),
-		}
-	}
-	idpCfg, idpType := getProvider(cfg, idpID)
-	if idpType == nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue("unknown identity provider"),
 		}
 	}
 
@@ -140,19 +121,15 @@ func SSOCallback(
 		}
 	}
 
-	idpReq := &sso.IdentityProviderRequest{
-		System: idpCfg,
-		CallbackURL: (&url.URL{
-			Scheme: req.URL.Scheme,
-			Host:   req.URL.Host,
-			Path:   req.URL.Path,
-			RawQuery: url.Values{
-				"provider": []string{idpID},
-			}.Encode(),
-		}).String(),
-		DendriteNonce: nonce.Value,
+	callbackURL := &url.URL{
+		Scheme: req.URL.Scheme,
+		Host:   req.URL.Host,
+		Path:   req.URL.Path,
+		RawQuery: url.Values{
+			"provider": []string{idpID},
+		}.Encode(),
 	}
-	result, err := idpType.ProcessCallback(ctx, idpReq, query)
+	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, query)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -165,7 +142,7 @@ func SSOCallback(
 		return util.RedirectResponse(result.RedirectURL)
 	}
 
-	localpart, err := verifySSOUserIdentifier(ctx, userAPI, result.Identifier, cfg.Matrix.ServerName)
+	localpart, err := verifySSOUserIdentifier(ctx, userAPI, result.Identifier, serverName)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
@@ -184,7 +161,7 @@ func SSOCallback(
 		}
 	}
 
-	token, err := createLoginToken(ctx, userAPI, userutil.MakeUserID(localpart, cfg.Matrix.ServerName))
+	token, err := createLoginToken(ctx, userAPI, userutil.MakeUserID(localpart, serverName))
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("PerformLoginTokenCreation failed")
 		return jsonerror.InternalServerError()
@@ -208,23 +185,6 @@ type userAPIForSSO interface {
 	PerformAccountCreation(ctx context.Context, req *uapi.PerformAccountCreationRequest, res *uapi.PerformAccountCreationResponse) error
 	PerformSaveSSOAssociation(ctx context.Context, req *uapi.PerformSaveSSOAssociationRequest, res *struct{}) error
 	QueryLocalpartForSSO(ctx context.Context, req *uapi.QueryLocalpartForSSORequest, res *uapi.QueryLocalpartForSSOResponse) error
-}
-
-// getProvider looks up the given provider in the
-// configuration. Returns nil if it wasn't found or was of unknown
-// type.
-func getProvider(cfg *config.ClientAPI, id string) (*config.IdentityProvider, sso.IdentityProvider) {
-	for _, idp := range cfg.Login.SSO.Providers {
-		if idp.ID == id {
-			switch sso.IdentityProviderType(id) {
-			case sso.TypeGitHub:
-				return &idp, sso.GitHubIdentityProvider
-			default:
-				return nil, nil
-			}
-		}
-	}
-	return nil, nil
 }
 
 // formatNonce creates a random nonce that also contains the URL.

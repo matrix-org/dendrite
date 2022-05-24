@@ -1,0 +1,159 @@
+// Copyright 2022 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package sso
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"sync"
+	"time"
+
+	"github.com/matrix-org/dendrite/setup/config"
+	uapi "github.com/matrix-org/dendrite/userapi/api"
+)
+
+type oidcIdentityProvider struct {
+	*oauth2IdentityProvider
+
+	disc *oidcDiscovery
+	exp  time.Time
+	mu   sync.Mutex
+}
+
+func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidcIdentityProvider {
+	return &oidcIdentityProvider{
+		oauth2IdentityProvider: &oauth2IdentityProvider{
+			cfg: cfg,
+			hc:  hc,
+
+			scopes:              []string{"openid", "profile", "email"},
+			responseMimeType:    "application/json",
+			subPath:             "sub",
+			emailPath:           "email",
+			displayNamePath:     "name",
+			suggestedUserIDPath: "preferred_username",
+		},
+	}
+}
+
+func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
+	oauth2p, _, err := p.get(ctx)
+	if err != nil {
+		return "", err
+	}
+	return oauth2p.AuthorizationURL(ctx, callbackURL, nonce)
+}
+
+func (p *oidcIdentityProvider) ProcessCallback(ctx context.Context, callbackURL, nonce string, query url.Values) (*CallbackResult, error) {
+	oauth2p, disc, err := p.get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := oauth2p.ProcessCallback(ctx, callbackURL, nonce, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// OIDC has the notion of issuer URL, which will be more
+	// stable than our configuration ID.
+	res.Identifier.Namespace = uapi.OIDCNamespace
+	res.Identifier.Issuer = disc.Issuer
+
+	return res, nil
+}
+
+func (p *oidcIdentityProvider) get(ctx context.Context) (*oauth2IdentityProvider, *oidcDiscovery, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	now := time.Now()
+	if p.exp.Before(now) || p.disc == nil {
+		disc, err := oidcDiscover(ctx, p.cfg.OIDC.DiscoveryURL)
+		if err != nil {
+			if p.disc != nil {
+				// Prefers returning a stale entry.
+				return p.oauth2IdentityProvider, p.disc, nil
+			}
+			return nil, nil, err
+		}
+
+		p.exp = now.Add(24 * time.Hour)
+		newProvider := *p.oauth2IdentityProvider
+		newProvider.authorizationURL = disc.AuthorizationEndpoint
+		newProvider.accessTokenURL = disc.TokenEndpoint
+		newProvider.userInfoURL = disc.UserinfoEndpoint
+
+		p.oauth2IdentityProvider = &newProvider
+		p.disc = disc
+	}
+
+	return p.oauth2IdentityProvider, p.disc, nil
+}
+
+type oidcDiscovery struct {
+	Issuer                string   `json:"issuer"`
+	AuthorizationEndpoint string   `json:"authorization_endpoint"`
+	TokenEndpoint         string   `json:"token_endpoint"`
+	UserinfoEndpoint      string   `json:"userinfo_endpoint"`
+	ScopesSupported       []string `json:"scopes_supported"`
+	ClaimsSupported       []string `json:"claims_supported"`
+}
+
+func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	hreq.Header.Set("Accept", "application/jrd+json,application/json;q=0.9")
+
+	hresp, err := http.DefaultClient.Do(hreq)
+	if err != nil {
+		return nil, err
+	}
+	defer hresp.Body.Close()
+
+	var disc oidcDiscovery
+	if err := json.NewDecoder(hresp.Body).Decode(&disc); err != nil {
+		return nil, err
+	}
+
+	if disc.ScopesSupported != nil {
+		if !stringSliceContains(disc.ScopesSupported, "openid") {
+			return nil, fmt.Errorf("scope 'openid' is missing in %q", url)
+		}
+	}
+
+	if disc.ClaimsSupported != nil {
+		for _, claim := range []string{"iss", "sub"} {
+			if !stringSliceContains(disc.ClaimsSupported, claim) {
+				return nil, fmt.Errorf("claim %q is not supported in %q", claim, url)
+			}
+		}
+	}
+
+	return &disc, nil
+}
+
+func stringSliceContains(ss []string, s string) bool {
+	for _, s2 := range ss {
+		if s2 == s {
+			return true
+		}
+	}
+	return false
+}

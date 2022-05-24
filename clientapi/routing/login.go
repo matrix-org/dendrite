@@ -20,7 +20,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/clientapi/auth/sso"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -46,10 +45,10 @@ type stage struct {
 }
 
 type identityProvider struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Brand string `json:"brand,omitempty"`
-	Icon  string `json:"icon,omitempty"`
+	ID    string          `json:"id"`
+	Name  string          `json:"name"`
+	Brand config.SSOBrand `json:"brand,omitempty"`
+	Icon  string          `json:"icon,omitempty"`
 }
 
 func passwordLogin() []stage {
@@ -69,11 +68,14 @@ func ssoLogin(cfg *config.ClientAPI) []stage {
 		if brand == "" {
 			typ := idp.Type
 			if typ == "" {
-				typ = idp.ID
+				typ = config.IdentityProviderType(idp.ID)
 			}
-			idpType := sso.GetIdentityProvider(sso.IdentityProviderType(typ))
-			if idpType != nil {
-				brand = idpType.DefaultBrand()
+			switch typ {
+			case config.SSOTypeGitHub:
+				brand = config.SSOBrandGitHub
+
+			default:
+				brand = config.SSOBrand(idp.ID)
 			}
 		}
 		idps = append(idps, identityProvider{

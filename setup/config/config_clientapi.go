@@ -161,7 +161,7 @@ type IdentityProvider struct {
 
 	// Brand is a hint on how to display the IdP to the user. If this is empty, a default
 	// based on the type is used.
-	Brand string `yaml:"brand"`
+	Brand SSOBrand `yaml:"brand"`
 
 	// Icon is an MXC URI describing how to display the IdP to the user. Prefer using `brand`.
 	Icon string `yaml:"icon"`
@@ -169,18 +169,19 @@ type IdentityProvider struct {
 	// Type describes how this provider is implemented. It must match "github". If this is
 	// empty, the ID is used, which means there is a weak expectation that ID is also a
 	// valid type, unless you have a complicated setup.
-	Type string `yaml:"type"`
+	Type IdentityProviderType `yaml:"type"`
 
 	// OIDC contains settings for providers based on OpenID Connect (OAuth 2).
 	OIDC struct {
 		ClientID     string `yaml:"client_id"`
 		ClientSecret string `yaml:"client_secret"`
+		DiscoveryURL string `yaml:"discovery_url"`
 	} `yaml:"oidc"`
 }
 
 func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "client_api.sso.providers.id", idp.ID)
-	if !checkIdentityProviderBrand(idp.ID) {
+	if !checkIdentityProviderBrand(SSOBrand(idp.ID)) {
 		configErrs.Add(fmt.Sprintf("unrecognized ID config key %q: %s", "client_api.sso.providers", idp.ID))
 	}
 	checkNotEmpty(configErrs, "client_api.sso.providers.name", idp.Name)
@@ -192,11 +193,16 @@ func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
 	}
 	typ := idp.Type
 	if idp.Type == "" {
-		typ = idp.ID
+		typ = IdentityProviderType(idp.ID)
 	}
 
 	switch typ {
-	case "github":
+	case SSOTypeOIDC:
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_id", idp.OIDC.ClientID)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OIDC.ClientSecret)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.discovery_url", idp.OIDC.DiscoveryURL)
+
+	case SSOTypeGitHub:
 		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_id", idp.OIDC.ClientID)
 		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OIDC.ClientSecret)
 
@@ -206,7 +212,7 @@ func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
 }
 
 // See https://github.com/matrix-org/matrix-doc/blob/old_master/informal/idp-brands.md.
-func checkIdentityProviderBrand(s string) bool {
+func checkIdentityProviderBrand(s SSOBrand) bool {
 	switch s {
 	case SSOBrandApple, SSOBrandFacebook, SSOBrandGitHub, SSOBrandGitLab, SSOBrandGoogle, SSOBrandTwitter:
 		return true
@@ -215,13 +221,22 @@ func checkIdentityProviderBrand(s string) bool {
 	}
 }
 
+type SSOBrand string
+
 const (
-	SSOBrandApple    = "apple"
-	SSOBrandFacebook = "facebook"
-	SSOBrandGitHub   = "github"
-	SSOBrandGitLab   = "gitlab"
-	SSOBrandGoogle   = "google"
-	SSOBrandTwitter  = "twitter"
+	SSOBrandApple    SSOBrand = "apple"
+	SSOBrandFacebook SSOBrand = "facebook"
+	SSOBrandGitHub   SSOBrand = "github"
+	SSOBrandGitLab   SSOBrand = "gitlab"
+	SSOBrandGoogle   SSOBrand = "google"
+	SSOBrandTwitter  SSOBrand = "twitter"
+)
+
+type IdentityProviderType string
+
+const (
+	SSOTypeOIDC   IdentityProviderType = "oidc"
+	SSOTypeGitHub IdentityProviderType = "github"
 )
 
 type TURN struct {

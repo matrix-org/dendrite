@@ -16,44 +16,76 @@ package sso
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-type IdentityProvider interface {
-	DefaultBrand() string
-
-	AuthorizationURL(context.Context, *IdentityProviderRequest) (string, error)
-	ProcessCallback(context.Context, *IdentityProviderRequest, url.Values) (*CallbackResult, error)
+type Authenticator struct {
+	providers map[string]identityProvider
 }
 
-type IdentityProviderRequest struct {
-	System        *config.IdentityProvider
-	CallbackURL   string
-	DendriteNonce string
+func NewAuthenticator(cfg *config.SSO) (*Authenticator, error) {
+	hc := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			Proxy:             http.ProxyFromEnvironment,
+		},
+	}
+
+	a := &Authenticator{
+		providers: make(map[string]identityProvider, len(cfg.Providers)),
+	}
+	for _, pcfg := range cfg.Providers {
+		typ := pcfg.Type
+		if typ == "" {
+			typ = config.IdentityProviderType(pcfg.ID)
+		}
+
+		switch typ {
+		case config.SSOTypeOIDC:
+			a.providers[pcfg.ID] = newOIDCIdentityProvider(&pcfg, hc)
+		case config.SSOTypeGitHub:
+			a.providers[pcfg.ID] = newGitHubIdentityProvider(&pcfg, hc)
+		default:
+			return nil, fmt.Errorf("unknown SSO provider type: %s", typ)
+		}
+	}
+
+	return a, nil
+}
+
+func (auth *Authenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce string) (string, error) {
+	p := auth.providers[providerID]
+	if p == nil {
+		return "", fmt.Errorf("unknown identity provider: %s", providerID)
+	}
+	return p.AuthorizationURL(ctx, callbackURL, nonce)
+}
+
+func (auth *Authenticator) ProcessCallback(ctx context.Context, providerID, callbackURL, nonce string, query url.Values) (*CallbackResult, error) {
+	p := auth.providers[providerID]
+	if p == nil {
+		return nil, fmt.Errorf("unknown identity provider: %s", providerID)
+	}
+	return p.ProcessCallback(ctx, callbackURL, nonce, query)
+}
+
+type identityProvider interface {
+	AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error)
+	ProcessCallback(ctx context.Context, callbackURL, nonce string, query url.Values) (*CallbackResult, error)
 }
 
 type CallbackResult struct {
 	RedirectURL     string
 	Identifier      *UserIdentifier
+	DisplayName     string
 	SuggestedUserID string
-}
-
-type IdentityProviderType string
-
-const (
-	TypeGitHub IdentityProviderType = config.SSOBrandGitHub
-)
-
-func GetIdentityProvider(t IdentityProviderType) IdentityProvider {
-	switch t {
-	case TypeGitHub:
-		return GitHubIdentityProvider
-	default:
-		return nil
-	}
 }
 
 type UserIdentifier struct {

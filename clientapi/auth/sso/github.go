@@ -15,23 +15,25 @@
 package sso
 
 import (
+	"net/http"
+
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-// GitHubIdentityProvider is a GitHub-flavored identity provider.
-var GitHubIdentityProvider IdentityProvider = githubIdentityProvider{
-	baseOIDCIdentityProvider: &baseOIDCIdentityProvider{
-		AuthURL:                     mustParseURLTemplate("https://github.com/login/oauth/authorize?scope=user:email"),
-		AccessTokenURL:              mustParseURLTemplate("https://github.com/login/oauth/access_token"),
-		UserInfoURL:                 mustParseURLTemplate("https://api.github.com/user"),
-		UserInfoAccept:              "application/vnd.github.v3+json",
-		UserInfoEmailPath:           "email",
-		UserInfoSuggestedUserIDPath: "login",
-	},
-}
+func newGitHubIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) identityProvider {
+	return &oauth2IdentityProvider{
+		cfg: cfg,
+		hc:  hc,
 
-type githubIdentityProvider struct {
-	*baseOIDCIdentityProvider
-}
+		authorizationURL: "https://github.com/login/oauth/authorize",
+		accessTokenURL:   "https://github.com/login/oauth/access_token",
+		userInfoURL:      "https://api.github.com/user",
 
-func (githubIdentityProvider) DefaultBrand() string { return config.SSOBrandGitHub }
+		scopes:              []string{"user:email"},
+		responseMimeType:    "application/vnd.github.v3+json",
+		subPath:             "id",
+		emailPath:           "email",
+		displayNamePath:     "name",
+		suggestedUserIDPath: "login",
+	}
+}

@@ -47,6 +47,10 @@ type SSOIssuerNamespace string
 const (
 	UnknownNamespace SSOIssuerNamespace = ""
 
+	// SSOIDNamespace indicates the issuer is an ID key matching a
+	// Dendrite SSO provider configuration.
+	SSOIDNamespace SSOIssuerNamespace = "sso"
+
 	// OIDCNamespace indicates the issuer is a full URL, as defined in
 	// https://openid.net/specs/openid-connect-core-1_0.html#Terminology.
 	OIDCNamespace SSOIssuerNamespace = "oidc"
