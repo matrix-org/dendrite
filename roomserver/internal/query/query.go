@@ -799,7 +799,8 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// If the user is already invited to the room then the join is allowed
 	// but we don't specify an authorised via user, since the event auth
 	// will allow the join anyway.
-	if pending, _, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
+	var pending bool
+	if pending, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
 		return fmt.Errorf("helpers.IsInvitePending: %w", err)
 	} else if pending {
 		res.Allowed = true
