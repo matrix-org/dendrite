@@ -108,7 +108,7 @@ func SendEvent(
 	// via key if it is present, otherwise other servers won't be able to auth
 	// the event if the room is set to the "restricted" join rule.
 	if eventType == gomatrixserverlib.MRoomMember {
-		delete(r, "join_authorised_by_users_server")
+		delete(r, "join_authorised_via_users_server")
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
