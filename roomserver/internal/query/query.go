@@ -759,6 +759,7 @@ func (r *Queryer) QueryAuthChain(ctx context.Context, req *api.QueryAuthChainReq
 	return nil
 }
 
+// nolint:gocyclo
 func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse) error {
 	// Look up if we know anything about the room. If it doesn't exist
 	// or is a stub entry then we can't do anything.
@@ -795,6 +796,15 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// come across any rooms in the request that are missing, we will unset
 	// the flag.
 	res.Resident = true
+	// If the user is already invited to the room then the join is allowed
+	// but we don't specify an authorised via user, since the event auth
+	// will allow the join anyway.
+	if pending, _, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
+		return fmt.Errorf("helpers.IsInvitePending: %w", err)
+	} else if pending {
+		res.Allowed = true
+		return nil
+	}
 	// Step through the join rules and see if the user matches any of them.
 	for _, rule := range joinRules.Allow {
 		// We only understand "m.room_membership" rules at this point in
