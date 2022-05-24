@@ -768,7 +768,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
 	if roomInfo == nil || roomInfo.IsStub {
-		return fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
+		return nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
 	}
 	// If the room version doesn't allow restricted joins then don't
 	// try to process any further.
@@ -804,6 +804,18 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	} else if pending {
 		res.Allowed = true
 		return nil
+	}
+	// We need to get the power levels content so that we can determine which
+	// users in the room are entitled to issue invites. We need to use one of
+	// these users as the authorising user.
+	// Get the join rules to work out if the join rule is "restricted".
+	powerLevelsEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, gomatrixserverlib.MRoomPowerLevels, "")
+	if err != nil {
+		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+	}
+	var powerLevels gomatrixserverlib.PowerLevelContent
+	if err = json.Unmarshal(powerLevelsEvent.Content(), &powerLevels); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
 	// Step through the join rules and see if the user matches any of them.
 	for _, rule := range joinRules.Allow {
@@ -858,6 +870,10 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 			event := events[0]
 			if event.Type() != gomatrixserverlib.MRoomMember || event.StateKey() == nil {
 				continue // shouldn't happen
+			}
+			// Only users that have the power to invite should be chosen.
+			if powerLevels.UserLevel(*event.StateKey()) < powerLevels.Invite {
+				continue
 			}
 			res.Resident = true
 			res.Allowed = true
