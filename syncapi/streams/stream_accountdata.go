@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"math"
 
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -30,7 +31,7 @@ func (p *AccountDataStreamProvider) CompleteSync(
 	ctx context.Context,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, req, 0, math.MaxInt64)
 }
 
 func (p *AccountDataStreamProvider) IncrementalSync(
