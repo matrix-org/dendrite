@@ -716,3 +716,4 @@ PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
 Unnamed room comes with a name summary
 Named room comes with just joined member count summary
 Room summary only has 5 heroes
+registration is idempotent, with username specified
