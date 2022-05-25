@@ -102,9 +102,13 @@ func main() {
 	}
 
 	if *resetPassword {
+		var (
+			accountDB storage.Database
+			available bool
+		)
 		b := base.NewBaseDendrite(cfg, "")
 		defer b.Close() // nolint: errcheck
-		accountDB, err := storage.NewUserAPIDatabase(
+		accountDB, err = storage.NewUserAPIDatabase(
 			b,
 			&cfg.UserAPI.AccountDatabase,
 			cfg.Global.ServerName,
@@ -117,7 +121,7 @@ func main() {
 			logrus.WithError(err).Fatalln("Failed to connect to the database")
 		}
 
-		available, err := accountDB.CheckAccountAvailability(context.Background(), *username)
+		available, err = accountDB.CheckAccountAvailability(context.Background(), *username)
 		if err != nil {
 			logrus.Fatalln("Unable check username existence.")
 		}
