@@ -9,11 +9,17 @@ permalink: /installation/planning
 
 ## Modes
 
-Dendrite consists of several components, each responsible for a different aspect of the matrix protocol. Users can run Dendrite in one of two modes which dictate how these components are executed and communicate.
+Dendrite consists of several components, each responsible for a different aspect of the Matrix protocol.
+Users can run Dendrite in one of two modes which dictate how these components are executed and communicate.
 
-* **Monolith mode** runs all components in a single process. Components communicate through an internal NATS server with generally low overhead. This mode dramatically simplifies deployment complexity and offers the best balance between performance and resource usage for low-to-mid volume deployments.
+* **Monolith mode** runs all components in a single process. Components communicate through an internal NATS
+  server with generally low overhead. This mode dramatically simplifies deployment complexity and offers the
+  best balance between performance and resource usage for low-to-mid volume deployments.
 
-* **Polylith mode** runs all components in isolated processes. Components communicate through an external NATS server and HTTP APIs, which incur considerable overhead. While this mode allows for more granular control of resources dedicated toward individual processes, given the additional communications overhead, it is only necessary for very large deployments.
+* **Polylith mode** runs all components in isolated processes. Components communicate through an external NATS
+  server and HTTP APIs, which incur considerable overhead. While this mode allows for more granular control of
+  resources dedicated toward individual processes, given the additional communications overhead, it is only
+  necessary for very large deployments.
 
 Given our current state of development, **we recommend monolith mode** for all deployments.
 
