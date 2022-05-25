@@ -83,29 +83,38 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 		return true
 	}
 
-	if output.Type != api.OutputTypeNewRoomEvent || output.NewRoomEvent == nil {
-		return true
-	}
+	log.WithFields(log.Fields{
+		"type": output.Type,
+	}).Debug("Got a message in OutputRoomEventConsumer")
 
-	newEventID := output.NewRoomEvent.Event.EventID()
-	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(output.NewRoomEvent.AddsStateEventIDs))
-	events = append(events, output.NewRoomEvent.Event)
-	if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
-		eventsReq := &api.QueryEventsByIDRequest{
-			EventIDs: make([]string, 0, len(output.NewRoomEvent.AddsStateEventIDs)),
-		}
-		eventsRes := &api.QueryEventsByIDResponse{}
-		for _, eventID := range output.NewRoomEvent.AddsStateEventIDs {
-			if eventID != newEventID {
-				eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
+	events := []*gomatrixserverlib.HeaderedEvent{}
+	if output.Type == api.OutputTypeNewRoomEvent && output.NewRoomEvent != nil {
+		newEventID := output.NewRoomEvent.Event.EventID()
+		events = append(events, output.NewRoomEvent.Event)
+		if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
+			eventsReq := &api.QueryEventsByIDRequest{
+				EventIDs: make([]string, 0, len(output.NewRoomEvent.AddsStateEventIDs)),
+			}
+			eventsRes := &api.QueryEventsByIDResponse{}
+			for _, eventID := range output.NewRoomEvent.AddsStateEventIDs {
+				if eventID != newEventID {
+					eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
+				}
+			}
+			if len(eventsReq.EventIDs) > 0 {
+				if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
+					return false
+				}
+				events = append(events, eventsRes.Events...)
 			}
 		}
-		if len(eventsReq.EventIDs) > 0 {
-			if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
-				return false
-			}
-			events = append(events, eventsRes.Events...)
-		}
+	} else if output.Type == api.OutputTypeNewInviteEvent && output.NewInviteEvent != nil {
+		events = append(events, output.NewInviteEvent.Event)
+	} else {
+		log.WithFields(log.Fields{
+			"type": output.Type,
+		}).Debug("appservice OutputRoomEventConsumer ignoring event", string(msg.Data))
+		return true
 	}
 
 	// Send event to any relevant application services
