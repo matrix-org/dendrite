@@ -35,8 +35,8 @@ type oidcIdentityProvider struct {
 	mu   sync.Mutex
 }
 
-func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidcIdentityProvider {
-	return &oidcIdentityProvider{
+func newOIDCIdentityProvider(ctx context.Context, cfg *config.IdentityProvider, hc *http.Client) (*oidcIdentityProvider, error) {
+	p := &oidcIdentityProvider{
 		oauth2IdentityProvider: &oauth2IdentityProvider{
 			cfg: cfg,
 			hc:  hc,
@@ -49,6 +49,17 @@ func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oid
 			suggestedUserIDPath: "preferred_username",
 		},
 	}
+
+	// TODO: Complement starts and waits for the "base image" without
+	// first starting httpmockserver, which means we cannot always do
+	// this sanity check.
+	if false {
+		if _, _, err := p.get(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	return p, nil
 }
 
 func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
@@ -129,7 +140,20 @@ func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
 
 	var disc oidcDiscovery
 	if err := json.NewDecoder(hresp.Body).Decode(&disc); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding OIDC discovery response from %q: %w", url, err)
+	}
+
+	if !validWebURL(disc.Issuer) {
+		return nil, fmt.Errorf("issuer identifier is invalid in %q", url)
+	}
+	if !validWebURL(disc.AuthorizationEndpoint) {
+		return nil, fmt.Errorf("authorization endpoint is invalid in %q", url)
+	}
+	if !validWebURL(disc.TokenEndpoint) {
+		return nil, fmt.Errorf("token endpoint is invalid in %q", url)
+	}
+	if !validWebURL(disc.UserinfoEndpoint) {
+		return nil, fmt.Errorf("userinfo endpoint is invalid in %q", url)
 	}
 
 	if disc.ScopesSupported != nil {
@@ -147,6 +171,18 @@ func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
 	}
 
 	return &disc, nil
+}
+
+func validWebURL(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return u.Scheme != "" && u.Host != ""
 }
 
 func stringSliceContains(ss []string, s string) bool {

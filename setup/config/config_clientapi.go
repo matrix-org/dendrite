@@ -117,6 +117,14 @@ type SSO struct {
 	// Enabled determines whether SSO should be allowed.
 	Enabled bool `yaml:"enabled"`
 
+	// CallbackURL is the absolute URL where a user agent can reach
+	// the Dendrite `/_matrix/v3/login/sso/callback` endpoint. This is
+	// used to create SSO redirect URLs passed to identity
+	// providers. If this is empty, a default is inferred from request
+	// headers. When Dendrite is running behind a proxy, this may not
+	// always be the right information.
+	CallbackURL string `yaml:"callback_url"`
+
 	// Providers list the identity providers this server is capable of confirming an
 	// identity with.
 	Providers []IdentityProvider `yaml:"providers"`

@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/sso"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -36,7 +38,10 @@ func SSORedirect(
 	req *http.Request,
 	idpID string,
 	auth *sso.Authenticator,
+	cfg *config.SSO,
 ) util.JSONResponse {
+	ctx := req.Context()
+
 	if auth == nil {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
@@ -59,25 +64,69 @@ func SSORedirect(
 		}
 	}
 
-	callbackURL := req.URL.ResolveReference(&url.URL{Path: "../callback", RawQuery: url.Values{"provider": []string{idpID}}.Encode()})
-	nonce := formatNonce(redirectURL)
-	u, err := auth.AuthorizationURL(req.Context(), idpID, callbackURL.String(), nonce)
+	callbackURL, err := buildCallbackURLFromRedirect(cfg, req)
 	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
 		}
 	}
 
+	callbackURL = callbackURL.ResolveReference(&url.URL{
+		RawQuery: url.Values{"provider": []string{idpID}}.Encode(),
+	})
+	nonce := formatNonce(redirectURL)
+	u, err := auth.AuthorizationURL(ctx, idpID, callbackURL.String(), nonce)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to get SSO authorization URL")
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: err,
+		}
+	}
+
+	util.GetLogger(ctx).Infof("SSO redirect to %s.", u)
+
 	resp := util.RedirectResponse(u)
 	resp.Headers["Set-Cookie"] = (&http.Cookie{
 		Name:     "oidc_nonce",
 		Value:    nonce,
+		Path:     "/",
 		Expires:  time.Now().Add(10 * time.Minute),
-		Secure:   true,
+		Secure:   callbackURL.Scheme != "http",
 		SameSite: http.SameSiteStrictMode,
 	}).String()
 	return resp
+}
+
+// buildCallbackURLFromRedirect builds a callback URL from a redirect
+// request and configuration.
+func buildCallbackURLFromRedirect(cfg *config.SSO, req *http.Request) (*url.URL, error) {
+	u := &url.URL{
+		Scheme: "https",
+		User:   req.URL.User,
+		Host:   req.Host,
+		Path:   req.URL.Path,
+	}
+	if req.TLS == nil {
+		u.Scheme = "http"
+	}
+
+	// Find the v3mux base, handling both `redirect` and
+	// `redirect/{idp}` and not hard-coding the Matrix version.
+	const redirectPath = "/login/sso/redirect"
+	i := strings.Index(u.Path, redirectPath)
+	if i < 0 {
+		return nil, fmt.Errorf("cannot find %q to replace in URL %q", redirectPath, u.Path)
+	}
+	u.Path = u.Path[:i] + "/login/sso/callback"
+
+	cu, err := url.Parse(cfg.CallbackURL)
+	if err != nil {
+		return nil, err
+	}
+	return u.ResolveReference(cu), nil
 }
 
 // SSOCallback implements /login/sso/callback.
@@ -131,11 +180,13 @@ func SSOCallback(
 	}
 	result, err := auth.ProcessCallback(ctx, idpID, callbackURL.String(), nonce.Value, query)
 	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to process callback")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: err,
 		}
 	}
+	util.GetLogger(ctx).WithField("result", result).Info("SSO callback done")
 
 	if result.Identifier == nil {
 		// Not authenticated yet.
@@ -144,7 +195,7 @@ func SSOCallback(
 
 	localpart, err := verifySSOUserIdentifier(ctx, userAPI, result.Identifier, serverName)
 	if err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier).Error("failed to find user")
+		util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.Forbidden("ID not associated with a local account"),
@@ -153,10 +204,16 @@ func SSOCallback(
 	if localpart == "" {
 		// The user doesn't exist.
 		// TODO: let the user select the local part, and whether to associate email addresses.
+		util.GetLogger(ctx).WithField("localpart", result.SuggestedUserID).WithField("ssoIdentifier", result.Identifier).Info("SSO registering account")
 		localpart = result.SuggestedUserID
+		if localpart == "" {
+			util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Info("no suggested user ID from SSO provider")
+			localpart = result.Identifier.Subject
+		}
+
 		ok, resp := registerSSOAccount(ctx, userAPI, result.Identifier, localpart)
 		if !ok {
-			util.GetLogger(ctx).WithError(err).WithField("identifier", result.Identifier).WithField("localpart", localpart).Error("failed to create account")
+			util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).WithField("localpart", localpart).Error("failed to register account")
 			return resp
 		}
 	}
@@ -166,6 +223,7 @@ func SSOCallback(
 		util.GetLogger(ctx).WithError(err).Errorf("PerformLoginTokenCreation failed")
 		return jsonerror.InternalServerError()
 	}
+	util.GetLogger(ctx).WithField("localpart", localpart).WithField("ssoIdentifier", result.Identifier).Info("SSO created token")
 
 	rquery := finalRedirectURL.Query()
 	rquery.Set("loginToken", token.Token)

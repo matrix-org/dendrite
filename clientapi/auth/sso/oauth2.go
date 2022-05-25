@@ -101,6 +101,10 @@ func (p *oauth2IdentityProvider) ProcessCallback(ctx context.Context, callbackUR
 		return nil, err
 	}
 
+	if subject == "" {
+		return nil, fmt.Errorf("no subject from SSO provider")
+	}
+
 	return &CallbackResult{
 		Identifier: &UserIdentifier{
 			Namespace: uapi.SSOIDNamespace,

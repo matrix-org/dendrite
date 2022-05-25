@@ -29,7 +29,7 @@ type Authenticator struct {
 	providers map[string]identityProvider
 }
 
-func NewAuthenticator(cfg *config.SSO) (*Authenticator, error) {
+func NewAuthenticator(ctx context.Context, cfg *config.SSO) (*Authenticator, error) {
 	hc := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
@@ -49,7 +49,11 @@ func NewAuthenticator(cfg *config.SSO) (*Authenticator, error) {
 
 		switch typ {
 		case config.SSOTypeOIDC:
-			a.providers[pcfg.ID] = newOIDCIdentityProvider(&pcfg, hc)
+			p, err := newOIDCIdentityProvider(ctx, &pcfg, hc)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create OpenID Connect provider %q: %w", pcfg.ID, err)
+			}
+			a.providers[pcfg.ID] = p
 		case config.SSOTypeGitHub:
 			a.providers[pcfg.ID] = newGitHubIdentityProvider(&pcfg, hc)
 		default:
