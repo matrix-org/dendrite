@@ -408,6 +408,17 @@ func SendJoin(
 	}
 }
 
+// checkRestrictedJoin finds out whether or not we can assist in processing
+// a restricted room join. If the room version does not support restricted
+// joins then this function returns with no side effects. This returns three
+// values:
+// * an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
+//   should always be sent back to the client if one is specified
+// * a user ID of an authorising user, typically a user that has power to
+//   issue invites in the room, if one has been found
+// * an error if there was a problem finding out if this was allowable,
+//   like if the room version isn't known or a problem happened talking to
+//   the roomserver
 func checkRestrictedJoin(
 	httpReq *http.Request,
 	rsAPI api.FederationRoomserverAPI,

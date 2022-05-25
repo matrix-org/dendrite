@@ -809,7 +809,6 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// We need to get the power levels content so that we can determine which
 	// users in the room are entitled to issue invites. We need to use one of
 	// these users as the authorising user.
-	// Get the join rules to work out if the join rule is "restricted".
 	powerLevelsEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, gomatrixserverlib.MRoomPowerLevels, "")
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
