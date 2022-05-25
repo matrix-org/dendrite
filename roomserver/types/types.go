@@ -173,10 +173,6 @@ func DeduplicateStateEntries(a []StateEntry) []StateEntry {
 
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
-	// Should this state overwrite the latest events and memberships of the room?
-	// This might be necessary when rejoining a federated room after a period of
-	// absence, as our state and latest events will be out of date.
-	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
 	// True if this StateEntry is rejected. State resolution should then treat this
