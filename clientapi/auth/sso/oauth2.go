@@ -39,7 +39,6 @@ type oauth2IdentityProvider struct {
 
 	scopes              []string
 	responseMimeType    string
-	issPath             string
 	subPath             string
 	emailPath           string
 	displayNamePath     string
@@ -79,7 +78,7 @@ func (p *oauth2IdentityProvider) ProcessCallback(ctx context.Context, callbackUR
 			desc = error
 		}
 		switch error {
-		case "unauthorized_client", "access_denied":
+		case "unauthorized_client", "access_denied": // nolint:misspell
 			return nil, jsonerror.Forbidden("SSO said no: " + desc)
 		default:
 			return nil, fmt.Errorf("SSO failed: %v", error)
@@ -135,7 +134,7 @@ func (p *oauth2IdentityProvider) getAccessToken(ctx context.Context, callbackURL
 	if err != nil {
 		return "", err
 	}
-	defer hresp.Body.Close()
+	defer hresp.Body.Close() // nolint:errcheck
 
 	var resp oauth2TokenResponse
 	if err := json.NewDecoder(hresp.Body).Decode(&resp); err != nil {
@@ -178,7 +177,7 @@ func (p *oauth2IdentityProvider) getUserInfo(ctx context.Context, accessToken st
 	if err != nil {
 		return "", "", "", err
 	}
-	defer hresp.Body.Close()
+	defer hresp.Body.Close() // nolint:errcheck
 
 	body, err := ioutil.ReadAll(hresp.Body)
 	if err != nil {

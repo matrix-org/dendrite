@@ -193,7 +193,7 @@ func SSOCallback(
 		return util.RedirectResponse(result.RedirectURL)
 	}
 
-	localpart, err := verifySSOUserIdentifier(ctx, userAPI, result.Identifier, serverName)
+	localpart, err := verifySSOUserIdentifier(ctx, userAPI, result.Identifier)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to find user")
 		return util.JSONResponse{
@@ -278,7 +278,7 @@ func parseNonce(s string) (redirectURL *url.URL, _ error) {
 // verifySSOUserIdentifier resolves an sso.UserIdentifier to a local
 // part using the User API. Returns empty if there is no associated
 // user.
-func verifySSOUserIdentifier(ctx context.Context, userAPI userAPIForSSO, id *sso.UserIdentifier, serverName gomatrixserverlib.ServerName) (localpart string, _ error) {
+func verifySSOUserIdentifier(ctx context.Context, userAPI userAPIForSSO, id *sso.UserIdentifier) (localpart string, _ error) {
 	req := &uapi.QueryLocalpartForSSORequest{
 		Namespace: id.Namespace,
 		Issuer:    id.Issuer,

@@ -136,7 +136,7 @@ func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer hresp.Body.Close()
+	defer hresp.Body.Close() // nolint:errcheck
 
 	var disc oidcDiscovery
 	if err := json.NewDecoder(hresp.Body).Decode(&disc); err != nil {

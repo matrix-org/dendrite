@@ -190,11 +190,11 @@ type IdentityProvider struct {
 func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "client_api.sso.providers.id", idp.ID)
 	if !checkIdentityProviderBrand(SSOBrand(idp.ID)) {
-		configErrs.Add(fmt.Sprintf("unrecognized ID config key %q: %s", "client_api.sso.providers", idp.ID))
+		configErrs.Add(fmt.Sprintf("unrecognised ID config key %q: %s", "client_api.sso.providers", idp.ID))
 	}
 	checkNotEmpty(configErrs, "client_api.sso.providers.name", idp.Name)
 	if idp.Brand != "" && !checkIdentityProviderBrand(idp.Brand) {
-		configErrs.Add(fmt.Sprintf("unrecognized brand in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", idp.Brand))
+		configErrs.Add(fmt.Sprintf("unrecognised brand in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", idp.Brand))
 	}
 	if idp.Icon != "" {
 		checkURL(configErrs, "client_api.sso.providers.icon", idp.Icon)
@@ -215,7 +215,7 @@ func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
 		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OIDC.ClientSecret)
 
 	default:
-		configErrs.Add(fmt.Sprintf("unrecognized type in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", typ))
+		configErrs.Add(fmt.Sprintf("unrecognised type in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", typ))
 	}
 }
 
