@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -32,11 +31,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tidwall/gjson"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/term"
+
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/term"
 )
 
 const usage = `Usage: %s
@@ -168,7 +170,7 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
-	defer nonceResp.Body.Close()
+	defer nonceResp.Body.Close() // nolint: errcheck
 
 	nonce := gjson.GetBytes(body, "nonce").Str
 
@@ -201,7 +203,7 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 	if err != nil {
 		return "", fmt.Errorf("unable to create account: %w", err)
 	}
-	defer regResp.Body.Close()
+	defer regResp.Body.Close() // nolint: errcheck
 	if regResp.StatusCode < 200 || regResp.StatusCode >= 300 {
 		body, _ = ioutil.ReadAll(regResp.Body)
 		return "", fmt.Errorf(gjson.GetBytes(body, "error").Str)
