@@ -403,7 +403,7 @@ func SendJoin(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
-			Event:       &signed,
+			Event:       signed.JSON(),
 		},
 	}
 }
