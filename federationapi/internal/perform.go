@@ -210,10 +210,18 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 	r.statistics.ForServer(serverName).Success()
 
-	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
+	// If the remote server returned an event in the "event" key of
+	// the send_join request then we should use that instead. It may
+	// contain signatures that we don't know about.
+	if respSendJoin.Event != nil && isWellFormedMembershipEvent(
+		respSendJoin.Event, roomID, userID, r.cfg.Matrix.ServerName,
+	) {
+		event = respSendJoin.Event
+	}
 
 	// Sanity-check the join response to ensure that it has a create
 	// event, that the room version is known, etc.
+	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
 	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
@@ -269,6 +277,26 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 
 	return nil
+}
+
+// isWellFormedMembershipEvent returns true if the event looks like a legitimate
+// membership event.
+func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string, origin gomatrixserverlib.ServerName) bool {
+	if membership, err := event.Membership(); err != nil {
+		return false
+	} else if membership != gomatrixserverlib.Join {
+		return false
+	}
+	if event.RoomID() != roomID {
+		return false
+	}
+	if event.Origin() != origin {
+		return false
+	}
+	if !event.StateKeyEquals(userID) {
+		return false
+	}
+	return true
 }
 
 // PerformOutboundPeekRequest implements api.FederationInternalAPI
