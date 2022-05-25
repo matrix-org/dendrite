@@ -213,10 +213,14 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// If the remote server returned an event in the "event" key of
 	// the send_join request then we should use that instead. It may
 	// contain signatures that we don't know about.
-	if respSendJoin.Event != nil && isWellFormedMembershipEvent(
-		respSendJoin.Event, roomID, userID, r.cfg.Matrix.ServerName,
-	) {
-		event = respSendJoin.Event
+	if len(respSendJoin.Event) > 0 {
+		var remoteEvent *gomatrixserverlib.Event
+		remoteEvent, err = respSendJoin.Event.UntrustedEvent(respMakeJoin.RoomVersion)
+		if err == nil && isWellFormedMembershipEvent(
+			remoteEvent, roomID, userID, r.cfg.Matrix.ServerName,
+		) {
+			event = remoteEvent
+		}
 	}
 
 	// Sanity-check the join response to ensure that it has a create
