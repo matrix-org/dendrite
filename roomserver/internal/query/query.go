@@ -772,7 +772,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	}
 	// If the room version doesn't allow restricted joins then don't
 	// try to process any further.
-	allowRestrictedJoins, err := roomInfo.RoomVersion.AllowRestrictedJoinsInEventAuth()
+	allowRestrictedJoins, err := roomInfo.RoomVersion.MayAllowRestrictedJoinsInEventAuth()
 	if err != nil {
 		return fmt.Errorf("roomInfo.RoomVersion.AllowRestrictedJoinsInEventAuth: %w", err)
 	} else if !allowRestrictedJoins {
