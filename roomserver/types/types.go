@@ -210,6 +210,14 @@ func (s StateAtEventAndReferences) Swap(a, b int) {
 	s[a], s[b] = s[b], s[a]
 }
 
+func (s StateAtEventAndReferences) EventIDs() string {
+	strs := make([]string, 0, len(s))
+	for _, r := range s {
+		strs = append(strs, r.EventID)
+	}
+	return "[" + strings.Join(strs, " ") + "]"
+}
+
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
 // It is when performing bulk event lookup in the database.
 type Event struct {

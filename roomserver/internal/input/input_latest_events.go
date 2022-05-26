@@ -102,8 +102,8 @@ type latestEventsUpdater struct {
 	// The eventID of the event that was processed before this one.
 	lastEventIDSent string
 	// The latest events in the room after processing this event.
-	oldLatest []types.StateAtEventAndReference
-	latest    []types.StateAtEventAndReference
+	oldLatest types.StateAtEventAndReferences
+	latest    types.StateAtEventAndReferences
 	// The state entries removed from and added to the current state of the
 	// room as a result of processing this event. They are sorted lists.
 	removed []types.StateEntry
@@ -126,7 +126,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// state snapshot from somewhere else, e.g. a federated room join,
 	// then start with an empty set - none of the forward extremities
 	// that we knew about before matter anymore.
-	u.oldLatest = []types.StateAtEventAndReference{}
+	u.oldLatest = types.StateAtEventAndReferences{}
 	if !u.rewritesState {
 		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 		u.oldLatest = u.updater.LatestEvents()
@@ -277,8 +277,8 @@ func (u *latestEventsUpdater) latestState() error {
 			"room_id":       u.event.RoomID(),
 			"old_state_nid": u.oldStateNID,
 			"new_state_nid": u.newStateNID,
-			"old_latest":    u.oldLatest,
-			"new_latest":    u.latest,
+			"old_latest":    u.oldLatest.EventIDs(),
+			"new_latest":    u.latest.EventIDs(),
 		}).Errorf("Unexpected state deletion (removing %d events)", removed)
 	}
 
