@@ -45,7 +45,7 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 
 func TestOutputRoomEventsTable(t *testing.T) {
 	ctx := context.Background()
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, db, close := newOutputRoomEventsTable(t, dbType)

@@ -186,3 +186,38 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		}
 	}
 }
+
+func TestUserInteractive_AddCompletedStage(t *testing.T) {
+	tests := []struct {
+		name      string
+		sessionID string
+	}{
+		{
+			name:      "first user",
+			sessionID: util.RandomString(8),
+		},
+		{
+			name:      "second user",
+			sessionID: util.RandomString(8),
+		},
+		{
+			name:      "third user",
+			sessionID: util.RandomString(8),
+		},
+	}
+	u := setup()
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, resp := u.Verify(ctx, []byte("{}"))
+			challenge, ok := resp.JSON.(Challenge)
+			if !ok {
+				t.Fatalf("expected a Challenge, got %T", resp.JSON)
+			}
+			if len(challenge.Completed) > 0 {
+				t.Fatalf("expected 0 completed stages, got %d", len(challenge.Completed))
+			}
+			u.AddCompletedStage(tt.sessionID, "")
+		})
+	}
+}

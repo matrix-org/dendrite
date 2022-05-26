@@ -15,7 +15,6 @@
 package test
 
 import (
-	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
@@ -35,12 +34,6 @@ var (
 	PresetTrustedPrivateChat Preset = 3
 
 	roomIDCounter = int64(0)
-
-	testKeyID      = gomatrixserverlib.KeyID("ed25519:test")
-	testPrivateKey = ed25519.NewKeyFromSeed([]byte{
-		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-		17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-	})
 )
 
 type Room struct {
@@ -49,28 +42,49 @@ type Room struct {
 	preset  Preset
 	creator *User
 
-	authEvents gomatrixserverlib.AuthEvents
-	events     []*gomatrixserverlib.HeaderedEvent
+	authEvents   gomatrixserverlib.AuthEvents
+	currentState map[string]*gomatrixserverlib.HeaderedEvent
+	events       []*gomatrixserverlib.HeaderedEvent
 }
 
 // Create a new test room. Automatically creates the initial create events.
 func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 	t.Helper()
 	counter := atomic.AddInt64(&roomIDCounter, 1)
-
-	// set defaults then let roomModifiers override
+	if creator.srvName == "" {
+		t.Fatalf("NewRoom: creator doesn't belong to a server: %+v", *creator)
+	}
 	r := &Room{
-		ID:         fmt.Sprintf("!%d:localhost", counter),
-		creator:    creator,
-		authEvents: gomatrixserverlib.NewAuthEvents(nil),
-		preset:     PresetPublicChat,
-		Version:    gomatrixserverlib.RoomVersionV9,
+		ID:           fmt.Sprintf("!%d:%s", counter, creator.srvName),
+		creator:      creator,
+		authEvents:   gomatrixserverlib.NewAuthEvents(nil),
+		preset:       PresetPublicChat,
+		Version:      gomatrixserverlib.RoomVersionV9,
+		currentState: make(map[string]*gomatrixserverlib.HeaderedEvent),
 	}
 	for _, m := range modifiers {
 		m(t, r)
 	}
 	r.insertCreateEvents(t)
 	return r
+}
+
+func (r *Room) MustGetAuthEventRefsForEvent(t *testing.T, needed gomatrixserverlib.StateNeeded) []gomatrixserverlib.EventReference {
+	t.Helper()
+	a, err := needed.AuthEventReferences(&r.authEvents)
+	if err != nil {
+		t.Fatalf("MustGetAuthEvents: %v", err)
+	}
+	return a
+}
+
+func (r *Room) ForwardExtremities() []string {
+	if len(r.events) == 0 {
+		return nil
+	}
+	return []string{
+		r.events[len(r.events)-1].EventID(),
+	}
 }
 
 func (r *Room) insertCreateEvents(t *testing.T) {
@@ -88,6 +102,7 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 		joinRule.JoinRule = "public"
 		hisVis.HistoryVisibility = "shared"
 	}
+
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomCreate, map[string]interface{}{
 		"creator":      r.creator.ID,
 		"room_version": r.Version,
@@ -112,16 +127,16 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	}
 
 	if mod.privKey == nil {
-		mod.privKey = testPrivateKey
+		mod.privKey = creator.privKey
 	}
 	if mod.keyID == "" {
-		mod.keyID = testKeyID
+		mod.keyID = creator.keyID
 	}
 	if mod.originServerTS.IsZero() {
 		mod.originServerTS = time.Now()
 	}
 	if mod.origin == "" {
-		mod.origin = gomatrixserverlib.ServerName("localhost")
+		mod.origin = creator.srvName
 	}
 
 	var unsigned gomatrixserverlib.RawJSON
@@ -174,18 +189,29 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 // Add a new event to this room DAG. Not thread-safe.
 func (r *Room) InsertEvent(t *testing.T, he *gomatrixserverlib.HeaderedEvent) {
 	t.Helper()
-	// Add the event to the list of auth events
+	// Add the event to the list of auth/state events
 	r.events = append(r.events, he)
 	if he.StateKey() != nil {
 		err := r.authEvents.AddEvent(he.Unwrap())
 		if err != nil {
 			t.Fatalf("InsertEvent: failed to add event to auth events: %s", err)
 		}
+		r.currentState[he.Type()+" "+*he.StateKey()] = he
 	}
 }
 
 func (r *Room) Events() []*gomatrixserverlib.HeaderedEvent {
 	return r.events
+}
+
+func (r *Room) CurrentState() []*gomatrixserverlib.HeaderedEvent {
+	events := make([]*gomatrixserverlib.HeaderedEvent, len(r.currentState))
+	i := 0
+	for _, e := range r.currentState {
+		events[i] = e
+		i++
+	}
+	return events
 }
 
 func (r *Room) CreateAndInsert(t *testing.T, creator *User, eventType string, content interface{}, mods ...eventModifier) *gomatrixserverlib.HeaderedEvent {

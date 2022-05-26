@@ -4,13 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -23,11 +24,17 @@ import (
 //   e.g. ./resolve-state --roomversion=5 1254 1235 1282
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
+var filterType = flag.String("filtertype", "", "the event types to filter on")
 
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
-	args := os.Args[1:]
+	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
+		Type:  "std",
+		Level: "error",
+	})
+	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
+	args := flag.Args()
 
 	fmt.Println("Room version", *roomVersion)
 
@@ -45,7 +52,7 @@ func main() {
 		panic(err)
 	}
 
-	roomserverDB, err := storage.Open(nil, &cfg.RoomServer.Database, cache)
+	roomserverDB, err := storage.Open(base, &cfg.RoomServer.Database, cache)
 	if err != nil {
 		panic(err)
 	}
@@ -113,9 +120,18 @@ func main() {
 	}
 
 	fmt.Println("Resolved state contains", len(resolved), "events")
+	filteringEventType := *filterType
+	count := 0
 	for _, event := range resolved {
+		if filteringEventType != "" && event.Type() != filteringEventType {
+			continue
+		}
+		count++
 		fmt.Println()
 		fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
 		fmt.Printf("  %s\n", string(event.Content()))
 	}
+
+	fmt.Println()
+	fmt.Println("Returned", count, "state events after filtering")
 }

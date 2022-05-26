@@ -9,21 +9,19 @@ permalink: /installation/planning
 
 ## Modes
 
-Dendrite can be run in one of two configurations:
+Dendrite consists of several components, each responsible for a different aspect of the Matrix protocol.
+Users can run Dendrite in one of two modes which dictate how these components are executed and communicate.
 
-* **Monolith mode**: All components run in the same process. In this mode,
-   it is possible to run an in-process NATS Server instead of running a standalone deployment.
-   This will usually be the preferred model for low-to-mid volume deployments, providing the best
-   balance between performance and resource usage.
+* **Monolith mode** runs all components in a single process. Components communicate through an internal NATS
+  server with generally low overhead. This mode dramatically simplifies deployment complexity and offers the
+  best balance between performance and resource usage for low-to-mid volume deployments.
 
-* **Polylith mode**: A cluster of individual components running in their own processes, dealing
-  with different aspects of the Matrix protocol. Components communicate with each other using
-  internal HTTP APIs and NATS Server. This will almost certainly be the preferred model for very
-  large deployments but scalability comes with a cost. API calls are expensive and therefore a
-  polylith deployment may end up using disproportionately more resources for a smaller number of
-  users compared to a monolith deployment.
+* **Polylith mode** runs all components in isolated processes. Components communicate through an external NATS
+  server and HTTP APIs, which incur considerable overhead. While this mode allows for more granular control of
+  resources dedicated toward individual processes, given the additional communications overhead, it is only
+  necessary for very large deployments.
 
-At present, we **recommend monolith mode deployments** in all cases.
+Given our current state of development, **we recommend monolith mode** for all deployments.
 
 ## Databases
 

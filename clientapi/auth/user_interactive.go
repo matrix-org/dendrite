@@ -103,7 +103,8 @@ type userInteractiveFlow struct {
 // that it isn't stolen by re-authenticating them.
 type UserInteractive struct {
 	Completed []string
-	Flows     []userInteractiveFlow
+
+	Flows []userInteractiveFlow
 	// Map of login type to implementation
 	Types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
@@ -129,6 +130,12 @@ func NewUserInteractive(
 			GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
 			Config:               cfg,
 		}
+
+		userInteractive.Flows = append(userInteractive.Flows, userInteractiveFlow{
+			Stages: []string{typePassword.Name()},
+		},
+		)
+		userInteractive.Types[typePassword.Name()] = typePassword
 		typePassword.AddFLows(&userInteractive)
 	}
 
@@ -155,7 +162,6 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 
 func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 	// TODO: Handle multi-stage flows
-	u.Completed = append(u.Completed, authType)
 	delete(u.Sessions, sessionID)
 }
 
@@ -176,7 +182,7 @@ func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 	return &util.JSONResponse{
 		Code: 401,
 		JSON: Challenge{
-			Completed: u.Completed,
+			Completed: u.Sessions[sessionID],
 			Flows:     u.Flows,
 			Session:   sessionID,
 			Params:    u.Params,

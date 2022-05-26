@@ -39,7 +39,7 @@ func mustCreateEventsTable(t *testing.T, dbType test.DBType) (tables.Events, fun
 }
 
 func Test_EventsTable(t *testing.T) {
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -85,7 +85,6 @@ func Test_EventsTable(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			stateAtEvent := types.StateAtEvent{
-				Overwrite:              false,
 				BeforeStateSnapshotNID: types.StateSnapshotNID(stateSnapshot),
 				IsRejected:             false,
 				StateEntry: types.StateEntry{
