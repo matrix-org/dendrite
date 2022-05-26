@@ -74,7 +74,7 @@ type Login struct {
 
 // Username returns the user localpart/user_id in this request, if it exists.
 func (r *Login) Username() string {
-	if r.Identifier.Type == "m.id.user" {
+	if r.Identifier.Type == "m.id.user" || r.Identifier.Type == "m.id.publickey" {
 		return r.Identifier.User
 	}
 	// deprecated but without it Element iOS won't log in
@@ -102,29 +102,53 @@ type userInteractiveFlow struct {
 // the user already has a valid access token, but we want to double-check
 // that it isn't stolen by re-authenticating them.
 type UserInteractive struct {
+	Completed []string
+
 	Flows []userInteractiveFlow
 	// Map of login type to implementation
 	Types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
 	Sessions map[string][]string
+	Params   map[string]interface{}
 }
 
-func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) *UserInteractive {
-	typePassword := &LoginTypePassword{
-		GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
-		Config:               cfg,
+func NewUserInteractive(
+	userAccountAPI api.UserLoginAPI,
+	clientUserAPI api.ClientUserAPI,
+	cfg *config.ClientAPI,
+) *UserInteractive {
+	userInteractive := UserInteractive{
+		Completed: []string{},
+		Flows:     []userInteractiveFlow{},
+		Types:     make(map[string]Type),
+		Sessions:  make(map[string][]string),
+		Params:    make(map[string]interface{}),
 	}
-	return &UserInteractive{
-		Flows: []userInteractiveFlow{
-			{
-				Stages: []string{typePassword.Name()},
-			},
+
+	if !cfg.PasswordAuthenticationDisabled {
+		typePassword := &LoginTypePassword{
+			GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
+			Config:               cfg,
+		}
+
+		userInteractive.Flows = append(userInteractive.Flows, userInteractiveFlow{
+			Stages: []string{typePassword.Name()},
 		},
-		Types: map[string]Type{
-			typePassword.Name(): typePassword,
-		},
-		Sessions: make(map[string][]string),
+		)
+		userInteractive.Types[typePassword.Name()] = typePassword
+		typePassword.AddFLows(&userInteractive)
 	}
+
+	if cfg.PublicKeyAuthentication.Enabled() {
+		typePublicKey := &LoginTypePublicKey{
+			clientUserAPI,
+			&userInteractive,
+			cfg,
+		}
+		typePublicKey.AddFlows(&userInteractive)
+	}
+
+	return &userInteractive
 }
 
 func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
@@ -138,6 +162,10 @@ func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
 
 func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 	// TODO: Handle multi-stage flows
+	delete(u.Sessions, sessionID)
+}
+
+func (u *UserInteractive) DeleteSession(sessionID string) {
 	delete(u.Sessions, sessionID)
 }
 
@@ -157,7 +185,7 @@ func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 			Completed: u.Sessions[sessionID],
 			Flows:     u.Flows,
 			Session:   sessionID,
-			Params:    make(map[string]interface{}),
+			Params:    u.Params,
 		},
 	}
 }
@@ -201,7 +229,7 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
 // Returns the login that was verified for additional checks if required.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"
