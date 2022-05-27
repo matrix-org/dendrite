@@ -577,7 +577,7 @@ func Setup(
 
 	v3mux.Handle("/login/sso/callback",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
-			return SSOCallback(req, userAPI, ssoAuthenticator, cfg.Matrix.ServerName)
+			return SSOCallback(req, userAPI, ssoAuthenticator, &cfg.Login.SSO, cfg.Matrix.ServerName)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
