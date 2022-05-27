@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -219,7 +220,12 @@ func SSOCallback(
 		localpart = result.SuggestedUserID
 		if localpart == "" {
 			util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Info("no suggested user ID from SSO provider")
-			localpart = result.Identifier.Subject
+			var res uapi.QueryNumericLocalpartResponse
+			if err := userAPI.QueryNumericLocalpart(ctx, &res); err != nil {
+				util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to generate numeric localpart")
+				return jsonerror.InternalServerError()
+			}
+			localpart = strconv.FormatInt(res.ID, 10)
 		}
 
 		ok, resp := registerSSOAccount(ctx, userAPI, result.Identifier, localpart)
@@ -254,6 +260,7 @@ type userAPIForSSO interface {
 	PerformAccountCreation(ctx context.Context, req *uapi.PerformAccountCreationRequest, res *uapi.PerformAccountCreationResponse) error
 	PerformSaveSSOAssociation(ctx context.Context, req *uapi.PerformSaveSSOAssociationRequest, res *struct{}) error
 	QueryLocalpartForSSO(ctx context.Context, req *uapi.QueryLocalpartForSSORequest, res *uapi.QueryLocalpartForSSOResponse) error
+	QueryNumericLocalpart(ctx context.Context, res *uapi.QueryNumericLocalpartResponse) error
 }
 
 // formatNonce creates a random nonce that also contains the URL.
