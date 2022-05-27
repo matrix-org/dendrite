@@ -200,7 +200,7 @@ func httpDo(ctx context.Context, hc *http.Client, req *http.Request) (*http.Resp
 	}
 
 	if resp.StatusCode/100 != 2 {
-		defer resp.Body.Close()
+		defer resp.Body.Close() // nolint:errcheck
 
 		contentType := resp.Header.Get("Content-Type")
 		switch {
