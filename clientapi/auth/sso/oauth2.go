@@ -136,6 +136,10 @@ func (p *oauth2IdentityProvider) getAccessToken(ctx context.Context, callbackURL
 	}
 	defer hresp.Body.Close() // nolint:errcheck
 
+	if hresp.StatusCode/100 != 2 {
+		return "", fmt.Errorf("OAuth2 access token request %q failed: %d %s", p.accessTokenURL, hresp.StatusCode, hresp.Status)
+	}
+
 	var resp oauth2TokenResponse
 	if err := json.NewDecoder(hresp.Body).Decode(&resp); err != nil {
 		return "", err
@@ -170,7 +174,7 @@ func (p *oauth2IdentityProvider) getUserInfo(ctx context.Context, accessToken st
 	if err != nil {
 		return "", "", "", err
 	}
-	hreq.Header.Set("Authorization", "token "+accessToken)
+	hreq.Header.Set("Authorization", "Bearer "+accessToken)
 	hreq.Header.Set("Accept", p.responseMimeType)
 
 	hresp, err := p.hc.Do(hreq)
@@ -178,6 +182,10 @@ func (p *oauth2IdentityProvider) getUserInfo(ctx context.Context, accessToken st
 		return "", "", "", err
 	}
 	defer hresp.Body.Close() // nolint:errcheck
+
+	if hresp.StatusCode/100 != 2 {
+		return "", "", "", fmt.Errorf("OAuth2 user info request %q failed: %d %s", p.userInfoURL, hresp.StatusCode, hresp.Status)
+	}
 
 	body, err := ioutil.ReadAll(hresp.Body)
 	if err != nil {

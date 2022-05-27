@@ -138,6 +138,10 @@ func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
 	}
 	defer hresp.Body.Close() // nolint:errcheck
 
+	if hresp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("OIDC discovery request %q failed: %d %s", url, hresp.StatusCode, hresp.Status)
+	}
+
 	var disc oidcDiscovery
 	if err := json.NewDecoder(hresp.Body).Decode(&disc); err != nil {
 		return nil, fmt.Errorf("decoding OIDC discovery response from %q: %w", url, err)
