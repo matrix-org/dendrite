@@ -35,7 +35,7 @@ type oidcIdentityProvider struct {
 	mu   sync.Mutex
 }
 
-func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) (*oidcIdentityProvider, error) {
+func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidcIdentityProvider {
 	return &oidcIdentityProvider{
 		oauth2IdentityProvider: &oauth2IdentityProvider{
 			cfg: cfg,
@@ -48,7 +48,7 @@ func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) (*oi
 			displayNamePath:     "name",
 			suggestedUserIDPath: "preferred_username",
 		},
-	}, nil
+	}
 }
 
 func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
