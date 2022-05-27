@@ -35,7 +35,7 @@ type oidcIdentityProvider struct {
 	mu   sync.Mutex
 }
 
-func newOIDCIdentityProvider(ctx context.Context, cfg *config.IdentityProvider, hc *http.Client) (*oidcIdentityProvider, error) {
+func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) (*oidcIdentityProvider, error) {
 	return &oidcIdentityProvider{
 		oauth2IdentityProvider: &oauth2IdentityProvider{
 			cfg: cfg,

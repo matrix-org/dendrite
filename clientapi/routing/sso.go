@@ -219,7 +219,7 @@ func SSOCallback(
 		util.GetLogger(ctx).WithField("localpart", result.SuggestedUserID).WithField("ssoIdentifier", result.Identifier).Info("SSO registering account")
 		localpart = result.SuggestedUserID
 		if localpart == "" {
-			util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Info("no suggested user ID from SSO provider")
+			util.GetLogger(ctx).WithField("ssoIdentifier", result.Identifier).Info("no suggested user ID from SSO provider")
 			var res uapi.QueryNumericLocalpartResponse
 			if err := userAPI.QueryNumericLocalpart(ctx, &res); err != nil {
 				util.GetLogger(ctx).WithError(err).WithField("ssoIdentifier", result.Identifier).Error("failed to generate numeric localpart")

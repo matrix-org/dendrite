@@ -46,7 +46,7 @@ func NewAuthenticator(ctx context.Context, cfg *config.SSO) (*Authenticator, err
 
 		switch pcfg.Type {
 		case config.SSOTypeOIDC:
-			p, err := newOIDCIdentityProvider(ctx, &pcfg, hc)
+			p, err := newOIDCIdentityProvider(&pcfg, hc)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create OpenID Connect provider %q: %w", pcfg.ID, err)
 			}
