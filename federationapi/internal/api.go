@@ -25,8 +25,8 @@ type FederationInternalAPI struct {
 	db         storage.Database
 	cfg        *config.FederationAPI
 	statistics *statistics.Statistics
-	rsAPI      roomserverAPI.RoomserverInternalAPI
-	federation *gomatrixserverlib.FederationClient
+	rsAPI      roomserverAPI.FederationRoomserverAPI
+	federation api.FederationClient
 	keyRing    *gomatrixserverlib.KeyRing
 	queues     *queue.OutgoingQueues
 	joins      sync.Map // joins currently in progress
@@ -34,8 +34,8 @@ type FederationInternalAPI struct {
 
 func NewFederationInternalAPI(
 	db storage.Database, cfg *config.FederationAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	federation *gomatrixserverlib.FederationClient,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
+	federation api.FederationClient,
 	statistics *statistics.Statistics,
 	caches *caching.Caches,
 	queues *queue.OutgoingQueues,

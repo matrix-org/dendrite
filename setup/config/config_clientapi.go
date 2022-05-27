@@ -75,19 +75,13 @@ func (c *ClientAPI) Defaults(generate bool) {
 }
 
 func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkURL(configErrs, "client_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "client_api.internal_api.connect", string(c.InternalAPI.Connect))
-	if !isMonolith {
-		checkURL(configErrs, "client_api.external_api.listen", string(c.ExternalAPI.Listen))
-	}
-	if c.RecaptchaEnabled {
-		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", string(c.RecaptchaPublicKey))
-		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", string(c.RecaptchaPrivateKey))
-		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", string(c.RecaptchaSiteVerifyAPI))
-	}
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
-
+	if c.RecaptchaEnabled {
+		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
+		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
+		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", c.RecaptchaSiteVerifyAPI)
+	}
 	// Ensure there is any spam counter measure when enabling registration
 	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled {
 		if !c.RecaptchaEnabled {
@@ -101,6 +95,12 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 			)
 		}
 	}
+	if isMonolith { // polylith required configs below
+		return
+	}
+	checkURL(configErrs, "client_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "client_api.internal_api.connect", string(c.InternalAPI.Connect))
+	checkURL(configErrs, "client_api.external_api.listen", string(c.ExternalAPI.Listen))
 }
 
 type TURN struct {

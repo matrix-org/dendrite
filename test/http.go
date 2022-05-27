@@ -2,10 +2,15 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -42,4 +47,46 @@ func NewRequest(t *testing.T, method, path string, opts ...HTTPRequestOpt) *http
 		o(req)
 	}
 	return req
+}
+
+// ListenAndServe will listen on a random high-numbered port and attach the given router.
+// Returns the base URL to send requests to. Call `cancel` to shutdown the server, which will block until it has closed.
+func ListenAndServe(t *testing.T, router http.Handler, withTLS bool) (apiURL string, cancel func()) {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("failed to listen: %s", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	srv := http.Server{}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		srv.Handler = router
+		var err error
+		if withTLS {
+			certFile := filepath.Join(t.TempDir(), "dendrite.cert")
+			keyFile := filepath.Join(t.TempDir(), "dendrite.key")
+			err = NewTLSKey(keyFile, certFile)
+			if err != nil {
+				t.Errorf("failed to make TLS key: %s", err)
+				return
+			}
+			err = srv.ServeTLS(listener, certFile, keyFile)
+		} else {
+			err = srv.Serve(listener)
+		}
+		if err != nil && err != http.ErrServerClosed {
+			t.Logf("Listen failed: %s", err)
+		}
+	}()
+	s := ""
+	if withTLS {
+		s = "s"
+	}
+	return fmt.Sprintf("http%s://localhost:%d", s, port), func() {
+		_ = srv.Shutdown(context.Background())
+		wg.Wait()
+	}
 }

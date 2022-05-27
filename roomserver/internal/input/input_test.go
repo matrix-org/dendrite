@@ -12,7 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 )
@@ -22,7 +22,7 @@ var jc *nats.Conn
 
 func TestMain(m *testing.M) {
 	var b *base.BaseDendrite
-	b, js, jc = test.Base(nil)
+	b, js, jc = testrig.Base(nil)
 	code := m.Run()
 	b.ShutdownDendrite()
 	b.WaitForComponentsToFinish()

@@ -55,60 +55,62 @@ var servers = map[string]*server{
 func TestMain(m *testing.M) {
 	// Set up the server key API for each "server" that we
 	// will use in our tests.
-	for _, s := range servers {
-		// Generate a new key.
-		_, testPriv, err := ed25519.GenerateKey(nil)
-		if err != nil {
-			panic("can't generate identity key: " + err.Error())
+	os.Exit(func() int {
+		for _, s := range servers {
+			// Generate a new key.
+			_, testPriv, err := ed25519.GenerateKey(nil)
+			if err != nil {
+				panic("can't generate identity key: " + err.Error())
+			}
+
+			// Create a new cache but don't enable prometheus!
+			s.cache, err = caching.NewInMemoryLRUCache(false)
+			if err != nil {
+				panic("can't create cache: " + err.Error())
+			}
+
+			// Create a temporary directory for JetStream.
+			d, err := ioutil.TempDir("./", "jetstream*")
+			if err != nil {
+				panic(err)
+			}
+			defer os.RemoveAll(d)
+
+			// Draw up just enough Dendrite config for the server key
+			// API to work.
+			cfg := &config.Dendrite{}
+			cfg.Defaults(true)
+			cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
+			cfg.Global.PrivateKey = testPriv
+			cfg.Global.JetStream.InMemory = true
+			cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
+			cfg.Global.JetStream.StoragePath = config.Path(d)
+			cfg.Global.KeyID = serverKeyID
+			cfg.Global.KeyValidityPeriod = s.validity
+			cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
+			s.config = &cfg.FederationAPI
+
+			// Create a transport which redirects federation requests to
+			// the mock round tripper. Since we're not *really* listening for
+			// federation requests then this will return the key instead.
+			transport := &http.Transport{}
+			transport.RegisterProtocol("matrix", &MockRoundTripper{})
+
+			// Create the federation client.
+			s.fedclient = gomatrixserverlib.NewFederationClient(
+				s.config.Matrix.ServerName, serverKeyID, testPriv,
+				gomatrixserverlib.WithTransport(transport),
+			)
+
+			// Finally, build the server key APIs.
+			sbase := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+			s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, nil, true)
 		}
 
-		// Create a new cache but don't enable prometheus!
-		s.cache, err = caching.NewInMemoryLRUCache(false)
-		if err != nil {
-			panic("can't create cache: " + err.Error())
-		}
-
-		// Create a temporary directory for JetStream.
-		d, err := ioutil.TempDir("./", "jetstream*")
-		if err != nil {
-			panic(err)
-		}
-		defer os.RemoveAll(d)
-
-		// Draw up just enough Dendrite config for the server key
-		// API to work.
-		cfg := &config.Dendrite{}
-		cfg.Defaults(true)
-		cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
-		cfg.Global.PrivateKey = testPriv
-		cfg.Global.JetStream.InMemory = true
-		cfg.Global.JetStream.TopicPrefix = string(s.name[:1])
-		cfg.Global.JetStream.StoragePath = config.Path(d)
-		cfg.Global.KeyID = serverKeyID
-		cfg.Global.KeyValidityPeriod = s.validity
-		cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
-		s.config = &cfg.FederationAPI
-
-		// Create a transport which redirects federation requests to
-		// the mock round tripper. Since we're not *really* listening for
-		// federation requests then this will return the key instead.
-		transport := &http.Transport{}
-		transport.RegisterProtocol("matrix", &MockRoundTripper{})
-
-		// Create the federation client.
-		s.fedclient = gomatrixserverlib.NewFederationClient(
-			s.config.Matrix.ServerName, serverKeyID, testPriv,
-			gomatrixserverlib.WithTransport(transport),
-		)
-
-		// Finally, build the server key APIs.
-		sbase := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
-		s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, nil, true)
-	}
-
-	// Now that we have built our server key APIs, start the
-	// rest of the tests.
-	os.Exit(m.Run())
+		// Now that we have built our server key APIs, start the
+		// rest of the tests.
+		return m.Run()
+	}())
 }
 
 type MockRoundTripper struct{}

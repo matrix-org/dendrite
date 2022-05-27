@@ -37,7 +37,7 @@ import (
 type KeyInternalAPI struct {
 	DB         storage.Database
 	ThisServer gomatrixserverlib.ServerName
-	FedClient  fedsenderapi.FederationClient
+	FedClient  fedsenderapi.KeyserverFederationAPI
 	UserAPI    userapi.KeyserverUserAPI
 	Producer   *producers.KeyChange
 	Updater    *DeviceListUpdater

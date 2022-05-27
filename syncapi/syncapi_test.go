@@ -15,9 +15,11 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
+	"github.com/tidwall/gjson"
 )
 
 type syncRoomserverAPI struct {
@@ -86,7 +88,7 @@ func TestSyncAPIAccessTokens(t *testing.T) {
 }
 
 func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
+	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -96,14 +98,14 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	base, close := test.CreateBaseDendrite(t, dbType)
+	base, close := testrig.CreateBaseDendrite(t, dbType)
 	defer close()
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 	msgs := toNATSMsgs(t, base, room.Events())
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
-	test.MustPublishMsgs(t, jsctx, msgs...)
+	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
 	testCases := []struct {
 		name            string
@@ -173,7 +175,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
-	user := test.NewUser()
+	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
 		ID:          "ALICEID",
@@ -183,7 +185,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 		AccountType: userapi.AccountTypeUser,
 	}
 
-	base, close := test.CreateBaseDendrite(t, dbType)
+	base, close := testrig.CreateBaseDendrite(t, dbType)
 	defer close()
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
@@ -198,7 +200,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	sinceTokens := make([]string, len(msgs))
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
 	for i, msg := range msgs {
-		test.MustPublishMsgs(t, jsctx, msg)
+		testrig.MustPublishMsgs(t, jsctx, msg)
 		time.Sleep(100 * time.Millisecond)
 		w := httptest.NewRecorder()
 		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
@@ -255,6 +257,60 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	}
 }
 
+// Test that if we hit /sync we get back presence: online, regardless of whether messages get delivered
+// via NATS. Regression test for a flakey test "User sees their own presence in a sync"
+func TestSyncAPIUpdatePresenceImmediately(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testSyncAPIUpdatePresenceImmediately(t, dbType)
+	})
+}
+
+func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
+	user := test.NewUser(t)
+	alice := userapi.Device{
+		ID:          "ALICEID",
+		UserID:      user.ID,
+		AccessToken: "ALICE_BEARER_TOKEN",
+		DisplayName: "Alice",
+		AccountType: userapi.AccountTypeUser,
+	}
+
+	base, close := testrig.CreateBaseDendrite(t, dbType)
+	base.Cfg.Global.Presence.EnableOutbound = true
+	base.Cfg.Global.Presence.EnableInbound = true
+	defer close()
+
+	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, &syncKeyAPI{})
+	w := httptest.NewRecorder()
+	base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+		"access_token": alice.AccessToken,
+		"timeout":      "0",
+		"set_presence": "online",
+	})))
+	if w.Code != 200 {
+		t.Fatalf("got HTTP %d want %d", w.Code, 200)
+	}
+	var res types.Response
+	if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+		t.Errorf("failed to decode response body: %s", err)
+	}
+	if len(res.Presence.Events) != 1 {
+		t.Fatalf("expected 1 presence events, got: %+v", res.Presence.Events)
+	}
+	if res.Presence.Events[0].Sender != alice.UserID {
+		t.Errorf("sender: got %v want %v", res.Presence.Events[0].Sender, alice.UserID)
+	}
+	if res.Presence.Events[0].Type != "m.presence" {
+		t.Errorf("type: got %v want %v", res.Presence.Events[0].Type, "m.presence")
+	}
+	if gjson.ParseBytes(res.Presence.Events[0].Content).Get("presence").Str != "online" {
+		t.Errorf("content: not online,  got %v", res.Presence.Events[0].Content)
+	}
+
+}
+
 func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input []*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
@@ -262,7 +318,7 @@ func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input []*gomatrixserverli
 		if ev.StateKey() != nil {
 			addsStateIDs = append(addsStateIDs, ev.EventID())
 		}
-		result[i] = test.NewOutputEventMsg(t, base, ev.RoomID(), api.OutputEvent{
+		result[i] = testrig.NewOutputEventMsg(t, base, ev.RoomID(), api.OutputEvent{
 			Type: rsapi.OutputTypeNewRoomEvent,
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,

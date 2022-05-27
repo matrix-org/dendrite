@@ -42,26 +42,19 @@ func (c *MediaAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7774"
 	c.InternalAPI.Connect = "http://localhost:7774"
 	c.ExternalAPI.Listen = "http://[::]:8074"
+	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
+	c.MaxThumbnailGenerators = 10
 	c.Database.Defaults(5)
 	if generate {
 		c.Database.ConnectionString = "file:mediaapi.db"
 		c.BasePath = "./media_store"
 	}
-
-	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
-	c.MaxThumbnailGenerators = 10
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
-	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))
-	if !isMonolith {
-		checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
-	}
 	if c.Matrix.DatabaseOptions.ConnectionString == "" {
 		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 	}
-
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
@@ -70,4 +63,10 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].width", i), int64(size.Width))
 		checkPositive(configErrs, fmt.Sprintf("media_api.thumbnail_sizes[%d].height", i), int64(size.Height))
 	}
+	if isMonolith { // polylith required configs below
+		return
+	}
+	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
+	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))
+	checkURL(configErrs, "media_api.external_api.listen", string(c.ExternalAPI.Listen))
 }

@@ -38,6 +38,12 @@ func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.Stream
 	return 0, nil
 }
 
+type dummyConsumer struct{}
+
+func (d dummyConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
+
+}
+
 func TestRequestPool_updatePresence(t *testing.T) {
 	type args struct {
 		presence string
@@ -45,6 +51,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 		sleep    time.Duration
 	}
 	publisher := &dummyPublisher{}
+	consumer := &dummyConsumer{}
 	syncMap := sync.Map{}
 
 	tests := []struct {
@@ -101,6 +108,7 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	rp := &RequestPool{
 		presence: &syncMap,
 		producer: publisher,
+		consumer: consumer,
 		cfg: &config.SyncAPI{
 			Matrix: &config.Global{
 				JetStream: config.JetStream{

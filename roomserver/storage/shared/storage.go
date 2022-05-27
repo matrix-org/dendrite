@@ -1216,7 +1216,7 @@ func (d *Database) GetKnownUsers(ctx context.Context, userID, searchString strin
 
 // GetKnownRooms returns a list of all rooms we know about.
 func (d *Database) GetKnownRooms(ctx context.Context) ([]string, error) {
-	return d.RoomsTable.SelectRoomIDs(ctx, nil)
+	return d.RoomsTable.SelectRoomIDsWithEvents(ctx, nil)
 }
 
 // ForgetRoom sets a users room to forgotten

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/consumers"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
@@ -165,7 +166,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if content == nil {
 		content = map[string]interface{}{}
 	}
-	content["membership"] = "join"
+	_ = json.Unmarshal(respMakeJoin.JoinEvent.Content, &content)
+	content["membership"] = gomatrixserverlib.Join
 	if err = respMakeJoin.JoinEvent.SetContent(content); err != nil {
 		return fmt.Errorf("respMakeJoin.JoinEvent.SetContent: %w", err)
 	}
@@ -208,10 +210,22 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 	r.statistics.ForServer(serverName).Success()
 
-	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
+	// If the remote server returned an event in the "event" key of
+	// the send_join request then we should use that instead. It may
+	// contain signatures that we don't know about.
+	if len(respSendJoin.Event) > 0 {
+		var remoteEvent *gomatrixserverlib.Event
+		remoteEvent, err = respSendJoin.Event.UntrustedEvent(respMakeJoin.RoomVersion)
+		if err == nil && isWellFormedMembershipEvent(
+			remoteEvent, roomID, userID, r.cfg.Matrix.ServerName,
+		) {
+			event = remoteEvent
+		}
+	}
 
 	// Sanity-check the join response to ensure that it has a create
 	// event, that the room version is known, etc.
+	authEvents := respSendJoin.AuthEvents.UntrustedEvents(respMakeJoin.RoomVersion)
 	if err = sanityCheckAuthChain(authEvents); err != nil {
 		return fmt.Errorf("sanityCheckAuthChain: %w", err)
 	}
@@ -235,6 +249,21 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		return fmt.Errorf("respSendJoin.Check: %w", err)
 	}
 
+	// We need to immediately update our list of joined hosts for this room now as we are technically
+	// joined. We must do this synchronously: we cannot rely on the roomserver output events as they
+	// will happen asyncly. If we don't update this table, you can end up with bad failure modes like
+	// joining a room, waiting for 200 OK then changing device keys and have those keys not be sent
+	// to other servers (this was a cause of a flakey sytest "Local device key changes get to remote servers")
+	// The events are trusted now as we performed auth checks above.
+	joinedHosts, err := consumers.JoinedHostsFromEvents(respState.StateEvents.TrustedEvents(respMakeJoin.RoomVersion, false))
+	if err != nil {
+		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
+	}
+	logrus.WithField("hosts", joinedHosts).WithField("room", roomID).Info("Joined federated room with hosts")
+	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
+		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
+	}
+
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
@@ -252,6 +281,26 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	}
 
 	return nil
+}
+
+// isWellFormedMembershipEvent returns true if the event looks like a legitimate
+// membership event.
+func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string, origin gomatrixserverlib.ServerName) bool {
+	if membership, err := event.Membership(); err != nil {
+		return false
+	} else if membership != gomatrixserverlib.Join {
+		return false
+	}
+	if event.RoomID() != roomID {
+		return false
+	}
+	if event.Origin() != origin {
+		return false
+	}
+	if !event.StateKeyEquals(userID) {
+		return false
+	}
+	return true
 }
 
 // PerformOutboundPeekRequest implements api.FederationInternalAPI
@@ -650,7 +699,7 @@ func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder
 
 // FederatedAuthProvider is an auth chain provider which fetches events from the server provided
 func federatedAuthProvider(
-	ctx context.Context, federation *gomatrixserverlib.FederationClient,
+	ctx context.Context, federation api.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier, server gomatrixserverlib.ServerName,
 ) gomatrixserverlib.AuthChainProvider {
 	// A list of events that we have retried, if they were not included in
