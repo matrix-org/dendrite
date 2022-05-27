@@ -36,7 +36,7 @@ type oidcIdentityProvider struct {
 }
 
 func newOIDCIdentityProvider(ctx context.Context, cfg *config.IdentityProvider, hc *http.Client) (*oidcIdentityProvider, error) {
-	p := &oidcIdentityProvider{
+	return &oidcIdentityProvider{
 		oauth2IdentityProvider: &oauth2IdentityProvider{
 			cfg: cfg,
 			hc:  hc,
@@ -48,18 +48,7 @@ func newOIDCIdentityProvider(ctx context.Context, cfg *config.IdentityProvider, 
 			displayNamePath:     "name",
 			suggestedUserIDPath: "preferred_username",
 		},
-	}
-
-	// TODO: Complement starts and waits for the "base image" without
-	// first starting httpmockserver, which means we cannot always do
-	// this sanity check.
-	if false {
-		if _, _, err := p.get(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	return p, nil
+	}, nil
 }
 
 func (p *oidcIdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {

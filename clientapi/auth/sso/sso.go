@@ -42,12 +42,9 @@ func NewAuthenticator(ctx context.Context, cfg *config.SSO) (*Authenticator, err
 		providers: make(map[string]identityProvider, len(cfg.Providers)),
 	}
 	for _, pcfg := range cfg.Providers {
-		typ := pcfg.Type
-		if typ == "" {
-			typ = config.IdentityProviderType(pcfg.ID)
-		}
+		pcfg = pcfg.WithDefaults()
 
-		switch typ {
+		switch pcfg.Type {
 		case config.SSOTypeOIDC:
 			p, err := newOIDCIdentityProvider(ctx, &pcfg, hc)
 			if err != nil {
@@ -57,7 +54,7 @@ func NewAuthenticator(ctx context.Context, cfg *config.SSO) (*Authenticator, err
 		case config.SSOTypeGitHub:
 			a.providers[pcfg.ID] = newGitHubIdentityProvider(&pcfg, hc)
 		default:
-			return nil, fmt.Errorf("unknown SSO provider type: %s", typ)
+			return nil, fmt.Errorf("unknown SSO provider type: %s", pcfg.Type)
 		}
 	}
 

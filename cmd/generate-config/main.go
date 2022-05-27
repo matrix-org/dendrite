@@ -85,20 +85,19 @@ func main() {
 		cfg.ClientAPI.Login.SSO.Enabled = true
 		cfg.ClientAPI.Login.SSO.Providers = []config.IdentityProvider{
 			{
-				ID:   "github",
-				Name: "Fake GitHub",
-				OIDC: config.OIDC{
+				Brand: "github",
+				OAuth2: config.OAuth2{
 					ClientID:     "aclientid",
 					ClientSecret: "aclientsecret",
 				},
 			},
 			{
-				ID:   "google",
-				Name: "Fake Google",
-				Type: "oidc",
-				OIDC: config.OIDC{
+				Brand: "google",
+				OAuth2: config.OAuth2{
 					ClientID:     "aclientid",
 					ClientSecret: "aclientsecret",
+				},
+				OIDC: config.OIDC{
 					DiscoveryURL: "https://accounts.google.com/.well-known/openid-configuration",
 				},
 			},
