@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -89,14 +90,20 @@ func SSORedirect(
 	util.GetLogger(ctx).Infof("SSO redirect to %s.", u)
 
 	resp := util.RedirectResponse(u)
-	resp.Headers["Set-Cookie"] = (&http.Cookie{
+	cookie := &http.Cookie{
 		Name:     "oidc_nonce",
 		Value:    nonce,
-		Path:     "/",
+		Path:     path.Dir(callbackURL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
 		Secure:   callbackURL.Scheme != "http",
-		SameSite: http.SameSiteStrictMode,
-	}).String()
+		SameSite: http.SameSiteNoneMode,
+	}
+	if !cookie.Secure {
+		// SameSite=None requires Secure, so we might as well remove
+		// it. See https://blog.chromium.org/2019/10/developers-get-ready-for-new.html.
+		cookie.SameSite = http.SameSiteDefaultMode
+	}
+	resp.Headers["Set-Cookie"] = cookie.String()
 	return resp
 }
 
