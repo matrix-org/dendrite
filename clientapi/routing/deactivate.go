@@ -28,7 +28,7 @@ func Deactivate(
 		}
 	}
 
-	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes)
+	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, deviceAPI)
 	if errRes != nil {
 		return *errRes
 	}
