@@ -180,11 +180,13 @@ type IdentityProvider struct {
 	Type IdentityProviderType `yaml:"type"`
 
 	// OIDC contains settings for providers based on OpenID Connect (OAuth 2).
-	OIDC struct {
-		ClientID     string `yaml:"client_id"`
-		ClientSecret string `yaml:"client_secret"`
-		DiscoveryURL string `yaml:"discovery_url"`
-	} `yaml:"oidc"`
+	OIDC OIDC `yaml:"oidc"`
+}
+
+type OIDC struct {
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	DiscoveryURL string `yaml:"discovery_url"`
 }
 
 func (idp *IdentityProvider) Verify(configErrs *ConfigErrors) {
