@@ -4,7 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/storage"
@@ -110,7 +112,8 @@ func main() {
 	}
 
 	fmt.Println("Resolving state")
-	resolved, err := gomatrixserverlib.ResolveConflicts(
+	var resolved Events
+	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion),
 		events,
 		authEvents,
@@ -120,6 +123,7 @@ func main() {
 	}
 
 	fmt.Println("Resolved state contains", len(resolved), "events")
+	sort.Sort(resolved)
 	filteringEventType := *filterType
 	count := 0
 	for _, event := range resolved {
@@ -134,4 +138,26 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("Returned", count, "state events after filtering")
+}
+
+type Events []*gomatrixserverlib.Event
+
+func (e Events) Len() int {
+	return len(e)
+}
+
+func (e Events) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+
+func (e Events) Less(i, j int) bool {
+	typeDelta := strings.Compare(e[i].Type(), e[j].Type())
+	if typeDelta < 0 {
+		return true
+	}
+	if typeDelta > 0 {
+		return false
+	}
+	stateKeyDelta := strings.Compare(*e[i].StateKey(), *e[j].StateKey())
+	return stateKeyDelta < 0
 }
