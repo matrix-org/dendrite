@@ -96,10 +96,9 @@ than features that massive deployments may be interested in (User Directory, Ope
 This means Dendrite supports amongst others:
 
 - Core room functionality (creating rooms, invites, auth rules)
-- Full support for room versions 1 to 7
-- Experimental support for room versions 8 to 9
+- Room versions 1 to 10 supported
 - Backfilling locally and via federation
-- Accounts, Profiles and Devices
+- Accounts, profiles and devices
 - Published room lists
 - Typing
 - Media APIs
