@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_json (
 	-- The JSON body. Text so that we preserve UTF-8.
 	json_body TEXT NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_json_json_nid_idx
+    ON federationsender_queue_json (json_nid);
 `
 
 const insertJSONSQL = "" +
