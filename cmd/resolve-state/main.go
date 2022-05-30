@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
@@ -59,25 +60,23 @@ func main() {
 		panic(err)
 	}
 
-	blockNIDs, err := roomserverDB.StateBlockNIDs(ctx, snapshotNIDs)
-	if err != nil {
-		panic(err)
-	}
+	stateres := state.NewStateResolution(roomserverDB, &types.RoomInfo{
+		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
+	})
 
-	var stateEntries []types.StateEntryList
-	for _, list := range blockNIDs {
-		entries, err2 := roomserverDB.StateEntries(ctx, list.StateBlockNIDs)
-		if err2 != nil {
-			panic(err2)
+	var stateEntries []types.StateEntry
+	for _, snapshotNID := range snapshotNIDs {
+		var entries []types.StateEntry
+		entries, err = stateres.LoadStateAtSnapshot(ctx, snapshotNID)
+		if err != nil {
+			panic(err)
 		}
 		stateEntries = append(stateEntries, entries...)
 	}
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
-		for _, e := range entry.StateEntries {
-			eventNIDs = append(eventNIDs, e.EventNID)
-		}
+		eventNIDs = append(eventNIDs, entry.EventNID)
 	}
 
 	fmt.Println("Fetching", len(eventNIDs), "state events")
