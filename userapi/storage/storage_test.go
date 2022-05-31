@@ -133,6 +133,14 @@ func Test_Accounts(t *testing.T) {
 		// test getting a numeric localpart, with an existing user without a localpart
 		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeGuest)
 		assert.NoError(t, err)
+
+		// Create a user with a high numeric localpart, out of range for the Postgres integer (2147483647) type
+		_, err = db.CreateAccount(ctx, "2147483650", "", "", api.AccountTypeUser)
+		assert.NoError(t, err)
+
+		// Now try to create a new guest user
+		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeGuest)
+		assert.NoError(t, err)
 	})
 }
 
