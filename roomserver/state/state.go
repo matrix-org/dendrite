@@ -998,11 +998,14 @@ func (v *StateResolution) loadAuthEvents(
 			return nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 		}
 		eventMap[event.EventID()] = struct{}{}
-		next, err := getEvents(event.AuthEventIDs())
-		if err != nil {
-			return nil, err
+		for _, event := range events {
+			next, err := getEvents(event.AuthEventIDs())
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, next...)
 		}
-		return append(events, next...), nil
+		return events, nil
 	}
 	authEvents, err := getEvents(event.AuthEventIDs())
 	if err != nil {
