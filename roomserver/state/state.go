@@ -39,6 +39,7 @@ type StateResolutionStorage interface {
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
 	Events(ctx context.Context, eventNIDs []types.EventNID) ([]types.Event, error)
+	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
 }
 
 type StateResolution struct {
@@ -659,15 +660,13 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 	}
 
 	// Collect all the entries with the same type and key together.
-	// We don't care about the order here because the conflict resolution
-	// algorithm doesn't depend on the order of the prev events.
-	// Remove duplicate entires.
+	// This is done so findDuplicateStateKeys can work in groups.
+	// We remove duplicates (same type, state key and event NID) too.
 	combined = combined[:util.SortAndUnique(stateEntrySorter(combined))]
 
 	// Find the conflicts
-	conflicts := findDuplicateStateKeys(combined)
-
-	if len(conflicts) > 0 {
+	if conflicts := findDuplicateStateKeys(combined); len(conflicts) > 0 {
+		conflictMap := stateEntryMap(conflicts)
 		conflictLength = len(conflicts)
 
 		// 5) There are conflicting state events, for each conflict workout
@@ -676,7 +675,7 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		// Work out which entries aren't conflicted.
 		var notConflicted []types.StateEntry
 		for _, entry := range combined {
-			if _, ok := stateEntryMap(conflicts).lookup(entry.StateKeyTuple); !ok {
+			if _, ok := conflictMap.lookup(entry.StateKeyTuple); !ok {
 				notConflicted = append(notConflicted, entry)
 			}
 		}
@@ -689,7 +688,7 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 			return
 		}
 		algorithm = "full_state_with_conflicts"
-		state = resolved[:util.SortAndUnique(stateEntrySorter(resolved))]
+		state = resolved
 	} else {
 		algorithm = "full_state_no_conflicts"
 		// 6) There weren't any conflicts
@@ -818,36 +817,12 @@ func (v *StateResolution) resolveConflictsV2(
 	authDifference := make([]*gomatrixserverlib.Event, 0, estimate)
 
 	// For each conflicted event, let's try and get the needed auth events.
-	neededStateKeys := make([]string, 16)
-	authEntries := make([]types.StateEntry, 16)
 	for _, conflictedEvent := range conflictedEvents {
 		// Work out which auth events we need to load.
 		key := conflictedEvent.EventID()
-		needed := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{conflictedEvent})
-
-		// Find the numeric IDs for the necessary state keys.
-		neededStateKeys = neededStateKeys[:0]
-		neededStateKeys = append(neededStateKeys, needed.Member...)
-		neededStateKeys = append(neededStateKeys, needed.ThirdPartyInvite...)
-		stateKeyNIDMap, err := v.db.EventStateKeyNIDs(ctx, neededStateKeys)
-		if err != nil {
-			return nil, err
-		}
-
-		// Load the necessary auth events.
-		tuplesNeeded := v.stateKeyTuplesNeeded(stateKeyNIDMap, needed)
-		authEntries = authEntries[:0]
-		for _, tuple := range tuplesNeeded {
-			if eventNID, ok := stateEntryMap(notConflicted).lookup(tuple); ok {
-				authEntries = append(authEntries, types.StateEntry{
-					StateKeyTuple: tuple,
-					EventNID:      eventNID,
-				})
-			}
-		}
 
 		// Store the newly found auth events in the auth set for this event.
-		authSets[key], _, err = v.loadStateEvents(ctx, authEntries)
+		authSets[key], err = v.loadAuthEvents(ctx, conflictedEvent)
 		if err != nil {
 			return nil, err
 		}
@@ -994,6 +969,42 @@ func (v *StateResolution) loadStateEvents(
 		v.events[entry.EventNID] = event.Event
 	}
 	return result, eventIDMap, nil
+}
+
+// loadAuthEvents loads all of the auth events for a given event recursively.
+func (v *StateResolution) loadAuthEvents(
+	ctx context.Context, event *gomatrixserverlib.Event,
+) ([]*gomatrixserverlib.Event, error) {
+	eventMap := map[string]struct{}{}
+	var getEvents func(eventIDs []string) ([]*gomatrixserverlib.Event, error)
+	getEvents = func(eventIDs []string) ([]*gomatrixserverlib.Event, error) {
+		lookup := make([]string, 0, len(event.AuthEventIDs()))
+		for _, eventID := range eventIDs {
+			if _, ok := eventMap[eventID]; ok {
+				continue
+			}
+			lookup = append(lookup, eventID)
+		}
+		if len(lookup) == 0 {
+			return nil, nil
+		}
+		events, err := v.db.EventsFromIDs(ctx, lookup)
+		if err != nil {
+			return nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
+		}
+		result := make([]*gomatrixserverlib.Event, 0, len(events))
+		for _, event := range events {
+			result = append(result, event.Event)
+			eventMap[event.EventID()] = struct{}{}
+			next, err := getEvents(event.AuthEventIDs())
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, next...)
+		}
+		return result, nil
+	}
+	return getEvents(event.AuthEventIDs())
 }
 
 // findDuplicateStateKeys finds the state entries where the state key tuple appears more than once in a sorted list.

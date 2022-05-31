@@ -34,7 +34,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220530084946-3a4b148706bc
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220531143527-a7d16af5affc
 	github.com/matrix-org/pinecone v0.0.0-20220408153826-2999ea29ed48
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.13
