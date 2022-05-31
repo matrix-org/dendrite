@@ -884,7 +884,7 @@ func (v *StateResolution) resolveConflictsV2(
 	for _, resolvedEvent := range resolvedEvents {
 		entry, ok := eventIDMap[resolvedEvent.EventID()]
 		if !ok {
-			panic(fmt.Errorf("missing state entry for event ID %q", resolvedEvent.EventID()))
+			return nil, fmt.Errorf("missing state entry for event ID %q", resolvedEvent.EventID())
 		}
 		notConflicted = append(notConflicted, entry)
 	}
