@@ -124,6 +124,15 @@ func Test_Accounts(t *testing.T) {
 
 		_, err = db.GetAccountByLocalpart(ctx, "unusename")
 		assert.Error(t, err, "expected an error for non existent localpart")
+
+		// create an empty localpart; this should never happen, but is required to test getting a numeric localpart
+		// if there's already a user without a localpart in the database
+		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeUser)
+		assert.NoError(t, err)
+
+		// test getting a numeric localpart, with an existing user without a localpart
+		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeGuest)
+		assert.NoError(t, err)
 	})
 }
 
