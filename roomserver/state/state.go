@@ -997,8 +997,8 @@ func (v *StateResolution) loadAuthEvents(
 		if err != nil {
 			return nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 		}
-		eventMap[event.EventID()] = struct{}{}
 		for _, event := range events {
+			eventMap[event.EventID()] = struct{}{}
 			next, err := getEvents(event.AuthEventIDs())
 			if err != nil {
 				return nil, err
