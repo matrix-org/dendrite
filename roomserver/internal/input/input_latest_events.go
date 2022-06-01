@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -101,8 +102,8 @@ type latestEventsUpdater struct {
 	// The eventID of the event that was processed before this one.
 	lastEventIDSent string
 	// The latest events in the room after processing this event.
-	oldLatest []types.StateAtEventAndReference
-	latest    []types.StateAtEventAndReference
+	oldLatest types.StateAtEventAndReferences
+	latest    types.StateAtEventAndReferences
 	// The state entries removed from and added to the current state of the
 	// room as a result of processing this event. They are sorted lists.
 	removed []types.StateEntry
@@ -125,7 +126,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// state snapshot from somewhere else, e.g. a federated room join,
 	// then start with an empty set - none of the forward extremities
 	// that we knew about before matter anymore.
-	u.oldLatest = []types.StateAtEventAndReference{}
+	u.oldLatest = types.StateAtEventAndReferences{}
 	if !u.rewritesState {
 		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 		u.oldLatest = u.updater.LatestEvents()
@@ -258,13 +259,6 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
 	}
 
-	// If we are overwriting the state then we should make sure that we
-	// don't send anything out over federation again, it will very likely
-	// be a repeat.
-	if u.stateAtEvent.Overwrite {
-		u.sendAsServer = ""
-	}
-
 	// Now that we have a new state snapshot based on the latest events,
 	// we can compare that new snapshot to the previous one and see what
 	// has changed. This gives us one list of removed state events and
@@ -275,6 +269,17 @@ func (u *latestEventsUpdater) latestState() error {
 	)
 	if err != nil {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+	}
+
+	if removed := len(u.removed) - len(u.added); removed > 0 {
+		logrus.WithFields(logrus.Fields{
+			"event_id":      u.event.EventID(),
+			"room_id":       u.event.RoomID(),
+			"old_state_nid": u.oldStateNID,
+			"new_state_nid": u.newStateNID,
+			"old_latest":    u.oldLatest.EventIDs(),
+			"new_latest":    u.latest.EventIDs(),
+		}).Errorf("Unexpected state deletion (removing %d events)", removed)
 	}
 
 	// Also work out the state before the event removes and the event

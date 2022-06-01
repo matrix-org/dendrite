@@ -535,8 +535,6 @@ func (r *Inputer) calculateAndSetState(
 	roomState := state.NewStateResolution(updater, roomInfo)
 
 	if input.HasState {
-		stateAtEvent.Overwrite = true
-
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
@@ -549,8 +547,6 @@ func (r *Inputer) calculateAndSetState(
 			return fmt.Errorf("updater.AddState: %w", err)
 		}
 	} else {
-		stateAtEvent.Overwrite = false
-
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
 		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, isRejected); err != nil {
 			return fmt.Errorf("roomState.CalculateAndStoreStateBeforeEvent: %w", err)

@@ -61,6 +61,7 @@ const (
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
+	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -554,6 +555,16 @@ func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) QueryRestrictedJoinAllowed(
+	ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRestrictedJoinAllowed")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRestrictedJoinAllowed
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 
