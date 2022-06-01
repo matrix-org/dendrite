@@ -234,19 +234,12 @@ func (u *latestEventsUpdater) latestState() error {
 		}
 	}
 
-	// Take the old set of extremities and the new set of extremities and
-	// mash them together into a list. This may or may not include the new event
-	// from the input path, depending on whether it became a forward extremity
-	// or not. We'll then run state resolution across all of them to determine
-	// the new current state of the room. Including the old extremities here
-	// ensures that new forward extremities with bad state snapshots (from
-	// possible malicious actors) can't completely corrupt the room state
-	// away from what it was before.
-	combinedExtremities := types.StateAtEventAndReferences(append(u.oldLatest, u.latest...))
-	combinedExtremities = combinedExtremities[:util.SortAndUnique(combinedExtremities)]
-	latestStateAtEvents := make([]types.StateAtEvent, len(combinedExtremities))
-	for i := range combinedExtremities {
-		latestStateAtEvents[i] = combinedExtremities[i].StateAtEvent
+	// Get a list of the current latest events. This may or may not
+	// include the new event from the input path, depending on whether
+	// it is a forward extremity or not.
+	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
+	for i := range u.latest {
+		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
 
 	// Takes the NIDs of the latest events and creates a state snapshot
