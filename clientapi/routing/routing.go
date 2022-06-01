@@ -89,6 +89,9 @@ func Setup(
 					"r0.4.0",
 					"r0.5.0",
 					"r0.6.1",
+					"v1.0",
+					"v1.1",
+					"v1.2",
 				}, UnstableFeatures: unstableFeatures},
 			}
 		}),
