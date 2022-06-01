@@ -206,7 +206,7 @@ func (u *latestEventsUpdater) latestState() error {
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
 	// hard work.
-	if u.event.StateKey() == nil {
+	if !u.stateAtEvent.IsStateEvent() {
 		stateChanged := false
 		oldStateNIDs := make([]types.StateSnapshotNID, 0, len(u.oldLatest))
 		newStateNIDs := make([]types.StateSnapshotNID, 0, len(u.latest))
