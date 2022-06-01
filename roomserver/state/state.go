@@ -981,35 +981,38 @@ func (v *StateResolution) loadAuthEvents(
 	ctx context.Context, event *gomatrixserverlib.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	eventMap := map[string]struct{}{}
-	var getEvents func(eventIDs []string) ([]types.Event, error)
-	getEvents = func(eventIDs []string) ([]types.Event, error) {
-		lookup := make([]string, 0, len(event.AuthEventIDs()))
-		for _, eventID := range eventIDs {
-			if _, ok := eventMap[eventID]; ok {
+	var lookup []string
+	var authEvents []types.Event
+	queue := event.AuthEventIDs()
+	for i := 0; i < len(queue); i++ {
+		lookup = lookup[:0]
+		for _, authEventID := range queue {
+			if _, ok := eventMap[authEventID]; ok {
 				continue
 			}
-			lookup = append(lookup, eventID)
+			lookup = append(lookup, authEventID)
 		}
 		if len(lookup) == 0 {
-			return nil, nil
+			break
 		}
 		events, err := v.db.EventsFromIDs(ctx, lookup)
 		if err != nil {
-			return nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
+			return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 		}
+		add := map[string]struct{}{}
 		for _, event := range events {
 			eventMap[event.EventID()] = struct{}{}
-			next, err := getEvents(event.AuthEventIDs())
-			if err != nil {
-				return nil, err
+			authEvents = append(authEvents, event)
+			for _, authEventID := range event.AuthEventIDs() {
+				if _, ok := eventMap[authEventID]; ok {
+					continue
+				}
+				add[authEventID] = struct{}{}
 			}
-			events = append(events, next...)
+			for authEventID := range add {
+				queue = append(queue, authEventID)
+			}
 		}
-		return events, nil
-	}
-	authEvents, err := getEvents(event.AuthEventIDs())
-	if err != nil {
-		return nil, nil, fmt.Errorf("getEvents: %w", err)
 	}
 	authEventTypes := map[string]struct{}{}
 	authEventStateKeys := map[string]struct{}{}
