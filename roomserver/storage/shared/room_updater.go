@@ -192,6 +192,10 @@ func (u *RoomUpdater) StateAtEventIDs(
 	return u.d.EventsTable.BulkSelectStateAtEventByID(ctx, u.txn, eventIDs)
 }
 
+func (u *RoomUpdater) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
+	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, false)
+}
+
 func (u *RoomUpdater) UnsentEventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
 	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, true)
 }
