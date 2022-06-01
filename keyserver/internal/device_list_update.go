@@ -374,7 +374,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 	// fetch stale device lists
 	userIDs, err := u.db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{serverName})
 	if err != nil {
-		logger.WithError(err).Error("failed to load stale device lists")
+		logger.WithError(err).Error("Failed to load stale device lists")
 		return waitTime, true
 	}
 	failCount := 0
@@ -399,7 +399,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 				}
 			} else {
 				waitTime = time.Hour
-				logger.WithError(err).WithField("user_id", userID).Warn("GetUserDevices returned unknown error type")
+				logger.WithError(err).WithField("user_id", userID).Debug("GetUserDevices returned unknown error type")
 			}
 			continue
 		}
@@ -422,12 +422,12 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		}
 		err = u.updateDeviceList(&res)
 		if err != nil {
-			logger.WithError(err).WithField("user_id", userID).Error("fetched device list but failed to store/emit it")
+			logger.WithError(err).WithField("user_id", userID).Error("Fetched device list but failed to store/emit it")
 			failCount += 1
 		}
 	}
 	if failCount > 0 {
-		logger.WithField("total", len(userIDs)).WithField("failed", failCount).WithField("wait", waitTime).Error("failed to query device keys for some users")
+		logger.WithField("total", len(userIDs)).WithField("failed", failCount).WithField("wait", waitTime).Warn("Failed to query device keys for some users")
 	}
 	for _, userID := range userIDs {
 		// always clear the channel to unblock Update calls regardless of success/failure

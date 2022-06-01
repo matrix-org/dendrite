@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_pdus (
 
 CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_pdus_pdus_json_nid_idx
     ON federationsender_queue_pdus (json_nid, server_name);
+CREATE INDEX IF NOT EXISTS federationsender_queue_pdus_json_nid_idx
+    ON federationsender_queue_pdus (json_nid);
+CREATE INDEX IF NOT EXISTS federationsender_queue_pdus_server_name_idx
+    ON federationsender_queue_pdus (server_name);
 `
 
 const insertQueuePDUSQL = "" +
