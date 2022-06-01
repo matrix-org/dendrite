@@ -65,7 +65,6 @@ func AdminReindex(req *http.Request, cfg *config.ClientAPI, device *userapi.Devi
 		logrus.WithError(err).Error("failed to publish nats message")
 		return jsonerror.InternalServerError()
 	}
-	logrus.Debugf("Indexing events")
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
