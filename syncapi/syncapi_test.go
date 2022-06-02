@@ -3,6 +3,7 @@ package syncapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -48,6 +50,12 @@ func (s *syncRoomserverAPI) QuerySharedUsers(ctx context.Context, req *rsapi.Que
 	return nil
 }
 func (s *syncRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *rsapi.QueryBulkStateContentRequest, res *rsapi.QueryBulkStateContentResponse) error {
+	return nil
+}
+
+func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsapi.QueryMembershipForUserRequest, res *rsapi.QueryMembershipForUserResponse) error {
+	res.IsRoomForgotten = false
+	res.RoomExists = true
 	return nil
 }
 
@@ -103,7 +111,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
-	msgs := toNATSMsgs(t, base, room.Events())
+	msgs := toNATSMsgs(t, base, room.Events()...)
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
 	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
@@ -196,7 +204,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	// m.room.power_levels
 	// m.room.join_rules
 	// m.room.history_visibility
-	msgs := toNATSMsgs(t, base, room.Events())
+	msgs := toNATSMsgs(t, base, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
 	for i, msg := range msgs {
@@ -311,7 +319,208 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 
 }
 
-func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input []*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
+// This is mainly what Sytest is doing in "test_history_visibility"
+func TestMessageHistoryVisibility(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testHistoryVisibility(t, dbType)
+	})
+}
+
+func testHistoryVisibility(t *testing.T, dbType test.DBType) {
+	type result struct {
+		seeWithoutJoin bool
+		seeBeforeJoin  bool
+		seeAfterInvite bool
+	}
+
+	// create the users
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+
+	bobDev := userapi.Device{
+		ID:          "BOBID",
+		UserID:      bob.ID,
+		AccessToken: "BOD_BEARER_TOKEN",
+		DisplayName: "BOB",
+	}
+	// check guest and normaler user accounts
+	for _, accType := range []userapi.AccountType{userapi.AccountTypeGuest, userapi.AccountTypeUser} {
+		testCases := []struct {
+			historyVisibility string
+			wantResult        result
+		}{
+			{
+				historyVisibility: "world_readable",
+				wantResult: result{
+					seeWithoutJoin: true,
+					seeBeforeJoin:  true,
+					seeAfterInvite: true,
+				},
+			},
+			{
+				historyVisibility: "shared",
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  true,
+					seeAfterInvite: true,
+				},
+			},
+			{
+				historyVisibility: "invited",
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  false,
+					seeAfterInvite: true,
+				},
+			},
+			{
+				historyVisibility: "joined",
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  false,
+					seeAfterInvite: false,
+				},
+			},
+			{
+				historyVisibility: "default",
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  true,
+					seeAfterInvite: true,
+				},
+			},
+		}
+
+		bobDev.AccountType = accType
+		userType := "guest"
+		if accType == userapi.AccountTypeUser {
+			userType = "real user"
+		}
+
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
+
+		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+
+		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{bobDev}}, &syncRoomserverAPI{}, &syncKeyAPI{})
+
+		for _, tc := range testCases {
+			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
+			t.Run(testname, func(t *testing.T) {
+				// create a room with the given visibility
+				room := test.NewRoom(t, alice, test.RoomHistoryVisibility(tc.historyVisibility))
+
+				// send the events/messages to NATS to create the rooms
+				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)})
+				testrig.MustPublishMsgs(t, jsctx, toNATSMsgs(t, base, room.Events()...)...)
+				testrig.MustPublishMsgs(t, jsctx, toNATSMsgs(t, base, beforeJoinEv)...)
+				time.Sleep(100 * time.Millisecond)
+
+				// There is only one event, we expect only to be able to see this, if the room is world_readable
+				w := httptest.NewRecorder()
+				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": bobDev.AccessToken,
+					"dir":          "b",
+				})))
+				if w.Code != 200 {
+					t.Logf("%s", w.Body.String())
+					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+				}
+				var res routing.MessageResp
+				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+					t.Errorf("failed to decode response body: %s", err)
+				}
+
+				if tc.wantResult.seeWithoutJoin {
+					found := false
+					for _, ev := range res.Chunk {
+						if ev.EventID == beforeJoinEv.EventID() {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Fatalf("expected to see event %s without joining but didn't: %+v", beforeJoinEv.EventID(), res.Chunk)
+					}
+				} else {
+					for _, ev := range res.Chunk {
+						if ev.EventID == beforeJoinEv.EventID() {
+							t.Fatalf("expected not to see event %s without joining: %+v", beforeJoinEv.EventID(), string(ev.Content))
+						}
+					}
+				}
+
+				// Create invite, a message, join the room and create another message.
+				msgs := toNATSMsgs(t, base, room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID)))
+				testrig.MustPublishMsgs(t, jsctx, msgs...)
+				afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
+				msgs = toNATSMsgs(t, base,
+					afterInviteEv,
+					room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID)),
+					room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After join in a %s room", tc.historyVisibility)}),
+				)
+				testrig.MustPublishMsgs(t, jsctx, msgs...)
+				time.Sleep(time.Millisecond * 100)
+
+				// Verify the messages after/before invite are visible or not
+				w = httptest.NewRecorder()
+				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": bobDev.AccessToken,
+					"dir":          "b",
+				})))
+				if w.Code != 200 {
+					t.Logf("%s", w.Body.String())
+					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+				}
+				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+					t.Errorf("failed to decode response body: %s", err)
+				}
+				// verify result for seeBeforeJoin
+				if tc.wantResult.seeBeforeJoin {
+					found := false
+					for _, ev := range res.Chunk {
+						if ev.EventID == beforeJoinEv.EventID() {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Fatalf("expected to see event %s before joining but didn't: %+v", beforeJoinEv.EventID(), res.Chunk)
+					}
+				} else {
+					for _, ev := range res.Chunk {
+						if ev.EventID == beforeJoinEv.EventID() {
+							t.Fatalf("expected not to see event %s before joining: %+v", beforeJoinEv.EventID(), string(ev.Content))
+						}
+					}
+				}
+
+				// verify result for seeAfterInvite
+				if tc.wantResult.seeAfterInvite {
+					found := false
+					for _, ev := range res.Chunk {
+						if ev.EventID == afterInviteEv.EventID() {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Fatalf("expected to see event %s after invite but didn't: %+v", afterInviteEv.EventID(), res.Chunk)
+					}
+				} else {
+					for _, ev := range res.Chunk {
+						if ev.EventID == afterInviteEv.EventID() {
+							t.Fatalf("expected not to see event %s after invite: %+v", afterInviteEv.EventID(), string(ev.Content))
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input ...*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string

@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -47,7 +48,7 @@ type messagesReq struct {
 	filter           *gomatrixserverlib.RoomEventFilter
 }
 
-type messagesResp struct {
+type MessageResp struct {
 	Start       string                          `json:"start"`
 	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
 	End         string                          `json:"end"`
@@ -200,11 +201,25 @@ func OnIncomingMessagesRequest(
 		return jsonerror.InternalServerError()
 	}
 
+	// apply history_visibility filter
+	clientEventsNew := []gomatrixserverlib.ClientEvent{}
+	var stateForEvents internal.Visibility
+	stateForEvents, err = internal.GetStateForEvents(req.Context(), db, clientEvents, device.UserID)
+	if err != nil {
+		logrus.WithError(err).Error("internal.GetStateForEvents failed")
+		return jsonerror.InternalServerError()
+	}
+	for _, ev := range clientEvents {
+		if stateForEvents.Allowed(ev.EventID) {
+			clientEventsNew = append(clientEventsNew, ev)
+		}
+	}
+
 	// at least fetch the membership events for the users returned in chunk if LazyLoadMembers is set
 	state := []gomatrixserverlib.ClientEvent{}
 	if filter.LazyLoadMembers {
 		membershipToUser := make(map[string]*gomatrixserverlib.HeaderedEvent)
-		for _, evt := range clientEvents {
+		for _, evt := range clientEventsNew {
 			// Don't add membership events the client should already know about
 			if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, roomID, evt.Sender); cached {
 				continue
@@ -224,6 +239,8 @@ func OnIncomingMessagesRequest(
 		}
 	}
 
+	logrus.Debugf("Events after filtering: %d vs %d", len(clientEvents), len(clientEventsNew))
+
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"from":         from.String(),
 		"to":           to.String(),
@@ -233,8 +250,8 @@ func OnIncomingMessagesRequest(
 		"return_end":   end.String(),
 	}).Info("Responding")
 
-	res := messagesResp{
-		Chunk: clientEvents,
+	res := MessageResp{
+		Chunk: clientEventsNew,
 		Start: start.String(),
 		End:   end.String(),
 		State: state,
@@ -320,7 +337,6 @@ func (r *messagesReq) retrieveEvents() (
 		}
 		events = reversed(events)
 	}
-	events = r.filterHistoryVisible(events)
 	if len(events) == 0 {
 		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
 	}
@@ -328,89 +344,6 @@ func (r *messagesReq) retrieveEvents() (
 	// Convert all of the events into client events.
 	clientEvents = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll)
 	return clientEvents, start, end, err
-}
-
-func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
-	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
-	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
-	// which is equiv to history_visibility: joined
-	joinEventIndex := -1
-	for i, ev := range events {
-		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(r.device.UserID) {
-			membership, _ := ev.Membership()
-			if membership == "join" {
-				joinEventIndex = i
-				break
-			}
-		}
-	}
-
-	var result []*gomatrixserverlib.HeaderedEvent
-	var eventsToCheck []*gomatrixserverlib.HeaderedEvent
-	if joinEventIndex != -1 {
-		if r.backwardOrdering {
-			result = events[:joinEventIndex+1]
-			eventsToCheck = append(eventsToCheck, result[0])
-		} else {
-			result = events[joinEventIndex:]
-			eventsToCheck = append(eventsToCheck, result[len(result)-1])
-		}
-	} else {
-		eventsToCheck = []*gomatrixserverlib.HeaderedEvent{events[0], events[len(events)-1]}
-		result = events
-	}
-	// make sure the user was in the room for both the earliest and latest events, we need this because
-	// some backpagination results will not have the join event (e.g if they hit /messages at the join event itself)
-	wasJoined := true
-	for _, ev := range eventsToCheck {
-		var queryRes api.QueryStateAfterEventsResponse
-		err := r.rsAPI.QueryStateAfterEvents(r.ctx, &api.QueryStateAfterEventsRequest{
-			RoomID:       ev.RoomID(),
-			PrevEventIDs: ev.PrevEventIDs(),
-			StateToFetch: []gomatrixserverlib.StateKeyTuple{
-				{EventType: gomatrixserverlib.MRoomMember, StateKey: r.device.UserID},
-				{EventType: gomatrixserverlib.MRoomHistoryVisibility, StateKey: ""},
-			},
-		}, &queryRes)
-		if err != nil {
-			wasJoined = false
-			break
-		}
-		var hisVisEvent, membershipEvent *gomatrixserverlib.HeaderedEvent
-		for i := range queryRes.StateEvents {
-			switch queryRes.StateEvents[i].Type() {
-			case gomatrixserverlib.MRoomMember:
-				membershipEvent = queryRes.StateEvents[i]
-			case gomatrixserverlib.MRoomHistoryVisibility:
-				hisVisEvent = queryRes.StateEvents[i]
-			}
-		}
-		if hisVisEvent == nil {
-			return events // apply no filtering as it defaults to Shared.
-		}
-		hisVis, _ := hisVisEvent.HistoryVisibility()
-		if hisVis == "shared" || hisVis == "world_readable" {
-			return events // apply no filtering
-		}
-		if membershipEvent == nil {
-			wasJoined = false
-			break
-		}
-		membership, err := membershipEvent.Membership()
-		if err != nil {
-			wasJoined = false
-			break
-		}
-		if membership != "join" {
-			wasJoined = false
-			break
-		}
-	}
-	if !wasJoined {
-		util.GetLogger(r.ctx).WithField("num_events", len(events)).Warnf("%s was not joined to room during these events, omitting them", r.device.UserID)
-		return []*gomatrixserverlib.HeaderedEvent{}
-	}
-	return result
 }
 
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
