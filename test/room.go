@@ -37,10 +37,11 @@ var (
 )
 
 type Room struct {
-	ID      string
-	Version gomatrixserverlib.RoomVersion
-	preset  Preset
-	creator *User
+	ID         string
+	Version    gomatrixserverlib.RoomVersion
+	preset     Preset
+	visibility string
+	creator    *User
 
 	authEvents   gomatrixserverlib.AuthEvents
 	currentState map[string]*gomatrixserverlib.HeaderedEvent
@@ -101,6 +102,10 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 	case PresetPublicChat:
 		joinRule.JoinRule = "public"
 		hisVis.HistoryVisibility = "shared"
+	}
+
+	if r.visibility != "" {
+		hisVis.HistoryVisibility = r.visibility
 	}
 
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomCreate, map[string]interface{}{
@@ -239,6 +244,12 @@ func RoomPreset(p Preset) roomModifier {
 		default:
 			t.Errorf("invalid RoomPreset: %v", p)
 		}
+	}
+}
+
+func RoomHistoryVisibility(vis string) roomModifier {
+	return func(t *testing.T, r *Room) {
+		r.visibility = vis
 	}
 }
 
