@@ -56,6 +56,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	topology, err := NewSqliteTopologyTable(d.db)
+	if err != nil {
+		return err
+	}
 	events, err := NewSqliteEventsTable(d.db, &d.streamID)
 	if err != nil {
 		return err
@@ -69,10 +73,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		return err
 	}
 	peeks, err := NewSqlitePeeksTable(d.db, &d.streamID)
-	if err != nil {
-		return err
-	}
-	topology, err := NewSqliteTopologyTable(d.db)
 	if err != nil {
 		return err
 	}

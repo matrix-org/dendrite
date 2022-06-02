@@ -66,11 +66,15 @@ const selectMembershipCountSQL = "" +
 const selectHeroesSQL = "" +
 	"SELECT DISTINCT user_id FROM syncapi_memberships WHERE room_id = $1 AND user_id != $2 AND membership IN ($3) LIMIT 5"
 
+const selectMembershipBeforeSQL = "" +
+	"SELECT membership, topological_pos FROM syncapi_memberships WHERE room_id = $1 and user_id = $2 AND topological_pos <= $3 ORDER BY topological_pos DESC LIMIT 1"
+
 type membershipsStatements struct {
 	db                        *sql.DB
 	upsertMembershipStmt      *sql.Stmt
 	selectMembershipCountStmt *sql.Stmt
 	//selectHeroesStmt          *sql.Stmt - prepared at runtime due to variadic
+	selectMembershipForUserStmt *sql.Stmt
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -84,6 +88,7 @@ func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 	return s, sqlutil.StatementList{
 		{&s.upsertMembershipStmt, upsertMembershipSQL},
 		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
+		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
 		// {&s.selectHeroesStmt, selectHeroesSQL}, - prepared at runtime due to variadic
 	}.Prepare(db)
 }
@@ -147,4 +152,21 @@ func (s *membershipsStatements) SelectHeroes(
 		heroes = append(heroes, hero)
 	}
 	return heroes, rows.Err()
+}
+
+// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
+// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
+// string as the membership.
+func (s *membershipsStatements) SelectMembershipForUser(
+	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int,
+) (membership string, topologyPos int, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "leave", 0, nil
+		}
+		return "", 0, err
+	}
+	return membership, topologyPos, nil
 }

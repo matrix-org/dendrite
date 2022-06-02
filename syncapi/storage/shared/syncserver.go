@@ -227,7 +227,7 @@ func (d *Database) AddPeek(
 	return
 }
 
-// DeletePeeks tracks the fact that a user has stopped peeking from the specified
+// DeletePeek tracks the fact that a user has stopped peeking from the specified
 // device. If the peeks was successfully deleted this returns the stream ID it was
 // stored at. Returns an error if there was a problem communicating with the database.
 func (d *Database) DeletePeek(
@@ -557,7 +557,7 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	return err
 }
 
-// Retrieve the backward topology position, i.e. the position of the
+// GetBackwardTopologyPos retrieves the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
 func (d *Database) GetBackwardTopologyPos(
 	ctx context.Context,
@@ -668,7 +668,7 @@ func (d *Database) fetchMissingStateEvents(
 	return events, nil
 }
 
-// getStateDeltas returns the state deltas between fromPos and toPos,
+// GetStateDeltas returns the state deltas between fromPos and toPos,
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
@@ -806,7 +806,7 @@ func (d *Database) GetStateDeltas(
 	return deltas, joinedRoomIDs, nil
 }
 
-// getStateDeltasForFullStateSync is a variant of getStateDeltas used for /sync
+// GetStateDeltasForFullStateSync is a variant of getStateDeltas used for /sync
 // requests with full_state=true.
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
@@ -1033,37 +1033,45 @@ func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID s
 	return d.NotificationData.SelectUserUnreadCounts(ctx, userID, from, to)
 }
 
-func (s *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
+func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
 }
 
-func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
+func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
 }
-func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
-}
-
-func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
-	return s.Ignores.SelectIgnores(ctx, userID)
+func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
 
-func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
-	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
+func (d *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
+	return d.Ignores.SelectIgnores(ctx, userID)
 }
 
-func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
-	return s.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
+func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
+	return d.Ignores.UpsertIgnores(ctx, userID, ignores)
 }
 
-func (s *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceForUser(ctx, nil, userID)
+func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+	return d.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
 }
 
-func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceAfter(ctx, nil, after, filter)
+func (d *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
-	return s.Presence.GetMaxPresenceID(ctx, nil)
+func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceAfter(ctx, nil, after, filter)
+}
+
+func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return d.Presence.GetMaxPresenceID(ctx, nil)
+}
+
+func (d *Database) SelectTopologicalEvent(ctx context.Context, topologicalPosition int, eventType, roomID string) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
+	return d.OutputEvents.SelectTopologicalEvent(ctx, nil, topologicalPosition, eventType, roomID)
+}
+
+func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int) (membership string, topologicalPos int, err error) {
+	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
