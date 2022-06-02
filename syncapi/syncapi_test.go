@@ -14,7 +14,6 @@ import (
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/syncapi/routing"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
@@ -343,7 +342,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		AccessToken: "BOD_BEARER_TOKEN",
 		DisplayName: "BOB",
 	}
-	// check guest and normaler user accounts
+	// check guest and normal user accounts
 	for _, accType := range []userapi.AccountType{userapi.AccountTypeGuest, userapi.AccountTypeUser} {
 		testCases := []struct {
 			historyVisibility string
@@ -427,29 +426,15 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 					t.Logf("%s", w.Body.String())
 					t.Fatalf("got HTTP %d want %d", w.Code, 200)
 				}
-				var res routing.MessageResp
+				// We only care about the returned events at this point
+				var res struct {
+					Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+				}
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
 					t.Errorf("failed to decode response body: %s", err)
 				}
 
-				if tc.wantResult.seeWithoutJoin {
-					found := false
-					for _, ev := range res.Chunk {
-						if ev.EventID == beforeJoinEv.EventID() {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected to see event %s without joining but didn't: %+v", beforeJoinEv.EventID(), res.Chunk)
-					}
-				} else {
-					for _, ev := range res.Chunk {
-						if ev.EventID == beforeJoinEv.EventID() {
-							t.Fatalf("expected not to see event %s without joining: %+v", beforeJoinEv.EventID(), string(ev.Content))
-						}
-					}
-				}
+				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
 
 				// Create invite, a message, join the room and create another message.
 				msgs := toNATSMsgs(t, base, room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID)))
@@ -476,46 +461,32 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
 					t.Errorf("failed to decode response body: %s", err)
 				}
-				// verify result for seeBeforeJoin
-				if tc.wantResult.seeBeforeJoin {
-					found := false
-					for _, ev := range res.Chunk {
-						if ev.EventID == beforeJoinEv.EventID() {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected to see event %s before joining but didn't: %+v", beforeJoinEv.EventID(), res.Chunk)
-					}
-				} else {
-					for _, ev := range res.Chunk {
-						if ev.EventID == beforeJoinEv.EventID() {
-							t.Fatalf("expected not to see event %s before joining: %+v", beforeJoinEv.EventID(), string(ev.Content))
-						}
-					}
-				}
-
-				// verify result for seeAfterInvite
-				if tc.wantResult.seeAfterInvite {
-					found := false
-					for _, ev := range res.Chunk {
-						if ev.EventID == afterInviteEv.EventID() {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected to see event %s after invite but didn't: %+v", afterInviteEv.EventID(), res.Chunk)
-					}
-				} else {
-					for _, ev := range res.Chunk {
-						if ev.EventID == afterInviteEv.EventID() {
-							t.Fatalf("expected not to see event %s after invite: %+v", afterInviteEv.EventID(), string(ev.Content))
-						}
-					}
-				}
+				// verify results
+				verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
+				verifyEventVisible(t, tc.wantResult.seeAfterInvite, afterInviteEv, res.Chunk)
 			})
+		}
+	}
+}
+
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []gomatrixserverlib.ClientEvent) {
+	t.Helper()
+	if wantVisible {
+		found := false
+		for _, ev := range chunk {
+			if ev.EventID == wantVisibleEvent.EventID() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected to see event %s but didn't: %+v", wantVisibleEvent.EventID(), chunk)
+		}
+	} else {
+		for _, ev := range chunk {
+			if ev.EventID == wantVisibleEvent.EventID() {
+				t.Fatalf("expected not to see event %s: %+v", wantVisibleEvent.EventID(), string(ev.Content))
+			}
 		}
 	}
 }
