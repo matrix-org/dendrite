@@ -174,7 +174,7 @@ type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
 	SelectHeroes(ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string) (heroes []string, err error)
-	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int) (membership string, topologicalPos int, err error)
+	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
 }
 
 type NotificationData interface {

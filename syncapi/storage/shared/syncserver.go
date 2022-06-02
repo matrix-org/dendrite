@@ -1072,6 +1072,6 @@ func (d *Database) SelectTopologicalEvent(ctx context.Context, topologicalPositi
 	return d.OutputEvents.SelectTopologicalEvent(ctx, nil, topologicalPosition, eventType, roomID)
 }
 
-func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int) (membership string, topologicalPos int, err error) {
+func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }

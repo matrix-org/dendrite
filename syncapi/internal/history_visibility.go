@@ -120,7 +120,7 @@ func GetStateForEvents(ctx context.Context, db storage.Database, events []gomatr
 		}
 		// get the membership event
 		var membership string
-		membership, memberPos, err := db.SelectMembershipForUser(ctx, ev.RoomID, userID, int(pos.Depth))
+		membership, memberPos, err := db.SelectMembershipForUser(ctx, ev.RoomID, userID, int64(pos.Depth))
 		if err != nil {
 			return nil, err
 		}

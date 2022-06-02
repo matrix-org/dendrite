@@ -163,7 +163,7 @@ type Database interface {
 	// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 	// string as the membership.
-	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int) (membership string, topologicalPos int, err error)
+	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
 }
 
 type Presence interface {

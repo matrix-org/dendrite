@@ -142,7 +142,7 @@ func (s *membershipsStatements) SelectHeroes(
 // returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 // string as the membership.
 func (s *membershipsStatements) SelectMembershipForUser(
-	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int,
+	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64,
 ) (membership string, topologyPos int, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
 	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
