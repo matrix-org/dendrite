@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -65,8 +66,8 @@ const selectPositionInTopologySQL = "" +
 	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE event_id = $1"
 
-	// Select the max topological position for the room, then sort by stream position and take the highest,
-	// returning both topological and stream positions.
+// Select the max topological position for the room, then sort by stream position and take the highest,
+// returning both topological and stream positions.
 const selectMaxPositionInTopologySQL = "" +
 	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE topological_position=(" +
@@ -79,6 +80,13 @@ const selectStreamToTopologicalPositionAscSQL = "" +
 const selectStreamToTopologicalPositionDescSQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE room_id = $1 AND stream_position <= $2 ORDER BY topological_position DESC LIMIT 1;"
 
+const selectTopologicalEventSQL = "" +
+	"SELECT se.headered_event_json, st.topological_position, st.stream_position " +
+	" FROM syncapi_output_room_events_topology st " +
+	" JOIN syncapi_output_room_events se ON se.event_id = st.event_id " +
+	" WHERE st.room_id = $1 AND st.topological_position <= $2 AND se.type = $3 " +
+	" ORDER BY st.topological_position DESC LIMIT 1"
+
 type outputRoomEventsTopologyStatements struct {
 	insertEventInTopologyStmt                 *sql.Stmt
 	selectEventIDsInRangeASCStmt              *sql.Stmt
@@ -87,6 +95,7 @@ type outputRoomEventsTopologyStatements struct {
 	selectMaxPositionInTopologyStmt           *sql.Stmt
 	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
 	selectStreamToTopologicalPositionDescStmt *sql.Stmt
+	selectTopologicalEventStmt                *sql.Stmt
 }
 
 func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -95,28 +104,16 @@ func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.insertEventInTopologyStmt, err = db.Prepare(insertEventInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventIDsInRangeASCStmt, err = db.Prepare(selectEventIDsInRangeASCSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventIDsInRangeDESCStmt, err = db.Prepare(selectEventIDsInRangeDESCSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectStreamToTopologicalPositionAscStmt, err = db.Prepare(selectStreamToTopologicalPositionAscSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStreamToTopologicalPositionDescStmt, err = db.Prepare(selectStreamToTopologicalPositionDescSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertEventInTopologyStmt, insertEventInTopologySQL},
+		{&s.selectEventIDsInRangeASCStmt, selectEventIDsInRangeASCSQL},
+		{&s.selectEventIDsInRangeDESCStmt, selectEventIDsInRangeDESCSQL},
+		{&s.selectPositionInTopologyStmt, selectPositionInTopologySQL},
+		{&s.selectMaxPositionInTopologyStmt, selectMaxPositionInTopologySQL},
+		{&s.selectStreamToTopologicalPositionAscStmt, selectStreamToTopologicalPositionAscSQL},
+		{&s.selectStreamToTopologicalPositionDescStmt, selectStreamToTopologicalPositionDescSQL},
+		{&s.selectTopologicalEventStmt, selectTopologicalEventSQL},
+	}.Prepare(db)
 }
 
 // InsertEventInTopology inserts the given event in the room's topology, based
@@ -195,4 +192,30 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	err = s.selectMaxPositionInTopologyStmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
+}
+
+// SelectTopologicalEvent selects an event before and including the given position by eventType and roomID. Returns the found event and the topology token.
+// If not event was found, returns nil and sql.ErrNoRows.
+func (s *outputRoomEventsTopologyStatements) SelectTopologicalEvent(
+	ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string,
+) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
+	var (
+		eventBytes []byte
+		token      types.TopologyToken
+	)
+
+	err := sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalEventStmt).
+		QueryRowContext(ctx, roomID, topologicalPosition, eventType).
+		Scan(&eventBytes, &token.Depth, &token.PDUPosition)
+
+	if err != nil {
+		return nil, types.TopologyToken{}, err
+	}
+
+	var res *gomatrixserverlib.HeaderedEvent
+	if err = json.Unmarshal(eventBytes, &res); err != nil {
+		return nil, types.TopologyToken{}, err
+	}
+
+	return res, token, nil
 }

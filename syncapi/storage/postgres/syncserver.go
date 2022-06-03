@@ -46,10 +46,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err != nil {
 		return nil, err
 	}
-	topology, err := NewPostgresTopologyTable(d.db)
-	if err != nil {
-		return nil, err
-	}
 	events, err := NewPostgresEventsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -63,6 +59,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 		return nil, err
 	}
 	peeks, err := NewPostgresPeeksTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	topology, err := NewPostgresTopologyTable(d.db)
 	if err != nil {
 		return nil, err
 	}

@@ -29,19 +29,11 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 	var tab tables.Events
 	switch dbType {
 	case test.DBTypePostgres:
-		_, err = postgres.NewPostgresTopologyTable(db) // needed, since there is a join on it
-		if err != nil {
-			t.Fatalf("unable to create table: %s", err)
-		}
 		tab, err = postgres.NewPostgresEventsTable(db)
 	case test.DBTypeSQLite:
 		var stream sqlite3.StreamIDStatements
 		if err = stream.Prepare(db); err != nil {
 			t.Fatalf("failed to prepare stream stmts: %s", err)
-		}
-		_, err = sqlite3.NewSqliteTopologyTable(db) // needed, since there is a join on it
-		if err != nil {
-			t.Fatalf("unable to create table: %s", err)
 		}
 		tab, err = sqlite3.NewSqliteEventsTable(db, &stream)
 	}

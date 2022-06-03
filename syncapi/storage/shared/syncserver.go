@@ -1069,7 +1069,7 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 }
 
 func (d *Database) SelectTopologicalEvent(ctx context.Context, topologicalPosition int, eventType, roomID string) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
-	return d.OutputEvents.SelectTopologicalEvent(ctx, nil, topologicalPosition, eventType, roomID)
+	return d.Topology.SelectTopologicalEvent(ctx, nil, topologicalPosition, eventType, roomID)
 }
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {

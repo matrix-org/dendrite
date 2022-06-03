@@ -114,13 +114,6 @@ const selectContextAfterEventSQL = "" +
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
-const selectTopologicalEventSQL = "" +
-	"SELECT headered_event_json, topological_position, stream_position " +
-	" FROM syncapi_output_room_events_topology " +
-	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_output_room_events_topology.event_id " +
-	" WHERE syncapi_output_room_events_topology.room_id = $1 AND topological_position < $2 AND type = $3 " +
-	" ORDER BY topological_position DESC LIMIT 1"
-
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
 	streamIDStatements           *StreamIDStatements
@@ -131,7 +124,6 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt       *sql.Stmt
 	selectContextBeforeEventStmt *sql.Stmt
 	selectContextAfterEventStmt  *sql.Stmt
-	selectTopologicalEventStmt   *sql.Stmt
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Events, error) {
@@ -151,7 +143,6 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-		{&s.selectTopologicalEventStmt, selectTopologicalEventSQL},
 	}.Prepare(db)
 }
 
@@ -607,31 +598,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		evts = append(evts, evt)
 	}
 	return lastID, evts, rows.Err()
-}
-
-// SelectTopologicalEvent selects an event before and including the given position by eventType and roomID. Returns the found event and the topology token.
-// If not event was found, returns nil and sql.ErrNoRows.
-func (s *outputRoomEventsStatements) SelectTopologicalEvent(
-	ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string,
-) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
-	var (
-		eventBytes []byte
-		token      types.TopologyToken
-	)
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalEventStmt).
-		QueryRowContext(ctx, roomID, topologicalPosition, eventType).
-		Scan(&eventBytes, &token.Depth, &token.PDUPosition)
-
-	if err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	var res *gomatrixserverlib.HeaderedEvent
-	if err = json.Unmarshal(eventBytes, &res); err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	return res, token, nil
 }
 
 func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs []string, err error) {
