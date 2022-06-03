@@ -48,4 +48,7 @@ Notifications can be viewed with GET /notifications
 # More flakey
 
 If remote user leaves room we no longer receive device updates
-Guest users can join guest_access rooms
+
+# User sees their own presence in a sync
+
+# Inbound /v1/send_join rejects joins from other servers
