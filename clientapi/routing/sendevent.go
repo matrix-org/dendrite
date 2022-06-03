@@ -104,7 +104,7 @@ func SendEvent(
 	}
 
 	if stateKey != nil {
-		// If the existing/new state content are equal, return the existing event id -> making the request idempotent.
+		// If the existing/new state content are equal, return the existing event_id, making the request idempotent.
 		if resp := stateEqual(req.Context(), rsAPI, eventType, *stateKey, roomID, r); resp != nil {
 			return *resp
 		}
@@ -217,7 +217,7 @@ func SendEvent(
 }
 
 // stateEqual compares the new and the existing state event content. If they are equal, returns a *util.JSONResponse
-// with the existing event_ID -> making this an idempotent request.
+// with the existing event_id, making this an idempotent request.
 func stateEqual(ctx context.Context, rsAPI api.ClientRoomserverAPI, eventType, stateKey, roomID string, newContent map[string]interface{}) *util.JSONResponse {
 	stateRes := api.QueryCurrentStateResponse{}
 	tuple := gomatrixserverlib.StateKeyTuple{
@@ -231,8 +231,7 @@ func stateEqual(ctx context.Context, rsAPI api.ClientRoomserverAPI, eventType, s
 	if err != nil {
 		return nil
 	}
-	if len(stateRes.StateEvents) > 0 {
-		existingEvent := stateRes.StateEvents[tuple]
+	if existingEvent, ok := stateRes.StateEvents[tuple]; ok {
 		var existingContent map[string]interface{}
 		if err = json.Unmarshal(existingEvent.Content(), &existingContent); err != nil {
 			return nil
