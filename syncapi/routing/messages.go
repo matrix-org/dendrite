@@ -251,23 +251,6 @@ func OnIncomingMessagesRequest(
 	}
 }
 
-func (r *messagesReq) applyHistoryVisibilityFilter(
-	clientEvents []gomatrixserverlib.ClientEvent,
-	userID string,
-) ([]gomatrixserverlib.ClientEvent, error) {
-	clientEventsFiltered := []gomatrixserverlib.ClientEvent{}
-	stateForEvents, err := internal.GetStateForEvents(r.ctx, r.db, clientEvents, userID)
-	if err != nil {
-		return clientEventsFiltered, err
-	}
-	for _, ev := range clientEvents {
-		if stateForEvents.Allowed(ev.EventID) {
-			clientEventsFiltered = append(clientEventsFiltered, ev)
-		}
-	}
-	return clientEventsFiltered, nil
-}
-
 func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (forgotten bool, exists bool, err error) {
 	req := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
@@ -346,7 +329,7 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	// Convert all events into client events and filter them.
-	clientEvents, err = r.applyHistoryVisibilityFilter(gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll), r.device.UserID)
+	clientEvents, err = internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll), r.device.UserID)
 
 	return clientEvents, start, end, err
 }

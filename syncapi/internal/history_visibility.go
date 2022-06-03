@@ -84,8 +84,29 @@ func (v Visibility) Allowed(eventID string) (allowed bool) {
 	}
 }
 
-// GetStateForEvents returns a Visibility map containing the state before and at the given events.
-func GetStateForEvents(ctx context.Context, db storage.Database, events []gomatrixserverlib.ClientEvent, userID string) (Visibility, error) {
+// ApplyHistoryVisibilityFilter applies the room history visibility filter on gomatrixserverlib.ClientEvents.
+// Returns the filtered events and an error, if any.
+func ApplyHistoryVisibilityFilter(
+	ctx context.Context,
+	syncDB storage.Database,
+	clientEvents []gomatrixserverlib.ClientEvent,
+	userID string,
+) ([]gomatrixserverlib.ClientEvent, error) {
+	clientEventsFiltered := []gomatrixserverlib.ClientEvent{}
+	stateForEvents, err := getStateForEvents(ctx, syncDB, clientEvents, userID)
+	if err != nil {
+		return clientEventsFiltered, err
+	}
+	for _, ev := range clientEvents {
+		if stateForEvents.Allowed(ev.EventID) {
+			clientEventsFiltered = append(clientEventsFiltered, ev)
+		}
+	}
+	return clientEventsFiltered, nil
+}
+
+// getStateForEvents returns a Visibility map containing the state before and at the given events.
+func getStateForEvents(ctx context.Context, db storage.Database, events []gomatrixserverlib.ClientEvent, userID string) (Visibility, error) {
 	result := make(map[string]EventVisibility, len(events))
 	var (
 		membershipCurrent string
