@@ -737,3 +737,4 @@ Real users can sync from default guest_access rooms if joined
 Only see history_visibility changes on boundaries
 Current state appears in timeline in private history
 Current state appears in timeline in private history with many messages before
+Local users can peek into world_readable rooms by room ID
