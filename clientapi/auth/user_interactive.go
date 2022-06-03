@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
@@ -170,13 +171,29 @@ type Challenge struct {
 
 // Challenge returns an HTTP 401 with the supported flows for authenticating
 func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
+	paramsCopy := mapsutil.MapCopy(u.Params)
+	for key, element := range paramsCopy {
+		p := getAuthParams(element)
+		if p != nil {
+			// If an auth flow has params,
+			// send it as part of the challenge.
+			paramsCopy[key] = p
+
+			// If an auth flow generated a nonce, track it as well.
+			nonce := getAuthParamNonce(p)
+			if nonce != "" {
+				u.Sessions[sessionID] = append(u.Sessions[sessionID], nonce)
+			}
+		}
+	}
+
 	return &util.JSONResponse{
 		Code: 401,
 		JSON: Challenge{
 			Completed: u.Sessions[sessionID],
 			Flows:     u.Flows,
 			Session:   sessionID,
-			Params:    u.Params,
+			Params:    paramsCopy,
 		},
 	}
 }
@@ -261,4 +278,21 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	cleanup(ctx, nil)
 	// TODO: Check if there's more stages to go and return an error
 	return login, nil
+}
+
+func getAuthParams(params interface{}) interface{} {
+	v, ok := params.(config.AuthParams)
+	if ok {
+		p := v.GetParams()
+		return p
+	}
+	return nil
+}
+
+func getAuthParamNonce(p interface{}) string {
+	v, ok := p.(config.AuthParams)
+	if ok {
+		return v.GetNonce()
+	}
+	return ""
 }
