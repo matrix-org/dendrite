@@ -1,7 +1,10 @@
 # Changelog
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> main
 ## Dendrite 0.8.7 (2022-06-01)
 
 ### Features
@@ -14,6 +17,9 @@
 * Fixed destination queue performance issues as a result of missing indexes, which speeds up outbound federation considerably
 * A bug which could cause the `/register` endpoint to return HTTP 500 has been fixed
 
+<<<<<<< HEAD
+>>>>>>> main
+=======
 >>>>>>> main
 ## Dendrite 0.8.6 (2022-05-26)
 
