@@ -107,7 +107,7 @@ func Context(
 	}
 
 	// verify the user is allowed to see the context for this room/event
-	filteredEvent, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, device.UserID)
+	filteredEvent, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
@@ -131,12 +131,12 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsBefore, device.UserID)
+	eventsBeforeFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsBefore, nil, device.UserID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
 	}
-	eventsAfterFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsAfter, device.UserID)
+	eventsAfterFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsAfter, nil, device.UserID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()

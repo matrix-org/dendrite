@@ -735,3 +735,5 @@ Real users can sync from invited guest_access rooms if joined
 Real users can sync from joined guest_access rooms if joined
 Real users can sync from default guest_access rooms if joined
 Only see history_visibility changes on boundaries
+Current state appears in timeline in private history
+Current state appears in timeline in private history with many messages before

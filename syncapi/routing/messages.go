@@ -329,7 +329,7 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	// Apply room history visibility filter
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, events, r.device.UserID)
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, events, nil, r.device.UserID)
 
 	return gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll), start, end, err
 }

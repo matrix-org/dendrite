@@ -298,26 +298,50 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	switch delta.Membership {
 	case gomatrixserverlib.Join:
+		// We need to make sure we always include the latest states events, if they are in the timeline
+		stateEvents, err := p.DB.CurrentState(ctx, delta.RoomID, &gomatrixserverlib.StateFilter{Limit: 1000}, nil)
+		if err != nil {
+			logrus.WithError(err).Warnf("failed to get current state")
+		}
+		alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
+		for _, ev := range stateEvents {
+			alwaysIncludeIDs[ev.EventID()] = struct{}{}
+		}
+
+		events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, alwaysIncludeIDs, device.UserID)
+		if err != nil {
+			logrus.WithError(err).Error("unable to apply history visibility filter")
+			return r.From, err
+		}
 		jr := types.NewJoinResponse()
 		if hasMembershipChange {
 			p.addRoomSummary(ctx, jr, delta.RoomID, device.UserID, latestPosition)
 		}
 		jr.Timeline.PrevBatch = &prevBatch
-		events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, device.UserID)
-		if err != nil {
-			logrus.WithError(err).Error("unable to apply history visibility filter")
-			return r.From, err
-		}
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.RoomID] = *jr
 
 	case gomatrixserverlib.Peek:
+		// We need to make sure we always include the latest states events, if they are in the timeline
+		stateEvents, err := p.DB.CurrentState(ctx, delta.RoomID, &gomatrixserverlib.StateFilter{Limit: 1000}, nil)
+		if err != nil {
+			logrus.WithError(err).Warnf("failed to get current state")
+		}
+		alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
+		for _, ev := range stateEvents {
+			alwaysIncludeIDs[ev.EventID()] = struct{}{}
+		}
+		events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, alwaysIncludeIDs, device.UserID)
+		if err != nil {
+			logrus.WithError(err).Error("unable to apply history visibility filter")
+			return r.From, err
+		}
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = &prevBatch
-		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = limited
+		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
+		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Peek[delta.RoomID] = *jr
 
@@ -442,7 +466,15 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
-	events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, device.UserID)
+	fullStateEvents, err := p.DB.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: 1000}, nil)
+	if err != nil {
+		return
+	}
+	alwaysIncludeIDs := make(map[string]struct{}, len(fullStateEvents))
+	for _, ev := range stateEvents {
+		alwaysIncludeIDs[ev.EventID()] = struct{}{}
+	}
+	events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, alwaysIncludeIDs, device.UserID)
 	if err != nil {
 		return nil, err
 	}

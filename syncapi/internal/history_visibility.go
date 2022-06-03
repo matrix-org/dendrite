@@ -97,6 +97,7 @@ func ApplyHistoryVisibilityFilter(
 	ctx context.Context,
 	syncDB storage.Database,
 	events []*gomatrixserverlib.HeaderedEvent,
+	alwaysIncludeEventIDs map[string]struct{},
 	userID string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
@@ -105,8 +106,15 @@ func ApplyHistoryVisibilityFilter(
 		return eventsFiltered, err
 	}
 	for _, ev := range events {
+		// Always include specific state events for /sync responses
+		if alwaysIncludeEventIDs != nil {
+			if _, ok := alwaysIncludeEventIDs[ev.EventID()]; ok {
+				eventsFiltered = append(eventsFiltered, ev)
+				continue
+			}
+		}
 		// NOTSPEC: Always allow user to see their own membership events (spec contains more "rules")
-		if _, err = ev.Membership(); err == nil && ev.Sender() == userID {
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKey() != nil && *ev.StateKey() == userID {
 			eventsFiltered = append(eventsFiltered, ev)
 			continue
 		}
@@ -123,6 +131,7 @@ func ApplyHistoryVisibilityFilter(
 				}
 			}
 		}
+		// do the actual check
 		if stateForEvents.allowed(ev.EventID()) {
 			eventsFiltered = append(eventsFiltered, ev)
 		}
