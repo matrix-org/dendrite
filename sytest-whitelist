@@ -110,8 +110,6 @@ Newly joined room is included in an incremental sync
 User is offline if they set_presence=offline in their sync
 Changes to state are included in an incremental sync
 A change to displayname should appear in incremental /sync
-Current state appears in timeline in private history
-Current state appears in timeline in private history with many messages before
 Rooms a user is invited to appear in an initial sync
 Rooms a user is invited to appear in an incremental sync
 Sync can be polled for updates
@@ -459,7 +457,6 @@ After changing password, a different session no longer works by default
 Read markers appear in incremental v2 /sync
 Read markers appear in initial v2 /sync
 Read markers can be updated
-Local users can peek into world_readable rooms by room ID
 We can't peek into rooms with shared history_visibility
 We can't peek into rooms with invited history_visibility
 We can't peek into rooms with joined history_visibility
@@ -727,3 +724,14 @@ m.room.history_visibility == "default" allows/forbids appropriately for Guest us
 m.room.history_visibility == "shared" allows/forbids appropriately for Real users
 m.room.history_visibility == "invited" allows/forbids appropriately for Real users
 m.room.history_visibility == "default" allows/forbids appropriately for Real users
+Guest users can sync from world_readable guest_access rooms if joined
+Guest users can sync from shared guest_access rooms if joined
+Guest users can sync from invited guest_access rooms if joined
+Guest users can sync from joined guest_access rooms if joined
+Guest users can sync from default guest_access rooms if joined
+Real users can sync from world_readable guest_access rooms if joined
+Real users can sync from shared guest_access rooms if joined
+Real users can sync from invited guest_access rooms if joined
+Real users can sync from joined guest_access rooms if joined
+Real users can sync from default guest_access rooms if joined
+Only see history_visibility changes on boundaries
