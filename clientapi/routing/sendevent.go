@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -96,13 +97,20 @@ func SendEvent(
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
-	startedGeneratingEvent := time.Now()
-
 	var r map[string]interface{} // must be a JSON object
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
+
+	if stateKey != nil {
+		// If the existing/new state content are equal, return the existing event_id, making the request idempotent.
+		if resp := stateEqual(req.Context(), rsAPI, eventType, *stateKey, roomID, r); resp != nil {
+			return *resp
+		}
+	}
+
+	startedGeneratingEvent := time.Now()
 
 	// If we're sending a membership update, make sure to strip the authorised
 	// via key if it is present, otherwise other servers won't be able to auth
@@ -206,6 +214,37 @@ func SendEvent(
 	sendEventDuration.With(prometheus.Labels{"action": "submit"}).Observe(float64(timeToSubmitEvent.Milliseconds()))
 
 	return res
+}
+
+// stateEqual compares the new and the existing state event content. If they are equal, returns a *util.JSONResponse
+// with the existing event_id, making this an idempotent request.
+func stateEqual(ctx context.Context, rsAPI api.ClientRoomserverAPI, eventType, stateKey, roomID string, newContent map[string]interface{}) *util.JSONResponse {
+	stateRes := api.QueryCurrentStateResponse{}
+	tuple := gomatrixserverlib.StateKeyTuple{
+		EventType: eventType,
+		StateKey:  stateKey,
+	}
+	err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+	}, &stateRes)
+	if err != nil {
+		return nil
+	}
+	if existingEvent, ok := stateRes.StateEvents[tuple]; ok {
+		var existingContent map[string]interface{}
+		if err = json.Unmarshal(existingEvent.Content(), &existingContent); err != nil {
+			return nil
+		}
+		if reflect.DeepEqual(existingContent, newContent) {
+			return &util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: sendEventResponse{existingEvent.EventID()},
+			}
+		}
+
+	}
+	return nil
 }
 
 func generateSendEvent(

@@ -65,7 +65,7 @@ const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = FALSE"
 
 const selectNewNumericLocalpartSQL = "" +
-	"SELECT COALESCE(MAX(localpart::integer), 0) FROM account_accounts WHERE localpart ~ '^[0-9]*$'"
+	"SELECT COALESCE(MAX(localpart::bigint), 0) FROM account_accounts WHERE localpart ~ '^[0-9]{1,}$'"
 
 type accountsStatements struct {
 	insertAccountStmt             *sql.Stmt
