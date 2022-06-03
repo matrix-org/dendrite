@@ -10,9 +10,11 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"go.uber.org/atomic"
 )
@@ -301,8 +303,13 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 			p.addRoomSummary(ctx, jr, delta.RoomID, device.UserID, latestPosition)
 		}
 		jr.Timeline.PrevBatch = &prevBatch
-		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = limited
+		events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, device.UserID)
+		if err != nil {
+			logrus.WithError(err).Error("unable to apply history visibility filter")
+			return r.From, err
+		}
+		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
+		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.RoomID] = *jr
 
@@ -392,33 +399,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		return
 	}
 
-	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
-	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
-	// which is equiv to history_visibility: joined
-	joinEventIndex := -1
-	for i := len(recentStreamEvents) - 1; i >= 0; i-- {
-		ev := recentStreamEvents[i]
-		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(device.UserID) {
-			membership, _ := ev.Membership()
-			if membership == "join" {
-				joinEventIndex = i
-				if i > 0 {
-					// the create event happens before the first join, so we should cut it at that point instead
-					if recentStreamEvents[i-1].Type() == gomatrixserverlib.MRoomCreate && recentStreamEvents[i-1].StateKeyEquals("") {
-						joinEventIndex = i - 1
-						break
-					}
-				}
-				break
-			}
-		}
-	}
-	if joinEventIndex != -1 {
-		// cut all events earlier than the join (but not the join itself)
-		recentStreamEvents = recentStreamEvents[joinEventIndex:]
-		limited = false // so clients know not to try to backpaginate
-	}
-
 	// Work our way through the timeline events and pick out the event IDs
 	// of any state events that appear in the timeline. We'll specifically
 	// exclude them at the next step, so that we don't get duplicate state
@@ -462,6 +442,12 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
+	events, err := internal.ApplyHistoryVisibilityFilter(ctx, p.DB, recentEvents, device.UserID)
+	if err != nil {
+		return nil, err
+	}
+	limited = limited && len(events) == len(recentEvents)
+
 	if stateFilter.LazyLoadMembers {
 		if err != nil {
 			return nil, err
@@ -476,7 +462,8 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	}
 
 	jr.Timeline.PrevBatch = prevBatch
-	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+
+	jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
 	jr.Timeline.Limited = limited
 	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil

@@ -328,10 +328,10 @@ func (r *messagesReq) retrieveEvents() (
 		return []gomatrixserverlib.ClientEvent{}, *r.from, *r.to, nil
 	}
 
-	// Convert all events into client events and filter them.
-	clientEvents, err = internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatAll), r.device.UserID)
+	// Apply room history visibility filter
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, events, r.device.UserID)
 
-	return clientEvents, start, end, err
+	return gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll), start, end, err
 }
 
 func (r *messagesReq) getStartEnd(events []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {

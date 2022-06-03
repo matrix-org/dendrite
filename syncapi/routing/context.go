@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -93,24 +94,6 @@ func Context(
 		ContainsURL:             filter.ContainsURL,
 	}
 
-	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
-	state, _ := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
-	// verify the user is allowed to see the context for this room/event
-	for _, x := range state {
-		var hisVis string
-		hisVis, err = x.HistoryVisibility()
-		if err != nil {
-			continue
-		}
-		allowed := hisVis == gomatrixserverlib.WorldReadable || membershipRes.Membership == gomatrixserverlib.Join
-		if !allowed {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("User is not allowed to query context"),
-			}
-		}
-	}
-
 	id, requestedEvent, err := syncDB.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -121,6 +104,19 @@ func Context(
 		}
 		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
 		return jsonerror.InternalServerError()
+	}
+
+	// verify the user is allowed to see the context for this room/event
+	filteredEvent, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, device.UserID)
+	if err != nil {
+		logrus.WithError(err).Error("unable to apply history visibility filter")
+		return jsonerror.InternalServerError()
+	}
+	if len(filteredEvent) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("User is not allowed to query context"),
+		}
 	}
 
 	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, roomID, filter)
@@ -135,8 +131,26 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatAll)
-	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatAll)
+	eventsBeforeFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsBefore, device.UserID)
+	if err != nil {
+		logrus.WithError(err).Error("unable to apply history visibility filter")
+		return jsonerror.InternalServerError()
+	}
+	eventsAfterFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsAfter, device.UserID)
+	if err != nil {
+		logrus.WithError(err).Error("unable to apply history visibility filter")
+		return jsonerror.InternalServerError()
+	}
+
+	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
+	state, err := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
+	if err != nil {
+		logrus.WithError(err).Error("unable to fetch current room state")
+		return jsonerror.InternalServerError()
+	}
+
+	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBeforeFiltered, gomatrixserverlib.FormatAll)
+	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfterFiltered, gomatrixserverlib.FormatAll)
 	newState := applyLazyLoadMembers(device, filter, eventsAfterClient, eventsBeforeClient, state, lazyLoadCache)
 
 	response := ContextRespsonse{
