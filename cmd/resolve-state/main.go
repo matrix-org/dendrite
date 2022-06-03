@@ -4,9 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
@@ -57,25 +60,23 @@ func main() {
 		panic(err)
 	}
 
-	blockNIDs, err := roomserverDB.StateBlockNIDs(ctx, snapshotNIDs)
-	if err != nil {
-		panic(err)
-	}
+	stateres := state.NewStateResolution(roomserverDB, &types.RoomInfo{
+		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
+	})
 
-	var stateEntries []types.StateEntryList
-	for _, list := range blockNIDs {
-		entries, err2 := roomserverDB.StateEntries(ctx, list.StateBlockNIDs)
-		if err2 != nil {
-			panic(err2)
+	var stateEntries []types.StateEntry
+	for _, snapshotNID := range snapshotNIDs {
+		var entries []types.StateEntry
+		entries, err = stateres.LoadStateAtSnapshot(ctx, snapshotNID)
+		if err != nil {
+			panic(err)
 		}
 		stateEntries = append(stateEntries, entries...)
 	}
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
-		for _, e := range entry.StateEntries {
-			eventNIDs = append(eventNIDs, e.EventNID)
-		}
+		eventNIDs = append(eventNIDs, entry.EventNID)
 	}
 
 	fmt.Println("Fetching", len(eventNIDs), "state events")
@@ -110,7 +111,8 @@ func main() {
 	}
 
 	fmt.Println("Resolving state")
-	resolved, err := gomatrixserverlib.ResolveConflicts(
+	var resolved Events
+	resolved, err = gomatrixserverlib.ResolveConflicts(
 		gomatrixserverlib.RoomVersion(*roomVersion),
 		events,
 		authEvents,
@@ -120,6 +122,7 @@ func main() {
 	}
 
 	fmt.Println("Resolved state contains", len(resolved), "events")
+	sort.Sort(resolved)
 	filteringEventType := *filterType
 	count := 0
 	for _, event := range resolved {
@@ -134,4 +137,26 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("Returned", count, "state events after filtering")
+}
+
+type Events []*gomatrixserverlib.Event
+
+func (e Events) Len() int {
+	return len(e)
+}
+
+func (e Events) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+
+func (e Events) Less(i, j int) bool {
+	typeDelta := strings.Compare(e[i].Type(), e[j].Type())
+	if typeDelta < 0 {
+		return true
+	}
+	if typeDelta > 0 {
+		return false
+	}
+	stateKeyDelta := strings.Compare(*e[i].StateKey(), *e[j].StateKey())
+	return stateKeyDelta < 0
 }
