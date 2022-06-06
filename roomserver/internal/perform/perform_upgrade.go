@@ -111,7 +111,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// 5. Send the tombstone event to the old room
-	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent); pErr != nil {
+	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent, string(r.Cfg.Matrix.ServerName)); pErr != nil {
 		return "", pErr
 	}
 
@@ -182,7 +182,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 			return resErr
 		}
 	} else {
-		if resErr = r.sendHeaderedEvent(ctx, restrictedPowerLevelsHeadered); resErr != nil {
+		if resErr = r.sendHeaderedEvent(ctx, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers); resErr != nil {
 			return resErr
 		}
 	}
@@ -253,7 +253,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 			return resErr
 		}
 	} else {
-		if resErr = r.sendHeaderedEvent(ctx, emptyCanonicalAliasEvent); resErr != nil {
+		if resErr = r.sendHeaderedEvent(ctx, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers); resErr != nil {
 			return resErr
 		}
 	}
@@ -666,13 +666,14 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 func (r *Upgrader) sendHeaderedEvent(
 	ctx context.Context,
 	headeredEvent *gomatrixserverlib.HeaderedEvent,
+	sendAsServer string,
 ) *api.PerformError {
 	var inputs []api.InputRoomEvent
 	inputs = append(inputs, api.InputRoomEvent{
 		Kind:         api.KindNew,
 		Event:        headeredEvent,
 		Origin:       r.Cfg.Matrix.ServerName,
-		SendAsServer: api.DoNotSendToOtherServers,
+		SendAsServer: sendAsServer,
 	})
 	if err := api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
 		return &api.PerformError{
