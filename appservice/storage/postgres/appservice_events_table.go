@@ -45,12 +45,13 @@ const selectEventsByApplicationServiceIDSQL = "" +
 	"SELECT id, headered_event_json, txn_id " +
 	"FROM appservice_events WHERE as_id = $1 ORDER BY txn_id DESC, id ASC"
 
-const countEventsByApplicationServiceIDSQL = "" +
-	"SELECT COUNT(id) FROM appservice_events WHERE as_id = $1"
+const getLatestIdSQL = "" +
+	"SELECT id FROM appservice_events WHERE as_id = $1 ORDER BY id DESC LIMIT 1"
 
 const insertEventSQL = "" +
 	"INSERT INTO appservice_events(as_id, headered_event_json, txn_id) " +
-	"VALUES ($1, $2, $3)"
+	"VALUES ($1, $2, $3)" +
+	"RETURNING id"
 
 const updateTxnIDForEventsSQL = "" +
 	"UPDATE appservice_events SET txn_id = $1 WHERE as_id = $2 AND id <= $3"
@@ -66,7 +67,7 @@ const (
 
 type eventsStatements struct {
 	selectEventsByApplicationServiceIDStmt *sql.Stmt
-	countEventsByApplicationServiceIDStmt  *sql.Stmt
+	getLatestIdStmt                        *sql.Stmt
 	insertEventStmt                        *sql.Stmt
 	updateTxnIDForEventsStmt               *sql.Stmt
 	deleteEventsBeforeAndIncludingIDStmt   *sql.Stmt
@@ -81,7 +82,7 @@ func (s *eventsStatements) prepare(db *sql.DB) (err error) {
 	if s.selectEventsByApplicationServiceIDStmt, err = db.Prepare(selectEventsByApplicationServiceIDSQL); err != nil {
 		return
 	}
-	if s.countEventsByApplicationServiceIDStmt, err = db.Prepare(countEventsByApplicationServiceIDSQL); err != nil {
+	if s.getLatestIdStmt, err = db.Prepare(getLatestIdSQL); err != nil {
 		return
 	}
 	if s.insertEventStmt, err = db.Prepare(insertEventSQL); err != nil {
@@ -196,14 +197,12 @@ func retrieveEvents(eventRows *sql.Rows, limit int) (events []gomatrixserverlib.
 	return
 }
 
-// countEventsByApplicationServiceID inserts an event mapped to its corresponding application service
-// IDs into the db.
-func (s *eventsStatements) countEventsByApplicationServiceID(
+func (s *eventsStatements) getLatestId(
 	ctx context.Context,
 	appServiceID string,
 ) (int, error) {
 	var count int
-	err := s.countEventsByApplicationServiceIDStmt.QueryRowContext(ctx, appServiceID).Scan(&count)
+	err := s.getLatestIdStmt.QueryRowContext(ctx, appServiceID).Scan(&count)
 	if err != nil && err != sql.ErrNoRows {
 		return 0, err
 	}
@@ -217,19 +216,19 @@ func (s *eventsStatements) insertEvent(
 	ctx context.Context,
 	appServiceID string,
 	event *gomatrixserverlib.HeaderedEvent,
-) (err error) {
+) (id int, err error) {
 	// Convert event to JSON before inserting
-	eventJSON, err := json.Marshal(event)
+	var eventJSON []byte
+	eventJSON, err = json.Marshal(event)
 	if err != nil {
-		return err
+		return 0, err
 	}
-
-	_, err = s.insertEventStmt.ExecContext(
+	err = s.insertEventStmt.QueryRowContext(
 		ctx,
 		appServiceID,
 		eventJSON,
 		-1, // No transaction ID yet
-	)
+	).Scan(&id)
 	return
 }
 

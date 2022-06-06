@@ -44,7 +44,7 @@ var (
 func SetupTransactionWorkers(
 	client *http.Client,
 	appserviceDB storage.Database,
-	workerStates []types.ApplicationServiceWorkerState,
+	workerStates []*types.ApplicationServiceWorkerState,
 ) error {
 	// Create a worker that handles transmitting events to a single homeserver
 	for _, workerState := range workerStates {
@@ -58,31 +58,29 @@ func SetupTransactionWorkers(
 
 // worker is a goroutine that sends any queued events to the application service
 // it is given.
-func worker(client *http.Client, db storage.Database, ws types.ApplicationServiceWorkerState) {
+func worker(client *http.Client, db storage.Database, ws *types.ApplicationServiceWorkerState) {
 	log.WithFields(log.Fields{
 		"appservice": ws.AppService.ID,
 	}).Info("Starting application service")
 	ctx := context.Background()
 
 	// Initial check for any leftover events to send from last time
-	eventCount, err := db.CountEventsWithAppServiceID(ctx, ws.AppService.ID)
+	latestId, err := db.GetLatestId(ctx, ws.AppService.ID)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"appservice": ws.AppService.ID,
 		}).WithError(err).Fatal("appservice worker unable to read queued events from DB")
 		return
 	}
-	if eventCount > 0 {
-		ws.NotifyNewEvents()
-	}
-
+	ws.NotifyNewEvents(latestId)
+	id := 0
 	// Loop forever and keep waiting for more events to send
 	for {
 		// Wait for more events if we've sent all the events in the database
-		ws.WaitForNewEvents()
+		ws.WaitForNewEvents(id)
 
 		// Batch events up into a transaction
-		transactionJSON, txnID, maxEventID, eventsRemaining, err := createTransaction(ctx, db, ws.AppService.ID)
+		transactionJSON, txnID, maxEventID, _, err := createTransaction(ctx, db, ws.AppService.ID)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"appservice": ws.AppService.ID,
@@ -90,6 +88,10 @@ func worker(client *http.Client, db storage.Database, ws types.ApplicationServic
 
 			return
 		}
+		// Transactions have a maximum event size (or new events may arrive while
+		// transaction is processed by Application Service), so there may still be
+		// some events left over to send. We will keep sending if id < ws.latestID.
+		id = maxEventID
 
 		// Send the events off to the application service
 		// Backoff if the application service does not respond
@@ -99,18 +101,12 @@ func worker(client *http.Client, db storage.Database, ws types.ApplicationServic
 				"appservice": ws.AppService.ID,
 			}).WithError(err).Error("unable to send event")
 			// Backoff
-			backoff(&ws, err)
+			backoff(ws, err)
 			continue
 		}
 
 		// We sent successfully, hooray!
 		ws.Backoff = 0
-
-		// Transactions have a maximum event size, so there may still be some events
-		// left over to send. Keep sending until none are left
-		if !eventsRemaining {
-			ws.FinishEventProcessing()
-		}
 
 		// Remove sent events from the DB
 		err = db.RemoveEventsBeforeAndIncludingID(ctx, ws.AppService.ID, maxEventID)

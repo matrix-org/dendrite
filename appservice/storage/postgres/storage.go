@@ -62,7 +62,7 @@ func (d *Database) StoreEvent(
 	ctx context.Context,
 	appServiceID string,
 	event *gomatrixserverlib.HeaderedEvent,
-) error {
+) (int, error) {
 	return d.events.insertEvent(ctx, appServiceID, event)
 }
 
@@ -76,13 +76,16 @@ func (d *Database) GetEventsWithAppServiceID(
 	return d.events.selectEventsByApplicationServiceID(ctx, appServiceID, limit)
 }
 
-// CountEventsWithAppServiceID returns the number of events destined for an
-// application service given its ID.
-func (d *Database) CountEventsWithAppServiceID(
+// GetLatestId returns the latest incremental id associated with appservice.
+func (d *Database) GetLatestId(
 	ctx context.Context,
 	appServiceID string,
 ) (int, error) {
-	return d.events.countEventsByApplicationServiceID(ctx, appServiceID)
+	id, err := d.events.getLatestId(ctx, appServiceID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
 }
 
 // UpdateTxnIDForEvents takes in an application service ID and a
