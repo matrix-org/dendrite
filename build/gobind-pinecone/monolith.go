@@ -261,7 +261,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
-	if err := cfg.Derive(); err != nil {
+	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
 
@@ -342,11 +342,23 @@ func (m *DendriteMonolith) Start() {
 
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
-		m.logger.Fatal(m.httpServer.Serve(m.PineconeQUIC.Protocol("matrix")))
+
+		switch m.httpServer.Serve(m.PineconeQUIC.Protocol("matrix")) {
+		case net.ErrClosed, http.ErrServerClosed:
+			m.logger.Info("Stopped listening on ", cfg.Global.ServerName)
+		default:
+			m.logger.Fatal(err)
+		}
 	}()
 	go func() {
 		logrus.Info("Listening on ", m.listener.Addr())
-		logrus.Fatal(http.Serve(m.listener, httpRouter))
+
+		switch http.Serve(m.listener, httpRouter) {
+		case net.ErrClosed, http.ErrServerClosed:
+			m.logger.Info("Stopped listening on ", cfg.Global.ServerName)
+		default:
+			m.logger.Fatal(err)
+		}
 	}()
 }
 
