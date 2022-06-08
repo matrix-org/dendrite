@@ -466,6 +466,7 @@ func Test_SSO(t *testing.T) {
 		t.Log("Retrieve localpart for association")
 
 		gotLocalpart, err := db.GetLocalpartForSSO(ctx, ns, issuer, subject)
+		assert.NoError(t, err, "unable to get localpart for SSO subject")
 		assert.Equal(t, aliceLocalpart, gotLocalpart)
 
 		t.Log("Remove SSO association")
