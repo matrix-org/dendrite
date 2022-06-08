@@ -429,6 +429,41 @@ func Test_Pusher(t *testing.T) {
 	})
 }
 
+func Test_SSO(t *testing.T) {
+	alice := test.NewUser(t)
+	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	assert.NoError(t, err)
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		t.Log("Create SSO association")
+
+		ns := util.RandomString(8)
+		issuer := util.RandomString(8)
+		subject := util.RandomString(8)
+		err := db.SaveSSOAssociation(ctx, ns, issuer, subject, aliceLocalpart)
+		assert.NoError(t, err, "unable to save SSO association")
+
+		t.Log("Retrieve localpart for association")
+
+		gotLocalpart, err := db.GetLocalpartForSSO(ctx, ns, issuer, subject)
+		assert.Equal(t, aliceLocalpart, gotLocalpart)
+
+		t.Log("Remove SSO association")
+
+		err = db.RemoveSSOAssociation(ctx, ns, issuer, subject)
+		assert.NoError(t, err, "unexpected error")
+
+		t.Log("Verify the SSO association was removed")
+
+		gotLocalpart, err = db.GetLocalpartForSSO(ctx, ns, issuer, subject)
+		assert.NoError(t, err, "unable to get localpart for SSO subject")
+		assert.Equal(t, "", gotLocalpart)
+	})
+}
+
 func Test_ThreePID(t *testing.T) {
 	alice := test.NewUser(t)
 	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)

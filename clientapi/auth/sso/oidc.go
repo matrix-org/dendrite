@@ -27,6 +27,18 @@ import (
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
+// oidcDiscoveryMaxStaleness indicates how stale the Discovery
+// information is allowed to be. This will very rarely change, so
+// we're just making sure even a Dendrite that isn't restarting often
+// is picking this up eventually.
+const oidcDiscoveryMaxStaleness = 24 * time.Hour
+
+// An oidcIdentityProvider wraps OAuth2 with OpenID Connect Discovery.
+//
+// The SSO identifier is the "sub." A suggested UserID is grabbed from
+// "preferred_username", though this isn't commonly provided.
+//
+// See https://openid.net/specs/openid-connect-core-1_0.html and https://openid.net/specs/openid-connect-discovery-1_0.html.
 type oidcIdentityProvider struct {
 	*oauth2IdentityProvider
 
@@ -44,7 +56,7 @@ func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oid
 			scopes:              []string{"openid", "profile", "email"},
 			responseMimeType:    "application/json",
 			subPath:             "sub",
-			emailPath:           "email",
+			emailPath:           "email", // TODO: should this require email_verified?
 			displayNamePath:     "name",
 			suggestedUserIDPath: "preferred_username",
 		},
@@ -92,7 +104,7 @@ func (p *oidcIdentityProvider) get(ctx context.Context) (*oauth2IdentityProvider
 			return nil, nil, err
 		}
 
-		p.exp = now.Add(24 * time.Hour)
+		p.exp = now.Add(oidcDiscoveryMaxStaleness)
 		newProvider := *p.oauth2IdentityProvider
 		newProvider.authorizationURL = disc.AuthorizationEndpoint
 		newProvider.accessTokenURL = disc.TokenEndpoint

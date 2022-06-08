@@ -39,7 +39,7 @@ import (
 func SSORedirect(
 	req *http.Request,
 	idpID string,
-	auth *sso.Authenticator,
+	auth ssoAuthenticator,
 	cfg *config.SSO,
 ) util.JSONResponse {
 	ctx := req.Context()
@@ -58,11 +58,15 @@ func SSORedirect(
 			JSON: jsonerror.MissingArgument("redirectUrl parameter missing"),
 		}
 	}
-	_, err := url.Parse(redirectURL)
-	if err != nil {
+	if ru, err := url.Parse(redirectURL); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidArgumentValue("Invalid redirectURL: " + err.Error()),
+		}
+	} else if ru.Scheme == "" || ru.Host == "" || ru.Path == "" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidArgumentValue("Invalid redirectURL: " + redirectURL),
 		}
 	}
 
@@ -92,7 +96,7 @@ func SSORedirect(
 
 	resp := util.RedirectResponse(u)
 	cookie := &http.Cookie{
-		Name:     "oidc_nonce",
+		Name:     "sso_nonce",
 		Value:    nonce,
 		Path:     path.Dir(callbackURL.Path),
 		Expires:  time.Now().Add(10 * time.Minute),
@@ -113,7 +117,6 @@ func SSORedirect(
 func buildCallbackURLFromOther(cfg *config.SSO, req *http.Request, expectedPath string) (*url.URL, error) {
 	u := &url.URL{
 		Scheme: "https",
-		User:   req.URL.User,
 		Host:   req.Host,
 		Path:   req.URL.Path,
 	}
@@ -141,7 +144,7 @@ func buildCallbackURLFromOther(cfg *config.SSO, req *http.Request, expectedPath 
 func SSOCallback(
 	req *http.Request,
 	userAPI userAPIForSSO,
-	auth *sso.Authenticator,
+	auth ssoAuthenticator,
 	cfg *config.SSO,
 	serverName gomatrixserverlib.ServerName,
 ) util.JSONResponse {
@@ -163,7 +166,7 @@ func SSOCallback(
 		}
 	}
 
-	nonce, err := req.Cookie("oidc_nonce")
+	nonce, err := req.Cookie("sso_nonce")
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -246,12 +249,17 @@ func SSOCallback(
 	rquery.Set("loginToken", token.Token)
 	resp := util.RedirectResponse(finalRedirectURL.ResolveReference(&url.URL{RawQuery: rquery.Encode()}).String())
 	resp.Headers["Set-Cookie"] = (&http.Cookie{
-		Name:   "oidc_nonce",
+		Name:   "sso_nonce",
 		Value:  "",
 		MaxAge: -1,
 		Secure: true,
 	}).String()
 	return resp
+}
+
+type ssoAuthenticator interface {
+	AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce string) (string, error)
+	ProcessCallback(ctx context.Context, providerID, callbackURL, nonce string, query url.Values) (*sso.CallbackResult, error)
 }
 
 type userAPIForSSO interface {
@@ -273,21 +281,21 @@ func formatNonce(redirectURL string) string {
 // function. The URL is not integrity protected.
 func parseNonce(s string) (redirectURL *url.URL, _ error) {
 	if s == "" {
-		return nil, jsonerror.MissingArgument("empty OIDC nonce cookie")
+		return nil, jsonerror.MissingArgument("empty SSO nonce cookie")
 	}
 
 	ss := strings.Split(s, ".")
 	if len(ss) < 2 {
-		return nil, jsonerror.InvalidArgumentValue("malformed OIDC nonce cookie")
+		return nil, jsonerror.InvalidArgumentValue("malformed SSO nonce cookie")
 	}
 
 	urlbs, err := base64.RawURLEncoding.DecodeString(ss[1])
 	if err != nil {
-		return nil, jsonerror.InvalidArgumentValue("invalid redirect URL in OIDC nonce cookie")
+		return nil, jsonerror.InvalidArgumentValue("invalid redirect URL in SSO nonce cookie")
 	}
 	u, err := url.Parse(string(urlbs))
 	if err != nil {
-		return nil, jsonerror.InvalidArgumentValue("invalid redirect URL in OIDC nonce cookie: " + err.Error())
+		return nil, jsonerror.InvalidArgumentValue("invalid redirect URL in SSO nonce cookie: " + err.Error())
 	}
 
 	return u, nil
@@ -309,6 +317,9 @@ func verifySSOUserIdentifier(ctx context.Context, userAPI userAPIForSSO, id *sso
 	return res.Localpart, nil
 }
 
+// registerSSOAccount creates an account and associates the SSO
+// identifier with it. Note that SSO login account creation doesn't
+// use the standard registration API, but happens ad-hoc.
 func registerSSOAccount(ctx context.Context, userAPI userAPIForSSO, ssoID *sso.UserIdentifier, localpart string) (bool, util.JSONResponse) {
 	var accRes uapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(ctx, &uapi.PerformAccountCreationRequest{
@@ -347,6 +358,8 @@ func registerSSOAccount(ctx context.Context, userAPI userAPIForSSO, ssoID *sso.U
 	return true, util.JSONResponse{}
 }
 
+// createLoginToken produces a new login token, valid for the given
+// user.
 func createLoginToken(ctx context.Context, userAPI userAPIForSSO, userID string) (*uapi.LoginTokenMetadata, error) {
 	req := uapi.PerformLoginTokenCreationRequest{Data: uapi.LoginTokenData{UserID: userID}}
 	var resp uapi.PerformLoginTokenCreationResponse

@@ -62,7 +62,7 @@ global:
     local_part: "_server"
     display_name: "Server alerts"
     avatar: ""
-    room_name: "Server Alerts"	
+    room_name: "Server Alerts"
 app_service_api:
   internal_api:
     listen: http://localhost:7777
@@ -86,6 +86,22 @@ client_api:
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
+  login:
+    sso:
+      enabled: true
+      callback_url: http://example.com:8071/_matrix/v3/login/sso/callback
+      default_provider: github
+      providers:
+      - brand: github
+      - id: custom
+        name: "Custom Provider"
+        icon: "mxc://example.com/abc123"
+        type: oidc
+        oauth2:
+          client_id: aclientid
+          client_secret: aclientsecret
+        oidc:
+          discovery_url: http://auth.example.com/.well-known/openid-configuration
   turn:
     turn_user_lifetime: ""
     turn_uris: []

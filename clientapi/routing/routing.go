@@ -73,7 +73,7 @@ func Setup(
 	var ssoAuthenticator *sso.Authenticator
 	if cfg.Login.SSO.Enabled {
 		var err error
-		ssoAuthenticator, err = sso.NewAuthenticator(ctx, &cfg.Login.SSO)
+		ssoAuthenticator, err = sso.NewAuthenticator(&cfg.Login.SSO)
 		if err != nil {
 			logrus.WithError(err).Fatal("failed to create SSO authenticator")
 		}

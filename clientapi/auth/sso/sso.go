@@ -25,13 +25,19 @@ import (
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
+// maxHTTPTimeout is an upper bound on an HTTP request to an SSO
+// backend. The individual request context deadlines are also honored.
+const maxHTTPTimeout = 10 * time.Second
+
+// An Authenticator keeps a set of identity providers and dispatches
+// calls to one of them, based on configured ID.
 type Authenticator struct {
 	providers map[string]identityProvider
 }
 
-func NewAuthenticator(ctx context.Context, cfg *config.SSO) (*Authenticator, error) {
+func NewAuthenticator(cfg *config.SSO) (*Authenticator, error) {
 	hc := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: maxHTTPTimeout,
 		Transport: &http.Transport{
 			DisableKeepAlives: true,
 			Proxy:             http.ProxyFromEnvironment,
