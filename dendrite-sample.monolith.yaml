@@ -167,7 +167,7 @@ client_api:
     threshold: 5
     cooloff_ms: 500
     exempt_user_ids:
-    #  - @user:domain.com
+    #  - "@user:domain.com"
 
 # Configuration for the Federation API.
 federation_api:
