@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 type UserDirectoryResponse struct {
@@ -43,6 +42,7 @@ func SearchUserDirectory(
 	searchString string,
 	limit int,
 	federation *gomatrixserverlib.FederationClient,
+	localServerName gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	if limit < 10 {
 		limit = 10
@@ -65,14 +65,15 @@ func SearchUserDirectory(
 	}
 
 knownUsersLoop:
-	for userID, localUser := range knownUsersRes.Users {
+	for _, profile := range knownUsersRes.Users {
 		if len(results) == limit {
 			response.Limited = true
 			break
 		}
+		userID := profile.UserID
 		// get the full profile of the local user
 		localpart, serverName, _ := gomatrixserverlib.SplitID('@', userID)
-		if localUser {
+		if serverName == localServerName {
 			userReq := &userapi.QuerySearchProfilesRequest{
 				SearchString: localpart,
 				Limit:        limit,
@@ -96,6 +97,19 @@ knownUsersLoop:
 				}
 			}
 		} else {
+			// If the username already contains the search string, don't bother hitting federation
+			if strings.Contains(localpart, searchString) {
+				results[userID] = authtypes.FullyQualifiedProfile{
+					UserID:      userID,
+					DisplayName: profile.DisplayName,
+					AvatarURL:   profile.AvatarURL,
+				}
+				if len(results) == limit {
+					response.Limited = true
+					break knownUsersLoop
+				}
+			}
+			// TODO: We should probably cache/store this
 			profile, fedErr := federation.LookupProfile(ctx, serverName, userID, "")
 			if fedErr != nil {
 				if x, ok := fedErr.(gomatrix.HTTPError); ok {
@@ -104,23 +118,23 @@ knownUsersLoop:
 					}
 				}
 			}
-
-			results[userID] = authtypes.FullyQualifiedProfile{
-				UserID:      userID,
-				DisplayName: profile.DisplayName,
-				AvatarURL:   profile.AvatarURL,
+			if strings.Contains(profile.DisplayName, searchString) {
+				results[userID] = authtypes.FullyQualifiedProfile{
+					UserID:      userID,
+					DisplayName: profile.DisplayName,
+					AvatarURL:   profile.AvatarURL,
+				}
+				if len(results) == limit {
+					response.Limited = true
+					break knownUsersLoop
+				}
 			}
 		}
-		logrus.Debugf("userID: %s - searchString: %s; localUser: %v", userID, searchString, localUser)
-		//if strings.Contains(userID, searchString) {
-
-		//}
 	}
 
 	for _, result := range results {
 		response.Results = append(response.Results, result)
 	}
-	logrus.Debugf("Result: %+v", response.Results)
 
 	return util.JSONResponse{
 		Code: 200,

@@ -908,6 +908,7 @@ func Setup(
 				postContent.SearchString,
 				postContent.Limit,
 				federation,
+				cfg.Matrix.ServerName,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
