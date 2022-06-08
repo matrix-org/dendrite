@@ -26,7 +26,8 @@ import (
 )
 
 // maxHTTPTimeout is an upper bound on an HTTP request to an SSO
-// backend. The individual request context deadlines are also honored.
+// backend. The individual request context deadlines are also
+// honoured.
 const maxHTTPTimeout = 10 * time.Second
 
 // An Authenticator keeps a set of identity providers and dispatches

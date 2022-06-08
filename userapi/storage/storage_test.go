@@ -443,7 +443,7 @@ func Test_SSO(t *testing.T) {
 		ns := util.RandomString(8)
 		issuer := util.RandomString(8)
 		subject := util.RandomString(8)
-		err := db.SaveSSOAssociation(ctx, ns, issuer, subject, aliceLocalpart)
+		err = db.SaveSSOAssociation(ctx, ns, issuer, subject, aliceLocalpart)
 		assert.NoError(t, err, "unable to save SSO association")
 
 		t.Log("Retrieve localpart for association")
