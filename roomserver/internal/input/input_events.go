@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
@@ -74,6 +75,11 @@ func (r *Inputer) processRoomEvent(
 		return context.DeadlineExceeded
 	default:
 	}
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "processRoomEvent")
+	span.SetTag("room_id", input.Event.RoomID())
+	span.SetTag("event_id", input.Event.EventID())
+	defer span.Finish()
 
 	// Measure how long it takes to process this event.
 	started := time.Now()
@@ -411,6 +417,9 @@ func (r *Inputer) fetchAuthEvents(
 	known map[string]*types.Event,
 	servers []gomatrixserverlib.ServerName,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "fetchAuthEvents")
+	defer span.Finish()
+
 	unknown := map[string]struct{}{}
 	authEventIDs := event.AuthEventIDs()
 	if len(authEventIDs) == 0 {
@@ -526,6 +535,9 @@ func (r *Inputer) calculateAndSetState(
 	event *gomatrixserverlib.Event,
 	isRejected bool,
 ) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "calculateAndSetState")
+	defer span.Finish()
+
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
@@ -535,8 +547,6 @@ func (r *Inputer) calculateAndSetState(
 	roomState := state.NewStateResolution(updater, roomInfo)
 
 	if input.HasState {
-		stateAtEvent.Overwrite = true
-
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
@@ -549,8 +559,6 @@ func (r *Inputer) calculateAndSetState(
 			return fmt.Errorf("updater.AddState: %w", err)
 		}
 	} else {
-		stateAtEvent.Overwrite = false
-
 		// We haven't been told what the state at the event is so we need to calculate it from the prev_events
 		if stateAtEvent.BeforeStateSnapshotNID, err = roomState.CalculateAndStoreStateBeforeEvent(ctx, event, isRejected); err != nil {
 			return fmt.Errorf("roomState.CalculateAndStoreStateBeforeEvent: %w", err)
