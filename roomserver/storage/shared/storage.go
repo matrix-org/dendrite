@@ -832,13 +832,14 @@ func (d *Database) handleRedactions(
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to get powerlevels for room: %w", err)
 	}
-	redactPL := pl.Redact
+
 	redactUser := pl.UserLevel(redactionEvent.Sender())
-	// The power level of the redaction event’s sender is greater than or equal to the redact level.
-	userAllowed := redactUser >= redactPL
-	// The domain of the redaction event’s sender matches that of the original event’s sender.
-	originAllowed := redactedEvent.Origin() == redactionEvent.Origin()
-	if !originAllowed && !userAllowed {
+	switch {
+	case redactUser >= pl.Redact:
+		// The power level of the redaction event’s sender is greater than or equal to the redact level.
+	case redactedEvent.Origin() == redactionEvent.Origin() && redactedEvent.Sender() == redactionEvent.Sender():
+		// The domain of the redaction event’s sender matches that of the original event’s sender.
+	default:
 		return nil, "", nil
 	}
 
