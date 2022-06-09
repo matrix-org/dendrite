@@ -9,6 +9,7 @@ require (
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Microsoft/go-winio v0.5.1 // indirect
@@ -56,6 +57,7 @@ require (
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.12.2
 	github.com/sirupsen/logrus v1.8.1
+	github.com/spruceid/siwe-go v0.2.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.1
 	github.com/tidwall/gjson v1.14.1
@@ -78,42 +80,4 @@ require (
 	nhooyr.io/websocket v1.8.7
 )
 
-require (
-	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
-	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.1.2 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cheekybits/genny v1.0.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
-	github.com/klauspost/compress v1.14.4 // indirect
-	github.com/lucas-clemente/quic-go v0.26.0 // indirect
-	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
-	github.com/marten-seemann/qtls-go1-17 v0.1.1 // indirect
-	github.com/marten-seemann/qtls-go1-18 v0.1.1 // indirect
-	github.com/minio/highwayhash v1.0.2 // indirect
-	github.com/nats-io/jwt/v2 v2.2.1-0.20220330180145-442af02fd36a // indirect
-	github.com/nats-io/nkeys v0.3.0 // indirect
-	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/onsi/ginkgo v1.16.4 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.2.0 // indirect
-	github.com/prometheus/common v0.32.1 // indirect
-	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.0 // indirect
-	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
-	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
-	golang.org/x/tools v0.1.8-0.20211022200916-316ba0b74098 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	gopkg.in/macaroon.v2 v2.1.0 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-)
-
-go 1.17
+go 1.16

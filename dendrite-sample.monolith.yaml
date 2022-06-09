@@ -137,6 +137,16 @@ client_api:
   # of whether registration is otherwise disabled.
   registration_shared_secret: ""
 
+  # Disable password authentication.
+  password_authentication_disabled: false
+
+  # public key authentication
+  public_key_authentication:
+    ethereum:
+      enabled: false
+      version: 1
+      chain_ids: []
+
   # Whether to require reCAPTCHA for registration. If you have enabled registration
   # then this is HIGHLY RECOMMENDED to reduce the risk of your homeserver being used
   # for coordinated spam attacks.

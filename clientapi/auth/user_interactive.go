@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
@@ -170,13 +171,29 @@ type Challenge struct {
 
 // Challenge returns an HTTP 401 with the supported flows for authenticating
 func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
+	paramsCopy := mapsutil.MapCopy(u.Params)
+	for key, element := range paramsCopy {
+		p := getAuthParams(element)
+		if p != nil {
+			// If an auth flow has params,
+			// send it as part of the challenge.
+			paramsCopy[key] = p
+
+			// If an auth flow generated a nonce, track it as well.
+			nonce := getAuthParamNonce(p)
+			if nonce != "" {
+				u.Sessions[sessionID] = append(u.Sessions[sessionID], nonce)
+			}
+		}
+	}
+
 	return &util.JSONResponse{
 		Code: 401,
 		JSON: Challenge{
 			Completed: u.Sessions[sessionID],
 			Flows:     u.Flows,
 			Session:   sessionID,
-			Params:    u.Params,
+			Params:    paramsCopy,
 		},
 	}
 }
@@ -220,7 +237,7 @@ func (u *UserInteractive) ResponseWithChallenge(sessionID string, response inter
 // Verify returns an error/challenge response to send to the client, or nil if the user is authenticated.
 // `bodyBytes` is the HTTP request body which must contain an `auth` key.
 // Returns the login that was verified for additional checks if required.
-func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte) (*Login, *util.JSONResponse) {
+func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *api.Device) (*Login, *util.JSONResponse) {
 	// TODO: rate limit
 
 	// "A client should first make a request with no auth parameter. The homeserver returns an HTTP 401 response, with a JSON body"
@@ -261,4 +278,21 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte) (*Login,
 	cleanup(ctx, nil)
 	// TODO: Check if there's more stages to go and return an error
 	return login, nil
+}
+
+func getAuthParams(params interface{}) interface{} {
+	v, ok := params.(config.AuthParams)
+	if ok {
+		p := v.GetParams()
+		return p
+	}
+	return nil
+}
+
+func getAuthParamNonce(p interface{}) string {
+	v, ok := p.(config.AuthParams)
+	if ok {
+		return v.GetNonce()
+	}
+	return ""
 }
