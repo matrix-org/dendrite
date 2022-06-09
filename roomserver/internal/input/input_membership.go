@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/opentracing/opentracing-go"
 )
 
 // updateMembership updates the current membership and the invites for each
@@ -34,6 +35,9 @@ func (r *Inputer) updateMemberships(
 	updater *shared.RoomUpdater,
 	removed, added []types.StateEntry,
 ) ([]api.OutputEvent, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "updateMemberships")
+	defer span.Finish()
+
 	changes := membershipChanges(removed, added)
 	var eventNIDs []types.EventNID
 	for _, change := range changes {

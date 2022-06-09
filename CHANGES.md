@@ -1,5 +1,36 @@
 # Changelog
 
+## Dendrite 0.8.7 (2022-06-01)
+
+### Features
+
+* Support added for room version 10
+
+### Fixes
+
+* A number of state handling bugs have been fixed, which previously resulted in missing state events, unexpected state deletions, reverted memberships and unexpectedly rejected/soft-failed events in some specific cases
+* Fixed destination queue performance issues as a result of missing indexes, which speeds up outbound federation considerably
+* A bug which could cause the `/register` endpoint to return HTTP 500 has been fixed
+
+## Dendrite 0.8.6 (2022-05-26)
+
+### Features
+
+* Room versions 8 and 9 are now marked as stable
+* Dendrite can now assist remote users to join restricted rooms via `/make_join` and `/send_join`
+
+### Fixes
+
+* The sync API no longer returns immediately on `/sync` requests unnecessarily if it can be avoided
+* A race condition has been fixed in the sync API when updating presence via `/sync`
+* A race condition has been fixed sending E2EE keys to remote servers over federation when joining rooms
+* The `trusted_private_chat` preset should now grant power level 100 to all participant users, which should improve the user experience of direct messages
+* Invited users are now authed correctly in restricted rooms
+* The `join_authorised_by_users_server` key is now correctly stripped in restricted rooms when updating the membership event
+* Appservices should now receive invite events correctly
+* Device list updates should no longer contain optional fields with `null` values
+* The `/deactivate` endpoint has been fixed to no longer confuse Element with incorrect completed flows
+
 ## Dendrite 0.8.5 (2022-05-13)
 
 ### Features

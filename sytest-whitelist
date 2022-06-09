@@ -717,3 +717,6 @@ Unnamed room comes with a name summary
 Named room comes with just joined member count summary
 Room summary only has 5 heroes
 registration is idempotent, with username specified
+Setting state twice is idempotent
+Joining room twice is idempotent
+Inbound federation can return missing events for shared visibility

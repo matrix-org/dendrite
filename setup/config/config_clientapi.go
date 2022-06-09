@@ -134,6 +134,10 @@ type RateLimiting struct {
 	// The cooloff period in milliseconds after a request before the "slot"
 	// is freed again
 	CooloffMS int64 `yaml:"cooloff_ms"`
+
+	// A list of users that are exempt from rate limiting, i.e. if you want
+	// to run Mjolnir or other bots.
+	ExemptUserIDs []string `yaml:"exempt_user_ids"`
 }
 
 func (r *RateLimiting) Verify(configErrs *ConfigErrors) {

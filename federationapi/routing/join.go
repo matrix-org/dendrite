@@ -403,7 +403,7 @@ func SendJoin(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
-			Event:       &signed,
+			Event:       signed.JSON(),
 		},
 	}
 }
@@ -425,7 +425,7 @@ func checkRestrictedJoin(
 	roomVersion gomatrixserverlib.RoomVersion,
 	roomID, userID string,
 ) (*util.JSONResponse, string, error) {
-	if allowRestricted, err := roomVersion.AllowRestrictedJoinsInEventAuth(); err != nil {
+	if allowRestricted, err := roomVersion.MayAllowRestrictedJoinsInEventAuth(); err != nil {
 		return nil, "", err
 	} else if !allowRestricted {
 		return nil, "", nil
