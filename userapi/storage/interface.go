@@ -23,13 +23,14 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Profile interface {
-	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
+	GetProfileByLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (*authtypes.Profile, error)
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
-	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
-	SetDisplayName(ctx context.Context, localpart string, displayName string) error
+	SetAvatarURL(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, avatarURL string) error
+	SetDisplayName(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, displayName string) error
 }
 
 type Account interface {

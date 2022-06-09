@@ -43,9 +43,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		// preparing statements for columns that don't exist yet
 		return nil, err
 	}
+	if _, err = db.Exec(profilesSchema); err != nil {
+		return nil, err
+	}
 	deltas.LoadIsActive(m)
 	//deltas.LoadLastSeenTSIP(m)
 	deltas.LoadAddAccountType(m)
+	deltas.LoadProfilePrimaryKey(m, serverName)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}

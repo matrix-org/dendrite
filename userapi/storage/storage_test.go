@@ -22,6 +22,8 @@ import (
 
 const loginTokenLifetime = time.Minute
 
+const serverName = "example.com"
+
 var (
 	openIDLifetimeMS = time.Minute.Milliseconds()
 	ctx              = context.Background()
@@ -31,7 +33,7 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
+	}, serverName, bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
@@ -370,20 +372,21 @@ func Test_Profile(t *testing.T) {
 		_, err = db.CreateAccount(ctx, aliceLocalpart, "testing", "", api.AccountTypeAdmin)
 		assert.NoError(t, err, "failed to create account")
 
-		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart)
+		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart, serverName)
 		assert.NoError(t, err, "unable to get profile by localpart")
-		wantProfile := &authtypes.Profile{Localpart: aliceLocalpart}
+		wantProfile := &authtypes.Profile{Localpart: aliceLocalpart, ServerName: string(serverName)}
 		assert.Equal(t, wantProfile, gotProfile)
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
 		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		err = db.SetDisplayName(ctx, aliceLocalpart, "Alice")
+		wantProfile.ServerName = string(serverName)
+		err = db.SetDisplayName(ctx, aliceLocalpart, serverName, "Alice")
 		assert.NoError(t, err, "unable to set displayname")
-		err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		err = db.SetAvatarURL(ctx, aliceLocalpart, serverName, "mxc://aliceAvatar")
 		assert.NoError(t, err, "unable to set avatar url")
 		// verify profile
-		gotProfile, err = db.GetProfileByLocalpart(ctx, aliceLocalpart)
+		gotProfile, err = db.GetProfileByLocalpart(ctx, aliceLocalpart, serverName)
 		assert.NoError(t, err, "unable to get profile by localpart")
 		assert.Equal(t, wantProfile, gotProfile)
 
