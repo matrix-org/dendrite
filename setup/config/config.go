@@ -302,7 +302,7 @@ func (config *Dendrite) Derive() error {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
-	} else {
+	} else if !config.ClientAPI.PasswordAuthenticationDisabled {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
 	}
