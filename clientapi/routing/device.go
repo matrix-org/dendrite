@@ -198,7 +198,7 @@ func DeleteDeviceById(
 		sessionID = s
 	}
 
-	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes)
+	login, errRes := userInteractiveAuth.Verify(ctx, bodyBytes, device)
 	if errRes != nil {
 		switch data := errRes.JSON.(type) {
 		case auth.Challenge:
