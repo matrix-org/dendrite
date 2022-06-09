@@ -1,15 +1,13 @@
 package config
 
 import (
-	"encoding/base64"
 	"math/rand"
-	"regexp"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
-var nonceByteLength = 32
-var minNonceCharacterLength = 8
+var nonceLength = 32
 
 type AuthParams interface {
 	GetParams() interface{}
@@ -26,7 +24,7 @@ func (p EthereumAuthParams) GetParams() interface{} {
 	copyP := p
 	copyP.ChainIDs = make([]int, len(p.ChainIDs))
 	copy(copyP.ChainIDs, p.ChainIDs)
-	copyP.Nonce = newNonce()
+	copyP.Nonce = newNonce(nonceLength)
 	return copyP
 }
 
@@ -71,22 +69,15 @@ func (pk *publicKeyAuthentication) GetPublicKeyRegistrationParams() map[string]i
 	return params
 }
 
-var regexpNotAlphaDigit = regexp.MustCompile("[^a-zA-Z0-9]+")
+const lettersAndNumbers = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func newNonce() string {
-	nonce := ""
+func newNonce(n int) string {
+	nonce := make([]byte, n)
+	rand.Seed(time.Now().UnixNano())
 
-	for len(nonce) < minNonceCharacterLength {
-		b := make([]byte, nonceByteLength)
-		if _, err := rand.Read(b); err != nil {
-			return ""
-		}
-		// url-safe no padding
-		nonce = base64.RawURLEncoding.EncodeToString(b)
-		// Remove any non alphanumeric or digit to comply with spec EIP-4361
-		// nonce grammar.
-		nonce = regexpNotAlphaDigit.ReplaceAllString(nonce, "")
+	for i := range nonce {
+		nonce[i] = lettersAndNumbers[rand.Int63()%int64(len(lettersAndNumbers))]
 	}
 
-	return nonce
+	return string(nonce)
 }
