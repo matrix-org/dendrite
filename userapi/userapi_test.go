@@ -79,10 +79,10 @@ func TestQueryProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
-	if err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
+	if err := accountDB.SetAvatarURL(context.TODO(), "alice", serverName, aliceAvatarURL); err != nil {
 		t.Fatalf("failed to set avatar url: %s", err)
 	}
-	if err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
+	if err := accountDB.SetDisplayName(context.TODO(), "alice", serverName, aliceDisplayName); err != nil {
 		t.Fatalf("failed to set display name: %s", err)
 	}
 

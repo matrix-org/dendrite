@@ -72,7 +72,7 @@ func TestProfileTable(t *testing.T) {
 			t.Fatalf("failed to set avatar url: %v", err)
 		}
 
-		// Verify dummy1 on serverName2 is as expected, just to test the function
+		// Verify dummy1 on serverName2 is as expected
 		dummy1, err := tab.SelectProfileByLocalpart(ctx, "dummy1", serverName2)
 		if err != nil {
 			t.Fatalf("failed to query profile by localpart: %v", err)

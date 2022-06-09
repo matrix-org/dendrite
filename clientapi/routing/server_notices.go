@@ -293,8 +293,9 @@ func getSenderDevice(
 	// set the avatarurl for the user
 	res := &userapi.PerformSetAvatarURLResponse{}
 	if err = userAPI.SetAvatarURL(ctx, &userapi.PerformSetAvatarURLRequest{
-		Localpart: cfg.Matrix.ServerNotices.LocalPart,
-		AvatarURL: cfg.Matrix.ServerNotices.AvatarURL,
+		Localpart:  cfg.Matrix.ServerNotices.LocalPart,
+		ServerName: cfg.Matrix.ServerName,
+		AvatarURL:  cfg.Matrix.ServerNotices.AvatarURL,
 	}, res); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err

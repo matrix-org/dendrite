@@ -414,8 +414,9 @@ type QueryOpenIDTokenResponse struct {
 
 // Device represents a client's device (mobile, web, etc)
 type Device struct {
-	ID     string
-	UserID string
+	ID         string
+	UserID     string
+	ServerName gomatrixserverlib.ServerName
 	// The access_token granted to this device.
 	// This uniquely identifies the device from all other devices and clients.
 	AccessToken string
@@ -577,6 +578,7 @@ type Notification struct {
 
 type PerformSetAvatarURLRequest struct {
 	Localpart, AvatarURL string
+	ServerName           gomatrixserverlib.ServerName
 }
 type PerformSetAvatarURLResponse struct{}
 
@@ -603,6 +605,7 @@ type QueryAccountByPasswordResponse struct {
 
 type PerformUpdateDisplayNameRequest struct {
 	Localpart, DisplayName string
+	ServerName             gomatrixserverlib.ServerName
 }
 
 type QueryLocalpartForThreePIDRequest struct {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -85,6 +86,10 @@ func VerifyUserFromRequest(
 			JSON: jsonerror.UnknownToken("Unknown token"),
 		}
 	}
+
+	// At this point, we should be certain we've got an actual UserID
+	_, res.Device.ServerName, _ = gomatrixserverlib.SplitID('@', res.Device.UserID)
+
 	return res.Device, nil
 }
 

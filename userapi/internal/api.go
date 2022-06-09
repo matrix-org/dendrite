@@ -103,7 +103,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+	if err = a.DB.SetDisplayName(ctx, req.Localpart, a.ServerName, req.Localpart); err != nil {
 		return err
 	}
 
@@ -275,7 +275,7 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	if domain != a.ServerName {
 		return fmt.Errorf("cannot query profile of remote users: got %s want %s", domain, a.ServerName)
 	}
-	prof, err := a.DB.GetProfileByLocalpart(ctx, local)
+	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil
@@ -770,7 +770,7 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 }
 
 func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
-	return a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	return a.DB.SetAvatarURL(ctx, req.Localpart, req.ServerName, req.AvatarURL)
 }
 
 func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.QueryNumericLocalpartResponse) error {
@@ -803,7 +803,7 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 }
 
 func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, _ *struct{}) error {
-	return a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+	return a.DB.SetDisplayName(ctx, req.Localpart, req.ServerName, req.DisplayName)
 }
 
 func (a *UserInternalAPI) QueryLocalpartForThreePID(ctx context.Context, req *api.QueryLocalpartForThreePIDRequest, res *api.QueryLocalpartForThreePIDResponse) error {

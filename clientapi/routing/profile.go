@@ -142,8 +142,9 @@ func SetAvatarURL(
 
 	setRes := &userapi.PerformSetAvatarURLResponse{}
 	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
-		Localpart: localpart,
-		AvatarURL: r.AvatarURL,
+		Localpart:  localpart,
+		ServerName: device.ServerName,
+		AvatarURL:  r.AvatarURL,
 	}, setRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return jsonerror.InternalServerError()
@@ -271,6 +272,7 @@ func SetDisplayName(
 
 	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
 		Localpart:   localpart,
+		ServerName:  device.ServerName,
 		DisplayName: r.DisplayName,
 	}, &struct{}{})
 	if err != nil {
