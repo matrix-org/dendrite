@@ -17,6 +17,11 @@ var (
 	serverName = gomatrixserverlib.ServerName("example.com")
 	// space separated localpart+password -> account
 	lookup = make(map[string]*api.Account)
+	device = &api.Device{
+		AccessToken: "flibble",
+		DisplayName: "My Device",
+		ID:          "device_id_goes_here",
+	}
 )
 
 type fakeAccountDatabase struct {
@@ -55,7 +60,7 @@ func setup() *UserInteractive {
 func TestUserInteractiveChallenge(t *testing.T) {
 	uia := setup()
 	// no auth key results in a challenge
-	_, errRes := uia.Verify(ctx, []byte(`{}`))
+	_, errRes := uia.Verify(ctx, []byte(`{}`), device)
 	if errRes == nil {
 		t.Fatalf("Verify succeeded with {} but expected failure")
 	}
@@ -95,7 +100,7 @@ func TestUserInteractivePasswordLogin(t *testing.T) {
 		}`),
 	}
 	for _, tc := range testCases {
-		_, errRes := uia.Verify(ctx, tc)
+		_, errRes := uia.Verify(ctx, tc, device)
 		if errRes != nil {
 			t.Errorf("Verify failed but expected success for request: %s - got %+v", string(tc), errRes)
 		}
@@ -176,7 +181,7 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		_, errRes := uia.Verify(ctx, tc.body)
+		_, errRes := uia.Verify(ctx, tc.body, device)
 		if errRes == nil {
 			t.Errorf("Verify succeeded but expected failure for request: %s", string(tc.body))
 			continue
@@ -209,7 +214,7 @@ func TestUserInteractive_AddCompletedStage(t *testing.T) {
 	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, resp := u.Verify(ctx, []byte("{}"))
+			_, resp := u.Verify(ctx, []byte("{}"), nil)
 			challenge, ok := resp.JSON.(Challenge)
 			if !ok {
 				t.Fatalf("expected a Challenge, got %T", resp.JSON)

@@ -68,6 +68,13 @@ func handlePublicKeyRegistration(
 		return false, "", nil
 	}
 
+	if _, ok := sessions.sessions[authHandler.GetSession()]; !ok {
+		return false, "", &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.Unknown("the session ID is missing or unknown."),
+		}
+	}
+
 	isCompleted, jerr := authHandler.ValidateLoginResponse()
 	if jerr != nil {
 		return false, "", &util.JSONResponse{
