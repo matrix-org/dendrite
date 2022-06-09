@@ -2,6 +2,7 @@ package config
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
@@ -72,6 +73,7 @@ const lettersAndNumbers = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 
 func newNonce(n int) string {
 	nonce := make([]byte, n)
+	rand.Seed(time.Now().UnixNano())
 
 	for i := range nonce {
 		nonce[i] = lettersAndNumbers[rand.Int63()%int64(len(lettersAndNumbers))]
