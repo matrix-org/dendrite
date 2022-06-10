@@ -29,7 +29,7 @@ level=warning msg="IMPORTANT: Process file descriptor limit is currently 1024, i
 UNIX systems have two limits: a hard limit and a soft limit. You can view the soft limit
 by running `ulimit -Sn` and the hard limit with `ulimit -Hn`:
 
-```
+```bash
 $ ulimit -Hn
 1048576
 
@@ -39,7 +39,7 @@ $ ulimit -Sn
 
 Increase the soft limit before starting Dendrite:
 
-```
+```bash
 ulimit -Sn 65535
 ```
 
@@ -55,7 +55,7 @@ place on your DNS resolver. This may also speed up outbound federation.
 
 Consider enabling the DNS cache by modifying the `global` section of your configuration file:
 
-```
+```yaml
   dns_cache:
     enabled: true
     cache_size: 4096
