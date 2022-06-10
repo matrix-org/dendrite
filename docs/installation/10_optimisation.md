@@ -1,15 +1,15 @@
 ---
-title: Next steps
+title: Optimise your installation
 parent: Installation
 has_toc: true
 nav_order: 10
-permalink: /installation/start/nextsteps
+permalink: /installation/start/optimisation
 ---
 
-# Next steps
+# Optimise your installation
 
 Now that you have Dendrite running, the following tweaks will improve the reliability
-of your installation.
+and performance of your installation.
 
 ## File descriptor limit
 
