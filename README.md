@@ -69,8 +69,9 @@ $ ./bin/generate-keys --private-key matrix_key.pem
 # needed for Matrix federation/clients to work properly!)
 $ ./bin/generate-keys --tls-cert server.crt --tls-key server.key
 
-# Copy and modify the config file - you'll need to set a server name and paths to the keys
-# at the very least, along with setting up the database connection strings.
+# Copy and modify the config file (samples are in docs/dendrite) - you'll
+# need to set a server name and paths to the keys at the very least, along
+# with setting up the database connection strings.
 $ cp dendrite-sample.monolith.yaml dendrite.yaml
 
 # Build and run the server:
