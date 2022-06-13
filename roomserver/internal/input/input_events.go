@@ -296,58 +296,18 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Get the state before the event so that we can work out if the event was
-	// allowed at the time. Don't bother doing this if the event is already
-	// rejected since it's just wasting CPU time.
+	// allowed at the time, and also to get the history visibility. We won't
+	// bother doing this if the event was already rejected as it just ends up
+	// burning CPU time.
+	historyVisibility := "joined" // Default to restrictive.
 	if rejectionErr == nil {
-		var stateBeforeEvent []*gomatrixserverlib.Event
-		if input.HasState {
-			// If we're overriding the state then we need to go and retrieve
-			// them from the database. It's a hard error if they are missing.
-			stateEvents, err := r.DB.EventsFromIDs(ctx, input.StateEventIDs)
-			if err != nil {
-				return fmt.Errorf("r.DB.EventsFromIDs: %w", err)
-			}
-			stateBeforeEvent = make([]*gomatrixserverlib.Event, 0, len(stateEvents))
-			for _, entry := range stateEvents {
-				stateBeforeEvent = append(stateBeforeEvent, entry.Event)
-			}
-		} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) > 0 {
-			// For all non-create events, there must be prev events, so we'll
-			// ask the query API for the relevant tuples needed for auth.
-			tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
-			stateBeforeReq := &api.QueryStateAfterEventsRequest{
-				RoomID:       event.RoomID(),
-				PrevEventIDs: event.PrevEventIDs(),
-				StateToFetch: tuplesNeeded,
-			}
-			stateBeforeRes := &api.QueryStateAfterEventsResponse{}
-			if err := r.Queryer.QueryStateAfterEvents(ctx, stateBeforeReq, stateBeforeRes); err != nil {
-				return fmt.Errorf("r.Queryer.QueryStateAfterEvents: %w", err)
-			}
-			switch {
-			case !stateBeforeRes.RoomExists:
-				rejectionErr = fmt.Errorf("room %q does not exist", event.RoomID())
-				isRejected = true
-			case !stateBeforeRes.PrevEventsExist:
-				rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
-				isRejected = true
-			default:
-				stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
-			}
-		} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) == 0 {
-			// Non-create events that don't have any prev event IDs are
-			// impossible in theory, so reject them.
-			rejectionErr = fmt.Errorf("event %q should have prev events", event.EventID())
-			isRejected = true
+		var err error
+		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
+		if err != nil {
+			return fmt.Errorf("r.processStateBefore: %w", err)
 		}
-		if rejectionErr == nil {
-			// If we haven't rejected the event for some other reason by now,
-			// see whether the event is allowed against the state at the time.
-			stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
-			if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
-				isRejected = true
-				logger.WithError(rejectionErr).Warnf("Event %s not allowed at the time of the prev events", event.EventID())
-			}
+		if rejectionErr != nil {
+			isRejected = true
 		}
 	}
 
@@ -416,6 +376,7 @@ func (r *Inputer) processRoomEvent(
 			input.SendAsServer,  // send as server
 			input.TransactionID, // transaction ID
 			input.HasState,      // rewrites state?
+			historyVisibility,   // the history visibility
 		); err != nil {
 			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
@@ -424,7 +385,8 @@ func (r *Inputer) processRoomEvent(
 			{
 				Type: api.OutputTypeOldRoomEvent,
 				OldRoomEvent: &api.OutputOldRoomEvent{
-					Event: headered,
+					Event:             headered,
+					HistoryVisibility: historyVisibility,
 				},
 			},
 		})
@@ -456,6 +418,94 @@ func (r *Inputer) processRoomEvent(
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
 	return nil
+}
+
+// processStateBefore works out what the state is before the event and
+// then checks the event auths against the state at the time. It also
+// tries to determine what the history visibility was of the event at
+// the time, so that it can be sent in the output event to downstream
+// components.
+// nolint:nakedret
+func (r *Inputer) processStateBefore(
+	ctx context.Context,
+	input *api.InputRoomEvent,
+	missingPrev bool,
+) (historyVisibility string, rejectionErr error, err error) {
+	historyVisibility = "joined" // Default to restrictive.
+	event := input.Event.Unwrap()
+	var stateBeforeEvent []*gomatrixserverlib.Event
+	if input.HasState {
+		// If we're overriding the state then we need to go and retrieve
+		// them from the database. It's a hard error if they are missing.
+		stateEvents, err := r.DB.EventsFromIDs(ctx, input.StateEventIDs)
+		if err != nil {
+			return "", nil, fmt.Errorf("r.DB.EventsFromIDs: %w", err)
+		}
+		stateBeforeEvent = make([]*gomatrixserverlib.Event, 0, len(stateEvents))
+		for _, entry := range stateEvents {
+			stateBeforeEvent = append(stateBeforeEvent, entry.Event)
+		}
+	} else if missingPrev {
+		// If we're missing prev events and still failed to fetch them
+		// before then we're stuck.
+		rejectionErr = fmt.Errorf("event %q should have prev events", event.EventID())
+		return
+	} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) > 0 {
+		// For all non-create events, there must be prev events, so we'll
+		// ask the query API for the relevant tuples needed for auth. We
+		// will include the history visibility here even though we don't
+		// actually need it for auth, because we want to send it in the
+		// output events.
+		tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
+		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
+			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			StateKey:  "",
+		})
+		stateBeforeReq := &api.QueryStateAfterEventsRequest{
+			RoomID:       event.RoomID(),
+			PrevEventIDs: event.PrevEventIDs(),
+			StateToFetch: tuplesNeeded,
+		}
+		stateBeforeRes := &api.QueryStateAfterEventsResponse{}
+		if err := r.Queryer.QueryStateAfterEvents(ctx, stateBeforeReq, stateBeforeRes); err != nil {
+			return "", nil, fmt.Errorf("r.Queryer.QueryStateAfterEvents: %w", err)
+		}
+		switch {
+		case !stateBeforeRes.RoomExists:
+			rejectionErr = fmt.Errorf("room %q does not exist", event.RoomID())
+			return
+		case !stateBeforeRes.PrevEventsExist:
+			rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
+			return
+		default:
+			stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
+		}
+	} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) == 0 {
+		// Non-create events that don't have any prev event IDs are
+		// impossible in theory, so reject them.
+		rejectionErr = fmt.Errorf("event %q should have prev events", event.EventID())
+		return
+	}
+	if rejectionErr == nil {
+		// If we haven't rejected the event for some other reason by now,
+		// see whether the event is allowed against the state at the time.
+		stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
+		if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
+			return
+		}
+	}
+	// Work out what the history visibility was at the time of the
+	// event.
+	for _, event := range stateBeforeEvent {
+		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
+			continue
+		}
+		if hisVis, err := event.HistoryVisibility(); err == nil {
+			historyVisibility = hisVis
+			break
+		}
+	}
+	return
 }
 
 // fetchAuthEvents will check to see if any of the
