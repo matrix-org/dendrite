@@ -17,7 +17,7 @@ RUN --mount=target=. \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -o /out/ ./cmd/...
 
 # dendrite base image; mainly creates a user and switches to it
-FROM alpine:3.15 AS dendrite-base
+FROM alpine:3.16 AS dendrite-base
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
@@ -26,7 +26,7 @@ USER dendrite
 WORKDIR /home/dendrite
 
 # polylith image, only contains the polylith binary
-FROM dendrite-base AS image-polylith
+FROM dendrite-base AS polylith
 LABEL org.opencontainers.image.title="Dendrite (Polylith)"
 
 COPY --from=build /out/dendrite-polylith-multi /usr/bin/
@@ -34,7 +34,7 @@ COPY --from=build /out/dendrite-polylith-multi /usr/bin/
 ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
 
 # monolith image
-FROM dendrite-base AS image-monolith
+FROM dendrite-base AS monolith
 LABEL org.opencontainers.image.title="Dendrite (Monolith)"
 
 COPY --from=build /out/create-account /usr/bin/create-account
@@ -46,7 +46,7 @@ ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
 EXPOSE 8008 8448
 
 # complement image
-FROM base AS image-complement
+FROM base AS complement
 RUN apk add --no-cache sqlite openssl ca-certificates
 COPY --from=build /out/* /usr/bin/
 RUN rm /usr/bin/dendrite-polylith-multi
@@ -66,4 +66,4 @@ EXPOSE 8008 8448
 CMD /usr/bin/generate-keys --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /ca/ca.crt --tls-authority-key /ca/ca.key && \
  /usr/bin/generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
  cp /ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
- /usr/bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+ /usr/bin/dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
