@@ -299,7 +299,7 @@ func (r *Inputer) processRoomEvent(
 	// allowed at the time, and also to get the history visibility. We won't
 	// bother doing this if the event was already rejected as it just ends up
 	// burning CPU time.
-	historyVisibility := "joined" // Default to restrictive.
+	historyVisibility := gomatrixserverlib.HistoryVisibilityJoined // Default to restrictive.
 	if rejectionErr == nil && !isRejected && !softfail {
 		var err error
 		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
@@ -376,7 +376,7 @@ func (r *Inputer) processRoomEvent(
 			input.SendAsServer,  // send as server
 			input.TransactionID, // transaction ID
 			input.HasState,      // rewrites state?
-			historyVisibility,   // the history visibility
+			historyVisibility,   // the history visibility before the event
 		); err != nil {
 			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
@@ -430,11 +430,17 @@ func (r *Inputer) processStateBefore(
 	ctx context.Context,
 	input *api.InputRoomEvent,
 	missingPrev bool,
-) (historyVisibility string, rejectionErr error, err error) {
-	historyVisibility = "joined" // Default to restrictive.
+) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
+	historyVisibility = gomatrixserverlib.HistoryVisibilityJoined // Default to restrictive.
 	event := input.Event.Unwrap()
+	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
 	var stateBeforeEvent []*gomatrixserverlib.Event
-	if input.HasState {
+	switch {
+	case isCreateEvent:
+		// There's no state before a create event so there is nothing
+		// else to do.
+		return
+	case input.HasState:
 		// If we're overriding the state then we need to go and retrieve
 		// them from the database. It's a hard error if they are missing.
 		stateEvents, err := r.DB.EventsFromIDs(ctx, input.StateEventIDs)
@@ -445,12 +451,18 @@ func (r *Inputer) processStateBefore(
 		for _, entry := range stateEvents {
 			stateBeforeEvent = append(stateBeforeEvent, entry.Event)
 		}
-	} else if missingPrev {
-		// If we're missing prev events and still failed to fetch them
-		// before then we're stuck.
-		rejectionErr = fmt.Errorf("event %q should have prev events", event.EventID())
+	case missingPrev:
+		// We don't know all of the prev events, so we can't work out
+		// the state before the event. Reject it in that case.
+		rejectionErr = fmt.Errorf("event %q has missing prev events", event.EventID())
 		return
-	} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) > 0 {
+	case len(event.PrevEventIDs()) == 0:
+		// There should be prev events since it's not a create event.
+		// A non-create event that claims to have no prev events is
+		// invalid, so reject it.
+		rejectionErr = fmt.Errorf("event %q must have prev events", event.EventID())
+		return
+	default:
 		// For all non-create events, there must be prev events, so we'll
 		// ask the query API for the relevant tuples needed for auth. We
 		// will include the history visibility here even though we don't
@@ -480,19 +492,13 @@ func (r *Inputer) processStateBefore(
 		default:
 			stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
 		}
-	} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) == 0 {
-		// Non-create events that don't have any prev event IDs are
-		// impossible in theory, so reject them.
-		rejectionErr = fmt.Errorf("event %q should have prev events", event.EventID())
-		return
 	}
-	if rejectionErr == nil {
-		// If we haven't rejected the event for some other reason by now,
-		// see whether the event is allowed against the state at the time.
-		stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
-		if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
-			return
-		}
+	// At this point, stateBeforeEvent should be populated either by
+	// the supplied state in the input request, or from the prev events.
+	// Check whether the event is allowed or not.
+	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
+	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
+		return
 	}
 	// Work out what the history visibility was at the time of the
 	// event.

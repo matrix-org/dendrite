@@ -56,7 +56,7 @@ func (r *Inputer) updateLatestEvents(
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
-	historyVisibility string,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "updateLatestEvents")
 	defer span.Finish()
@@ -119,9 +119,10 @@ type latestEventsUpdater struct {
 	stateBeforeEventRemoves []types.StateEntry
 	stateBeforeEventAdds    []types.StateEntry
 	// The snapshots of current state before and after processing this event
-	oldStateNID       types.StateSnapshotNID
-	newStateNID       types.StateSnapshotNID
-	historyVisibility string
+	oldStateNID types.StateSnapshotNID
+	newStateNID types.StateSnapshotNID
+	// The history visibility of the event itself (from the state before the event).
+	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {

@@ -97,7 +97,7 @@ func Context(
 	state, _ := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
 	// verify the user is allowed to see the context for this room/event
 	for _, x := range state {
-		var hisVis string
+		var hisVis gomatrixserverlib.HistoryVisibility
 		hisVis, err = x.HistoryVisibility()
 		if err != nil {
 			continue
