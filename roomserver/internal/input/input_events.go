@@ -301,6 +301,8 @@ func (r *Inputer) processRoomEvent(
 	if rejectionErr == nil {
 		var stateBeforeEvent []*gomatrixserverlib.Event
 		if input.HasState {
+			// If we're overriding the state then we need to go and retrieve
+			// them from the database. It's a hard error if they are missing.
 			stateEvents, err := r.DB.EventsFromIDs(ctx, input.StateEventIDs)
 			if err != nil {
 				return fmt.Errorf("r.DB.EventsFromIDs: %w", err)
@@ -309,7 +311,9 @@ func (r *Inputer) processRoomEvent(
 			for _, entry := range stateEvents {
 				stateBeforeEvent = append(stateBeforeEvent, entry.Event)
 			}
-		} else if len(event.PrevEventIDs()) > 0 {
+		} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) > 0 {
+			// For all non-create events, there must be prev events, so we'll
+			// ask the query API for the relevant tuples needed for auth.
 			tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
 			stateBeforeReq := &api.QueryStateAfterEventsRequest{
 				RoomID:       event.RoomID(),
@@ -330,11 +334,15 @@ func (r *Inputer) processRoomEvent(
 			default:
 				stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
 			}
-		} else {
-			rejectionErr = fmt.Errorf("event %q has no state", event.EventID())
+		} else if event.Type() != gomatrixserverlib.MRoomCreate && len(event.PrevEventIDs()) == 0 {
+			// Non-create events that don't have any prev event IDs are
+			// impossible in theory, so reject them.
+			rejectionErr = fmt.Errorf("event %q should have prev events", event.EventID())
 			isRejected = true
 		}
 		if rejectionErr == nil {
+			// If we haven't rejected the event for some other reason by now,
+			// see whether the event is allowed against the state at the time.
 			stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
 			if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
 				isRejected = true
