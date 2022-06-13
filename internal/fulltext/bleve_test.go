@@ -81,7 +81,7 @@ func mustAddTestData(t *testing.T, fts *fulltext.Search, firstStreamPos int64) (
 	}
 	e.SetContentType(gomatrixserverlib.MRoomTopic)
 	batchItems = append(batchItems, e)
-	if err := fts.BatchIndex(batchItems); err != nil {
+	if err := fts.Index(batchItems...); err != nil {
 		t.Fatalf("failed to batch insert elements: %v", err)
 	}
 	return eventIDs, roomIDs
