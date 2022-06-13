@@ -295,6 +295,54 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// Get the state before the event so that we can work out if the event was
+	// allowed at the time. Don't bother doing this if the event is already
+	// rejected since it's just wasting CPU time.
+	if rejectionErr == nil {
+		var stateBeforeEvent []*gomatrixserverlib.Event
+		if input.HasState {
+			stateEvents, err := r.DB.EventsFromIDs(ctx, input.StateEventIDs)
+			if err != nil {
+				return fmt.Errorf("r.DB.EventsFromIDs: %w", err)
+			}
+			stateBeforeEvent = make([]*gomatrixserverlib.Event, 0, len(stateEvents))
+			for _, entry := range stateEvents {
+				stateBeforeEvent = append(stateBeforeEvent, entry.Event)
+			}
+		} else if len(event.PrevEventIDs()) > 0 {
+			tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
+			stateBeforeReq := &api.QueryStateAfterEventsRequest{
+				RoomID:       event.RoomID(),
+				PrevEventIDs: event.PrevEventIDs(),
+				StateToFetch: tuplesNeeded,
+			}
+			stateBeforeRes := &api.QueryStateAfterEventsResponse{}
+			if err := r.Queryer.QueryStateAfterEvents(ctx, stateBeforeReq, stateBeforeRes); err != nil {
+				return fmt.Errorf("r.Queryer.QueryStateAfterEvents: %w", err)
+			}
+			switch {
+			case !stateBeforeRes.RoomExists:
+				rejectionErr = fmt.Errorf("room %q does not exist", event.RoomID())
+				isRejected = true
+			case !stateBeforeRes.PrevEventsExist:
+				rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
+				isRejected = true
+			default:
+				stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
+			}
+		} else {
+			rejectionErr = fmt.Errorf("event %q has no state", event.EventID())
+			isRejected = true
+		}
+		if rejectionErr == nil {
+			stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
+			if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
+				isRejected = true
+				logger.WithError(rejectionErr).Warnf("Event %s not allowed at the time of the prev events", event.EventID())
+			}
+		}
+	}
+
 	// Store the event.
 	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected || softfail)
 	if err != nil {
