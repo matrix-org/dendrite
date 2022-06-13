@@ -20,14 +20,14 @@ func UpProfilePrimaryKey(tx *sql.Tx) error {
     ALTER TABLE account_profiles RENAME TO account_profiles_tmp;
 	CREATE TABLE IF NOT EXISTS account_profiles (
     	localpart TEXT NOT NULL,
-    	servername TEXT NOT NULL,
+    	server_name TEXT NOT NULL,
     	display_name TEXT,
     	avatar_url TEXT,
-    	PRIMARY KEY (localpart, servername)
+    	PRIMARY KEY (localpart, server_name)
 	);
     INSERT
     INTO account_profiles (
-        localpart, servername, display_name, avatar_url
+        localpart, server_name, display_name, avatar_url
     )  SELECT
            localpart, '%s', display_name, avatar_url
     FROM account_profiles_tmp;

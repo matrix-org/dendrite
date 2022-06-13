@@ -32,29 +32,29 @@ CREATE TABLE IF NOT EXISTS account_profiles (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL,
      -- The server this user belongs to
-    servername TEXT NOT NULL,
+    server_name TEXT NOT NULL,
     -- The display name for this account
     display_name TEXT,
     -- The URL of the avatar for this account
     avatar_url TEXT,
-    PRIMARY KEY (localpart, servername)
+    PRIMARY KEY (localpart, server_name)
 );
 `
 
 const insertProfileSQL = "" +
-	"INSERT INTO account_profiles(localpart, display_name, avatar_url, servername) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO account_profiles(localpart, display_name, avatar_url, server_name) VALUES ($1, $2, $3, $4)"
 
 const selectProfileByLocalpartSQL = "" +
-	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1 AND servername = $2"
+	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1 AND server_name = $2"
 
 const setAvatarURLSQL = "" +
-	"UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2 AND servername = $3"
+	"UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2 AND server_name = $3"
 
 const setDisplayNameSQL = "" +
-	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2 AND servername = $3"
+	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2 AND server_name = $3"
 
 const selectProfilesBySearchSQL = "" +
-	"SELECT localpart, display_name, avatar_url, servername FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
+	"SELECT localpart, display_name, avatar_url, server_name FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
 type profilesStatements struct {
 	db                           *sql.DB
