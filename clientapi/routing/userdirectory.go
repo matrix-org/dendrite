@@ -82,14 +82,12 @@ knownUsersLoop:
 			if err := provider.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
 				return util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
 			}
-			for _, profile := range userRes.Profiles {
-				if strings.Contains(userRes.Profiles[0].DisplayName, searchString) ||
-					strings.Contains(userRes.Profiles[0].Localpart, searchString) {
-					results[userID] = authtypes.FullyQualifiedProfile{
-						UserID:      userID,
-						DisplayName: profile.DisplayName,
-						AvatarURL:   profile.AvatarURL,
-					}
+			for _, p := range userRes.Profiles {
+				if strings.Contains(p.DisplayName, searchString) ||
+					strings.Contains(p.Localpart, searchString) {
+					profile.DisplayName = p.DisplayName
+					profile.AvatarURL = p.AvatarURL
+					results[userID] = profile
 					if len(results) == limit {
 						response.Limited = true
 						break knownUsersLoop
@@ -97,20 +95,18 @@ knownUsersLoop:
 				}
 			}
 		} else {
-			// If the username already contains the search string, don't bother hitting federation
+			// If the username already contains the search string, don't bother hitting federation.
+			// This will result in missing avatars and displaynames, but saves the federation roundtrip.
 			if strings.Contains(localpart, searchString) {
-				results[userID] = authtypes.FullyQualifiedProfile{
-					UserID:      userID,
-					DisplayName: profile.DisplayName,
-					AvatarURL:   profile.AvatarURL,
-				}
+				results[userID] = profile
 				if len(results) == limit {
 					response.Limited = true
 					break knownUsersLoop
 				}
+				continue
 			}
 			// TODO: We should probably cache/store this
-			profile, fedErr := federation.LookupProfile(ctx, serverName, userID, "")
+			fedProfile, fedErr := federation.LookupProfile(ctx, serverName, userID, "")
 			if fedErr != nil {
 				if x, ok := fedErr.(gomatrix.HTTPError); ok {
 					if x.Code == http.StatusNotFound {
@@ -118,12 +114,10 @@ knownUsersLoop:
 					}
 				}
 			}
-			if strings.Contains(profile.DisplayName, searchString) {
-				results[userID] = authtypes.FullyQualifiedProfile{
-					UserID:      userID,
-					DisplayName: profile.DisplayName,
-					AvatarURL:   profile.AvatarURL,
-				}
+			if strings.Contains(fedProfile.DisplayName, searchString) {
+				profile.DisplayName = fedProfile.DisplayName
+				profile.AvatarURL = fedProfile.AvatarURL
+				results[userID] = profile
 				if len(results) == limit {
 					response.Limited = true
 					break knownUsersLoop
