@@ -62,7 +62,7 @@ func Setup(
 	uploadHandler := httputil.MakeAuthAPI(
 		"upload", userAPI,
 		func(req *http.Request, dev *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, dev); r != nil {
 				return *r
 			}
 			return Upload(req, cfg, dev, db, activeThumbnailGeneration)
@@ -70,7 +70,7 @@ func Setup(
 	)
 
 	configHandler := httputil.MakeAuthAPI("config", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-		if r := rateLimits.Limit(req); r != nil {
+		if r := rateLimits.Limit(req, device); r != nil {
 			return *r
 		}
 		respondSize := &cfg.MaxFileSizeBytes
@@ -126,7 +126,7 @@ func makeDownloadAPI(
 		// Ratelimit requests
 		// NOTSPEC: The spec says everything at /media/ should be rate limited, but this causes issues with thumbnails (#2243)
 		if name != "thumbnail" {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, nil); r != nil {
 				if err := json.NewEncoder(w).Encode(r); err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return

@@ -163,11 +163,14 @@ client_api:
 
   # Settings for rate-limited endpoints. Rate limiting kicks in after the threshold
   # number of "slots" have been taken by requests from a specific host. Each "slot"
-  # will be released after the cooloff time in milliseconds.
+  # will be released after the cooloff time in milliseconds. Server administrators
+  # and appservice users are exempt from rate limiting by default.
   rate_limiting:
     enabled: true
     threshold: 5
     cooloff_ms: 500
+    exempt_user_ids:
+    #  - "@user:domain.com"
 
 # Configuration for the Federation API.
 federation_api:
