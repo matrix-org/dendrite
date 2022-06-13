@@ -300,7 +300,7 @@ func (r *Inputer) processRoomEvent(
 	// bother doing this if the event was already rejected as it just ends up
 	// burning CPU time.
 	historyVisibility := "joined" // Default to restrictive.
-	if rejectionErr == nil {
+	if rejectionErr == nil && !isRejected && !softfail {
 		var err error
 		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
 		if err != nil {
