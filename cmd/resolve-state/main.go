@@ -38,6 +38,7 @@ func main() {
 		Type:  "std",
 		Level: "error",
 	})
+	cfg.ClientAPI.RegistrationDisabled = true
 	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
 	args := flag.Args()
 
@@ -70,8 +71,8 @@ func main() {
 		if len(snapshotNIDs) != 2 {
 			panic("need exactly two state snapshot NIDs to calculate difference")
 		}
-
-		removed, added, err := stateres.DifferenceBetweeenStateSnapshots(ctx, snapshotNIDs[0], snapshotNIDs[1])
+		var removed, added []types.StateEntry
+		removed, added, err = stateres.DifferenceBetweeenStateSnapshots(ctx, snapshotNIDs[0], snapshotNIDs[1])
 		if err != nil {
 			panic(err)
 		}
@@ -81,7 +82,8 @@ func main() {
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 
-		eventEntries, err := roomserverDB.Events(ctx, eventNIDs)
+		var eventEntries []types.Event
+		eventEntries, err = roomserverDB.Events(ctx, eventNIDs)
 		if err != nil {
 			panic(err)
 		}
