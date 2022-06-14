@@ -5,147 +5,106 @@ import (
 	"time"
 
 	"github.com/dgraph-io/ristretto"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func NewRistrettoCache(enablePrometheus bool) (*Caches, error) {
-	roomVersions, err := NewRistrettoCachePartition(
-		RoomVersionCacheName,
-		RoomVersionCacheMutable,
-		RoomVersionCacheMaxEntries,
-		RoomVersionCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	serverKeys, err := NewRistrettoCachePartition(
-		ServerKeyCacheName,
-		ServerKeyCacheMutable,
-		ServerKeyCacheMaxEntries,
-		ServerKeyCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	roomServerRoomIDs, err := NewRistrettoCachePartition(
-		RoomServerRoomIDsCacheName,
-		RoomServerRoomIDsCacheMutable,
-		RoomServerRoomIDsCacheMaxEntries,
-		RoomServerRoomIDsCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	roomInfos, err := NewRistrettoCachePartition(
-		RoomInfoCacheName,
-		RoomInfoCacheMutable,
-		RoomInfoCacheMaxEntries,
-		RoomInfoCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	federationEvents, err := NewRistrettoCachePartition(
-		FederationEventCacheName,
-		FederationEventCacheMutable,
-		FederationEventCacheMaxEntries,
-		FederationEventCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-	spaceRooms, err := NewRistrettoCachePartition(
-		SpaceSummaryRoomsCacheName,
-		SpaceSummaryRoomsCacheMutable,
-		SpaceSummaryRoomsCacheMaxEntries,
-		SpaceSummaryRoomsCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	lazyLoadCache, err := NewRistrettoCachePartition(
-		LazyLoadCacheName,
-		LazyLoadCacheMutable,
-		LazyLoadCacheMaxEntries,
-		LazyLoadCacheMaxAge,
-		enablePrometheus,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Caches{
-		RoomVersions:      roomVersions,
-		ServerKeys:        serverKeys,
-		RoomServerRoomIDs: roomServerRoomIDs,
-		RoomInfos:         roomInfos,
-		FederationEvents:  federationEvents,
-		SpaceSummaryRooms: spaceRooms,
-		LazyLoading:       lazyLoadCache,
-	}, nil
-}
-
-type RistrettoCachePartition struct {
-	name       string
-	mutable    bool
-	maxEntries int
-	maxAge     time.Duration
-	ristretto  *ristretto.Cache
-}
-
-func NewRistrettoCachePartition(name string, mutable bool, maxEntries int, maxAge time.Duration, enablePrometheus bool) (*RistrettoCachePartition, error) {
-	var err error
-	cache := RistrettoCachePartition{
-		name:       name,
-		mutable:    mutable,
-		maxEntries: maxEntries,
-		maxAge:     maxAge,
-	}
-	cache.ristretto, err = ristretto.NewCache(&ristretto.Config{
+func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error) {
+	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 1e7,
-		MaxCost:     1 << 27,
+		MaxCost:     int64(maxCost),
 		BufferItems: 64,
 		Metrics:     true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if enablePrometheus {
-		promauto.NewGaugeFunc(prometheus.GaugeOpts{
-			Namespace: "dendrite",
-			Subsystem: "caching_ristretto",
-			Name:      name,
-		}, func() float64 {
-			return float64(cache.ristretto.Metrics.Ratio())
-		})
-	}
-	return &cache, nil
+	promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "caching_ristretto",
+		Name:      "ratio",
+	}, func() float64 {
+		return float64(cache.Metrics.Ratio())
+	})
+	return &Caches{
+		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
+			cache: cache,
+			Name:  "room_versions",
+		},
+		ServerKeys: &RistrettoCachePartition[gomatrixserverlib.PublicKeyLookupRequest, gomatrixserverlib.PublicKeyLookupResult]{
+			cache:   cache,
+			Name:    "server_keys",
+			Mutable: true,
+		},
+		RoomServerRoomIDs: &RistrettoCachePartition[types.RoomNID, string]{
+			cache: cache,
+			Name:  "room_ids",
+		},
+		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
+			cache:   cache,
+			Name:    "room_infos",
+			Mutable: true,
+			MaxAge:  time.Minute * 5,
+		},
+		FederationPDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
+			cache: cache,
+			Name:  "federation_events_pdu",
+		},
+		FederationEDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.EDU]{
+			cache: cache,
+			Name:  "federation_events_edu",
+		},
+		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{
+			cache:   cache,
+			Name:    "space_summary_rooms",
+			Mutable: true,
+		},
+		LazyLoading: &RistrettoCachePartition[string, any]{ // TODO: type
+			cache:   cache,
+			Name:    "lazy_loading",
+			Mutable: true,
+		},
+	}, nil
 }
 
-func (c *RistrettoCachePartition) Set(key string, value interface{}) {
-	if !c.mutable {
-		if entry, ok := c.ristretto.Get(key); ok && entry != value {
-			panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
+type RistrettoCachePartition[K keyable, V any] struct {
+	cache   *ristretto.Cache
+	Name    string
+	Mutable bool
+	MaxAge  time.Duration
+}
+
+func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
+	if !c.Mutable {
+		if _, ok := c.cache.Get(key); ok {
+			panic(fmt.Sprintf("invalid use of immutable cache tries to replace value of %v", key))
 		}
 	}
-	c.ristretto.SetWithTTL(key, value, 1, c.maxAge)
-}
-
-func (c *RistrettoCachePartition) Unset(key string) {
-	if !c.mutable {
-		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %q", key))
+	cost := int64(1)
+	if cv, ok := any(value).(costable); ok {
+		cost = int64(cv.CacheCost())
 	}
-	c.ristretto.Del(key)
+	c.cache.SetWithTTL(key, value, cost, c.MaxAge)
 }
 
-func (c *RistrettoCachePartition) Get(key string) (value interface{}, ok bool) {
-	return c.ristretto.Get(key)
+func (c *RistrettoCachePartition[K, V]) Unset(key K) {
+	if c.cache == nil {
+		return
+	}
+	if !c.Mutable {
+		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", key))
+	}
+	c.cache.Del(key)
+}
+
+func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
+	if c.cache == nil {
+		var empty V
+		return empty, false
+	}
+	v, ok := c.cache.Get(key)
+	value, ok = v.(V)
+	return
 }

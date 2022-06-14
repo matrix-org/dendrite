@@ -19,13 +19,7 @@ type SpaceSummaryRoomsCache interface {
 }
 
 func (c Caches) GetSpaceSummary(roomID string) (r gomatrixserverlib.MSC2946SpacesResponse, ok bool) {
-	val, found := c.SpaceSummaryRooms.Get(roomID)
-	if found && val != nil {
-		if resp, ok := val.(gomatrixserverlib.MSC2946SpacesResponse); ok {
-			return resp, true
-		}
-	}
-	return r, false
+	return c.SpaceSummaryRooms.Get(roomID)
 }
 
 func (c Caches) StoreSpaceSummary(roomID string, r gomatrixserverlib.MSC2946SpacesResponse) {

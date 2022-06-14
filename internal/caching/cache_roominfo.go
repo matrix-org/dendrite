@@ -32,13 +32,7 @@ type RoomInfoCache interface {
 // GetRoomInfo must only be called from the roomserver only. It is not
 // safe for use from other components.
 func (c Caches) GetRoomInfo(roomID string) (types.RoomInfo, bool) {
-	val, found := c.RoomInfos.Get(roomID)
-	if found && val != nil {
-		if roomInfo, ok := val.(types.RoomInfo); ok {
-			return roomInfo, true
-		}
-	}
-	return types.RoomInfo{}, false
+	return c.RoomInfos.Get(roomID)
 }
 
 // StoreRoomInfo must only be called from the roomserver only. It is not

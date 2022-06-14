@@ -17,13 +17,7 @@ type RoomVersionCache interface {
 }
 
 func (c Caches) GetRoomVersion(roomID string) (gomatrixserverlib.RoomVersion, bool) {
-	val, found := c.RoomVersions.Get(roomID)
-	if found && val != nil {
-		if roomVersion, ok := val.(gomatrixserverlib.RoomVersion); ok {
-			return roomVersion, true
-		}
-	}
-	return "", false
+	return c.RoomVersions.Get(roomID)
 }
 
 func (c Caches) StoreRoomVersion(roomID string, roomVersion gomatrixserverlib.RoomVersion) {

@@ -1,8 +1,6 @@
 package caching
 
 import (
-	"fmt"
-
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -26,43 +24,25 @@ type FederationCache interface {
 }
 
 func (c Caches) GetFederationQueuedPDU(eventNID int64) (*gomatrixserverlib.HeaderedEvent, bool) {
-	key := fmt.Sprintf("%d", eventNID)
-	val, found := c.FederationEvents.Get(key)
-	if found && val != nil {
-		if event, ok := val.(*gomatrixserverlib.HeaderedEvent); ok {
-			return event, true
-		}
-	}
-	return nil, false
+	return c.FederationPDUs.Get(eventNID)
 }
 
 func (c Caches) StoreFederationQueuedPDU(eventNID int64, event *gomatrixserverlib.HeaderedEvent) {
-	key := fmt.Sprintf("%d", eventNID)
-	c.FederationEvents.Set(key, event)
+	c.FederationPDUs.Set(eventNID, event)
 }
 
 func (c Caches) EvictFederationQueuedPDU(eventNID int64) {
-	key := fmt.Sprintf("%d", eventNID)
-	c.FederationEvents.Unset(key)
+	c.FederationPDUs.Unset(eventNID)
 }
 
 func (c Caches) GetFederationQueuedEDU(eventNID int64) (*gomatrixserverlib.EDU, bool) {
-	key := fmt.Sprintf("%d", eventNID)
-	val, found := c.FederationEvents.Get(key)
-	if found && val != nil {
-		if event, ok := val.(*gomatrixserverlib.EDU); ok {
-			return event, true
-		}
-	}
-	return nil, false
+	return c.FederationEDUs.Get(eventNID)
 }
 
 func (c Caches) StoreFederationQueuedEDU(eventNID int64, event *gomatrixserverlib.EDU) {
-	key := fmt.Sprintf("%d", eventNID)
-	c.FederationEvents.Set(key, event)
+	c.FederationEDUs.Set(eventNID, event)
 }
 
 func (c Caches) EvictFederationQueuedEDU(eventNID int64) {
-	key := fmt.Sprintf("%d", eventNID)
-	c.FederationEvents.Unset(key)
+	c.FederationEDUs.Unset(eventNID)
 }

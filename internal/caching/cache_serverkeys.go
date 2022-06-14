@@ -1,8 +1,6 @@
 package caching
 
 import (
-	"fmt"
-
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -32,26 +30,19 @@ func (c Caches) GetServerKey(
 	request gomatrixserverlib.PublicKeyLookupRequest,
 	timestamp gomatrixserverlib.Timestamp,
 ) (gomatrixserverlib.PublicKeyLookupResult, bool) {
-	key := fmt.Sprintf("%s/%s", request.ServerName, request.KeyID)
-	val, found := c.ServerKeys.Get(key)
-	if found && val != nil {
-		if keyLookupResult, ok := val.(gomatrixserverlib.PublicKeyLookupResult); ok {
-			if !keyLookupResult.WasValidAt(timestamp, true) {
-				// The key wasn't valid at the requested timestamp so don't
-				// return it. The caller will have to work out what to do.
-				c.ServerKeys.Unset(key)
-				return gomatrixserverlib.PublicKeyLookupResult{}, false
-			}
-			return keyLookupResult, true
-		}
+	val, found := c.ServerKeys.Get(request)
+	if found && !val.WasValidAt(timestamp, true) {
+		// The key wasn't valid at the requested timestamp so don't
+		// return it. The caller will have to work out what to do.
+		c.ServerKeys.Unset(request)
+		return gomatrixserverlib.PublicKeyLookupResult{}, false
 	}
-	return gomatrixserverlib.PublicKeyLookupResult{}, false
+	return val, found
 }
 
 func (c Caches) StoreServerKey(
 	request gomatrixserverlib.PublicKeyLookupRequest,
 	response gomatrixserverlib.PublicKeyLookupResult,
 ) {
-	key := fmt.Sprintf("%s/%s", request.ServerName, request.KeyID)
-	c.ServerKeys.Set(key, response)
+	c.ServerKeys.Set(request, response)
 }
