@@ -17,5 +17,7 @@ func (c Caches) GetRoomServerEvent(eventNID types.EventNID) (*gomatrixserverlib.
 }
 
 func (c Caches) StoreRoomServerEvent(eventNID types.EventNID, event *gomatrixserverlib.Event) {
-	c.RoomServerEvents.Set(int64(eventNID), event)
+	if event != nil {
+		c.RoomServerEvents.Set(int64(eventNID), event)
+	}
 }
