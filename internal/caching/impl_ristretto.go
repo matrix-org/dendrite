@@ -38,7 +38,7 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			Name:    "server_keys",
 			Mutable: true,
 		},
-		RoomServerRoomIDs: &RistrettoCachePartition[types.RoomNID, string]{
+		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{
 			cache: cache,
 			Name:  "room_ids",
 		},
