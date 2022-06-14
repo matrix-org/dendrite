@@ -38,6 +38,10 @@ type costable interface {
 	CacheCost() int64
 }
 
+type equatable interface {
+	comparable
+}
+
 type CacheSize int64
 
 const (
