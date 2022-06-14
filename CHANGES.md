@@ -1,5 +1,22 @@
 # Changelog
 
+## Dendrite 0.8.8 (2022-06-09)
+
+### Features
+
+* The performance of state resolution has been increased significantly for larger rooms
+* A number of changes have been made to rate limiting:
+  * Logged in users will now be rate-limited on a per-session basis rather than by remote IP
+  * Rate limiting no longer applies to admin or appservice users
+  * It is now possible to configure additional users that are exempt from rate limiting using the `exempt_user_ids` option in the `rate_limiting` section of the Dendrite config
+* Setting state is now idempotent via the client API state endpoints
+
+### Fixes
+
+* Room upgrades now properly propagate tombstone events to remote servers
+* Room upgrades will no longer send tombstone events if creating the upgraded room fails
+* A crash has been fixed when evaluating restricted room joins
+
 ## Dendrite 0.8.7 (2022-06-01)
 
 ### Features
