@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   remove_state_ids TEXT, -- JSON encoded string array
   session_id BIGINT,
   transaction_id TEXT,
-  exclude_from_sync BOOL NOT NULL DEFAULT FALSE
+  exclude_from_sync BOOL NOT NULL DEFAULT FALSE,
+  history_visibility SMALLINT NOT NULL DEFAULT 3 -- The history visibility before this event (0 - world_readable; 1 - shared; 2 - invited; 3 - joined)
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events (type);

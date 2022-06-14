@@ -67,7 +67,9 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   -- events retrieved through backfilling that have a position in the stream
   -- that relates to the moment these were retrieved rather than the moment these
   -- were emitted.
-  exclude_from_sync BOOL DEFAULT FALSE
+  exclude_from_sync BOOL DEFAULT FALSE,
+  -- The history visibility before this event (0 - world_readable; 1 - shared; 2 - invited; 3 - joined)
+  history_visibility SMALLINT NOT NULL DEFAULT 3
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events (type);
