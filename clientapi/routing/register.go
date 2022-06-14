@@ -775,7 +775,7 @@ func handleRegistrationFlow(
 		if isCompleted {
 			sessions.addCompletedSessionStage(sessionID, authType)
 		} else {
-			newPublicKeyAuthSession(&r)
+			newPublicKeyAuthSession(&r, sessions, sessionID)
 		}
 
 	case "":
