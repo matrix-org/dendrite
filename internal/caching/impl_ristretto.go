@@ -51,6 +51,10 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			cache: cache,
 			Name:  "room_ids",
 		},
+		RoomServerEvents: &RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
+			cache: cache,
+			Name:  "room_events",
+		},
 		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
 			cache:   cache,
 			Name:    "room_infos",

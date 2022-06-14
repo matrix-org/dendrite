@@ -15,6 +15,7 @@ type Caches struct {
 	ServerKeys         Cache[string, gomatrixserverlib.PublicKeyLookupResult]
 	RoomServerRoomNIDs Cache[string, types.RoomNID]
 	RoomServerRoomIDs  Cache[int64, string]
+	RoomServerEvents   Cache[int64, *gomatrixserverlib.Event]
 	RoomInfos          Cache[string, types.RoomInfo]
 	FederationPDUs     Cache[int64, *gomatrixserverlib.HeaderedEvent]
 	FederationEDUs     Cache[int64, *gomatrixserverlib.EDU]

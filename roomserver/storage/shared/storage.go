@@ -433,8 +433,20 @@ func (d *Database) Events(
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, inputEventNIDs []types.EventNID,
 ) ([]types.Event, error) {
+	results := make([]types.Event, len(inputEventNIDs))
+	eventNIDs := make([]types.EventNID, 0, len(results))
+	for _, nid := range eventNIDs {
+		if event, ok := d.Cache.GetRoomServerEvent(nid); ok {
+			results = append(results, types.Event{
+				EventNID: nid,
+				Event:    event,
+			})
+		} else {
+			eventNIDs = append(eventNIDs, nid)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -470,7 +482,6 @@ func (d *Database) events(
 	for n, v := range dbRoomVersions {
 		roomVersions[n] = v
 	}
-	results := make([]types.Event, len(eventJSONs))
 	for i, eventJSON := range eventJSONs {
 		result := &results[i]
 		result.EventNID = eventJSON.EventNID
@@ -482,6 +493,7 @@ func (d *Database) events(
 		if err != nil {
 			return nil, err
 		}
+		d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)

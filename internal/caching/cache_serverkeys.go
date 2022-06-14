@@ -6,13 +6,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const (
-	ServerKeyCacheName       = "server_key"
-	ServerKeyCacheMaxEntries = 4096
-	ServerKeyCacheMutable    = true
-	ServerKeyCacheMaxAge     = CacheNoMaxAge
-)
-
 // ServerKeyCache contains the subset of functions needed for
 // a server key cache.
 type ServerKeyCache interface {

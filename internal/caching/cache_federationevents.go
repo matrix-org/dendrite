@@ -4,13 +4,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const (
-	FederationEventCacheName       = "federation_event"
-	FederationEventCacheMaxEntries = 256
-	FederationEventCacheMutable    = true // to allow use of Unset only
-	FederationEventCacheMaxAge     = CacheNoMaxAge
-)
-
 // FederationCache contains the subset of functions needed for
 // a federation event cache.
 type FederationCache interface {

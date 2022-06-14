@@ -1,16 +1,7 @@
 package caching
 
 import (
-	"time"
-
 	"github.com/matrix-org/gomatrixserverlib"
-)
-
-const (
-	SpaceSummaryRoomsCacheName       = "space_summary_rooms"
-	SpaceSummaryRoomsCacheMaxEntries = 100
-	SpaceSummaryRoomsCacheMutable    = true
-	SpaceSummaryRoomsCacheMaxAge     = time.Minute * 5
 )
 
 type SpaceSummaryRoomsCache interface {

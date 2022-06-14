@@ -1,8 +1,6 @@
 package caching
 
 import (
-	"time"
-
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
@@ -13,13 +11,6 @@ import (
 // will be kept up-to-date by the latest events updater. It MUST NOT be
 // used from other components as we currently have no way to invalidate
 // the cache in downstream components.
-
-const (
-	RoomInfoCacheName       = "roominfo"
-	RoomInfoCacheMaxEntries = 1024
-	RoomInfoCacheMutable    = true
-	RoomInfoCacheMaxAge     = time.Minute * 5
-)
 
 // RoomInfosCache contains the subset of functions needed for
 // a room Info cache. It must only be used from the roomserver only

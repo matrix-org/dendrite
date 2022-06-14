@@ -15,6 +15,7 @@ type RoomServerCaches interface {
 	RoomServerNIDsCache
 	RoomVersionCache
 	RoomInfoCache
+	RoomServerEventsCache
 }
 
 // RoomServerNIDsCache contains the subset of functions needed for
