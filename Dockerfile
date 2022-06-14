@@ -1,6 +1,8 @@
 #syntax=docker/dockerfile:1.2
 
+#
 # base installs required dependencies and runs go mod download to cache dependencies
+#
 FROM --platform=${BUILDPLATFORM} docker.io/golang:1.18-alpine AS base
 RUN apk --update --no-cache add bash build-base
 
@@ -8,7 +10,9 @@ WORKDIR /src
 COPY go.* .
 RUN go mod download
 
+#
 # build creates all needed binaries
+#
 FROM base AS build
 ARG TARGETOS
 ARG TARGETARCH
@@ -16,7 +20,9 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -o /out/ ./cmd/...
 
-# dendrite base image; mainly creates a user and switches to it
+#
+# The dendrite base image; mainly creates a user and switches to it
+#
 FROM alpine:3.16 AS dendrite-base
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
@@ -25,7 +31,9 @@ RUN addgroup dendrite && adduser dendrite -G dendrite -u 1337 -D
 USER dendrite
 WORKDIR /home/dendrite
 
-# polylith image, only contains the polylith binary
+#
+# Builds the polylith image and only contains the polylith binary
+#
 FROM dendrite-base AS polylith
 LABEL org.opencontainers.image.title="Dendrite (Polylith)"
 
@@ -33,7 +41,9 @@ COPY --from=build /out/dendrite-polylith-multi /usr/bin/
 
 ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
 
-# monolith image
+#
+# Builds the monolith image and contains all required binaries
+#
 FROM dendrite-base AS monolith
 LABEL org.opencontainers.image.title="Dendrite (Monolith)"
 
@@ -45,11 +55,13 @@ COPY --from=build /out/dendrite-monolith-server /usr/bin/dendrite-monolith-serve
 ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
 EXPOSE 8008 8448
 
-# complement image
+#
+# Builds the Complement image, used for integration tests
+#
 FROM base AS complement
 RUN apk add --no-cache sqlite openssl ca-certificates
 COPY --from=build /out/* /usr/bin/
-RUN rm /usr/bin/dendrite-polylith-multi
+RUN rm /usr/bin/dendrite-polylith-multi /usr/bin/dendrite-demo* /usr/bin/dendritejs-pinecone
 
 WORKDIR /dendrite
 RUN /usr/bin/generate-keys --private-key matrix_key.pem && \
