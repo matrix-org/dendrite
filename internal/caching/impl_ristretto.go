@@ -79,8 +79,8 @@ type RistrettoCachePartition[K keyable, V any] struct {
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
 	if !c.Mutable {
-		if v, ok := c.cache.Get(key); ok && !reflect.DeepEqual(v, value) {
-			panic(fmt.Sprintf("invalid use of immutable cache tries to replace value of %v", key))
+		if v, ok := c.cache.Get(key); ok && v != nil && !reflect.DeepEqual(v, value) {
+			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", key, v, value))
 		}
 	}
 	cost := int64(1)
@@ -91,9 +91,6 @@ func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
 }
 
 func (c *RistrettoCachePartition[K, V]) Unset(key K) {
-	if c.cache == nil {
-		return
-	}
 	if !c.Mutable {
 		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", key))
 	}
@@ -101,11 +98,11 @@ func (c *RistrettoCachePartition[K, V]) Unset(key K) {
 }
 
 func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
-	if c.cache == nil {
+	v, ok := c.cache.Get(key)
+	if !ok || v == nil {
 		var empty V
 		return empty, false
 	}
-	v, ok := c.cache.Get(key)
 	value, ok = v.(V)
 	return
 }
