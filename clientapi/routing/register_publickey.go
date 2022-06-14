@@ -26,7 +26,8 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func newPublicKeyAuthSession(request *registerRequest) {
+func newPublicKeyAuthSession(request *registerRequest, sessions *sessionsDict, sessionID string) {
+	sessions.sessions[sessionID] = append(sessions.sessions[sessionID], authtypes.LoginTypePublicKey)
 	// Public key auth does not use password. But the registration flow
 	// requires setting a password in order to create the account.
 	// Create a random password to satisfy the requirement.
