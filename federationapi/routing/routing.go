@@ -128,7 +128,7 @@ func Setup(
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			return Send(
 				httpReq, request, gomatrixserverlib.TransactionID(vars["txnID"]),
-				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
+				cfg, rsAPI, keyAPI, userAPI, keys, federation, mu, servers, producer,
 			)
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)

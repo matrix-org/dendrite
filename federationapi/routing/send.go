@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -84,6 +85,7 @@ func Send(
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keyAPI keyapi.FederationKeyAPI,
+	userAPI userapi.FederationUserAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation federationAPI.FederationClient,
 	mu *internal.MutexByRoom,
@@ -131,6 +133,7 @@ func Send(
 		roomsMu:                mu,
 		producer:               producer,
 		inboundPresenceEnabled: cfg.Matrix.Presence.EnableInbound,
+		userAPI:                userAPI,
 	}
 
 	var txnEvents struct {
@@ -184,6 +187,7 @@ type txnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI                  api.FederationRoomserverAPI
 	keyAPI                 keyapi.FederationKeyAPI
+	userAPI                userapi.FederationUserAPI
 	ourServerName          gomatrixserverlib.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
 	federation             txnFederationClient
@@ -275,6 +279,13 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			continue
 		}
 
+		// Clear our local user profile cache, if this is a membership event
+		if event.Type() == gomatrixserverlib.MRoomMember && event.StateKey() != nil {
+			if err = t.userAPI.DeleteProfile(ctx, &userapi.PerformDeleteProfileRequest{UserID: event.Sender()}, &struct{}{}); err != nil {
+				// non-fatal error, log and continue
+				util.GetLogger(ctx).WithError(err).Warnf("Transaction: couldn't delete user profile for %s", event.Sender())
+			}
+		}
 		// pass the event to the roomserver which will do auth checks
 		// If the event fail auth checks, gmsl.NotAllowed error will be returned which we be silently
 		// discarded by the caller of this function
