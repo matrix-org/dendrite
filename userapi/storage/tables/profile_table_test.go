@@ -113,5 +113,22 @@ func TestProfileTable(t *testing.T) {
 			}
 		}
 
+		// Delete dummy1 on serverName1...
+		if err = tab.DeleteProfile(ctx, nil, "dummy1", serverName1); err != nil {
+			t.Fatalf("failed to delete profile for user: %s", err)
+		}
+		searchRes, err = tab.SelectProfilesBySearch(ctx, "dummy", 10)
+		if err != nil {
+			t.Fatalf("unable to search profiles: %v", err)
+		}
+		// ... verify that we only get one result back.
+		if count := len(searchRes); count != 1 {
+			t.Fatalf("expected 1 results, got %d", count)
+		}
+
+		// Deleting a non-existent profile should not give an error
+		if err = tab.DeleteProfile(ctx, nil, "doesnotexist", serverName1); err != nil {
+			t.Fatalf("failed to delete profile for user: %s", err)
+		}
 	})
 }

@@ -763,3 +763,10 @@ func (d *Database) RemovePushers(
 func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error) {
 	return d.Stats.UserStatistics(ctx, nil)
 }
+
+// DeleteProfile deletes a user profile from the database
+func (d *Database) DeleteProfile(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Profiles.DeleteProfile(ctx, txn, localpart, serverName)
+	})
+}

@@ -56,6 +56,9 @@ const setDisplayNameSQL = "" +
 const selectProfilesBySearchSQL = "" +
 	"SELECT localpart, display_name, avatar_url, server_name FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
+const deleteProfileSQL = "" +
+	"DELETE FROM account_profiles WHERE localpart = $1 AND server_name = $2"
+
 type profilesStatements struct {
 	serverNoticesLocalpart       string
 	insertProfileStmt            *sql.Stmt
@@ -63,6 +66,7 @@ type profilesStatements struct {
 	setAvatarURLStmt             *sql.Stmt
 	setDisplayNameStmt           *sql.Stmt
 	selectProfilesBySearchStmt   *sql.Stmt
+	deleteProfileStmt            *sql.Stmt
 }
 
 func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables.ProfileTable, error) {
@@ -79,6 +83,7 @@ func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables
 		{&s.setAvatarURLStmt, setAvatarURLSQL},
 		{&s.setDisplayNameStmt, setDisplayNameSQL},
 		{&s.selectProfilesBySearchStmt, selectProfilesBySearchSQL},
+		{&s.deleteProfileStmt, deleteProfileSQL},
 	}.Prepare(db)
 }
 
@@ -138,4 +143,11 @@ func (s *profilesStatements) SelectProfilesBySearch(
 		}
 	}
 	return profiles, nil
+}
+
+func (s *profilesStatements) DeleteProfile(
+	ctx context.Context, txn *sql.Tx, localpart string, serverName gomatrixserverlib.ServerName,
+) error {
+	_, err := sqlutil.TxStmtContext(ctx, txn, s.deleteProfileStmt).ExecContext(ctx, localpart, serverName)
+	return err
 }

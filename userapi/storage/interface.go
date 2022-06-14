@@ -31,6 +31,7 @@ type Profile interface {
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
 	SetAvatarURL(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, avatarURL string) error
 	SetDisplayName(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, displayName string) error
+	DeleteProfile(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) error
 }
 
 type Account interface {
