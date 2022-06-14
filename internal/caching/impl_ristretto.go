@@ -33,7 +33,7 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			cache: cache,
 			Name:  "room_versions",
 		},
-		ServerKeys: &RistrettoCachePartition[gomatrixserverlib.PublicKeyLookupRequest, gomatrixserverlib.PublicKeyLookupResult]{
+		ServerKeys: &RistrettoCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{
 			cache:   cache,
 			Name:    "server_keys",
 			Mutable: true,
