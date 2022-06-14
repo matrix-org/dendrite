@@ -35,8 +35,7 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 		Subsystem: "caching_ristretto",
 		Name:      "cost",
 	}, func() float64 {
-		evicted := cache.Metrics.CostEvicted() + cache.Metrics.CostEvicted()
-		return float64(cache.Metrics.CostAdded() - evicted)
+		return float64(cache.Metrics.CostAdded() - cache.Metrics.CostEvicted())
 	})
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
