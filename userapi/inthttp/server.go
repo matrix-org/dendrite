@@ -457,4 +457,16 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
 		}),
 	)
+	internalAPIMux.Handle(PerformDeleteUserProfilePath,
+		httputil.MakeInternalAPI("performDeleteUserProfilePath", func(req *http.Request) util.JSONResponse {
+			request := api.PerformDeleteProfileRequest{}
+			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+				return util.MessageResponse(http.StatusBadRequest, err.Error())
+			}
+			if err := s.DeleteProfile(req.Context(), &request, &struct{}{}); err != nil {
+				return util.ErrorResponse(err)
+			}
+			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
+		}),
+	)
 }

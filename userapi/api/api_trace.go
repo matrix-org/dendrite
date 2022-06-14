@@ -203,6 +203,12 @@ func (t *UserInternalAPITrace) PerformSaveThreePIDAssociation(ctx context.Contex
 	return err
 }
 
+func (t *UserInternalAPITrace) DeleteProfile(ctx context.Context, req *PerformDeleteProfileRequest, res *struct{}) error {
+	err := t.Impl.DeleteProfile(ctx, req, res)
+	util.GetLogger(ctx).Infof("DeleteProfile req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {

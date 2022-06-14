@@ -44,6 +44,7 @@ const (
 	PerformSetDisplayNamePath          = "/userapi/performSetDisplayName"
 	PerformForgetThreePIDPath          = "/userapi/performForgetThreePID"
 	PerformSaveThreePIDAssociationPath = "/userapi/performSaveThreePIDAssociation"
+	PerformDeleteUserProfilePath       = "/userapi/performDeleteUserProfile"
 
 	QueryKeyBackupPath             = "/userapi/queryKeyBackup"
 	QueryProfilePath               = "/userapi/queryProfile"
@@ -389,5 +390,13 @@ func (h *httpUserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context
 	defer span.Finish()
 
 	apiURL := h.apiURL + PerformSaveThreePIDAssociationPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpUserInternalAPI) DeleteProfile(ctx context.Context, req *api.PerformDeleteProfileRequest, res *struct{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, PerformDeleteUserProfilePath)
+	defer span.Finish()
+
+	apiURL := h.apiURL + PerformDeleteUserProfilePath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
