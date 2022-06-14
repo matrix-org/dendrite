@@ -50,12 +50,14 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			MaxAge:  time.Minute * 5,
 		},
 		FederationPDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
-			cache: cache,
-			Name:  "federation_events_pdu",
+			cache:   cache,
+			Name:    "federation_events_pdu",
+			Mutable: true,
 		},
 		FederationEDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.EDU]{
-			cache: cache,
-			Name:  "federation_events_edu",
+			cache:   cache,
+			Name:    "federation_events_edu",
+			Mutable: true,
 		},
 		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{
 			cache:   cache,
