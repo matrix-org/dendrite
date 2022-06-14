@@ -132,10 +132,8 @@ func NewRistrettoCachePartition(name string, mutable bool, maxEntries int, maxAg
 
 func (c *RistrettoCachePartition) Set(key string, value interface{}) {
 	if !c.mutable {
-		if peek, ok := c.ristretto.Get(key); ok {
-			if entry, ok := peek.(*inMemoryLRUCacheEntry); ok && entry.value != value {
-				panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
-			}
+		if entry, ok := c.ristretto.Get(key); ok && entry != value {
+			panic(fmt.Sprintf("invalid use of immutable cache tries to mutate existing value of %q", key))
 		}
 	}
 	c.ristretto.SetWithTTL(key, value, 1, c.maxAge)
