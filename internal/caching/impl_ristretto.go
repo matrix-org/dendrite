@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+	"unsafe"
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/matrix-org/dendrite/roomserver/types"
@@ -28,6 +29,14 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 		Name:      "ratio",
 	}, func() float64 {
 		return float64(cache.Metrics.Ratio())
+	})
+	promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Namespace: "dendrite",
+		Subsystem: "caching_ristretto",
+		Name:      "cost",
+	}, func() float64 {
+		evicted := cache.Metrics.CostEvicted() + cache.Metrics.CostEvicted()
+		return float64(cache.Metrics.CostAdded() - evicted)
 	})
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
@@ -86,9 +95,13 @@ func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
 			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", strkey, v, value))
 		}
 	}
-	cost := int64(1)
+	var cost int64
 	if cv, ok := any(value).(costable); ok {
-		cost = int64(cv.CacheCost())
+		cost = cv.CacheCost()
+	} else if cv, ok := any(value).(string); ok {
+		cost = int64(len(cv))
+	} else {
+		cost = int64(unsafe.Sizeof(value))
 	}
 	c.cache.SetWithTTL(strkey, value, cost, c.MaxAge)
 }
