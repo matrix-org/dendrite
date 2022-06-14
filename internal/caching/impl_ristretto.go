@@ -78,8 +78,10 @@ type RistrettoCachePartition[K keyable, V any] struct {
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
 	if !c.Mutable {
-		if _, ok := c.cache.Get(key); ok {
-			panic(fmt.Sprintf("invalid use of immutable cache tries to replace value of %v", key))
+		if v, ok := c.cache.Get(key); ok {
+			if fmt.Sprintf("%v", v) != fmt.Sprintf("%v", value) { // TODO: this is yucky
+				panic(fmt.Sprintf("invalid use of immutable cache tries to replace value of %v", key))
+			}
 		}
 	}
 	cost := int64(1)
