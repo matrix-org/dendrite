@@ -778,10 +778,17 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	} else if !allowRestrictedJoins {
 		return nil
 	}
+	// Start off by populating the "resident" flag in the response. If we
+	// come across any rooms in the request that are missing, we will unset
+	// the flag.
+	res.Resident = true
 	// Get the join rules to work out if the join rule is "restricted".
 	joinRulesEvent, err := r.DB.GetStateEvent(ctx, req.RoomID, gomatrixserverlib.MRoomJoinRules, "")
 	if err != nil {
 		return fmt.Errorf("r.DB.GetStateEvent: %w", err)
+	}
+	if joinRulesEvent == nil {
+		return nil
 	}
 	var joinRules gomatrixserverlib.JoinRuleContent
 	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
@@ -792,10 +799,6 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if !res.Restricted {
 		return nil
 	}
-	// Start off by populating the "resident" flag in the response. If we
-	// come across any rooms in the request that are missing, we will unset
-	// the flag.
-	res.Resident = true
 	// If the user is already invited to the room then the join is allowed
 	// but we don't specify an authorised via user, since the event auth
 	// will allow the join anyway.

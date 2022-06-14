@@ -823,13 +823,39 @@ func (d *Database) handleRedactions(
 		return nil, "", nil
 	}
 
+	// Get the power level from the database, so we can verify the user is allowed to redact the event
+	powerLevels, err := d.GetStateEvent(ctx, event.RoomID(), gomatrixserverlib.MRoomPowerLevels, "")
+	if err != nil {
+		return nil, "", fmt.Errorf("d.GetStateEvent: %w", err)
+	}
+	pl, err := powerLevels.PowerLevels()
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to get powerlevels for room: %w", err)
+	}
+
+	redactUser := pl.UserLevel(redactionEvent.Sender())
+	switch {
+	case redactUser >= pl.Redact:
+		// The power level of the redaction event’s sender is greater than or equal to the redact level.
+	case redactedEvent.Origin() == redactionEvent.Origin() && redactedEvent.Sender() == redactionEvent.Sender():
+		// The domain of the redaction event’s sender matches that of the original event’s sender.
+	default:
+		return nil, "", nil
+	}
+
 	// mark the event as redacted
+	if redactionsArePermanent {
+		redactedEvent.Event = redactedEvent.Redact()
+	}
+
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
 	if err != nil {
 		return nil, "", fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 	}
-	if redactionsArePermanent {
-		redactedEvent.Event = redactedEvent.Redact()
+	// NOTSPEC: sytest relies on this unspecced field existing :(
+	err = redactedEvent.SetUnsignedField("redacted_by", redactionEvent.EventID())
+	if err != nil {
+		return nil, "", fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 	}
 	// overwrite the eventJSON table
 	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
