@@ -29,9 +29,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -68,9 +69,10 @@ const (
 // It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {
 	sync.RWMutex
-	sessions map[string][]authtypes.LoginType
-	params   map[string]registerRequest
-	timer    map[string]*time.Timer
+	sessions               map[string][]authtypes.LoginType
+	sessionCompletedResult map[string]registerResponse
+	params                 map[string]registerRequest
+	timer                  map[string]*time.Timer
 	// deleteSessionToDeviceID protects requests to DELETE /devices/{deviceID} from being abused.
 	// If a UIA session is started by trying to delete device1, and then UIA is completed by deleting device2,
 	// the delete request will fail for device2 since the UIA was initiated by trying to delete device1.
@@ -115,6 +117,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	delete(d.params, sessionID)
 	delete(d.sessions, sessionID)
 	delete(d.deleteSessionToDeviceID, sessionID)
+	delete(d.sessionCompletedResult, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
 		if !t.Stop() {
@@ -130,6 +133,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
 		sessions:                make(map[string][]authtypes.LoginType),
+		sessionCompletedResult:  make(map[string]registerResponse),
 		params:                  make(map[string]registerRequest),
 		timer:                   make(map[string]*time.Timer),
 		deleteSessionToDeviceID: make(map[string]string),
@@ -171,6 +175,19 @@ func (d *sessionsDict) addDeviceToDelete(sessionID, deviceID string) {
 	d.Lock()
 	defer d.Unlock()
 	d.deleteSessionToDeviceID[sessionID] = deviceID
+}
+
+func (d *sessionsDict) addCompletedRegistration(sessionID string, response registerResponse) {
+	d.Lock()
+	defer d.Unlock()
+	d.sessionCompletedResult[sessionID] = response
+}
+
+func (d *sessionsDict) getCompletedRegistration(sessionID string) (registerResponse, bool) {
+	d.RLock()
+	defer d.RUnlock()
+	result, ok := d.sessionCompletedResult[sessionID]
+	return result, ok
 }
 
 func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
@@ -544,6 +561,14 @@ func Register(
 		r.DeviceID = data.DeviceID
 		r.InitialDisplayName = data.InitialDisplayName
 		r.InhibitLogin = data.InhibitLogin
+		// Check if the user already registered using this session, if so, return that result
+		if response, ok := sessions.getCompletedRegistration(sessionID); ok {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: response,
+			}
+		}
+
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
@@ -856,13 +881,6 @@ func completeRegistration(
 	displayName, deviceID *string,
 	accType userapi.AccountType,
 ) util.JSONResponse {
-	var registrationOK bool
-	defer func() {
-		if registrationOK {
-			sessions.deleteSession(sessionID)
-		}
-	}()
-
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -903,7 +921,6 @@ func completeRegistration(
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
 	if inhibitLogin {
-		registrationOK = true
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
@@ -937,15 +954,17 @@ func completeRegistration(
 		}
 	}
 
-	registrationOK = true
+	result := registerResponse{
+		UserID:      devRes.Device.UserID,
+		AccessToken: devRes.Device.AccessToken,
+		HomeServer:  accRes.Account.ServerName,
+		DeviceID:    devRes.Device.ID,
+	}
+	sessions.addCompletedRegistration(sessionID, result)
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: registerResponse{
-			UserID:      devRes.Device.UserID,
-			AccessToken: devRes.Device.AccessToken,
-			HomeServer:  accRes.Account.ServerName,
-			DeviceID:    devRes.Device.ID,
-		},
+		JSON: result,
 	}
 }
 
