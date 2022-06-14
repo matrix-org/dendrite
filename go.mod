@@ -14,6 +14,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/codeclysm/extract v2.2.0+incompatible
+	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v20.10.16+incompatible
 	github.com/docker/go-connections v0.4.0
