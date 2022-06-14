@@ -78,27 +78,30 @@ type RistrettoCachePartition[K keyable, V any] struct {
 }
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
+	strkey := fmt.Sprintf("%s_%v", c.Name, key)
 	if !c.Mutable {
-		if v, ok := c.cache.Get(key); ok && v != nil && !reflect.DeepEqual(v, value) {
-			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", key, v, value))
+		if v, ok := c.cache.Get(strkey); ok && v != nil && !reflect.DeepEqual(v, value) {
+			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", strkey, v, value))
 		}
 	}
 	cost := int64(1)
 	if cv, ok := any(value).(costable); ok {
 		cost = int64(cv.CacheCost())
 	}
-	c.cache.SetWithTTL(key, value, cost, c.MaxAge)
+	c.cache.SetWithTTL(strkey, value, cost, c.MaxAge)
 }
 
 func (c *RistrettoCachePartition[K, V]) Unset(key K) {
+	strkey := fmt.Sprintf("%s_%v", c.Name, key)
 	if !c.Mutable {
-		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", key))
+		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", strkey))
 	}
-	c.cache.Del(key)
+	c.cache.Del(strkey)
 }
 
 func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
-	v, ok := c.cache.Get(key)
+	strkey := fmt.Sprintf("%s_%v", c.Name, key)
+	v, ok := c.cache.Get(strkey)
 	if !ok || v == nil {
 		var empty V
 		return empty, false
