@@ -29,7 +29,7 @@ import (
 type LoginPublicKeyEthereum struct {
 	// https://github.com/tak-hntlabs/matrix-spec-proposals/blob/main/proposals/3782-matrix-publickey-login-spec.md#client-sends-login-request-with-authentication-data
 	Type      string `json:"type"`
-	Address   string `json:"address"`
+	UserId    string `json:"user_id"`
 	Session   string `json:"session"`
 	Message   string `json:"message"`
 	Signature string `json:"signature"`
@@ -51,7 +51,7 @@ func CreatePublicKeyEthereumHandler(
 	pk.config = config
 	pk.userAPI = userAPI
 	// Case-insensitive
-	pk.Address = strings.ToLower(pk.Address)
+	pk.UserId = strings.ToLower(pk.UserId)
 
 	return &pk, nil
 }
@@ -65,7 +65,7 @@ func (pk LoginPublicKeyEthereum) GetType() string {
 }
 
 func (pk LoginPublicKeyEthereum) AccountExists(ctx context.Context) (string, *jsonerror.MatrixError) {
-	localPart, err := userutil.ParseUsernameParam(pk.Address, &pk.config.Matrix.ServerName)
+	localPart, err := userutil.ParseUsernameParam(pk.UserId, &pk.config.Matrix.ServerName)
 	if err != nil {
 		// userId does not exist
 		return "", jsonerror.Forbidden("the address is incorrect, or the account does not exist.")
@@ -110,7 +110,7 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 func (pk LoginPublicKeyEthereum) CreateLogin() *Login {
 	identifier := LoginIdentifier{
 		Type: "m.id.publickey",
-		User: pk.Address,
+		User: pk.UserId,
 	}
 	login := Login{
 		Identifier: identifier,
