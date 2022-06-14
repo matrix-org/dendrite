@@ -1,7 +1,6 @@
 package caching
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/dgraph-io/ristretto"
@@ -77,13 +76,15 @@ type RistrettoCachePartition[K keyable, V any] struct {
 }
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
-	if !c.Mutable {
-		if v, ok := c.cache.Get(key); ok {
-			if fmt.Sprintf("%v", v) != fmt.Sprintf("%v", value) { // TODO: this is yucky
-				panic(fmt.Sprintf("invalid use of immutable cache tries to replace value of %v", key))
+	/*
+		if !c.Mutable {
+			if v, ok := c.cache.Get(key); ok {
+				if fmt.Sprintf("%v", v) != fmt.Sprintf("%v", value) { // TODO: this is yucky
+					panic(fmt.Sprintf("invalid use of immutable cache tries to replace value of %v", key))
+				}
 			}
 		}
-	}
+	*/
 	cost := int64(1)
 	if cv, ok := any(value).(costable); ok {
 		cost = int64(cv.CacheCost())
@@ -95,9 +96,11 @@ func (c *RistrettoCachePartition[K, V]) Unset(key K) {
 	if c.cache == nil {
 		return
 	}
-	if !c.Mutable {
-		panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", key))
-	}
+	/*
+		if !c.Mutable {
+			panic(fmt.Sprintf("invalid use of immutable cache tries to unset value of %v", key))
+		}
+	*/
 	c.cache.Del(key)
 }
 
