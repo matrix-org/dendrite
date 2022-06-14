@@ -493,7 +493,9 @@ func (d *Database) events(
 		if err != nil {
 			return nil, err
 		}
-		d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
+		if result.Event != nil {
+			d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
+		}
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
