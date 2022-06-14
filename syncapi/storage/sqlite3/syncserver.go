@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
+	"github.com/sirupsen/logrus"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -52,11 +53,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
-	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
-	if err != nil {
-		return err
+	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
+		logrus.Fatalf("unable to create table: %s", err)
 	}
-	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
@@ -113,6 +113,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
 	deltas.LoadAddHistoryVisibilityColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+		return err
+	}
+	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{

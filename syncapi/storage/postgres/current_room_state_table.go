@@ -104,7 +104,7 @@ const selectEventsWithEventIDsSQL = "" +
 	// the rowsToStreamEvents expects there to be exactly six columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, 3 as history_visibility" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 type currentRoomStateStatements struct {

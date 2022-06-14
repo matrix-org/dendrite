@@ -364,11 +364,12 @@ func (d *Database) WriteEvent(
 	addStateEvents []*gomatrixserverlib.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (pduPosition types.StreamPosition, returnErr error) {
 	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
-			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility.NumericValue(),
 		)
 		if err != nil {
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
