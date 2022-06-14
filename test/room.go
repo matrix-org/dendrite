@@ -40,7 +40,7 @@ type Room struct {
 	ID         string
 	Version    gomatrixserverlib.RoomVersion
 	preset     Preset
-	visibility string
+	visibility gomatrixserverlib.HistoryVisibility
 	creator    *User
 
 	authEvents   gomatrixserverlib.AuthEvents
@@ -98,10 +98,10 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 		fallthrough
 	case PresetPrivateChat:
 		joinRule.JoinRule = "invite"
-		hisVis.HistoryVisibility = "shared"
+		hisVis.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
 	case PresetPublicChat:
 		joinRule.JoinRule = "public"
-		hisVis.HistoryVisibility = "shared"
+		hisVis.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
 	}
 
 	if r.visibility != "" {
@@ -247,7 +247,7 @@ func RoomPreset(p Preset) roomModifier {
 	}
 }
 
-func RoomHistoryVisibility(vis string) roomModifier {
+func RoomHistoryVisibility(vis gomatrixserverlib.HistoryVisibility) roomModifier {
 	return func(t *testing.T, r *Room) {
 		r.visibility = vis
 	}

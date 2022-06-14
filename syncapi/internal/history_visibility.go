@@ -162,7 +162,7 @@ func getStateForEvents(ctx context.Context, db storage.Database, events []*gomat
 			return nil, fmt.Errorf("initial event does not exist: %w", err)
 		}
 		// By default if no history_visibility is set, or if the value is not understood, the visibility is assumed to be shared
-		var hisVis = "shared"
+		var hisVis = gomatrixserverlib.HistoryVisibilityShared
 		historyEvent, _, err := db.SelectTopologicalEvent(ctx, int(pos.Depth), "m.room.history_visibility", ev.RoomID())
 		if err != nil {
 			if err != sql.ErrNoRows {
@@ -172,7 +172,7 @@ func getStateForEvents(ctx context.Context, db storage.Database, events []*gomat
 		} else {
 			hisVis, err = historyEvent.HistoryVisibility()
 			if err != nil {
-				hisVis = "shared"
+				hisVis = gomatrixserverlib.HistoryVisibilityShared
 			}
 		}
 		// get the membership event

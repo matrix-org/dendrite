@@ -345,7 +345,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 	// check guest and normal user accounts
 	for _, accType := range []userapi.AccountType{userapi.AccountTypeGuest, userapi.AccountTypeUser} {
 		testCases := []struct {
-			historyVisibility string
+			historyVisibility gomatrixserverlib.HistoryVisibility
 			wantResult        result
 		}{
 			{
@@ -378,14 +378,6 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 					seeWithoutJoin: false,
 					seeBeforeJoin:  false,
 					seeAfterInvite: false,
-				},
-			},
-			{
-				historyVisibility: "default",
-				wantResult: result{
-					seeWithoutJoin: false,
-					seeBeforeJoin:  true,
-					seeAfterInvite: true,
 				},
 			},
 		}
