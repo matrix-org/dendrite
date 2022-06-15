@@ -15,7 +15,7 @@ import (
 
 func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error) {
 	cache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 1e6,
+		NumCounters: 1e7,
 		MaxCost:     int64(maxCost),
 		BufferItems: 64,
 		Metrics:     true,
@@ -52,9 +52,8 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			Name:  "room_ids",
 		},
 		RoomServerEvents: &RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
-			cache:   cache,
-			Name:    "room_events",
-			Mutable: true,
+			cache: cache,
+			Name:  "room_events",
 		},
 		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
 			cache:   cache,
@@ -93,7 +92,7 @@ type RistrettoCachePartition[K keyable, V any] struct {
 }
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
-	strkey := fmt.Sprintf("%s_%v", c.Name, key)
+	strkey := fmt.Sprintf("%v\000%s", key, c.Name)
 	if !c.Mutable {
 		if v, ok := c.cache.Get(strkey); ok && v != nil && !reflect.DeepEqual(v, value) {
 			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", strkey, v, value))
