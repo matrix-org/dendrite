@@ -16,7 +16,7 @@ import (
 
 func MustCreateCache(maxCost CacheSize, enablePrometheus bool) *ristretto.Cache {
 	cache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 1e6,
+		NumCounters: 1e5,
 		MaxCost:     int64(maxCost),
 		BufferItems: 64,
 		Metrics:     true,
