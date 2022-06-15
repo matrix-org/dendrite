@@ -487,28 +487,19 @@ func (d *Database) events(
 		roomVersions[n] = v
 	}
 	for _, eventJSON := range eventJSONs {
-		result := types.Event{
-			EventNID: eventJSON.EventNID,
-		}
-		roomNID := roomNIDs[result.EventNID]
+		eventNID := eventJSON.EventNID
+		result := &results[positions[eventNID]]
+		result.EventNID = eventNID
+		roomNID := roomNIDs[eventNID]
 		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventIDs[result.EventNID], eventJSON.EventJSON, false, roomVersions[roomNID],
+			eventIDs[eventNID], eventJSON.EventJSON, false, roomVersions[roomNID],
 		)
 		if err != nil {
 			return nil, err
 		}
-		pos, ok := positions[result.EventNID]
-		if !ok {
-			panic("should have position")
-		}
-		delete(positions, result.EventNID)
-		results[pos] = result
 		if result.Event != nil {
-			d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
+			d.Cache.StoreRoomServerEvent(eventNID, result.Event)
 		}
-	}
-	if len(positions) > 0 {
-		panic("unsatisfied events")
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
