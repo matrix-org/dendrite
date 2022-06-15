@@ -33,7 +33,8 @@ func UpAddHistoryVisibilityColumn(tx *sql.Tx) error {
 		return nil
 	}
 	_, err = tx.Exec(`
-		ALTER TABLE syncapi_output_room_events ADD COLUMN history_visibility SMALLINT NOT NULL DEFAULT 3;
+		ALTER TABLE syncapi_output_room_events ADD COLUMN history_visibility SMALLINT NOT NULL DEFAULT 2;
+		UPDATE syncapi_output_room_events SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
