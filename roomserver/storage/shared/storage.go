@@ -438,7 +438,7 @@ func (d *Database) events(
 	results := make([]types.Event, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(results))
 	for _, nid := range inputEventNIDs {
-		if event, ok := d.Cache.GetRoomServerEvent(nid); ok {
+		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
 			results = append(results, types.Event{
 				EventNID: nid,
 				Event:    event,
