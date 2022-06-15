@@ -487,16 +487,15 @@ func (d *Database) events(
 		result.EventNID = eventJSON.EventNID
 		roomNID := roomNIDs[result.EventNID]
 		roomVersion := roomVersions[roomNID]
-		event, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
+		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
 		if err != nil {
 			return nil, err
 		}
-		if event != nil {
-			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+		if result.Event != nil {
+			d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
 		}
-		result.Event = event
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
