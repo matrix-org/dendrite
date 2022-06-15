@@ -501,10 +501,14 @@ func (d *Database) events(
 		if !ok {
 			panic("should have position")
 		}
+		delete(positions, result.EventNID)
 		results[pos] = result
 		if result.Event != nil {
 			d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
 		}
+	}
+	if len(positions) > 0 {
+		panic("unsatisfied events")
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
