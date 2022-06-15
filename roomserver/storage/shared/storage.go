@@ -433,8 +433,9 @@ func (d *Database) Events(
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, inputEventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
+	sort.Sort(inputEventNIDs)
 	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
 	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
 	for _, nid := range inputEventNIDs {
@@ -496,7 +497,7 @@ func (d *Database) events(
 	for _, nid := range inputEventNIDs {
 		event, ok := events[nid]
 		if !ok || event == nil {
-			panic("missing event")
+			return nil, fmt.Errorf("event %d missing", nid)
 		}
 		results = append(results, types.Event{
 			EventNID: nid,

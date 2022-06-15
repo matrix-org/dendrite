@@ -1036,7 +1036,6 @@ func (v *StateResolution) loadStateEvents(
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
-	sort.Sort(eventNIDs)
 	events, err := v.db.Events(ctx, eventNIDs)
 	if err != nil {
 		return nil, nil, err
