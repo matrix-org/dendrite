@@ -70,7 +70,12 @@ func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msg *nats.Msg)
 	}
 	err := t.updater.Update(ctx, m)
 	if err != nil {
-		logrus.WithError(err).Errorf("Failed to update device list")
+		logrus.WithFields(logrus.Fields{
+			"user_id":   m.UserID,
+			"device_id": m.DeviceID,
+			"stream_id": m.StreamID,
+			"prev_id":   m.PrevID,
+		}).WithError(err).Errorf("Failed to update device list")
 		return false
 	}
 	return true
