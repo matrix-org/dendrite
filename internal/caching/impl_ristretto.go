@@ -75,10 +75,12 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			Prefix: roomIDsCache,
 			MaxAge: time.Hour,
 		},
-		RoomServerEvents: &RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
-			cache:  cache,
-			Prefix: roomEventsCache,
-			MaxAge: time.Hour,
+		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{
+			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
+				cache:  cache,
+				Prefix: roomEventsCache,
+				MaxAge: time.Hour,
+			},
 		},
 		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
 			cache:   cache,
@@ -86,17 +88,21 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 			Mutable: true,
 			MaxAge:  time.Hour,
 		},
-		FederationPDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
-			cache:   cache,
-			Prefix:  federationPDUsCache,
-			Mutable: true,
-			MaxAge:  time.Hour / 2,
+		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
+			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
+				cache:   cache,
+				Prefix:  federationPDUsCache,
+				Mutable: true,
+				MaxAge:  time.Hour / 2,
+			},
 		},
-		FederationEDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.EDU]{
-			cache:   cache,
-			Prefix:  federationEDUsCache,
-			Mutable: true,
-			MaxAge:  time.Hour / 2,
+		FederationEDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.EDU]{
+			&RistrettoCachePartition[int64, *gomatrixserverlib.EDU]{
+				cache:   cache,
+				Prefix:  federationEDUsCache,
+				Mutable: true,
+				MaxAge:  time.Hour / 2,
+			},
 		},
 		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{
 			cache:   cache,
@@ -120,22 +126,24 @@ type RistrettoCachePartition[K keyable, V any] struct {
 	MaxAge  time.Duration
 }
 
-func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
+func (c *RistrettoCachePartition[K, V]) setWithCost(key K, value V, cost int64) {
 	bkey := fmt.Sprintf("%c%v", c.Prefix, key)
 	if !c.Mutable {
 		if v, ok := c.cache.Get(bkey); ok && v != nil && !reflect.DeepEqual(v, value) {
 			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", key, v, value))
 		}
 	}
+	c.cache.SetWithTTL(bkey, value, cost, c.MaxAge)
+}
+
+func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
 	var cost int64
-	if cv, ok := any(value).(costable); ok {
-		cost = cv.CacheCost()
-	} else if cv, ok := any(value).(string); ok {
+	if cv, ok := any(value).(string); ok {
 		cost = int64(len(cv))
 	} else {
 		cost = int64(unsafe.Sizeof(value))
 	}
-	c.cache.SetWithTTL(bkey, value, cost, c.MaxAge)
+	c.setWithCost(key, value, cost)
 }
 
 func (c *RistrettoCachePartition[K, V]) Unset(key K) {
@@ -155,4 +163,13 @@ func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
 	}
 	value, ok = v.(V)
 	return
+}
+
+type RistrettoCostedCachePartition[k keyable, v costable] struct {
+	*RistrettoCachePartition[k, v]
+}
+
+func (c *RistrettoCostedCachePartition[K, V]) Set(key K, value V) {
+	cost := value.CacheCost()
+	c.setWithCost(key, value, int64(cost))
 }

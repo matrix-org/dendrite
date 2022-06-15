@@ -36,7 +36,7 @@ type keyable interface {
 }
 
 type costable interface {
-	CacheCost() int64
+	CacheCost() int
 }
 
 type CacheSize int64
