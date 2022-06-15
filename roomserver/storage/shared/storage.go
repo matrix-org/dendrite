@@ -997,10 +997,10 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	var inDatabase []types.EventNID
+	var eventNIDs []types.EventNID
 	for _, e := range entries {
 		if e.EventTypeNID == eventTypeNID && e.EventStateKeyNID == stateKeyNID {
-			inDatabase = append(inDatabase, e.EventNID)
+			eventNIDs = append(eventNIDs, e.EventNID)
 		}
 	}
 	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
@@ -1054,10 +1054,10 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if err != nil {
 		return nil, err
 	}
-	var inDatabase []types.EventNID
+	var eventNIDs []types.EventNID
 	for _, e := range entries {
 		if e.EventTypeNID == eventTypeNID {
-			inDatabase = append(inDatabase, e.EventNID)
+			eventNIDs = append(eventNIDs, e.EventNID)
 		}
 	}
 	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
@@ -1065,7 +1065,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		eventIDs = map[types.EventNID]string{}
 	}
 	// return the events requested
-	eventPairs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, inDatabase)
+	eventPairs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, eventNIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -1158,7 +1158,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		stateKeyNIDSet[nid] = true
 	}
 
-	var inDatabase []types.EventNID
+	var eventNIDs []types.EventNID
 	eventNIDToVer := make(map[types.EventNID]gomatrixserverlib.RoomVersion)
 	// TODO: This feels like this is going to be really slow...
 	for _, roomID := range roomIDs {
@@ -1177,7 +1177,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 		for _, entry := range entries {
 			if typeNIDSet[entry.EventTypeNID] {
 				if allowWildcard[entry.EventTypeNID] || stateKeyNIDSet[entry.EventStateKeyNID] {
-					inDatabase = append(inDatabase, entry.EventNID)
+					eventNIDs = append(eventNIDs, entry.EventNID)
 					eventNIDToVer[entry.EventNID] = roomInfo.RoomVersion
 				}
 			}
@@ -1187,7 +1187,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 	if err != nil {
 		eventIDs = map[types.EventNID]string{}
 	}
-	events, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, inDatabase)
+	events, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, eventNIDs)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to load event JSON for event nids: %w", err)
 	}
