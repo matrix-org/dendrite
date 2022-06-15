@@ -46,7 +46,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
 		logrus.Fatalf("unable to create table: %s", err)
 	}
-	events, err := NewPostgresEventsTable(d.db)
+	accountData, err := NewPostgresAccountDataTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
-	accountData, err := NewPostgresAccountDataTable(d.db)
+	events, err := NewPostgresEventsTable(d.db)
 	if err != nil {
 		return nil, err
 	}
