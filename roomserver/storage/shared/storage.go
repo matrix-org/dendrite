@@ -440,7 +440,6 @@ func (d *Database) events(
 	inCache := make([]bool, len(inputEventNIDs))
 	inDatabase := make([]types.EventNID, 0, len(results))
 	for i, nid := range inputEventNIDs {
-		positions[nid] = i
 		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
 			results[i] = types.Event{
 				EventNID: nid,
@@ -449,6 +448,7 @@ func (d *Database) events(
 			inCache[i] = true
 		} else {
 			inDatabase = append(inDatabase, nid)
+			positions[nid] = i
 		}
 	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, inDatabase)
@@ -487,21 +487,23 @@ func (d *Database) events(
 		roomVersions[n] = v
 	}
 	for _, eventJSON := range eventJSONs {
-		eventNID := eventJSON.EventNID
-		roomNID := roomNIDs[eventNID]
-		roomVersion := roomVersions[roomNID]
-		event, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
-			eventIDs[eventNID], eventJSON.EventJSON, false, roomVersion,
+		result := types.Event{
+			EventNID: eventJSON.EventNID,
+		}
+		roomNID := roomNIDs[result.EventNID]
+		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
+			eventIDs[result.EventNID], eventJSON.EventJSON, false, roomVersions[roomNID],
 		)
 		if err != nil {
 			return nil, err
 		}
-		results[positions[eventNID]] = types.Event{
-			EventNID: eventJSON.EventNID,
-			Event:    event,
+		pos, ok := positions[result.EventNID]
+		if !ok {
+			panic("should have position")
 		}
-		if event != nil {
-			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+		results[pos] = result
+		if result.Event != nil {
+			d.Cache.StoreRoomServerEvent(result.EventNID, result.Event)
 		}
 	}
 	if !redactionsArePermanent {
