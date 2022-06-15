@@ -495,7 +495,7 @@ func (d *Database) events(
 	results := make([]types.Event, 0, len(inputEventNIDs))
 	for _, nid := range inputEventNIDs {
 		event, ok := events[nid]
-		if !ok {
+		if !ok || event == nil {
 			panic("missing event")
 		}
 		results = append(results, types.Event{
