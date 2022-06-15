@@ -493,7 +493,7 @@ func (d *Database) events(
 		if err != nil {
 			return nil, err
 		}
-		if result.Event != nil {
+		if event != nil {
 			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
 		}
 		result.Event = event
