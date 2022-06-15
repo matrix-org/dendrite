@@ -44,38 +44,46 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
-			cache: MustCreateCache("room_versions", 1*MB, enablePrometheus),
+			cache:  MustCreateCache("room_versions", 1*MB, enablePrometheus),
+			MaxAge: time.Hour,
 		},
 		ServerKeys: &RistrettoCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{
 			cache:   MustCreateCache("server_keys", 32*MB, enablePrometheus),
 			Mutable: true,
+			MaxAge:  time.Hour,
 		},
 		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{
-			cache: MustCreateCache("room_ids", 1*MB, enablePrometheus),
+			cache:  MustCreateCache("room_ids", 1*MB, enablePrometheus),
+			MaxAge: time.Hour,
 		},
 		RoomServerEvents: &RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
-			cache: MustCreateCache("room_events", 1*GB, enablePrometheus),
+			cache:  MustCreateCache("room_events", 1*GB, enablePrometheus),
+			MaxAge: time.Hour,
 		},
 		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
 			cache:   MustCreateCache("room_infos", 16*MB, enablePrometheus),
 			Mutable: true,
-			MaxAge:  time.Minute * 5,
+			MaxAge:  time.Hour,
 		},
 		FederationPDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
 			cache:   MustCreateCache("federation_pdus", 128*MB, enablePrometheus),
 			Mutable: true,
+			MaxAge:  time.Hour / 2,
 		},
 		FederationEDUs: &RistrettoCachePartition[int64, *gomatrixserverlib.EDU]{
 			cache:   MustCreateCache("federation_edus", 128*MB, enablePrometheus),
 			Mutable: true,
+			MaxAge:  time.Hour / 2,
 		},
 		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{
 			cache:   MustCreateCache("space_summary_rooms", 128, enablePrometheus), // TODO: not costed
 			Mutable: true,
+			MaxAge:  time.Hour,
 		},
 		LazyLoading: &RistrettoCachePartition[string, any]{ // TODO: type
 			cache:   MustCreateCache("lazy_loading", 256, enablePrometheus), // TODO: not costed
 			Mutable: true,
+			MaxAge:  time.Hour,
 		},
 	}, nil
 }

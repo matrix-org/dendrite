@@ -54,7 +54,7 @@ func (p *SyncAPIProducer) SendReceipt(
 	m.Header.Set("timestamp", strconv.Itoa(int(timestamp)))
 
 	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	_, err := p.JetStream.PublishMsgAsync(m, nats.Context(ctx))
 	return err
 }
 
@@ -122,7 +122,7 @@ func (p *SyncAPIProducer) SendToDevice(
 		m.Header.Set("sender", sender)
 		m.Header.Set(jetstream.UserID, userID)
 
-		if _, err = p.JetStream.PublishMsg(m, nats.Context(ctx)); err != nil {
+		if _, err = p.JetStream.PublishMsgAsync(m, nats.Context(ctx)); err != nil {
 			log.WithError(err).Error("sendToDevice failed t.Producer.SendMessage")
 			return err
 		}
@@ -141,7 +141,7 @@ func (p *SyncAPIProducer) SendTyping(
 	m.Header.Set(jetstream.RoomID, roomID)
 	m.Header.Set("typing", strconv.FormatBool(typing))
 	m.Header.Set("timeout_ms", strconv.Itoa(int(timeoutMS)))
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	_, err := p.JetStream.PublishMsgAsync(m, nats.Context(ctx))
 	return err
 }
 
@@ -158,6 +158,6 @@ func (p *SyncAPIProducer) SendPresence(
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(lastActiveTS)))
 	log.Debugf("Sending presence to syncAPI: %+v", m.Header)
-	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	_, err := p.JetStream.PublishMsgAsync(m, nats.Context(ctx))
 	return err
 }
