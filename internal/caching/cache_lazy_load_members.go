@@ -1,17 +1,7 @@
 package caching
 
 import (
-	"time"
-
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-)
-
-const (
-	LazyLoadCacheName           = "lazy_load_members"
-	LazyLoadCacheMaxEntries     = 128
-	LazyLoadCacheMaxUserEntries = 128
-	LazyLoadCacheMutable        = true
-	LazyLoadCacheMaxAge         = time.Minute * 30
 )
 
 type LazyLoadCache interface {

@@ -4,13 +4,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
-const (
-	RoomServerRoomIDsCacheName       = "roomserver_room_ids"
-	RoomServerRoomIDsCacheMaxEntries = 1024
-	RoomServerRoomIDsCacheMutable    = false
-	RoomServerRoomIDsCacheMaxAge     = CacheNoMaxAge
-)
-
 type RoomServerCaches interface {
 	RoomServerNIDsCache
 	RoomVersionCache

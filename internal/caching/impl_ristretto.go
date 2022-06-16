@@ -119,6 +119,15 @@ func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error
 	}, nil
 }
 
+type RistrettoCostedCachePartition[k keyable, v costable] struct {
+	*RistrettoCachePartition[k, v]
+}
+
+func (c *RistrettoCostedCachePartition[K, V]) Set(key K, value V) {
+	cost := value.CacheCost()
+	c.setWithCost(key, value, int64(cost))
+}
+
 type RistrettoCachePartition[K keyable, V any] struct {
 	cache   *ristretto.Cache
 	Prefix  byte
@@ -163,13 +172,4 @@ func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
 	}
 	value, ok = v.(V)
 	return
-}
-
-type RistrettoCostedCachePartition[k keyable, v costable] struct {
-	*RistrettoCachePartition[k, v]
-}
-
-func (c *RistrettoCostedCachePartition[K, V]) Set(key K, value V) {
-	cost := value.CacheCost()
-	c.setWithCost(key, value, int64(cost))
 }
