@@ -716,3 +716,8 @@ PUT /rooms/:room_id/redact/:event_id/:txn_id is idempotent
 Unnamed room comes with a name summary
 Named room comes with just joined member count summary
 Room summary only has 5 heroes
+registration is idempotent, with username specified
+Setting state twice is idempotent
+Joining room twice is idempotent
+Inbound federation can return missing events for shared visibility
+Inbound federation ignores redactions from invalid servers room > v3

@@ -354,6 +354,16 @@ func (t *RoomserverInternalAPITrace) QueryAuthChain(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) QueryRestrictedJoinAllowed(
+	ctx context.Context,
+	request *QueryRestrictedJoinAllowedRequest,
+	response *QueryRestrictedJoinAllowedResponse,
+) error {
+	err := t.Impl.QueryRestrictedJoinAllowed(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryRestrictedJoinAllowed req=%+v res=%+v", js(request), js(response))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {

@@ -501,11 +501,7 @@ func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverli
 	} else if serverName != t.Origin {
 		return
 	}
-	var inputRes keyapi.InputDeviceListUpdateResponse
-	t.keyAPI.InputDeviceListUpdate(context.Background(), &keyapi.InputDeviceListUpdateRequest{
-		Event: payload,
-	}, &inputRes)
-	if inputRes.Error != nil {
-		util.GetLogger(ctx).WithError(inputRes.Error).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
+	if err := t.producer.SendDeviceListUpdate(ctx, &payload); err != nil {
+		util.GetLogger(ctx).WithError(err).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
 	}
 }

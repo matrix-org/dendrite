@@ -37,7 +37,7 @@ type traceInterceptor struct {
 	sqlmw.NullInterceptor
 }
 
-func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.StmtQueryContext, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.StmtQueryContext, query string, args []driver.NamedValue) (context.Context, driver.Rows, error) {
 	startedAt := time.Now()
 	rows, err := stmt.QueryContext(ctx, args)
 
@@ -45,7 +45,7 @@ func (in *traceInterceptor) StmtQueryContext(ctx context.Context, stmt driver.St
 
 	logrus.WithField("duration", time.Since(startedAt)).WithField(logrus.ErrorKey, err).Debug("executed sql query ", query, " args: ", args)
 
-	return rows, err
+	return ctx, rows, err
 }
 
 func (in *traceInterceptor) StmtExecContext(ctx context.Context, stmt driver.StmtExecContext, query string, args []driver.NamedValue) (driver.Result, error) {
