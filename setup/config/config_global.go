@@ -73,6 +73,9 @@ type Global struct {
 
 	// ReportStats configures opt-in anonymous stats reporting.
 	ReportStats ReportStats `yaml:"report_stats"`
+
+	// Configuration for the caches.
+	Caches Caches `yaml:"caches"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -90,6 +93,7 @@ func (c *Global) Defaults(generate bool) {
 	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(generate)
 	c.ReportStats.Defaults()
+	c.Caches.Defaults(generate)
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -102,6 +106,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.DNSCache.Verify(configErrs, isMonolith)
 	c.ServerNotices.Verify(configErrs, isMonolith)
 	c.ReportStats.Verify(configErrs, isMonolith)
+	c.Caches.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -167,6 +172,20 @@ func (c *ServerNotices) Defaults(generate bool) {
 }
 
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
+
+type Caches struct {
+	Enabled    bool  `yaml:"enabled"`
+	EstMaxSize int64 `yaml:"max_bytes_est"`
+}
+
+func (c *Caches) Defaults(generate bool) {
+	c.Enabled = true
+	c.EstMaxSize = 1024 * 1024 * 1024 // 1GB
+}
+
+func (c *Caches) Verify(errors *ConfigErrors, isMonolith bool) {
+	checkPositive(errors, "max_bytes_est", int64(c.EstMaxSize))
+}
 
 // ReportStats configures opt-in anonymous stats reporting.
 type ReportStats struct {

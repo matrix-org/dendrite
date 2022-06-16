@@ -14,10 +14,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func MustCreateCache(maxCost CacheSize, enablePrometheus bool) *ristretto.Cache {
+func MustCreateCache(maxCost int64, enablePrometheus bool) *ristretto.Cache {
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 1e5,
-		MaxCost:     int64(maxCost),
+		MaxCost:     maxCost,
 		BufferItems: 64,
 		Metrics:     true,
 		KeyToHash: func(key interface{}) (uint64, uint64) {
@@ -56,7 +56,7 @@ const (
 	lazyLoadingCache
 )
 
-func NewRistrettoCache(maxCost CacheSize, enablePrometheus bool) (*Caches, error) {
+func NewRistrettoCache(maxCost int64, enablePrometheus bool) (*Caches, error) {
 	cache := MustCreateCache(maxCost, enablePrometheus)
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{

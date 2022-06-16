@@ -1,8 +1,6 @@
 package caching
 
 import (
-	"time"
-
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -38,15 +36,3 @@ type keyable interface {
 type costable interface {
 	CacheCost() int
 }
-
-type CacheSize int64
-
-const (
-	_            = iota
-	KB CacheSize = 1 << (10 * iota)
-	MB
-	GB
-	TB
-)
-
-const CacheNoMaxAge = time.Duration(0)
