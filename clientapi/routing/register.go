@@ -767,7 +767,7 @@ func handleRegistrationFlow(
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
 
 	case authtypes.LoginTypePublicKey:
-		isCompleted, authType, err := handlePublicKeyRegistration(cfg, reqBody, userAPI)
+		isCompleted, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
 		if err != nil {
 			return *err
 		}
