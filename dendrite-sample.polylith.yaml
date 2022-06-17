@@ -31,6 +31,14 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
+  # Configuration for in-process caches, to help speed up processing transactions
+  # and reducing load on the database.
+  cache:
+    # The estimated maximum size for the global cache in bytes. Note that this is
+    # not a hard limit, nor is it a memory limit for the entire process. A cache that
+    # is too small may end up yielding little benefit.
+    max_bytes_est: 1073741824
+
   # The server name to delegate server-server communications to, with optional port
   # e.g. localhost:443
   well_known_server_name: ""

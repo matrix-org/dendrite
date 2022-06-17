@@ -75,7 +75,7 @@ type Global struct {
 	ReportStats ReportStats `yaml:"report_stats"`
 
 	// Configuration for the caches.
-	Caches Caches `yaml:"caches"`
+	Cache Cache `yaml:"cache"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -93,7 +93,7 @@ func (c *Global) Defaults(generate bool) {
 	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(generate)
 	c.ReportStats.Defaults()
-	c.Caches.Defaults(generate)
+	c.Cache.Defaults(generate)
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -106,7 +106,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.DNSCache.Verify(configErrs, isMonolith)
 	c.ServerNotices.Verify(configErrs, isMonolith)
 	c.ReportStats.Verify(configErrs, isMonolith)
-	c.Caches.Verify(configErrs, isMonolith)
+	c.Cache.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -173,17 +173,15 @@ func (c *ServerNotices) Defaults(generate bool) {
 
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
-type Caches struct {
-	Enabled    bool  `yaml:"enabled"`
+type Cache struct {
 	EstMaxSize int64 `yaml:"max_bytes_est"`
 }
 
-func (c *Caches) Defaults(generate bool) {
-	c.Enabled = true
+func (c *Cache) Defaults(generate bool) {
 	c.EstMaxSize = 1024 * 1024 * 1024 // 1GB
 }
 
-func (c *Caches) Verify(errors *ConfigErrors, isMonolith bool) {
+func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
 	checkPositive(errors, "max_bytes_est", int64(c.EstMaxSize))
 }
 
