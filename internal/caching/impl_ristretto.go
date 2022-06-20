@@ -9,15 +9,16 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/dgraph-io/ristretto/z"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func MustCreateCache(maxCost int64, enablePrometheus bool) *ristretto.Cache {
+func MustCreateCache(maxCost config.DataUnit, enablePrometheus bool) *ristretto.Cache {
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 1e5,
-		MaxCost:     maxCost,
+		MaxCost:     int64(maxCost),
 		BufferItems: 64,
 		Metrics:     true,
 		KeyToHash: func(key interface{}) (uint64, uint64) {
@@ -56,7 +57,7 @@ const (
 	lazyLoadingCache
 )
 
-func NewRistrettoCache(maxCost int64, enablePrometheus bool) (*Caches, error) {
+func NewRistrettoCache(maxCost config.DataUnit, enablePrometheus bool) (*Caches, error) {
 	cache := MustCreateCache(maxCost, enablePrometheus)
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{

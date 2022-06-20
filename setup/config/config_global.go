@@ -2,6 +2,8 @@ package config
 
 import (
 	"math/rand"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -174,7 +176,7 @@ func (c *ServerNotices) Defaults(generate bool) {
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
 type Cache struct {
-	EstMaxSize int64 `yaml:"max_bytes_est"`
+	EstMaxSize DataUnit `yaml:"max_bytes_est"`
 }
 
 func (c *Cache) Defaults(generate bool) {
@@ -284,4 +286,29 @@ type PresenceOptions struct {
 	EnableInbound bool `yaml:"enable_inbound"`
 	// Whether outbound presence events are allowed
 	EnableOutbound bool `yaml:"enable_outbound"`
+}
+
+type DataUnit int64
+
+func (d *DataUnit) UnmarshalText(text []byte) error {
+	var magnitude float64
+	s := strings.ToLower(string(text))
+	switch {
+	case strings.HasSuffix(s, "tb"):
+		s, magnitude = s[:len(s)-2], 1024*1024*1024*1024
+	case strings.HasSuffix(s, "gb"):
+		s, magnitude = s[:len(s)-2], 1024*1024*1024
+	case strings.HasSuffix(s, "mb"):
+		s, magnitude = s[:len(s)-2], 1024*1024
+	case strings.HasSuffix(s, "kb"):
+		s, magnitude = s[:len(s)-2], 1024
+	default:
+		magnitude = 1
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return err
+	}
+	*d = DataUnit(v * magnitude)
+	return nil
 }
