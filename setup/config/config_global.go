@@ -176,11 +176,13 @@ func (c *ServerNotices) Defaults(generate bool) {
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
 type Cache struct {
-	EstMaxSize DataUnit `yaml:"max_bytes_est"`
+	EstMaxSize DataUnit      `yaml:"max_bytes_est"`
+	MaxAge     time.Duration `yaml:"max_age"`
 }
 
 func (c *Cache) Defaults(generate bool) {
 	c.EstMaxSize = 1024 * 1024 * 1024 // 1GB
+	c.MaxAge = time.Hour
 }
 
 func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {

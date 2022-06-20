@@ -57,37 +57,37 @@ const (
 	lazyLoadingCache
 )
 
-func NewRistrettoCache(maxCost config.DataUnit, enablePrometheus bool) (*Caches, error) {
+func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) (*Caches, error) {
 	cache := MustCreateCache(maxCost, enablePrometheus)
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
 			cache:  cache,
 			Prefix: roomVersionsCache,
-			MaxAge: time.Hour,
+			MaxAge: maxAge,
 		},
 		ServerKeys: &RistrettoCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{
 			cache:   cache,
 			Prefix:  serverKeysCache,
 			Mutable: true,
-			MaxAge:  time.Hour,
+			MaxAge:  maxAge,
 		},
 		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{
 			cache:  cache,
 			Prefix: roomIDsCache,
-			MaxAge: time.Hour,
+			MaxAge: maxAge,
 		},
 		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{
 			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
 				cache:  cache,
 				Prefix: roomEventsCache,
-				MaxAge: time.Hour,
+				MaxAge: maxAge,
 			},
 		},
 		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
 			cache:   cache,
 			Prefix:  roomInfosCache,
 			Mutable: true,
-			MaxAge:  time.Hour,
+			MaxAge:  maxAge,
 		},
 		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
 			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
@@ -109,13 +109,13 @@ func NewRistrettoCache(maxCost config.DataUnit, enablePrometheus bool) (*Caches,
 			cache:   cache,
 			Prefix:  spaceSummaryRoomsCache,
 			Mutable: true,
-			MaxAge:  time.Hour,
+			MaxAge:  maxAge,
 		},
 		LazyLoading: &RistrettoCachePartition[string, any]{ // TODO: type
 			cache:   cache,
 			Prefix:  lazyLoadingCache,
 			Mutable: true,
-			MaxAge:  time.Hour,
+			MaxAge:  maxAge,
 		},
 	}, nil
 }

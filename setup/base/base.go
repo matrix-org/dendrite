@@ -161,7 +161,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		}
 	}
 
-	cache, err := caching.NewRistrettoCache(cfg.Global.Cache.EstMaxSize, enableMetrics)
+	cache, err := caching.NewRistrettoCache(cfg.Global.Cache.EstMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
 	if err != nil {
 		logrus.WithError(err).Warnf("Failed to create cache")
 	}

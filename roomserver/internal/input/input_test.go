@@ -48,7 +48,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		Kind:  api.KindOutlier, // don't panic if we generate an output event
 		Event: event.Headered(gomatrixserverlib.RoomVersionV6),
 	}
-	cache, err := caching.NewRistrettoCache(8*1024*1024, false)
+	cache, err := caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 	if err != nil {
 		t.Fatal(err)
 	}

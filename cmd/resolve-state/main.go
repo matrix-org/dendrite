@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -53,7 +54,7 @@ func main() {
 
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
-	cache, err := caching.NewRistrettoCache(128*1024*1024, true)
+	cache, err := caching.NewRistrettoCache(128*1024*1024, time.Hour, true)
 	if err != nil {
 		panic(err)
 	}
