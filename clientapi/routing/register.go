@@ -750,8 +750,8 @@ func handleRegistrationFlow(
 		}
 	}
 
-	switch r.Auth.Type {
-	case authtypes.LoginTypeRecaptcha:
+	switch true {
+	case r.Auth.Type == authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
 		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
 		if resErr != nil {
@@ -761,24 +761,20 @@ func handleRegistrationFlow(
 		// Add Recaptcha to the list of completed registration stages
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
 
-	case authtypes.LoginTypeDummy:
+	case r.Auth.Type == authtypes.LoginTypeDummy && !cfg.PasswordAuthenticationDisabled:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
 
-	case authtypes.LoginTypePublicKey:
-		isCompleted, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
+	case r.Auth.Type == authtypes.LoginTypePublicKey:
+		_, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
 		if err != nil {
 			return *err
 		}
 
-		if isCompleted {
-			sessions.addCompletedSessionStage(sessionID, authType)
-		} else {
-			newPublicKeyAuthSession(&r, sessions, sessionID)
-		}
+		sessions.addCompletedSessionStage(sessionID, authType)
 
-	case "":
+	case r.Auth.Type == "":
 		// An empty auth type means that we want to fetch the available
 		// flows. It can also mean that we want to register as an appservice
 		// but that is handed above.

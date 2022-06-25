@@ -26,14 +26,6 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func newPublicKeyAuthSession(request *registerRequest, sessions *sessionsDict, sessionID string) {
-	sessions.sessions[sessionID] = append(sessions.sessions[sessionID], authtypes.LoginTypePublicKey)
-	// Public key auth does not use password. But the registration flow
-	// requires setting a password in order to create the account.
-	// Create a random password to satisfy the requirement.
-	request.Password = util.RandomString(sessionIDLength)
-}
-
 func handlePublicKeyRegistration(
 	cfg *config.ClientAPI,
 	reqBytes []byte,
@@ -67,7 +59,7 @@ func handlePublicKeyRegistration(
 		authHandler = pkEthHandler
 	default:
 		// No response. Client is asking for a new registration session
-		return false, "", nil
+		return false, authtypes.LoginStagePublicKeyNewSession, nil
 	}
 
 	if _, ok := sessions.sessions[authHandler.GetSession()]; !ok {
@@ -85,7 +77,7 @@ func handlePublicKeyRegistration(
 		}
 	}
 
-	isCompleted, jerr := authHandler.ValidateLoginResponse()
+	isValidated, jerr := authHandler.ValidateLoginResponse()
 	if jerr != nil {
 		return false, "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -93,5 +85,19 @@ func handlePublicKeyRegistration(
 		}
 	}
 
-	return isCompleted, authtypes.LoginType(authHandler.GetType()), nil
+	// Registration flow requires a password to
+	// create a user account. Create a random one
+	// to satisfy the requirement. This is not used
+	// for public key cryptography.
+	createPassword(r)
+
+	return isValidated, authtypes.LoginType(authHandler.GetType()), nil
+}
+
+func createPassword(request *registerRequest) {
+	// Public key auth does not use password.
+	// Create a random one that is never used.
+	// Login validation will be done using public / private
+	// key cryptography.
+	request.Password = util.RandomString(sessionIDLength)
 }
