@@ -95,8 +95,8 @@ func (u *MembershipUpdater) Delete() error {
 }
 
 func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *gomatrixserverlib.Event) (bool, []string, error) {
-	var inserted bool
-	var retired []string
+	var inserted bool    // Did the query result in a membership change?
+	var retired []string // Did we retire any updates in the process?
 	return inserted, retired, u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
 		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, event.Sender())
 		if err != nil {
@@ -115,16 +115,14 @@ func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *
 			return nil
 		}
 		switch {
-		case u.oldMembership == tables.MembershipStateLeaveOrBan && newMembership == tables.MembershipStateInvite:
-			// add invite entry
+		case u.oldMembership != tables.MembershipStateInvite && newMembership == tables.MembershipStateInvite:
 			inserted, err = u.d.InvitesTable.InsertInviteEvent(
 				u.ctx, u.txn, event.EventID(), u.roomNID, u.targetUserNID, senderUserNID, event.JSON(),
 			)
 			if err != nil {
 				return fmt.Errorf("u.d.InvitesTable.InsertInviteEvent: %w", err)
 			}
-		case u.oldMembership == tables.MembershipStateInvite && newMembership == tables.MembershipStateLeaveOrBan:
-			// retire event
+		case u.oldMembership == tables.MembershipStateInvite && newMembership != tables.MembershipStateInvite:
 			retired, err = u.d.InvitesTable.UpdateInviteRetired(
 				u.ctx, u.txn, u.roomNID, u.targetUserNID,
 			)
