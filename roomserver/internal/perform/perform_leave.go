@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -228,7 +229,7 @@ func (r *Leaver) performFederatedRejectInvite(
 		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
-		if _, _, err = updater.Update(leaveRes.Event.Unwrap()); err != nil {
+		if _, _, err = updater.Update(tables.MembershipStateLeaveOrBan, leaveRes.Event.Unwrap()); err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("failed to set membership to leave, still retiring invite event")
 			if err = updater.Rollback(); err != nil {
 				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback membership leave, still retiring invite event")

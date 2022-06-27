@@ -90,30 +90,13 @@ func (u *MembershipUpdater) IsKnock() bool {
 	return u.oldMembership == tables.MembershipStateKnock
 }
 
-func (u *MembershipUpdater) Update(event *gomatrixserverlib.Event) (bool, []string, error) {
+func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *gomatrixserverlib.Event) (bool, []string, error) {
 	var inserted bool
 	var retired []string
 	return inserted, retired, u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		membership, err := event.Membership()
-		if err != nil {
-			return fmt.Errorf("event.Membership: %w", err)
-		}
 		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, event.Sender())
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
-		}
-		var newMembership tables.MembershipState
-		switch membership {
-		case gomatrixserverlib.Join:
-			newMembership = tables.MembershipStateJoin
-		case gomatrixserverlib.Leave, gomatrixserverlib.Ban:
-			newMembership = tables.MembershipStateLeaveOrBan
-		case gomatrixserverlib.Invite:
-			newMembership = tables.MembershipStateInvite
-		case gomatrixserverlib.Knock:
-			newMembership = tables.MembershipStateKnock
-		default:
-			return fmt.Errorf("unrecognised membership %q", membership)
 		}
 		eventID := event.EventID()
 		eventNIDs, err := u.d.eventNIDs(u.ctx, u.txn, []string{eventID}, false)

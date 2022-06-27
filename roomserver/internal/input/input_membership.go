@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
@@ -152,7 +153,7 @@ func updateToJoinMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	_, retired, err := mu.Update(add)
+	_, retired, err := mu.Update(tables.MembershipStateJoin, add)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +180,7 @@ func updateToLeaveMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	_, retired, err := mu.Update(add)
+	_, retired, err := mu.Update(tables.MembershipStateLeaveOrBan, add)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +202,7 @@ func updateToLeaveMembership(
 func updateToKnockMembership(
 	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	if _, _, err := mu.Update(add); err != nil {
+	if _, _, err := mu.Update(tables.MembershipStateKnock, add); err != nil {
 		return nil, err
 	}
 	return updates, nil
