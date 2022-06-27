@@ -119,6 +119,9 @@ const selectServerInRoomSQL = "" +
 	" JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
 	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
 
+const deleteMembershipSQL = "" +
+	"DELETE FROM roomserver_membership WHERE room_nid = $1 AND target_nid = $2"
+
 type membershipStatements struct {
 	db                                              *sql.DB
 	insertMembershipStmt                            *sql.Stmt
@@ -134,6 +137,7 @@ type membershipStatements struct {
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 	selectLocalServerInRoomStmt                     *sql.Stmt
 	selectServerInRoomStmt                          *sql.Stmt
+	deleteMembershipStmt                            *sql.Stmt
 }
 
 func CreateMembershipTable(db *sql.DB) error {
@@ -160,6 +164,7 @@ func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 		{&s.selectLocalServerInRoomStmt, selectLocalServerInRoomSQL},
 		{&s.selectServerInRoomStmt, selectServerInRoomSQL},
+		{&s.deleteMembershipStmt, deleteMembershipSQL},
 	}.Prepare(db)
 }
 
@@ -372,4 +377,14 @@ func (s *membershipStatements) SelectServerInRoom(ctx context.Context, txn *sql.
 		return false, err
 	}
 	return roomNID == nid, nil
+}
+
+func (s *membershipStatements) DeleteMembership(
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.deleteMembershipStmt).ExecContext(
+		ctx, roomNID, targetUserNID,
+	)
+	return err
 }

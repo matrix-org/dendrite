@@ -99,6 +99,16 @@ func (r *Inputer) updateMembership(
 		}
 	}
 
+	var targetLocal bool
+	if add != nil {
+		targetLocal = r.isLocalTarget(add)
+	}
+
+	mu, err := updater.MembershipUpdater(targetUserNID, targetLocal)
+	if err != nil {
+		return nil, err
+	}
+
 	// In an ideal world, we shouldn't ever have "add" be nil and "remove" be
 	// set, as this implies that we're deleting a state event without replacing
 	// it (a thing that ordinarily shouldn't happen in Matrix). However, state
@@ -108,17 +118,10 @@ func (r *Inputer) updateMembership(
 	// after a state reset, often thinking that the user was still joined to
 	// the room even though the room state said otherwise, and this would prevent
 	// the user from being able to attempt to rejoin the room without modifying
-	// the database. So instead what we'll do is we'll just update the membership
-	// table to say that the user is "leave" and we'll use the old event to
-	// avoid nil pointer exceptions on the code path that follows.
-	if add == nil {
-		add = remove
-		newMembership = gomatrixserverlib.Leave
-	}
-
-	mu, err := updater.MembershipUpdater(targetUserNID, r.isLocalTarget(add))
-	if err != nil {
-		return nil, err
+	// the database. So instead we're going to remove the membership from the
+	// database altogether, so that it doesn't create future problems.
+	if add == nil && remove != nil {
+		return nil, mu.Delete()
 	}
 
 	switch newMembership {

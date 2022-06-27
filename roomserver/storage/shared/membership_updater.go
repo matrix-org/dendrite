@@ -90,6 +90,10 @@ func (u *MembershipUpdater) IsKnock() bool {
 	return u.oldMembership == tables.MembershipStateKnock
 }
 
+func (u *MembershipUpdater) Delete() error {
+	return u.d.MembershipTable.DeleteMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID)
+}
+
 func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *gomatrixserverlib.Event) (bool, []string, error) {
 	var inserted bool
 	var retired []string
