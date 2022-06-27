@@ -90,25 +90,12 @@ func (r *Inputer) updateMembership(
 ) ([]api.OutputEvent, error) {
 	var err error
 	// Default the membership to Leave if no event was added or removed.
-	oldMembership := gomatrixserverlib.Leave
 	newMembership := gomatrixserverlib.Leave
-
-	if remove != nil {
-		oldMembership, err = remove.Membership()
-		if err != nil {
-			return nil, err
-		}
-	}
 	if add != nil {
 		newMembership, err = add.Membership()
 		if err != nil {
 			return nil, err
 		}
-	}
-	if oldMembership == newMembership && newMembership != gomatrixserverlib.Join {
-		// If the membership is the same then nothing changed and we can return
-		// immediately, unless it's a Join update (e.g. profile update).
-		return updates, nil
 	}
 
 	// In an ideal world, we shouldn't ever have "add" be nil and "remove" be
@@ -161,21 +148,11 @@ func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
 func updateToJoinMembership(
 	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	// If the user is already marked as being joined, we call SetToJoin to update
-	// the event ID then we can return immediately. Retired is ignored as there
-	// is no invite event to retire.
-	if mu.IsJoin() {
-		_, err := mu.SetToJoin(add.Sender(), add.EventID(), true)
-		if err != nil {
-			return nil, err
-		}
-		return updates, nil
-	}
 	// When we mark a user as being joined we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToJoin(add.Sender(), add.EventID(), false)
+	_, retired, err := mu.Update(add)
 	if err != nil {
 		return nil, err
 	}
@@ -198,16 +175,11 @@ func updateToLeaveMembership(
 	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	// If the user is already neither joined, nor invited to the room then we
-	// can return immediately.
-	if mu.IsLeave() {
-		return updates, nil
-	}
 	// When we mark a user as having left we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToLeave(add.Sender(), add.EventID())
+	_, retired, err := mu.Update(add)
 	if err != nil {
 		return nil, err
 	}
@@ -229,11 +201,8 @@ func updateToLeaveMembership(
 func updateToKnockMembership(
 	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	if mu.IsLeave() {
-		_, err := mu.SetToKnock(add)
-		if err != nil {
-			return nil, err
-		}
+	if _, _, err := mu.Update(add); err != nil {
+		return nil, err
 	}
 	return updates, nil
 }

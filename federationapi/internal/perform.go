@@ -561,6 +561,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		}
 
 		r.statistics.ForServer(serverName).Success()
+		response.Event = event.Headered(respMakeLeave.RoomVersion)
 		return nil
 	}
 

@@ -228,7 +228,7 @@ func (r *Leaver) performFederatedRejectInvite(
 		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
-		if _, err = updater.SetToLeave(req.UserID, eventID); err != nil {
+		if _, _, err = updater.Update(leaveRes.Event.Unwrap()); err != nil {
 			util.GetLogger(ctx).WithError(err).Errorf("failed to set membership to leave, still retiring invite event")
 			if err = updater.Rollback(); err != nil {
 				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback membership leave, still retiring invite event")

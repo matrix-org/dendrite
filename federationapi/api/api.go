@@ -181,6 +181,7 @@ type PerformLeaveRequest struct {
 }
 
 type PerformLeaveResponse struct {
+	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
 }
 
 type PerformInviteRequest struct {
