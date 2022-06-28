@@ -161,15 +161,14 @@ func updateToJoinMembership(
 		return nil, err
 	}
 	for _, eventID := range retired {
-		orie := api.OutputRetireInviteEvent{
-			EventID:          eventID,
-			Membership:       gomatrixserverlib.Join,
-			RetiredByEventID: add.EventID(),
-			TargetUserID:     *add.StateKey(),
-		}
 		updates = append(updates, api.OutputEvent{
-			Type:              api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &orie,
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:          eventID,
+				Membership:       gomatrixserverlib.Join,
+				RetiredByEventID: add.EventID(),
+				TargetUserID:     *add.StateKey(),
+			},
 		})
 	}
 	return updates, nil
@@ -188,15 +187,14 @@ func updateToLeaveMembership(
 		return nil, err
 	}
 	for _, eventID := range retired {
-		orie := api.OutputRetireInviteEvent{
-			EventID:          eventID,
-			Membership:       newMembership,
-			RetiredByEventID: add.EventID(),
-			TargetUserID:     *add.StateKey(),
-		}
 		updates = append(updates, api.OutputEvent{
-			Type:              api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &orie,
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:          eventID,
+				Membership:       newMembership,
+				RetiredByEventID: add.EventID(),
+				TargetUserID:     *add.StateKey(),
+			},
 		})
 	}
 	return updates, nil

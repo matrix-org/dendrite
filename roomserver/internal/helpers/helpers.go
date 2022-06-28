@@ -29,7 +29,7 @@ func UpdateToInviteMembership(
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, _, err := mu.Update(tables.MembershipStateInvite, add)
+	needsSending, retired, err := mu.Update(tables.MembershipStateInvite, add)
 	if err != nil {
 		return nil, err
 	}
@@ -39,13 +39,23 @@ func UpdateToInviteMembership(
 		// room event stream. This ensures that the consumers only have to
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
-		onie := api.OutputNewInviteEvent{
-			Event:       add.Headered(roomVersion),
-			RoomVersion: roomVersion,
-		}
 		updates = append(updates, api.OutputEvent{
-			Type:           api.OutputTypeNewInviteEvent,
-			NewInviteEvent: &onie,
+			Type: api.OutputTypeNewInviteEvent,
+			NewInviteEvent: &api.OutputNewInviteEvent{
+				Event:       add.Headered(roomVersion),
+				RoomVersion: roomVersion,
+			},
+		})
+	}
+	for _, eventID := range retired {
+		updates = append(updates, api.OutputEvent{
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:          eventID,
+				Membership:       gomatrixserverlib.Join,
+				RetiredByEventID: add.EventID(),
+				TargetUserID:     *add.StateKey(),
+			},
 		})
 	}
 	return updates, nil

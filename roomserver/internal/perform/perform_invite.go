@@ -24,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -44,6 +43,7 @@ func (r *Inviter) PerformInvite(
 	req *api.PerformInviteRequest,
 	res *api.PerformInviteResponse,
 ) ([]api.OutputEvent, error) {
+	var outputUpdates []api.OutputEvent
 	event := req.Event
 	if event.StateKey() == nil {
 		return nil, fmt.Errorf("invite must be a state event")
@@ -133,30 +133,26 @@ func (r *Inviter) PerformInvite(
 		return nil, nil
 	}
 
+	// Update the membership table for the invite.
+	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
+	if err != nil {
+		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+	}
+	outputUpdates, err = helpers.UpdateToInviteMembership(updater, event.Unwrap(), outputUpdates, req.Event.RoomVersion)
+	if err != nil {
+		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
+	}
+	if err = updater.Commit(); err != nil {
+		return nil, fmt.Errorf("updater.Commit: %w", err)
+	}
+	logger.Debugf("updated membership to invite and sending invite OutputEvent")
+
+	// If the invite originated remotely then we can't send an
+	// InputRoomEvent for the invite as it will never pass auth checks
+	// due to lacking room state, but we still need to tell the client
+	// about the invite so we can accept it, hence we return an output
+	// event to send to the Sync API.
 	if !isOriginLocal {
-		// The invite originated over federation. Process the membership
-		// update, which will notify the sync API etc about the incoming
-		// invite. We do NOT send an InputRoomEvent for the invite as it
-		// will never pass auth checks due to lacking room state, but we
-		// still need to tell the client about the invite so we can accept
-		// it, hence we return an output event to send to the sync api.
-		var updater *shared.MembershipUpdater
-		updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
-		if err != nil {
-			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
-		}
-
-		unwrapped := event.Unwrap()
-		var outputUpdates []api.OutputEvent
-		outputUpdates, err = helpers.UpdateToInviteMembership(updater, unwrapped, nil, req.Event.RoomVersion)
-		if err != nil {
-			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
-		}
-
-		if err = updater.Commit(); err != nil {
-			return nil, fmt.Errorf("updater.Commit: %w", err)
-		}
-		logger.Debugf("updated membership to invite and sending invite OutputEvent")
 		return outputUpdates, nil
 	}
 
@@ -222,12 +218,11 @@ func (r *Inviter) PerformInvite(
 			Code: api.PerformErrorNotAllowed,
 		}
 		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
-		return nil, nil
 	}
 
 	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
 	// gets the invite, as the roomserver will do this when it processes the m.room.member invite.
-	return nil, nil
+	return outputUpdates, nil
 }
 
 func buildInviteStrippedState(
