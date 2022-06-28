@@ -50,7 +50,7 @@ type messagesReq struct {
 type messagesResp struct {
 	Start       string                          `json:"start"`
 	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
-	End         string                          `json:"end"`
+	End         string                          `json:"end,omitempty"`
 	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
 	State       []gomatrixserverlib.ClientEvent `json:"state"`
 }
@@ -238,6 +238,12 @@ func OnIncomingMessagesRequest(
 		Start: start.String(),
 		End:   end.String(),
 		State: state,
+	}
+
+	// If we didn't return any events, set the end to an empty string, so it will be omitted
+	// in the response JSON.
+	if len(res.Chunk) == 0 {
+		res.End = ""
 	}
 	if fromStream != nil {
 		res.StartStream = fromStream.String()
