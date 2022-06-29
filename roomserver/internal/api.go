@@ -64,6 +64,7 @@ func NewRoomserverAPI(
 	producer := &producers.RoomEvent{
 		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent)),
 		JetStream: js,
+		ACLs:      serverACLs,
 	}
 	a := &RoomserverInternalAPI{
 		ProcessContext:         processCtx,
