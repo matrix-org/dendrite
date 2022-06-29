@@ -53,6 +53,10 @@ func (r *Joiner) PerformJoin(
 	req *rsAPI.PerformJoinRequest,
 	res *rsAPI.PerformJoinResponse,
 ) {
+	// We'll store whether the user intended to force a federated join
+	// here, since req.ServerNames will be mutated when we've performed
+	// a directory lookup, so it's difficult to check later.
+	req.ForceFederated = len(req.ServerNames) > 0
 	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
 		"room_id": req.RoomIDOrAlias,
 		"user_id": req.UserID,
@@ -221,17 +225,27 @@ func (r *Joiner) performJoinRoomByID(
 		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
 
-	// Force a federated join if we aren't in the room and we've been
-	// given some server names to try joining by.
-	inRoomReq := &rsAPI.QueryServerJoinedToRoomRequest{
-		RoomID: req.RoomIDOrAlias,
+	// Force a federated join if we aren't in the room or if the
+	// user specifically requested to force a federated join. The
+	// server names by this point may have been populated by a
+	// directory lookup.
+	forceFederatedJoin := req.ForceFederated
+	if !forceFederatedJoin {
+		inRoomReq := &rsAPI.QueryServerJoinedToRoomRequest{
+			RoomID: req.RoomIDOrAlias,
+		}
+		inRoomRes := &rsAPI.QueryServerJoinedToRoomResponse{}
+		if err = r.Queryer.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
+			return "", "", fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+		}
+		forceFederatedJoin = !inRoomRes.IsInRoom
 	}
-	inRoomRes := &rsAPI.QueryServerJoinedToRoomResponse{}
-	if err = r.Queryer.QueryServerJoinedToRoom(ctx, inRoomReq, inRoomRes); err != nil {
-		return "", "", fmt.Errorf("r.Queryer.QueryServerJoinedToRoom: %w", err)
+	if forceFederatedJoin && len(req.ServerNames) == 0 {
+		return "", "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorBadRequest,
+			Msg:  "Unable to find any servers to complete a federated join to this room",
+		}
 	}
-	serverInRoom := inRoomRes.IsInRoom
-	forceFederatedJoin := len(req.ServerNames) > 0 && !serverInRoom
 
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
@@ -297,7 +311,7 @@ func (r *Joiner) performJoinRoomByID(
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,
-					Msg:  fmt.Sprintf("InputRoomEvents auth failed: %s", err),
+					Msg:  fmt.Sprintf("Authenticating the room join failed: %s", err),
 				}
 			}
 		}
@@ -313,7 +327,7 @@ func (r *Joiner) performJoinRoomByID(
 			if len(req.ServerNames) == 0 {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNoRoom,
-					Msg:  fmt.Sprintf("room ID %q does not exist", req.RoomIDOrAlias),
+					Msg:  fmt.Sprintf("Room %q does not exist on this server", req.RoomIDOrAlias),
 				}
 			}
 		}
@@ -324,7 +338,10 @@ func (r *Joiner) performJoinRoomByID(
 
 	default:
 		// Something else went wrong.
-		return "", "", fmt.Errorf("error joining local room: %q", err)
+		return "", "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("Failed to join the room: %s", err),
+		}
 	}
 
 	// By this point, if req.RoomIDOrAlias contained an alias, then

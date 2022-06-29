@@ -75,10 +75,11 @@ const (
 )
 
 type PerformJoinRequest struct {
-	RoomIDOrAlias string                         `json:"room_id_or_alias"`
-	UserID        string                         `json:"user_id"`
-	Content       map[string]interface{}         `json:"content"`
-	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
+	RoomIDOrAlias  string                         `json:"room_id_or_alias"`
+	UserID         string                         `json:"user_id"`
+	Content        map[string]interface{}         `json:"content"`
+	ServerNames    []gomatrixserverlib.ServerName `json:"server_names"`
+	ForceFederated bool                           `json:"force_federated"`
 }
 
 type PerformJoinResponse struct {
