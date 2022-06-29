@@ -96,7 +96,7 @@ func (r *Unpeeker) performUnpeekRoomByID(
 
 	// TODO: handle federated peeks
 
-	err = r.Inputer.WriteOutputEvents(req.RoomID, []api.OutputEvent{
+	err = r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeRetirePeek,
 			RetirePeek: &api.OutputRetirePeek{
