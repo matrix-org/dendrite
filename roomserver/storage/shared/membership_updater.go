@@ -103,10 +103,9 @@ func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
 		eventID := event.EventID()
-		eventNIDs, err := u.d.eventNIDs(u.ctx, u.txn, []string{eventID}, false)
-		if err != nil {
-			return fmt.Errorf("u.d.eventNIDs: %w", err)
-		}
+		// It's possible the event isn't persisted, i.e. in the case of invites,
+		// so don't error if we can't find the event NID.
+		eventNIDs, _ := u.d.eventNIDs(u.ctx, u.txn, []string{eventID}, false)
 		inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, newMembership, eventNIDs[eventID], false)
 		if err != nil {
 			return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
