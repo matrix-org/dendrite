@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -56,11 +57,14 @@ type RoomserverInternalAPI struct {
 
 func NewRoomserverAPI(
 	processCtx *process.ProcessContext, cfg *config.RoomServer, roomserverDB storage.Database,
-	consumer nats.JetStreamContext, nc *nats.Conn,
-	inputRoomEventTopic string, producer *producers.RoomEvent,
+	js nats.JetStreamContext, nc *nats.Conn, inputRoomEventTopic string,
 	caches caching.RoomServerCaches, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
+	producer := &producers.RoomEvent{
+		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent)),
+		JetStream: js,
+	}
 	a := &RoomserverInternalAPI{
 		ProcessContext:         processCtx,
 		DB:                     roomserverDB,
@@ -70,7 +74,7 @@ func NewRoomserverAPI(
 		PerspectiveServerNames: perspectiveServerNames,
 		InputRoomEventTopic:    inputRoomEventTopic,
 		OutputProducer:         producer,
-		JetStream:              consumer,
+		JetStream:              js,
 		NATSClient:             nc,
 		Durable:                cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,

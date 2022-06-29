@@ -18,7 +18,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
-	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/roomserver/internal"
@@ -53,14 +52,9 @@ func NewInternalAPI(
 
 	js, nc := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	roomEventProducer := &producers.RoomEvent{
-		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent)),
-		JetStream: js,
-	}
-
 	return internal.NewRoomserverAPI(
 		base.ProcessContext, cfg, roomserverDB, js, nc,
 		cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
-		roomEventProducer, base.Caches, perspectiveServerNames,
+		base.Caches, perspectiveServerNames,
 	)
 }
