@@ -471,6 +471,13 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return err
 	}
 
+	pusherReq := &api.PerformPusherDeletionRequest{
+		Localpart: req.Localpart,
+	}
+	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+		return err
+	}
+
 	err := a.DB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err

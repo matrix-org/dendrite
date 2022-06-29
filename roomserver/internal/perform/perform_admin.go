@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -184,7 +185,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 	}
 
 	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
@@ -192,7 +193,16 @@ func (r *Admin) PerformAdminEvacuateUser(
 		return
 	}
 
-	for _, roomID := range roomIDs {
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
+	if err != nil && err != sql.ErrNoRows {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
+		}
+		return
+	}
+
+	for _, roomID := range append(roomIDs, inviteRoomIDs...) {
 		leaveReq := &api.PerformLeaveRequest{
 			RoomID: roomID,
 			UserID: req.UserID,
