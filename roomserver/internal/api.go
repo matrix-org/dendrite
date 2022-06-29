@@ -170,6 +170,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Cfg:     r.Cfg,
 		Inputer: r.Inputer,
 		Queryer: r.Queryer,
+		Leaver:  r.Leaver,
 	}
 
 	if err := r.Inputer.Start(); err != nil {
