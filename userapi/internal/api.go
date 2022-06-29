@@ -460,6 +460,14 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
 	a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes)
 	if err := evacuateRes.Error; err != nil {
+		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
+	}
+
+	deviceReq := &api.PerformDeviceDeletionRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	deviceRes := &api.PerformDeviceDeletionResponse{}
+	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
 		return err
 	}
 
