@@ -30,34 +30,26 @@ const (
 type ApplicationServiceWorkerState struct {
 	AppService config.ApplicationService
 	Cond       *sync.Cond
-	// Events ready to be sent
-	EventsReady bool
+	// Lastest incremental ID from appservice_events table that is ready to be sent to application service
+	latestId int
 	// Backoff exponent (2^x secs). Max 6, aka 64s.
 	Backoff int
 }
 
 // NotifyNewEvents wakes up all waiting goroutines, notifying that events remain
 // in the event queue for this application service worker.
-func (a *ApplicationServiceWorkerState) NotifyNewEvents() {
+func (a *ApplicationServiceWorkerState) NotifyNewEvents(id int) {
 	a.Cond.L.Lock()
-	a.EventsReady = true
+	a.latestId = id
 	a.Cond.Broadcast()
-	a.Cond.L.Unlock()
-}
-
-// FinishEventProcessing marks all events of this worker as being sent to the
-// application service.
-func (a *ApplicationServiceWorkerState) FinishEventProcessing() {
-	a.Cond.L.Lock()
-	a.EventsReady = false
 	a.Cond.L.Unlock()
 }
 
 // WaitForNewEvents causes the calling goroutine to wait on the worker state's
 // condition for a broadcast or similar wakeup, if there are no events ready.
-func (a *ApplicationServiceWorkerState) WaitForNewEvents() {
+func (a *ApplicationServiceWorkerState) WaitForNewEvents(id int) {
 	a.Cond.L.Lock()
-	if !a.EventsReady {
+	if a.latestId <= id {
 		a.Cond.Wait()
 	}
 	a.Cond.L.Unlock()

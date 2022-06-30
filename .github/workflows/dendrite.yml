@@ -13,50 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  wasm:
-    name: WASM build test
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-wasm-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-wasm
-
-      - name: Install Node
-        uses: actions/setup-node@v2
-        with:
-          node-version: 14
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Reconfigure Git to use HTTPS auth for repo packages
-        run: >
-          git config --global url."https://github.com/".insteadOf
-          ssh://git@github.com/
-
-      - name: Install test dependencies
-        working-directory: ./test/wasm
-        run: npm ci
-
-      - name: Test
-        run: ./test-dendritejs.sh
 
   # Run golangci-lint
   lint:
@@ -68,7 +24,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
 
-  # run go test with different go versions
+  # run go test with go 1.18
   test:
     timeout-minutes: 5
     name: Unit tests (Go ${{ matrix.go }})
@@ -96,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -118,7 +74,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: dendrite
 
-  # build Dendrite for linux with different architectures and go versions
+  # build Dendrite for linux amd64 with go 1.18
   build:
     name: Build for Linux
     timeout-minutes: 10
@@ -126,9 +82,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18"]
         goos: ["linux"]
-        goarch: ["amd64", "386"]
+        goarch: ["amd64"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -152,43 +108,10 @@ jobs:
           CGO_ENABLED: 1
         run: go build -trimpath -v -o "bin/" ./cmd/...
 
-  # build for Windows 64-bit
-  build_windows:
-    name: Build for Windows
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go: ["1.16", "1.17", "1.18"]
-        goos: ["windows"]
-        goarch: ["amd64"]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go ${{ matrix.go }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go }}
-      - name: Install dependencies
-        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}
-      - env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 1
-          CC: "/usr/bin/x86_64-w64-mingw32-gcc"
-        run: go build -trimpath -v -o "bin/" ./cmd/...
-
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
     name: Initial tests passed
-    needs: [lint, test, build, build_windows]
+    needs: [lint, test, build]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:

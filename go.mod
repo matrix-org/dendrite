@@ -21,6 +21,7 @@ require (
 	github.com/frankban/quicktest v1.14.3 // indirect
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.1
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.3.0
@@ -37,6 +38,7 @@ require (
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20220607143425-e55d796fd0b3
 	github.com/matrix-org/pinecone v0.0.0-20220408153826-2999ea29ed48
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
+	github.com/matryer/is v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/miekg/dns v1.1.49 // indirect

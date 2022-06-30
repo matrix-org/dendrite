@@ -21,9 +21,9 @@ import (
 )
 
 type Database interface {
-	StoreEvent(ctx context.Context, appServiceID string, event *gomatrixserverlib.HeaderedEvent) error
-	GetEventsWithAppServiceID(ctx context.Context, appServiceID string, limit int) (int, int, []gomatrixserverlib.HeaderedEvent, bool, error)
-	CountEventsWithAppServiceID(ctx context.Context, appServiceID string) (int, error)
+	StoreEvent(ctx context.Context, appServiceID string, event *gomatrixserverlib.HeaderedEvent) (int, error)
+	GetEventsWithAppServiceID(ctx context.Context, appServiceID string, limit int) (int, int, []gomatrixserverlib.HeaderedEvent, error)
+	GetLatestId(ctx context.Context, appServiceID string) (int, error)
 	UpdateTxnIDForEvents(ctx context.Context, appserviceID string, maxID, txnID int) error
 	RemoveEventsBeforeAndIncludingID(ctx context.Context, appserviceID string, eventTableID int) error
 	GetLatestTxnID(ctx context.Context) (int, error)
