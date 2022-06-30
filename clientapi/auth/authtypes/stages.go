@@ -15,5 +15,5 @@
 package authtypes
 
 const (
-	LoginStagePublicKeyNewSession = "m.login.publickey.newsession"
+	LoginStagePublicKeyNewRegistration = "m.login.publickey.newregistration"
 )

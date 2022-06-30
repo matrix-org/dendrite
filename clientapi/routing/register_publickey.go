@@ -59,7 +59,7 @@ func handlePublicKeyRegistration(
 		authHandler = pkEthHandler
 	default:
 		// No response. Client is asking for a new registration session
-		return false, authtypes.LoginStagePublicKeyNewSession, nil
+		return false, authtypes.LoginStagePublicKeyNewRegistration, nil
 	}
 
 	if _, ok := sessions.sessions[authHandler.GetSession()]; !ok {
