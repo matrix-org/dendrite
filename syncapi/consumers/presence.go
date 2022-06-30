@@ -138,7 +138,7 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	presence := msg.Header.Get("presence")
 	timestamp := msg.Header.Get("last_active_ts")
 	fromSync, _ := strconv.ParseBool(msg.Header.Get("from_sync"))
-	logrus.Debugf("syncAPI received presence event: %+v", msg.Header)
+	logrus.Tracef("syncAPI received presence event: %+v", msg.Header)
 
 	if fromSync { // do not process local presence changes; we already did this synchronously.
 		return true
