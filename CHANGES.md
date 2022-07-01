@@ -8,14 +8,14 @@
 * The `/context` endpoint now returns `"start"` and `"end"` parameters to allow pagination from a context call
 * The `/messages` endpoint will no longer return `"end"` when there are no more messages remaining
 * Deactivated user accounts will now leave all rooms automatically
-* New admin endpoint `/_dendrite/admin/evacuateUser` has been added for forcing a local user to leave all joined rooms
+* New admin endpoint `/_dendrite/admin/evacuateUser/{userID}` has been added for forcing a local user to leave all joined rooms
 * Dendrite will now automatically attempt to raise the file descriptor limit at startup if it is too low
 
 ### Fixes
 
-* A rare panic when retrieving remote device lists has been fixed
+* A rare crash when retrieving remote device lists has been fixed
 * Fixes a bug where events were not redacted properly over federation
-* The `/invite` endpoints will now return an error if the user ID is obviously malformed
+* The `/invite` endpoints will now return an error instead of silently proceeding if the user ID is obviously malformed
 
 ## Dendrite 0.8.8 (2022-06-09)
 
