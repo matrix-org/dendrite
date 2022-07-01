@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -206,8 +207,17 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			}
 			logger.Infof("returned %d PDUs which made events %+v", len(res.PDUs), result)
 			for _, res := range result {
-				if res.Error != nil {
-					logger.WithError(res.Error).Warn("event failed PDU checks")
+				switch err := res.Error.(type) {
+				case nil:
+				case gomatrixserverlib.SignatureErr:
+					// The signature of the event might not be valid anymore, for example if
+					// the key ID was reused with a different signature.
+					logger.WithError(err).Errorf("event failed PDU checks, storing anyway")
+				case gomatrixserverlib.AuthChainErr, gomatrixserverlib.AuthRulesErr:
+					logger.WithError(err).Warn("event failed PDU checks")
+					continue
+				default:
+					logger.WithError(err).Warn("event failed PDU checks")
 					continue
 				}
 				missingMap[id] = res.Event
@@ -306,6 +316,7 @@ FederationHit:
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = res
 		return res, nil
 	}
+	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
@@ -366,19 +377,25 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 		}
 	}
 
-	c := gomatrixserverlib.FederatedStateProvider{
-		FedClient:          b.fsAPI,
-		RememberAuthEvents: false,
-		Server:             b.servers[0],
+	var lastErr error
+	for _, srv := range b.servers {
+		c := gomatrixserverlib.FederatedStateProvider{
+			FedClient:          b.fsAPI,
+			RememberAuthEvents: false,
+			Server:             srv,
+		}
+		result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		for eventID, ev := range result {
+			b.eventIDMap[eventID] = ev
+		}
+		return result, nil
 	}
-	result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
-	if err != nil {
-		return nil, err
-	}
-	for eventID, ev := range result {
-		b.eventIDMap[eventID] = ev
-	}
-	return result, nil
+	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
+	return nil, lastErr
 }
 
 // ServersAtEvent is called when trying to determine which server to request from.
