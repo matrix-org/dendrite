@@ -12,8 +12,10 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
 	"github.com/matrix-org/dendrite/roomserver/internal/perform"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
+	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -49,17 +51,21 @@ type RoomserverInternalAPI struct {
 	JetStream              nats.JetStreamContext
 	Durable                string
 	InputRoomEventTopic    string // JetStream topic for new input room events
-	OutputRoomEventTopic   string // JetStream topic for new output room events
+	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []gomatrixserverlib.ServerName
 }
 
 func NewRoomserverAPI(
 	processCtx *process.ProcessContext, cfg *config.RoomServer, roomserverDB storage.Database,
-	consumer nats.JetStreamContext, nc *nats.Conn,
-	inputRoomEventTopic, outputRoomEventTopic string,
+	js nats.JetStreamContext, nc *nats.Conn, inputRoomEventTopic string,
 	caches caching.RoomServerCaches, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
+	producer := &producers.RoomEventProducer{
+		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent)),
+		JetStream: js,
+		ACLs:      serverACLs,
+	}
 	a := &RoomserverInternalAPI{
 		ProcessContext:         processCtx,
 		DB:                     roomserverDB,
@@ -68,8 +74,8 @@ func NewRoomserverAPI(
 		ServerName:             cfg.Matrix.ServerName,
 		PerspectiveServerNames: perspectiveServerNames,
 		InputRoomEventTopic:    inputRoomEventTopic,
-		OutputRoomEventTopic:   outputRoomEventTopic,
-		JetStream:              consumer,
+		OutputProducer:         producer,
+		JetStream:              js,
 		NATSClient:             nc,
 		Durable:                cfg.Matrix.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
@@ -92,19 +98,19 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.KeyRing = keyRing
 
 	r.Inputer = &input.Inputer{
-		Cfg:                  r.Cfg,
-		ProcessContext:       r.ProcessContext,
-		DB:                   r.DB,
-		InputRoomEventTopic:  r.InputRoomEventTopic,
-		OutputRoomEventTopic: r.OutputRoomEventTopic,
-		JetStream:            r.JetStream,
-		NATSClient:           r.NATSClient,
-		Durable:              nats.Durable(r.Durable),
-		ServerName:           r.Cfg.Matrix.ServerName,
-		FSAPI:                fsAPI,
-		KeyRing:              keyRing,
-		ACLs:                 r.ServerACLs,
-		Queryer:              r.Queryer,
+		Cfg:                 r.Cfg,
+		ProcessContext:      r.ProcessContext,
+		DB:                  r.DB,
+		InputRoomEventTopic: r.InputRoomEventTopic,
+		OutputProducer:      r.OutputProducer,
+		JetStream:           r.JetStream,
+		NATSClient:          r.NATSClient,
+		Durable:             nats.Durable(r.Durable),
+		ServerName:          r.Cfg.Matrix.ServerName,
+		FSAPI:               fsAPI,
+		KeyRing:             keyRing,
+		ACLs:                r.ServerACLs,
+		Queryer:             r.Queryer,
 	}
 	r.Inviter = &perform.Inviter{
 		DB:      r.DB,
@@ -170,6 +176,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Cfg:     r.Cfg,
 		Inputer: r.Inputer,
 		Queryer: r.Queryer,
+		Leaver:  r.Leaver,
 	}
 
 	if err := r.Inputer.Start(); err != nil {
@@ -198,7 +205,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 	if len(outputEvents) == 0 {
 		return nil
 	}
-	return r.WriteOutputEvents(req.Event.RoomID(), outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformLeave(
@@ -214,7 +221,7 @@ func (r *RoomserverInternalAPI) PerformLeave(
 	if len(outputEvents) == 0 {
 		return nil
 	}
-	return r.WriteOutputEvents(req.RoomID, outputEvents)
+	return r.OutputProducer.ProduceRoomEvents(req.RoomID, outputEvents)
 }
 
 func (r *RoomserverInternalAPI) PerformForget(

@@ -16,6 +16,7 @@ const (
 
 var (
 	InputRoomEvent          = "InputRoomEvent"
+	InputDeviceListUpdate   = "InputDeviceListUpdate"
 	OutputRoomEvent         = "OutputRoomEvent"
 	OutputSendToDeviceEvent = "OutputSendToDeviceEvent"
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
@@ -43,6 +44,11 @@ func InputRoomEventSubj(roomID string) string {
 var streams = []*nats.StreamConfig{
 	{
 		Name:      InputRoomEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      InputDeviceListUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},
