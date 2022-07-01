@@ -135,7 +135,7 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 
 func (pk LoginPublicKeyEthereum) CreateLogin() *Login {
 	identifier := LoginIdentifier{
-		Type: "m.id.publickey",
+		Type: "m.id.decentralizedid",
 		User: pk.UserId,
 	}
 	login := Login{
