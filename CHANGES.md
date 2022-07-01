@@ -1,5 +1,22 @@
 # Changelog
 
+## Dendrite 0.8.9 (2022-07-01)
+
+### Features
+
+* Incoming device list updates over federation are now queued in JetStream for processing so that they will no longer block incoming federation transactions and should never end up dropped, which will hopefully help E2EE reliability
+* The `/context` endpoint now returns `"start"` and `"end"` parameters to allow pagination from a context call
+* The `/messages` endpoint will no longer return `"end"` when there are no more messages remaining
+* Deactivated user accounts will now leave all rooms automatically
+* New admin endpoint `/_dendrite/admin/evacuateUser` has been added for forcing a local user to leave all joined rooms
+* Dendrite will now automatically attempt to raise the file descriptor limit at startup if it is too low
+
+### Fixes
+
+* A rare panic when retrieving remote device lists has been fixed
+* Fixes a bug where events were not redacted properly over federation
+* The `/invite` endpoints will now return an error if the user ID is obviously malformed
+
 ## Dendrite 0.8.8 (2022-06-09)
 
 ### Features
