@@ -79,7 +79,7 @@ type Inputer struct {
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
 	InputRoomEventTopic string
-	OutputProducer      *producers.RoomEvent
+	OutputProducer      *producers.RoomEventProducer
 	workers             sync.Map // room ID -> *worker
 
 	Queryer *query.Queryer

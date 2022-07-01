@@ -51,7 +51,7 @@ type RoomserverInternalAPI struct {
 	JetStream              nats.JetStreamContext
 	Durable                string
 	InputRoomEventTopic    string // JetStream topic for new input room events
-	OutputProducer         *producers.RoomEvent
+	OutputProducer         *producers.RoomEventProducer
 	PerspectiveServerNames []gomatrixserverlib.ServerName
 }
 
@@ -61,7 +61,7 @@ func NewRoomserverAPI(
 	caches caching.RoomServerCaches, perspectiveServerNames []gomatrixserverlib.ServerName,
 ) *RoomserverInternalAPI {
 	serverACLs := acls.NewServerACLs(roomserverDB)
-	producer := &producers.RoomEvent{
+	producer := &producers.RoomEventProducer{
 		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent)),
 		JetStream: js,
 		ACLs:      serverACLs,

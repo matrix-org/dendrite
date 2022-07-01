@@ -31,13 +31,13 @@ var keyContentFields = map[string]string{
 	"m.room.member":             "membership",
 }
 
-type RoomEvent struct {
+type RoomEventProducer struct {
 	Topic     string
 	ACLs      *acls.ServerACLs
 	JetStream nats.JetStreamContext
 }
 
-func (r *RoomEvent) ProduceRoomEvents(roomID string, updates []api.OutputEvent) error {
+func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.OutputEvent) error {
 	var err error
 	for _, update := range updates {
 		msg := &nats.Msg{
