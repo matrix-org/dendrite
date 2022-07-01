@@ -76,7 +76,7 @@ type Login struct {
 
 // Username returns the user localpart/user_id in this request, if it exists.
 func (r *Login) Username() string {
-	if r.Identifier.Type == "m.id.user" || r.Identifier.Type == "m.id.publickey" {
+	if r.Identifier.Type == "m.id.user" || r.Identifier.Type == "m.id.decentralizedid" {
 		return r.Identifier.User
 	}
 	// deprecated but without it Element iOS won't log in

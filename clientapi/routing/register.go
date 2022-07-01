@@ -764,19 +764,17 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+		if !cfg.PasswordAuthenticationDisabled {
+			sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+		}
 
 	case authtypes.LoginTypePublicKey:
-		isCompleted, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
+		_, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
 		if err != nil {
 			return *err
 		}
 
-		if isCompleted {
-			sessions.addCompletedSessionStage(sessionID, authType)
-		} else {
-			newPublicKeyAuthSession(&r, sessions, sessionID)
-		}
+		sessions.addCompletedSessionStage(sessionID, authType)
 
 	case "":
 		// An empty auth type means that we want to fetch the available
