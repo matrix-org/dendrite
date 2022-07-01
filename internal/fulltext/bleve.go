@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !wasm
+// +build !wasm
+
 package fulltext
 
 import (
@@ -64,13 +67,8 @@ func (f *Search) Close() error {
 	return f.FulltextIndex.Close()
 }
 
-// FulltextIndex indexes a given element
-func (f *Search) Index(e IndexElement) error {
-	return f.FulltextIndex.Index(e.EventID, e)
-}
-
-// BatchIndex indexes the given elements
-func (f *Search) BatchIndex(elements []IndexElement) error {
+// Index indexes the given elements
+func (f *Search) Index(elements ...IndexElement) error {
 	batch := f.FulltextIndex.NewBatch()
 
 	for _, element := range elements {
