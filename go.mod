@@ -2,7 +2,7 @@ module github.com/matrix-org/dendrite
 
 replace github.com/nats-io/nats-server/v2 => github.com/neilalexander/nats-server/v2 v2.8.3-0.20220513095553-73a9a246d34f
 
-replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.13.1-0.20220419101051-b262d9f0be1e
+replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.13.1-0.20220621084451-ac518c356673
 
 require (
 	github.com/Arceliar/ironwood v0.0.0-20220306165321-319147a02d98

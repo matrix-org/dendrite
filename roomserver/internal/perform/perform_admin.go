@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -34,6 +35,7 @@ type Admin struct {
 	Cfg     *config.RoomServer
 	Queryer *query.Queryer
 	Inputer *input.Inputer
+	Leaver  *Leaver
 }
 
 // PerformEvacuateRoom will remove all local users from the given room.
@@ -159,4 +161,72 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	}
 	inputRes := &api.InputRoomEventsResponse{}
 	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+}
+
+func (r *Admin) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *api.PerformAdminEvacuateUserRequest,
+	res *api.PerformAdminEvacuateUserResponse,
+) {
+	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("Malformed user ID: %s", err),
+		}
+		return
+	}
+	if domain != r.Cfg.Matrix.ServerName {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  "Can only evacuate local users using this endpoint",
+		}
+		return
+	}
+
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
+	if err != nil && err != sql.ErrNoRows {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
+		}
+		return
+	}
+
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
+	if err != nil && err != sql.ErrNoRows {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
+		}
+		return
+	}
+
+	for _, roomID := range append(roomIDs, inviteRoomIDs...) {
+		leaveReq := &api.PerformLeaveRequest{
+			RoomID: roomID,
+			UserID: req.UserID,
+		}
+		leaveRes := &api.PerformLeaveResponse{}
+		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
+		if err != nil {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("r.Leaver.PerformLeave: %s", err),
+			}
+			return
+		}
+		if len(outputEvents) == 0 {
+			continue
+		}
+		if err := r.Inputer.WriteOutputEvents(roomID, outputEvents); err != nil {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("r.Inputer.WriteOutputEvents: %s", err),
+			}
+			return
+		}
+
+		res.Affected = append(res.Affected, roomID)
+	}
 }

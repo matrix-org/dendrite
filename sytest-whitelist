@@ -107,6 +107,7 @@ Lazy loading parameters in the filter are strictly boolean
 Can sync
 Can sync a joined room
 Newly joined room is included in an incremental sync
+Newly joined room includes presence in incremental sync
 User is offline if they set_presence=offline in their sync
 Changes to state are included in an incremental sync
 A change to displayname should appear in incremental /sync
@@ -241,7 +242,6 @@ Inbound federation can receive v2 /send_join
 Message history can be paginated
 Backfill works correctly with history visibility set to joined
 Guest user cannot call /events globally
-Guest users can join guest_access rooms
 Guest user can set display names
 Guest user cannot upgrade other users
 Guest non-joined user cannot call /events on shared room

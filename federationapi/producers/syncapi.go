@@ -159,7 +159,7 @@ func (p *SyncAPIProducer) SendPresence(
 	lastActiveTS := gomatrixserverlib.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(lastActiveTS)))
-	log.Debugf("Sending presence to syncAPI: %+v", m.Header)
+	log.Tracef("Sending presence to syncAPI: %+v", m.Header)
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }
