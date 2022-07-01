@@ -1,5 +1,51 @@
 # Changelog
 
+## Dendrite 0.8.9 (2022-07-01)
+
+### Features
+
+* Incoming device list updates over federation are now queued in JetStream for processing so that they will no longer block incoming federation transactions and should never end up dropped, which will hopefully help E2EE reliability
+* The `/context` endpoint now returns `"start"` and `"end"` parameters to allow pagination from a context call
+* The `/messages` endpoint will no longer return `"end"` when there are no more messages remaining
+* Deactivated user accounts will now leave all rooms automatically
+* New admin endpoint `/_dendrite/admin/evacuateUser/{userID}` has been added for forcing a local user to leave all joined rooms
+* Dendrite will now automatically attempt to raise the file descriptor limit at startup if it is too low
+
+### Fixes
+
+* A rare crash when retrieving remote device lists has been fixed
+* Fixes a bug where events were not redacted properly over federation
+* The `/invite` endpoints will now return an error instead of silently proceeding if the user ID is obviously malformed
+
+## Dendrite 0.8.8 (2022-06-09)
+
+### Features
+
+* The performance of state resolution has been increased significantly for larger rooms
+* A number of changes have been made to rate limiting:
+  * Logged in users will now be rate-limited on a per-session basis rather than by remote IP
+  * Rate limiting no longer applies to admin or appservice users
+  * It is now possible to configure additional users that are exempt from rate limiting using the `exempt_user_ids` option in the `rate_limiting` section of the Dendrite config
+* Setting state is now idempotent via the client API state endpoints
+
+### Fixes
+
+* Room upgrades now properly propagate tombstone events to remote servers
+* Room upgrades will no longer send tombstone events if creating the upgraded room fails
+* A crash has been fixed when evaluating restricted room joins
+
+## Dendrite 0.8.7 (2022-06-01)
+
+### Features
+
+* Support added for room version 10
+
+### Fixes
+
+* A number of state handling bugs have been fixed, which previously resulted in missing state events, unexpected state deletions, reverted memberships and unexpectedly rejected/soft-failed events in some specific cases
+* Fixed destination queue performance issues as a result of missing indexes, which speeds up outbound federation considerably
+* A bug which could cause the `/register` endpoint to return HTTP 500 has been fixed
+
 ## Dendrite 0.8.6 (2022-05-26)
 
 ### Features

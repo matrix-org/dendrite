@@ -63,20 +63,6 @@ type httpKeyInternalAPI struct {
 func (h *httpKeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
 	// no-op: doesn't need it
 }
-func (h *httpKeyInternalAPI) InputDeviceListUpdate(
-	ctx context.Context, req *api.InputDeviceListUpdateRequest, res *api.InputDeviceListUpdateResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputDeviceListUpdate")
-	defer span.Finish()
-
-	apiURL := h.apiURL + InputDeviceListUpdatePath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-	if err != nil {
-		res.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
-}
 
 func (h *httpKeyInternalAPI) PerformClaimKeys(
 	ctx context.Context,

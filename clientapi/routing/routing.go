@@ -89,6 +89,9 @@ func Setup(
 					"r0.4.0",
 					"r0.5.0",
 					"r0.6.1",
+					"v1.0",
+					"v1.1",
+					"v1.2",
 				}, UnstableFeatures: unstableFeatures},
 			}
 		}),
@@ -126,6 +129,12 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
+		httputil.MakeAuthAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateUser(req, device, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	dendriteAdminRouter.Handle("/admin/fulltext/reindex",
 		httputil.MakeAuthAPI("admin_fultext_reindex", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return AdminReindex(req, cfg, device, natsClient)
@@ -143,7 +152,7 @@ func Setup(
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				// not specced, but ensure we're rate limiting requests to this endpoint
-				if r := rateLimits.Limit(req); r != nil {
+				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
 				}
 				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -163,7 +172,7 @@ func Setup(
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 				// not specced, but ensure we're rate limiting requests to this endpoint
-				if r := rateLimits.Limit(req); r != nil {
+				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
 				}
 				return SendServerNotice(
@@ -193,7 +202,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/join/{roomIDOrAlias}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -209,7 +218,7 @@ func Setup(
 	if mscCfg.Enabled("msc2753") {
 		v3mux.Handle("/peek/{roomIDOrAlias}",
 			httputil.MakeAuthAPI(gomatrixserverlib.Peek, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-				if r := rateLimits.Limit(req); r != nil {
+				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
 				}
 				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -229,7 +238,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/join",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -243,7 +252,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/leave",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -277,7 +286,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomID}/invite",
 		httputil.MakeAuthAPI("membership", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -395,14 +404,14 @@ func Setup(
 	).Methods(http.MethodPut, http.MethodOptions)
 
 	v3mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
-		if r := rateLimits.Limit(req); r != nil {
+		if r := rateLimits.Limit(req, nil); r != nil {
 			return *r
 		}
 		return Register(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {
-		if r := rateLimits.Limit(req); r != nil {
+		if r := rateLimits.Limit(req, nil); r != nil {
 			return *r
 		}
 		return RegisterAvailable(req, cfg, userAPI)
@@ -476,7 +485,7 @@ func Setup(
 
 	v3mux.Handle("/rooms/{roomID}/typing/{userID}",
 		httputil.MakeAuthAPI("rooms_typing", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -533,7 +542,7 @@ func Setup(
 
 	v3mux.Handle("/account/whoami",
 		httputil.MakeAuthAPI("whoami", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			return Whoami(req, device)
@@ -542,7 +551,7 @@ func Setup(
 
 	v3mux.Handle("/account/password",
 		httputil.MakeAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			return Password(req, userAPI, device, cfg)
@@ -551,7 +560,7 @@ func Setup(
 
 	v3mux.Handle("/account/deactivate",
 		httputil.MakeAuthAPI("deactivate", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			return Deactivate(req, userInteractiveAuth, userAPI, device)
@@ -562,7 +571,7 @@ func Setup(
 
 	v3mux.Handle("/login",
 		httputil.MakeExternalAPI("login", func(req *http.Request) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, nil); r != nil {
 				return *r
 			}
 			return Login(req, userAPI, cfg)
@@ -670,7 +679,7 @@ func Setup(
 
 	v3mux.Handle("/pushrules/{scope}/{kind}/{ruleID}",
 		httputil.MakeAuthAPI("push_rules", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -736,7 +745,7 @@ func Setup(
 
 	v3mux.Handle("/profile/{userID}/avatar_url",
 		httputil.MakeAuthAPI("profile_avatar_url", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -761,7 +770,7 @@ func Setup(
 
 	v3mux.Handle("/profile/{userID}/displayname",
 		httputil.MakeAuthAPI("profile_displayname", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -800,7 +809,7 @@ func Setup(
 
 	v3mux.Handle("/voip/turnServer",
 		httputil.MakeAuthAPI("turn_server", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			return RequestTurnServer(req, device, cfg)
@@ -879,7 +888,7 @@ func Setup(
 
 	v3mux.Handle("/user/{userID}/openid/request_token",
 		httputil.MakeAuthAPI("openid_request_token", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -892,7 +901,7 @@ func Setup(
 
 	v3mux.Handle("/user_directory/search",
 		httputil.MakeAuthAPI("userdirectory_search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			postContent := struct {
@@ -938,7 +947,7 @@ func Setup(
 
 	v3mux.Handle("/rooms/{roomID}/read_markers",
 		httputil.MakeAuthAPI("rooms_read_markers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -951,7 +960,7 @@ func Setup(
 
 	v3mux.Handle("/rooms/{roomID}/forget",
 		httputil.MakeAuthAPI("rooms_forget", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -1028,7 +1037,7 @@ func Setup(
 
 	v3mux.Handle("/pushers/set",
 		httputil.MakeAuthAPI("set_pushers", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			return SetPusher(req, device, userAPI)
@@ -1086,7 +1095,7 @@ func Setup(
 
 	v3mux.Handle("/capabilities",
 		httputil.MakeAuthAPI("capabilities", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			return GetCapabilities(req, rsAPI)
@@ -1302,7 +1311,7 @@ func Setup(
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/rooms/{roomId}/receipt/{receiptType}/{eventId}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))

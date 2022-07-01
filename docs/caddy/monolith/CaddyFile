@@ -1,0 +1,68 @@
+{
+    # debug
+    admin off
+    email example@example.com
+    default_sni example.com
+    # Debug endpoint
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory	
+}
+
+#######################################################################
+#   Snippets
+#______________________________________________________________________
+
+(handle_errors_maintenance) {
+	handle_errors {
+		@maintenance expression {http.error.status_code} == 502
+		rewrite @maintenance maintenance.html
+		root * "/path/to/service/pages"
+		file_server
+	}
+}
+
+(matrix-well-known-header) {
+    # Headers
+    header Access-Control-Allow-Origin "*"
+    header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    header Content-Type "application/json"
+}
+
+#######################################################################
+
+example.com {
+
+	# ...
+
+	handle /.well-known/matrix/server {
+		import matrix-well-known-header
+		respond `{ "m.server": "matrix.example.com:443" }` 200
+	}
+	
+	handle /.well-known/matrix/client {
+		import matrix-well-known-header
+		respond `{ "m.homeserver": { "base_url": "https://matrix.example.com" } }` 200
+	}
+
+	import handle_errors_maintenance
+}
+
+example.com:8448 {
+	# server<->server HTTPS traffic
+    reverse_proxy http://dendrite-host:8008
+}
+
+matrix.example.com {
+
+	handle /_matrix/* {
+		# client<->server HTTPS traffic
+		reverse_proxy  http://dendrite-host:8008
+	}
+
+	handle_path /* {
+		# Client webapp (Element SPA or ...)
+		file_server {
+			root /path/to/www/example.com/matrix-web-client/
+		}	
+	}
+}
