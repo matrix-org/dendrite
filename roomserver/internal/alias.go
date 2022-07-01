@@ -216,11 +216,10 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			err = api.SendEvents(ctx, r.RSAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}
-
 		}
 	}
 

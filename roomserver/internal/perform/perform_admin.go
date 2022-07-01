@@ -219,7 +219,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		if len(outputEvents) == 0 {
 			continue
 		}
-		if err := r.Inputer.WriteOutputEvents(roomID, outputEvents); err != nil {
+		if err := r.Inputer.OutputProducer.ProduceRoomEvents(roomID, outputEvents); err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
 				Msg:  fmt.Sprintf("r.Inputer.WriteOutputEvents: %s", err),
