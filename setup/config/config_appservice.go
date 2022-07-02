@@ -187,7 +187,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Load the config data into our struct
-		if err = yaml.UnmarshalStrict(configData, &appservice); err != nil {
+		if err = yaml.Unmarshal(configData, &appservice); err != nil {
 			return err
 		}
 
