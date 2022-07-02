@@ -315,6 +315,20 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 			}
 		}
 
+		// Check required fields
+		if appservice.ID == "" {
+			return ConfigErrors([]string{"Application service ID is required"})
+		}
+		if appservice.ASToken == "" {
+			return ConfigErrors([]string{"Application service Token is required"})
+		}
+		if appservice.HSToken == "" {
+			return ConfigErrors([]string{"Homeserver Token is required"})
+		}
+		if appservice.SenderLocalpart == "" {
+			return ConfigErrors([]string{"Sender Localpart is required"})
+		}
+
 		// Check if the url has trailing /'s. If so, remove them
 		appservice.URL = strings.TrimRight(appservice.URL, "/")
 
