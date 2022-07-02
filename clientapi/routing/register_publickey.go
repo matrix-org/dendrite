@@ -62,7 +62,7 @@ func handlePublicKeyRegistration(
 		return false, authtypes.LoginStagePublicKeyNewRegistration, nil
 	}
 
-	if _, ok := sessions.sessions[authHandler.GetSession()]; !ok {
+	if !sessions.hasSession(authHandler.GetSession()) {
 		return false, "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.Unknown("the session ID is missing or unknown."),
