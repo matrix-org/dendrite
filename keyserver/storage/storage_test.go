@@ -18,7 +18,7 @@ func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	base, close := testrig.CreateBaseDendrite(t, dbType)
 	db, err := storage.NewDatabase(base, &base.Cfg.KeyServer.Database)
 	if err != nil {
-		t.Fatalf("failed to create new Database")
+		t.Fatalf("failed to create new database: %v", err)
 	}
 	return db, close
 }
