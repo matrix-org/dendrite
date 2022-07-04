@@ -3,6 +3,7 @@
 # Hidden files
 .*
 !.vscode
+!.cloudbuild
 
 # Allow GitHub config
 !.github
