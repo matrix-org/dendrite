@@ -113,6 +113,15 @@ func (t *RoomserverInternalAPITrace) PerformAdminEvacuateRoom(
 	util.GetLogger(ctx).Infof("PerformAdminEvacuateRoom req=%+v res=%+v", js(req), js(res))
 }
 
+func (t *RoomserverInternalAPITrace) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *PerformAdminEvacuateUserRequest,
+	res *PerformAdminEvacuateUserResponse,
+) {
+	t.Impl.PerformAdminEvacuateUser(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformAdminEvacuateUser req=%+v res=%+v", js(req), js(res))
+}
+
 func (t *RoomserverInternalAPITrace) PerformInboundPeek(
 	ctx context.Context,
 	req *PerformInboundPeekRequest,

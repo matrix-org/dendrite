@@ -140,11 +140,8 @@ type ClientRoomserverAPI interface {
 
 	// PerformRoomUpgrade upgrades a room to a newer version
 	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
-	PerformAdminEvacuateRoom(
-		ctx context.Context,
-		req *PerformAdminEvacuateRoomRequest,
-		res *PerformAdminEvacuateRoomResponse,
-	)
+	PerformAdminEvacuateRoom(ctx context.Context, req *PerformAdminEvacuateRoomRequest, res *PerformAdminEvacuateRoomResponse)
+	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse)
 	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse)
 	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse)
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
@@ -161,6 +158,7 @@ type UserRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse)
 }
 
 type FederationRoomserverAPI interface {

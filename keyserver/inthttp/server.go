@@ -25,17 +25,6 @@ import (
 )
 
 func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
-	internalAPIMux.Handle(InputDeviceListUpdatePath,
-		httputil.MakeInternalAPI("inputDeviceListUpdate", func(req *http.Request) util.JSONResponse {
-			request := api.InputDeviceListUpdateRequest{}
-			response := api.InputDeviceListUpdateResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.InputDeviceListUpdate(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 	internalAPIMux.Handle(PerformClaimKeysPath,
 		httputil.MakeInternalAPI("performClaimKeys", func(req *http.Request) util.JSONResponse {
 			request := api.PerformClaimKeysRequest{}
