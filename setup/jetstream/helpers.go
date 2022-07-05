@@ -3,7 +3,6 @@ package jetstream
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
@@ -76,17 +75,6 @@ func JetStreamConsumer(
 				continue
 			}
 			msg := msgs[0]
-			sentry.AddBreadcrumb(&sentry.Breadcrumb{
-				Type:     "nats",
-				Category: "jetstream",
-				Data: map[string]interface{}{
-					"subject": subj,
-					"durable": durable,
-					"header":  msg.Header,
-				},
-				Message:   string(msg.Data),
-				Timestamp: time.Now(),
-			})
 			if err = msg.InProgress(nats.Context(ctx)); err != nil {
 				logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.InProgress: %w", err))
 				sentry.CaptureException(err)
