@@ -156,6 +156,13 @@ func (d *sessionsDict) startTimer(duration time.Duration, sessionID string) {
 	})
 }
 
+func (d *sessionsDict) hasSession(sessionID string) bool {
+	d.RLock()
+	defer d.RUnlock()
+	_, ok := d.sessions[sessionID]
+	return ok
+}
+
 // addCompletedSessionStage records that a session has completed an auth stage
 // also starts a timer to delete the session once done.
 func (d *sessionsDict) addCompletedSessionStage(sessionID string, stage authtypes.LoginType) {

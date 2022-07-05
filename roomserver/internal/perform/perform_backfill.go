@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -322,6 +323,7 @@ FederationHit:
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = res
 		return res, nil
 	}
+	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
