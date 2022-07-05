@@ -1235,6 +1235,13 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 		stateKeyNIDs[i] = nid
 		i++
 	}
+	// If we didn't have any userIDs to look up, get the UserIDs for the returned userNIDToCount now
+	if len(userIDs) == 0 {
+		nidToUserID, err = d.EventStateKeys(ctx, stateKeyNIDs)
+		if err != nil {
+			return nil, err
+		}
+	}
 	result := make(map[string]int, len(userNIDToCount))
 	for nid, count := range userNIDToCount {
 		result[nidToUserID[nid]] = count
