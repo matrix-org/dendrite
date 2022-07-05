@@ -263,6 +263,12 @@ func (d *Database) snapshotNIDFromEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (types.StateSnapshotNID, error) {
 	_, stateNID, err := d.EventsTable.SelectEvent(ctx, txn, eventID)
+	if err != nil {
+		return 0, err
+	}
+	if stateNID == 0 {
+		return 0, sql.ErrNoRows // effectively there's no state entry
+	}
 	return stateNID, err
 }
 
@@ -1213,6 +1219,13 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	for nid := range userNIDToCount {
 		stateKeyNIDs[i] = nid
 		i++
+	}
+	// If we didn't have any userIDs to look up, get the UserIDs for the returned userNIDToCount now
+	if len(userIDs) == 0 {
+		nidToUserID, err = d.EventStateKeys(ctx, stateKeyNIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
 	result := make(map[string]int, len(userNIDToCount))
 	for nid, count := range userNIDToCount {
