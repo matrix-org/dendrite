@@ -90,7 +90,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msg *nats.Msg) bo
 		return true
 	}
 
-	timestamp, err := strconv.ParseUint(msg.Header.Get("timestamp"), 0, 10)
+	timestamp, err := strconv.ParseUint(msg.Header.Get("timestamp"), 10, 64)
 	if err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("EDU output log: message parse failure")
