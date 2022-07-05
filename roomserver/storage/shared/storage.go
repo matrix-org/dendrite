@@ -263,6 +263,12 @@ func (d *Database) snapshotNIDFromEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (types.StateSnapshotNID, error) {
 	_, stateNID, err := d.EventsTable.SelectEvent(ctx, txn, eventID)
+	if err != nil {
+		return 0, err
+	}
+	if stateNID == 0 {
+		return 0, sql.ErrNoRows // effectively there's no state entry
+	}
 	return stateNID, err
 }
 
