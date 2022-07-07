@@ -143,23 +143,17 @@ func (c *RistrettoCachePartition[K, V]) setWithCost(key K, value V, cost int64) 
 			panic(fmt.Sprintf("invalid use of immutable cache tries to change value of %v from %v to %v", key, v, value))
 		}
 	}
-	c.cache.SetWithTTL(bkey, value, cost, c.MaxAge)
+	c.cache.SetWithTTL(bkey, value, int64(len(bkey))+cost, c.MaxAge)
 }
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
-	var keyCost int64
-	var valueCost int64
-	if ck, ok := any(key).(string); ok {
-		keyCost = int64(len(ck))
-	} else {
-		keyCost = int64(unsafe.Sizeof(key))
-	}
+	var cost int64
 	if cv, ok := any(value).(string); ok {
-		valueCost = int64(len(cv))
+		cost = int64(len(cv))
 	} else {
-		valueCost = int64(unsafe.Sizeof(value))
+		cost = int64(unsafe.Sizeof(value))
 	}
-	c.setWithCost(key, value, keyCost+valueCost)
+	c.setWithCost(key, value, cost)
 }
 
 func (c *RistrettoCachePartition[K, V]) Unset(key K) {
