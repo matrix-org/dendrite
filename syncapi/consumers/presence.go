@@ -144,7 +144,7 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 		return true
 	}
 
-	ts, err := strconv.ParseInt(timestamp, 10, 64)
+	ts, err := strconv.ParseUint(timestamp, 10, 64)
 	if err != nil {
 		return true
 	}
