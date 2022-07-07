@@ -834,6 +834,9 @@ func (d *Database) handleRedactions(
 	if err != nil {
 		return nil, "", fmt.Errorf("d.GetStateEvent: %w", err)
 	}
+	if powerLevels == nil {
+		return nil, "", fmt.Errorf("unable to fetch m.room.power_levels event from database for room %s", event.RoomID())
+	}
 	pl, err := powerLevels.PowerLevels()
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to get powerlevels for room: %w", err)
