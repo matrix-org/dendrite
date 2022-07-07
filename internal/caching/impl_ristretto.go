@@ -94,7 +94,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				cache:   cache,
 				Prefix:  federationPDUsCache,
 				Mutable: true,
-				MaxAge:  time.Hour / 2,
+				MaxAge:  lesserOf(time.Hour/2, maxAge),
 			},
 		},
 		FederationEDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.EDU]{
@@ -102,7 +102,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				cache:   cache,
 				Prefix:  federationEDUsCache,
 				Mutable: true,
-				MaxAge:  time.Hour / 2,
+				MaxAge:  lesserOf(time.Hour/2, maxAge),
 			},
 		},
 		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{
@@ -173,4 +173,11 @@ func (c *RistrettoCachePartition[K, V]) Get(key K) (value V, ok bool) {
 	}
 	value, ok = v.(V)
 	return
+}
+
+func lesserOf(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
 }

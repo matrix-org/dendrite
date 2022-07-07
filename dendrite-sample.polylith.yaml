@@ -31,15 +31,16 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
-  # Configuration for in-process caches, to help speed up processing transactions
-  # and reducing load on the database.
+  # Configuration for in-memory caches. Caches can often improve performance by
+  # keeping frequently accessed items (like events, identifiers etc.) in memory
+  # rather than having to read them from the database.
   cache:
     # The estimated maximum size for the global cache in bytes, or in terabytes,
     # gigabytes, megabytes or kilobytes when the appropriate 'tb', 'gb', 'mb' or
     # 'kb' suffix is specified. Note that this is not a hard limit, nor is it a
     # memory limit for the entire process. A cache that is too small may ultimately
     # provide little or no benefit.
-    max_bytes_est: 1gb
+    max_size_est: 1gb
 
     # The maximum amount of time that a cache entry can live for in memory before
     # it will be evicted and/or refreshed from the database. Lower values result in

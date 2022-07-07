@@ -176,7 +176,7 @@ func (c *ServerNotices) Defaults(generate bool) {
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
 type Cache struct {
-	EstMaxSize DataUnit      `yaml:"max_bytes_est"`
+	EstMaxSize DataUnit      `yaml:"max_size_est"`
 	MaxAge     time.Duration `yaml:"max_age"`
 }
 
@@ -186,7 +186,7 @@ func (c *Cache) Defaults(generate bool) {
 }
 
 func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
-	checkPositive(errors, "max_bytes_est", int64(c.EstMaxSize))
+	checkPositive(errors, "max_size_est", int64(c.EstMaxSize))
 }
 
 // ReportStats configures opt-in anonymous stats reporting.
