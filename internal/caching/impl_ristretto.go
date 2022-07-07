@@ -28,20 +28,22 @@ func MustCreateCache(maxCost config.DataUnit, enablePrometheus bool) *ristretto.
 	if err != nil {
 		panic(err)
 	}
-	promauto.NewGaugeFunc(prometheus.GaugeOpts{
-		Namespace: "dendrite",
-		Subsystem: "caching_ristretto",
-		Name:      "ratio",
-	}, func() float64 {
-		return float64(cache.Metrics.Ratio())
-	})
-	promauto.NewGaugeFunc(prometheus.GaugeOpts{
-		Namespace: "dendrite",
-		Subsystem: "caching_ristretto",
-		Name:      "cost",
-	}, func() float64 {
-		return float64(cache.Metrics.CostAdded() - cache.Metrics.CostEvicted())
-	})
+	if enablePrometheus {
+		promauto.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace: "dendrite",
+			Subsystem: "caching_ristretto",
+			Name:      "ratio",
+		}, func() float64 {
+			return float64(cache.Metrics.Ratio())
+		})
+		promauto.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace: "dendrite",
+			Subsystem: "caching_ristretto",
+			Name:      "cost",
+		}, func() float64 {
+			return float64(cache.Metrics.CostAdded() - cache.Metrics.CostEvicted())
+		})
+	}
 	return cache
 }
 
