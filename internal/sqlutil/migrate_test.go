@@ -61,16 +61,16 @@ func Test_migrations_Up(t *testing.T) {
 	tests := []struct {
 		name       string
 		migrations []sqlutil.Migration
-		wantResult map[string]bool
+		wantResult map[string]struct{}
 		wantErr    bool
 	}{
 		{
 			name:       "dummy migration",
 			migrations: dummyMigrations,
-			wantResult: map[string]bool{
-				"init":           true,
-				"v2":             true,
-				"multiple execs": true,
+			wantResult: map[string]struct{}{
+				"init":           {},
+				"v2":             {},
+				"multiple execs": {},
 			},
 		},
 		{

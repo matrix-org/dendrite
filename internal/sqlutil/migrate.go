@@ -22,64 +22,64 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/sirupsen/logrus"
 )
 
 const createDBMigrationsSQL = "" +
 	"CREATE TABLE IF NOT EXISTS db_migrations (" +
-	" version TEXT PRIMARY KEY," +
-	" time TEXT," +
-	" dendrite_version TEXT" +
+	" version TEXT PRIMARY KEY NOT NULL," +
+	" time TEXT NOT NULL," +
+	" dendrite_version TEXT NOT NULL" +
 	");"
 
 const insertVersionSQL = "" +
 	"INSERT INTO db_migrations (version, time, dendrite_version)" +
-	" VALUES ($1, $2, $3) " +
-	" ON CONFLICT(version) DO UPDATE SET dendrite_version = $4, time = $5"
+	" VALUES ($1, $2, $3)"
 
 const selectDBMigrationsSQL = "SELECT version FROM db_migrations"
 
 // Migration defines a migration to be run.
 type Migration struct {
-	// Version is a simple name description/name of this migration
+	// Version is a simple description/name of this migration.
 	Version string
-	// Up defines function to execute
+	// Up defines the function to execute for an upgrade.
 	Up func(ctx context.Context, txn *sql.Tx) error
-	// Down defines function to execute (not implemented yet)
+	// Down defines the function to execute for a downgrade (not implemented yet).
 	Down func(ctx context.Context, txn *sql.Tx) error
 }
 
-// Migrator the structure used by migrations
+// Migrator
 type Migrator struct {
 	db              *sql.DB
 	migrations      []Migration
-	knownMigrations map[string]bool
+	knownMigrations map[string]struct{}
 	mutex           *sync.Mutex
 }
 
-// NewMigrator creates a new DB migrator
+// NewMigrator creates a new DB migrator.
 func NewMigrator(db *sql.DB) *Migrator {
 	return &Migrator{
 		db:              db,
 		migrations:      []Migration{},
-		knownMigrations: make(map[string]bool),
+		knownMigrations: make(map[string]struct{}),
 		mutex:           &sync.Mutex{},
 	}
 }
 
-// AddMigrations adds new migrations to the list.
-// De-duplicates migrations by their version
+// AddMigrations appends migrations to the list of migrations. Migrations are executed
+// in the order they are added to the list. De-duplicates migrations using their Version field.
 func (m *Migrator) AddMigrations(migrations ...Migration) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	for _, mig := range migrations {
-		if !m.knownMigrations[mig.Version] {
+		if _, ok := m.knownMigrations[mig.Version]; !ok {
 			m.migrations = append(m.migrations, mig)
-			m.knownMigrations[mig.Version] = true
+			m.knownMigrations[mig.Version] = struct{}{}
 		}
 	}
 }
 
-// Up executes all migrations
+// Up executes all migrations in order they were added.
 func (m *Migrator) Up(ctx context.Context) error {
 	var (
 		err             error
@@ -95,30 +95,32 @@ func (m *Migrator) Up(ctx context.Context) error {
 		for i := range m.migrations {
 			now := time.Now().UTC().Format(time.RFC3339)
 			migration := m.migrations[i]
-			if !executedMigrations[migration.Version] {
-				err = migration.Up(ctx, txn)
-				if err != nil {
-					return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
-				}
-				_, err = txn.ExecContext(ctx, insertVersionSQL,
-					migration.Version,
-					now,
-					dendriteVersion,
-					dendriteVersion,
-					now,
-				)
-				if err != nil {
-					return fmt.Errorf("unable to insert executed migrations: %w", err)
-				}
+			logrus.Debugf("Executing database migration '%s'", migration.Version)
+			// Skip migration if it was already executed
+			if _, ok := executedMigrations[migration.Version]; ok {
+				continue
+			}
+			err = migration.Up(ctx, txn)
+			if err != nil {
+				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
+			}
+			_, err = txn.ExecContext(ctx, insertVersionSQL,
+				migration.Version,
+				now,
+				dendriteVersion,
+			)
+			if err != nil {
+				return fmt.Errorf("unable to insert executed migrations: %w", err)
 			}
 		}
 		return nil
 	})
 }
 
-// ExecutedMigrations returns a map with already executed migrations
-func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]bool, error) {
-	result := make(map[string]bool)
+// ExecutedMigrations returns a map with already executed migrations in addition to creating the
+// migrations table, if it doesn't exist.
+func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{}, error) {
+	result := make(map[string]struct{})
 	_, err := m.db.ExecContext(ctx, createDBMigrationsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create db_migrations: %w", err)
@@ -127,13 +129,13 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]bool, err
 	if err != nil {
 		return nil, fmt.Errorf("unable to query db_migrations: %w", err)
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "ExecutedMigrations: rows.close() failed")
 	var version string
 	for rows.Next() {
 		if err = rows.Scan(&version); err != nil {
 			return nil, fmt.Errorf("unable to scan version: %w", err)
 		}
-		result[version] = true
+		result[version] = struct{}{}
 	}
 
 	return result, rows.Err()
