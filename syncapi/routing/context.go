@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -149,11 +151,28 @@ func Context(
 	if len(response.State) > filter.Limit {
 		response.State = response.State[len(response.State)-filter.Limit:]
 	}
-
+	start, end, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
+	if err == nil {
+		response.End = end.String()
+		response.Start = start.String()
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,
 	}
+}
+
+func getStartEnd(ctx context.Context, syncDB storage.Database, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+	if len(startEvents) > 0 {
+		start, err = syncDB.EventPositionInTopology(ctx, startEvents[0].EventID())
+		if err != nil {
+			return
+		}
+	}
+	if len(endEvents) > 0 {
+		end, err = syncDB.EventPositionInTopology(ctx, endEvents[0].EventID())
+	}
+	return
 }
 
 func applyLazyLoadMembers(
