@@ -17,6 +17,7 @@ jobs:
     name: WASM build test
     timeout-minutes: 5
     runs-on: ubuntu-latest
+    if: ${{ false }} # disable for now
     steps:
       - uses: actions/checkout@v2
 
