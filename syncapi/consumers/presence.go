@@ -144,7 +144,7 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 		return true
 	}
 
-	ts, err := strconv.Atoi(timestamp)
+	ts, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
 		return true
 	}
@@ -161,7 +161,7 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	return true
 }
 
-func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
+func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int64, fromSync bool) {
 	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
 	if err != nil {
 		logrus.WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")

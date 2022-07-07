@@ -40,7 +40,7 @@ func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.Stream
 
 type dummyConsumer struct{}
 
-func (d dummyConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
+func (d dummyConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int64, fromSync bool) {
 
 }
 
