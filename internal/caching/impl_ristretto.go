@@ -147,13 +147,19 @@ func (c *RistrettoCachePartition[K, V]) setWithCost(key K, value V, cost int64) 
 }
 
 func (c *RistrettoCachePartition[K, V]) Set(key K, value V) {
-	var cost int64
-	if cv, ok := any(value).(string); ok {
-		cost = int64(len(cv))
+	var keyCost int64
+	var valueCost int64
+	if ck, ok := any(key).(string); ok {
+		keyCost = int64(len(ck))
 	} else {
-		cost = int64(unsafe.Sizeof(value))
+		keyCost = int64(unsafe.Sizeof(key))
 	}
-	c.setWithCost(key, value, cost)
+	if cv, ok := any(value).(string); ok {
+		valueCost = int64(len(cv))
+	} else {
+		valueCost = int64(unsafe.Sizeof(value))
+	}
+	c.setWithCost(key, value, keyCost+valueCost)
 }
 
 func (c *RistrettoCachePartition[K, V]) Unset(key K) {
