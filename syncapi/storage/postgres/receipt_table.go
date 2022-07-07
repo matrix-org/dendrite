@@ -76,7 +76,7 @@ func NewPostgresReceiptsTable(db *sql.DB) (tables.Receipts, error) {
 	}
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
-		Version: "fix sequences",
+		Version: "syncapi: fix sequences",
 		Up:      deltas.UpFixSequences,
 	})
 	err = m.Up(context.Background())

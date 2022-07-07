@@ -123,7 +123,7 @@ func NewPostgresDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName
 	}
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
-		Version: "add last_seen_ts",
+		Version: "userapi: add last_seen_ts",
 		Up:      deltas.UpLastSeenTSIP,
 	})
 	err = m.Up(context.Background())

@@ -144,7 +144,7 @@ func CreateMembershipTable(db *sql.DB) error {
 	}
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
-		Version: "add forgotten column",
+		Version: "roomserver: add forgotten column",
 		Up:      deltas.UpAddForgottenColumn,
 	})
 	return m.Up(context.Background())

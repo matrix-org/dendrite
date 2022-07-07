@@ -61,12 +61,11 @@ func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	// TODO: Remove when we are sure we are not having goose artefacts in the db
 	// This forces an error, which indicates the migration is already applied, since the
 	// column partition was removed from the table
-	var count int
-	err = db.QueryRow("SELECT partition FROM keyserver_key_changes LIMIT 1;").Scan(&count)
+	err = db.QueryRow("SELECT partition FROM keyserver_key_changes LIMIT 1;").Scan()
 	if err == nil {
 		m := sqlutil.NewMigrator(db)
 		m.AddMigrations(sqlutil.Migration{
-			Version: "refactor key changes",
+			Version: "keyserver: refactor key changes",
 			Up:      deltas.UpRefactorKeyChanges,
 		})
 		return s, m.Up(context.Background())

@@ -68,7 +68,7 @@ func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error)
 	}
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
-		Version: "",
+		Version: "keyserver: cross signing signature indexes",
 		Up:      deltas.UpFixCrossSigningSignatureIndexes,
 	})
 	if err = m.Up(context.Background()); err != nil {

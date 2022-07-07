@@ -16,7 +16,6 @@
 package sqlite3
 
 import (
-	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
@@ -84,10 +83,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	}
 	m := sqlutil.NewMigrator(d.db)
 	m.AddMigrations(sqlutil.Migration{
-		Version: "drop federationsender_rooms",
+		Version: "federationsender: drop federationsender_rooms",
 		Up:      deltas.UpRemoveRoomsTable,
 	})
-	err = m.Up(context.Background())
+	err = m.Up(base.Context())
 	if err != nil {
 		return nil, err
 	}

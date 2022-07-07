@@ -89,12 +89,12 @@ func NewPostgresAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerNam
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations([]sqlutil.Migration{
 		{
-			Version: "add is active",
+			Version: "userapi: add is active",
 			Up:      deltas.UpIsActive,
 			Down:    deltas.DownIsActive,
 		},
 		{
-			Version: "add account type",
+			Version: "userapi: add account type",
 			Up:      deltas.UpAddAccountType,
 			Down:    deltas.DownAddAccountType,
 		},
