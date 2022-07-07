@@ -207,7 +207,7 @@ func (r *Peeker) performPeekRoomByID(
 
 	// TODO: handle federated peeks
 
-	err = r.Inputer.WriteOutputEvents(roomID, []api.OutputEvent{
+	err = r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{

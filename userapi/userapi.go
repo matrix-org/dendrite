@@ -78,6 +78,7 @@ func NewInternalAPI(
 		ServerName:           cfg.Matrix.ServerName,
 		AppServices:          appServices,
 		KeyAPI:               keyAPI,
+		RSAPI:                rsAPI,
 		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
 	}
 

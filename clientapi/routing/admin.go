@@ -47,3 +47,40 @@ func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserv
 		},
 	}
 }
+
+func AdminEvacuateUser(req *http.Request, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+	if device.AccountType != userapi.AccountTypeAdmin {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("This API can only be used by admin users."),
+		}
+	}
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	userID, ok := vars["userID"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting user ID."),
+		}
+	}
+	res := &roomserverAPI.PerformAdminEvacuateUserResponse{}
+	rsAPI.PerformAdminEvacuateUser(
+		req.Context(),
+		&roomserverAPI.PerformAdminEvacuateUserRequest{
+			UserID: userID,
+		},
+		res,
+	)
+	if err := res.Error; err != nil {
+		return err.JSONResponse()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{
+			"affected": res.Affected,
+		},
+	}
+}
