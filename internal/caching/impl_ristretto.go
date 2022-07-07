@@ -111,7 +111,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Mutable: true,
 			MaxAge:  maxAge,
 		},
-		LazyLoading: &RistrettoCachePartition[string, any]{ // TODO: type
+		LazyLoading: &RistrettoCachePartition[lazyLoadingCacheKey, string]{
 			cache:   cache,
 			Prefix:  lazyLoadingCache,
 			Mutable: true,
