@@ -64,10 +64,7 @@ func TestMain(m *testing.M) {
 			}
 
 			// Create a new cache but don't enable prometheus!
-			s.cache, err = caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
-			if err != nil {
-				panic("can't create cache: " + err.Error())
-			}
+			s.cache = caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 
 			// Create a temporary directory for JetStream.
 			d, err := ioutil.TempDir("./", "jetstream*")

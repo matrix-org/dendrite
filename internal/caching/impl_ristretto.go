@@ -29,7 +29,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-func mustCreateCache(maxCost config.DataUnit, enablePrometheus bool) *ristretto.Cache {
+const (
+	roomVersionsCache byte = iota + 1
+	serverKeysCache
+	roomIDsCache
+	roomEventsCache
+	roomInfosCache
+	federationPDUsCache
+	federationEDUsCache
+	spaceSummaryRoomsCache
+	lazyLoadingCache
+)
+
+func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 1e5,
 		MaxCost:     int64(maxCost),
@@ -58,23 +70,6 @@ func mustCreateCache(maxCost config.DataUnit, enablePrometheus bool) *ristretto.
 			return float64(cache.Metrics.CostAdded() - cache.Metrics.CostEvicted())
 		})
 	}
-	return cache
-}
-
-const (
-	roomVersionsCache byte = iota + 1
-	serverKeysCache
-	roomIDsCache
-	roomEventsCache
-	roomInfosCache
-	federationPDUsCache
-	federationEDUsCache
-	spaceSummaryRoomsCache
-	lazyLoadingCache
-)
-
-func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) (*Caches, error) {
-	cache := mustCreateCache(maxCost, enablePrometheus)
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
 			cache:  cache,
@@ -133,7 +128,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Mutable: true,
 			MaxAge:  maxAge,
 		},
-	}, nil
+	}
 }
 
 type RistrettoCostedCachePartition[k keyable, v costable] struct {

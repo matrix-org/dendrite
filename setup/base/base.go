@@ -161,11 +161,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		}
 	}
 
-	cache, err := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
-	if err != nil {
-		logrus.WithError(err).Fatalf("Failed to create cache")
-	}
-
 	var dnsCache *gomatrixserverlib.DNSCache
 	if cfg.Global.DNSCache.Enabled {
 		dnsCache = gomatrixserverlib.NewDNSCache(
@@ -233,7 +228,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		UseHTTPAPIs:            useHTTPAPIs,
 		tracerCloser:           closer,
 		Cfg:                    cfg,
-		Caches:                 cache,
+		Caches:                 caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics),
 		DNSCache:               dnsCache,
 		PublicClientAPIMux:     mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicClientPathPrefix).Subrouter().UseEncodedPath(),
 		PublicFederationAPIMux: mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath(),
