@@ -92,7 +92,7 @@ func main() {
 	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
 	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
-	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
 	pMulticast.Start()
 	if instancePeer != nil && *instancePeer != "" {
 		pManager.AddPeer(*instancePeer)
