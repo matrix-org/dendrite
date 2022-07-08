@@ -161,9 +161,9 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		}
 	}
 
-	cache, err := caching.NewRistrettoCache(cfg.Global.Cache.EstMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
+	cache, err := caching.NewRistrettoCache(cfg.Global.Cache.EstimatedMaxSize, cfg.Global.Cache.MaxAge, enableMetrics)
 	if err != nil {
-		logrus.WithError(err).Warnf("Failed to create cache")
+		logrus.WithError(err).Fatalf("Failed to create cache")
 	}
 
 	var dnsCache *gomatrixserverlib.DNSCache

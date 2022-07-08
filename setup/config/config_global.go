@@ -176,17 +176,17 @@ func (c *ServerNotices) Defaults(generate bool) {
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
 type Cache struct {
-	EstMaxSize DataUnit      `yaml:"max_size_est"`
-	MaxAge     time.Duration `yaml:"max_age"`
+	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
+	MaxAge           time.Duration `yaml:"max_age"`
 }
 
 func (c *Cache) Defaults(generate bool) {
-	c.EstMaxSize = 1024 * 1024 * 1024 // 1GB
+	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
 
 func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
-	checkPositive(errors, "max_size_est", int64(c.EstMaxSize))
+	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
 }
 
 // ReportStats configures opt-in anonymous stats reporting.
