@@ -45,7 +45,9 @@ global:
     # The maximum amount of time that a cache entry can live for in memory before
     # it will be evicted and/or refreshed from the database. Lower values result in
     # easier admission of new cache entries but may also increase database load in
-    # comparison to higher values, so adjust conservatively.
+    # comparison to higher values, so adjust conservatively. Higher values may make
+    # it harder for new items to make it into the cache, e.g. if new rooms suddenly
+    # become popular.
     max_age: 1h
 
   # The server name to delegate server-server communications to, with optional port
