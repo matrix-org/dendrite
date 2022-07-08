@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -164,72 +163,6 @@ func TestServersRequestOwnKeys(t *testing.T) {
 			t.Fatalf("server didn't return its own key in the results")
 		}
 		t.Logf("%s's key expires at %s\n", name, res[req].ValidUntilTS.Time())
-	}
-}
-
-func TestCachingBehaviour(t *testing.T) {
-	// Server A will request Server B's key, which has a validity
-	// period of an hour from now. We should retrieve the key and
-	// it should make it into the cache automatically.
-
-	req := gomatrixserverlib.PublicKeyLookupRequest{
-		ServerName: serverB.name,
-		KeyID:      serverKeyID,
-	}
-	ts := gomatrixserverlib.AsTimestamp(time.Now())
-
-	res, err := serverA.api.FetchKeys(
-		context.Background(),
-		map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp{
-			req: ts,
-		},
-	)
-	if err != nil {
-		t.Fatalf("server A failed to retrieve server B key: %s", err)
-	}
-	if len(res) != 1 {
-		t.Fatalf("server B should have returned one key but instead returned %d keys", len(res))
-	}
-	if _, ok := res[req]; !ok {
-		t.Fatalf("server B isn't included in the key fetch response")
-	}
-
-	// At this point, if the previous key request was a success,
-	// then the cache should now contain the key. Check if that's
-	// the case - if it isn't then there's something wrong with
-	// the cache implementation or we failed to get the key.
-
-	cres, ok := serverA.cache.GetServerKey(req, ts)
-	if !ok {
-		t.Fatalf("server B key should be in cache but isn't")
-	}
-	if !reflect.DeepEqual(cres, res[req]) {
-		t.Fatalf("the cached result from server B wasn't what server B gave us")
-	}
-
-	// If we ask the cache for the same key but this time for an event
-	// that happened in +30 minutes. Since the validity period is for
-	// another hour, then we should get a response back from the cache.
-
-	_, ok = serverA.cache.GetServerKey(
-		req,
-		gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute*30)),
-	)
-	if !ok {
-		t.Fatalf("server B key isn't in cache when it should be (+30 minutes)")
-	}
-
-	// If we ask the cache for the same key but this time for an event
-	// that happened in +90 minutes then we should expect to get no
-	// cache result. This is because the cache shouldn't return a result
-	// that is obviously past the validity of the event.
-
-	_, ok = serverA.cache.GetServerKey(
-		req,
-		gomatrixserverlib.AsTimestamp(time.Now().Add(time.Minute*90)),
-	)
-	if ok {
-		t.Fatalf("server B key is in cache when it shouldn't be (+90 minutes)")
 	}
 }
 
