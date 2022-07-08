@@ -192,32 +192,7 @@ func TestRenewalBehaviour(t *testing.T) {
 		t.Fatalf("server C isn't included in the key fetch response")
 	}
 
-	// If we ask the cache for the server key for an event that happened
-	// 90 minutes ago then we should get a cache result, as the key hadn't
-	// passed its validity by that point. The fact that the key is now in
-	// the cache is, in itself, proof that we successfully retrieved the
-	// key before.
-
-	oldcached, ok := serverA.cache.GetServerKey(
-		req,
-		gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute*90)),
-	)
-	if !ok {
-		t.Fatalf("server C key isn't in cache when it should be (-90 minutes)")
-	}
-
-	// If we now ask the cache for the same key but this time for an event
-	// that only happened 30 minutes ago then we shouldn't get a cached
-	// result, as the event happened after the key validity expired. This
-	// is really just for sanity checking.
-
-	_, ok = serverA.cache.GetServerKey(
-		req,
-		gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute*30)),
-	)
-	if ok {
-		t.Fatalf("server B key is in cache when it shouldn't be (-30 minutes)")
-	}
+	originalValidity := res[req].ValidUntilTS
 
 	// We're now going to kick server C into renewing its key. Since we're
 	// happy at this point that the key that we already have is from the past
@@ -238,24 +213,13 @@ func TestRenewalBehaviour(t *testing.T) {
 	if len(res) != 1 {
 		t.Fatalf("server C should have returned one key but instead returned %d keys", len(res))
 	}
-	if _, ok = res[req]; !ok {
+	if _, ok := res[req]; !ok {
 		t.Fatalf("server C isn't included in the key fetch response")
 	}
 
-	// We're now going to ask the cache what the new key validity is. If
-	// it is still the same as the previous validity then we've failed to
-	// retrieve the renewed key. If it's newer then we've successfully got
-	// the renewed key.
+	currentValidity := res[req].ValidUntilTS
 
-	newcached, ok := serverA.cache.GetServerKey(
-		req,
-		gomatrixserverlib.AsTimestamp(time.Now().Add(-time.Minute*30)),
-	)
-	if !ok {
-		t.Fatalf("server B key isn't in cache when it shouldn't be (post-renewal)")
+	if originalValidity == currentValidity {
+		t.Fatalf("server C key should have renewed but didn't")
 	}
-	if oldcached.ValidUntilTS >= newcached.ValidUntilTS {
-		t.Fatalf("the server B key should have been renewed but wasn't")
-	}
-	t.Log(res)
 }
