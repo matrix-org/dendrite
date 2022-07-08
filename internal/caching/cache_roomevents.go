@@ -5,8 +5,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-// RoomServerNIDsCache contains the subset of functions needed for
-// a roomserver NID cache.
+// RoomServerEventsCache contains the subset of functions needed for
+// a roomserver event cache.
 type RoomServerEventsCache interface {
 	GetRoomServerEvent(eventNID types.EventNID) (*gomatrixserverlib.Event, bool)
 	StoreRoomServerEvent(eventNID types.EventNID, event *gomatrixserverlib.Event)

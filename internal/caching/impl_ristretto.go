@@ -32,6 +32,7 @@ import (
 const (
 	roomVersionsCache byte = iota + 1
 	serverKeysCache
+	roomNIDsCache
 	roomIDsCache
 	roomEventsCache
 	roomInfosCache
@@ -43,9 +44,9 @@ const (
 
 func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
 	cache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 1e5,
+		NumCounters: 1e5, // 10x number of expected cache items, affects bloom filter size, gives us room for 10,000 currently
+		BufferItems: 64,  // recommended by the ristretto godocs as a sane buffer size value
 		MaxCost:     int64(maxCost),
-		BufferItems: 64,
 		Metrics:     true,
 		KeyToHash: func(key interface{}) (uint64, uint64) {
 			return z.KeyToHash(key)
@@ -71,36 +72,41 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 		})
 	}
 	return &Caches{
-		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{
+		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{ // room ID -> room version
 			cache:  cache,
 			Prefix: roomVersionsCache,
 			MaxAge: maxAge,
 		},
-		ServerKeys: &RistrettoCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{
+		ServerKeys: &RistrettoCachePartition[string, gomatrixserverlib.PublicKeyLookupResult]{ // server name -> server keys
 			cache:   cache,
 			Prefix:  serverKeysCache,
 			Mutable: true,
 			MaxAge:  maxAge,
 		},
-		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{
+		RoomServerRoomNIDs: &RistrettoCachePartition[string, types.RoomNID]{ // room ID -> room NID
+			cache:  cache,
+			Prefix: roomNIDsCache,
+			MaxAge: maxAge,
+		},
+		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{ // room NID -> room ID
 			cache:  cache,
 			Prefix: roomIDsCache,
 			MaxAge: maxAge,
 		},
-		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{
+		RoomServerEvents: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.Event]{ // event NID -> event
 			&RistrettoCachePartition[int64, *gomatrixserverlib.Event]{
 				cache:  cache,
 				Prefix: roomEventsCache,
 				MaxAge: maxAge,
 			},
 		},
-		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{
+		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{ // room ID -> room info
 			cache:   cache,
 			Prefix:  roomInfosCache,
 			Mutable: true,
 			MaxAge:  maxAge,
 		},
-		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
+		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{ // queue NID -> PDU
 			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
 				cache:   cache,
 				Prefix:  federationPDUsCache,
@@ -108,7 +114,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				MaxAge:  lesserOf(time.Hour/2, maxAge),
 			},
 		},
-		FederationEDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.EDU]{
+		FederationEDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.EDU]{ // queue NID -> EDU
 			&RistrettoCachePartition[int64, *gomatrixserverlib.EDU]{
 				cache:   cache,
 				Prefix:  federationEDUsCache,
@@ -116,13 +122,13 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				MaxAge:  lesserOf(time.Hour/2, maxAge),
 			},
 		},
-		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{
+		SpaceSummaryRooms: &RistrettoCachePartition[string, gomatrixserverlib.MSC2946SpacesResponse]{ // room ID -> space response
 			cache:   cache,
 			Prefix:  spaceSummaryRoomsCache,
 			Mutable: true,
 			MaxAge:  maxAge,
 		},
-		LazyLoading: &RistrettoCachePartition[lazyLoadingCacheKey, string]{
+		LazyLoading: &RistrettoCachePartition[lazyLoadingCacheKey, string]{ // composite key -> event ID
 			cache:   cache,
 			Prefix:  lazyLoadingCache,
 			Mutable: true,

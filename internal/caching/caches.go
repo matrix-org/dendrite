@@ -23,16 +23,16 @@ import (
 // different implementations as long as they satisfy the Cache
 // interface.
 type Caches struct {
-	RoomVersions       Cache[string, gomatrixserverlib.RoomVersion]
-	ServerKeys         Cache[string, gomatrixserverlib.PublicKeyLookupResult]
-	RoomServerRoomNIDs Cache[string, types.RoomNID]
-	RoomServerRoomIDs  Cache[int64, string]
-	RoomServerEvents   Cache[int64, *gomatrixserverlib.Event]
-	RoomInfos          Cache[string, types.RoomInfo]
-	FederationPDUs     Cache[int64, *gomatrixserverlib.HeaderedEvent]
-	FederationEDUs     Cache[int64, *gomatrixserverlib.EDU]
-	SpaceSummaryRooms  Cache[string, gomatrixserverlib.MSC2946SpacesResponse]
-	LazyLoading        Cache[lazyLoadingCacheKey, string]
+	RoomVersions       Cache[string, gomatrixserverlib.RoomVersion]           // room ID -> room version
+	ServerKeys         Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
+	RoomServerRoomNIDs Cache[string, types.RoomNID]                           // room ID -> room NID
+	RoomServerRoomIDs  Cache[int64, string]                                   // room NID -> room ID
+	RoomServerEvents   Cache[int64, *gomatrixserverlib.Event]                 // event NID -> event
+	RoomInfos          Cache[string, types.RoomInfo]                          // room ID -> room info
+	FederationPDUs     Cache[int64, *gomatrixserverlib.HeaderedEvent]         // queue NID -> PDU
+	FederationEDUs     Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
+	SpaceSummaryRooms  Cache[string, gomatrixserverlib.MSC2946SpacesResponse] // room ID -> space response
+	LazyLoading        Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
 }
 
 // Cache is the interface that an implementation must satisfy.
