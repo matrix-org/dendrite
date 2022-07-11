@@ -1,28 +1,52 @@
+// Copyright 2022 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package caching
 
 import (
-	"time"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // Caches contains a set of references to caches. They may be
 // different implementations as long as they satisfy the Cache
 // interface.
 type Caches struct {
-	RoomVersions       Cache // RoomVersionCache
-	ServerKeys         Cache // ServerKeyCache
-	RoomServerRoomNIDs Cache // RoomServerNIDsCache
-	RoomServerRoomIDs  Cache // RoomServerNIDsCache
-	RoomInfos          Cache // RoomInfoCache
-	FederationEvents   Cache // FederationEventsCache
-	SpaceSummaryRooms  Cache // SpaceSummaryRoomsCache
-	LazyLoading        Cache // LazyLoadCache
+	RoomVersions       Cache[string, gomatrixserverlib.RoomVersion]           // room ID -> room version
+	ServerKeys         Cache[string, gomatrixserverlib.PublicKeyLookupResult] // server name -> server keys
+	RoomServerRoomNIDs Cache[string, types.RoomNID]                           // room ID -> room NID
+	RoomServerRoomIDs  Cache[int64, string]                                   // room NID -> room ID
+	RoomServerEvents   Cache[int64, *gomatrixserverlib.Event]                 // event NID -> event
+	RoomInfos          Cache[string, types.RoomInfo]                          // room ID -> room info
+	FederationPDUs     Cache[int64, *gomatrixserverlib.HeaderedEvent]         // queue NID -> PDU
+	FederationEDUs     Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
+	SpaceSummaryRooms  Cache[string, gomatrixserverlib.MSC2946SpacesResponse] // room ID -> space response
+	LazyLoading        Cache[lazyLoadingCacheKey, string]                     // composite key -> event ID
 }
 
 // Cache is the interface that an implementation must satisfy.
-type Cache interface {
-	Get(key string) (value interface{}, ok bool)
-	Set(key string, value interface{})
-	Unset(key string)
+type Cache[K keyable, T any] interface {
+	Get(key K) (value T, ok bool)
+	Set(key K, value T)
+	Unset(key K)
 }
 
-const CacheNoMaxAge = time.Duration(0)
+type keyable interface {
+	// from https://github.com/dgraph-io/ristretto/blob/8e850b710d6df0383c375ec6a7beae4ce48fc8d5/z/z.go#L34
+	uint64 | string | []byte | byte | int | int32 | uint32 | int64 | lazyLoadingCacheKey
+}
+
+type costable interface {
+	CacheCost() int
+}
