@@ -266,10 +266,17 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted := event.Redact()
+	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	if err != nil {
+		logrus.WithError(err).Errorf("XXX: join.go")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+		}
+	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName:             event.Origin(),
-		Message:                redacted.JSON(),
+		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
 	}}

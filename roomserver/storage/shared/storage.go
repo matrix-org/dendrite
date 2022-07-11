@@ -263,6 +263,12 @@ func (d *Database) snapshotNIDFromEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (types.StateSnapshotNID, error) {
 	_, stateNID, err := d.EventsTable.SelectEvent(ctx, txn, eventID)
+	if err != nil {
+		return 0, err
+	}
+	if stateNID == 0 {
+		return 0, sql.ErrNoRows // effectively there's no state entry
+	}
 	return stateNID, err
 }
 
@@ -433,8 +439,18 @@ func (d *Database) Events(
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
+	sort.Sort(inputEventNIDs)
+	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
+	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
+	for _, nid := range inputEventNIDs {
+		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
+			events[nid] = event
+		} else {
+			eventNIDs = append(eventNIDs, nid)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -470,18 +486,29 @@ func (d *Database) events(
 	for n, v := range dbRoomVersions {
 		roomVersions[n] = v
 	}
-	results := make([]types.Event, len(eventJSONs))
-	for i, eventJSON := range eventJSONs {
-		result := &results[i]
-		result.EventNID = eventJSON.EventNID
-		roomNID := roomNIDs[result.EventNID]
+	for _, eventJSON := range eventJSONs {
+		roomNID := roomNIDs[eventJSON.EventNID]
 		roomVersion := roomVersions[roomNID]
-		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
+		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
 		if err != nil {
 			return nil, err
 		}
+		if event := events[eventJSON.EventNID]; event != nil {
+			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+		}
+	}
+	results := make([]types.Event, 0, len(inputEventNIDs))
+	for _, nid := range inputEventNIDs {
+		event, ok := events[nid]
+		if !ok || event == nil {
+			return nil, fmt.Errorf("event %d missing", nid)
+		}
+		results = append(results, types.Event{
+			EventNID: nid,
+			Event:    event,
+		})
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
@@ -828,6 +855,9 @@ func (d *Database) handleRedactions(
 	if err != nil {
 		return nil, "", fmt.Errorf("d.GetStateEvent: %w", err)
 	}
+	if powerLevels == nil {
+		return nil, "", fmt.Errorf("unable to fetch m.room.power_levels event from database for room %s", event.RoomID())
+	}
 	pl, err := powerLevels.PowerLevels()
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to get powerlevels for room: %w", err)
@@ -845,7 +875,7 @@ func (d *Database) handleRedactions(
 
 	// mark the event as redacted
 	if redactionsArePermanent {
-		redactedEvent.Event = redactedEvent.Redact()
+		redactedEvent.Redact()
 	}
 
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
@@ -917,7 +947,7 @@ func (d *Database) loadRedactionPair(
 func (d *Database) applyRedactions(events []types.Event) {
 	for i := range events {
 		if result := gjson.GetBytes(events[i].Unsigned(), "redacted_because"); result.Exists() {
-			events[i].Event = events[i].Redact()
+			events[i].Redact()
 		}
 	}
 }
@@ -1213,6 +1243,13 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	for nid := range userNIDToCount {
 		stateKeyNIDs[i] = nid
 		i++
+	}
+	// If we didn't have any userIDs to look up, get the UserIDs for the returned userNIDToCount now
+	if len(userIDs) == 0 {
+		nidToUserID, err = d.EventStateKeys(ctx, stateKeyNIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
 	result := make(map[string]int, len(userNIDToCount))
 	for nid, count := range userNIDToCount {

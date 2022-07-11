@@ -61,7 +61,7 @@ type PresencePublisher interface {
 }
 
 type PresenceConsumer interface {
-	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool)
+	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool)
 }
 
 // NewRequestPool makes a new RequestPool
@@ -171,7 +171,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	// the /sync response else we may not return presence: online immediately.
 	rp.consumer.EmitPresence(
 		context.Background(), userID, presenceID, newPresence.ClientFields.StatusMsg,
-		int(gomatrixserverlib.AsTimestamp(time.Now())), true,
+		gomatrixserverlib.AsTimestamp(time.Now()), true,
 	)
 }
 
