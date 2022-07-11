@@ -875,7 +875,7 @@ func (d *Database) handleRedactions(
 
 	// mark the event as redacted
 	if redactionsArePermanent {
-		redactedEvent.Event = redactedEvent.Redact()
+		redactedEvent.Redact()
 	}
 
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
@@ -947,7 +947,7 @@ func (d *Database) loadRedactionPair(
 func (d *Database) applyRedactions(events []types.Event) {
 	for i := range events {
 		if result := gjson.GetBytes(events[i].Unsigned(), "redacted_because"); result.Exists() {
-			events[i].Event = events[i].Redact()
+			events[i].Redact()
 		}
 	}
 }
