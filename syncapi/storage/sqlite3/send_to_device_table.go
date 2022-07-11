@@ -49,7 +49,7 @@ const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content
 	  FROM syncapi_send_to_device
 	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
-	  ORDER BY id DESC
+	  ORDER BY id ASC
 `
 
 const deleteSendToDeviceMessagesSQL = `
@@ -120,9 +120,6 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			logrus.WithError(err).Errorf("Failed to retrieve send-to-device message")
 			return
 		}
-		if id > lastPos {
-			lastPos = id
-		}
 		event := types.SendToDeviceEvent{
 			ID:       id,
 			UserID:   userID,
@@ -131,6 +128,9 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
 			logrus.WithError(err).Errorf("Failed to unmarshal send-to-device message")
 			continue
+		}
+		if id > lastPos {
+			lastPos = id
 		}
 		events = append(events, event)
 	}
