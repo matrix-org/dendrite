@@ -304,18 +304,6 @@ type DefaultOpts struct {
 func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Version = Version
 
-	if opts.Generate {
-		c.Logging = []LogrusHook{
-			{
-				Type:  "file",
-				Level: "info",
-				Params: map[string]interface{}{
-					"path": "/var/log",
-				},
-			},
-		}
-	}
-
 	c.Global.Defaults(opts)
 	c.ClientAPI.Defaults(opts)
 	c.FederationAPI.Defaults(opts)

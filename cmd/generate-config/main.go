@@ -50,6 +50,15 @@ func main() {
 			cfg.Global.DatabaseOptions.ConnectionString = config.DataSource(*dbURI)
 		}
 	}
+	cfg.Logging = []config.LogrusHook{
+		{
+			Type:  "file",
+			Level: "info",
+			Params: map[string]interface{}{
+				"path": "/var/log/dendrite",
+			},
+		},
+	}
 	if *defaultsForCI {
 		cfg.AppServiceAPI.DisableTLSValidation = true
 		cfg.ClientAPI.RateLimiting.Enabled = false
