@@ -11,74 +11,42 @@ import (
 )
 
 func main() {
-	defaultsForCI := flag.Bool("ci", false, "sane defaults for CI testing")
+	defaultsForCI := flag.Bool("ci", false, "Populate the configuration with sane defaults for use in CI")
 	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
 	dbURI := flag.String("db", "", "The DB URI to use for all components if not SQLite files")
+	normalise := flag.String("normalise", "", "Normalise a given configuration file")
+	polylith := flag.Bool("polylith", false, "Generate a config that makes sense for polylith deployments")
 	flag.Parse()
 
-	cfg := &config.Dendrite{
-		Version: config.Version,
+	var cfg *config.Dendrite
+	if *normalise == "" {
+		cfg = &config.Dendrite{
+			Version: config.Version,
+		}
+		cfg.Defaults(true, !*polylith)
+	} else {
+		var err error
+		if cfg, err = config.Load(*normalise, !*polylith); err != nil {
+			panic(err)
+		}
 	}
-	cfg.Defaults(true)
 	if *serverName != "" {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 	}
 	if *dbURI != "" {
-		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.FederationAPI.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.MSCs.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.MediaAPI.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
-		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
+		if *polylith {
+			cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.FederationAPI.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.MSCs.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.MediaAPI.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
+			cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
+		} else {
+			cfg.Global.DatabaseOptions.ConnectionString = config.DataSource(*dbURI)
+		}
 	}
-	cfg.Global.TrustedIDServers = []string{
-		"matrix.org",
-		"vector.im",
-	}
-	cfg.Logging = []config.LogrusHook{
-		{
-			Type:  "file",
-			Level: "info",
-			Params: map[string]interface{}{
-				"path": "/var/log/dendrite",
-			},
-		},
-	}
-	cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{
-		{
-			ServerName: "matrix.org",
-			Keys: []config.KeyPerspectiveTrustKey{
-				{
-					KeyID:     "ed25519:auto",
-					PublicKey: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
-				},
-				{
-					KeyID:     "ed25519:a_RXGa",
-					PublicKey: "l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ",
-				},
-			},
-		},
-	}
-	cfg.MediaAPI.ThumbnailSizes = []config.ThumbnailSize{
-		{
-			Width:        32,
-			Height:       32,
-			ResizeMethod: "crop",
-		},
-		{
-			Width:        96,
-			Height:       96,
-			ResizeMethod: "crop",
-		},
-		{
-			Width:        640,
-			Height:       480,
-			ResizeMethod: "scale",
-		},
-	}
-
 	if *defaultsForCI {
 		cfg.AppServiceAPI.DisableTLSValidation = true
 		cfg.ClientAPI.RateLimiting.Enabled = false

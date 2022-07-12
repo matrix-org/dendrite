@@ -41,7 +41,7 @@ type Global struct {
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
 	// In a polylith deployment, this will be ignored.
-	DatabaseOptions DatabaseOptions `yaml:"database"`
+	DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
 
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
@@ -80,15 +80,21 @@ type Global struct {
 	Cache Cache `yaml:"cache"`
 }
 
-func (c *Global) Defaults(generate bool) {
+func (c *Global) Defaults(generate bool, isMonolith bool) {
 	if generate {
 		c.ServerName = "localhost"
 		c.PrivateKeyPath = "matrix_key.pem"
 		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 		c.KeyID = "ed25519:auto"
+		c.TrustedIDServers = []string{
+			"matrix.org",
+			"vector.im",
+		}
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-
+	if isMonolith {
+		c.DatabaseOptions.Defaults(90)
+	}
 	c.JetStream.Defaults(generate)
 	c.Metrics.Defaults(generate)
 	c.DNSCache.Defaults()

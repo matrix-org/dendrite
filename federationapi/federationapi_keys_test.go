@@ -75,7 +75,7 @@ func TestMain(m *testing.M) {
 			// Draw up just enough Dendrite config for the server key
 			// API to work.
 			cfg := &config.Dendrite{}
-			cfg.Defaults(true)
+			cfg.Defaults(true, true)
 			cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 			cfg.Global.PrivateKey = testPriv
 			cfg.Global.JetStream.InMemory = true

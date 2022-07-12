@@ -5,7 +5,7 @@ import "golang.org/x/crypto/bcrypt"
 type UserAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
 
 	// The cost when hashing passwords.
 	BCryptCost int `yaml:"bcrypt_cost"`
@@ -18,19 +18,23 @@ type UserAPI struct {
 
 	// The Account database stores the login details and account information
 	// for local users. It is accessed by the UserAPI.
-	AccountDatabase DatabaseOptions `yaml:"account_database"`
+	AccountDatabase DatabaseOptions `yaml:"account_database,omitempty"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
 
-func (c *UserAPI) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7781"
-	c.InternalAPI.Connect = "http://localhost:7781"
+func (c *UserAPI) Defaults(generate bool, isMonolith bool) {
+	if !isMonolith {
+		c.InternalAPI.Listen = "http://localhost:7781"
+		c.InternalAPI.Connect = "http://localhost:7781"
+		c.AccountDatabase.Defaults(10)
+	}
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
-	c.AccountDatabase.Defaults(10)
 	if generate {
-		c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
+		if !isMonolith {
+			c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
+		}
 	}
 }
 

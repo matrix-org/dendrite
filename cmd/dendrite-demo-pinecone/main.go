@@ -127,7 +127,7 @@ func main() {
 	}()
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+	cfg.Defaults(true, true)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)

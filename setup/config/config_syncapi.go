@@ -3,21 +3,25 @@ package config
 type SyncAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
 
-	Database DatabaseOptions `yaml:"database"`
+	Database DatabaseOptions `yaml:"database,omitempty"`
 
 	RealIPHeader string `yaml:"real_ip_header"`
 }
 
-func (c *SyncAPI) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7773"
-	c.InternalAPI.Connect = "http://localhost:7773"
-	c.ExternalAPI.Listen = "http://localhost:8073"
-	c.Database.Defaults(10)
+func (c *SyncAPI) Defaults(generate bool, isMonolith bool) {
+	if !isMonolith {
+		c.InternalAPI.Listen = "http://localhost:7773"
+		c.InternalAPI.Connect = "http://localhost:7773"
+		c.ExternalAPI.Listen = "http://localhost:8073"
+		c.Database.Defaults(10)
+	}
 	if generate {
-		c.Database.ConnectionString = "file:syncapi.db"
+		if !isMonolith {
+			c.Database.ConnectionString = "file:syncapi.db"
+		}
 	}
 }
 

@@ -3,17 +3,21 @@ package config
 type KeyServer struct {
 	Matrix *Global `yaml:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
 
-	Database DatabaseOptions `yaml:"database"`
+	Database DatabaseOptions `yaml:"database,omitempty"`
 }
 
-func (c *KeyServer) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7779"
-	c.InternalAPI.Connect = "http://localhost:7779"
-	c.Database.Defaults(10)
+func (c *KeyServer) Defaults(generate bool, isMonolith bool) {
+	if !isMonolith {
+		c.InternalAPI.Listen = "http://localhost:7779"
+		c.InternalAPI.Connect = "http://localhost:7779"
+		c.Database.Defaults(10)
+	}
 	if generate {
-		c.Database.ConnectionString = "file:keyserver.db"
+		if !isMonolith {
+			c.Database.ConnectionString = "file:keyserver.db"
+		}
 	}
 }
 
