@@ -40,11 +40,11 @@ func (c *UserAPI) Defaults(generate bool, isMonolith bool) {
 
 func (c *UserAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkPositive(configErrs, "user_api.openid_token_lifetime_ms", c.OpenIDTokenLifetimeMS)
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "user_api.account_database.connection_string", string(c.AccountDatabase.ConnectionString))
 	}
 	checkURL(configErrs, "user_api.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "user_api.internal_api.connect", string(c.InternalAPI.Connect))

@@ -22,11 +22,11 @@ func (c *RoomServer) Defaults(generate bool, isMonolith bool) {
 }
 
 func (c *RoomServer) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "room_server.database.connection_string", string(c.Database.ConnectionString))
 	}
 	checkURL(configErrs, "room_server.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "room_server.internal_ap.connect", string(c.InternalAPI.Connect))

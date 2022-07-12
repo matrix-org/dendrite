@@ -73,9 +73,6 @@ func (c *MediaAPI) Defaults(generate bool, isMonolith bool) {
 }
 
 func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
-	}
 	checkNotEmpty(configErrs, "media_api.base_path", string(c.BasePath))
 	checkPositive(configErrs, "media_api.max_file_size_bytes", int64(c.MaxFileSizeBytes))
 	checkPositive(configErrs, "media_api.max_thumbnail_generators", int64(c.MaxThumbnailGenerators))
@@ -86,6 +83,9 @@ func (c *MediaAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	}
 	if isMonolith { // polylith required configs below
 		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "media_api.database.connection_string", string(c.Database.ConnectionString))
 	}
 	checkURL(configErrs, "media_api.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "media_api.internal_api.connect", string(c.InternalAPI.Connect))

@@ -62,11 +62,11 @@ func (c *FederationAPI) Defaults(generate bool, isMonolith bool) {
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
 	}
 	checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
 	checkURL(configErrs, "federation_api.internal_api.listen", string(c.InternalAPI.Listen))

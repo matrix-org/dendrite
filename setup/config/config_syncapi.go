@@ -26,11 +26,11 @@ func (c *SyncAPI) Defaults(generate bool, isMonolith bool) {
 }
 
 func (c *SyncAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "sync_api.database", string(c.Database.ConnectionString))
 	}
 	checkURL(configErrs, "sync_api.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "sync_api.internal_api.connect", string(c.InternalAPI.Connect))
