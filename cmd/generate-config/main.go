@@ -14,7 +14,7 @@ func main() {
 	defaultsForCI := flag.Bool("ci", false, "Populate the configuration with sane defaults for use in CI")
 	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
 	dbURI := flag.String("db", "", "The DB URI to use for all components if not SQLite files")
-	normalise := flag.String("normalise", "", "Normalise a given configuration file")
+	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
 	polylith := flag.Bool("polylith", false, "Generate a config that makes sense for polylith deployments")
 	flag.Parse()
 
@@ -23,7 +23,10 @@ func main() {
 		cfg = &config.Dendrite{
 			Version: config.Version,
 		}
-		cfg.Defaults(true, !*polylith)
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: !*polylith,
+		})
 	} else {
 		var err error
 		if cfg, err = config.Load(*normalise, !*polylith); err != nil {

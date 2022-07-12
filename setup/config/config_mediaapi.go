@@ -38,8 +38,8 @@ type MediaAPI struct {
 // DefaultMaxFileSizeBytes defines the default file size allowed in transfers
 var DefaultMaxFileSizeBytes = FileSizeBytes(10485760)
 
-func (c *MediaAPI) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *MediaAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7774"
 		c.InternalAPI.Connect = "http://localhost:7774"
 		c.ExternalAPI.Listen = "http://[::]:8074"
@@ -47,7 +47,7 @@ func (c *MediaAPI) Defaults(generate bool, isMonolith bool) {
 	}
 	c.MaxFileSizeBytes = DefaultMaxFileSizeBytes
 	c.MaxThumbnailGenerators = 10
-	if generate {
+	if opts.Generate {
 		c.ThumbnailSizes = []ThumbnailSize{
 			{
 				Width:        32,
@@ -65,7 +65,7 @@ func (c *MediaAPI) Defaults(generate bool, isMonolith bool) {
 				ResizeMethod: "scale",
 			},
 		}
-		if !isMonolith {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:mediaapi.db"
 		}
 		c.BasePath = "./media_store"

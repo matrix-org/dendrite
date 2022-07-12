@@ -30,8 +30,8 @@ type FederationAPI struct {
 	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
 }
 
-func (c *FederationAPI) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *FederationAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7772"
 		c.InternalAPI.Connect = "http://localhost:7772"
 		c.ExternalAPI.Listen = "http://[::]:8072"
@@ -39,7 +39,7 @@ func (c *FederationAPI) Defaults(generate bool, isMonolith bool) {
 	}
 	c.FederationMaxRetries = 16
 	c.DisableTLSValidation = false
-	if generate {
+	if opts.Generate {
 		c.KeyPerspectives = KeyPerspectives{
 			{
 				ServerName: "matrix.org",
@@ -55,7 +55,7 @@ func (c *FederationAPI) Defaults(generate bool, isMonolith bool) {
 				},
 			},
 		}
-		if !isMonolith {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:federationapi.db"
 		}
 	}

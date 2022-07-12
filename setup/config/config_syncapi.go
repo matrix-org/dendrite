@@ -11,15 +11,15 @@ type SyncAPI struct {
 	RealIPHeader string `yaml:"real_ip_header"`
 }
 
-func (c *SyncAPI) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *SyncAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7773"
 		c.InternalAPI.Connect = "http://localhost:7773"
 		c.ExternalAPI.Listen = "http://localhost:8073"
 		c.Database.Defaults(10)
 	}
-	if generate {
-		if !isMonolith {
+	if opts.Generate {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:syncapi.db"
 		}
 	}

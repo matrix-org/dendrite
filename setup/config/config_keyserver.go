@@ -8,14 +8,14 @@ type KeyServer struct {
 	Database DatabaseOptions `yaml:"database,omitempty"`
 }
 
-func (c *KeyServer) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *KeyServer) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7779"
 		c.InternalAPI.Connect = "http://localhost:7779"
 		c.Database.Defaults(10)
 	}
-	if generate {
-		if !isMonolith {
+	if opts.Generate {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:keyserver.db"
 		}
 	}

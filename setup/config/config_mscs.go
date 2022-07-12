@@ -13,12 +13,12 @@ type MSCs struct {
 	Database DatabaseOptions `yaml:"database,omitempty"`
 }
 
-func (c *MSCs) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *MSCs) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.Database.Defaults(5)
 	}
-	if generate {
-		if !isMonolith {
+	if opts.Generate {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:mscs.db"
 		}
 	}

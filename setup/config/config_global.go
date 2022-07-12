@@ -80,8 +80,8 @@ type Global struct {
 	Cache Cache `yaml:"cache"`
 }
 
-func (c *Global) Defaults(generate bool, isMonolith bool) {
-	if generate {
+func (c *Global) Defaults(opts DefaultOpts) {
+	if opts.Generate {
 		c.ServerName = "localhost"
 		c.PrivateKeyPath = "matrix_key.pem"
 		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
@@ -92,16 +92,16 @@ func (c *Global) Defaults(generate bool, isMonolith bool) {
 		}
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-	if isMonolith {
+	if opts.Monolithic {
 		c.DatabaseOptions.Defaults(90)
 	}
-	c.JetStream.Defaults(generate)
-	c.Metrics.Defaults(generate)
+	c.JetStream.Defaults(opts)
+	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
-	c.ServerNotices.Defaults(generate)
+	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
-	c.Cache.Defaults(generate)
+	c.Cache.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -145,9 +145,9 @@ type Metrics struct {
 	} `yaml:"basic_auth"`
 }
 
-func (c *Metrics) Defaults(generate bool) {
+func (c *Metrics) Defaults(opts DefaultOpts) {
 	c.Enabled = false
-	if generate {
+	if opts.Generate {
 		c.BasicAuth.Username = "metrics"
 		c.BasicAuth.Password = "metrics"
 	}
@@ -169,8 +169,8 @@ type ServerNotices struct {
 	RoomName string `yaml:"room_name"`
 }
 
-func (c *ServerNotices) Defaults(generate bool) {
-	if generate {
+func (c *ServerNotices) Defaults(opts DefaultOpts) {
+	if opts.Generate {
 		c.Enabled = true
 		c.LocalPart = "_server"
 		c.DisplayName = "Server Alert"
@@ -186,7 +186,7 @@ type Cache struct {
 	MaxAge           time.Duration `yaml:"max_age"`
 }
 
-func (c *Cache) Defaults(generate bool) {
+func (c *Cache) Defaults() {
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }

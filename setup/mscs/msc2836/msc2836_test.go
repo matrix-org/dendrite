@@ -544,7 +544,10 @@ func (r *testRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *roo
 func injectEvents(t *testing.T, userAPI userapi.UserInternalAPI, rsAPI roomserver.RoomserverInternalAPI, events []*gomatrixserverlib.HeaderedEvent) *mux.Router {
 	t.Helper()
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true, true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	cfg.Global.ServerName = "localhost"
 	cfg.MSCs.Database.ConnectionString = "file:msc2836_test.db"
 	cfg.MSCs.MSCs = []string{"msc2836"}

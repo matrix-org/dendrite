@@ -8,14 +8,14 @@ type RoomServer struct {
 	Database DatabaseOptions `yaml:"database,omitempty"`
 }
 
-func (c *RoomServer) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *RoomServer) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7770"
 		c.InternalAPI.Connect = "http://localhost:7770"
 		c.Database.Defaults(10)
 	}
-	if generate {
-		if !isMonolith {
+	if opts.Generate {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:roomserver.db"
 		}
 	}

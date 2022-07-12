@@ -40,14 +40,14 @@ type AppServiceAPI struct {
 	ConfigFiles []string `yaml:"config_files"`
 }
 
-func (c *AppServiceAPI) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7777"
 		c.InternalAPI.Connect = "http://localhost:7777"
 		c.Database.Defaults(5)
 	}
-	if generate {
-		if !isMonolith {
+	if opts.Generate {
+		if !opts.Monolithic {
 			c.Database.ConnectionString = "file:appservice.db"
 		}
 	}

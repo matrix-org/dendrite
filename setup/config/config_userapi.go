@@ -23,16 +23,16 @@ type UserAPI struct {
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes
 
-func (c *UserAPI) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *UserAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7781"
 		c.InternalAPI.Connect = "http://localhost:7781"
 		c.AccountDatabase.Defaults(10)
 	}
 	c.BCryptCost = bcrypt.DefaultCost
 	c.OpenIDTokenLifetimeMS = DefaultOpenIDTokenLifetimeMS
-	if generate {
-		if !isMonolith {
+	if opts.Generate {
+		if !opts.Monolithic {
 			c.AccountDatabase.ConnectionString = "file:userapi_accounts.db"
 		}
 	}

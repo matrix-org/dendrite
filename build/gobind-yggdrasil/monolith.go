@@ -82,7 +82,10 @@ func (m *DendriteMonolith) Start() {
 	m.YggdrasilNode = ygg
 
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true, true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(ygg.DerivedServerName())
 	cfg.Global.PrivateKey = ygg.PrivateKey()
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)

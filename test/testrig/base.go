@@ -30,13 +30,22 @@ import (
 
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
-	cfg.Defaults(false, true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   false,
+		Monolithic: true,
+	})
 	cfg.Global.JetStream.InMemory = true
 
 	switch dbType {
 	case test.DBTypePostgres:
-		cfg.Global.Defaults(true, true)   // autogen a signing key
-		cfg.MediaAPI.Defaults(true, true) // autogen a media path
+		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
+			Generate:   true,
+			Monolithic: true,
+		})
+		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
+			Generate:   true,
+			Monolithic: true,
+		})
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
@@ -49,7 +58,10 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		}
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
 	case test.DBTypeSQLite:
-		cfg.Defaults(true, true) // sets a sqlite db per component
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: true,
+		}) // sets a sqlite db per component
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
@@ -82,7 +94,10 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nats.Conn) {
 	if cfg == nil {
 		cfg = &config.Dendrite{}
-		cfg.Defaults(true, true)
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: true,
+		})
 	}
 	cfg.Global.JetStream.InMemory = true
 	base := base.NewBaseDendrite(cfg, "Tests")

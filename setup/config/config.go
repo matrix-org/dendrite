@@ -211,7 +211,10 @@ func loadConfig(
 	monolithic bool,
 ) (*Dendrite, error) {
 	var c Dendrite
-	c.Defaults(false, monolithic)
+	c.Defaults(DefaultOpts{
+		Generate:   false,
+		Monolithic: monolithic,
+	})
 	c.IsMonolith = monolithic
 
 	var err error
@@ -292,11 +295,16 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
+type DefaultOpts struct {
+	Generate   bool
+	Monolithic bool
+}
+
 // SetDefaults sets default config values if they are not explicitly set.
-func (c *Dendrite) Defaults(generate bool, isMonolith bool) {
+func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Version = Version
 
-	if generate {
+	if opts.Generate {
 		c.Logging = []LogrusHook{
 			{
 				Type:  "file",
@@ -308,17 +316,16 @@ func (c *Dendrite) Defaults(generate bool, isMonolith bool) {
 		}
 	}
 
-	c.Global.Defaults(generate, isMonolith)
-	c.ClientAPI.Defaults(generate, isMonolith)
-	c.FederationAPI.Defaults(generate, isMonolith)
-	c.KeyServer.Defaults(generate, isMonolith)
-	c.MediaAPI.Defaults(generate, isMonolith)
-	c.RoomServer.Defaults(generate, isMonolith)
-	c.SyncAPI.Defaults(generate, isMonolith)
-	c.UserAPI.Defaults(generate, isMonolith)
-	c.AppServiceAPI.Defaults(generate, isMonolith)
-	c.MSCs.Defaults(generate, isMonolith)
-
+	c.Global.Defaults(opts)
+	c.ClientAPI.Defaults(opts)
+	c.FederationAPI.Defaults(opts)
+	c.KeyServer.Defaults(opts)
+	c.MediaAPI.Defaults(opts)
+	c.RoomServer.Defaults(opts)
+	c.SyncAPI.Defaults(opts)
+	c.UserAPI.Defaults(opts)
+	c.AppServiceAPI.Defaults(opts)
+	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
 

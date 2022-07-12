@@ -51,8 +51,8 @@ type ClientAPI struct {
 	MSCs *MSCs `yaml:"-"`
 }
 
-func (c *ClientAPI) Defaults(generate bool, isMonolith bool) {
-	if !isMonolith {
+func (c *ClientAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7771"
 		c.InternalAPI.Connect = "http://localhost:7771"
 		c.ExternalAPI.Listen = "http://[::]:8071"
