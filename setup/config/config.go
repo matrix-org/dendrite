@@ -310,7 +310,7 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 				Type:  "file",
 				Level: "info",
 				Params: map[string]interface{}{
-					"path": "/var/log/dendrite",
+					"path": "/var/log",
 				},
 			},
 		}
