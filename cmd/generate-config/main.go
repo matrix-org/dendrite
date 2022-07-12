@@ -36,18 +36,18 @@ func main() {
 	if *serverName != "" {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 	}
-	if *dbURI != "" {
-		if *polylith {
-			cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.FederationAPI.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.MSCs.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.MediaAPI.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.RoomServer.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.SyncAPI.Database.ConnectionString = config.DataSource(*dbURI)
-			cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(*dbURI)
+	if uri := config.DataSource(*dbURI); uri != "" {
+		if *polylith || uri.IsSQLite() {
+			cfg.AppServiceAPI.Database.ConnectionString = uri
+			cfg.FederationAPI.Database.ConnectionString = uri
+			cfg.KeyServer.Database.ConnectionString = uri
+			cfg.MSCs.Database.ConnectionString = uri
+			cfg.MediaAPI.Database.ConnectionString = uri
+			cfg.RoomServer.Database.ConnectionString = uri
+			cfg.SyncAPI.Database.ConnectionString = uri
+			cfg.UserAPI.AccountDatabase.ConnectionString = uri
 		} else {
-			cfg.Global.DatabaseOptions.ConnectionString = config.DataSource(*dbURI)
+			cfg.Global.DatabaseOptions.ConnectionString = uri
 		}
 	}
 	cfg.Logging = []config.LogrusHook{
