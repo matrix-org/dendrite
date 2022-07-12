@@ -28,7 +28,7 @@ type Caches struct {
 	RoomServerRoomNIDs Cache[string, types.RoomNID]                           // room ID -> room NID
 	RoomServerRoomIDs  Cache[int64, string]                                   // room NID -> room ID
 	RoomServerEvents   Cache[int64, *gomatrixserverlib.Event]                 // event NID -> event
-	RoomInfos          Cache[string, types.RoomInfo]                          // room ID -> room info
+	RoomInfos          Cache[string, *types.RoomInfo]                         // room ID -> room info
 	FederationPDUs     Cache[int64, *gomatrixserverlib.HeaderedEvent]         // queue NID -> PDU
 	FederationEDUs     Cache[int64, *gomatrixserverlib.EDU]                   // queue NID -> EDU
 	SpaceSummaryRooms  Cache[string, gomatrixserverlib.MSC2946SpacesResponse] // room ID -> space response
