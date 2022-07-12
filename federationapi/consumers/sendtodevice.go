@@ -95,6 +95,11 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msg *nats.Ms
 		return true
 	}
 
+	// The SyncAPI is already handling sendToDevice for the local server
+	if destServerName == t.ServerName {
+		return true
+	}
+
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MDirectToDevice,
