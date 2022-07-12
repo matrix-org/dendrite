@@ -60,8 +60,8 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
 			Generate:   true,
-			Monolithic: true,
-		}) // sets a sqlite db per component
+			Monolithic: false, // because we need a database per component
+		})
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
