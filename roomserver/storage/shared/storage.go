@@ -139,13 +139,13 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-		return &roomInfo, nil
+	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok && roomInfo != nil {
+		return roomInfo, nil
 	}
 	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
 	if err == nil && roomInfo != nil {
 		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, *roomInfo)
+		d.Cache.StoreRoomInfo(roomID, roomInfo)
 	}
 	return roomInfo, err
 }
