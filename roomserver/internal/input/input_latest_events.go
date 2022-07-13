@@ -204,12 +204,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		return fmt.Errorf("u.updater.MarkEventAsSent: %w", err)
 	}
 
-	// Since it's entirely possible that this types.RoomInfo came from the
-	// cache, we should make sure to update that entry so that the next run
-	// works from live data.
-	u.roomInfo.IsStub = false
-	u.roomInfo.StateSnapshotNID = u.newStateNID
-
 	return nil
 }
 
