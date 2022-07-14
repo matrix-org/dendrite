@@ -139,13 +139,13 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-		return &roomInfo, nil
+	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok && roomInfo != nil {
+		return roomInfo, nil
 	}
 	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
 	if err == nil && roomInfo != nil {
 		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, *roomInfo)
+		d.Cache.StoreRoomInfo(roomID, roomInfo)
 	}
 	return roomInfo, err
 }
@@ -439,8 +439,18 @@ func (d *Database) Events(
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
+	sort.Sort(inputEventNIDs)
+	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
+	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
+	for _, nid := range inputEventNIDs {
+		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
+			events[nid] = event
+		} else {
+			eventNIDs = append(eventNIDs, nid)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -476,18 +486,29 @@ func (d *Database) events(
 	for n, v := range dbRoomVersions {
 		roomVersions[n] = v
 	}
-	results := make([]types.Event, len(eventJSONs))
-	for i, eventJSON := range eventJSONs {
-		result := &results[i]
-		result.EventNID = eventJSON.EventNID
-		roomNID := roomNIDs[result.EventNID]
+	for _, eventJSON := range eventJSONs {
+		roomNID := roomNIDs[eventJSON.EventNID]
 		roomVersion := roomVersions[roomNID]
-		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
+		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
 		if err != nil {
 			return nil, err
 		}
+		if event := events[eventJSON.EventNID]; event != nil {
+			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+		}
+	}
+	results := make([]types.Event, 0, len(inputEventNIDs))
+	for _, nid := range inputEventNIDs {
+		event, ok := events[nid]
+		if !ok || event == nil {
+			return nil, fmt.Errorf("event %d missing", nid)
+		}
+		results = append(results, types.Event{
+			EventNID: nid,
+			Event:    event,
+		})
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
@@ -834,6 +855,9 @@ func (d *Database) handleRedactions(
 	if err != nil {
 		return nil, "", fmt.Errorf("d.GetStateEvent: %w", err)
 	}
+	if powerLevels == nil {
+		return nil, "", fmt.Errorf("unable to fetch m.room.power_levels event from database for room %s", event.RoomID())
+	}
 	pl, err := powerLevels.PowerLevels()
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to get powerlevels for room: %w", err)
@@ -851,7 +875,7 @@ func (d *Database) handleRedactions(
 
 	// mark the event as redacted
 	if redactionsArePermanent {
-		redactedEvent.Event = redactedEvent.Redact()
+		redactedEvent.Redact()
 	}
 
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
@@ -923,7 +947,7 @@ func (d *Database) loadRedactionPair(
 func (d *Database) applyRedactions(events []types.Event) {
 	for i := range events {
 		if result := gjson.GetBytes(events[i].Unsigned(), "redacted_because"); result.Exists() {
-			events[i].Event = events[i].Redact()
+			events[i].Redact()
 		}
 	}
 }

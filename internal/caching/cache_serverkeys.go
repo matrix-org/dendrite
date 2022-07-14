@@ -6,13 +6,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const (
-	ServerKeyCacheName       = "server_key"
-	ServerKeyCacheMaxEntries = 4096
-	ServerKeyCacheMutable    = true
-	ServerKeyCacheMaxAge     = CacheNoMaxAge
-)
-
 // ServerKeyCache contains the subset of functions needed for
 // a server key cache.
 type ServerKeyCache interface {
@@ -34,18 +27,13 @@ func (c Caches) GetServerKey(
 ) (gomatrixserverlib.PublicKeyLookupResult, bool) {
 	key := fmt.Sprintf("%s/%s", request.ServerName, request.KeyID)
 	val, found := c.ServerKeys.Get(key)
-	if found && val != nil {
-		if keyLookupResult, ok := val.(gomatrixserverlib.PublicKeyLookupResult); ok {
-			if !keyLookupResult.WasValidAt(timestamp, true) {
-				// The key wasn't valid at the requested timestamp so don't
-				// return it. The caller will have to work out what to do.
-				c.ServerKeys.Unset(key)
-				return gomatrixserverlib.PublicKeyLookupResult{}, false
-			}
-			return keyLookupResult, true
-		}
+	if found && !val.WasValidAt(timestamp, true) {
+		// The key wasn't valid at the requested timestamp so don't
+		// return it. The caller will have to work out what to do.
+		c.ServerKeys.Unset(key)
+		return gomatrixserverlib.PublicKeyLookupResult{}, false
 	}
-	return gomatrixserverlib.PublicKeyLookupResult{}, false
+	return val, found
 }
 
 func (c Caches) StoreServerKey(
