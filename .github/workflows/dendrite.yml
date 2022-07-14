@@ -102,11 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-<<<<<<< HEAD
         go: ["1.18", "1.19"]
-=======
-        go: ["1.18"]
->>>>>>> 698369f5 (merge latest changes from dendrite main (#15))
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
