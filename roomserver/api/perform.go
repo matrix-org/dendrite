@@ -223,3 +223,12 @@ type PerformAdminEvacuateRoomResponse struct {
 	Affected []string `json:"affected"`
 	Error    *PerformError
 }
+
+type PerformAdminEvacuateUserRequest struct {
+	UserID string `json:"user_id"`
+}
+
+type PerformAdminEvacuateUserResponse struct {
+	Affected []string `json:"affected"`
+	Error    *PerformError
+}

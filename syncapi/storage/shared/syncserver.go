@@ -546,12 +546,11 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 	eventToRedact := redactedEvents[0].Unwrap()
 	redactionEvent := redactedBecause.Unwrap()
-	ev, err := eventutil.RedactEvent(redactionEvent, eventToRedact)
-	if err != nil {
+	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
 		return err
 	}
 
-	newEvent := ev.Headered(redactedBecause.RoomVersion)
+	newEvent := eventToRedact.Headered(redactedBecause.RoomVersion)
 	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
 		return d.OutputEvents.UpdateEventJSON(ctx, newEvent)
 	})

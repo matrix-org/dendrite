@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/consumers"
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
 	"github.com/matrix-org/dendrite/keyserver/producers"
@@ -59,10 +60,17 @@ func NewInternalAPI(
 	updater := internal.NewDeviceListUpdater(db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
 	ap.Updater = updater
 	go func() {
-		if err := updater.Start(); err != nil {
+		if err = updater.Start(); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
+
+	dlConsumer := consumers.NewDeviceListUpdateConsumer(
+		base.ProcessContext, cfg, js, updater,
+	)
+	if err = dlConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start device list consumer")
+	}
 
 	return ap
 }
