@@ -1027,7 +1027,7 @@ func (v *StateResolution) loadStateEvents(
 
 	result := make([]*gomatrixserverlib.Event, 0, len(entries))
 	eventEntries := make([]types.StateEntry, 0, len(entries))
-	eventNIDs := make([]types.EventNID, 0, len(entries))
+	eventNIDs := make(types.EventNIDs, 0, len(entries))
 	for _, entry := range entries {
 		if e, ok := v.events[entry.EventNID]; ok {
 			result = append(result, e)

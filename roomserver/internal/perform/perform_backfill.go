@@ -593,12 +593,11 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 		// redacted, which we don't care about since we aren't returning it in this backfill.
 		if redactedEventID == ev.EventID() {
 			eventToRedact := ev.Unwrap()
-			redactedEvent, err := eventutil.RedactEvent(redactionEvent, eventToRedact)
-			if err != nil {
+			if err := eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
 				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 				continue
 			}
-			ev = redactedEvent.Headered(ev.RoomVersion)
+			ev = eventToRedact.Headered(ev.RoomVersion)
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{
