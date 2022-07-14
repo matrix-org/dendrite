@@ -12,22 +12,20 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var ctx = context.Background()
 
-func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func(), func()) {
+func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	base, closeBase := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.NewSyncServerDatasource(base, &config.DatabaseOptions{
+	db, err := storage.NewSyncServerDatasource(nil, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, close, closeBase
+	return db, close
 }
 
 func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
@@ -53,9 +51,8 @@ func TestWriteEvents(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		MustWriteEvents(t, db, r.Events())
 	})
 }
@@ -63,9 +60,8 @@ func TestWriteEvents(t *testing.T) {
 // These tests assert basic functionality of RecentEvents for PDUs
 func TestRecentEventsPDU(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		alice := test.NewUser(t)
 		// dummy room to make sure SQL queries are filtering on room ID
 		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
@@ -167,9 +163,8 @@ func TestRecentEventsPDU(t *testing.T) {
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
 func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		for i := 0; i < 10; i++ {
@@ -409,9 +404,8 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 	bob := test.NewUser(t)
 	deviceID := "one"
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close, closeBase := MustCreateDatabase(t, dbType)
+		db, close := MustCreateDatabase(t, dbType)
 		defer close()
-		defer closeBase()
 		// At this point there should be no messages. We haven't sent anything
 		// yet.
 		_, events, err := db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
