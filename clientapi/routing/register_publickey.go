@@ -69,7 +69,7 @@ func handlePublicKeyRegistration(
 		}
 	}
 
-	isValidUserId := authHandler.IsValidUserIdForRegistration(r.Username)
+	isValidUserId := authHandler.IsValidUserId(r.Username)
 	if !isValidUserId {
 		return false, "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,

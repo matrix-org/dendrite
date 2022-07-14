@@ -30,10 +30,10 @@ import (
 
 type LoginPublicKeyHandler interface {
 	AccountExists(ctx context.Context) (string, *jsonerror.MatrixError)
-	IsValidUserIdForRegistration(userId string) bool
 	CreateLogin() *Login
 	GetSession() string
 	GetType() string
+	IsValidUserId(userId string) bool
 	ValidateLoginResponse() (bool, *jsonerror.MatrixError)
 }
 
