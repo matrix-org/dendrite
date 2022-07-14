@@ -170,20 +170,18 @@ func truncateAuthAndPrevEvents(auth, prev []gomatrixserverlib.EventReference) (
 
 // RedactEvent redacts the given event and sets the unsigned field appropriately. This should be used by
 // downstream components to the roomserver when an OutputTypeRedactedEvent occurs.
-func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) (*gomatrixserverlib.Event, error) {
+func RedactEvent(redactionEvent, redactedEvent *gomatrixserverlib.Event) error {
 	// sanity check
 	if redactionEvent.Type() != gomatrixserverlib.MRoomRedaction {
-		return nil, fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
+		return fmt.Errorf("RedactEvent: redactionEvent isn't a redaction event, is '%s'", redactionEvent.Type())
 	}
-	r := redactedEvent.Redact()
-	err := r.SetUnsignedField("redacted_because", redactionEvent)
-	if err != nil {
-		return nil, err
+	redactedEvent.Redact()
+	if err := redactedEvent.SetUnsignedField("redacted_because", redactionEvent); err != nil {
+		return err
 	}
 	// NOTSPEC: sytest relies on this unspecced field existing :(
-	err = r.SetUnsignedField("redacted_by", redactionEvent.EventID())
-	if err != nil {
-		return nil, err
+	if err := redactedEvent.SetUnsignedField("redacted_by", redactionEvent.EventID()); err != nil {
+		return err
 	}
-	return r, nil
+	return nil
 }
