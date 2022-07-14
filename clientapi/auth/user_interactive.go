@@ -173,13 +173,13 @@ type Challenge struct {
 func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 	paramsCopy := mapsutil.MapCopy(u.Params)
 	for key, element := range paramsCopy {
-		p := getAuthParams(element)
+		p := GetAuthParams(element)
 		if p != nil {
 			// If an auth flow has params,
 			// send it as part of the challenge.
 			paramsCopy[key] = p
 
-			// If an auth flow generated a nonce, track it as well.
+			// If an auth flow generated a nonce, add it to the session.
 			nonce := getAuthParamNonce(p)
 			if nonce != "" {
 				u.Sessions[sessionID] = append(u.Sessions[sessionID], nonce)
@@ -280,7 +280,7 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	return login, nil
 }
 
-func getAuthParams(params interface{}) interface{} {
+func GetAuthParams(params interface{}) interface{} {
 	v, ok := params.(config.AuthParams)
 	if ok {
 		p := v.GetParams()
