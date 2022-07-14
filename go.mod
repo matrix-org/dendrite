@@ -54,7 +54,7 @@ require (
 	nhooyr.io/websocket v1.8.7
 )
 
-require github.com/ethereum/go-ethereum v1.10.15 // indirect
+require github.com/ethereum/go-ethereum v1.10.15
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
