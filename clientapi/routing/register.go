@@ -45,6 +45,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -247,7 +248,7 @@ type authDict struct {
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
-type userInteractiveResponse struct {
+type UserInteractiveResponse struct {
 	Flows     []authtypes.Flow       `json:"flows"`
 	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
@@ -260,9 +261,18 @@ func newUserInteractiveResponse(
 	sessionID string,
 	fs []authtypes.Flow,
 	params map[string]interface{},
-) userInteractiveResponse {
-	return userInteractiveResponse{
-		fs, sessions.getCompletedStages(sessionID), params, sessionID,
+) UserInteractiveResponse {
+	paramsCopy := mapsutil.MapCopy(params)
+	for key, element := range paramsCopy {
+		p := auth.GetAuthParams(element)
+		if p != nil {
+			// If an auth flow has params, make a new copy
+			// and send it as part of the response.
+			paramsCopy[key] = p
+		}
+	}
+	return UserInteractiveResponse{
+		fs, sessions.getCompletedStages(sessionID), paramsCopy, sessionID,
 	}
 }
 
