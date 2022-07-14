@@ -32,6 +32,15 @@ To create a new **admin account**, add the `-admin` flag:
 ./bin/create-account -config /path/to/dendrite.yaml -username USERNAME -admin
 ```
 
+An example of using `create-account` when running in **docker**:
+
+```bash
+docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME
+```
+```bash
+docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME -admin
+```
+
 ## Using shared secret registration
 
 Dendrite supports the Synapse-compatible shared secret registration endpoint.
