@@ -32,7 +32,7 @@ To create a new **admin account**, add the `-admin` flag:
 ./bin/create-account -config /path/to/dendrite.yaml -username USERNAME -admin
 ```
 
-An example of using `create-account` when running in **docker**:
+An example of using `create-account` when running in **Docker**, having found the `CONTAINERNAME` from `docker ps`:
 
 ```bash
 docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME
