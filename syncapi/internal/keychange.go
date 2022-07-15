@@ -221,25 +221,23 @@ func TrackChangedUsers(
 func filterSharedUsers(
 	ctx context.Context, db storage.SharedUsers, userID string, usersWithChangedKeys []string,
 ) (map[string]int, []string) {
-	sharedUsersRes := &roomserverAPI.QuerySharedUsersResponse{
-		UserIDsToCount: map[string]int{},
+	sharedUsersMap := make(map[string]int, len(usersWithChangedKeys))
+	for _, userID := range usersWithChangedKeys {
+		sharedUsersMap[userID] = 0
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
 		// default to all users so we do needless queries rather than miss some important device update
 		return nil, usersWithChangedKeys
 	}
+	for _, userID := range sharedUsers {
+		sharedUsersMap[userID]++
+	}
 	// We forcibly put ourselves in this list because we should be notified about our own device updates
 	// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
 	// be notified about key changes.
-	sharedUsersRes.UserIDsToCount[userID] = 1
-	result := make([]string, 0, len(sharedUsers)+1)
-	for _, uid := range sharedUsers {
-		if sharedUsersRes.UserIDsToCount[uid] > 0 {
-			result = append(result, uid)
-		}
-	}
-	return sharedUsersRes.UserIDsToCount, result
+	sharedUsersMap[userID] = 1
+	return sharedUsersMap, sharedUsers
 }
 
 func joinedRooms(res *types.Response, userID string) []string {
