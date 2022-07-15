@@ -21,6 +21,7 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	keytypes "github.com/matrix-org/dendrite/keyserver/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -46,7 +47,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, devi
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
 func DeviceListCatchup(
-	ctx context.Context, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
+	ctx context.Context, db storage.Database, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
 	userID string, res *types.Response, from, to types.StreamPosition,
 ) (newPos types.StreamPosition, hasNew bool, err error) {
 
@@ -93,7 +94,7 @@ func DeviceListCatchup(
 	queryRes.UserIDs = append(queryRes.UserIDs, leaveUserIDs...)
 	queryRes.UserIDs = util.UniqueStrings(queryRes.UserIDs)
 	var sharedUsersMap map[string]int
-	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, rsAPI, userID, queryRes.UserIDs)
+	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, db, userID, queryRes.UserIDs)
 	util.GetLogger(ctx).Debugf(
 		"QueryKeyChanges request off=%d,to=%d response off=%d uids=%v",
 		offset, toOffset, queryRes.Offset, queryRes.UserIDs,
@@ -218,14 +219,10 @@ func TrackChangedUsers(
 // filterSharedUsers takes a list of remote users whose keys have changed and filters
 // it down to include only users who the requesting user shares a room with.
 func filterSharedUsers(
-	ctx context.Context, rsAPI roomserverAPI.SyncRoomserverAPI, userID string, usersWithChangedKeys []string,
+	ctx context.Context, db storage.Database, userID string, usersWithChangedKeys []string,
 ) (map[string]int, []string) {
-	var result []string
 	var sharedUsersRes roomserverAPI.QuerySharedUsersResponse
-	err := rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID:       userID,
-		OtherUserIDs: usersWithChangedKeys,
-	}, &sharedUsersRes)
+	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
 		// default to all users so we do needless queries rather than miss some important device update
 		return nil, usersWithChangedKeys
@@ -234,8 +231,8 @@ func filterSharedUsers(
 	// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
 	// be notified about key changes.
 	sharedUsersRes.UserIDsToCount[userID] = 1
-
-	for _, uid := range usersWithChangedKeys {
+	result := make([]string, 0, len(sharedUsers)+1)
+	for _, uid := range sharedUsers {
 		if sharedUsersRes.UserIDsToCount[uid] > 0 {
 			result = append(result, uid)
 		}
