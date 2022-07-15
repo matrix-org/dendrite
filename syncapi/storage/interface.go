@@ -54,6 +54,8 @@ type Database interface {
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
 	// AllJoinedUsersInRoom returns a map of room ID to a list of all joined user IDs for a given room.
 	AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
+	// SharedUsers returns a subset of otherUserIDs that share a room with userID.
+	SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error)
 
 	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
 	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error)

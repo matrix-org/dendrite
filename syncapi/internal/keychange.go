@@ -215,6 +215,8 @@ func TrackChangedUsers(
 	return changed, left, nil
 }
 
+// filterSharedUsers takes a list of remote users whose keys have changed and filters
+// it down to include only users who the requesting user shares a room with.
 func filterSharedUsers(
 	ctx context.Context, rsAPI roomserverAPI.SyncRoomserverAPI, userID string, usersWithChangedKeys []string,
 ) (map[string]int, []string) {
