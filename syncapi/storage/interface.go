@@ -27,6 +27,8 @@ import (
 
 type Database interface {
 	Presence
+	SharedUsers
+
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error)
@@ -54,8 +56,6 @@ type Database interface {
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
 	// AllJoinedUsersInRoom returns a map of room ID to a list of all joined user IDs for a given room.
 	AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
-	// SharedUsers returns a subset of otherUserIDs that share a room with userID.
-	SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error)
 
 	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
 	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error)
@@ -166,4 +166,9 @@ type Presence interface {
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
+}
+
+type SharedUsers interface {
+	// SharedUsers returns a subset of otherUserIDs that share a room with userID.
+	SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error)
 }

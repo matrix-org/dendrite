@@ -47,7 +47,7 @@ func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, devi
 // was filled in, else false if there are no new device list changes because there is nothing to catch up on. The response MUST
 // be already filled in with join/leave information.
 func DeviceListCatchup(
-	ctx context.Context, db storage.Database, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
+	ctx context.Context, db storage.SharedUsers, keyAPI keyapi.SyncKeyAPI, rsAPI roomserverAPI.SyncRoomserverAPI,
 	userID string, res *types.Response, from, to types.StreamPosition,
 ) (newPos types.StreamPosition, hasNew bool, err error) {
 
@@ -219,9 +219,11 @@ func TrackChangedUsers(
 // filterSharedUsers takes a list of remote users whose keys have changed and filters
 // it down to include only users who the requesting user shares a room with.
 func filterSharedUsers(
-	ctx context.Context, db storage.Database, userID string, usersWithChangedKeys []string,
+	ctx context.Context, db storage.SharedUsers, userID string, usersWithChangedKeys []string,
 ) (map[string]int, []string) {
-	var sharedUsersRes roomserverAPI.QuerySharedUsersResponse
+	sharedUsersRes := &roomserverAPI.QuerySharedUsersResponse{
+		UserIDsToCount: map[string]int{},
+	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
 		// default to all users so we do needless queries rather than miss some important device update
