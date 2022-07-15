@@ -176,6 +176,10 @@ func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]t
 	return d.Peeks.SelectPeekingDevices(ctx)
 }
 
+func (d *Database) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+	return d.CurrentRoomState.SelectSharedUsers(ctx, nil, userID, otherUserIDs)
+}
+
 func (d *Database) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {

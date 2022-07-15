@@ -16,18 +16,18 @@ import (
 // a room Info cache. It must only be used from the roomserver only
 // It is not safe for use from other components.
 type RoomInfoCache interface {
-	GetRoomInfo(roomID string) (roomInfo types.RoomInfo, ok bool)
-	StoreRoomInfo(roomID string, roomInfo types.RoomInfo)
+	GetRoomInfo(roomID string) (roomInfo *types.RoomInfo, ok bool)
+	StoreRoomInfo(roomID string, roomInfo *types.RoomInfo)
 }
 
 // GetRoomInfo must only be called from the roomserver only. It is not
 // safe for use from other components.
-func (c Caches) GetRoomInfo(roomID string) (types.RoomInfo, bool) {
+func (c Caches) GetRoomInfo(roomID string) (*types.RoomInfo, bool) {
 	return c.RoomInfos.Get(roomID)
 }
 
 // StoreRoomInfo must only be called from the roomserver only. It is not
 // safe for use from other components.
-func (c Caches) StoreRoomInfo(roomID string, roomInfo types.RoomInfo) {
+func (c Caches) StoreRoomInfo(roomID string, roomInfo *types.RoomInfo) {
 	c.RoomInfos.Set(roomID, roomInfo)
 }

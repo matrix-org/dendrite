@@ -100,7 +100,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				MaxAge: maxAge,
 			},
 		},
-		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{ // room ID -> room info
+		RoomInfos: &RistrettoCachePartition[string, *types.RoomInfo]{ // room ID -> room info
 			cache:   cache,
 			Prefix:  roomInfosCache,
 			Mutable: true,

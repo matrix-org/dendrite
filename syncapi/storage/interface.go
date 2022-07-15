@@ -27,6 +27,8 @@ import (
 
 type Database interface {
 	Presence
+	SharedUsers
+
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error)
@@ -164,4 +166,9 @@ type Presence interface {
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
+}
+
+type SharedUsers interface {
+	// SharedUsers returns a subset of otherUserIDs that share a room with userID.
+	SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error)
 }
