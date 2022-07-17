@@ -45,6 +45,9 @@ const (
 	ConstCreateEventContentValueSpace = "m.space"
 	ConstSpaceChildEventType          = "m.space.child"
 	ConstSpaceParentEventType         = "m.space.parent"
+	ConstJoinRulePublic               = "public"
+	ConstJoinRuleKnock                = "knock"
+	ConstJoinRuleRestricted           = "restricted"
 )
 
 type MSC2946ClientResponse struct {
