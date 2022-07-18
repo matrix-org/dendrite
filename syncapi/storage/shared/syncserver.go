@@ -392,7 +392,9 @@ func (d *Database) WriteEvent(
 			// Nothing to do, the event may have just been a message event.
 			return nil
 		}
-
+		for i := range addStateEvents {
+			addStateEvents[i].Visibility = historyVisibility
+		}
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 

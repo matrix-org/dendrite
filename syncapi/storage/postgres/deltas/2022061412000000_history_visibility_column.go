@@ -29,6 +29,8 @@ func UpAddHistoryVisibilityColumn(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE syncapi_output_room_events ADD COLUMN IF NOT EXISTS history_visibility SMALLINT NOT NULL DEFAULT 2;
 		UPDATE syncapi_output_room_events SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
+		ALTER TABLE syncapi_current_room_state ADD COLUMN IF NOT EXISTS history_visibility SMALLINT NOT NULL DEFAULT 2;
+		UPDATE syncapi_current_room_state SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
@@ -39,6 +41,7 @@ func UpAddHistoryVisibilityColumn(tx *sql.Tx) error {
 func DownAddHistoryVisibilityColumn(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE syncapi_output_room_events DROP COLUMN IF EXISTS history_visibility;
+		ALTER TABLE syncapi_current_room_state DROP COLUMN IF EXISTS history_visibility;
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
