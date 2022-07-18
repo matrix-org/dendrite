@@ -619,7 +619,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 				TransactionID: *txnID,
 			}
 		}
-
+		ev.Visibility = historyVisibility
 		result = append(result, types.StreamEvent{
 			HeaderedEvent:   &ev,
 			StreamPosition:  streamPos,
