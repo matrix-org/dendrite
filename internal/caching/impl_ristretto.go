@@ -70,7 +70,6 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 		}, func() float64 {
 			return float64(cache.Metrics.CostAdded() - cache.Metrics.CostEvicted())
 		})
-		cache.Metrics.GetsKept()
 	}
 	return &Caches{
 		RoomVersions: &RistrettoCachePartition[string, gomatrixserverlib.RoomVersion]{ // room ID -> room version
