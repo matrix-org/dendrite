@@ -91,6 +91,11 @@ const selectEventsWithEventIDsSQL = "" +
 	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, 3 AS history_visibility" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
+const selectSharedUsersSQL = "" +
+	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
+	"	SELECT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
+	") AND state_key IN ($2) AND membership='join';"
+
 type currentRoomStateStatements struct {
 	db                                 *sql.DB
 	streamIDStatements                 *StreamIDStatements
@@ -100,8 +105,9 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt    *sql.Stmt
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
-	//selectJoinedUsersInRoomStmt        *sql.Stmt - prepared at runtime due to variadic
+	//selectJoinedUsersInRoomStmt      *sql.Stmt - prepared at runtime due to variadic
 	selectStateEventStmt *sql.Stmt
+	//selectSharedUsersSQL             *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
@@ -395,4 +401,30 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	return &ev, err
+}
+
+func (s *currentRoomStateStatements) SelectSharedUsers(
+	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
+) ([]string, error) {
+	query := strings.Replace(selectSharedUsersSQL, "($2)", sqlutil.QueryVariadicOffset(len(otherUserIDs), 1), 1)
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		return nil, fmt.Errorf("SelectSharedUsers s.db.Prepare: %w", err)
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectSharedUsers: stmt.close() failed")
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, userID, otherUserIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectSharedUsersStmt: rows.close() failed")
+
+	var stateKey string
+	result := make([]string, 0, len(otherUserIDs))
+	for rows.Next() {
+		if err := rows.Scan(&stateKey); err != nil {
+			return nil, err
+		}
+		result = append(result, stateKey)
+	}
+	return result, rows.Err()
 }

@@ -2,6 +2,8 @@ package config
 
 import (
 	"math/rand"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -73,6 +75,9 @@ type Global struct {
 
 	// ReportStats configures opt-in anonymous stats reporting.
 	ReportStats ReportStats `yaml:"report_stats"`
+
+	// Configuration for the caches.
+	Cache Cache `yaml:"cache"`
 }
 
 func (c *Global) Defaults(generate bool) {
@@ -90,6 +95,7 @@ func (c *Global) Defaults(generate bool) {
 	c.Sentry.Defaults()
 	c.ServerNotices.Defaults(generate)
 	c.ReportStats.Defaults()
+	c.Cache.Defaults(generate)
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -102,6 +108,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.DNSCache.Verify(configErrs, isMonolith)
 	c.ServerNotices.Verify(configErrs, isMonolith)
 	c.ReportStats.Verify(configErrs, isMonolith)
+	c.Cache.Verify(configErrs, isMonolith)
 }
 
 type OldVerifyKeys struct {
@@ -167,6 +174,20 @@ func (c *ServerNotices) Defaults(generate bool) {
 }
 
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
+
+type Cache struct {
+	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
+	MaxAge           time.Duration `yaml:"max_age"`
+}
+
+func (c *Cache) Defaults(generate bool) {
+	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
+	c.MaxAge = time.Hour
+}
+
+func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
+	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
+}
 
 // ReportStats configures opt-in anonymous stats reporting.
 type ReportStats struct {
@@ -267,4 +288,29 @@ type PresenceOptions struct {
 	EnableInbound bool `yaml:"enable_inbound"`
 	// Whether outbound presence events are allowed
 	EnableOutbound bool `yaml:"enable_outbound"`
+}
+
+type DataUnit int64
+
+func (d *DataUnit) UnmarshalText(text []byte) error {
+	var magnitude float64
+	s := strings.ToLower(string(text))
+	switch {
+	case strings.HasSuffix(s, "tb"):
+		s, magnitude = s[:len(s)-2], 1024*1024*1024*1024
+	case strings.HasSuffix(s, "gb"):
+		s, magnitude = s[:len(s)-2], 1024*1024*1024
+	case strings.HasSuffix(s, "mb"):
+		s, magnitude = s[:len(s)-2], 1024*1024
+	case strings.HasSuffix(s, "kb"):
+		s, magnitude = s[:len(s)-2], 1024
+	default:
+		magnitude = 1
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return err
+	}
+	*d = DataUnit(v * magnitude)
+	return nil
 }

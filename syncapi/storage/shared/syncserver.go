@@ -176,6 +176,10 @@ func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]t
 	return d.Peeks.SelectPeekingDevices(ctx)
 }
 
+func (d *Database) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+	return d.CurrentRoomState.SelectSharedUsers(ctx, nil, userID, otherUserIDs)
+}
+
 func (d *Database) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
@@ -546,12 +550,11 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 	eventToRedact := redactedEvents[0].Unwrap()
 	redactionEvent := redactedBecause.Unwrap()
-	ev, err := eventutil.RedactEvent(redactionEvent, eventToRedact)
-	if err != nil {
+	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
 		return err
 	}
 
-	newEvent := ev.Headered(redactedBecause.RoomVersion)
+	newEvent := eventToRedact.Headered(redactedBecause.RoomVersion)
 	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
 		return d.OutputEvents.UpdateEventJSON(ctx, newEvent)
 	})
