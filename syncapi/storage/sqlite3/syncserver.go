@@ -52,15 +52,13 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
+	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
+		return err
+	}
+	if _, err = d.db.Exec(currentRoomStateSchema); err != nil {
+		return err
+	}
 	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
-	if err != nil {
-		return err
-	}
-	events, err := NewSqliteEventsTable(d.db, &d.streamID)
-	if err != nil {
-		return err
-	}
-	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
@@ -111,7 +109,17 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
+	deltas.LoadAddHistoryVisibilityColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+		return err
+	}
+	// prepare statements after the migrations have run
+	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
+	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
+	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{
