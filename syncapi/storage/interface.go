@@ -27,6 +27,8 @@ import (
 
 type Database interface {
 	Presence
+	SharedUsers
+
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error)
@@ -67,7 +69,9 @@ type Database interface {
 	// when generating the sync stream position for this event. Returns the sync stream position for the inserted event.
 	// Returns an error if there was a problem inserting this event.
 	WriteEvent(ctx context.Context, ev *gomatrixserverlib.HeaderedEvent, addStateEvents []*gomatrixserverlib.HeaderedEvent,
-		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool) (types.StreamPosition, error)
+		addStateEventIDs []string, removeStateEventIDs []string, transactionID *api.TransactionID, excludeFromSync bool,
+		historyVisibility gomatrixserverlib.HistoryVisibility,
+	) (types.StreamPosition, error)
 	// PurgeRoomState completely purges room state from the sync API. This is done when
 	// receiving an output event that completely resets the state.
 	PurgeRoomState(ctx context.Context, roomID string) error
@@ -171,4 +175,9 @@ type Presence interface {
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
+}
+
+type SharedUsers interface {
+	// SharedUsers returns a subset of otherUserIDs that share a room with userID.
+	SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error)
 }

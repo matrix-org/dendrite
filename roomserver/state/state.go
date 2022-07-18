@@ -110,7 +110,7 @@ func (v *StateResolution) LoadStateAtEvent(
 
 	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
 	if err != nil {
-		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %s", eventID, err)
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
 	}
 	if snapshotNID == 0 {
 		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
@@ -1027,7 +1027,7 @@ func (v *StateResolution) loadStateEvents(
 
 	result := make([]*gomatrixserverlib.Event, 0, len(entries))
 	eventEntries := make([]types.StateEntry, 0, len(entries))
-	eventNIDs := make([]types.EventNID, 0, len(entries))
+	eventNIDs := make(types.EventNIDs, 0, len(entries))
 	for _, entry := range entries {
 		if e, ok := v.events[entry.EventNID]; ok {
 			result = append(result, e)

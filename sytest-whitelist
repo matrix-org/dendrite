@@ -239,7 +239,6 @@ Inbound federation can receive v2 /send_join
 Message history can be paginated
 Backfill works correctly with history visibility set to joined
 Guest user cannot call /events globally
-Guest users can join guest_access rooms
 Guest user can set display names
 Guest user cannot upgrade other users
 Guest non-joined user cannot call /events on shared room
@@ -740,3 +739,4 @@ Only see history_visibility changes on boundaries
 Current state appears in timeline in private history
 Current state appears in timeline in private history with many messages before
 Local users can peek into world_readable rooms by room ID
+Newly joined room includes presence in incremental sync

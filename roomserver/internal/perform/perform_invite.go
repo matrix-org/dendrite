@@ -56,7 +56,14 @@ func (r *Inviter) PerformInvite(
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 
-	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
+	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("The user ID %q is invalid!", targetUserID),
+		}
+		return nil, nil
+	}
 	isTargetLocal := domain == r.Cfg.Matrix.ServerName
 	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
 

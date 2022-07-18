@@ -17,6 +17,7 @@ package producers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -34,6 +35,7 @@ type SyncAPIProducer struct {
 	TopicSendToDeviceEvent string
 	TopicTypingEvent       string
 	TopicPresenceEvent     string
+	TopicDeviceListUpdate  string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
 	UserAPI                userapi.UserInternalAPI
@@ -51,7 +53,7 @@ func (p *SyncAPIProducer) SendReceipt(
 	m.Header.Set(jetstream.RoomID, roomID)
 	m.Header.Set(jetstream.EventID, eventID)
 	m.Header.Set("type", receiptType)
-	m.Header.Set("timestamp", strconv.Itoa(int(timestamp)))
+	m.Header.Set("timestamp", fmt.Sprintf("%d", timestamp))
 
 	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
@@ -157,7 +159,22 @@ func (p *SyncAPIProducer) SendPresence(
 	lastActiveTS := gomatrixserverlib.AsTimestamp(time.Now().Add(-(time.Duration(lastActiveAgo) * time.Millisecond)))
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(lastActiveTS)))
-	log.Debugf("Sending presence to syncAPI: %+v", m.Header)
+	log.Tracef("Sending presence to syncAPI: %+v", m.Header)
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	return err
+}
+
+func (p *SyncAPIProducer) SendDeviceListUpdate(
+	ctx context.Context, deviceListUpdate *gomatrixserverlib.DeviceListUpdateEvent,
+) (err error) {
+	m := nats.NewMsg(p.TopicDeviceListUpdate)
+	m.Header.Set(jetstream.UserID, deviceListUpdate.UserID)
+	m.Data, err = json.Marshal(deviceListUpdate)
+	if err != nil {
+		return fmt.Errorf("json.Marshal: %w", err)
+	}
+
+	log.Debugf("Sending device list update: %+v", m.Header)
+	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }

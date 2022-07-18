@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
@@ -49,6 +50,7 @@ type UserInternalAPI struct {
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
 	KeyAPI      keyapi.UserKeyAPI
+	RSAPI       rsapi.UserRoomserverAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -452,6 +454,30 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 
 // PerformAccountDeactivation deactivates the user's account, removing all ability for the user to login again.
 func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
+	a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes)
+	if err := evacuateRes.Error; err != nil {
+		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
+	}
+
+	deviceReq := &api.PerformDeviceDeletionRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	deviceRes := &api.PerformDeviceDeletionResponse{}
+	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
+		return err
+	}
+
+	pusherReq := &api.PerformPusherDeletionRequest{
+		Localpart: req.Localpart,
+	}
+	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+		return err
+	}
+
 	err := a.DB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err

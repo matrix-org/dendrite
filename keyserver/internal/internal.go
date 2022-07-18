@@ -47,17 +47,6 @@ func (a *KeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
 	a.UserAPI = i
 }
 
-func (a *KeyInternalAPI) InputDeviceListUpdate(
-	ctx context.Context, req *api.InputDeviceListUpdateRequest, res *api.InputDeviceListUpdateResponse,
-) {
-	err := a.Updater.Update(ctx, req.Event)
-	if err != nil {
-		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("failed to update device list: %s", err),
-		}
-	}
-}
-
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
 	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Offset, req.ToOffset)
 	if err != nil {
