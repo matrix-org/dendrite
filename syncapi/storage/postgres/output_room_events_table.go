@@ -254,7 +254,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			excludeFromSync   bool
 			addIDs            pq.StringArray
 			delIDs            pq.StringArray
-			historyVisibility uint8
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs, &historyVisibility); err != nil {
 			return nil, nil, err
@@ -286,7 +286,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			needSet[id] = true
 		}
 		stateNeeded[ev.RoomID()] = needSet
-		ev.Visibility = gomatrixserverlib.HistoryVisibilityFromInt(historyVisibility)
+		ev.Visibility = historyVisibility
 
 		eventIDToEvent[eventID] = types.StreamEvent{
 			HeaderedEvent:   &ev,
@@ -318,7 +318,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 func (s *outputRoomEventsStatements) InsertEvent(
 	ctx context.Context, txn *sql.Tx,
 	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
-	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility uint8,
+	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (streamPos types.StreamPosition, err error) {
 	var txnID *string
 	var sessionID *int64
@@ -509,7 +509,7 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 	row := sqlutil.TxStmt(txn, s.selectContextEventStmt).QueryRowContext(ctx, roomID, eventID)
 
 	var eventAsString string
-	var historyVisibility uint8
+	var historyVisibility gomatrixserverlib.HistoryVisibility
 	if err = row.Scan(&id, &eventAsString, &historyVisibility); err != nil {
 		return 0, evt, err
 	}
@@ -517,7 +517,7 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 	if err = json.Unmarshal([]byte(eventAsString), &evt); err != nil {
 		return 0, evt, err
 	}
-	evt.Visibility = gomatrixserverlib.HistoryVisibilityFromInt(historyVisibility)
+	evt.Visibility = historyVisibility
 	return id, evt, nil
 }
 
@@ -541,7 +541,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 		var (
 			eventBytes        []byte
 			evt               *gomatrixserverlib.HeaderedEvent
-			historyVisibility uint8
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&eventBytes, &historyVisibility); err != nil {
 			return evts, err
@@ -549,7 +549,7 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 		if err = json.Unmarshal(eventBytes, &evt); err != nil {
 			return evts, err
 		}
-		evt.Visibility = gomatrixserverlib.HistoryVisibilityFromInt(historyVisibility)
+		evt.Visibility = historyVisibility
 		evts = append(evts, evt)
 	}
 
@@ -576,7 +576,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		var (
 			eventBytes        []byte
 			evt               *gomatrixserverlib.HeaderedEvent
-			historyVisibility uint8
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err = rows.Scan(&lastID, &eventBytes, &historyVisibility); err != nil {
 			return 0, evts, err
@@ -584,7 +584,7 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		if err = json.Unmarshal(eventBytes, &evt); err != nil {
 			return 0, evts, err
 		}
-		evt.Visibility = gomatrixserverlib.HistoryVisibilityFromInt(historyVisibility)
+		evt.Visibility = historyVisibility
 		evts = append(evts, evt)
 	}
 
@@ -602,7 +602,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			sessionID         *int64
 			txnID             *string
 			transactionID     *api.TransactionID
-			historyVisibility uint8
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
 		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
 			return nil, err
@@ -619,7 +619,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 				TransactionID: *txnID,
 			}
 		}
-		ev.Visibility = gomatrixserverlib.HistoryVisibilityFromInt(historyVisibility)
+
 		result = append(result, types.StreamEvent{
 			HeaderedEvent:   &ev,
 			StreamPosition:  streamPos,

@@ -53,7 +53,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range events {
-				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, 2)
+				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
 					return fmt.Errorf("failed to InsertEvent: %s", err)
 				}
@@ -79,7 +79,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 				"body": "test.txt",
 				"url":  "mxc://test.txt",
 			})
-			if _, err = tab.InsertEvent(ctx, txn, urlEv, nil, nil, nil, false, 2); err != nil {
+			if _, err = tab.InsertEvent(ctx, txn, urlEv, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared); err != nil {
 				return fmt.Errorf("failed to InsertEvent: %s", err)
 			}
 			wantEventID := []string{urlEv.EventID()}

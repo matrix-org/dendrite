@@ -108,15 +108,15 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
+	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
 	deltas.LoadAddHistoryVisibilityColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
-		return err
-	}
-	events, err := NewSqliteEventsTable(d.db, &d.streamID)
-	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{

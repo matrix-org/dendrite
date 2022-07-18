@@ -373,7 +373,7 @@ func (d *Database) WriteEvent(
 	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
-			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility.NumericValue(),
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
 		)
 		if err != nil {
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)

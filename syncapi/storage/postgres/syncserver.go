@@ -98,15 +98,15 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err != nil {
 		return nil, err
 	}
+	events, err := NewPostgresEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	m := sqlutil.NewMigrations()
 	deltas.LoadFixSequences(m)
 	deltas.LoadRemoveSendToDeviceSentColumn(m)
 	deltas.LoadAddHistoryVisibilityColumn(m)
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
-		return nil, err
-	}
-	events, err := NewPostgresEventsTable(d.db)
-	if err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{

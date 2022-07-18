@@ -58,7 +58,7 @@ type Events interface {
 		addState, removeState []string,
 		transactionID *api.TransactionID,
 		excludeFromSync bool,
-		historyVisibility uint8,
+		historyVisibility gomatrixserverlib.HistoryVisibility,
 	) (streamPos types.StreamPosition, err error)
 	// SelectRecentEvents returns events between the two stream positions: exclusive of low and inclusive of high.
 	// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude from sync.
