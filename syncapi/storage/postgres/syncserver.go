@@ -46,11 +46,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
 		logrus.Fatalf("unable to create table: %s", err)
 	}
-	accountData, err := NewPostgresAccountDataTable(d.db)
-	if err != nil {
-		return nil, err
+	if _, err = d.db.Exec(currentRoomStateSchema); err != nil {
+		logrus.Fatalf("unable to create table: %s", err)
 	}
-	currState, err := NewPostgresCurrentRoomStateTable(d.db)
+	accountData, err := NewPostgresAccountDataTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +104,12 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
+	// prepare statements after the migrations have run
 	events, err := NewPostgresEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	currState, err := NewPostgresCurrentRoomStateTable(d.db)
 	if err != nil {
 		return nil, err
 	}

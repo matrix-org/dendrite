@@ -56,11 +56,10 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
 		logrus.Fatalf("unable to create table: %s", err)
 	}
-	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
-	if err != nil {
-		return err
+	if _, err = d.db.Exec(currentRoomStateSchema); err != nil {
+		logrus.Fatalf("unable to create table: %s", err)
 	}
-	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
+	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
@@ -115,7 +114,12 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return err
 	}
+	// prepare statements after the migrations have run
 	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
+	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
