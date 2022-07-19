@@ -26,15 +26,23 @@ Matrix servers discover each other when federating using the following methods:
 ## TLS certificates
 
 Matrix federation requires that valid TLS certificates are present on the domain. You must
-obtain certificates from a publicly accepted Certificate Authority (CA). [LetsEncrypt](https://letsencrypt.org)
-is an example of such a CA that can be used. Self-signed certificates are not suitable for
-federation and will typically not be accepted by other homeservers.
+obtain certificates from a publicly-trusted certificate authority (CA). [Let's Encrypt](https://letsencrypt.org)
+is a popular choice of CA because the certificates are publicly-trusted, free, and automated
+via the ACME protocol. (Self-signed certificates are not suitable for federation and will typically
+not be accepted by other homeservers.)
 
-A common practice to help ease the management of certificates is to install a reverse proxy in
-front of Dendrite which manages the TLS certificates and HTTPS proxying itself. Software such as
-[NGINX](https://www.nginx.com) and [HAProxy](http://www.haproxy.org) can be used for the task.
-Although the finer details of configuring these are not described here, you must reverse proxy
-all `/_matrix` paths to your Dendrite server.
+Automating the renewal of TLS certificates is best practice. There are many tools for this,
+but the simplest way to achieve TLS automation is to have your reverse proxy do it for you.
+[Caddy](https://caddyserver.com) is recommended as a production-grade reverse proxy with
+automatic TLS which is commonly used in front of Dendrite. It obtains and renews TLS certificates
+automatically and by default as long as your domain name is pointed at your server first.
+Although the finer details of [configuring Caddy](https://caddyserver.com/docs/) is not described
+here, in general, you must reverse proxy all `/_matrix` paths to your Dendrite server. For example,
+with Caddy:
+
+```
+reverse_proxy /_matrix/* localhost:8008
+```
 
 It is possible for the reverse proxy to listen on the standard HTTPS port TCP/443 so long as your
 domain delegation is configured to point to port TCP/443.
@@ -75,6 +83,16 @@ and contain the following JSON document:
 ```json
 {
     "m.server": "https://matrix.example.com:8448"
+}
+```
+
+For example, this can be done with the following Caddy config:
+
+```
+handle /.well-known/matrix/client {
+	header Content-Type application/json
+	header Access-Control-Allow-Origin *
+	respond `{"m.homeserver": {"base_url": "https://matrix.example.com:8448"}}`
 }
 ```
 
