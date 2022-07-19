@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -72,13 +71,6 @@ const selectStreamToTopologicalPositionAscSQL = "" +
 const selectStreamToTopologicalPositionDescSQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE room_id = $1 AND stream_position <= $2 ORDER BY topological_position DESC LIMIT 1;"
 
-const selectTopologicalEventSQL = "" +
-	"SELECT headered_event_json, topological_position, stream_position " +
-	" FROM syncapi_output_room_events_topology " +
-	" JOIN syncapi_output_room_events ON syncapi_output_room_events.event_id = syncapi_output_room_events_topology.event_id " +
-	" WHERE syncapi_output_room_events_topology.room_id = $1 AND topological_position <= $2 AND type = $3 " +
-	" ORDER BY topological_position DESC LIMIT 1"
-
 type outputRoomEventsTopologyStatements struct {
 	db                                        *sql.DB
 	insertEventInTopologyStmt                 *sql.Stmt
@@ -88,7 +80,6 @@ type outputRoomEventsTopologyStatements struct {
 	selectMaxPositionInTopologyStmt           *sql.Stmt
 	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
 	selectStreamToTopologicalPositionDescStmt *sql.Stmt
-	selectTopologicalEventStmt                *sql.Stmt
 }
 
 func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -107,7 +98,6 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 		{&s.selectMaxPositionInTopologyStmt, selectMaxPositionInTopologySQL},
 		{&s.selectStreamToTopologicalPositionAscStmt, selectStreamToTopologicalPositionAscSQL},
 		{&s.selectStreamToTopologicalPositionDescStmt, selectStreamToTopologicalPositionDescSQL},
-		{&s.selectTopologicalEventStmt, selectTopologicalEventSQL},
 	}.Prepare(db)
 }
 
@@ -186,29 +176,4 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
-}
-
-// SelectTopologicalEvent selects an event before and including the given position by eventType and roomID. Returns the found event and the topology token.
-// If not event was found, returns nil and sql.ErrNoRows.
-func (s *outputRoomEventsTopologyStatements) SelectTopologicalEvent(
-	ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string,
-) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
-	var (
-		eventBytes []byte
-		token      types.TopologyToken
-	)
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalEventStmt).
-		QueryRowContext(ctx, roomID, topologicalPosition, eventType).
-		Scan(&eventBytes, &token.Depth, &token.PDUPosition)
-
-	if err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	var res *gomatrixserverlib.HeaderedEvent
-	if err = json.Unmarshal(eventBytes, &res); err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	return res, token, nil
 }

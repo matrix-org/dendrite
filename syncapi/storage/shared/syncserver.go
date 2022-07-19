@@ -372,6 +372,7 @@ func (d *Database) WriteEvent(
 ) (pduPosition types.StreamPosition, returnErr error) {
 	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
+		ev.Visibility = historyVisibility
 		pos, err := d.OutputEvents.InsertEvent(
 			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
 		)
@@ -1072,10 +1073,6 @@ func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition
 
 func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return d.Presence.GetMaxPresenceID(ctx, nil)
-}
-
-func (d *Database) SelectTopologicalEvent(ctx context.Context, topologicalPosition int, eventType, roomID string) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
-	return d.Topology.SelectTopologicalEvent(ctx, nil, topologicalPosition, eventType, roomID)
 }
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {

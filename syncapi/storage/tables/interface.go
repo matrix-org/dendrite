@@ -93,7 +93,6 @@ type Topology interface {
 	SelectMaxPositionInTopology(ctx context.Context, txn *sql.Tx, roomID string) (depth types.StreamPosition, spos types.StreamPosition, err error)
 	// SelectStreamToTopologicalPosition converts a stream position to a topological position by finding the nearest topological position in the room.
 	SelectStreamToTopologicalPosition(ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, forward bool) (topoPos types.StreamPosition, err error)
-	SelectTopologicalEvent(ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error)
 }
 
 type CurrentRoomState interface {

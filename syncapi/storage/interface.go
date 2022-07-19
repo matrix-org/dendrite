@@ -161,9 +161,6 @@ type Database interface {
 
 	IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
-	// SelectTopologicalEvent selects an event before and including the given position by eventType and roomID. Returns the found event and the topology token.
-	// If not event was found, returns nil and sql.ErrNoRows.
-	SelectTopologicalEvent(ctx context.Context, topologicalPosition int, eventType, roomID string) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error)
 	// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 	// string as the membership.
