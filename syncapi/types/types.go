@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -281,9 +282,11 @@ func NewTopologyTokenFromString(tok string) (token TopologyToken, err error) {
 func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 	if len(tok) < 1 {
 		err = ErrMalformedSyncToken
+		logrus.WithField("token", tok).Info("invalid stream token: bad length")
 		return
 	}
 	if tok[0] != SyncTokenTypeStream[0] {
+		logrus.WithField("token", tok).Info("invalid stream token: not starting from s")
 		err = ErrMalformedSyncToken
 		return
 	}
@@ -299,6 +302,7 @@ func NewStreamTokenFromString(tok string) (token StreamingToken, err error) {
 		var pos int
 		pos, err = strconv.Atoi(p)
 		if err != nil {
+			logrus.WithField("token", tok).Info("invalid stream token: strconv")
 			err = ErrMalformedSyncToken
 			return
 		}
