@@ -40,7 +40,7 @@ type registerContext struct {
 	userInteractive *auth.UserInteractive
 }
 
-func createRegisterContext(t *testing.T) *registerContext {
+func createRegisterContext(_ *testing.T) *registerContext {
 	chainIds := []int{4}
 
 	cfg := &config.ClientAPI{
@@ -173,8 +173,8 @@ func (*fakePublicKeyUserApi) QueryLoginToken(ctx context.Context, req *uapi.Quer
 func newRegistrationSession(
 	t *testing.T,
 	userId string,
-	cfg *config.ClientAPI,
-	userInteractive *auth.UserInteractive,
+	_ *config.ClientAPI,
+	_ *auth.UserInteractive,
 	userAPI *fakePublicKeyUserApi,
 ) string {
 	body := fmt.Sprintf(`{
