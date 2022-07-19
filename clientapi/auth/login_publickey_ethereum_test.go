@@ -34,7 +34,7 @@ type loginContext struct {
 	userInteractive *UserInteractive
 }
 
-func createLoginContext(t *testing.T) *loginContext {
+func createLoginContext(_ *testing.T) *loginContext {
 	chainIds := []int{4}
 
 	cfg := &config.ClientAPI{
