@@ -87,7 +87,6 @@ type outputRoomEventsTopologyStatements struct {
 	selectMaxPositionInTopologyStmt           *sql.Stmt
 	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
 	selectStreamToTopologicalPositionDescStmt *sql.Stmt
-	selectTopologicalEventStmt                *sql.Stmt
 }
 
 func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
