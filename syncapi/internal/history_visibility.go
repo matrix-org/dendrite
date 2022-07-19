@@ -16,73 +16,52 @@ package internal
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"math"
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
-type HistoryVisibility string
-
-const (
-	WorldReadable HistoryVisibility = "world_readable"
-	Joined        HistoryVisibility = "joined"
-	Shared        HistoryVisibility = "shared"
-	Default       HistoryVisibility = "default"
-	Invited       HistoryVisibility = "invited"
-)
-
-var historyVisibilityPriority = map[HistoryVisibility]uint8{
-	WorldReadable: 0,
-	Shared:        1,
-	Default:       1, // as per the spec, default == shared
-	Invited:       2,
-	Joined:        3,
+var historyVisibilityPriority = map[gomatrixserverlib.HistoryVisibility]uint8{
+	gomatrixserverlib.WorldReadable:            0,
+	gomatrixserverlib.HistoryVisibilityShared:  1,
+	gomatrixserverlib.HistoryVisibilityInvited: 2,
+	gomatrixserverlib.HistoryVisibilityJoined:  3,
 }
 
-// EventVisibility contains the history visibility and membership state at a given event
-type EventVisibility struct {
-	Visibility        HistoryVisibility
-	MembershipAtEvent string
-	MembershipCurrent string
+// eventVisibility contains the history visibility and membership state at a given event
+type eventVisibility struct {
+	visibility        gomatrixserverlib.HistoryVisibility
+	membershipAtEvent string
+	membershipCurrent string
 }
 
-// Visibility is a map from event_id to EvVis, which contains the history visibility and membership for a given user.
-type Visibility map[string]EventVisibility
-
-// allowed checks the Visibility map if the user is allowed to see the given event.
-func (v Visibility) allowed(eventID string) (allowed bool) {
-	ev, ok := v[eventID]
-	if !ok {
-		return false
-	}
-	switch ev.Visibility {
-	case WorldReadable:
+// allowed checks the eventVisibility if the user is allowed to see the event.
+func (ev eventVisibility) allowed() (allowed bool) {
+	switch ev.visibility {
+	case gomatrixserverlib.HistoryVisibilityWorldReadable:
 		// If the history_visibility was set to world_readable, allow.
 		return true
-	case Joined:
+	case gomatrixserverlib.HistoryVisibilityJoined:
 		// If the user’s membership was join, allow.
-		if ev.MembershipAtEvent == gomatrixserverlib.Join {
+		if ev.membershipAtEvent == gomatrixserverlib.Join {
 			return true
 		}
 		return false
-	case Shared, Default:
+	case gomatrixserverlib.HistoryVisibilityShared:
 		// If the user’s membership was join, allow.
 		// If history_visibility was set to shared, and the user joined the room at any point after the event was sent, allow.
-		if ev.MembershipAtEvent == gomatrixserverlib.Join || ev.MembershipCurrent == gomatrixserverlib.Join {
+		if ev.membershipAtEvent == gomatrixserverlib.Join || ev.membershipCurrent == gomatrixserverlib.Join {
 			return true
 		}
 		return false
-	case Invited:
+	case gomatrixserverlib.HistoryVisibilityInvited:
 		// If the user’s membership was join, allow.
-		if ev.MembershipAtEvent == gomatrixserverlib.Join {
+		if ev.membershipAtEvent == gomatrixserverlib.Join {
 			return true
 		}
-		if ev.MembershipAtEvent == gomatrixserverlib.Invite {
+		if ev.membershipAtEvent == gomatrixserverlib.Invite {
 			return true
 		}
 		return false
@@ -101,11 +80,22 @@ func ApplyHistoryVisibilityFilter(
 	userID string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
-	stateForEvents, err := getStateForEvents(ctx, syncDB, events, userID)
-	if err != nil {
-		return eventsFiltered, err
+	if len(events) == 0 {
+		return events, nil
 	}
+
+	// try to get the current membership of the user
+	membershipCurrent, _, err := syncDB.SelectMembershipForUser(ctx, events[0].RoomID(), userID, math.MaxInt64)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, ev := range events {
+		event, err := visibilityForEvent(ctx, syncDB, ev, userID)
+		if err != nil {
+			return eventsFiltered, err
+		}
+		event.membershipCurrent = membershipCurrent
 		// Always include specific state events for /sync responses
 		if alwaysIncludeEventIDs != nil {
 			if _, ok := alwaysIncludeEventIDs[ev.EventID()]; ok {
@@ -121,73 +111,35 @@ func ApplyHistoryVisibilityFilter(
 		// Handle history visibility changes
 		if hisVis, err := ev.HistoryVisibility(); err == nil {
 			prevHisVis := gjson.GetBytes(ev.Unsigned(), "prev_content.history_visibility").String()
-			if oldPrio, ok := historyVisibilityPriority[HistoryVisibility(prevHisVis)]; ok {
+			if oldPrio, ok := historyVisibilityPriority[gomatrixserverlib.HistoryVisibility(prevHisVis)]; ok {
 				// no OK check, since this should have been validated when setting the value
-				newPrio := historyVisibilityPriority[HistoryVisibility(hisVis)]
+				newPrio := historyVisibilityPriority[hisVis]
 				if oldPrio < newPrio {
-					sfe := stateForEvents[ev.EventID()]
-					sfe.Visibility = HistoryVisibility(prevHisVis)
-					stateForEvents[ev.EventID()] = sfe
+					event.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
 				}
 			}
 		}
 		// do the actual check
-		if stateForEvents.allowed(ev.EventID()) {
+		allowed := event.allowed()
+		if allowed {
 			eventsFiltered = append(eventsFiltered, ev)
 		}
 	}
 	return eventsFiltered, nil
 }
 
-// getStateForEvents returns a Visibility map containing the state before and at the given events.
-func getStateForEvents(ctx context.Context, db storage.Database, events []*gomatrixserverlib.HeaderedEvent, userID string) (Visibility, error) {
-	result := make(map[string]EventVisibility, len(events))
-	if len(events) == 0 {
-		return result, nil
-	}
-	var (
-		membershipCurrent string
-		err               error
-	)
-	// try to get the current membership of the user
-	membershipCurrent, _, err = db.SelectMembershipForUser(ctx, events[0].RoomID(), userID, math.MaxInt64)
+// visibilityForEvent returns an eventVisibility containing the visibility and the membership at the given event.
+// Returns an error if the database returns an error.
+func visibilityForEvent(ctx context.Context, db storage.Database, event *gomatrixserverlib.HeaderedEvent, userID string) (eventVisibility, error) {
+	// get the membership event
+	var membershipAtEvent string
+	membershipAtEvent, _, err := db.SelectMembershipForUser(ctx, event.RoomID(), userID, event.Depth())
 	if err != nil {
-		return nil, err
+		return eventVisibility{}, err
 	}
 
-	for _, ev := range events {
-		// get the event topology position
-		pos, err := db.EventPositionInTopology(ctx, ev.EventID())
-		if err != nil {
-			return nil, fmt.Errorf("initial event does not exist: %w", err)
-		}
-		// By default if no history_visibility is set, or if the value is not understood, the visibility is assumed to be shared
-		var hisVis = gomatrixserverlib.HistoryVisibilityShared
-		historyEvent, _, err := db.SelectTopologicalEvent(ctx, int(pos.Depth), "m.room.history_visibility", ev.RoomID())
-		if err != nil {
-			if err != sql.ErrNoRows {
-				return nil, err
-			}
-			logrus.WithError(err).Debugf("unable to get history event, defaulting to %s", Shared)
-		} else {
-			hisVis, err = historyEvent.HistoryVisibility()
-			if err != nil {
-				hisVis = gomatrixserverlib.HistoryVisibilityShared
-			}
-		}
-		// get the membership event
-		var membership string
-		membership, _, err = db.SelectMembershipForUser(ctx, ev.RoomID(), userID, int64(pos.Depth))
-		if err != nil {
-			return nil, err
-		}
-		// finally create the mapping
-		result[ev.EventID()] = EventVisibility{
-			Visibility:        HistoryVisibility(hisVis),
-			MembershipAtEvent: membership,
-			MembershipCurrent: membershipCurrent,
-		}
-	}
-
-	return result, nil
+	return eventVisibility{
+		visibility:        event.Visibility,
+		membershipAtEvent: membershipAtEvent,
+	}, nil
 }

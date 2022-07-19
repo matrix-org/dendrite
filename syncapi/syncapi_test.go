@@ -349,7 +349,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 			wantResult        result
 		}{
 			{
-				historyVisibility: "world_readable",
+				historyVisibility: gomatrixserverlib.HistoryVisibilityWorldReadable,
 				wantResult: result{
 					seeWithoutJoin: true,
 					seeBeforeJoin:  true,
@@ -357,7 +357,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				},
 			},
 			{
-				historyVisibility: "shared",
+				historyVisibility: gomatrixserverlib.HistoryVisibilityShared,
 				wantResult: result{
 					seeWithoutJoin: false,
 					seeBeforeJoin:  true,
@@ -365,7 +365,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				},
 			},
 			{
-				historyVisibility: "invited",
+				historyVisibility: gomatrixserverlib.HistoryVisibilityInvited,
 				wantResult: result{
 					seeWithoutJoin: false,
 					seeBeforeJoin:  false,
@@ -373,7 +373,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				},
 			},
 			{
-				historyVisibility: "joined",
+				historyVisibility: gomatrixserverlib.HistoryVisibilityJoined,
 				wantResult: result{
 					seeWithoutJoin: false,
 					seeBeforeJoin:  false,
@@ -390,6 +390,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
+		_ = close
 
 		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
@@ -406,7 +407,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)})
 				testrig.MustPublishMsgs(t, jsctx, toNATSMsgs(t, base, room.Events()...)...)
 				testrig.MustPublishMsgs(t, jsctx, toNATSMsgs(t, base, beforeJoinEv)...)
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(200 * time.Millisecond)
 
 				// There is only one event, we expect only to be able to see this, if the room is world_readable
 				w := httptest.NewRecorder()
@@ -438,7 +439,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 					room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After join in a %s room", tc.historyVisibility)}),
 				)
 				testrig.MustPublishMsgs(t, jsctx, msgs...)
-				time.Sleep(time.Millisecond * 100)
+				time.Sleep(200 * time.Millisecond)
 
 				// Verify the messages after/before invite are visible or not
 				w = httptest.NewRecorder()
@@ -495,6 +496,7 @@ func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input ...*gomatrixserverl
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,
 				AddsStateEventIDs: addsStateIDs,
+				HistoryVisibility: ev.Visibility,
 			},
 		})
 	}
