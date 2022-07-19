@@ -43,11 +43,12 @@ example.com {
 	header /.well-known/matrix/* Content-Type application/json
 	header /.well-known/matrix/* Access-Control-Allow-Origin *
 	respond /.well-known/matrix/server `{"m.homeserver": {"base_url": "https://matrix.example.com"}}`
-	respond /.well-known/matrix/client `{"m.server": {"base_url": "matrix.example.com:443"}}`
+	respond /.well-known/matrix/client `{"m.server": "matrix.example.com:443"}`
 }
 
 # The actual domain name whereby your Matrix server is accessed.
 matrix.example.com {
 	# Set localhost:8008 to the address of your Dendrite server, if different
-	reverse_proxy /_matrix/* localhost:8008
+	reverse_proxy /_matrix/* localhost:8008 # matrix endpoints
+	reverse_proxy /_dendrite/* localhost:8008 # admin endpoints
 }
