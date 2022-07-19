@@ -188,7 +188,9 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err = gomatrixserverlib.Allowed(ev, &r.authEvents); err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
-	return ev.Headered(r.Version)
+	headeredEvent := ev.Headered(r.Version)
+	headeredEvent.Visibility = r.visibility
+	return headeredEvent
 }
 
 // Add a new event to this room DAG. Not thread-safe.
