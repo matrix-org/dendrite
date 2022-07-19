@@ -76,13 +76,15 @@ and contain the following JSON document:
 }
 ```
 
-You can also serve .well-known with Dendrite itself by setting the `well_known_server_name` config
+You can also serve `.well-known` with Dendrite itself by setting the `well_known_server_name` config
 option to the value you want for `m.server`. This is primarily useful if Dendrite is exposed on
-example.com:443 and you don't want to set up a separate webserver just for serving the .well-known
+`example.com:443` and you don't want to set up a separate webserver just for serving the `.well-known`
 file.
 
 ```yaml
-well_known_server_name: "example.com:443"
+global:
+...
+   well_known_server_name: "example.com:443"
 ```
 
 ## DNS SRV delegation
@@ -101,5 +103,5 @@ This behavior also means that if `example.com` and `matrix.example.com` point at
 address, there is no reason to have a SRV record pointing at `matrix.example.com`. It can still
 be used to change the port number, but it won't do anything else.
 
-If you understand how SRV records work and still want to use them, the service is `_matrix` and
+If you understand how SRV records work and still want to use them, the service name is `_matrix` and
 the protocol is `_tcp`.
