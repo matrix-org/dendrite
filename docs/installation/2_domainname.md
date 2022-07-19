@@ -14,14 +14,17 @@ that take the format `@user:example.com`.
 For federation to work, the server name must be resolvable by other homeservers on the internet
 — that is, the domain must be registered and properly configured with the relevant DNS records.
 
-Matrix servers discover each other when federating using the following methods:
+Matrix servers usually discover each other when federating using the following methods:
 
-1. If a well-known delegation exists on `example.com`, use the path server from the
+1. If a well-known delegation exists on `example.com`, use the domain and port from the
    well-known file to connect to the remote homeserver;
-2. If a DNS SRV delegation exists on `example.com`, use the hostname and port from the DNS SRV
+2. If a DNS SRV delegation exists on `example.com`, use the IP address and port from the DNS SRV
    record to connect to the remote homeserver;
 3. If neither well-known or DNS SRV delegation are configured, attempt to connect to the remote
    homeserver by connecting to `example.com` port TCP/8448 using HTTPS.
+
+The exact details of how server name resolution works can be found in
+[the spec](https://spec.matrix.org/v1.3/server-server-api/#resolving-server-names).
 
 ## TLS certificates
 
@@ -59,17 +62,12 @@ you will be able to delegate from `example.com` to `matrix.example.com` so that 
 
 Delegation can be performed in one of two ways:
 
-* **Well-known delegation**: A well-known text file is served over HTTPS on the domain name
-  that you want to use, pointing to your server on `matrix.example.com` port 8448;
-* **DNS SRV delegation**: A DNS SRV record is created on the domain name that you want to
-  use, pointing to your server on `matrix.example.com` port TCP/8448.
+* **Well-known delegation (preferred)**: A well-known text file is served over HTTPS on the domain
+  name that you want to use, pointing to your server on `matrix.example.com` port 8448;
+* **DNS SRV delegation (not recommended)**: See the SRV delegation section below for details.
 
-If you are using a reverse proxy to forward `/_matrix` to Dendrite, your well-known or DNS SRV
-delegation must refer to the hostname and port that the reverse proxy is listening on instead.
-
-Well-known delegation is typically easier to set up and usually preferred. However, you can use
-either or both methods to delegate. If you configure both methods of delegation, it is important
-that they both agree and refer to the same hostname and port.
+If you are using a reverse proxy to forward `/_matrix` to Dendrite, your well-known or delegation
+must refer to the hostname and port that the reverse proxy is listening on instead.
 
 ## Well-known delegation
 
@@ -82,7 +80,7 @@ and contain the following JSON document:
 
 ```json
 {
-    "m.server": "https://matrix.example.com:8448"
+    "m.server": "matrix.example.com:8448"
 }
 ```
 
@@ -96,16 +94,32 @@ handle /.well-known/matrix/client {
 }
 ```
 
+You can also serve `.well-known` with Dendrite itself by setting the `well_known_server_name` config
+option to the value you want for `m.server`. This is primarily useful if Dendrite is exposed on
+`example.com:443` and you don't want to set up a separate webserver just for serving the `.well-known`
+file.
+
+```yaml
+global:
+...
+   well_known_server_name: "example.com:443"
+```
+
 ## DNS SRV delegation
 
-Using DNS SRV delegation requires creating DNS SRV records on the `example.com` zone which
-refer to your Dendrite installation.
+This method is not recommended, as the behavior of SRV records in Matrix is rather unintuitive:
+SRV records will only change the IP address and port that other servers connect to, they won't
+affect the domain name. In technical terms, the `Host` header and TLS SNI of federation requests
+will still be `example.com` even if the SRV record points at `matrix.example.com`.
 
-Assuming that your Dendrite installation is listening for HTTPS connections at `matrix.example.com`
-port 8448, the DNS SRV record must have the following fields:
+In practice, this means that the server must be configured with valid TLS certificates for
+`example.com`, rather than `matrix.example.com` as one might intuitively expect. If there's a
+reverse proxy in between, the proxy configuration must be written as if it's `example.com`, as the
+proxy will never see the name `matrix.example.com` in incoming requests.
 
-* Name: `@` (or whichever term your DNS provider uses to signal the root)
-* Service: `_matrix`
-* Protocol: `_tcp`
-* Port: `8448`
-* Target: `matrix.example.com`
+This behavior also means that if `example.com` and `matrix.example.com` point at the same IP
+address, there is no reason to have a SRV record pointing at `matrix.example.com`. It can still
+be used to change the port number, but it won't do anything else.
+
+If you understand how SRV records work and still want to use them, the service name is `_matrix` and
+the protocol is `_tcp`.
