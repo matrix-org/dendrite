@@ -40,6 +40,7 @@ const (
 	federationEDUsCache
 	spaceSummaryRoomsCache
 	lazyLoadingCache
+	eventStateKeyCache
 )
 
 func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
@@ -88,7 +89,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Prefix: roomNIDsCache,
 			MaxAge: maxAge,
 		},
-		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{ // room NID -> room ID
+		RoomServerRoomIDs: &RistrettoCachePartition[types.RoomNID, string]{ // room NID -> room ID
 			cache:  cache,
 			Prefix: roomIDsCache,
 			MaxAge: maxAge,
@@ -99,6 +100,11 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				Prefix: roomEventsCache,
 				MaxAge: maxAge,
 			},
+		},
+		RoomServerStateKeys: &RistrettoCachePartition[types.EventStateKeyNID, string]{ // event NID -> event state key
+			cache:  cache,
+			Prefix: eventStateKeyCache,
+			MaxAge: maxAge,
 		},
 		RoomInfos: &RistrettoCachePartition[string, *types.RoomInfo]{ // room ID -> room info
 			cache:   cache,

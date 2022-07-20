@@ -72,7 +72,24 @@ func (d *Database) eventTypeNIDs(
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
-	return d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, eventStateKeyNIDs)
+	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
+	fetch := make([]types.EventStateKeyNID, 0, len(eventStateKeyNIDs))
+	for _, nid := range eventStateKeyNIDs {
+		if key, ok := d.Cache.GetEventStateKey(nid); ok {
+			result[nid] = key
+		} else {
+			fetch = append(fetch, nid)
+		}
+	}
+	fromDB, err := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, fetch)
+	if err != nil {
+		return nil, err
+	}
+	for nid, key := range fromDB {
+		result[nid] = key
+		d.Cache.StoreEventStateKey(nid, key)
+	}
+	return result, nil
 }
 
 func (d *Database) EventStateKeyNIDs(
