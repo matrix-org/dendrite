@@ -86,24 +86,24 @@ const insertMembershipSQL = "" +
 
 const selectMembershipFromRoomAndTargetSQL = "" +
 	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND target_nid = $2"
+	" WHERE room_nid = $1 AND event_nid != 0 AND target_nid = $2"
 
 const selectMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2 and forgotten = false"
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2 and forgotten = false"
 
 const selectLocalMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2" +
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2" +
 	" AND target_local = true and forgotten = false"
 
 const selectMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 and forgotten = false"
+	" WHERE room_nid = $1 AND event_nid != 0 and forgotten = false"
 
 const selectLocalMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1" +
+	" WHERE room_nid = $1 AND event_nid != 0" +
 	" AND target_local = true and forgotten = false"
 
 const selectMembershipForUpdateSQL = "" +
