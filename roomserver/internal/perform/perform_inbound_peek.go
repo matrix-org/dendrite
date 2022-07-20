@@ -113,7 +113,7 @@ func (r *InboundPeeker) PerformInboundPeek(
 		response.AuthChainEvents = append(response.AuthChainEvents, event.Headered(info.RoomVersion))
 	}
 
-	err = r.Inputer.WriteOutputEvents(request.RoomID, []api.OutputEvent{
+	err = r.Inputer.OutputProducer.ProduceRoomEvents(request.RoomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewInboundPeek,
 			NewInboundPeek: &api.OutputNewInboundPeek{

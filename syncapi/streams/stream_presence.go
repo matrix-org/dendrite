@@ -111,7 +111,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			currentlyActive := prevPresence.CurrentlyActive()
 			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
 			if skip {
-				req.Log.Debugf("Skipping presence, no change (%s)", presence.UserID)
+				req.Log.Tracef("Skipping presence, no change (%s)", presence.UserID)
 				continue
 			}
 		}

@@ -105,13 +105,13 @@ func (r *Upgrader) performRoomUpgrade(
 		return "", pErr
 	}
 
-	// 5. Send the tombstone event to the old room (must do this before we set the new canonical_alias)
-	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent); pErr != nil {
+	// Send the setup events to the new room
+	if pErr = r.sendInitialEvents(ctx, evTime, userID, newRoomID, string(req.RoomVersion), eventsToMake); pErr != nil {
 		return "", pErr
 	}
 
-	// Send the setup events to the new room
-	if pErr = r.sendInitialEvents(ctx, evTime, userID, newRoomID, string(req.RoomVersion), eventsToMake); pErr != nil {
+	// 5. Send the tombstone event to the old room
+	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent, string(r.Cfg.Matrix.ServerName)); pErr != nil {
 		return "", pErr
 	}
 
@@ -147,7 +147,7 @@ func (r *Upgrader) getRoomPowerLevels(ctx context.Context, roomID string) (*goma
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error()
 		return nil, &api.PerformError{
-			Msg: "powerLevel event was not actually a power level event",
+			Msg: "Power level event was invalid or malformed",
 		}
 	}
 	return powerLevelContent, nil
@@ -182,7 +182,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 			return resErr
 		}
 	} else {
-		if resErr = r.sendHeaderedEvent(ctx, restrictedPowerLevelsHeadered); resErr != nil {
+		if resErr = r.sendHeaderedEvent(ctx, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers); resErr != nil {
 			return resErr
 		}
 	}
@@ -198,7 +198,7 @@ func moveLocalAliases(ctx context.Context,
 	aliasRes := api.GetAliasesForRoomIDResponse{}
 	if err = URSAPI.GetAliasesForRoomID(ctx, &aliasReq, &aliasRes); err != nil {
 		return &api.PerformError{
-			Msg: "Could not get aliases for old room",
+			Msg: fmt.Sprintf("Failed to get old room aliases: %s", err),
 		}
 	}
 
@@ -207,7 +207,7 @@ func moveLocalAliases(ctx context.Context,
 		removeAliasRes := api.RemoveRoomAliasResponse{}
 		if err = URSAPI.RemoveRoomAlias(ctx, &removeAliasReq, &removeAliasRes); err != nil {
 			return &api.PerformError{
-				Msg: "api.RemoveRoomAlias failed",
+				Msg: fmt.Sprintf("Failed to remove old room alias: %s", err),
 			}
 		}
 
@@ -215,7 +215,7 @@ func moveLocalAliases(ctx context.Context,
 		setAliasRes := api.SetRoomAliasResponse{}
 		if err = URSAPI.SetRoomAlias(ctx, &setAliasReq, &setAliasRes); err != nil {
 			return &api.PerformError{
-				Msg: "api.SetRoomAlias failed",
+				Msg: fmt.Sprintf("Failed to set new room alias: %s", err),
 			}
 		}
 	}
@@ -253,7 +253,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 			return resErr
 		}
 	} else {
-		if resErr = r.sendHeaderedEvent(ctx, emptyCanonicalAliasEvent); resErr != nil {
+		if resErr = r.sendHeaderedEvent(ctx, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers); resErr != nil {
 			return resErr
 		}
 	}
@@ -509,7 +509,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		err = builder.SetContent(e.Content)
 		if err != nil {
 			return &api.PerformError{
-				Msg: "builder.SetContent failed",
+				Msg: fmt.Sprintf("Failed to set content of new %q event: %s", builder.Type, err),
 			}
 		}
 		if i > 0 {
@@ -519,13 +519,13 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		event, err = r.buildEvent(&builder, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion))
 		if err != nil {
 			return &api.PerformError{
-				Msg: "buildEvent failed",
+				Msg: fmt.Sprintf("Failed to build new %q event: %s", builder.Type, err),
 			}
 		}
 
 		if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
 			return &api.PerformError{
-				Msg: "gomatrixserverlib.Allowed failed",
+				Msg: fmt.Sprintf("Failed to auth new %q event: %s", builder.Type, err),
 			}
 		}
 
@@ -534,7 +534,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		err = authEvents.AddEvent(event)
 		if err != nil {
 			return &api.PerformError{
-				Msg: "authEvents.AddEvent failed",
+				Msg: fmt.Sprintf("Failed to add new %q event to auth set: %s", builder.Type, err),
 			}
 		}
 	}
@@ -550,7 +550,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 	}
 	if err = api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
 		return &api.PerformError{
-			Msg: "api.SendInputRoomEvents failed",
+			Msg: fmt.Sprintf("Failed to send new room %q to roomserver: %s", newRoomID, err),
 		}
 	}
 	return nil
@@ -582,7 +582,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	err := builder.SetContent(event.Content)
 	if err != nil {
 		return nil, &api.PerformError{
-			Msg: "builder.SetContent failed",
+			Msg: fmt.Sprintf("Failed to set new %q event content: %s", builder.Type, err),
 		}
 	}
 	var queryRes api.QueryLatestEventsAndStateResponse
@@ -607,7 +607,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 		}
 	} else if err != nil {
 		return nil, &api.PerformError{
-			Msg: "eventutil.BuildEvent failed",
+			Msg: fmt.Sprintf("Failed to build new %q event: %s", builder.Type, err),
 		}
 	}
 	// check to see if this user can perform this operation
@@ -619,7 +619,7 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 	if err = gomatrixserverlib.Allowed(headeredEvent.Event, &provider); err != nil {
 		return nil, &api.PerformError{
 			Code: api.PerformErrorNotAllowed,
-			Msg:  err.Error(), // TODO: Is this error string comprehensible to the client?
+			Msg:  fmt.Sprintf("Failed to auth new %q event: %s", builder.Type, err), // TODO: Is this error string comprehensible to the client?
 		}
 	}
 
@@ -666,17 +666,18 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 func (r *Upgrader) sendHeaderedEvent(
 	ctx context.Context,
 	headeredEvent *gomatrixserverlib.HeaderedEvent,
+	sendAsServer string,
 ) *api.PerformError {
 	var inputs []api.InputRoomEvent
 	inputs = append(inputs, api.InputRoomEvent{
 		Kind:         api.KindNew,
 		Event:        headeredEvent,
 		Origin:       r.Cfg.Matrix.ServerName,
-		SendAsServer: api.DoNotSendToOtherServers,
+		SendAsServer: sendAsServer,
 	})
 	if err := api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
 		return &api.PerformError{
-			Msg: "api.SendInputRoomEvents failed",
+			Msg: fmt.Sprintf("Failed to send new %q event to roomserver: %s", headeredEvent.Type(), err),
 		}
 	}
 
@@ -703,7 +704,7 @@ func (r *Upgrader) buildEvent(
 		r.Cfg.Matrix.PrivateKey, roomVersion,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build event %s : Builder failed to build. %w", builder.Type, err)
+		return nil, err
 	}
 	return event, nil
 }

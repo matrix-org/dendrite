@@ -26,16 +26,10 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func newPublicKeyAuthSession(request *registerRequest) {
-	// Public key auth does not use password. But the registration flow
-	// requires setting a password in order to create the account.
-	// Create a random password to satisfy the requirement.
-	request.Password = util.RandomString(sessionIDLength)
-}
-
 func handlePublicKeyRegistration(
 	cfg *config.ClientAPI,
 	reqBytes []byte,
+	r *registerRequest,
 	userAPI userapi.ClientUserAPI,
 ) (bool, authtypes.LoginType, *util.JSONResponse) {
 	if !cfg.PublicKeyAuthentication.Enabled() {
@@ -65,10 +59,25 @@ func handlePublicKeyRegistration(
 		authHandler = pkEthHandler
 	default:
 		// No response. Client is asking for a new registration session
-		return false, "", nil
+		return false, authtypes.LoginStagePublicKeyNewRegistration, nil
 	}
 
-	isCompleted, jerr := authHandler.ValidateLoginResponse()
+	if !sessions.hasSession(authHandler.GetSession()) {
+		return false, "", &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.Unknown("the session ID is missing or unknown."),
+		}
+	}
+
+	isValidUserId := authHandler.IsValidUserId(r.Username)
+	if !isValidUserId {
+		return false, "", &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.InvalidUsername(r.Username),
+		}
+	}
+
+	isValidated, jerr := authHandler.ValidateLoginResponse()
 	if jerr != nil {
 		return false, "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -76,5 +85,19 @@ func handlePublicKeyRegistration(
 		}
 	}
 
-	return isCompleted, authtypes.LoginType(authHandler.GetType()), nil
+	// Registration flow requires a password to
+	// create a user account. Create a random one
+	// to satisfy the requirement. This is not used
+	// for public key cryptography.
+	createPassword(r)
+
+	return isValidated, authtypes.LoginType(authHandler.GetType()), nil
+}
+
+func createPassword(request *registerRequest) {
+	// Public key auth does not use password.
+	// Create a random one that is never used.
+	// Login validation will be done using public / private
+	// key cryptography.
+	request.Password = util.RandomString(sessionIDLength)
 }

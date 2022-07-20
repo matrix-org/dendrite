@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -28,7 +29,9 @@ import (
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 var filterType = flag.String("filtertype", "", "the event types to filter on")
+var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
 
+// nolint:gocyclo
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
@@ -36,6 +39,7 @@ func main() {
 		Type:  "std",
 		Level: "error",
 	})
+	cfg.ClientAPI.RegistrationDisabled = true
 	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
 	args := flag.Args()
 
@@ -50,12 +54,10 @@ func main() {
 
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
-	cache, err := caching.NewInMemoryLRUCache(true)
-	if err != nil {
-		panic(err)
-	}
-
-	roomserverDB, err := storage.Open(base, &cfg.RoomServer.Database, cache)
+	roomserverDB, err := storage.Open(
+		base, &cfg.RoomServer.Database,
+		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -63,6 +65,59 @@ func main() {
 	stateres := state.NewStateResolution(roomserverDB, &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	})
+
+	if *difference {
+		if len(snapshotNIDs) != 2 {
+			panic("need exactly two state snapshot NIDs to calculate difference")
+		}
+		var removed, added []types.StateEntry
+		removed, added, err = stateres.DifferenceBetweeenStateSnapshots(ctx, snapshotNIDs[0], snapshotNIDs[1])
+		if err != nil {
+			panic(err)
+		}
+
+		var eventNIDs []types.EventNID
+		for _, entry := range append(removed, added...) {
+			eventNIDs = append(eventNIDs, entry.EventNID)
+		}
+
+		var eventEntries []types.Event
+		eventEntries, err = roomserverDB.Events(ctx, eventNIDs)
+		if err != nil {
+			panic(err)
+		}
+
+		events := make(map[types.EventNID]*gomatrixserverlib.Event, len(eventEntries))
+		for _, entry := range eventEntries {
+			events[entry.EventNID] = entry.Event
+		}
+
+		if len(removed) > 0 {
+			fmt.Println("Removed:")
+			for _, r := range removed {
+				event := events[r.EventNID]
+				fmt.Println()
+				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				fmt.Printf("  %s\n", string(event.Content()))
+			}
+		}
+
+		if len(removed) > 0 && len(added) > 0 {
+			fmt.Println()
+		}
+
+		if len(added) > 0 {
+			fmt.Println("Added:")
+			for _, a := range added {
+				event := events[a.EventNID]
+				fmt.Println()
+				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				fmt.Printf("  %s\n", string(event.Content()))
+			}
+		}
+
+		return
+	}
 
 	var stateEntries []types.StateEntry
 	for _, snapshotNID := range snapshotNIDs {

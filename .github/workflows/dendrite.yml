@@ -17,13 +17,14 @@ jobs:
     name: WASM build test
     timeout-minutes: 5
     runs-on: ubuntu-latest
+    if: ${{ false }} # disable for now
     steps:
       - uses: actions/checkout@v2
 
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.18
 
       - uses: actions/cache@v2
         with:
@@ -96,7 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -126,7 +127,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18"]
         goos: ["linux"]
         goarch: ["amd64", "386"]
     steps:
@@ -159,7 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18"]
         goos: ["windows"]
         goarch: ["amd64"]
     steps:
@@ -208,7 +209,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: "1.16"
+          go-version: "1.18"
       - uses: actions/cache@v3
         with:
           path: |

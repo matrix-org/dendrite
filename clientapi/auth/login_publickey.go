@@ -33,6 +33,7 @@ type LoginPublicKeyHandler interface {
 	CreateLogin() *Login
 	GetSession() string
 	GetType() string
+	IsValidUserId(userId string) bool
 	ValidateLoginResponse() (bool, *jsonerror.MatrixError)
 }
 

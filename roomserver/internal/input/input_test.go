@@ -48,10 +48,6 @@ func TestSingleTransactionOnInput(t *testing.T) {
 		Kind:  api.KindOutlier, // don't panic if we generate an output event
 		Event: event.Headered(gomatrixserverlib.RoomVersionV6),
 	}
-	cache, err := caching.NewInMemoryLRUCache(false)
-	if err != nil {
-		t.Fatal(err)
-	}
 	db, err := storage.Open(
 		nil,
 		&config.DatabaseOptions{
@@ -59,7 +55,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 			MaxOpenConnections: 1,
 			MaxIdleConnections: 1,
 		},
-		cache,
+		caching.NewRistrettoCache(8*1024*1024, time.Hour, false),
 	)
 	if err != nil {
 		t.Logf("PostgreSQL not available (%s), skipping", err)

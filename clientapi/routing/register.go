@@ -29,9 +29,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
+	"github.com/matrix-org/dendrite/setup/config"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -68,9 +70,10 @@ const (
 // It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {
 	sync.RWMutex
-	sessions map[string][]authtypes.LoginType
-	params   map[string]registerRequest
-	timer    map[string]*time.Timer
+	sessions               map[string][]authtypes.LoginType
+	sessionCompletedResult map[string]registerResponse
+	params                 map[string]registerRequest
+	timer                  map[string]*time.Timer
 	// deleteSessionToDeviceID protects requests to DELETE /devices/{deviceID} from being abused.
 	// If a UIA session is started by trying to delete device1, and then UIA is completed by deleting device2,
 	// the delete request will fail for device2 since the UIA was initiated by trying to delete device1.
@@ -115,6 +118,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	delete(d.params, sessionID)
 	delete(d.sessions, sessionID)
 	delete(d.deleteSessionToDeviceID, sessionID)
+	delete(d.sessionCompletedResult, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
 		if !t.Stop() {
@@ -130,6 +134,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
 		sessions:                make(map[string][]authtypes.LoginType),
+		sessionCompletedResult:  make(map[string]registerResponse),
 		params:                  make(map[string]registerRequest),
 		timer:                   make(map[string]*time.Timer),
 		deleteSessionToDeviceID: make(map[string]string),
@@ -152,6 +157,13 @@ func (d *sessionsDict) startTimer(duration time.Duration, sessionID string) {
 	})
 }
 
+func (d *sessionsDict) hasSession(sessionID string) bool {
+	d.RLock()
+	defer d.RUnlock()
+	_, ok := d.sessions[sessionID]
+	return ok
+}
+
 // addCompletedSessionStage records that a session has completed an auth stage
 // also starts a timer to delete the session once done.
 func (d *sessionsDict) addCompletedSessionStage(sessionID string, stage authtypes.LoginType) {
@@ -171,6 +183,19 @@ func (d *sessionsDict) addDeviceToDelete(sessionID, deviceID string) {
 	d.Lock()
 	defer d.Unlock()
 	d.deleteSessionToDeviceID[sessionID] = deviceID
+}
+
+func (d *sessionsDict) addCompletedRegistration(sessionID string, response registerResponse) {
+	d.Lock()
+	defer d.Unlock()
+	d.sessionCompletedResult[sessionID] = response
+}
+
+func (d *sessionsDict) getCompletedRegistration(sessionID string) (registerResponse, bool) {
+	d.RLock()
+	defer d.RUnlock()
+	result, ok := d.sessionCompletedResult[sessionID]
+	return result, ok
 }
 
 func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
@@ -223,7 +248,7 @@ type authDict struct {
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
-type userInteractiveResponse struct {
+type UserInteractiveResponse struct {
 	Flows     []authtypes.Flow       `json:"flows"`
 	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
@@ -236,9 +261,18 @@ func newUserInteractiveResponse(
 	sessionID string,
 	fs []authtypes.Flow,
 	params map[string]interface{},
-) userInteractiveResponse {
-	return userInteractiveResponse{
-		fs, sessions.getCompletedStages(sessionID), params, sessionID,
+) UserInteractiveResponse {
+	paramsCopy := mapsutil.MapCopy(params)
+	for key, element := range paramsCopy {
+		p := auth.GetAuthParams(element)
+		if p != nil {
+			// If an auth flow has params, make a new copy
+			// and send it as part of the response.
+			paramsCopy[key] = p
+		}
+	}
+	return UserInteractiveResponse{
+		fs, sessions.getCompletedStages(sessionID), paramsCopy, sessionID,
 	}
 }
 
@@ -544,6 +578,14 @@ func Register(
 		r.DeviceID = data.DeviceID
 		r.InitialDisplayName = data.InitialDisplayName
 		r.InhibitLogin = data.InhibitLogin
+		// Check if the user already registered using this session, if so, return that result
+		if response, ok := sessions.getCompletedRegistration(sessionID); ok {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: response,
+			}
+		}
+
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
@@ -739,19 +781,17 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+		if !cfg.PasswordAuthenticationDisabled {
+			sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+		}
 
 	case authtypes.LoginTypePublicKey:
-		isCompleted, authType, err := handlePublicKeyRegistration(cfg, reqBody, userAPI)
+		_, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
 		if err != nil {
 			return *err
 		}
 
-		if isCompleted {
-			sessions.addCompletedSessionStage(sessionID, authType)
-		} else {
-			newPublicKeyAuthSession(&r)
-		}
+		sessions.addCompletedSessionStage(sessionID, authType)
 
 	case "":
 		// An empty auth type means that we want to fetch the available
@@ -856,13 +896,6 @@ func completeRegistration(
 	displayName, deviceID *string,
 	accType userapi.AccountType,
 ) util.JSONResponse {
-	var registrationOK bool
-	defer func() {
-		if registrationOK {
-			sessions.deleteSession(sessionID)
-		}
-	}()
-
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -903,7 +936,6 @@ func completeRegistration(
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
 	if inhibitLogin {
-		registrationOK = true
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
@@ -937,15 +969,17 @@ func completeRegistration(
 		}
 	}
 
-	registrationOK = true
+	result := registerResponse{
+		UserID:      devRes.Device.UserID,
+		AccessToken: devRes.Device.AccessToken,
+		HomeServer:  accRes.Account.ServerName,
+		DeviceID:    devRes.Device.ID,
+	}
+	sessions.addCompletedRegistration(sessionID, result)
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: registerResponse{
-			UserID:      devRes.Device.UserID,
-			AccessToken: devRes.Device.AccessToken,
-			HomeServer:  accRes.Account.ServerName,
-			DeviceID:    devRes.Device.ID,
-		},
+		JSON: result,
 	}
 }
 
