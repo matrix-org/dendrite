@@ -429,7 +429,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), syncReq, fromToken.PDUPosition, toToken.PDUPosition)
 	_, _, err = internal.DeviceListCatchup(
-		req.Context(), rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
+		req.Context(), rp.db, rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {

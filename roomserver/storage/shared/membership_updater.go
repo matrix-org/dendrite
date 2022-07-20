@@ -105,8 +105,15 @@ func (u *MembershipUpdater) SetToInvite(event *gomatrixserverlib.Event) (bool, e
 		if err != nil {
 			return fmt.Errorf("u.d.InvitesTable.InsertInviteEvent: %w", err)
 		}
+
+		// Look up the NID of the invite event
+		nIDs, err := u.d.eventNIDs(u.ctx, u.txn, []string{event.EventID()}, false)
+		if err != nil {
+			return fmt.Errorf("u.d.EventNIDs: %w", err)
+		}
+
 		if u.membership != tables.MembershipStateInvite {
-			if inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, 0, false); err != nil {
+			if inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, tables.MembershipStateInvite, nIDs[event.EventID()], false); err != nil {
 				return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 			}
 		}
