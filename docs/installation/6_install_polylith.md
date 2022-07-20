@@ -29,5 +29,6 @@ Polylith deployments require a reverse proxy in order to ensure that requests ar
 sent to the correct endpoint. You must ensure that a suitable reverse proxy is installed
 and configured.
 
-Sample configurations are provided for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy/monolith/Caddyfile)
+Sample configurations are provided
+for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy/polylith/Caddyfile)
 and [NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx/polylith-sample.conf).

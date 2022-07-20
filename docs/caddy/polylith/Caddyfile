@@ -52,6 +52,15 @@ example.com {
 
 # The actual domain name whereby your Matrix server is accessed.
 matrix.example.com {
-	# Set localhost:8008 to the address of your Dendrite server, if different
-	reverse_proxy /_matrix/* localhost:8008
+	# Change the end of each reverse_proxy line to the correct
+	# address for your various services.
+	@sync_api {
+		path_regexp /_matrix/client/.*?/(sync|user/.*?/filter/?.*|keys/changes|rooms/.*?/messages)$
+	}
+	reverse_proxy @sync_api sync_api:8073
+
+	reverse_proxy /_matrix/client* client_api:8071
+	reverse_proxy /_matrix/federation* federation_api:8071
+	reverse_proxy /_matrix/key* federation_api:8071
+	reverse_proxy /_matrix/media* media_api:8071
 }

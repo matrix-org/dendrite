@@ -100,9 +100,8 @@ or by specifying the `store_dir` option in the the `jetstream` configuration.
 A reverse proxy such as [Caddy](https://caddyserver.com), [NGINX](https://www.nginx.com) or
 [HAProxy](http://www.haproxy.org) is required for polylith deployments and is useful for monolith
 deployments. Configuring those is not covered in this documentation, although sample configurations
-for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy/monolith/Caddyfile) and
-[NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx/polylith-sample.conf)
-are provided.
+for [Caddy](https://github.com/matrix-org/dendrite/blob/main/docs/caddy) and
+[NGINX](https://github.com/matrix-org/dendrite/blob/main/docs/nginx) are provided.
 
 ### Windows
 
