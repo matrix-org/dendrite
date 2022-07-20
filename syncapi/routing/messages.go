@@ -594,6 +594,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 			[]string{},
 			[]string{},
 			nil, true,
+			gomatrixserverlib.HistoryVisibilityShared,
 		)
 		if err != nil {
 			return nil, err

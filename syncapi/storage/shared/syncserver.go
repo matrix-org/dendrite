@@ -176,6 +176,10 @@ func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]t
 	return d.Peeks.SelectPeekingDevices(ctx)
 }
 
+func (d *Database) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+	return d.CurrentRoomState.SelectSharedUsers(ctx, nil, userID, otherUserIDs)
+}
+
 func (d *Database) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
@@ -364,11 +368,12 @@ func (d *Database) WriteEvent(
 	addStateEvents []*gomatrixserverlib.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (pduPosition types.StreamPosition, returnErr error) {
 	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
-			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
 		)
 		if err != nil {
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
@@ -387,7 +392,9 @@ func (d *Database) WriteEvent(
 			// Nothing to do, the event may have just been a message event.
 			return nil
 		}
-
+		for i := range addStateEvents {
+			addStateEvents[i].Visibility = historyVisibility
+		}
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 
