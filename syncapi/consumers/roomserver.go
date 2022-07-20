@@ -240,6 +240,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
 		false,
+		msg.HistoryVisibility,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -289,7 +290,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
-		ev.StateKey() != nil, // exclude from sync?
+		ev.StateKey() != nil, // exclude from sync?,
+		msg.HistoryVisibility,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database

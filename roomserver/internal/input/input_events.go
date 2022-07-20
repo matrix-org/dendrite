@@ -319,11 +319,9 @@ func (r *Inputer) processRoomEvent(
 
 	// if storing this event results in it being redacted then do so.
 	if !isRejected && redactedEventID == event.EventID() {
-		r, rerr := eventutil.RedactEvent(redactionEvent, event)
-		if rerr != nil {
+		if err = eventutil.RedactEvent(redactionEvent, event); err != nil {
 			return fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
-		event = r
 	}
 
 	// For outliers we can stop after we've stored the event itself as it
@@ -381,7 +379,7 @@ func (r *Inputer) processRoomEvent(
 			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
-		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+		err = r.OutputProducer.ProduceRoomEvents(event.RoomID(), []api.OutputEvent{
 			{
 				Type: api.OutputTypeOldRoomEvent,
 				OldRoomEvent: &api.OutputOldRoomEvent{
@@ -400,7 +398,7 @@ func (r *Inputer) processRoomEvent(
 	// so notify downstream components to redact this event - they should have it if they've
 	// been tracking our output log.
 	if redactedEventID != "" {
-		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+		err = r.OutputProducer.ProduceRoomEvents(event.RoomID(), []api.OutputEvent{
 			{
 				Type: api.OutputTypeRedactedEvent,
 				RedactedEvent: &api.OutputRedactedEvent{

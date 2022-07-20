@@ -41,9 +41,15 @@ const membershipSchema = `
 	);
 `
 
-var selectJoinedUsersSetForRoomsSQL = "" +
+var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
 	" WHERE room_nid IN ($1) AND target_nid IN ($2) AND" +
+	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" GROUP BY target_nid"
+
+var selectJoinedUsersSetForRoomsSQL = "" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
+	" WHERE room_nid IN ($1) AND " +
 	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
 	" GROUP BY target_nid"
 
@@ -298,8 +304,12 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 	for _, v := range userNIDs {
 		params = append(params, v)
 	}
+
 	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
-	query = strings.Replace(query, "($2)", sqlutil.QueryVariadicOffset(len(userNIDs), len(roomNIDs)), 1)
+	if len(userNIDs) > 0 {
+		query = strings.Replace(selectJoinedUsersSetForRoomsAndUserSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
+		query = strings.Replace(query, "($2)", sqlutil.QueryVariadicOffset(len(userNIDs), len(roomNIDs)), 1)
+	}
 	var rows *sql.Rows
 	var err error
 	if txn != nil {
