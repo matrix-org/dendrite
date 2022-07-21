@@ -35,16 +35,16 @@ submitting your contribution.
 
 ## Comments
 
-Please make sure that the comments adequately explain *why* your code does what it
+Please make sure that the comments adequately explain _why_ your code does what it
 does. If there are statements that are not obvious, please comment what they do.
 
 We also have some special tags which we use for searchability. These are:
 
-* `// TODO:` for places where a future review, rewrite or refactor is likely required;
-* `// FIXME:` for places where we know there is an outstanding bug that needs a fix;
-* `// NOTSPEC:` for places where the behaviour specifically does not match what the
+- `// TODO:` for places where a future review, rewrite or refactor is likely required;
+- `// FIXME:` for places where we know there is an outstanding bug that needs a fix;
+- `// NOTSPEC:` for places where the behaviour specifically does not match what the
   [Matrix Specification](https://spec.matrix.org/) prescribes, along with a description
-  of *why* that is the case.
+  of _why_ that is the case.
 
 ## Linting
 
@@ -64,7 +64,7 @@ comment. Please avoid doing this if you can.
 We also have unit tests which we run via:
 
 ```bash
-go test ./...
+go test --race ./...
 ```
 
 In general, we like submissions that come with tests. Anything that proves that the

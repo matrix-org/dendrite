@@ -10,6 +10,7 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/sasha-s/go-deadlock"
 )
 
 var ctx = context.Background()
@@ -103,6 +104,9 @@ func TestKeyChangesUpperLimit(t *testing.T) {
 	})
 }
 
+var dbLock deadlock.Mutex
+var deviceArray = []string{"AAA", "another_device"}
+
 // The purpose of this test is to make sure that the storage layer is generating sequential stream IDs per user,
 // and that they are returned correctly when querying for device keys.
 func TestDeviceKeysStreamIDGeneration(t *testing.T) {
@@ -169,8 +173,12 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 			t.Fatalf("Expected StoreLocalDeviceKeys to set StreamID=3 (new key same device) but got %d", msgs[0].StreamID)
 		}
 
+		dbLock.Lock()
+		defer dbLock.Unlock()
 		// Querying for device keys returns the latest stream IDs
-		msgs, err = db.DeviceKeysForUser(ctx, alice, []string{"AAA", "another_device"}, false)
+		msgs, err = func() ([]api.DeviceMessage, error) {
+			return db.DeviceKeysForUser(ctx, alice, deviceArray, false)
+		}()
 		if err != nil {
 			t.Fatalf("DeviceKeysForUser returned error: %s", err)
 		}

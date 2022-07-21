@@ -9,13 +9,17 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sasha-s/go-deadlock"
 )
 
 type dummyPublisher struct {
+	lock  deadlock.Mutex
 	count int
 }
 
 func (d *dummyPublisher) SendPresence(userID string, presence types.Presence, statusMsg *string) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	d.count++
 	return nil
 }
@@ -125,11 +129,19 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	go rp.cleanPresence(db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			beforeCount := publisher.count
+			beforeCount := func() int {
+				publisher.lock.Lock()
+				defer publisher.lock.Unlock()
+				return publisher.count
+			}()
 			rp.updatePresence(db, tt.args.presence, tt.args.userID)
-			if tt.wantIncrease && publisher.count <= beforeCount {
-				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
-			}
+			func() {
+				publisher.lock.Lock()
+				defer publisher.lock.Unlock()
+				if tt.wantIncrease && publisher.count <= beforeCount {
+					t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
+				}
+			}()
 			time.Sleep(tt.args.sleep)
 		})
 	}

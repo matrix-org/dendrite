@@ -4,25 +4,25 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
-	"github.com/nats-io/nats.go"
 	natsclient "github.com/nats-io/nats.go"
 )
 
 type NATSInstance struct {
 	*natsserver.Server
-	sync.Mutex
 }
 
-func DeleteAllStreams(js nats.JetStreamContext, cfg *config.JetStream) {
+var natsLock deadlock.Mutex
+
+func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 	for _, stream := range streams { // streams are defined in streams.go
 		name := cfg.Prefixed(stream.Name)
 		_ = js.DeleteStream(name)
@@ -30,11 +30,12 @@ func DeleteAllStreams(js nats.JetStreamContext, cfg *config.JetStream) {
 }
 
 func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
+	natsLock.Lock()
+	defer natsLock.Unlock()
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
 		return setupNATS(process, cfg, nil)
 	}
-	s.Lock()
 	if s.Server == nil {
 		var err error
 		s.Server, err = natsserver.NewServer(&natsserver.Options{
@@ -61,7 +62,6 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			process.ComponentFinished()
 		}()
 	}
-	s.Unlock()
 	if !s.ReadyForConnections(time.Second * 10) {
 		logrus.Fatalln("NATS did not start in time")
 	}

@@ -8,9 +8,11 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/pressly/goose"
+	"github.com/sasha-s/go-deadlock"
 )
 
 type Migrations struct {
+	gooseMutex             deadlock.Mutex
 	registeredGoMigrations map[int64]*goose.Migration
 }
 
@@ -42,6 +44,8 @@ func (m *Migrations) AddNamedMigration(filename string, up func(*sql.Tx) error, 
 
 // RunDeltas up to the latest version.
 func (m *Migrations) RunDeltas(db *sql.DB, props *config.DatabaseOptions) error {
+	m.gooseMutex.Lock()
+	defer m.gooseMutex.Unlock()
 	maxVer := goose.MaxVersion
 	minVer := int64(0)
 	migrations, err := m.collect(minVer, maxVer)
