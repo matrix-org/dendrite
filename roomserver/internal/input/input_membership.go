@@ -61,20 +61,14 @@ func (r *Inputer) updateMemberships(
 	var updates []api.OutputEvent
 
 	for _, change := range changes {
-		var ae *gomatrixserverlib.Event
-		var re *gomatrixserverlib.Event
+		var ae *types.Event
+		var re *types.Event
 		targetUserNID := change.EventStateKeyNID
 		if change.removedEventNID != 0 {
-			ev, _ := helpers.EventMap(events).Lookup(change.removedEventNID)
-			if ev != nil {
-				re = ev.Event
-			}
+			re, _ = helpers.EventMap(events).Lookup(change.removedEventNID)
 		}
 		if change.addedEventNID != 0 {
-			ev, _ := helpers.EventMap(events).Lookup(change.addedEventNID)
-			if ev != nil {
-				ae = ev.Event
-			}
+			ae, _ = helpers.EventMap(events).Lookup(change.addedEventNID)
 		}
 		if updates, err = r.updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
 			return nil, err
@@ -86,7 +80,7 @@ func (r *Inputer) updateMemberships(
 func (r *Inputer) updateMembership(
 	updater *shared.RoomUpdater,
 	targetUserNID types.EventStateKeyNID,
-	remove, add *gomatrixserverlib.Event,
+	remove, add *types.Event, // *gomatrixserverlib.Event,
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	var err error
@@ -140,7 +134,7 @@ func (r *Inputer) updateMembership(
 	}
 }
 
-func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
+func (r *Inputer) isLocalTarget(event *types.Event) bool {
 	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
 		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
@@ -150,7 +144,7 @@ func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
 }
 
 func updateToJoinMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// When we mark a user as being joined we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
@@ -175,7 +169,7 @@ func updateToJoinMembership(
 }
 
 func updateToLeaveMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event,
+	mu *shared.MembershipUpdater, add *types.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	// When we mark a user as having left we will invalidate any invites that
@@ -201,7 +195,7 @@ func updateToLeaveMembership(
 }
 
 func updateToKnockMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	if _, _, err := mu.Update(tables.MembershipStateKnock, add); err != nil {
 		return nil, err

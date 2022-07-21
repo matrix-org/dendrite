@@ -22,7 +22,7 @@ import (
 // Move these to a more sensible place.
 
 func UpdateToInviteMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are

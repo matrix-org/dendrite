@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type MembershipUpdater struct {
@@ -94,7 +95,7 @@ func (u *MembershipUpdater) Delete() error {
 	return u.d.MembershipTable.DeleteMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID)
 }
 
-func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *gomatrixserverlib.Event) (bool, []string, error) {
+func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *types.Event) (bool, []string, error) {
 	var inserted bool    // Did the query result in a membership change?
 	var retired []string // Did we retire any updates in the process?
 	return inserted, retired, u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
@@ -102,15 +103,13 @@ func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
-		eventID := event.EventID()
-		// It's possible the event isn't persisted, i.e. in the case of invites,
-		// so don't error if we can't find the event NID.
-		eventNIDs, _ := u.d.eventNIDs(u.ctx, u.txn, []string{eventID}, false)
-		inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, newMembership, eventNIDs[eventID], false)
+		inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, newMembership, event.EventNID, false)
+		logrus.Infof("XXX: Updating membership table room %d user %d membership %d event %d", u.roomNID, u.targetUserNID, newMembership, event.EventNID)
 		if err != nil {
 			return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 		}
 		if !inserted {
+			logrus.Info("XXX: No change")
 			return nil
 		}
 		switch {

@@ -145,7 +145,11 @@ func (r *Inviter) PerformInvite(
 	if err != nil {
 		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 	}
-	outputUpdates, err = helpers.UpdateToInviteMembership(updater, event.Unwrap(), outputUpdates, req.Event.RoomVersion)
+	ev := &types.Event{
+		EventNID: 0,
+		Event:    event.Unwrap(),
+	}
+	outputUpdates, err = helpers.UpdateToInviteMembership(updater, ev, outputUpdates, req.Event.RoomVersion)
 	if err != nil {
 		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
 	}
