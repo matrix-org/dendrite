@@ -71,7 +71,7 @@ func (r *Inviter) PerformInvite(
 	if !isOriginLocal && !isTargetLocal {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
-			Msg:  fmt.Sprintf("The invite must be either from or to a local user"),
+			Msg:  "The invite must be either from or to a local user",
 		}
 		return nil, nil
 	}
