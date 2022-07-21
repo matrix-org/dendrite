@@ -80,7 +80,7 @@ func (r *Inputer) updateMemberships(
 func (r *Inputer) updateMembership(
 	updater *shared.RoomUpdater,
 	targetUserNID types.EventStateKeyNID,
-	remove, add *types.Event, // *gomatrixserverlib.Event,
+	remove, add *types.Event,
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	var err error

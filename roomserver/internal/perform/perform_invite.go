@@ -140,24 +140,6 @@ func (r *Inviter) PerformInvite(
 		return nil, nil
 	}
 
-	// Update the membership table for the invite.
-	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
-	if err != nil {
-		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
-	}
-	ev := &types.Event{
-		EventNID: 0,
-		Event:    event.Unwrap(),
-	}
-	outputUpdates, err = helpers.UpdateToInviteMembership(updater, ev, outputUpdates, req.Event.RoomVersion)
-	if err != nil {
-		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
-	}
-	if err = updater.Commit(); err != nil {
-		return nil, fmt.Errorf("updater.Commit: %w", err)
-	}
-	logger.Debugf("updated membership to invite and sending invite OutputEvent")
-
 	// If the invite originated remotely then we can't send an
 	// InputRoomEvent for the invite as it will never pass auth checks
 	// due to lacking room state, but we still need to tell the client
@@ -182,6 +164,24 @@ func (r *Inviter) PerformInvite(
 		}
 		return nil, nil
 	}
+
+	// Update the membership table for the invite.
+	updater, err := r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
+	if err != nil {
+		return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+	}
+	ev := &types.Event{
+		EventNID: 0,
+		Event:    event.Unwrap(),
+	}
+	outputUpdates, err = helpers.UpdateToInviteMembership(updater, ev, outputUpdates, req.Event.RoomVersion)
+	if err != nil {
+		return nil, fmt.Errorf("updateToInviteMembership: %w", err)
+	}
+	if err = updater.Commit(); err != nil {
+		return nil, fmt.Errorf("updater.Commit: %w", err)
+	}
+	logger.Debugf("updated membership to invite and sending invite OutputEvent")
 
 	// If the invite originated from us and the target isn't local then we
 	// should try and send the invite over federation first. It might be

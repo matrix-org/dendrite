@@ -8,7 +8,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 type MembershipUpdater struct {
@@ -104,12 +103,10 @@ func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
 		inserted, err = u.d.MembershipTable.UpdateMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID, senderUserNID, newMembership, event.EventNID, false)
-		logrus.Infof("XXX: Updating membership table room %d user %d membership %d event %d", u.roomNID, u.targetUserNID, newMembership, event.EventNID)
 		if err != nil {
 			return fmt.Errorf("u.d.MembershipTable.UpdateMembership: %w", err)
 		}
 		if !inserted {
-			logrus.Info("XXX: No change")
 			return nil
 		}
 		switch {
