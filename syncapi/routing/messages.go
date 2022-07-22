@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -345,8 +346,12 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	// Apply room history visibility filter
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, events, nil, r.device.UserID)
-
+	startTime := time.Now()
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, r.rsAPI, events, nil, r.device.UserID, "messages")
+	logrus.WithFields(logrus.Fields{
+		"duration": time.Since(startTime),
+		"room_id":  r.roomID,
+	}).Debug("applied history visibility (messages)")
 	return gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll), start, end, err
 }
 

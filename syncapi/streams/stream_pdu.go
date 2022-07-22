@@ -114,7 +114,7 @@ func (p *PDUStreamProvider) CompleteSync(
 
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
+				ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device, false,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -140,7 +140,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		if !peek.Deleted {
 			var jr *types.JoinResponse
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
+				ctx, peek.RoomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device, true,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -300,7 +300,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	switch delta.Membership {
 	case gomatrixserverlib.Join:
 		// We need to make sure we always include the latest states events, if they are in the timeline
-		events, err := applyHistoryVisibilityFilter(ctx, p.DB, delta.RoomID, device.UserID, recentEvents)
+		events, err := applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, delta.RoomID, device.UserID, recentEvents)
 		if err != nil {
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
@@ -315,15 +315,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		res.Rooms.Join[delta.RoomID] = *jr
 
 	case gomatrixserverlib.Peek:
-		events, err := applyHistoryVisibilityFilter(ctx, p.DB, delta.RoomID, device.UserID, recentEvents)
-		if err != nil {
-			logrus.WithError(err).Error("unable to apply history visibility filter")
-		}
-
 		jr := types.NewJoinResponse()
 		jr.Timeline.PrevBatch = &prevBatch
-		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
-		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
+		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
+		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Peek[delta.RoomID] = *jr
 
@@ -349,6 +344,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 func applyHistoryVisibilityFilter(
 	ctx context.Context,
 	db storage.Database,
+	rsAPI roomserverAPI.SyncRoomserverAPI,
 	roomID, userID string,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
@@ -361,11 +357,16 @@ func applyHistoryVisibilityFilter(
 	for _, ev := range stateEvents {
 		alwaysIncludeIDs[ev.EventID()] = struct{}{}
 	}
-	events, err := internal.ApplyHistoryVisibilityFilter(ctx, db, recentEvents, alwaysIncludeIDs, userID)
+	startTime := time.Now()
+	events, err := internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
 	if err != nil {
 
 		return nil, err
 	}
+	logrus.WithFields(logrus.Fields{
+		"duration": time.Since(startTime),
+		"room_id":  roomID,
+	}).Debug("applied history visibility (sync)")
 	return events, err
 }
 
@@ -416,6 +417,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	eventFilter *gomatrixserverlib.RoomEventFilter,
 	wantFullState bool,
 	device *userapi.Device,
+	isPeek bool,
 ) (jr *types.JoinResponse, err error) {
 	jr = types.NewJoinResponse()
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
@@ -473,10 +475,15 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
 	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
-	events, err := applyHistoryVisibilityFilter(ctx, p.DB, roomID, device.UserID, recentEvents)
-	if err != nil {
-		logrus.WithError(err).Error("unable to apply history visibility filter")
+	events := recentEvents
+	// Only apply history visibility checks if the response is for joined rooms
+	if !isPeek {
+		events, err = applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, roomID, device.UserID, recentEvents)
+		if err != nil {
+			logrus.WithError(err).Error("unable to apply history visibility filter")
+		}
 	}
+
 	limited = limited && len(events) == len(recentEvents)
 
 	if stateFilter.LazyLoadMembers {

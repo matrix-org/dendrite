@@ -17,10 +17,34 @@ package internal
 import (
 	"context"
 	"math"
+	"sync"
+	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tidwall/gjson"
+)
+
+var registerOnce = &sync.Once{}
+
+// calculateHistoryVisibilityDuration stores the time it takes to
+// calculate the history visibility. In polylith mode the roundtrip
+// to the roomserver is included in this time.
+var calculateHistoryVisibilityDuration = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Namespace: "dendrite",
+		Subsystem: "syncapi",
+		Name:      "calculateHistoryVisibility_duration_millis",
+		Help:      "How long it takes to calculate the history visibility",
+		Buckets: []float64{ // milliseconds
+			5, 10, 25, 50, 75, 100, 250, 500,
+			1000, 2000, 3000, 4000, 5000, 6000,
+			7000, 8000, 9000, 10000, 15000, 20000,
+		},
+	},
+	[]string{"api"},
 )
 
 var historyVisibilityPriority = map[gomatrixserverlib.HistoryVisibility]uint8{
@@ -75,14 +99,18 @@ func (ev eventVisibility) allowed() (allowed bool) {
 func ApplyHistoryVisibilityFilter(
 	ctx context.Context,
 	syncDB storage.Database,
+	rsAPI api.SyncRoomserverAPI,
 	events []*gomatrixserverlib.HeaderedEvent,
 	alwaysIncludeEventIDs map[string]struct{},
-	userID string,
+	userID, endpoint string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	registerOnce.Do(func() {
+		prometheus.MustRegister(calculateHistoryVisibilityDuration)
+	})
 	if len(events) == 0 {
 		return events, nil
 	}
+	start := time.Now()
 
 	// try to get the current membership of the user
 	membershipCurrent, _, err := syncDB.SelectMembershipForUser(ctx, events[0].RoomID(), userID, math.MaxInt64)
@@ -90,12 +118,21 @@ func ApplyHistoryVisibilityFilter(
 		return nil, err
 	}
 
+	eventIDs := make([]string, len(events))
+	for i := range events {
+		eventIDs[i] = events[i].EventID()
+	}
+
+	// Get the mapping from eventID -> eventVisibility
+	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	event, err := visibilityForEvents(ctx, rsAPI, eventIDs, userID, events[0].RoomID())
+	if err != nil {
+		return eventsFiltered, err
+	}
 	for _, ev := range events {
-		event, err := visibilityForEvent(ctx, syncDB, ev, userID)
-		if err != nil {
-			return eventsFiltered, err
-		}
-		event.membershipCurrent = membershipCurrent
+		d := event[ev.EventID()]
+		d.membershipCurrent = membershipCurrent
+		d.visibility = ev.Visibility
 		// Always include specific state events for /sync responses
 		if alwaysIncludeEventIDs != nil {
 			if _, ok := alwaysIncludeEventIDs[ev.EventID()]; ok {
@@ -115,31 +152,53 @@ func ApplyHistoryVisibilityFilter(
 				// no OK check, since this should have been validated when setting the value
 				newPrio := historyVisibilityPriority[hisVis]
 				if oldPrio < newPrio {
-					event.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
+					d.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
 				}
 			}
 		}
 		// do the actual check
-		allowed := event.allowed()
+		allowed := d.allowed()
 		if allowed {
 			eventsFiltered = append(eventsFiltered, ev)
 		}
 	}
+	calculateHistoryVisibilityDuration.With(prometheus.Labels{"api": endpoint}).Observe(float64(time.Since(start).Milliseconds()))
 	return eventsFiltered, nil
 }
 
-// visibilityForEvent returns an eventVisibility containing the visibility and the membership at the given event.
-// Returns an error if the database returns an error.
-func visibilityForEvent(ctx context.Context, db storage.Database, event *gomatrixserverlib.HeaderedEvent, userID string) (eventVisibility, error) {
-	// get the membership event
-	var membershipAtEvent string
-	membershipAtEvent, _, err := db.SelectMembershipForUser(ctx, event.RoomID(), userID, event.Depth())
+// visibilityForEvents returns a map from eventID to eventVisibility containing the visibility and the membership at the given event.
+// Returns an error if the roomserver can't calculate the memberships.
+func visibilityForEvents(ctx context.Context, rsAPI api.SyncRoomserverAPI, eventIDs []string, userID, roomID string) (map[string]eventVisibility, error) {
+	res := make(map[string]eventVisibility, len(eventIDs))
+
+	// get the membership events for all eventIDs
+	resp := &api.QueryMembersipAtEventResponse{}
+	err := rsAPI.QueryMembershipAtEvent(ctx, &api.QueryMembersipAtEventRequest{
+		RoomID:   roomID,
+		EventIDs: eventIDs,
+		UserID:   userID,
+	}, resp)
 	if err != nil {
-		return eventVisibility{}, err
+		return res, err
 	}
 
-	return eventVisibility{
-		visibility:        event.Visibility,
-		membershipAtEvent: membershipAtEvent,
-	}, nil
+	// Create a map from eventID -> eventVisibility
+	for _, eventID := range eventIDs {
+		vis := eventVisibility{membershipAtEvent: gomatrixserverlib.Leave}
+		events, ok := resp.Memberships[eventID]
+		if !ok {
+			res[eventID] = vis
+			continue
+		}
+		for _, ev := range events {
+			membership, err := ev.Membership()
+			if err != nil {
+				return res, err
+			}
+			vis.membershipAtEvent = membership
+		}
+		res[eventID] = vis
+	}
+
+	return res, nil
 }

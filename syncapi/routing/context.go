@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -109,11 +110,16 @@ func Context(
 	}
 
 	// verify the user is allowed to see the context for this room/event
-	filteredEvent, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID)
+	startTime := time.Now()
+	filteredEvent, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
 	}
+	logrus.WithFields(logrus.Fields{
+		"duration": time.Since(startTime),
+		"room_id":  roomID,
+	}).Debug("applied history visibility (context)")
 	if len(filteredEvent) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
@@ -133,16 +139,17 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsBefore, nil, device.UserID)
+	startTime = time.Now()
+	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, syncDB, rsAPI, eventsBefore, eventsAfter, device.UserID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
 	}
-	eventsAfterFiltered, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, eventsAfter, nil, device.UserID)
-	if err != nil {
-		logrus.WithError(err).Error("unable to apply history visibility filter")
-		return jsonerror.InternalServerError()
-	}
+
+	logrus.WithFields(logrus.Fields{
+		"duration": time.Since(startTime),
+		"room_id":  roomID,
+	}).Debug("applied history visibility (context eventsBefore/eventsAfter)")
 
 	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
 	state, err := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
@@ -174,6 +181,44 @@ func Context(
 		Code: http.StatusOK,
 		JSON: response,
 	}
+}
+
+// applyHistoryVisibilityOnContextEvents is a helper function to avoid roundtrips to the roomserver
+// by combining the events before and after the context event. Returns the filtered events,
+// and an error, if any.
+func applyHistoryVisibilityOnContextEvents(
+	ctx context.Context, syncDB storage.Database, rsAPI roomserver.SyncRoomserverAPI,
+	eventsBefore, eventsAfter []*gomatrixserverlib.HeaderedEvent,
+	userID string,
+) (filteredBefore, filteredAfter []*gomatrixserverlib.HeaderedEvent, err error) {
+	eventIDsBefore := make(map[string]struct{}, len(eventsBefore))
+	eventIDsAfter := make(map[string]struct{}, len(eventsAfter))
+
+	// Remember before/after eventIDs, so we can restore them
+	// after applying history visibility checks
+	for _, ev := range eventsBefore {
+		eventIDsBefore[ev.EventID()] = struct{}{}
+	}
+	for _, ev := range eventsAfter {
+		eventIDsAfter[ev.EventID()] = struct{}{}
+	}
+
+	allEvents := append(eventsBefore, eventsAfter...)
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, allEvents, nil, userID, "context")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// "Restore" events in the correct context
+	for _, ev := range filteredEvents {
+		if _, ok := eventIDsBefore[ev.EventID()]; ok {
+			filteredBefore = append(filteredBefore, ev)
+		}
+		if _, ok := eventIDsAfter[ev.EventID()]; ok {
+			filteredAfter = append(filteredAfter, ev)
+		}
+	}
+	return filteredBefore, filteredAfter, nil
 }
 
 func getStartEnd(ctx context.Context, syncDB storage.Database, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
