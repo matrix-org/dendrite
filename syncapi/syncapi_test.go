@@ -10,6 +10,7 @@ import (
 	"time"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -20,6 +21,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -55,6 +57,27 @@ func (s *syncRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *rsap
 func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsapi.QueryMembershipForUserRequest, res *rsapi.QueryMembershipForUserResponse) error {
 	res.IsRoomForgotten = false
 	res.RoomExists = true
+	return nil
+}
+
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembersipAtEventRequest, res *rsapi.QueryMembersipAtEventResponse) error {
+	var roomEvents []*gomatrixserverlib.HeaderedEvent
+	for _, room := range s.rooms {
+		if room.ID == req.RoomID {
+			roomEvents = room.Events()
+			break
+		}
+	}
+
+	res.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
+	for _, ev := range roomEvents {
+		logrus.Infof("roomEvents: %s", string(ev.JSON()))
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(req.UserID) {
+			logrus.Infof("Adding membership event")
+			res.Memberships[ev.EventID()] = append(res.Memberships[ev.EventID()], ev)
+		}
+	}
+
 	return nil
 }
 
@@ -342,6 +365,8 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		AccessToken: "BOD_BEARER_TOKEN",
 		DisplayName: "BOB",
 	}
+
+	ctx := context.Background()
 	// check guest and normal user accounts
 	for _, accType := range []userapi.AccountType{userapi.AccountTypeGuest, userapi.AccountTypeUser} {
 		testCases := []struct {
@@ -395,7 +420,11 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
-		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{bobDev}}, &syncRoomserverAPI{}, &syncKeyAPI{})
+		// Use the actual internal roomserver API
+		rsAPI := roomserver.NewInternalAPI(base)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{bobDev}}, rsAPI, &syncKeyAPI{})
 
 		for _, tc := range testCases {
 			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
@@ -405,9 +434,10 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 				// send the events/messages to NATS to create the rooms
 				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)})
-				testrig.MustPublishMsgs(t, jsctx, toNATSMsgs(t, base, room.Events()...)...)
-				testrig.MustPublishMsgs(t, jsctx, toNATSMsgs(t, base, beforeJoinEv)...)
-				time.Sleep(200 * time.Millisecond)
+				eventsToSend := append(room.Events(), beforeJoinEv)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
 
 				// There is only one event, we expect only to be able to see this, if the room is world_readable
 				w := httptest.NewRecorder()
@@ -430,16 +460,16 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
 
 				// Create invite, a message, join the room and create another message.
-				msgs := toNATSMsgs(t, base, room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID)))
-				testrig.MustPublishMsgs(t, jsctx, msgs...)
+				inviteEv := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID))
 				afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
-				msgs = toNATSMsgs(t, base,
-					afterInviteEv,
-					room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID)),
-					room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After join in a %s room", tc.historyVisibility)}),
-				)
-				testrig.MustPublishMsgs(t, jsctx, msgs...)
-				time.Sleep(200 * time.Millisecond)
+				joinEv := room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID))
+				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After join in a %s room", tc.historyVisibility)})
+
+				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
 
 				// Verify the messages after/before invite are visible or not
 				w = httptest.NewRecorder()

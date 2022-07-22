@@ -62,6 +62,7 @@ func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 		preset:       PresetPublicChat,
 		Version:      gomatrixserverlib.RoomVersionV9,
 		currentState: make(map[string]*gomatrixserverlib.HeaderedEvent),
+		visibility:   gomatrixserverlib.HistoryVisibilityShared,
 	}
 	for _, m := range modifiers {
 		m(t, r)
