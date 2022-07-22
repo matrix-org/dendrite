@@ -138,7 +138,7 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(sqlutil.Migration{
 		Version: "syncapi: add history visibility column (current_room_state)",
-		Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
+		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
 	})
 	err = m.Up(context.Background())
 	if err != nil {
