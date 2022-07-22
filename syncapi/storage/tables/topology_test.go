@@ -28,20 +28,8 @@ func newTopologyTable(t *testing.T, dbType test.DBType) (tables.Topology, *sql.D
 	var tab tables.Topology
 	switch dbType {
 	case test.DBTypePostgres:
-		_, err = postgres.NewPostgresEventsTable(db) // needed for SQL join
-		if err != nil {
-			t.Fatalf("unable to prepare events table")
-		}
 		tab, err = postgres.NewPostgresTopologyTable(db)
 	case test.DBTypeSQLite:
-		var stream sqlite3.StreamIDStatements
-		if err = stream.Prepare(db); err != nil {
-			t.Fatalf("failed to prepare stream stmts: %s", err)
-		}
-		_, err = sqlite3.NewSqliteEventsTable(db, &stream) // needed for SQL join
-		if err != nil {
-			t.Fatalf("unable to prepare events table")
-		}
 		tab, err = sqlite3.NewSqliteTopologyTable(db)
 	}
 	if err != nil {
