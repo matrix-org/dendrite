@@ -107,13 +107,19 @@ func (r *Inviter) PerformInvite(
 	}
 
 	updateMembershipTableManually := func() ([]api.OutputEvent, error) {
+		event := event.Unwrap()
+		var eventNID types.EventNID
+		eventNID, _, _, _, _, err = r.DB.StoreEvent(ctx, event, nil, false)
+		if err != nil {
+			return nil, fmt.Errorf("r.DB.StoreEvent: %w", err)
+		}
 		var updater *shared.MembershipUpdater
 		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion); err != nil {
 			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
 		}
 		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
-			EventNID: 0,
-			Event:    event.Unwrap(),
+			EventNID: eventNID,
+			Event:    event,
 		}, outputUpdates, req.Event.RoomVersion)
 		if err != nil {
 			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
