@@ -139,7 +139,7 @@ func (p *phoneHomeStats) collect() {
 
 	output := bytes.Buffer{}
 	if err = json.NewEncoder(&output).Encode(p.stats); err != nil {
-		logrus.WithError(err).Error("unable to encode anonymous stats")
+		logrus.WithError(err).Error("Unable to encode phone-home statistics")
 		return
 	}
 
@@ -147,14 +147,14 @@ func (p *phoneHomeStats) collect() {
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.cfg.Global.ReportStats.Endpoint, &output)
 	if err != nil {
-		logrus.WithError(err).Error("unable to create anonymous stats request")
+		logrus.WithError(err).Error("Unable to create phone-home statistics request")
 		return
 	}
 	request.Header.Set("User-Agent", "Dendrite/"+internal.VersionString())
 
 	_, err = p.client.Do(request)
 	if err != nil {
-		logrus.WithError(err).Error("unable to send anonymous stats")
+		logrus.WithError(err).Error("Unable to send phone-home statistics")
 		return
 	}
 }

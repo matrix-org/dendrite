@@ -2,13 +2,6 @@ package caching
 
 import "github.com/matrix-org/gomatrixserverlib"
 
-const (
-	RoomVersionCacheName       = "room_versions"
-	RoomVersionCacheMaxEntries = 1024
-	RoomVersionCacheMutable    = false
-	RoomVersionCacheMaxAge     = CacheNoMaxAge
-)
-
 // RoomVersionsCache contains the subset of functions needed for
 // a room version cache.
 type RoomVersionCache interface {
@@ -17,13 +10,7 @@ type RoomVersionCache interface {
 }
 
 func (c Caches) GetRoomVersion(roomID string) (gomatrixserverlib.RoomVersion, bool) {
-	val, found := c.RoomVersions.Get(roomID)
-	if found && val != nil {
-		if roomVersion, ok := val.(gomatrixserverlib.RoomVersion); ok {
-			return roomVersion, true
-		}
-	}
-	return "", false
+	return c.RoomVersions.Get(roomID)
 }
 
 func (c Caches) StoreRoomVersion(roomID string, roomVersion gomatrixserverlib.RoomVersion) {

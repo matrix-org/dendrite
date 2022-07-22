@@ -1,13 +1,13 @@
 ---
-title: Populate the configuration
+title: Configuring Dendrite
 parent: Installation
 nav_order: 7
 permalink: /installation/configuration
 ---
 
-# Populate the configuration
+# Configuring Dendrite
 
-The configuration file is used to configure Dendrite. Sample configuration files are
+A YAML configuration file is used to configure Dendrite. Sample configuration files are
 present in the top level of the Dendrite repository:
 
 * [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml)
