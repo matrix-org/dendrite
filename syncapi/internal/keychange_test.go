@@ -53,11 +53,6 @@ type mockRoomserverAPI struct {
 	roomIDToJoinedMembers map[string][]string
 }
 
-func (s *mockRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, request *api.QueryMembersipAtEventRequest, response *api.QueryMembersipAtEventResponse) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 // QueryRoomsForUser retrieves a list of room IDs matching the given query.
 func (s *mockRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForUserRequest, res *api.QueryRoomsForUserResponse) error {
 	return nil

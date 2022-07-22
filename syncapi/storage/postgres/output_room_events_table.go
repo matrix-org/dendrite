@@ -166,13 +166,6 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
-const selectTopologicalEventSQL = "" +
-	"SELECT se.headered_event_json, st.topological_position, st.stream_position " +
-	" FROM syncapi_output_room_events_topology st " +
-	" JOIN syncapi_output_room_events se ON se.event_id = st.event_id " +
-	" WHERE st.room_id = $1 AND st.topological_position < $2 AND se.type = $3 " +
-	" ORDER BY st.topological_position DESC LIMIT 1"
-
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -187,7 +180,6 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
-	selectTopologicalEventStmt    *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -210,7 +202,6 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-		{&s.selectTopologicalEventStmt, selectTopologicalEventSQL},
 	}.Prepare(db)
 }
 
@@ -598,32 +589,6 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	}
 
 	return lastID, evts, rows.Err()
-}
-
-// SelectTopologicalEvent selects an event before and including the given position by eventType and roomID. Returns the found event and the topology token.
-// If not event was found, returns nil and sql.ErrNoRows.
-func (s *outputRoomEventsStatements) SelectTopologicalEvent(
-	ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string,
-) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
-	var (
-		eventBytes []byte
-		token      types.TopologyToken
-	)
-
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalEventStmt).
-		QueryRowContext(ctx, roomID, topologicalPosition, eventType).
-		Scan(&eventBytes, &token.Depth, &token.PDUPosition)
-
-	if err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	var res *gomatrixserverlib.HeaderedEvent
-	if err = json.Unmarshal(eventBytes, &res); err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	return res, token, nil
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {

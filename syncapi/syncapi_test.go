@@ -21,7 +21,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 )
 
@@ -61,23 +60,6 @@ func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsa
 }
 
 func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembersipAtEventRequest, res *rsapi.QueryMembersipAtEventResponse) error {
-	var roomEvents []*gomatrixserverlib.HeaderedEvent
-	for _, room := range s.rooms {
-		if room.ID == req.RoomID {
-			roomEvents = room.Events()
-			break
-		}
-	}
-
-	res.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
-	for _, ev := range roomEvents {
-		logrus.Infof("roomEvents: %s", string(ev.JSON()))
-		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(req.UserID) {
-			logrus.Infof("Adding membership event")
-			res.Memberships[ev.EventID()] = append(res.Memberships[ev.EventID()], ev)
-		}
-	}
-
 	return nil
 }
 

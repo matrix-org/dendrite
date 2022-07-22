@@ -190,28 +190,3 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
 }
-
-// SelectTopologicalEvent selects an event before and including the given position by eventType and roomID. Returns the found event and the topology token.
-// If not event was found, returns nil and sql.ErrNoRows.
-func (s *outputRoomEventsTopologyStatements) SelectTopologicalEvent(
-	ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string,
-) (*gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
-	var (
-		eventBytes []byte
-		token      types.TopologyToken
-	)
-	err := sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalEventStmt).
-		QueryRowContext(ctx, roomID, topologicalPosition, eventType).
-		Scan(&eventBytes, &token.Depth, &token.PDUPosition)
-
-	if err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	var res *gomatrixserverlib.HeaderedEvent
-	if err = json.Unmarshal(eventBytes, &res); err != nil {
-		return nil, types.TopologyToken{}, err
-	}
-
-	return res, token, nil
-}
