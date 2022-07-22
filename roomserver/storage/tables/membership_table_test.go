@@ -60,9 +60,6 @@ func TestMembershipTable(t *testing.T) {
 			// This inserts a left user to the room
 			err = tab.InsertMembership(ctx, nil, 1, stateKeyNID, true)
 			assert.NoError(t, err)
-			// We must update the membership with a non-zero event NID or it will get filtered out in later queries
-			_, err = tab.UpdateMembership(ctx, nil, 1, stateKeyNID, userNIDs[0], tables.MembershipStateLeaveOrBan, 1, false)
-			assert.NoError(t, err)
 		}
 
 		// ... so this should be false
