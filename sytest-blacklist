@@ -49,3 +49,7 @@ Notifications can be viewed with GET /notifications
 
 If remote user leaves room we no longer receive device updates
 Guest users can join guest_access rooms
+
+# Something is wrong with this test — it passes fine on Complement
+
+Invited user can reject invite over federation several times
