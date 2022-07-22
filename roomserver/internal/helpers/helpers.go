@@ -197,6 +197,12 @@ func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.Room
 	return roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 }
 
+func MembershipAtEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, stateKeyNID types.EventStateKeyNID) ([]types.StateEntry, error) {
+	roomState := state.NewStateResolution(db, info)
+	// Fetch the state as it was when this event was fired
+	return roomState.LoadMembershipAtEvent(ctx, eventID, stateKeyNID)
+}
+
 func LoadEvents(
 	ctx context.Context, db storage.Database, eventNIDs []types.EventNID,
 ) ([]*gomatrixserverlib.Event, error) {

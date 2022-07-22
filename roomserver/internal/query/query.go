@@ -203,6 +203,52 @@ func (r *Queryer) QueryMembershipForUser(
 	return err
 }
 
+func (r *Queryer) QueryMembershipAtEvent(
+	ctx context.Context,
+	request *api.QueryMembersipAtEventRequest,
+	response *api.QueryMembersipAtEventResponse,
+) error {
+	response.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return fmt.Errorf("unable to get roomInfo: %w", err)
+	}
+	if info == nil {
+		return fmt.Errorf("no roomInfo found")
+	}
+
+	// get the users stateKeyNID
+	stateKeyNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.UserID})
+	if err != nil {
+		return fmt.Errorf("unable to get stateKeyNIDs for %s: %w", request.UserID, err)
+	}
+	if _, ok := stateKeyNIDs[request.UserID]; !ok {
+		return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
+	}
+
+	for _, eventID := range request.EventIDs {
+		stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, eventID, stateKeyNIDs[request.UserID])
+		if err != nil {
+			return fmt.Errorf("unable to get state before event: %w", err)
+		}
+		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntries, false)
+		if err != nil {
+			return fmt.Errorf("unable to get memberships at state: %w", err)
+		}
+		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
+
+		for i := range memberships {
+			ev := memberships[i]
+			if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
+				res = append(res, ev.Headered(info.RoomVersion))
+			}
+		}
+		response.Memberships[eventID] = res
+	}
+
+	return nil
+}
+
 // QueryMembershipsForRoom implements api.RoomserverInternalAPI
 func (r *Queryer) QueryMembershipsForRoom(
 	ctx context.Context,

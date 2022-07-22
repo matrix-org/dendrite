@@ -427,3 +427,13 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+type QueryMembersipAtEventRequest struct {
+	RoomID   string
+	EventIDs []string
+	UserID   string
+}
+
+type QueryMembersipAtEventResponse struct {
+	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
+}

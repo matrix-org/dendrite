@@ -23,12 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type StateResolutionStorage interface {
@@ -122,6 +121,47 @@ func (v *StateResolution) LoadStateAtEvent(
 	}
 
 	return stateEntries, nil
+}
+
+func (v *StateResolution) LoadMembershipAtEvent(
+	ctx context.Context, eventID string, stateKeyNID types.EventStateKeyNID,
+) ([]types.StateEntry, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadMembershipAtEvent")
+	defer span.Finish()
+
+	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
+	}
+	if snapshotNID == 0 {
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
+	}
+
+	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, []types.StateSnapshotNID{snapshotNID})
+	if err != nil {
+		return nil, err
+	}
+	// We've asked for exactly one snapshot from the db so we should have exactly one entry in the result.
+	stateBlockNIDList := stateBlockNIDLists[0]
+
+	// Query the membership event for the user at the given stateblocks
+	stateEntryLists, err := v.db.StateEntriesForTuples(ctx, stateBlockNIDList.StateBlockNIDs, []types.StateKeyTuple{
+		{
+			EventTypeNID:     types.MRoomMemberNID,
+			EventStateKeyNID: stateKeyNID,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []types.StateEntry
+	for _, x := range stateEntryLists {
+		if len(x.StateEntries) > 0 {
+			result = append(result, x.StateEntries...)
+		}
+	}
+	return result, nil
 }
 
 // LoadCombinedStateAfterEvents loads a snapshot of the state after each of the events

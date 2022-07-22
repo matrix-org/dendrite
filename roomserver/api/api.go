@@ -97,6 +97,12 @@ type SyncRoomserverAPI interface {
 		req *PerformBackfillRequest,
 		res *PerformBackfillResponse,
 	) error
+
+	QueryMembershipAtEvent(
+		ctx context.Context,
+		request *QueryMembersipAtEventRequest,
+		response *QueryMembersipAtEventResponse,
+	) error
 }
 
 type AppserviceRoomserverAPI interface {

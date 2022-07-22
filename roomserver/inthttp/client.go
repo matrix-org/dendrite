@@ -12,7 +12,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
 )
@@ -63,6 +62,7 @@ const (
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
+	RoomserverQueryMembershipAtEventPath       = "/roomserver/queryMembershipAtEvent"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -593,4 +593,12 @@ func (h *httpRoomserverInternalAPI) PerformForget(ctx context.Context, req *api.
 	apiURL := h.roomserverURL + RoomserverPerformForgetPath
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 
+}
+
+func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, req *api.QueryMembersipAtEventRequest, res *api.QueryMembersipAtEventResponse) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershiptAtEvent")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryMembershipAtEventPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
