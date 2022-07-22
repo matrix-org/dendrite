@@ -413,6 +413,7 @@ Remote users may not join unfederated rooms
 Non-numeric ports in server names are rejected
 Invited user can reject invite over federation
 Invited user can reject invite over federation for empty room
+Invited user can reject invite over federation several times
 Can reject invites over federation for rooms with version 1
 Can reject invites over federation for rooms with version 2
 Can reject invites over federation for rooms with version 3

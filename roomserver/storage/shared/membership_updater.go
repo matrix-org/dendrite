@@ -91,6 +91,9 @@ func (u *MembershipUpdater) IsKnock() bool {
 }
 
 func (u *MembershipUpdater) Delete() error {
+	if _, err := u.d.InvitesTable.UpdateInviteRetired(u.ctx, u.txn, u.roomNID, u.targetUserNID); err != nil {
+		return err
+	}
 	return u.d.MembershipTable.DeleteMembership(u.ctx, u.txn, u.roomNID, u.targetUserNID)
 }
 
