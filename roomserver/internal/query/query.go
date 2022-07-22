@@ -226,12 +226,14 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
 	}
 
+	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, request.EventIDs, stateKeyNIDs[request.UserID])
+	if err != nil {
+		return fmt.Errorf("unable to get state before event: %w", err)
+	}
+
 	for _, eventID := range request.EventIDs {
-		stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, eventID, stateKeyNIDs[request.UserID])
-		if err != nil {
-			return fmt.Errorf("unable to get state before event: %w", err)
-		}
-		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntries, false)
+		stateEntry := stateEntries[eventID]
+		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
 		}

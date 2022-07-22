@@ -197,10 +197,10 @@ func StateBeforeEvent(ctx context.Context, db storage.Database, info *types.Room
 	return roomState.LoadCombinedStateAfterEvents(ctx, prevState)
 }
 
-func MembershipAtEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, stateKeyNID types.EventStateKeyNID) ([]types.StateEntry, error) {
+func MembershipAtEvent(ctx context.Context, db storage.Database, info *types.RoomInfo, eventIDs []string, stateKeyNID types.EventStateKeyNID) (map[string][]types.StateEntry, error) {
 	roomState := state.NewStateResolution(db, info)
 	// Fetch the state as it was when this event was fired
-	return roomState.LoadMembershipAtEvent(ctx, eventID, stateKeyNID)
+	return roomState.LoadMembershipAtEvent(ctx, eventIDs, stateKeyNID)
 }
 
 func LoadEvents(
