@@ -42,6 +42,7 @@ global:
   key_id: ed25519:auto
   key_validity_period: 168h0m0s
   well_known_server_name: "localhost:443"
+  well_known_client_name: "localhost:443"
   trusted_third_party_id_servers:
   - matrix.org
   - vector.im
