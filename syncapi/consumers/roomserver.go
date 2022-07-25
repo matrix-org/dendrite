@@ -365,7 +365,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write invite failure")
+		}).Errorf("roomserver output log: write invite failure")
 		return
 	}
 
@@ -385,7 +385,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: remove invite failure")
+		}).Errorf("roomserver output log: remove invite failure")
 		return
 	}
 
@@ -403,7 +403,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write peek failure")
+		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
 
@@ -422,7 +422,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write peek failure")
+		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
 

@@ -15,6 +15,7 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -23,14 +24,19 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func LoadAddHistoryVisibilityColumn(m *sqlutil.Migrations) {
-	m.AddMigration(UpAddHistoryVisibilityColumn, DownAddHistoryVisibilityColumn)
-}
-
-func UpAddHistoryVisibilityColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func UpAddHistoryVisibilityColumnOutputRoomEvents(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_output_room_events ADD COLUMN IF NOT EXISTS history_visibility SMALLINT NOT NULL DEFAULT 2;
 		UPDATE syncapi_output_room_events SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to execute upgrade: %w", err)
+	}
+	return nil
+}
+
+func UpAddHistoryVisibilityColumnCurrentRoomState(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_current_room_state ADD COLUMN IF NOT EXISTS history_visibility SMALLINT NOT NULL DEFAULT 2;
 		UPDATE syncapi_current_room_state SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
 	`)
@@ -75,8 +81,8 @@ func UpAddHistoryVisibilityColumn(tx *sql.Tx) error {
 	return nil
 }
 
-func DownAddHistoryVisibilityColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func DownAddHistoryVisibilityColumn(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_output_room_events DROP COLUMN IF EXISTS history_visibility;
 		ALTER TABLE syncapi_current_room_state DROP COLUMN IF EXISTS history_visibility;
 	`)

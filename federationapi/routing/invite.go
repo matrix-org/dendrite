@@ -26,7 +26,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // InviteV2 implements /_matrix/federation/v2/invite/{roomID}/{eventID}
@@ -144,7 +143,6 @@ func processInvite(
 	// Check that the event is signed by the server sending the request.
 	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
 	if err != nil {
-		logrus.WithError(err).Errorf("XXX: invite.go")
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),

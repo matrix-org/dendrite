@@ -16,6 +16,7 @@ package query
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -273,6 +274,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.LocalOnly)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}
 		events, err = r.DB.Events(ctx, eventNIDs)
@@ -308,6 +312,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
 			return err
 		}
 
