@@ -64,6 +64,10 @@ global:
   # e.g. localhost:443
   well_known_server_name: ""
 
+  # The server name to delegate client-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_client_name: ""
+
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
   trusted_third_party_id_servers:

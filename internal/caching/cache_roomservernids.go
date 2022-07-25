@@ -9,6 +9,7 @@ type RoomServerCaches interface {
 	RoomVersionCache
 	RoomInfoCache
 	RoomServerEventsCache
+	EventStateKeyCache
 }
 
 // RoomServerNIDsCache contains the subset of functions needed for
@@ -19,9 +20,9 @@ type RoomServerNIDsCache interface {
 }
 
 func (c Caches) GetRoomServerRoomID(roomNID types.RoomNID) (string, bool) {
-	return c.RoomServerRoomIDs.Get(int64(roomNID))
+	return c.RoomServerRoomIDs.Get(roomNID)
 }
 
 func (c Caches) StoreRoomServerRoomID(roomNID types.RoomNID, roomID string) {
-	c.RoomServerRoomIDs.Set(int64(roomNID), roomID)
+	c.RoomServerRoomIDs.Set(roomNID, roomID)
 }

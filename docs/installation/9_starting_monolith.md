@@ -15,8 +15,9 @@ you can start your Dendrite monolith deployment by starting the `dendrite-monoli
 ./dendrite-monolith-server -config /path/to/dendrite.yaml
 ```
 
-If you want to change the addresses or ports that Dendrite listens on, you
-can use the `-http-bind-address` and `-https-bind-address` command line arguments:
+By default, Dendrite will listen HTTP on port 8008. If you want to change the addresses
+or ports that Dendrite listens on, you can use the `-http-bind-address` and
+`-https-bind-address` command line arguments:
 
 ```bash
 ./dendrite-monolith-server -config /path/to/dendrite.yaml \

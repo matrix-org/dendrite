@@ -46,6 +46,9 @@ type Global struct {
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
 
+	// The server name to delegate client-server communications to, with optional port
+	WellKnownClientName string `yaml:"well_known_client_name"`
+
 	// Disables federation. Dendrite will not be able to make any outbound HTTP requests
 	// to other servers and the federation API will not be exposed.
 	DisableFederation bool `yaml:"disable_federation"`
@@ -73,7 +76,7 @@ type Global struct {
 	// ServerNotices configuration used for sending server notices
 	ServerNotices ServerNotices `yaml:"server_notices"`
 
-	// ReportStats configures opt-in anonymous stats reporting.
+	// ReportStats configures opt-in phone-home statistics reporting.
 	ReportStats ReportStats `yaml:"report_stats"`
 
 	// Configuration for the caches.
@@ -195,9 +198,9 @@ func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
 	checkPositive(errors, "max_size_estimated", int64(c.EstimatedMaxSize))
 }
 
-// ReportStats configures opt-in anonymous stats reporting.
+// ReportStats configures opt-in phone-home statistics reporting.
 type ReportStats struct {
-	// Enabled configures anonymous usage stats of the server
+	// Enabled configures phone-home statistics of the server
 	Enabled bool `yaml:"enabled"`
 
 	// Endpoint the endpoint to report stats to
