@@ -178,11 +178,6 @@ func SaveReadMarker(
 		return util.ErrorResponse(err)
 	}
 
-	if err := syncProducer.SendData(device.UserID, roomID, "m.fully_read", &r, nil); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("syncProducer.SendData failed")
-		return jsonerror.InternalServerError()
-	}
-
 	// Handle the read receipt that may be included in the read marker
 	if r.Read != "" {
 		return SetReceipt(req, syncProducer, device, roomID, "m.read", r.Read)

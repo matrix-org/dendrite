@@ -18,8 +18,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -98,10 +96,6 @@ func PutTag(
 		return jsonerror.InternalServerError()
 	}
 
-	if err = syncProducer.SendData(userID, roomID, "m.tag", nil, nil); err != nil {
-		logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
-	}
-
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
@@ -148,11 +142,6 @@ func DeleteTag(
 	if err = saveTagData(req, userID, roomID, userAPI, tagContent); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("saveTagData failed")
 		return jsonerror.InternalServerError()
-	}
-
-	// TODO: user API should do this since it's account data
-	if err := syncProducer.SendData(userID, roomID, "m.tag", nil, nil); err != nil {
-		logrus.WithError(err).Error("Failed to send m.tag account data update to syncapi")
 	}
 
 	return util.JSONResponse{
