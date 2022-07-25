@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     headered_event_json TEXT NOT NULL,
     membership TEXT,
     added_at BIGINT,
+    history_visibility SMALLINT NOT NULL DEFAULT 2, -- The history visibility before this event (1 - world_readable; 2 - shared; 3 - invited; 4 - joined)
     UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
@@ -52,8 +53,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON sync
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" ON CONFLICT (room_id, type, state_key)" +
 	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
@@ -84,11 +85,11 @@ const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly six columns. We need to
+	// TODO: The session_id and transaction_id blanks are here because
+	// the rowsToStreamEvents expects there to be exactly seven columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, history_visibility" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 const selectSharedUsersSQL = "" +
@@ -328,6 +329,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		headeredJSON,
 		membership,
 		addedAt,
+		event.Visibility,
 	)
 	return err
 }

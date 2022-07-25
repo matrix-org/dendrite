@@ -368,11 +368,12 @@ func (d *Database) WriteEvent(
 	addStateEvents []*gomatrixserverlib.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (pduPosition types.StreamPosition, returnErr error) {
 	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		pos, err := d.OutputEvents.InsertEvent(
-			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
 		)
 		if err != nil {
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
@@ -391,7 +392,9 @@ func (d *Database) WriteEvent(
 			// Nothing to do, the event may have just been a message event.
 			return nil
 		}
-
+		for i := range addStateEvents {
+			addStateEvents[i].Visibility = historyVisibility
+		}
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 

@@ -2,7 +2,7 @@
 title: Optimise your installation
 parent: Installation
 has_toc: true
-nav_order: 10
+nav_order: 11
 permalink: /installation/start/optimisation
 ---
 

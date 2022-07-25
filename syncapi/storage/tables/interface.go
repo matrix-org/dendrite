@@ -52,7 +52,14 @@ type Peeks interface {
 type Events interface {
 	SelectStateInRange(ctx context.Context, txn *sql.Tx, r types.Range, stateFilter *gomatrixserverlib.StateFilter, roomIDs []string) (map[string]map[string]bool, map[string]types.StreamEvent, error)
 	SelectMaxEventID(ctx context.Context, txn *sql.Tx) (id int64, err error)
-	InsertEvent(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, addState, removeState []string, transactionID *api.TransactionID, excludeFromSync bool) (streamPos types.StreamPosition, err error)
+	InsertEvent(
+		ctx context.Context, txn *sql.Tx,
+		event *gomatrixserverlib.HeaderedEvent,
+		addState, removeState []string,
+		transactionID *api.TransactionID,
+		excludeFromSync bool,
+		historyVisibility gomatrixserverlib.HistoryVisibility,
+	) (streamPos types.StreamPosition, err error)
 	// SelectRecentEvents returns events between the two stream positions: exclusive of low and inclusive of high.
 	// If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude from sync.
 	// Returns up to `limit` events. Returns `limited=true` if there are more events in this range but we hit the `limit`.

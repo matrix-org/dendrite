@@ -2,7 +2,7 @@
 title: Starting the polylith
 parent: Installation
 has_toc: true
-nav_order: 9
+nav_order: 10
 permalink: /installation/start/polylith
 ---
 
