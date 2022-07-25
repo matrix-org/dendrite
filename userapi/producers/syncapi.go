@@ -6,6 +6,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -34,7 +35,7 @@ func NewSyncAPI(db storage.Database, js JetStreamPublisher, clientDataTopic stri
 }
 
 // SendAccountData sends account data to the Sync API server.
-func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string) error {
+func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string, readMarker *eventutil.ReadMarkerJSON, ignoredUsers *types.IgnoredUsers) error {
 	m := &nats.Msg{
 		Subject: p.clientDataTopic,
 		Header:  nats.Header{},
@@ -43,8 +44,10 @@ func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string)
 
 	var err error
 	m.Data, err = json.Marshal(eventutil.AccountData{
-		RoomID: roomID,
-		Type:   dataType,
+		RoomID:       roomID,
+		Type:         dataType,
+		ReadMarker:   readMarker,
+		IgnoredUsers: ignoredUsers,
 	})
 	if err != nil {
 		return err

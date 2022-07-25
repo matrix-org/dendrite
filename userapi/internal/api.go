@@ -35,6 +35,7 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	synctypes "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -64,7 +65,20 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
-	return a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData)
+	if err := a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
+		return fmt.Errorf("failed to save account data: %w", err)
+	}
+	var ignoredUsers *synctypes.IgnoredUsers
+	if req.DataType == "m.ignored_user_list" {
+		ignoredUsers = &synctypes.IgnoredUsers{}
+		_ = json.Unmarshal(req.AccountData, ignoredUsers)
+	}
+	if err := a.SyncProducer.SendAccountData(req.UserID, req.RoomID, req.DataType, nil, ignoredUsers); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
+		return fmt.Errorf("failed to send account data to output: %w", err)
+	}
+	return nil
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -93,7 +107,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	// Inform the SyncAPI about the newly created push_rules
-	if err = a.SyncProducer.SendAccountData(acc.UserID, "", "m.push_rules"); err != nil {
+	if err = a.SyncProducer.SendAccountData(acc.UserID, "", "m.push_rules", nil, nil); err != nil {
 		util.GetLogger(ctx).WithFields(logrus.Fields{
 			"user_id": acc.UserID,
 		}).WithError(err).Warn("failed to send account data to the SyncAPI")
@@ -732,11 +746,9 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-
-	if err := a.SyncProducer.SendAccountData(req.UserID, "" /* roomID */, pushRulesAccountDataType); err != nil {
+	if err := a.SyncProducer.SendAccountData(req.UserID, "" /* roomID */, pushRulesAccountDataType, nil, nil); err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
 	}
-
 	return nil
 }
 
