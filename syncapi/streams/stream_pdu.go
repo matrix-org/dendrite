@@ -229,6 +229,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		// This is all "okay" assuming history_visibility == "shared" which it is by default.
 		r.To = delta.MembershipPos
 	}
+	// if we joined in between sync calls, send reset From to simulate a complete sync
+	if delta.Membership == gomatrixserverlib.Join && delta.MembershipPos <= r.To && delta.MembershipPos > r.From {
+		r.From = 0
+	}
+
 	recentStreamEvents, limited, err := p.DB.RecentEvents(
 		ctx, delta.RoomID, r,
 		eventFilter, true, true,
