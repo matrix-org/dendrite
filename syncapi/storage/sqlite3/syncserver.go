@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
-	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -42,23 +41,25 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
-	if err = d.prepare(dbProperties); err != nil {
+	if err = d.prepare(); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
-func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
+func (d *SyncServerDatasource) prepare() (err error) {
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
-	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
-		return err
-	}
-	if _, err = d.db.Exec(currentRoomStateSchema); err != nil {
-		return err
-	}
 	accountData, err := NewSqliteAccountDataTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
+	events, err := NewSqliteEventsTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
+	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
@@ -103,22 +104,6 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 		return err
 	}
 	presence, err := NewSqlitePresenceTable(d.db, &d.streamID)
-	if err != nil {
-		return err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	deltas.LoadAddHistoryVisibilityColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
-		return err
-	}
-	// prepare statements after the migrations have run
-	events, err := NewSqliteEventsTable(d.db, &d.streamID)
-	if err != nil {
-		return err
-	}
-	roomState, err := NewSqliteCurrentRoomStateTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
