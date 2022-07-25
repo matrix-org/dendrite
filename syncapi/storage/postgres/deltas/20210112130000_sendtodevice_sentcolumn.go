@@ -21,7 +21,7 @@ import (
 )
 
 func UpRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_send_to_device
 		  DROP COLUMN IF EXISTS sent_by_token;
 	`)
@@ -32,7 +32,7 @@ func UpRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
 }
 
 func DownRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_send_to_device
 		  ADD COLUMN IF NOT EXISTS sent_by_token TEXT;
 	`)

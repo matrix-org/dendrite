@@ -21,7 +21,7 @@ import (
 )
 
 func UpAddHistoryVisibilityColumnOutputRoomEvents(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_output_room_events ADD COLUMN IF NOT EXISTS history_visibility SMALLINT NOT NULL DEFAULT 2;
 		UPDATE syncapi_output_room_events SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
 	`)
@@ -32,7 +32,7 @@ func UpAddHistoryVisibilityColumnOutputRoomEvents(ctx context.Context, tx *sql.T
 }
 
 func UpAddHistoryVisibilityColumnCurrentRoomState(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_current_room_state ADD COLUMN IF NOT EXISTS history_visibility SMALLINT NOT NULL DEFAULT 2;
 		UPDATE syncapi_current_room_state SET history_visibility = 4 WHERE type IN ('m.room.message', 'm.room.encrypted');
 	`)
@@ -43,7 +43,7 @@ func UpAddHistoryVisibilityColumnCurrentRoomState(ctx context.Context, tx *sql.T
 }
 
 func DownAddHistoryVisibilityColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE syncapi_output_room_events DROP COLUMN IF EXISTS history_visibility;
 		ALTER TABLE syncapi_current_room_state DROP COLUMN IF EXISTS history_visibility;
 	`)

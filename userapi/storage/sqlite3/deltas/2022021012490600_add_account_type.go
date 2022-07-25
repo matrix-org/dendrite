@@ -9,7 +9,7 @@ import (
 func UpAddAccountType(ctx context.Context, tx *sql.Tx) error {
 	// initially set every account to useraccount, change appservice and guest accounts afterwards
 	// (user = 1, guest = 2, admin = 3, appservice = 4)
-	_, err := tx.Exec(`ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
+	_, err := tx.ExecContext(ctx, `ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
@@ -35,7 +35,7 @@ DROP TABLE account_accounts_tmp;`)
 }
 
 func DownAddAccountType(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`ALTER TABLE account_accounts DROP COLUMN account_type;`)
+	_, err := tx.ExecContext(ctx, `ALTER TABLE account_accounts DROP COLUMN account_type;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}

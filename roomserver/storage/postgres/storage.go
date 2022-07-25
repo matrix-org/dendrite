@@ -16,7 +16,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 
@@ -61,7 +60,7 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 			Version: "roomserver: state blocks refactor",
 			Up:      deltas.UpStateBlocksRefactor,
 		})
-		if err := m.Up(context.Background()); err != nil {
+		if err := m.Up(base.Context()); err != nil {
 			return nil, err
 		}
 	}

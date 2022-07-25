@@ -21,7 +21,7 @@ import (
 )
 
 func UpFixSequences(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		-- We need to delete all of the existing receipts because the indexes
 		-- will be wrong, and we'll get primary key violations if we try to
 		-- reuse existing stream IDs from a different sequence.
@@ -39,7 +39,7 @@ func UpFixSequences(ctx context.Context, tx *sql.Tx) error {
 }
 
 func DownFixSequences(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		-- We need to delete all of the existing receipts because the indexes
 		-- will be wrong, and we'll get primary key violations if we try to
 		-- reuse existing stream IDs from a different sequence.

@@ -21,7 +21,7 @@ import (
 )
 
 func UpFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE keyserver_cross_signing_sigs DROP CONSTRAINT keyserver_cross_signing_sigs_pkey;
 		ALTER TABLE keyserver_cross_signing_sigs ADD PRIMARY KEY (origin_user_id, origin_key_id, target_user_id, target_key_id);
 
@@ -34,7 +34,7 @@ func UpFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
 }
 
 func DownFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE keyserver_cross_signing_sigs DROP CONSTRAINT keyserver_cross_signing_sigs_pkey;
 		ALTER TABLE keyserver_cross_signing_sigs ADD PRIMARY KEY (origin_user_id, target_user_id, target_key_id);
 

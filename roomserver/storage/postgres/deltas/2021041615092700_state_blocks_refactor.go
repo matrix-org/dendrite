@@ -44,36 +44,36 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	var snapshotcount int
 	var maxsnapshotid int
 	var maxblockid int
-	if err := tx.QueryRow(`SELECT COUNT(DISTINCT state_snapshot_nid) FROM roomserver_state_snapshots;`).Scan(&snapshotcount); err != nil {
-		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(DISTINCT state_snapshot_nid) FROM roomserver_state_snapshots;`).Scan(&snapshotcount); err != nil {
+		return fmt.Errorf("tx.QueryRowContext.Scan (count snapshots): %w", err)
 	}
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(state_snapshot_nid),0) FROM roomserver_state_snapshots;`).Scan(&maxsnapshotid); err != nil {
-		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(state_snapshot_nid),0) FROM roomserver_state_snapshots;`).Scan(&maxsnapshotid); err != nil {
+		return fmt.Errorf("tx.QueryRowContext.Scan (count snapshots): %w", err)
 	}
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(state_block_nid),0) FROM roomserver_state_block;`).Scan(&maxblockid); err != nil {
-		return fmt.Errorf("tx.QueryRow.Scan (count snapshots): %w", err)
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(state_block_nid),0) FROM roomserver_state_block;`).Scan(&maxblockid); err != nil {
+		return fmt.Errorf("tx.QueryRowContext.Scan (count snapshots): %w", err)
 	}
 	maxsnapshotid++
 	maxblockid++
 
-	if _, err := tx.Exec(`ALTER TABLE roomserver_state_block RENAME TO _roomserver_state_block;`); err != nil {
-		return fmt.Errorf("tx.Exec: %w", err)
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_state_block RENAME TO _roomserver_state_block;`); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
 	}
-	if _, err := tx.Exec(`ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
-		return fmt.Errorf("tx.Exec: %w", err)
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_state_snapshots RENAME TO _roomserver_state_snapshots;`); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
 	}
 	// We create new sequences starting with the maximum state snapshot and block NIDs.
 	// This means that all newly created snapshots and blocks by the migration will have
 	// NIDs higher than these values, so that when we come to update the references to
 	// these NIDs using UPDATE statements, we can guarantee we are only ever updating old
 	// values and not accidentally overwriting new ones.
-	if _, err := tx.Exec(fmt.Sprintf(`CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH %d;`, maxblockid)); err != nil {
-		return fmt.Errorf("tx.Exec: %w", err)
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`CREATE SEQUENCE roomserver_state_block_nid_sequence START WITH %d;`, maxblockid)); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
 	}
-	if _, err := tx.Exec(fmt.Sprintf(`CREATE SEQUENCE roomserver_state_snapshot_nid_sequence START WITH %d;`, maxsnapshotid)); err != nil {
-		return fmt.Errorf("tx.Exec: %w", err)
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`CREATE SEQUENCE roomserver_state_snapshot_nid_sequence START WITH %d;`, maxsnapshotid)); err != nil {
+		return fmt.Errorf("tx.ExecContext: %w", err)
 	}
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS roomserver_state_block (
 			state_block_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_block_nid_sequence'),
 			state_block_hash BYTEA UNIQUE,
@@ -83,7 +83,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("tx.Exec (create blocks table): %w", err)
 	}
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS roomserver_state_snapshots (
 			state_snapshot_nid bigint PRIMARY KEY DEFAULT nextval('roomserver_state_snapshot_nid_sequence'),
 			state_snapshot_hash BYTEA UNIQUE,
@@ -100,7 +100,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	// in question a state snapshot NID of 0 to indicate 'no snapshot'.
 	// If we don't do this, we'll fail the assertions later on which try to ensure we didn't forget
 	// any snapshots.
-	_, err = tx.Exec(
+	_, err = tx.ExecContext(ctx,
 		`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE event_type_nid = $1 AND event_state_key_nid = $2`,
 		types.MRoomCreateNID, types.EmptyStateKeyNID,
 	)
@@ -111,7 +111,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	batchsize := 100
 	for batchoffset := 0; batchoffset < snapshotcount; batchoffset += batchsize {
 		var snapshotrows *sql.Rows
-		snapshotrows, err = tx.Query(`
+		snapshotrows, err = tx.QueryContext(ctx, `
 			SELECT
 				state_snapshot_nid,
 				room_nid,
@@ -142,7 +142,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 				state_block_nid;
 		`, batchsize, batchoffset)
 		if err != nil {
-			return fmt.Errorf("tx.Query: %w", err)
+			return fmt.Errorf("tx.QueryContext: %w", err)
 		}
 
 		logrus.Warnf("Rewriting snapshots %d-%d of %d...", batchoffset, batchoffset+batchsize, snapshotcount)
@@ -179,7 +179,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 		// fill in bad create snapshots
 		for _, s := range badCreateSnapshots {
 			var createEventNID types.EventNID
-			err = tx.QueryRow(
+			err = tx.QueryRowContext(ctx,
 				`SELECT event_nid FROM roomserver_events WHERE state_snapshot_nid = $1 AND event_type_nid = 1`, s.StateSnapshotNID,
 			).Scan(&createEventNID)
 			if err == sql.ErrNoRows {
@@ -204,7 +204,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 			}
 
 			var blocknid types.StateBlockNID
-			err = tx.QueryRow(`
+			err = tx.QueryRowContext(ctx, `
 				INSERT INTO roomserver_state_block (state_block_hash, event_nids)
 					VALUES ($1, $2)
 					ON CONFLICT (state_block_hash) DO UPDATE SET event_nids=$2
@@ -223,7 +223,7 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 			}
 
 			var newNID types.StateSnapshotNID
-			err = tx.QueryRow(`
+			err = tx.QueryRowContext(ctx, `
 					INSERT INTO roomserver_state_snapshots (state_snapshot_hash, room_nid, state_block_nids)
 						VALUES ($1, $2, $3)
 						ON CONFLICT (state_snapshot_hash) DO UPDATE SET room_nid=$2
@@ -233,12 +233,12 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 				return fmt.Errorf("tx.QueryRow.Scan (insert new snapshot): %w", err)
 			}
 
-			if _, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newNID, snapshotdata.StateSnapshotNID, maxsnapshotid); err != nil {
-				return fmt.Errorf("tx.Exec (update events): %w", err)
+			if _, err = tx.ExecContext(ctx, `UPDATE roomserver_events SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newNID, snapshotdata.StateSnapshotNID, maxsnapshotid); err != nil {
+				return fmt.Errorf("tx.ExecContext (update events): %w", err)
 			}
 
-			if _, err = tx.Exec(`UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newNID, snapshotdata.StateSnapshotNID, maxsnapshotid); err != nil {
-				return fmt.Errorf("tx.Exec (update rooms): %w", err)
+			if _, err = tx.ExecContext(ctx, `UPDATE roomserver_rooms SET state_snapshot_nid=$1 WHERE state_snapshot_nid=$2 AND state_snapshot_nid<$3`, newNID, snapshotdata.StateSnapshotNID, maxsnapshotid); err != nil {
+				return fmt.Errorf("tx.ExecContext (update rooms): %w", err)
 			}
 		}
 	}
@@ -248,13 +248,13 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 	// in roomserver_state_snapshots
 	var count int64
 
-	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_events WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roomserver_events WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
 		return fmt.Errorf("assertion query failed: %s", err)
 	}
 	if count > 0 {
 		var res sql.Result
 		var c int64
-		res, err = tx.Exec(`UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid)
+		res, err = tx.ExecContext(ctx, `UPDATE roomserver_events SET state_snapshot_nid = 0 WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid)
 		if err != nil && err != sql.ErrNoRows {
 			return fmt.Errorf("failed to reset invalid state snapshots: %w", err)
 		}
@@ -264,13 +264,13 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 			return fmt.Errorf("expected to reset %d event(s) but only updated %d event(s)", count, c)
 		}
 	}
-	if err = tx.QueryRow(`SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid).Scan(&count); err != nil {
 		return fmt.Errorf("assertion query failed: %s", err)
 	}
 	if count > 0 {
 		var debugRoomID string
 		var debugSnapNID, debugLastEventNID int64
-		err = tx.QueryRow(
+		err = tx.QueryRowContext(ctx,
 			`SELECT room_id, state_snapshot_nid, last_event_sent_nid FROM roomserver_rooms WHERE state_snapshot_nid < $1 AND state_snapshot_nid != 0`, maxsnapshotid,
 		).Scan(&debugRoomID, &debugSnapNID, &debugLastEventNID)
 		if err != nil {
@@ -287,13 +287,13 @@ func UpStateBlocksRefactor(ctx context.Context, tx *sql.Tx) error {
 		return fmt.Errorf("%d rooms exist in roomserver_rooms which have not been converted to a new state_snapshot_nid; this is a bug, please report", count)
 	}
 
-	if _, err = tx.Exec(`
+	if _, err = tx.ExecContext(ctx, `
 		DROP TABLE _roomserver_state_snapshots;
 		DROP SEQUENCE roomserver_state_snapshot_nid_seq;
 	`); err != nil {
 		return fmt.Errorf("tx.Exec (delete old snapshot table): %w", err)
 	}
-	if _, err = tx.Exec(`
+	if _, err = tx.ExecContext(ctx, `
 		DROP TABLE _roomserver_state_block;
 		DROP SEQUENCE roomserver_state_block_nid_seq;
 	`); err != nil {

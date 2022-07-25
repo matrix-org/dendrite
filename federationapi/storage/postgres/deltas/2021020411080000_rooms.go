@@ -21,7 +21,7 @@ import (
 )
 
 func UpRemoveRoomsTable(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		DROP TABLE IF EXISTS federationsender_rooms;
 	`)
 	if err != nil {

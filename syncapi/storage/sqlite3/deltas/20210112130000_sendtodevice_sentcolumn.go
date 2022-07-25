@@ -21,7 +21,7 @@ import (
 )
 
 func UpRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		CREATE TEMPORARY TABLE syncapi_send_to_device_backup(id, user_id, device_id, content);
 		INSERT INTO syncapi_send_to_device_backup SELECT id, user_id, device_id, content FROM syncapi_send_to_device;
 		DROP TABLE syncapi_send_to_device;
@@ -41,7 +41,7 @@ func UpRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
 }
 
 func DownRemoveSendToDeviceSentColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 		CREATE TEMPORARY TABLE syncapi_send_to_device_backup(id, user_id, device_id, content);
 		INSERT INTO syncapi_send_to_device_backup SELECT id, user_id, device_id, content FROM syncapi_send_to_device;
 		DROP TABLE syncapi_send_to_device;

@@ -21,7 +21,7 @@ import (
 )
 
 func UpAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`ALTER TABLE roomserver_membership ADD COLUMN IF NOT EXISTS forgotten BOOLEAN NOT NULL DEFAULT false;`)
+	_, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_membership ADD COLUMN IF NOT EXISTS forgotten BOOLEAN NOT NULL DEFAULT false;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
@@ -29,7 +29,7 @@ func UpAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
 }
 
 func DownAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`ALTER TABLE roomserver_membership DROP COLUMN IF EXISTS forgotten;`)
+	_, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_membership DROP COLUMN IF EXISTS forgotten;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}

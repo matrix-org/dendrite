@@ -7,7 +7,7 @@ import (
 )
 
 func UpIsActive(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER TABLE account_accounts ADD COLUMN IF NOT EXISTS is_deactivated BOOLEAN DEFAULT FALSE;")
+	_, err := tx.ExecContext(ctx, "ALTER TABLE account_accounts ADD COLUMN IF NOT EXISTS is_deactivated BOOLEAN DEFAULT FALSE;")
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
@@ -15,7 +15,7 @@ func UpIsActive(ctx context.Context, tx *sql.Tx) error {
 }
 
 func DownIsActive(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER TABLE account_accounts DROP COLUMN is_deactivated;")
+	_, err := tx.ExecContext(ctx, "ALTER TABLE account_accounts DROP COLUMN is_deactivated;")
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}

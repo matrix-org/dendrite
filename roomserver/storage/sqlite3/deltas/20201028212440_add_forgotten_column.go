@@ -21,7 +21,7 @@ import (
 )
 
 func UpAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
+	_, err := tx.ExecContext(ctx, `	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
 CREATE TABLE IF NOT EXISTS roomserver_membership (
 		room_nid INTEGER NOT NULL,
 		target_nid INTEGER NOT NULL,
@@ -47,7 +47,7 @@ DROP TABLE roomserver_membership_tmp;`)
 }
 
 func DownAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
+	_, err := tx.ExecContext(ctx, `	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
 CREATE TABLE IF NOT EXISTS roomserver_membership (
 		room_nid INTEGER NOT NULL,
 		target_nid INTEGER NOT NULL,

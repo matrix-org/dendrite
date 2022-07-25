@@ -7,7 +7,7 @@ import (
 )
 
 func UpIsActive(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
@@ -31,7 +31,7 @@ DROP TABLE account_accounts_tmp;`)
 }
 
 func DownIsActive(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.Exec(`
+	_, err := tx.ExecContext(ctx, `
 	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
