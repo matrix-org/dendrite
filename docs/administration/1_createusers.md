@@ -38,6 +38,15 @@ the `-url` flag:
 ./bin/create-account -config /path/to/dendrite.yaml -username USERNAME -url http://localhost:8008
 ```
 
+An example of using `create-account` when running in **Docker**, having found the `CONTAINERNAME` from `docker ps`:
+
+```bash
+docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME
+```
+```bash
+docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME -admin
+```
+
 ## Using shared secret registration
 
 Dendrite supports the Synapse-compatible shared secret registration endpoint.

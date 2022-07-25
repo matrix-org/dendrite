@@ -40,6 +40,7 @@ const (
 	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
 	RoomserverPerformForgetPath            = "/roomserver/performForget"
 	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
+	RoomserverPerformAdminEvacuateUserPath = "/roomserver/performAdminEvacuateUser"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -61,6 +62,7 @@ const (
 	RoomserverQueryKnownUsersPath              = "/roomserver/queryKnownUsers"
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
+	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -296,6 +298,23 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoomPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *api.PerformAdminEvacuateUserRequest,
+	res *api.PerformAdminEvacuateUserResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateUser")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateUserPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 	if err != nil {
 		res.Error = &api.PerformError{
@@ -554,6 +573,16 @@ func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
+	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+}
+
+func (h *httpRoomserverInternalAPI) QueryRestrictedJoinAllowed(
+	ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse,
+) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRestrictedJoinAllowed")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverQueryRestrictedJoinAllowed
 	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 }
 

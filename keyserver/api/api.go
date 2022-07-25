@@ -62,8 +62,6 @@ type FederationKeyAPI interface {
 	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
 	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
 	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
-	// InputDeviceListUpdate from a federated server EDU
-	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
 	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
 	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
 }
@@ -335,13 +333,5 @@ type QuerySignaturesResponse struct {
 	// A map of target user ID -> cross-signing user-signing key
 	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
 	// The request error, if any
-	Error *KeyError
-}
-
-type InputDeviceListUpdateRequest struct {
-	Event gomatrixserverlib.DeviceListUpdateEvent
-}
-
-type InputDeviceListUpdateResponse struct {
 	Error *KeyError
 }

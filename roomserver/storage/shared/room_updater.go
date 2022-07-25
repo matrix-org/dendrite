@@ -192,6 +192,10 @@ func (u *RoomUpdater) StateAtEventIDs(
 	return u.d.EventsTable.BulkSelectStateAtEventByID(ctx, u.txn, eventIDs)
 }
 
+func (u *RoomUpdater) EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
+	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, false)
+}
+
 func (u *RoomUpdater) UnsentEventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error) {
 	return u.d.eventsFromIDs(ctx, u.txn, eventIDs, true)
 }
@@ -221,13 +225,12 @@ func (u *RoomUpdater) SetLatestEvents(
 		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
-		if roomID, ok := u.d.Cache.GetRoomServerRoomID(roomNID); ok {
-			if roomInfo, ok := u.d.Cache.GetRoomInfo(roomID); ok {
-				roomInfo.StateSnapshotNID = currentStateSnapshotNID
-				roomInfo.IsStub = false
-				u.d.Cache.StoreRoomInfo(roomID, roomInfo)
-			}
-		}
+
+		// Since it's entirely possible that this types.RoomInfo came from the
+		// cache, we should make sure to update that entry so that the next run
+		// works from live data.
+		u.roomInfo.StateSnapshotNID = currentStateSnapshotNID
+		u.roomInfo.IsStub = false
 		return nil
 	})
 }

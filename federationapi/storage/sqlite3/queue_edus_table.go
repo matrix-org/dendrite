@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS federationsender_queue_edus (
 
 CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
     ON federationsender_queue_edus (json_nid, server_name);
+CREATE INDEX IF NOT EXISTS federationsender_queue_edus_nid_idx
+    ON federationsender_queue_edus (json_nid);
+CREATE INDEX IF NOT EXISTS federationsender_queue_edus_server_name_idx
+    ON federationsender_queue_edus (server_name);
 `
 
 const insertQueueEDUSQL = "" +

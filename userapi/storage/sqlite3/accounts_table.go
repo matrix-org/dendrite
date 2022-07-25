@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 
 	log "github.com/sirupsen/logrus"
@@ -84,6 +85,23 @@ func NewSQLiteAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 		serverName: serverName,
 	}
 	_, err := db.Exec(accountsSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: "userapi: add is active",
+			Up:      deltas.UpIsActive,
+			Down:    deltas.DownIsActive,
+		},
+		{
+			Version: "userapi: add account type",
+			Up:      deltas.UpAddAccountType,
+			Down:    deltas.DownAddAccountType,
+		},
+	}...)
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}
