@@ -30,6 +30,7 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -74,7 +75,11 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		ignoredUsers = &synctypes.IgnoredUsers{}
 		_ = json.Unmarshal(req.AccountData, ignoredUsers)
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, req.RoomID, req.DataType, nil, ignoredUsers); err != nil {
+	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+		RoomID:       req.RoomID,
+		Type:         req.DataType,
+		IgnoredUsers: ignoredUsers,
+	}); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
 		return fmt.Errorf("failed to send account data to output: %w", err)
 	}
@@ -107,7 +112,9 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	// Inform the SyncAPI about the newly created push_rules
-	if err = a.SyncProducer.SendAccountData(acc.UserID, "", "m.push_rules", nil, nil); err != nil {
+	if err = a.SyncProducer.SendAccountData(acc.UserID, eventutil.AccountData{
+		Type: "m.push_rules",
+	}); err != nil {
 		util.GetLogger(ctx).WithFields(logrus.Fields{
 			"user_id": acc.UserID,
 		}).WithError(err).Warn("failed to send account data to the SyncAPI")
@@ -746,7 +753,9 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, "" /* roomID */, pushRulesAccountDataType, nil, nil); err != nil {
+	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+		Type: pushRulesAccountDataType,
+	}); err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
 	}
 	return nil

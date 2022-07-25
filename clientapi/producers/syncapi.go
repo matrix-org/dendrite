@@ -31,7 +31,6 @@ import (
 
 // SyncAPIProducer produces events for the sync API server to consume
 type SyncAPIProducer struct {
-	TopicClientData        string
 	TopicReceiptEvent      string
 	TopicSendToDeviceEvent string
 	TopicTypingEvent       string
