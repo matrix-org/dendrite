@@ -16,7 +16,9 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
+	"time"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
@@ -25,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
+	"github.com/sirupsen/logrus"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -122,5 +125,17 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 		Ignores:             ignores,
 		Presence:            presence,
 	}
+	go func() {
+		ctx := context.Background()
+		for {
+			err := d.Database.Presence.ExpirePresence(ctx)
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire presence")
+			} else {
+				logrus.Info("expired presence")
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
 	return &d, nil
 }

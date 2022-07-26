@@ -1067,3 +1067,7 @@ func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition
 func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return s.Presence.GetMaxPresenceID(ctx, nil)
 }
+
+func (s *Database) ExpirePresence(ctx context.Context) error {
+	return s.Presence.ExpirePresence(ctx)
+}

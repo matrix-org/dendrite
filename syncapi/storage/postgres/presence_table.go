@@ -76,12 +76,22 @@ const selectPresenceAfter = "" +
 	" WHERE id > $1 AND last_active_ts >= $2" +
 	" ORDER BY id ASC LIMIT $3"
 
+const expirePresenceSQL = `UPDATE syncapi_presence SET 
+	id = nextval('syncapi_presence_id'), 
+	presence = 3
+WHERE
+	to_timestamp(last_active_ts / 1000) < NOW() - INTERVAL '5 minutes'
+AND 
+	presence != 3
+`
+
 type presenceStatements struct {
 	upsertPresenceStmt         *sql.Stmt
 	upsertPresenceFromSyncStmt *sql.Stmt
 	selectPresenceForUsersStmt *sql.Stmt
 	selectMaxPresenceStmt      *sql.Stmt
 	selectPresenceAfterStmt    *sql.Stmt
+	expirePresenceStmt         *sql.Stmt
 }
 
 func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
@@ -96,6 +106,7 @@ func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
 		{&s.selectPresenceForUsersStmt, selectPresenceForUserSQL},
 		{&s.selectMaxPresenceStmt, selectMaxPresenceSQL},
 		{&s.selectPresenceAfterStmt, selectPresenceAfter},
+		{&s.expirePresenceStmt, expirePresenceSQL},
 	}.Prepare(db)
 }
 
@@ -165,4 +176,11 @@ func (p *presenceStatements) GetPresenceAfter(
 		presences[qryRes.UserID] = qryRes
 	}
 	return presences, rows.Err()
+}
+
+func (p *presenceStatements) ExpirePresence(
+	ctx context.Context,
+) error {
+	_, err := p.expirePresenceStmt.Exec()
+	return err
 }

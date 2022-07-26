@@ -180,3 +180,10 @@ func (p *presenceStatements) GetPresenceAfter(
 	}
 	return presences, rows.Err()
 }
+
+func (p *presenceStatements) ExpirePresence(
+	ctx context.Context,
+) error {
+	// TODO implement
+	return nil
+}
