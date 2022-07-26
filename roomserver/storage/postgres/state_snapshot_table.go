@@ -91,7 +91,7 @@ SELECT event_nid FROM (
 ) AS roomserver_events
 INNER JOIN roomserver_event_state_keys
 	ON roomserver_events.event_state_key_nid = roomserver_event_state_keys.event_state_key_nid
-	AND (event_type_nid = 7 OR event_state_key LIKE '%:$2');
+	AND (event_type_nid = 7 OR event_state_key LIKE '%:' || $2);
 `
 
 type stateSnapshotStatements struct {
