@@ -993,7 +993,11 @@ func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *type
 	if err != nil {
 		return nil, err
 	}
-	eventNIDs, err := d.StateSnapshotTable.BulkSelectStateForHistoryVisibility(ctx, nil, eventStates[0].BeforeStateSnapshotNID, domain)
+	stateSnapshotNID := eventStates[0].BeforeStateSnapshotNID
+	if stateSnapshotNID == 0 {
+		return nil, nil
+	}
+	eventNIDs, err := d.StateSnapshotTable.BulkSelectStateForHistoryVisibility(ctx, nil, stateSnapshotNID, domain)
 	if err != nil {
 		return nil, err
 	}
