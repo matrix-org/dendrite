@@ -166,4 +166,6 @@ type Database interface {
 	GetKnownRooms(ctx context.Context) ([]string, error)
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
 	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
+
+	lityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error)
 }

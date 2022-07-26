@@ -988,6 +988,34 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 	return &evs[0]
 }
 
+func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error) {
+	eventStates, err := d.EventsTable.BulkSelectStateAtEventByID(ctx, nil, []string{eventID})
+	if err != nil {
+		return nil, err
+	}
+	eventNIDs, err := d.StateSnapshotTable.BulkSelectStateForHistoryVisibility(ctx, nil, eventStates[0].BeforeStateSnapshotNID, domain)
+	if err != nil {
+		return nil, err
+	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
+	events := make([]*gomatrixserverlib.Event, 0, len(eventNIDs))
+	for _, eventNID := range eventNIDs {
+		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{eventNID})
+		if err != nil {
+			return nil, err
+		}
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[eventNID], data[0].EventJSON, false, roomInfo.RoomVersion)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error

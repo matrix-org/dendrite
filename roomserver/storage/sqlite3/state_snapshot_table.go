@@ -140,3 +140,9 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	}
 	return results, nil
 }
+
+func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
+	ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string,
+) ([]types.EventNID, error) {
+	return nil, nil
+}
