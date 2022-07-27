@@ -176,9 +176,8 @@ func TestDeviceKeysStreamIDGeneration(t *testing.T) {
 		dbLock.Lock()
 		defer dbLock.Unlock()
 		// Querying for device keys returns the latest stream IDs
-		msgs, err = func() ([]api.DeviceMessage, error) {
-			return db.DeviceKeysForUser(ctx, alice, deviceArray, false)
-		}()
+		msgs, err = db.DeviceKeysForUser(ctx, alice, deviceArray, false)
+
 		if err != nil {
 			t.Fatalf("DeviceKeysForUser returned error: %s", err)
 		}
