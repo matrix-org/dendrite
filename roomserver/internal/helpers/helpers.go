@@ -233,57 +233,6 @@ func LoadStateEvents(
 func CheckServerAllowedToSeeEvent(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
-	/*
-		roomState := state.NewStateResolution(db, info)
-		stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return false, nil
-			}
-			return false, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)
-		}
-
-		// Extract all of the event state key NIDs from the room state.
-		var stateKeyNIDs []types.EventStateKeyNID
-		for _, entry := range stateEntries {
-			stateKeyNIDs = append(stateKeyNIDs, entry.EventStateKeyNID)
-		}
-
-		// Then request those state key NIDs from the database.
-		stateKeys, err := db.EventStateKeys(ctx, stateKeyNIDs)
-		if err != nil {
-			return false, fmt.Errorf("db.EventStateKeys: %w", err)
-		}
-
-		// If the event state key doesn't match the given servername
-		// then we'll filter it out. This does preserve state keys that
-		// are "" since these will contain history visibility etc.
-		for nid, key := range stateKeys {
-			if key != "" && !strings.HasSuffix(key, ":"+string(serverName)) {
-				delete(stateKeys, nid)
-			}
-		}
-
-		// Now filter through all of the state events for the room.
-		// If the state key NID appears in the list of valid state
-		// keys then we'll add it to the list of filtered entries.
-		var filteredEntries []types.StateEntry
-		for _, entry := range stateEntries {
-			if _, ok := stateKeys[entry.EventStateKeyNID]; ok {
-				filteredEntries = append(filteredEntries, entry)
-			}
-		}
-
-		if len(filteredEntries) == 0 {
-			return false, nil
-		}
-
-		stateAtEvent, err := LoadStateEvents(ctx, db, filteredEntries)
-		if err != nil {
-			return false, err
-		}
-	*/
-
 	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
 	if err != nil {
 		return false, err
