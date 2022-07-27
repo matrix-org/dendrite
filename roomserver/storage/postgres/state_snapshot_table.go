@@ -77,22 +77,21 @@ const bulkSelectStateBlockNIDsSQL = "" +
 // helpers.CheckServerAllowedToSeeEvent function.
 // TODO: There's a sequence scan here because of the hash join strategy, which is
 // probably O(n) on state key entries, so there must be a way to avoid that somehow.
-const bulkSelectStateForHistoryVisibilitySQL = `
-SELECT event_nid FROM (
-	SELECT event_nid, event_type_nid, event_state_key_nid FROM roomserver_events
-	WHERE (event_type_nid = 5 OR event_type_nid = 7)
-	AND event_nid = ANY(
-		SELECT UNNEST(event_nids) FROM roomserver_state_block
-		WHERE state_block_nid = ANY(
-			SELECT UNNEST(state_block_nids) FROM roomserver_state_snapshots
-			WHERE state_snapshot_nid = $1
-		)
-	)
-) AS roomserver_events
-INNER JOIN roomserver_event_state_keys
-	ON roomserver_events.event_state_key_nid = roomserver_event_state_keys.event_state_key_nid
-	AND (event_type_nid = 7 OR event_state_key LIKE '%:' || $2);
-`
+const bulkSelectStateForHistoryVisibilitySQL = "" +
+	"SELECT event_nid FROM (" +
+	" SELECT event_nid, event_type_nid, event_state_key_nid FROM roomserver_events" +
+	" WHERE (event_type_nid = 5 OR event_type_nid = 7)" +
+	" AND event_nid = ANY(" +
+	"  SELECT UNNEST(event_nids) FROM roomserver_state_block" +
+	"  WHERE state_block_nid = ANY(" +
+	"   SELECT UNNEST(state_block_nids) FROM roomserver_state_snapshots" +
+	"   WHERE state_snapshot_nid = $1" +
+	"  )" +
+	" )" +
+	") AS roomserver_events" +
+	" INNER JOIN roomserver_event_state_keys" +
+	"  ON roomserver_events.event_state_key_nid = roomserver_event_state_keys.event_state_key_nid" +
+	"  AND (event_type_nid = 7 OR event_state_key LIKE '%:' || $2);"
 
 type stateSnapshotStatements struct {
 	insertStateStmt                         *sql.Stmt
