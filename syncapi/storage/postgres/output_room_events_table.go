@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
@@ -188,6 +189,17 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: add history visibility column (output_room_events)",
+		Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventsStmt, selectEventsSQL},

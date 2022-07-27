@@ -25,7 +25,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220718085240-f08f98af7d2d
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220725104114-b6003e522771
 	github.com/matrix-org/pinecone v0.0.0-20220708135211-1ce778fcde6a
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.13
@@ -37,7 +37,6 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose v2.7.0+incompatible
 	github.com/prometheus/client_golang v1.12.2
 	github.com/sasha-s/go-deadlock v0.3.1
 	github.com/sirupsen/logrus v1.8.1
