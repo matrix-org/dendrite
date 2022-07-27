@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
@@ -20,7 +20,7 @@ type NATSInstance struct {
 	*natsserver.Server
 }
 
-var natsLock deadlock.Mutex
+var natsLock sync.Mutex
 
 func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
 	for _, stream := range streams { // streams are defined in streams.go

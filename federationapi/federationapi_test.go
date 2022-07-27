@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	"github.com/sasha-s/go-deadlock"
 )
 
 type fedRoomserverAPI struct {
@@ -49,7 +49,7 @@ func (f *fedRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *rsapi.Que
 
 // TODO: This struct isn't generic, only works for TestFederationAPIJoinThenKeyUpdate
 type fedClient struct {
-	fedClientMutex deadlock.Mutex
+	fedClientMutex sync.Mutex
 	api.FederationClient
 	allowJoins []*test.Room
 	keys       map[gomatrixserverlib.ServerName]struct {

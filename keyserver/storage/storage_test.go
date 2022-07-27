@@ -3,6 +3,7 @@ package storage_test
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -10,7 +11,6 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/sasha-s/go-deadlock"
 )
 
 var ctx = context.Background()
@@ -104,7 +104,7 @@ func TestKeyChangesUpperLimit(t *testing.T) {
 	})
 }
 
-var dbLock deadlock.Mutex
+var dbLock sync.Mutex
 var deviceArray = []string{"AAA", "another_device"}
 
 // The purpose of this test is to make sure that the storage layer is generating sequential stream IDs per user,

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/sasha-s/go-deadlock"
 	"github.com/sirupsen/logrus"
 )
 
@@ -51,7 +50,7 @@ type Migration struct {
 
 // Migrator
 type Migrator struct {
-	gooseMutex      deadlock.Mutex
+	gooseMutex      sync.Mutex
 	db              *sql.DB
 	migrations      []Migration
 	knownMigrations map[string]struct{}

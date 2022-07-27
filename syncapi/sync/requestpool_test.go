@@ -9,11 +9,10 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sasha-s/go-deadlock"
 )
 
 type dummyPublisher struct {
-	lock  deadlock.Mutex
+	lock  sync.Mutex
 	count int
 }
 
