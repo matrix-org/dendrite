@@ -109,8 +109,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		p.queue(func() {
 			defer reqWaitGroup.Done()
 
-			var jr *types.JoinResponse
-			jr, err = p.getJoinResponseForCompleteSync(
+			jr, err := p.getJoinResponseForCompleteSync(
 				ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 			)
 			if err != nil {
