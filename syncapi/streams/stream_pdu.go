@@ -300,7 +300,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	switch delta.Membership {
 	case gomatrixserverlib.Join:
 		// We need to make sure we always include the latest states events, if they are in the timeline
-		events, err := applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, delta.RoomID, device.UserID, recentEvents)
+		events, err := applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
 		if err != nil {
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
@@ -310,6 +310,8 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
+		// If we are limited by the filter AND the history visibility filter
+		// didn't "remove" events, return that the response is limited.
 		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
 		res.Rooms.Join[delta.RoomID] = *jr
@@ -346,12 +348,16 @@ func applyHistoryVisibilityFilter(
 	db storage.Database,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	roomID, userID string,
+	limit int,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	// We need to make sure we always include the latest states events, if they are in the timeline
-	stateEvents, err := db.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: 1000}, nil)
+	// We need to make sure we always include the latest states events, if they are in the timeline.
+	// We grep at least limit * 2 events, to ensure we really get the needed events.
+	stateEvents, err := db.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: limit * 2}, nil)
 	if err != nil {
-		logrus.WithError(err).Warnf("failed to get current state")
+		// Not a fatal error, we can continue without the stateEvents,
+		// they are only needed if there are state events in the timeline.
+		logrus.WithError(err).Warnf("failed to get current room state")
 	}
 	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
 	for _, ev := range stateEvents {
@@ -478,12 +484,14 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
 	if !isPeek {
-		events, err = applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, roomID, device.UserID, recentEvents)
+		events, err = applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, roomID, device.UserID, eventFilter.Limit, recentEvents)
 		if err != nil {
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
 	}
 
+	// If we are limited by the filter AND the history visibility filter
+	// didn't "remove" events, return that the response is limited.
 	limited = limited && len(events) == len(recentEvents)
 
 	if stateFilter.LazyLoadMembers {

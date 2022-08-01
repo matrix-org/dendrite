@@ -17,7 +17,6 @@ package internal
 import (
 	"context"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -27,7 +26,9 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-var registerOnce = &sync.Once{}
+func init() {
+	prometheus.MustRegister(calculateHistoryVisibilityDuration)
+}
 
 // calculateHistoryVisibilityDuration stores the time it takes to
 // calculate the history visibility. In polylith mode the roundtrip
@@ -62,6 +63,7 @@ type eventVisibility struct {
 }
 
 // allowed checks the eventVisibility if the user is allowed to see the event.
+// Rules as defined by https://spec.matrix.org/v1.3/client-server-api/#server-behaviour-5
 func (ev eventVisibility) allowed() (allowed bool) {
 	switch ev.visibility {
 	case gomatrixserverlib.HistoryVisibilityWorldReadable:
@@ -104,9 +106,6 @@ func ApplyHistoryVisibilityFilter(
 	alwaysIncludeEventIDs map[string]struct{},
 	userID, endpoint string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	registerOnce.Do(func() {
-		prometheus.MustRegister(calculateHistoryVisibilityDuration)
-	})
 	if len(events) == 0 {
 		return events, nil
 	}
@@ -118,21 +117,15 @@ func ApplyHistoryVisibilityFilter(
 		return nil, err
 	}
 
-	eventIDs := make([]string, len(events))
-	for i := range events {
-		eventIDs[i] = events[i].EventID()
-	}
-
 	// Get the mapping from eventID -> eventVisibility
 	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
-	event, err := visibilityForEvents(ctx, rsAPI, eventIDs, userID, events[0].RoomID())
+	visibilities, err := visibilityForEvents(ctx, rsAPI, events, userID, events[0].RoomID())
 	if err != nil {
 		return eventsFiltered, err
 	}
 	for _, ev := range events {
-		d := event[ev.EventID()]
-		d.membershipCurrent = membershipCurrent
-		d.visibility = ev.Visibility
+		evVis := visibilities[ev.EventID()]
+		evVis.membershipCurrent = membershipCurrent
 		// Always include specific state events for /sync responses
 		if alwaysIncludeEventIDs != nil {
 			if _, ok := alwaysIncludeEventIDs[ev.EventID()]; ok {
@@ -141,23 +134,29 @@ func ApplyHistoryVisibilityFilter(
 			}
 		}
 		// NOTSPEC: Always allow user to see their own membership events (spec contains more "rules")
-		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKey() != nil && *ev.StateKey() == userID {
+		if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(userID) {
 			eventsFiltered = append(eventsFiltered, ev)
 			continue
 		}
-		// Handle history visibility changes
+		// Always allow history evVis events on boundaries. This is done
+		// by setting the effective evVis to the least restrictive
+		// of the old vs new.
+		// https://spec.matrix.org/v1.3/client-server-api/#server-behaviour-5
 		if hisVis, err := ev.HistoryVisibility(); err == nil {
 			prevHisVis := gjson.GetBytes(ev.Unsigned(), "prev_content.history_visibility").String()
-			if oldPrio, ok := historyVisibilityPriority[gomatrixserverlib.HistoryVisibility(prevHisVis)]; ok {
-				// no OK check, since this should have been validated when setting the value
-				newPrio := historyVisibilityPriority[hisVis]
-				if oldPrio < newPrio {
-					d.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
-				}
+			oldPrio, ok := historyVisibilityPriority[gomatrixserverlib.HistoryVisibility(prevHisVis)]
+			// if we can't get the previous history visibility, default to shared.
+			if !ok {
+				oldPrio = historyVisibilityPriority[gomatrixserverlib.HistoryVisibilityShared]
+			}
+			// no OK check, since this should have been validated when setting the value
+			newPrio := historyVisibilityPriority[hisVis]
+			if oldPrio < newPrio {
+				evVis.visibility = gomatrixserverlib.HistoryVisibility(prevHisVis)
 			}
 		}
 		// do the actual check
-		allowed := d.allowed()
+		allowed := evVis.allowed()
 		if allowed {
 			eventsFiltered = append(eventsFiltered, ev)
 		}
@@ -166,39 +165,53 @@ func ApplyHistoryVisibilityFilter(
 	return eventsFiltered, nil
 }
 
-// visibilityForEvents returns a map from eventID to eventVisibility containing the visibility and the membership at the given event.
+// visibilityForEvents returns a map from eventID to eventVisibility containing the visibility and the membership
+// of `userID` at the given event.
 // Returns an error if the roomserver can't calculate the memberships.
-func visibilityForEvents(ctx context.Context, rsAPI api.SyncRoomserverAPI, eventIDs []string, userID, roomID string) (map[string]eventVisibility, error) {
-	res := make(map[string]eventVisibility, len(eventIDs))
+func visibilityForEvents(
+	ctx context.Context,
+	rsAPI api.SyncRoomserverAPI,
+	events []*gomatrixserverlib.HeaderedEvent,
+	userID, roomID string,
+) (map[string]eventVisibility, error) {
+	eventIDs := make([]string, len(events))
+	for i := range events {
+		eventIDs[i] = events[i].EventID()
+	}
+
+	result := make(map[string]eventVisibility, len(eventIDs))
 
 	// get the membership events for all eventIDs
-	resp := &api.QueryMembersipAtEventResponse{}
-	err := rsAPI.QueryMembershipAtEvent(ctx, &api.QueryMembersipAtEventRequest{
+	membershipResp := &api.QueryMembershipAtEventResponse{}
+	err := rsAPI.QueryMembershipAtEvent(ctx, &api.QueryMembershipAtEventRequest{
 		RoomID:   roomID,
 		EventIDs: eventIDs,
 		UserID:   userID,
-	}, resp)
+	}, membershipResp)
 	if err != nil {
-		return res, err
+		return result, err
 	}
 
 	// Create a map from eventID -> eventVisibility
-	for _, eventID := range eventIDs {
-		vis := eventVisibility{membershipAtEvent: gomatrixserverlib.Leave}
-		events, ok := resp.Memberships[eventID]
+	for _, event := range events {
+		eventID := event.EventID()
+		vis := eventVisibility{
+			membershipAtEvent: gomatrixserverlib.Leave, // default to leave, to not expose events by accident
+			visibility:        event.Visibility,
+		}
+		membershipEvs, ok := membershipResp.Memberships[eventID]
 		if !ok {
-			res[eventID] = vis
+			result[eventID] = vis
 			continue
 		}
-		for _, ev := range events {
+		for _, ev := range membershipEvs {
 			membership, err := ev.Membership()
 			if err != nil {
-				return res, err
+				return result, err
 			}
 			vis.membershipAtEvent = membership
 		}
-		res[eventID] = vis
+		result[eventID] = vis
 	}
-
-	return res, nil
+	return result, nil
 }

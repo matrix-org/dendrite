@@ -428,12 +428,16 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type QueryMembersipAtEventRequest struct {
+// QueryMembershipAtEventRequest requests the membership events for a user
+// for a list of eventIDs.
+type QueryMembershipAtEventRequest struct {
 	RoomID   string
 	EventIDs []string
 	UserID   string
 }
 
-type QueryMembersipAtEventResponse struct {
+// QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
+type QueryMembershipAtEventResponse struct {
+	// Memberships is a map from eventID to a list of events (if any).
 	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
 }

@@ -98,10 +98,12 @@ type SyncRoomserverAPI interface {
 		res *PerformBackfillResponse,
 	) error
 
+	// QueryMembershipAtEvent queries the memberships at the given events.
+	// Returns a map from eventID to a slice of gomatrixserverlib.HeaderedEvent.
 	QueryMembershipAtEvent(
 		ctx context.Context,
-		request *QueryMembersipAtEventRequest,
-		response *QueryMembersipAtEventResponse,
+		request *QueryMembershipAtEventRequest,
+		response *QueryMembershipAtEventResponse,
 	) error
 }
 

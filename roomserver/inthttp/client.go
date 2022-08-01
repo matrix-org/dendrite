@@ -595,7 +595,7 @@ func (h *httpRoomserverInternalAPI) PerformForget(ctx context.Context, req *api.
 
 }
 
-func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, req *api.QueryMembersipAtEventRequest, res *api.QueryMembersipAtEventResponse) error {
+func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, req *api.QueryMembershipAtEventRequest, res *api.QueryMembershipAtEventResponse) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershiptAtEvent")
 	defer span.Finish()
 

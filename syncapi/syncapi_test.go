@@ -59,7 +59,7 @@ func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsa
 	return nil
 }
 
-func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembersipAtEventRequest, res *rsapi.QueryMembersipAtEventResponse) error {
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembershipAtEventRequest, res *rsapi.QueryMembershipAtEventResponse) error {
 	return nil
 }
 
@@ -397,7 +397,6 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
-		_ = close
 
 		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
@@ -477,16 +476,12 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []gomatrixserverlib.ClientEvent) {
 	t.Helper()
 	if wantVisible {
-		found := false
 		for _, ev := range chunk {
 			if ev.EventID == wantVisibleEvent.EventID() {
-				found = true
-				break
+				return
 			}
 		}
-		if !found {
-			t.Fatalf("expected to see event %s but didn't: %+v", wantVisibleEvent.EventID(), chunk)
-		}
+		t.Fatalf("expected to see event %s but didn't: %+v", wantVisibleEvent.EventID(), chunk)
 	} else {
 		for _, ev := range chunk {
 			if ev.EventID == wantVisibleEvent.EventID() {

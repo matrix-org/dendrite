@@ -498,8 +498,8 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 	internalAPIMux.Handle(RoomserverQueryMembershipAtEventPath,
 		httputil.MakeInternalAPI("queryMembershipAtEventPath", func(req *http.Request) util.JSONResponse {
-			request := api.QueryMembersipAtEventRequest{}
-			response := api.QueryMembersipAtEventResponse{}
+			request := api.QueryMembershipAtEventRequest{}
+			response := api.QueryMembershipAtEventResponse{}
 			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 				return util.MessageResponse(http.StatusBadRequest, err.Error())
 			}

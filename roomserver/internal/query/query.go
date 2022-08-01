@@ -206,8 +206,8 @@ func (r *Queryer) QueryMembershipForUser(
 
 func (r *Queryer) QueryMembershipAtEvent(
 	ctx context.Context,
-	request *api.QueryMembersipAtEventRequest,
-	response *api.QueryMembersipAtEventResponse,
+	request *api.QueryMembershipAtEventRequest,
+	response *api.QueryMembershipAtEventResponse,
 ) error {
 	response.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)

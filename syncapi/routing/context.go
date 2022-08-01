@@ -111,7 +111,7 @@ func Context(
 
 	// verify the user is allowed to see the context for this room/event
 	startTime := time.Now()
-	filteredEvent, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
@@ -120,7 +120,7 @@ func Context(
 		"duration": time.Since(startTime),
 		"room_id":  roomID,
 	}).Debug("applied history visibility (context)")
-	if len(filteredEvent) == 0 {
+	if len(filteredEvents) == 0 {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("User is not allowed to query context"),
