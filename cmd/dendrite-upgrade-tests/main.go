@@ -37,6 +37,7 @@ var (
 	flagBuildConcurrency = flag.Int("build-concurrency", runtime.NumCPU(), "The amount of build concurrency when building images")
 	flagHead             = flag.String("head", "", "Location to a dendrite repository to treat as HEAD instead of Github")
 	flagDockerHost       = flag.String("docker-host", "localhost", "The hostname of the docker client. 'localhost' if running locally, 'host.docker.internal' if running in Docker.")
+	flagDirect           = flag.Bool("direct", false, "If a direct upgrade from the defined FROM version to TO should be done")
 	alphaNumerics        = regexp.MustCompile("[^a-zA-Z0-9]+")
 )
 
@@ -229,7 +230,7 @@ func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Ve
 	return semVers, nil
 }
 
-func calculateVersions(cli *http.Client, from, to string) []string {
+func calculateVersions(cli *http.Client, from, to string, direct bool) []string {
 	semvers, err := getAndSortVersionsFromGithub(cli)
 	if err != nil {
 		log.Fatalf("failed to collect semvers from github: %s", err)
@@ -283,6 +284,9 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 	}
 	if to == HEAD {
 		versions = append(versions, HEAD)
+	}
+	if direct {
+		versions = []string{versions[0], versions[len(versions)-1]}
 	}
 	return versions
 }
@@ -461,7 +465,7 @@ func main() {
 		os.Exit(1)
 	}
 	cleanup(dockerClient)
-	versions := calculateVersions(httpClient, *flagFrom, *flagTo)
+	versions := calculateVersions(httpClient, *flagFrom, *flagTo, *flagDirect)
 	log.Printf("Testing dendrite versions: %v\n", versions)
 
 	branchToImageID := buildDendriteImages(httpClient, dockerClient, *flagTempDir, *flagBuildConcurrency, versions)

@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -42,13 +41,15 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
 		return nil, err
 	}
-	if _, err = d.db.Exec(outputRoomEventsSchema); err != nil {
-		return nil, err
-	}
-	if _, err = d.db.Exec(currentRoomStateSchema); err != nil {
-		return nil, err
-	}
 	accountData, err := NewPostgresAccountDataTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	events, err := NewPostgresEventsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	currState, err := NewPostgresCurrentRoomStateTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -93,22 +94,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 		return nil, err
 	}
 	presence, err := NewPostgresPresenceTable(d.db)
-	if err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	deltas.LoadAddHistoryVisibilityColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
-		return nil, err
-	}
-	// prepare statements after the migrations have run
-	events, err := NewPostgresEventsTable(d.db)
-	if err != nil {
-		return nil, err
-	}
-	currState, err := NewPostgresCurrentRoomStateTable(d.db)
 	if err != nil {
 		return nil, err
 	}
