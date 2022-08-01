@@ -35,6 +35,7 @@ func UpAddHistoryVisibilityColumnOutputRoomEvents(ctx context.Context, tx *sql.T
 }
 
 // UpSetHistoryVisibility sets the history visibility for already stored events.
+// Requires current_room_state and output_room_events to be created.
 func UpSetHistoryVisibility(ctx context.Context, tx *sql.Tx) error {
 	// get the current room history visibilities
 	historyVisibilities, err := currentHistoryVisibilities(ctx, tx)

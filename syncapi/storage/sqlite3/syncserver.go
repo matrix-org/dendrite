@@ -16,12 +16,14 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 )
 
 // SyncServerDatasource represents a sync server datasource which manages
@@ -41,13 +43,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
-	if err = d.prepare(); err != nil {
+	if err = d.prepare(base.Context()); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
-func (d *SyncServerDatasource) prepare() (err error) {
+func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
@@ -104,6 +106,19 @@ func (d *SyncServerDatasource) prepare() (err error) {
 		return err
 	}
 	presence, err := NewSqlitePresenceTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
+
+	// apply migrations which need multiple tables
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "syncapi: set history visibility for existing events",
+			Up:      deltas.UpSetHistoryVisibility, // Requires current_room_state and output_room_events to be created.
+		},
+	)
+	err = m.Up(ctx)
 	if err != nil {
 		return err
 	}

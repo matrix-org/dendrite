@@ -144,10 +144,6 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 			Version: "syncapi: add history visibility column (output_room_events)",
 			Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
 		},
-		sqlutil.Migration{
-			Version: "syncapi: set history visibility for existing events",
-			Up:      deltas.UpSetHistoryVisibility,
-		},
 	)
 	err = m.Up(context.Background())
 	if err != nil {
