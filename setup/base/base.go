@@ -369,6 +369,31 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	return client
 }
 
+func (b *BaseDendrite) configureHTTPErrors(internalRouter, externalRouter *mux.Router) {
+	notFoundHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("HTTP 404: endpoint not found"))
+	}
+	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(fmt.Sprintf("HTTP 405: %s not allowed on this endpoint", r.Method)))
+	}
+
+	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notFoundHandler))
+	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
+
+	for _, router := range []*mux.Router{
+		internalRouter, externalRouter,
+		b.DendriteAdminMux, b.SynapseAdminMux,
+		b.InternalAPIMux, b.PublicWellKnownAPIMux,
+		b.PublicClientAPIMux, b.PublicFederationAPIMux,
+		b.PublicKeyAPIMux, b.PublicMediaAPIMux,
+	} {
+		router.NotFoundHandler = notFoundCORSHandler
+		router.MethodNotAllowedHandler = notAllowedCORSHandler
+	}
+}
+
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
@@ -409,28 +434,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		}
 	}
 
-	notFoundHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("endpoint not found"))
-	}
-	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(fmt.Sprintf("%s not allowed on this endpoint", r.Method)))
-	}
-
-	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notFoundHandler))
-	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
-
-	for _, router := range []*mux.Router{
-		internalRouter, externalRouter,
-		b.DendriteAdminMux, b.SynapseAdminMux,
-		b.InternalAPIMux, b.PublicWellKnownAPIMux,
-		b.PublicClientAPIMux, b.PublicFederationAPIMux,
-		b.PublicKeyAPIMux, b.PublicMediaAPIMux,
-	} {
-		router.NotFoundHandler = notFoundCORSHandler
-		router.MethodNotAllowedHandler = notAllowedCORSHandler
-	}
+	b.configureHTTPErrors(internalRouter, externalRouter)
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {
