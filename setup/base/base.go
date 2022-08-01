@@ -451,6 +451,10 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
 
+	notFoundHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
+	internalRouter.NotFoundHandler = notFoundHandler
+	externalRouter.NotFoundHandler = notFoundHandler
+
 	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
 			var internalShutdown atomic.Bool // RegisterOnShutdown can be called more than once
