@@ -129,9 +129,10 @@ func (s *roomStatements) SelectRoomIDsWithEvents(ctx context.Context, txn *sql.T
 func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
 	var info types.RoomInfo
 	var latestNIDsJSON string
+	var stateSnapshotNID types.StateSnapshotNID
 	stmt := sqlutil.TxStmt(txn, s.selectRoomInfoStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(
-		&info.RoomVersion, &info.RoomNID, &info.StateSnapshotNID, &latestNIDsJSON,
+		&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDsJSON,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -143,7 +144,8 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID
 	if err = json.Unmarshal([]byte(latestNIDsJSON), &latestNIDs); err != nil {
 		return nil, err
 	}
-	info.IsStub = len(latestNIDs) == 0
+	info.SetStateSnapshotNID(stateSnapshotNID)
+	info.SetIsStub(len(latestNIDs) == 0)
 	return &info, err
 }
 

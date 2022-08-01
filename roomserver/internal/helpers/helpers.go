@@ -409,7 +409,7 @@ func QueryLatestEventsAndState(
 	if err != nil {
 		return err
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		response.RoomExists = false
 		return nil
 	}

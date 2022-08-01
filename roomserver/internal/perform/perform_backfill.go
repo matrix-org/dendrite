@@ -73,7 +73,7 @@ func (r *Backfiller) PerformBackfill(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("PerformBackfill: missing room info for room %s", request.RoomID)
 	}
 
@@ -106,7 +106,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
 	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities, r.PreferServers)
@@ -434,7 +434,7 @@ FindSuccessor:
 		logrus.WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
 		return nil
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		logrus.WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room, room is missing")
 		return nil
 	}
