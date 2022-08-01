@@ -3,11 +3,14 @@ package tables
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
 )
+
+var OptimisationNotSupportedError = errors.New("optimisation not supported")
 
 type EventJSONPair struct {
 	EventNID  types.EventNID
@@ -80,6 +83,10 @@ type Rooms interface {
 type StateSnapshot interface {
 	InsertState(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs) (stateNID types.StateSnapshotNID, err error)
 	BulkSelectStateBlockNIDs(ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
+	// BulkSelectStateForHistoryVisibility is a PostgreSQL-only optimisation for finding
+	// which users are in a room faster than having to load the entire room state. In the
+	// case of SQLite, this will return tables.OptimisationNotSupportedError.
+	BulkSelectStateForHistoryVisibility(ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string) ([]types.EventNID, error)
 }
 
 type StateBlock interface {
