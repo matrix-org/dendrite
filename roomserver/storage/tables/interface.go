@@ -3,11 +3,14 @@ package tables
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
 )
+
+var OptimisationNotSupportedError = errors.New("optimisation not supported")
 
 type EventJSONPair struct {
 	EventNID  types.EventNID
