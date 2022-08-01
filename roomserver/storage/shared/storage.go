@@ -1032,7 +1032,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1051,7 +1051,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1097,7 +1097,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1108,7 +1108,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1225,10 +1225,10 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load room info for room %s : %w", roomID, err2)
 		}
 		// for unknown rooms or rooms which we don't have the current state, skip them.
-		if roomInfo == nil || roomInfo.IsStub {
+		if roomInfo == nil || roomInfo.IsStub() {
 			continue
 		}
-		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 		if err2 != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load state for room %s : %w", roomID, err2)
 		}
