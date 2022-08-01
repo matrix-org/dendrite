@@ -451,9 +451,23 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
 
-	notFoundHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
-	internalRouter.NotFoundHandler = notFoundHandler
-	externalRouter.NotFoundHandler = notFoundHandler
+	notFoundHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(fmt.Sprintf("not found: %q", r.RequestURI)))
+	}
+	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(fmt.Sprintf("%s not allowed: %q", r.Method, r.RequestURI)))
+	}
+
+	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notFoundHandler))
+	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
+
+	internalRouter.NotFoundHandler = notFoundCORSHandler
+	internalRouter.MethodNotAllowedHandler = notAllowedCORSHandler
+
+	externalRouter.NotFoundHandler = notFoundCORSHandler
+	externalRouter.MethodNotAllowedHandler = notAllowedCORSHandler
 
 	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
