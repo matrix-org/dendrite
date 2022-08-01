@@ -370,16 +370,12 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 }
 
 func (b *BaseDendrite) configureHTTPErrors(internalRouter, externalRouter *mux.Router) {
-	notFoundHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte("HTTP 404: endpoint not found"))
-	}
 	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(fmt.Sprintf("HTTP 405: %s not allowed on this endpoint", r.Method)))
+		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
 	}
 
-	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notFoundHandler))
+	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
 	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
 
 	for _, router := range []*mux.Router{
