@@ -381,6 +381,21 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	internalRouter := externalRouter
 
+	notFoundHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("endpoint not found"))
+	}
+	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(fmt.Sprintf("%s not allowed on this endpoint", r.Method)))
+	}
+
+	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notFoundHandler))
+	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
+
+	externalRouter.NotFoundHandler = notFoundCORSHandler
+	externalRouter.MethodNotAllowedHandler = notAllowedCORSHandler
+
 	externalServ := &http.Server{
 		Addr:         string(externalAddr),
 		WriteTimeout: HTTPServerTimeout,
@@ -400,6 +415,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		// without enabling TLS.
 		internalH2S := &http2.Server{}
 		internalRouter = mux.NewRouter().SkipClean(true).UseEncodedPath()
+		internalRouter.NotFoundHandler = notFoundCORSHandler
+		internalRouter.MethodNotAllowedHandler = notAllowedCORSHandler
 		internalServ = &http.Server{
 			Addr:    string(internalAddr),
 			Handler: h2c.NewHandler(internalRouter, internalH2S),
@@ -450,24 +467,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.SynapseAdminMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
-
-	notFoundHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(fmt.Sprintf("not found: %q", r.RequestURI)))
-	}
-	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		_, _ = w.Write([]byte(fmt.Sprintf("%s not allowed: %q", r.Method, r.RequestURI)))
-	}
-
-	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notFoundHandler))
-	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
-
-	internalRouter.NotFoundHandler = notFoundCORSHandler
-	internalRouter.MethodNotAllowedHandler = notAllowedCORSHandler
-
-	externalRouter.NotFoundHandler = notFoundCORSHandler
-	externalRouter.MethodNotAllowedHandler = notAllowedCORSHandler
 
 	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
