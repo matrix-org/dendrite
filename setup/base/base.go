@@ -369,7 +369,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	return client
 }
 
-func (b *BaseDendrite) configureHTTPErrors(internalRouter, externalRouter *mux.Router) {
+func (b *BaseDendrite) configureHTTPErrors() {
 	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
@@ -379,11 +379,9 @@ func (b *BaseDendrite) configureHTTPErrors(internalRouter, externalRouter *mux.R
 	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
 
 	for _, router := range []*mux.Router{
-		internalRouter, externalRouter,
+		b.PublicClientAPIMux, b.PublicMediaAPIMux,
 		b.DendriteAdminMux, b.SynapseAdminMux,
-		b.InternalAPIMux, b.PublicWellKnownAPIMux,
-		b.PublicClientAPIMux, b.PublicFederationAPIMux,
-		b.PublicKeyAPIMux, b.PublicMediaAPIMux,
+		b.PublicWellKnownAPIMux,
 	} {
 		router.NotFoundHandler = notFoundCORSHandler
 		router.MethodNotAllowedHandler = notAllowedCORSHandler
@@ -430,7 +428,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		}
 	}
 
-	b.configureHTTPErrors(internalRouter, externalRouter)
+	b.configureHTTPErrors()
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {
