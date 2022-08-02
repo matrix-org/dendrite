@@ -310,3 +310,16 @@ func (r *RoomInfo) SetIsStub(isStub bool) {
 	defer r.mu.Unlock()
 	r.isStub = isStub
 }
+
+func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r2.mu.RLock()
+	defer r2.mu.RUnlock()
+
+	r.RoomNID = r2.RoomNID
+	r.RoomVersion = r2.RoomVersion
+	r.stateSnapshotNID = r2.stateSnapshotNID
+	r.isStub = r2.isStub
+}
