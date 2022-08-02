@@ -23,6 +23,15 @@ func mustCreateStateSnapshotTable(t *testing.T, dbType test.DBType) (tab tables.
 	assert.NoError(t, err)
 	switch dbType {
 	case test.DBTypePostgres:
+		// for the PostgreSQL history visibility optimisation to work,
+		// we also need some other tables to exist
+		err = postgres.CreateEventStateKeysTable(db)
+		assert.NoError(t, err)
+		err = postgres.CreateEventsTable(db)
+		assert.NoError(t, err)
+		err = postgres.CreateStateBlockTable(db)
+		assert.NoError(t, err)
+		// ... and then the snapshot table itself
 		err = postgres.CreateStateSnapshotTable(db)
 		assert.NoError(t, err)
 		tab, err = postgres.PrepareStateSnapshotTable(db)

@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"crypto/tls"
 	"fmt"
 	"reflect"
 	"strings"
@@ -46,6 +47,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			NoSystemAccount: true,
 			MaxPayload:      16 * 1024 * 1024,
 			NoSigs:          true,
+			NoLog:           cfg.NoLog,
 		})
 		if err != nil {
 			panic(err)
@@ -75,7 +77,13 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	if nc == nil {
 		var err error
-		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","))
+		opts := []natsclient.Option{}
+		if cfg.DisableTLSValidation {
+			opts = append(opts, natsclient.Secure(&tls.Config{
+				InsecureSkipVerify: true,
+			}))
+		}
+		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","), opts...)
 		if err != nil {
 			logrus.WithError(err).Panic("Unable to connect to NATS")
 			return nil, nil
