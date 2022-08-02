@@ -69,6 +69,13 @@ func (l *RateLimits) Limit(req *http.Request, device *userapi.Device) *util.JSON
 		return nil
 	}
 
+	// Take a read lock out on the cleaner mutex. The cleaner expects to
+	// be able to take a write lock, which isn't possible while there are
+	// readers, so this has the effect of blocking the cleaner goroutine
+	// from doing its work until there are no requests in flight.
+	l.cleanMutex.RLock()
+	defer l.cleanMutex.RUnlock()
+
 	// First of all, work out if X-Forwarded-For was sent to us. If not
 	// then we'll just use the IP address of the caller.
 	var caller string
