@@ -261,9 +261,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		var pos types.StreamPosition
 		if _, pos, err = p.DB.PositionInTopology(ctx, mostRecentEventID); err == nil {
 			switch {
-			case r.Backwards && pos < latestPosition:
+			case r.Backwards && pos > latestPosition:
 				fallthrough
-			case !r.Backwards && pos > latestPosition:
+			case !r.Backwards && pos < latestPosition:
 				latestPosition = pos
 			}
 		}
