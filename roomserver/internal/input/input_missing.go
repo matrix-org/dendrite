@@ -662,9 +662,20 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 	util.GetLogger(ctx).WithField("room_id", roomID).Infof("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
-	stateIDs, err := t.federation.LookupStateIDs(ctx, t.origin, roomID, eventID)
+	var stateIDs gomatrixserverlib.RespStateIDs
+	var err error
+	count := 0
+	for _, serverName := range t.servers {
+		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		stateIDs, err = t.federation.LookupStateIDs(reqctx, serverName, roomID, eventID)
+		cancel()
+		if err == nil {
+			break
+		}
+		count++
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("t.federation.LookupStateIDs tried %d server(s), last error: %w", count, err)
 	}
 	// work out which auth/state IDs are missing
 	wantIDs := append(stateIDs.StateEventIDs, stateIDs.AuthEventIDs...)
