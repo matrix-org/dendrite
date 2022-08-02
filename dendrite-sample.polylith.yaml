@@ -31,9 +31,32 @@ global:
   # considered valid by other homeservers.
   key_validity_period: 168h0m0s
 
+  # Configuration for in-memory caches. Caches can often improve performance by
+  # keeping frequently accessed items (like events, identifiers etc.) in memory
+  # rather than having to read them from the database.
+  cache:
+    # The estimated maximum size for the global cache in bytes, or in terabytes,
+    # gigabytes, megabytes or kilobytes when the appropriate 'tb', 'gb', 'mb' or
+    # 'kb' suffix is specified. Note that this is not a hard limit, nor is it a
+    # memory limit for the entire process. A cache that is too small may ultimately
+    # provide little or no benefit.
+    max_size_estimated: 1gb
+
+    # The maximum amount of time that a cache entry can live for in memory before
+    # it will be evicted and/or refreshed from the database. Lower values result in
+    # easier admission of new cache entries but may also increase database load in
+    # comparison to higher values, so adjust conservatively. Higher values may make
+    # it harder for new items to make it into the cache, e.g. if new rooms suddenly
+    # become popular.
+    max_age: 1h
+
   # The server name to delegate server-server communications to, with optional port
   # e.g. localhost:443
   well_known_server_name: ""
+
+  # The server name to delegate client-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_client_name: ""
 
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
@@ -106,7 +129,7 @@ app_service_api:
 
   # Database configuration for this component.
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_appservice?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_appservice?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -180,7 +203,7 @@ federation_api:
   external_api:
     listen: http://[::]:8072
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_federationapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_federationapi?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -217,7 +240,7 @@ key_server:
     listen: http://[::]:7779 # The listen address for incoming API requests
     connect: http://key_server:7779 # The connect address for other components to use
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_keyserver?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_keyserver?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -230,7 +253,7 @@ media_api:
   external_api:
     listen: http://[::]:8074
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_mediaapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_mediaapi?sslmode=disable
     max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -267,7 +290,7 @@ mscs:
   #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
   #  - msc2946  # (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_mscs?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_mscs?sslmode=disable
     max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -278,7 +301,7 @@ room_server:
     listen: http://[::]:7770 # The listen address for incoming API requests
     connect: http://room_server:7770 # The connect address for other components to use
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_roomserver?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_roomserver?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -291,7 +314,7 @@ sync_api:
   external_api:
     listen: http://[::]:8073
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_syncapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_syncapi?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -307,7 +330,7 @@ user_api:
     listen: http://[::]:7781 # The listen address for incoming API requests
     connect: http://user_api:7781 # The connect address for other components to use
   account_database:
-    connection_string: postgresql://username@password:hostname/dendrite_userapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_userapi?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1

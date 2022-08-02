@@ -186,7 +186,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Load the config data into our struct
-		if err = yaml.UnmarshalStrict(configData, &appservice); err != nil {
+		if err = yaml.Unmarshal(configData, &appservice); err != nil {
 			return err
 		}
 
@@ -312,6 +312,20 @@ func checkErrors(config *AppServiceAPI, derived *Derived) (err error) {
 					return err
 				}
 			}
+		}
+
+		// Check required fields
+		if appservice.ID == "" {
+			return ConfigErrors([]string{"Application service ID is required"})
+		}
+		if appservice.ASToken == "" {
+			return ConfigErrors([]string{"Application service Token is required"})
+		}
+		if appservice.HSToken == "" {
+			return ConfigErrors([]string{"Homeserver Token is required"})
+		}
+		if appservice.SenderLocalpart == "" {
+			return ConfigErrors([]string{"Sender Localpart is required"})
 		}
 
 		// Check if the url has trailing /'s. If so, remove them

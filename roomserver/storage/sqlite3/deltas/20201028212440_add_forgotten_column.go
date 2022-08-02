@@ -15,24 +15,13 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpAddForgottenColumn, DownAddForgottenColumn)
-	goose.AddMigration(UpStateBlocksRefactor, DownStateBlocksRefactor)
-}
-
-func LoadAddForgottenColumn(m *sqlutil.Migrations) {
-	m.AddMigration(UpAddForgottenColumn, DownAddForgottenColumn)
-}
-
-func UpAddForgottenColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
+func UpAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
 CREATE TABLE IF NOT EXISTS roomserver_membership (
 		room_nid INTEGER NOT NULL,
 		target_nid INTEGER NOT NULL,
@@ -57,8 +46,8 @@ DROP TABLE roomserver_membership_tmp;`)
 	return nil
 }
 
-func DownAddForgottenColumn(tx *sql.Tx) error {
-	_, err := tx.Exec(`	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
+func DownAddForgottenColumn(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `	ALTER TABLE roomserver_membership RENAME TO roomserver_membership_tmp;
 CREATE TABLE IF NOT EXISTS roomserver_membership (
 		room_nid INTEGER NOT NULL,
 		target_nid INTEGER NOT NULL,

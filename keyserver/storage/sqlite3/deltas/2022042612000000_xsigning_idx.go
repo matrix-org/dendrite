@@ -15,18 +15,13 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadFixCrossSigningSignatureIndexes(m *sqlutil.Migrations) {
-	m.AddMigration(UpFixCrossSigningSignatureIndexes, DownFixCrossSigningSignatureIndexes)
-}
-
-func UpFixCrossSigningSignatureIndexes(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func UpFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs_tmp (
 			origin_user_id TEXT NOT NULL,
 			origin_key_id TEXT NOT NULL,
@@ -50,8 +45,8 @@ func UpFixCrossSigningSignatureIndexes(tx *sql.Tx) error {
 	return nil
 }
 
-func DownFixCrossSigningSignatureIndexes(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func DownFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs_tmp (
 			origin_user_id TEXT NOT NULL,
 			origin_key_id TEXT NOT NULL,

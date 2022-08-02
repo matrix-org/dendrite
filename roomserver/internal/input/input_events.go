@@ -319,11 +319,9 @@ func (r *Inputer) processRoomEvent(
 
 	// if storing this event results in it being redacted then do so.
 	if !isRejected && redactedEventID == event.EventID() {
-		r, rerr := eventutil.RedactEvent(redactionEvent, event)
-		if rerr != nil {
+		if err = eventutil.RedactEvent(redactionEvent, event); err != nil {
 			return fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
-		event = r
 	}
 
 	// For outliers we can stop after we've stored the event itself as it

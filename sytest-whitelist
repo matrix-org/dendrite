@@ -719,3 +719,4 @@ Setting state twice is idempotent
 Joining room twice is idempotent
 Inbound federation can return missing events for shared visibility
 Inbound federation ignores redactions from invalid servers room > v3
+Newly joined room includes presence in incremental sync

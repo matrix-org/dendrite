@@ -52,7 +52,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		}
 		return
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorNoRoom,
 			Msg:  fmt.Sprintf("Room %s not found", req.RoomID),

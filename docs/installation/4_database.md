@@ -17,7 +17,9 @@ filenames in the Dendrite configuration file and start Dendrite. The databases w
 and populated automatically.
 
 Note that Dendrite **cannot share a single SQLite database across multiple components**. Each
-component must be configured with its own SQLite database filename.
+component must be configured with its own SQLite database filename. You will have to remove
+the `global.database` section from your Dendrite config and add it to each individual section
+instead in order to use SQLite.
 
 ### Connection strings
 
