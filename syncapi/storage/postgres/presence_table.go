@@ -62,6 +62,10 @@ const upsertPresenceFromSyncSQL = "" +
 	" presence = $2, last_active_ts = $3" +
 	" RETURNING id"
 
+const updateLastActiveSQL = `UPDATE syncapi_presence
+SET last_active_ts = $1
+WHERE user_id = $2`
+
 const selectPresenceForUserSQL = "" +
 	"SELECT presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
@@ -80,9 +84,10 @@ const expirePresenceSQL = `UPDATE syncapi_presence SET
 	id = nextval('syncapi_presence_id'), 
 	presence = 3
 WHERE
-	to_timestamp(last_active_ts / 1000) < NOW() - INTERVAL '5 minutes'
+	to_timestamp(last_active_ts / 1000) < NOW() - INTERVAL` + types.PresenceExpire + `
 AND 
 	presence != 3
+RETURNING id, user_id
 `
 
 type presenceStatements struct {
@@ -92,6 +97,7 @@ type presenceStatements struct {
 	selectMaxPresenceStmt      *sql.Stmt
 	selectPresenceAfterStmt    *sql.Stmt
 	expirePresenceStmt         *sql.Stmt
+	updateLastActiveStmt       *sql.Stmt
 }
 
 func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
@@ -107,6 +113,7 @@ func NewPostgresPresenceTable(db *sql.DB) (*presenceStatements, error) {
 		{&s.selectMaxPresenceStmt, selectMaxPresenceSQL},
 		{&s.selectPresenceAfterStmt, selectPresenceAfter},
 		{&s.expirePresenceStmt, expirePresenceSQL},
+		{&s.updateLastActiveStmt, updateLastActiveSQL},
 	}.Prepare(db)
 }
 
@@ -180,7 +187,22 @@ func (p *presenceStatements) GetPresenceAfter(
 
 func (p *presenceStatements) ExpirePresence(
 	ctx context.Context,
-) error {
-	_, err := p.expirePresenceStmt.Exec()
+) ([]types.PresenceNotify, error) {
+	rows, err := p.expirePresenceStmt.QueryContext(ctx)
+	presences := make([]types.PresenceNotify, 0)
+	i := 0
+	for rows.Next() {
+		presences = append(presences, types.PresenceNotify{})
+		err = rows.Scan(&presences[i].StreamPos, &presences[i].UserID)
+		if err != nil {
+			return nil, err
+		}
+		i++
+	}
+	return presences, err
+}
+
+func (p *presenceStatements) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	_, err := p.updateLastActiveStmt.Exec(&lastActiveTs, &userId)
 	return err
 }

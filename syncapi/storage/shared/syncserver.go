@@ -1068,6 +1068,10 @@ func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 	return s.Presence.GetMaxPresenceID(ctx, nil)
 }
 
-func (s *Database) ExpirePresence(ctx context.Context) error {
+func (s *Database) ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error) {
 	return s.Presence.ExpirePresence(ctx)
+}
+
+func (s *Database) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	return s.Presence.UpdateLastActive(ctx, userId, lastActiveTs)
 }

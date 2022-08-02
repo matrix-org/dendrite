@@ -183,7 +183,12 @@ func (p *presenceStatements) GetPresenceAfter(
 
 func (p *presenceStatements) ExpirePresence(
 	ctx context.Context,
-) error {
+) ([]types.PresenceNotify, error) {
+	// TODO implement
+	return nil, nil
+}
+
+func (p *presenceStatements) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
 	// TODO implement
 	return nil
 }
