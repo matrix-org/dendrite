@@ -750,9 +750,8 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 		// Define what we'll do in order to fetch the missing event ID.
 		fetch := func(missingEventID string) {
-			var h *gomatrixserverlib.Event
-			h, err = t.lookupEvent(ctx, roomVersion, roomID, missingEventID, false)
-			switch err.(type) {
+			h, herr := t.lookupEvent(ctx, roomVersion, roomID, missingEventID, false)
+			switch herr.(type) {
 			case verifySigError:
 				return
 			case nil:
@@ -761,7 +760,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 				util.GetLogger(ctx).WithFields(logrus.Fields{
 					"event_id": missingEventID,
 					"room_id":  roomID,
-				}).Warn("Failed to fetch missing event")
+				}).WithError(herr).Warn("Failed to fetch missing event")
 				return
 			}
 			haveEventsMutex.Lock()
