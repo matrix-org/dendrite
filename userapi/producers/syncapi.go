@@ -34,7 +34,7 @@ func NewSyncAPI(db storage.Database, js JetStreamPublisher, clientDataTopic stri
 }
 
 // SendAccountData sends account data to the Sync API server.
-func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string) error {
+func (p *SyncAPI) SendAccountData(userID string, data eventutil.AccountData) error {
 	m := &nats.Msg{
 		Subject: p.clientDataTopic,
 		Header:  nats.Header{},
@@ -42,18 +42,15 @@ func (p *SyncAPI) SendAccountData(userID string, roomID string, dataType string)
 	m.Header.Set(jetstream.UserID, userID)
 
 	var err error
-	m.Data, err = json.Marshal(eventutil.AccountData{
-		RoomID: roomID,
-		Type:   dataType,
-	})
+	m.Data, err = json.Marshal(data)
 	if err != nil {
 		return err
 	}
 
 	log.WithFields(log.Fields{
 		"user_id":   userID,
-		"room_id":   roomID,
-		"data_type": dataType,
+		"room_id":   data.RoomID,
+		"data_type": data.Type,
 	}).Tracef("Producing to topic '%s'", p.clientDataTopic)
 
 	_, err = p.producer.PublishMsg(m)

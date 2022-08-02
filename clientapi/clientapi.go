@@ -48,7 +48,6 @@ func AddPublicRoutes(
 
 	syncProducer := &producers.SyncAPIProducer{
 		JetStream:              js,
-		TopicClientData:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
 		TopicReceiptEvent:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),

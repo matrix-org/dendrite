@@ -147,14 +147,16 @@ func (s *roomStatements) InsertRoomNID(
 func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
 	var info types.RoomInfo
 	var latestNIDs pq.Int64Array
+	var stateSnapshotNID types.StateSnapshotNID
 	stmt := sqlutil.TxStmt(txn, s.selectRoomInfoStmt)
 	err := stmt.QueryRowContext(ctx, roomID).Scan(
-		&info.RoomVersion, &info.RoomNID, &info.StateSnapshotNID, &latestNIDs,
+		&info.RoomVersion, &info.RoomNID, &stateSnapshotNID, &latestNIDs,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	info.IsStub = len(latestNIDs) == 0
+	info.SetStateSnapshotNID(stateSnapshotNID)
+	info.SetIsStub(len(latestNIDs) == 0)
 	return &info, err
 }
 
