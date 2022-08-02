@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -279,8 +280,46 @@ func (e RejectedError) Error() string { return string(e) }
 
 // RoomInfo contains metadata about a room
 type RoomInfo struct {
+	mu               sync.RWMutex
 	RoomNID          RoomNID
 	RoomVersion      gomatrixserverlib.RoomVersion
-	StateSnapshotNID StateSnapshotNID
-	IsStub           bool
+	stateSnapshotNID StateSnapshotNID
+	isStub           bool
+}
+
+func (r *RoomInfo) StateSnapshotNID() StateSnapshotNID {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.stateSnapshotNID
+}
+
+func (r *RoomInfo) IsStub() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.isStub
+}
+
+func (r *RoomInfo) SetStateSnapshotNID(nid StateSnapshotNID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stateSnapshotNID = nid
+}
+
+func (r *RoomInfo) SetIsStub(isStub bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.isStub = isStub
+}
+
+func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r2.mu.RLock()
+	defer r2.mu.RUnlock()
+
+	r.RoomNID = r2.RoomNID
+	r.RoomVersion = r2.RoomVersion
+	r.stateSnapshotNID = r2.stateSnapshotNID
+	r.isStub = r2.isStub
 }

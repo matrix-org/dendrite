@@ -103,6 +103,11 @@ global:
     addresses:
       - hostname:4222
 
+    # Disable the validation of TLS certificates of NATS. This is
+    # not recommended in production since it may allow NATS traffic
+    # to be sent to an insecure endpoint.
+    disable_tls_validation: false
+
     # The prefix to use for stream names for this homeserver - really only useful
     # if you are running more than one Dendrite server on the same NATS deployment.
     topic_prefix: Dendrite

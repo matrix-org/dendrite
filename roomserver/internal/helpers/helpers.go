@@ -236,13 +236,34 @@ func LoadStateEvents(
 func CheckServerAllowedToSeeEvent(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
+	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
+	switch err {
+	case nil:
+		// No error, so continue normally
+	case tables.OptimisationNotSupportedError:
+		// The database engine didn't support this optimisation, so fall back to using
+		// the old and slow method
+		stateAtEvent, err = slowGetHistoryVisibilityState(ctx, db, info, eventID, serverName)
+		if err != nil {
+			return false, err
+		}
+	default:
+		// Something else went wrong
+		return false, err
+	}
+	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
+}
+
+func slowGetHistoryVisibilityState(
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName,
+) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
+			return nil, nil
 		}
-		return false, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)
+		return nil, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)
 	}
 
 	// Extract all of the event state key NIDs from the room state.
@@ -254,7 +275,7 @@ func CheckServerAllowedToSeeEvent(
 	// Then request those state key NIDs from the database.
 	stateKeys, err := db.EventStateKeys(ctx, stateKeyNIDs)
 	if err != nil {
-		return false, fmt.Errorf("db.EventStateKeys: %w", err)
+		return nil, fmt.Errorf("db.EventStateKeys: %w", err)
 	}
 
 	// If the event state key doesn't match the given servername
@@ -277,15 +298,10 @@ func CheckServerAllowedToSeeEvent(
 	}
 
 	if len(filteredEntries) == 0 {
-		return false, nil
+		return nil, nil
 	}
 
-	stateAtEvent, err := LoadStateEvents(ctx, db, filteredEntries)
-	if err != nil {
-		return false, err
-	}
-
-	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
+	return LoadStateEvents(ctx, db, filteredEntries)
 }
 
 // TODO: Remove this when we have tests to assert correctness of this function
@@ -393,7 +409,7 @@ func QueryLatestEventsAndState(
 	if err != nil {
 		return err
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		response.RoomExists = false
 		return nil
 	}

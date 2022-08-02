@@ -128,19 +128,15 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	go rp.cleanPresence(db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			beforeCount := func() int {
-				publisher.lock.Lock()
-				defer publisher.lock.Unlock()
-				return publisher.count
-			}()
+			publisher.lock.Lock()
+			beforeCount := publisher.count
+			publisher.lock.Unlock()
 			rp.updatePresence(db, tt.args.presence, tt.args.userID)
-			func() {
-				publisher.lock.Lock()
-				defer publisher.lock.Unlock()
-				if tt.wantIncrease && publisher.count <= beforeCount {
-					t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
-				}
-			}()
+			publisher.lock.Lock()
+			if tt.wantIncrease && publisher.count <= beforeCount {
+				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
+			}
+			publisher.lock.Unlock()
 			time.Sleep(tt.args.sleep)
 		})
 	}

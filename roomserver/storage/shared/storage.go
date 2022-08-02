@@ -156,15 +156,30 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok && roomInfo != nil {
+	roomInfo, ok := d.Cache.GetRoomInfo(roomID)
+	if ok && roomInfo != nil && !roomInfo.IsStub() {
+		// The data that's in the cache is not stubby, so return it.
 		return roomInfo, nil
 	}
-	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
-	if err == nil && roomInfo != nil {
-		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, roomInfo)
+	// At this point we either don't have an entry in the cache, or
+	// it is stubby, so let's check the roomserver_rooms table again.
+	roomInfoFromDB, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
+	if err != nil {
+		return nil, err
 	}
-	return roomInfo, err
+	// If we have a stubby cache entry already, update it and return
+	// the reference to the cache entry.
+	if roomInfo != nil {
+		roomInfo.CopyFrom(roomInfoFromDB)
+		return roomInfo, nil
+	}
+	// Otherwise, try to admit the data into the cache and return the
+	// new reference from the database.
+	if roomInfoFromDB != nil {
+		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
+		d.Cache.StoreRoomInfo(roomID, roomInfoFromDB)
+	}
+	return roomInfoFromDB, err
 }
 
 func (d *Database) AddState(
@@ -676,7 +691,7 @@ func (d *Database) storeEvent(
 		succeeded := false
 		if updater == nil {
 			var roomInfo *types.RoomInfo
-			roomInfo, err = d.RoomInfo(ctx, event.RoomID())
+			roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
 			if err != nil {
 				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
 			}
@@ -988,6 +1003,38 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 	return &evs[0]
 }
 
+func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error) {
+	eventStates, err := d.EventsTable.BulkSelectStateAtEventByID(ctx, nil, []string{eventID})
+	if err != nil {
+		return nil, err
+	}
+	stateSnapshotNID := eventStates[0].BeforeStateSnapshotNID
+	if stateSnapshotNID == 0 {
+		return nil, nil
+	}
+	eventNIDs, err := d.StateSnapshotTable.BulkSelectStateForHistoryVisibility(ctx, nil, stateSnapshotNID, domain)
+	if err != nil {
+		return nil, err
+	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
+	events := make([]*gomatrixserverlib.Event, 0, len(eventNIDs))
+	for _, eventNID := range eventNIDs {
+		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{eventNID})
+		if err != nil {
+			return nil, err
+		}
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[eventNID], data[0].EventJSON, false, roomInfo.RoomVersion)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
@@ -1000,7 +1047,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1019,7 +1066,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1065,7 +1112,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1076,7 +1123,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1193,10 +1240,10 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load room info for room %s : %w", roomID, err2)
 		}
 		// for unknown rooms or rooms which we don't have the current state, skip them.
-		if roomInfo == nil || roomInfo.IsStub {
+		if roomInfo == nil || roomInfo.IsStub() {
 			continue
 		}
-		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 		if err2 != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load state for room %s : %w", roomID, err2)
 		}
