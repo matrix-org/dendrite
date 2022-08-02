@@ -9,4 +9,4 @@ steps:
       - CLOUDSDK_CONTAINER_CLUSTER=synapse
 images:
   - gcr.io/$PROJECT_ID/dendrite-monolith:$COMMIT_SHA
-timeout: 300s
+timeout: 360s
