@@ -77,9 +77,9 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	if nc == nil {
 		var err error
-		opts := []nats.Option{}
+		opts := []natsclient.Option{}
 		if cfg.DisableTLSValidation {
-			opts = append(opts, nats.Secure(&tls.Config{
+			opts = append(opts, natsclient.Secure(&tls.Config{
 				InsecureSkipVerify: true,
 			}))
 		}
