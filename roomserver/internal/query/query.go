@@ -61,7 +61,7 @@ func (r *Queryer) QueryStateAfterEvents(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return nil
 	}
 
@@ -350,7 +350,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return nil
 	}
 	response.RoomExists = true
@@ -438,7 +438,7 @@ func (r *Queryer) QueryMissingEvents(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
@@ -477,7 +477,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return nil
 	}
 	response.RoomExists = true
@@ -822,7 +822,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		return nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
 	}
 	// If the room version doesn't allow restricted joins then don't
@@ -885,7 +885,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		// See if the room exists. If it doesn't exist or if it's a stub
 		// room entry then we can't check memberships.
 		targetRoomInfo, err := r.DB.RoomInfo(ctx, rule.RoomID)
-		if err != nil || targetRoomInfo == nil || targetRoomInfo.IsStub {
+		if err != nil || targetRoomInfo == nil || targetRoomInfo.IsStub() {
 			res.Resident = false
 			continue
 		}

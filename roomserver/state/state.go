@@ -149,7 +149,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	}
 
 	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, snapshotNIDs)
-	if err != nil {
+  if err != nil {
 		return nil, err
 	}
 
@@ -176,6 +176,29 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	}
 
 	return result, nil
+} 
+
+// LoadStateAtEvent loads the full state of a room before a particular event.
+func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
+	ctx context.Context, eventID string,
+) ([]types.StateEntry, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadStateAtEvent")
+	defer span.Finish()
+
+	snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
+	}
+	if snapshotNID == 0 {
+		return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
+	}
+
+	stateEntries, err := v.LoadStateAtSnapshot(ctx, snapshotNID)
+	if err != nil {
+		return nil, err
+	}
+
+	return stateEntries, nil
 }
 
 // LoadCombinedStateAfterEvents loads a snapshot of the state after each of the events
