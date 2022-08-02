@@ -375,11 +375,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 	defer span.Finish()
 
 	var res parsedRespState
-	roomInfo, err := t.db.RoomInfo(ctx, roomID)
-	if err != nil {
-		return nil
-	}
-	roomState := state.NewStateResolution(t.db, roomInfo)
+	roomState := state.NewStateResolution(t.db, t.roomInfo)
 	stateAtEvents, err := t.db.StateAtEventIDs(ctx, []string{eventID})
 	if err != nil {
 		util.GetLogger(ctx).WithField("room_id", roomID).WithError(err).Warnf("failed to get state after %s locally", eventID)

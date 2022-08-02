@@ -156,15 +156,30 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok && roomInfo != nil {
+	roomInfo, ok := d.Cache.GetRoomInfo(roomID)
+	if ok && roomInfo != nil && !roomInfo.IsStub() {
+		// The data that's in the cache is not stubby, so return it.
 		return roomInfo, nil
 	}
-	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
-	if err == nil && roomInfo != nil {
-		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, roomInfo)
+	// At this point we either don't have an entry in the cache, or
+	// it is stubby, so let's check the roomserver_rooms table again.
+	roomInfoFromDB, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
+	if err != nil {
+		return nil, err
 	}
-	return roomInfo, err
+	// If we have a stubby cache entry already, update it and return
+	// the reference to the cache entry.
+	if roomInfo != nil {
+		roomInfo.CopyFrom(roomInfoFromDB)
+		return roomInfo, nil
+	}
+	// Otherwise, try to admit the data into the cache and return the
+	// new reference from the database.
+	if roomInfoFromDB != nil {
+		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
+		d.Cache.StoreRoomInfo(roomID, roomInfoFromDB)
+	}
+	return roomInfoFromDB, err
 }
 
 func (d *Database) AddState(
@@ -676,7 +691,7 @@ func (d *Database) storeEvent(
 		succeeded := false
 		if updater == nil {
 			var roomInfo *types.RoomInfo
-			roomInfo, err = d.RoomInfo(ctx, event.RoomID())
+			roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
 			if err != nil {
 				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
 			}
