@@ -17,6 +17,8 @@ type JetStream struct {
 	TopicPrefix string `yaml:"topic_prefix"`
 	// Keep all storage in memory. This is mostly useful for unit tests.
 	InMemory bool `yaml:"in_memory"`
+	// Disable logging. This is mostly useful for unit tests.
+	NoLog bool `yaml:"-"`
 }
 
 func (c *JetStream) Prefixed(name string) string {
@@ -32,6 +34,7 @@ func (c *JetStream) Defaults(generate bool) {
 	c.TopicPrefix = "Dendrite"
 	if generate {
 		c.StoragePath = Path("./")
+		c.NoLog = true
 	}
 }
 

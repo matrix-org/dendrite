@@ -45,6 +45,7 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 			NoSystemAccount: true,
 			MaxPayload:      16 * 1024 * 1024,
 			NoSigs:          true,
+			NoLog:           cfg.NoLog,
 		})
 		if err != nil {
 			panic(err)
