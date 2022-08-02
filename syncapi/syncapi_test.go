@@ -370,26 +370,26 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 		},
 		{
 			name:  "incremental sync, one message", // this deletes message 1, as we advanced the since token
-			since: "s0_0_0_1_0_0_0_0_0",
+			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
 			want: []string{
 				"message 2",
 			},
 		},
 		{
 			name:  "failed incremental sync, one message", // didn't advance since, so still the same message
-			since: "s0_0_0_1_0_0_0_0_0",
+			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
 			want: []string{
 				"message 2",
 			},
 		},
 		{
-			name:  "incremental sync, no message", // this should delete message 2
-			since: "s0_0_0_2_0_0_0_0_0",           // next_batch from previous sync
+			name:  "incremental sync, no message",                         // this should delete message 2
+			since: types.StreamingToken{SendToDevicePosition: 2}.String(), // next_batch from previous sync
 			want:  []string{},
 		},
 		{
 			name:              "incremental sync, three new messages",
-			since:             "s0_0_0_2_0_0_0_0_0",
+			since:             types.StreamingToken{SendToDevicePosition: 2}.String(),
 			sendMessagesCount: 3,
 			want: []string{
 				"message 3", // message 2 was deleted in the previous test
@@ -407,14 +407,14 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 		},
 		{
 			name:  "incremental sync, no messages", // advance the sync token, no new messages
-			since: "s0_0_0_5_0_0_0_0_0",
+			since: types.StreamingToken{SendToDevicePosition: 5}.String(),
 			want:  []string{},
 		},
 	}
 
 	ctx := context.Background()
 	for _, tc := range testCases {
-		// send the messages, if any
+		// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
 		for i := 0; i < tc.sendMessagesCount; i++ {
 			msgCounter++
 			msg := map[string]string{
@@ -425,20 +425,21 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 			}
 		}
 		time.Sleep((time.Millisecond * 15) * time.Duration(tc.sendMessagesCount)) // wait a bit, so the messages can be processed
-		// sync
+		// Execute a /sync request, recording the response
 		w := httptest.NewRecorder()
 		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 			"access_token": alice.AccessToken,
 			"since":        tc.since,
 		})))
 
-		// verify
+		// Extract the to_device.events, # gets all values of an array, in this case a string slice with "message $counter" entries
 		events := gjson.Get(w.Body.String(), "to_device.events.#.content.dummy").Array()
 		got := make([]string, len(events))
 		for i := range events {
 			got[i] = events[i].String()
 		}
-		t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
+
+		// Ensure the messages we received are as we expect them to be
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
 			t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
