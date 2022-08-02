@@ -19,6 +19,8 @@ type JetStream struct {
 	InMemory bool `yaml:"in_memory"`
 	// Disable logging. This is mostly useful for unit tests.
 	NoLog bool `yaml:"-"`
+	// Disables TLS validation. This should NOT be used in production
+	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 }
 
 func (c *JetStream) Prefixed(name string) string {
@@ -35,6 +37,7 @@ func (c *JetStream) Defaults(generate bool) {
 	if generate {
 		c.StoragePath = Path("./")
 		c.NoLog = true
+		c.DisableTLSValidation = true
 	}
 }
 
