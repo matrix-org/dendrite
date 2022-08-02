@@ -149,7 +149,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	}
 
 	stateBlockNIDLists, err := v.db.StateBlockNIDs(ctx, snapshotNIDs)
-  if err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -176,7 +176,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	}
 
 	return result, nil
-} 
+}
 
 // LoadStateAtEvent loads the full state of a room before a particular event.
 func (v *StateResolution) LoadStateAtEventForHistoryVisibility(
