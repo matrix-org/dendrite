@@ -326,8 +326,10 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 		return respState, true, nil
 	}
 
+	logrus.WithContext(ctx).Warnf("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
 	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
+		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up state before event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
 	}
 
@@ -339,6 +341,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	case nil:
 		// do nothing
 	default:
+		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
 	h = t.cacheAndReturn(h)
