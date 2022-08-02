@@ -157,7 +157,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	existingPresence, ok := rp.Presence.LoadOrStore(userID, newPresence)
 	if ok {
 		p := existingPresence.(types.PresenceInternal)
-		if p.ClientFields.Presence == newPresence.ClientFields.Presence && newPresence.LastActiveTS-dbPresence.LastActiveTS < types.PresenceNoOpMs {
+		if dbPresence != nil && p.Presence == newPresence.Presence && newPresence.LastActiveTS-dbPresence.LastActiveTS < types.PresenceNoOpMs {
 			return
 		}
 		if dbPresence.Presence == types.PresenceOnline && presenceID == types.PresenceOnline && newPresence.LastActiveTS-dbPresence.LastActiveTS >= types.PresenceNoOpMs {

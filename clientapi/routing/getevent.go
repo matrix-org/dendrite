@@ -123,7 +123,7 @@ func GetEvent(
 			util.GetLogger(req.Context()).WithError(err).Error("stateEvent.Membership failed")
 			return jsonerror.InternalServerError()
 		}
-		if membership == gomatrixserverlib.Join {
+		if membership == gomatrixserverlib.Join || membership == gomatrixserverlib.Invite {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
