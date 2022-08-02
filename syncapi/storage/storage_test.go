@@ -416,11 +416,6 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			t.Fatal("first call should have no updates")
 		}
 
-		err = db.CleanSendToDeviceUpdates(context.Background(), alice.ID, deviceID, 100)
-		if err != nil {
-			return
-		}
-
 		// Try sending a message.
 		streamPos, err := db.StoreNewSendForDeviceMessage(ctx, alice.ID, deviceID, gomatrixserverlib.SendToDeviceEvent{
 			Sender:  bob.ID,
@@ -441,43 +436,35 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		if count := len(events); count != 1 {
 			t.Fatalf("second call should have one update, got %d", count)
 		}
-		err = db.CleanSendToDeviceUpdates(context.Background(), alice.ID, deviceID, streamPos)
-		if err != nil {
-			return
-		}
 
 		// At this point we should still have one message because we haven't progressed the
 		// sync position yet. This is equivalent to the client failing to /sync and retrying
 		// with the same position.
-		streamPos, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
+		streamPos, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(events) != 1 {
 			t.Fatal("third call should have one update still")
 		}
-		err = db.CleanSendToDeviceUpdates(context.Background(), alice.ID, deviceID, streamPos+1)
+		err = db.CleanSendToDeviceUpdates(context.Background(), alice.ID, deviceID, streamPos)
 		if err != nil {
 			return
 		}
 
 		// At this point we should now have no updates, because we've progressed the sync
 		// position. Therefore the update from before will not be sent again.
-		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos+1, streamPos+2)
+		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(events) != 0 {
 			t.Fatal("fourth call should have no updates")
 		}
-		err = db.CleanSendToDeviceUpdates(context.Background(), alice.ID, deviceID, streamPos+1)
-		if err != nil {
-			return
-		}
 
 		// At this point we should still have no updates, because no new updates have been
 		// sent.
-		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+2)
+		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -491,7 +478,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			streamPos, err = db.StoreNewSendForDeviceMessage(ctx, alice.ID, deviceID, gomatrixserverlib.SendToDeviceEvent{
 				Sender:  bob.ID,
 				Type:    "m.type",
-				Content: json.RawMessage(fmt.Sprintf(`{ "count": %d }`, i)),
+				Content: json.RawMessage(fmt.Sprintf(`{"count":%d}`, i)),
 			})
 			if err != nil {
 				t.Fatal(err)
