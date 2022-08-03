@@ -48,7 +48,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
+	publicAPIMux, wkMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
@@ -72,6 +72,26 @@ func Setup(
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
+	}
+
+	if cfg.Matrix.WellKnownClientName != "" {
+		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
+		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: struct {
+					HomeserverName struct {
+						BaseUrl string `json:"base_url"`
+					} `json:"m.homeserver"`
+				}{
+					HomeserverName: struct {
+						BaseUrl string `json:"base_url"`
+					}{
+						BaseUrl: cfg.Matrix.WellKnownClientName,
+					},
+				},
+			}
+		})).Methods(http.MethodGet, http.MethodOptions)
 	}
 
 	publicAPIMux.Handle("/versions",
@@ -126,6 +146,12 @@ func Setup(
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
 		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return AdminEvacuateRoom(req, device, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
+		httputil.MakeAuthAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateUser(req, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

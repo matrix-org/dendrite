@@ -63,6 +63,7 @@ func AddPublicRoutes(
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
 		ServerName:             cfg.Matrix.ServerName,
 		UserAPI:                userAPI,
 	}

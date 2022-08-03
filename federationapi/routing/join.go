@@ -202,6 +202,14 @@ func SendJoin(
 		}
 	}
 
+	// Check that the event is from the server sending the request.
+	if event.Origin() != request.Origin() {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
+		}
+	}
+
 	// Check that a state key is provided.
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
@@ -213,6 +221,22 @@ func SendJoin(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
+		}
+	}
+
+	// Check that the sender belongs to the server that is sending us
+	// the request. By this point we've already asserted that the sender
+	// and the state key are equal so we don't need to check both.
+	var domain gomatrixserverlib.ServerName
+	if _, domain, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
+		}
+	} else if domain != request.Origin() {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender of the join must belong to the origin server"),
 		}
 	}
 
@@ -242,14 +266,6 @@ func SendJoin(
 		}
 	}
 
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
-		}
-	}
-
 	// Check that this is in fact a join event
 	membership, err := event.Membership()
 	if err != nil {
@@ -266,10 +282,17 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted := event.Redact()
+	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	if err != nil {
+		logrus.WithError(err).Errorf("XXX: join.go")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+		}
+	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
 		ServerName:             event.Origin(),
-		Message:                redacted.JSON(),
+		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
 	}}

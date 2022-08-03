@@ -217,6 +217,14 @@ func (u *RoomUpdater) SetLatestEvents(
 	roomNID types.RoomNID, latest []types.StateAtEventAndReference, lastEventNIDSent types.EventNID,
 	currentStateSnapshotNID types.StateSnapshotNID,
 ) error {
+	switch {
+	case len(latest) == 0:
+		return fmt.Errorf("cannot set latest events with no latest event references")
+	case currentStateSnapshotNID == 0:
+		return fmt.Errorf("cannot set latest events with invalid state snapshot NID")
+	case lastEventNIDSent == 0:
+		return fmt.Errorf("cannot set latest events with invalid latest event NID")
+	}
 	eventNIDs := make([]types.EventNID, len(latest))
 	for i := range latest {
 		eventNIDs[i] = latest[i].EventNID
@@ -225,12 +233,13 @@ func (u *RoomUpdater) SetLatestEvents(
 		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
-		if roomID, ok := u.d.Cache.GetRoomServerRoomID(roomNID); ok {
-			if roomInfo, ok := u.d.Cache.GetRoomInfo(roomID); ok {
-				roomInfo.StateSnapshotNID = currentStateSnapshotNID
-				roomInfo.IsStub = false
-				u.d.Cache.StoreRoomInfo(roomID, roomInfo)
-			}
+
+		// Since it's entirely possible that this types.RoomInfo came from the
+		// cache, we should make sure to update that entry so that the next run
+		// works from live data.
+		if u.roomInfo != nil {
+			u.roomInfo.SetStateSnapshotNID(currentStateSnapshotNID)
+			u.roomInfo.SetIsStub(false)
 		}
 		return nil
 	})

@@ -15,18 +15,13 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadFixCrossSigningSignatureIndexes(m *sqlutil.Migrations) {
-	m.AddMigration(UpFixCrossSigningSignatureIndexes, DownFixCrossSigningSignatureIndexes)
-}
-
-func UpFixCrossSigningSignatureIndexes(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func UpFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE keyserver_cross_signing_sigs DROP CONSTRAINT keyserver_cross_signing_sigs_pkey;
 		ALTER TABLE keyserver_cross_signing_sigs ADD PRIMARY KEY (origin_user_id, origin_key_id, target_user_id, target_key_id);
 
@@ -38,8 +33,8 @@ func UpFixCrossSigningSignatureIndexes(tx *sql.Tx) error {
 	return nil
 }
 
-func DownFixCrossSigningSignatureIndexes(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func DownFixCrossSigningSignatureIndexes(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		ALTER TABLE keyserver_cross_signing_sigs DROP CONSTRAINT keyserver_cross_signing_sigs_pkey;
 		ALTER TABLE keyserver_cross_signing_sigs ADD PRIMARY KEY (origin_user_id, target_user_id, target_key_id);
 

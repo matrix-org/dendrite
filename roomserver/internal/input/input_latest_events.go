@@ -56,6 +56,7 @@ func (r *Inputer) updateLatestEvents(
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "updateLatestEvents")
 	defer span.Finish()
@@ -69,15 +70,16 @@ func (r *Inputer) updateLatestEvents(
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
 	u := latestEventsUpdater{
-		ctx:           ctx,
-		api:           r,
-		updater:       updater,
-		roomInfo:      roomInfo,
-		stateAtEvent:  stateAtEvent,
-		event:         event,
-		sendAsServer:  sendAsServer,
-		transactionID: transactionID,
-		rewritesState: rewritesState,
+		ctx:               ctx,
+		api:               r,
+		updater:           updater,
+		roomInfo:          roomInfo,
+		stateAtEvent:      stateAtEvent,
+		event:             event,
+		sendAsServer:      sendAsServer,
+		transactionID:     transactionID,
+		rewritesState:     rewritesState,
+		historyVisibility: historyVisibility,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -119,6 +121,8 @@ type latestEventsUpdater struct {
 	// The snapshots of current state before and after processing this event
 	oldStateNID types.StateSnapshotNID
 	newStateNID types.StateSnapshotNID
+	// The history visibility of the event itself (from the state before the event).
+	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
@@ -188,7 +192,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
@@ -365,12 +369,13 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:           u.event.Headered(u.roomInfo.RoomVersion),
-		RewritesState:   u.rewritesState,
-		LastSentEventID: u.lastEventIDSent,
-		LatestEventIDs:  latestEventIDs,
-		TransactionID:   u.transactionID,
-		SendAsServer:    u.sendAsServer,
+		Event:             u.event.Headered(u.roomInfo.RoomVersion),
+		RewritesState:     u.rewritesState,
+		LastSentEventID:   u.lastEventIDSent,
+		LatestEventIDs:    latestEventIDs,
+		TransactionID:     u.transactionID,
+		SendAsServer:      u.sendAsServer,
+		HistoryVisibility: u.historyVisibility,
 	}
 
 	eventIDMap, err := u.stateEventMap()

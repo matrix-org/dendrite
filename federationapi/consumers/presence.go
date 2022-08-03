@@ -133,7 +133,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 		return true
 	}
 
-	log.Debugf("sending presence EDU to %d servers", len(joined))
+	log.Tracef("sending presence EDU to %d servers", len(joined))
 	if err = t.queues.SendEDU(edu, t.ServerName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false

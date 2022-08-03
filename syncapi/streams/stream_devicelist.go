@@ -28,7 +28,7 @@ func (p *DeviceListStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	var err error
-	to, _, err = internal.DeviceListCatchup(context.Background(), p.keyAPI, p.rsAPI, req.Device.UserID, req.Response, from, to)
+	to, _, err = internal.DeviceListCatchup(context.Background(), p.DB, p.keyAPI, p.rsAPI, req.Device.UserID, req.Response, from, to)
 	if err != nil {
 		req.Log.WithError(err).Error("internal.DeviceListCatchup failed")
 		return from

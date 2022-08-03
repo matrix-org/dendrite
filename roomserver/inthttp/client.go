@@ -40,6 +40,7 @@ const (
 	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
 	RoomserverPerformForgetPath            = "/roomserver/performForget"
 	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
+	RoomserverPerformAdminEvacuateUserPath = "/roomserver/performAdminEvacuateUser"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -297,6 +298,23 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 	defer span.Finish()
 
 	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoomPath
+	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
+		}
+	}
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *api.PerformAdminEvacuateUserRequest,
+	res *api.PerformAdminEvacuateUserResponse,
+) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateUser")
+	defer span.Finish()
+
+	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateUserPath
 	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
 	if err != nil {
 		res.Error = &api.PerformError{

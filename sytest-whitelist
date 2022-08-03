@@ -241,7 +241,6 @@ Inbound federation can receive v2 /send_join
 Message history can be paginated
 Backfill works correctly with history visibility set to joined
 Guest user cannot call /events globally
-Guest users can join guest_access rooms
 Guest user can set display names
 Guest user cannot upgrade other users
 Guest non-joined user cannot call /events on shared room
@@ -721,6 +720,7 @@ Setting state twice is idempotent
 Joining room twice is idempotent
 Inbound federation can return missing events for shared visibility
 Inbound federation ignores redactions from invalid servers room > v3
+Newly joined room includes presence in incremental sync
 User in private room doesn't appear in user directory
 User joining then leaving public room appears and dissappears from directory
 User in remote room doesn't appear in user directory after server left room

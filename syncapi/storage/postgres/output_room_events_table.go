@@ -23,6 +23,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
@@ -67,7 +68,9 @@ CREATE TABLE IF NOT EXISTS syncapi_output_room_events (
   -- events retrieved through backfilling that have a position in the stream
   -- that relates to the moment these were retrieved rather than the moment these
   -- were emitted.
-  exclude_from_sync BOOL DEFAULT FALSE
+  exclude_from_sync BOOL DEFAULT FALSE,
+  -- The history visibility before this event (1 - world_readable; 2 - shared; 3 - invited; 4 - joined)
+  history_visibility SMALLINT NOT NULL DEFAULT 2
 );
 
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output_room_events (type);
@@ -78,16 +81,16 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON s
 
 const insertEventSQL = "" +
 	"INSERT INTO syncapi_output_room_events (" +
-	"room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync" +
-	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) " +
+	"room_id, event_id, headered_event_json, type, sender, contains_url, add_state_ids, remove_state_ids, session_id, transaction_id, exclude_from_sync, history_visibility" +
+	") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) " +
 	"ON CONFLICT ON CONSTRAINT syncapi_event_id_idx DO UPDATE SET exclude_from_sync = (excluded.exclude_from_sync AND $11) " +
 	"RETURNING id"
 
 const selectEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)"
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events WHERE event_id = ANY($1)"
 
 const selectEventsWithFilterSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events WHERE event_id = ANY($1)" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events WHERE event_id = ANY($1)" +
 	" AND ( $2::text[] IS NULL OR     sender  = ANY($2)  )" +
 	" AND ( $3::text[] IS NULL OR NOT(sender  = ANY($3)) )" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
@@ -96,7 +99,7 @@ const selectEventsWithFilterSQL = "" +
 	" LIMIT $7"
 
 const selectRecentEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
@@ -105,7 +108,7 @@ const selectRecentEventsSQL = "" +
 	" ORDER BY id DESC LIMIT $8"
 
 const selectRecentEventsForSyncSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
 	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
@@ -114,7 +117,7 @@ const selectRecentEventsForSyncSQL = "" +
 	" ORDER BY id DESC LIMIT $8"
 
 const selectEarlyEventsSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id FROM syncapi_output_room_events" +
+	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
 	" WHERE room_id = $1 AND id > $2 AND id <= $3" +
 	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
@@ -130,7 +133,7 @@ const updateEventJSONSQL = "" +
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
-	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids" +
+	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
 	" AND room_id = ANY($3)" +
@@ -146,10 +149,10 @@ const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
 
 const selectContextEventSQL = "" +
-	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND event_id = $2"
+	"SELECT id, headered_event_json, history_visibility FROM syncapi_output_room_events WHERE room_id = $1 AND event_id = $2"
 
 const selectContextBeforeEventSQL = "" +
-	"SELECT headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2" +
+	"SELECT headered_event_json, history_visibility FROM syncapi_output_room_events WHERE room_id = $1 AND id < $2" +
 	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
 	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
@@ -157,7 +160,7 @@ const selectContextBeforeEventSQL = "" +
 	" ORDER BY id DESC LIMIT $3"
 
 const selectContextAfterEventSQL = "" +
-	"SELECT id, headered_event_json FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2" +
+	"SELECT id, headered_event_json, history_visibility FROM syncapi_output_room_events WHERE room_id = $1 AND id > $2" +
 	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
 	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
@@ -186,6 +189,17 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: add history visibility column (output_room_events)",
+		Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventsStmt, selectEventsSQL},
@@ -246,14 +260,15 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 
 	for rows.Next() {
 		var (
-			eventID         string
-			streamPos       types.StreamPosition
-			eventBytes      []byte
-			excludeFromSync bool
-			addIDs          pq.StringArray
-			delIDs          pq.StringArray
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			excludeFromSync   bool
+			addIDs            pq.StringArray
+			delIDs            pq.StringArray
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
-		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs); err != nil {
+		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs, &historyVisibility); err != nil {
 			return nil, nil, err
 		}
 		// Sanity check for deleted state and whine if we see it. We don't need to do anything
@@ -283,6 +298,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			needSet[id] = true
 		}
 		stateNeeded[ev.RoomID()] = needSet
+		ev.Visibility = historyVisibility
 
 		eventIDToEvent[eventID] = types.StreamEvent{
 			HeaderedEvent:   &ev,
@@ -314,7 +330,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 func (s *outputRoomEventsStatements) InsertEvent(
 	ctx context.Context, txn *sql.Tx,
 	event *gomatrixserverlib.HeaderedEvent, addState, removeState []string,
-	transactionID *api.TransactionID, excludeFromSync bool,
+	transactionID *api.TransactionID, excludeFromSync bool, historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (streamPos types.StreamPosition, err error) {
 	var txnID *string
 	var sessionID *int64
@@ -351,6 +367,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		sessionID,
 		txnID,
 		excludeFromSync,
+		historyVisibility,
 	).Scan(&streamPos)
 	return
 }
@@ -504,13 +521,15 @@ func (s *outputRoomEventsStatements) SelectContextEvent(ctx context.Context, txn
 	row := sqlutil.TxStmt(txn, s.selectContextEventStmt).QueryRowContext(ctx, roomID, eventID)
 
 	var eventAsString string
-	if err = row.Scan(&id, &eventAsString); err != nil {
+	var historyVisibility gomatrixserverlib.HistoryVisibility
+	if err = row.Scan(&id, &eventAsString, &historyVisibility); err != nil {
 		return 0, evt, err
 	}
 
 	if err = json.Unmarshal([]byte(eventAsString), &evt); err != nil {
 		return 0, evt, err
 	}
+	evt.Visibility = historyVisibility
 	return id, evt, nil
 }
 
@@ -532,15 +551,17 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 
 	for rows.Next() {
 		var (
-			eventBytes []byte
-			evt        *gomatrixserverlib.HeaderedEvent
+			eventBytes        []byte
+			evt               *gomatrixserverlib.HeaderedEvent
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
-		if err = rows.Scan(&eventBytes); err != nil {
+		if err = rows.Scan(&eventBytes, &historyVisibility); err != nil {
 			return evts, err
 		}
 		if err = json.Unmarshal(eventBytes, &evt); err != nil {
 			return evts, err
 		}
+		evt.Visibility = historyVisibility
 		evts = append(evts, evt)
 	}
 
@@ -565,15 +586,17 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 
 	for rows.Next() {
 		var (
-			eventBytes []byte
-			evt        *gomatrixserverlib.HeaderedEvent
+			eventBytes        []byte
+			evt               *gomatrixserverlib.HeaderedEvent
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
-		if err = rows.Scan(&lastID, &eventBytes); err != nil {
+		if err = rows.Scan(&lastID, &eventBytes, &historyVisibility); err != nil {
 			return 0, evts, err
 		}
 		if err = json.Unmarshal(eventBytes, &evt); err != nil {
 			return 0, evts, err
 		}
+		evt.Visibility = historyVisibility
 		evts = append(evts, evt)
 	}
 
@@ -584,15 +607,16 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	var result []types.StreamEvent
 	for rows.Next() {
 		var (
-			eventID         string
-			streamPos       types.StreamPosition
-			eventBytes      []byte
-			excludeFromSync bool
-			sessionID       *int64
-			txnID           *string
-			transactionID   *api.TransactionID
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			excludeFromSync   bool
+			sessionID         *int64
+			txnID             *string
+			transactionID     *api.TransactionID
+			historyVisibility gomatrixserverlib.HistoryVisibility
 		)
-		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID); err != nil {
+		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
 			return nil, err
 		}
 		// TODO: Handle redacted events
@@ -607,7 +631,7 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 				TransactionID: *txnID,
 			}
 		}
-
+		ev.Visibility = historyVisibility
 		result = append(result, types.StreamEvent{
 			HeaderedEvent:   &ev,
 			StreamPosition:  streamPos,

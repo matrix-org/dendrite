@@ -86,9 +86,12 @@ would be a huge help too, as that will help us to understand where the memory us
 
 You may need to revisit the connection limit of your PostgreSQL server and/or make changes to the `max_connections` lines in your Dendrite configuration. Be aware that each Dendrite component opens its own database connections and has its own connection limit, even in monolith mode!
 
-## What is being reported when enabling anonymous stats?
+## What is being reported when enabling phone-home statistics?
 
-If anonymous stats reporting is enabled, the following data is send to the defined endpoint.
+Phone-home statistics contain your server's domain name, some configuration information about
+your deployment and aggregated information about active users on your deployment. They are sent
+to the endpoint URL configured in your Dendrite configuration file only. The following is an
+example of the data that is sent:
 
 ```json
 {
@@ -106,7 +109,7 @@ If anonymous stats reporting is enabled, the following data is send to the defin
     "go_arch": "amd64",
     "go_os": "linux",
     "go_version": "go1.16.13",
-    "homeserver": "localhost:8800",
+    "homeserver": "my.domain.com",
     "log_level": "trace",
     "memory_rss": 93452,
     "monolith": true,

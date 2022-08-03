@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -72,7 +73,7 @@ func (r *Backfiller) PerformBackfill(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("PerformBackfill: missing room info for room %s", request.RoomID)
 	}
 
@@ -105,7 +106,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
 	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities, r.PreferServers)
@@ -206,8 +207,17 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 			}
 			logger.Infof("returned %d PDUs which made events %+v", len(res.PDUs), result)
 			for _, res := range result {
-				if res.Error != nil {
-					logger.WithError(res.Error).Warn("event failed PDU checks")
+				switch err := res.Error.(type) {
+				case nil:
+				case gomatrixserverlib.SignatureErr:
+					// The signature of the event might not be valid anymore, for example if
+					// the key ID was reused with a different signature.
+					logger.WithError(err).Errorf("event failed PDU checks, storing anyway")
+				case gomatrixserverlib.AuthChainErr, gomatrixserverlib.AuthRulesErr:
+					logger.WithError(err).Warn("event failed PDU checks")
+					continue
+				default:
+					logger.WithError(err).Warn("event failed PDU checks")
 					continue
 				}
 				missingMap[id] = res.Event
@@ -306,6 +316,7 @@ FederationHit:
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = res
 		return res, nil
 	}
+	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
@@ -366,19 +377,25 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 		}
 	}
 
-	c := gomatrixserverlib.FederatedStateProvider{
-		FedClient:          b.fsAPI,
-		RememberAuthEvents: false,
-		Server:             b.servers[0],
+	var lastErr error
+	for _, srv := range b.servers {
+		c := gomatrixserverlib.FederatedStateProvider{
+			FedClient:          b.fsAPI,
+			RememberAuthEvents: false,
+			Server:             srv,
+		}
+		result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		for eventID, ev := range result {
+			b.eventIDMap[eventID] = ev
+		}
+		return result, nil
 	}
-	result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
-	if err != nil {
-		return nil, err
-	}
-	for eventID, ev := range result {
-		b.eventIDMap[eventID] = ev
-	}
-	return result, nil
+	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
+	return nil, lastErr
 }
 
 // ServersAtEvent is called when trying to determine which server to request from.
@@ -417,7 +434,7 @@ FindSuccessor:
 		logrus.WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
 		return nil
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		logrus.WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room, room is missing")
 		return nil
 	}
@@ -576,12 +593,11 @@ func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixs
 		// redacted, which we don't care about since we aren't returning it in this backfill.
 		if redactedEventID == ev.EventID() {
 			eventToRedact := ev.Unwrap()
-			redactedEvent, err := eventutil.RedactEvent(redactionEvent, eventToRedact)
-			if err != nil {
+			if err := eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
 				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("Failed to redact event")
 				continue
 			}
-			ev = redactedEvent.Headered(ev.RoomVersion)
+			ev = eventToRedact.Headered(ev.RoomVersion)
 			events[j] = ev
 		}
 		backfilledEventMap[ev.EventID()] = types.Event{

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -45,17 +46,6 @@ type KeyInternalAPI struct {
 
 func (a *KeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
 	a.UserAPI = i
-}
-
-func (a *KeyInternalAPI) InputDeviceListUpdate(
-	ctx context.Context, req *api.InputDeviceListUpdateRequest, res *api.InputDeviceListUpdateResponse,
-) {
-	err := a.Updater.Update(ctx, req.Event)
-	if err != nil {
-		res.Error = &api.KeyError{
-			Err: fmt.Sprintf("failed to update device list: %s", err),
-		}
-	}
 }
 
 func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
@@ -325,6 +315,11 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		for targetKeyID := range masterKey.Keys {
 			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
 			if err != nil {
+				// Stop executing the function if the context was canceled/the deadline was exceeded,
+				// as we can't continue without a valid context.
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return
+				}
 				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
 				continue
 			}
@@ -346,6 +341,11 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		for targetKeyID, key := range forUserID {
 			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, gomatrixserverlib.KeyID(targetKeyID))
 			if err != nil {
+				// Stop executing the function if the context was canceled/the deadline was exceeded,
+				// as we can't continue without a valid context.
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return
+				}
 				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
 				continue
 			}
