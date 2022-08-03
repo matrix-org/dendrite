@@ -25,9 +25,8 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
-
-const DeviceListLogName = "dl"
 
 // DeviceOTKCounts adds one-time key counts to the /sync response
 func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
@@ -93,18 +92,13 @@ func DeviceListCatchup(
 	queryRes.UserIDs = append(queryRes.UserIDs, joinUserIDs...)
 	queryRes.UserIDs = append(queryRes.UserIDs, leaveUserIDs...)
 	queryRes.UserIDs = util.UniqueStrings(queryRes.UserIDs)
-	var sharedUsersMap map[string]int
-	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, db, userID, queryRes.UserIDs)
-	util.GetLogger(ctx).Debugf(
-		"QueryKeyChanges request off=%d,to=%d response off=%d uids=%v",
-		offset, toOffset, queryRes.Offset, queryRes.UserIDs,
-	)
+	sharedUsersMap := filterSharedUsers(ctx, db, userID, queryRes.UserIDs)
 	userSet := make(map[string]bool)
 	for _, userID := range res.DeviceLists.Changed {
 		userSet[userID] = true
 	}
-	for _, userID := range queryRes.UserIDs {
-		if !userSet[userID] {
+	for userID, count := range sharedUsersMap {
+		if !userSet[userID] && count > 0 {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
 			hasNew = true
 			userSet[userID] = true
@@ -113,7 +107,7 @@ func DeviceListCatchup(
 	// Finally, add in users who have joined or left.
 	// TODO: This is sub-optimal because we will add users to `changed` even if we already shared a room with them.
 	for _, userID := range joinUserIDs {
-		if !userSet[userID] {
+		if !userSet[userID] && sharedUsersMap[userID] > 0 {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
 			hasNew = true
 			userSet[userID] = true
@@ -125,6 +119,13 @@ func DeviceListCatchup(
 			res.DeviceLists.Left = append(res.DeviceLists.Left, userID)
 		}
 	}
+
+	util.GetLogger(ctx).WithFields(logrus.Fields{
+		"user_id":         userID,
+		"from":            offset,
+		"to":              toOffset,
+		"response_offset": queryRes.Offset,
+	}).Debugf("QueryKeyChanges request result: %+v", res.DeviceLists)
 
 	return types.StreamPosition(queryRes.Offset), hasNew, nil
 }
@@ -220,24 +221,27 @@ func TrackChangedUsers(
 // it down to include only users who the requesting user shares a room with.
 func filterSharedUsers(
 	ctx context.Context, db storage.SharedUsers, userID string, usersWithChangedKeys []string,
-) (map[string]int, []string) {
+) map[string]int {
 	sharedUsersMap := make(map[string]int, len(usersWithChangedKeys))
-	for _, userID := range usersWithChangedKeys {
-		sharedUsersMap[userID] = 0
+	for _, changedUserID := range usersWithChangedKeys {
+		sharedUsersMap[changedUserID] = 0
+		if changedUserID == userID {
+			// We forcibly put ourselves in this list because we should be notified about our own device updates
+			// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
+			// be notified about key changes.
+			sharedUsersMap[userID] = 1
+		}
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("db.SharedUsers failed: %s", err)
 		// default to all users so we do needless queries rather than miss some important device update
-		return nil, usersWithChangedKeys
+		return sharedUsersMap
 	}
 	for _, userID := range sharedUsers {
 		sharedUsersMap[userID]++
 	}
-	// We forcibly put ourselves in this list because we should be notified about our own device updates
-	// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
-	// be notified about key changes.
-	sharedUsersMap[userID] = 1
-	return sharedUsersMap, sharedUsers
+	return sharedUsersMap
 }
 
 func joinedRooms(res *types.Response, userID string) []string {
