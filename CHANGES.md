@@ -1,5 +1,19 @@
 # Changelog
 
+## Dendrite 0.9.1 (2022-08-03)
+
+### Fixes
+
+* Upgrades a dependency which caused issues building Dendrite with Go 1.19
+* The roomserver will no longer give up prematurely after failing to call `/state_ids`
+* Removes the faulty room info cache, which caused of a number of race conditions and occasional bugs (including when creating and joining rooms)
+* The media endpoint now sets the `Cache-Control` header correctly to prevent web-based clients from hitting media endpoints excessively
+* The sync API will now advance the PDU stream position correctly in all cases (contributed by [sergekh2](https://github.com/sergekh2))
+* The sync API will now delete the correct range of send-to-device messages when advancing the stream position
+* The device list `changed` key in the `/sync` response should now return the correct users 
+* A data race when looking up missing state has been fixed
+* The `/send_join` API is now applying stronger validation to the received membership event
+
 ## Dendrite 0.9.0 (2022-08-01)
 
 ### Features

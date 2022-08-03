@@ -22,7 +22,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20220725104114-b6003e522771
-	github.com/matrix-org/pinecone v0.0.0-20220708135211-1ce778fcde6a
+	github.com/matrix-org/pinecone v0.0.0-20220803093810-b7a830c08fb9
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/nats-io/nats-server/v2 v2.8.5-0.20220731184415-903a06a5b4ee
@@ -45,7 +45,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	golang.org/x/image v0.0.0-20220413100746-70e8d0d3baa9
 	golang.org/x/mobile v0.0.0-20220518205345-8578da9835fd
-	golang.org/x/net v0.0.0-20220524220425-1d687d428aca
+	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
@@ -73,10 +73,11 @@ require (
 	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
-	github.com/lucas-clemente/quic-go v0.26.0 // indirect
+	github.com/lucas-clemente/quic-go v0.28.1 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
-	github.com/marten-seemann/qtls-go1-17 v0.1.1 // indirect
-	github.com/marten-seemann/qtls-go1-18 v0.1.1 // indirect
+	github.com/marten-seemann/qtls-go1-17 v0.1.2 // indirect
+	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
+	github.com/marten-seemann/qtls-go1-19 v0.1.0-beta.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/miekg/dns v1.1.49 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
