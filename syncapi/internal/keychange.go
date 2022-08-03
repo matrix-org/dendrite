@@ -28,8 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const DeviceListLogName = "dl"
-
 // DeviceOTKCounts adds one-time key counts to the /sync response
 func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
 	var queryRes keyapi.QueryOneTimeKeysResponse
@@ -94,16 +92,13 @@ func DeviceListCatchup(
 	queryRes.UserIDs = append(queryRes.UserIDs, joinUserIDs...)
 	queryRes.UserIDs = append(queryRes.UserIDs, leaveUserIDs...)
 	queryRes.UserIDs = util.UniqueStrings(queryRes.UserIDs)
-	var sharedUsersMap map[string]int
-	sharedUsersMap, queryRes.UserIDs = filterSharedUsers(ctx, db, userID, queryRes.UserIDs)
+	sharedUsersMap := filterSharedUsers(ctx, db, userID, queryRes.UserIDs)
 	userSet := make(map[string]bool)
 	for _, userID := range res.DeviceLists.Changed {
-		if sharedUsersMap[userID] > 0 {
-			userSet[userID] = true
-		}
+		userSet[userID] = true
 	}
-	for _, userID := range queryRes.UserIDs {
-		if !userSet[userID] && sharedUsersMap[userID] > 0 {
+	for userID, count := range sharedUsersMap {
+		if !userSet[userID] && count > 0 {
 			res.DeviceLists.Changed = append(res.DeviceLists.Changed, userID)
 			hasNew = true
 			userSet[userID] = true
@@ -226,25 +221,27 @@ func TrackChangedUsers(
 // it down to include only users who the requesting user shares a room with.
 func filterSharedUsers(
 	ctx context.Context, db storage.SharedUsers, userID string, usersWithChangedKeys []string,
-) (map[string]int, []string) {
+) map[string]int {
 	sharedUsersMap := make(map[string]int, len(usersWithChangedKeys))
-	for _, userID := range usersWithChangedKeys {
-		sharedUsersMap[userID] = 0
+	for _, changedUserID := range usersWithChangedKeys {
+		sharedUsersMap[changedUserID] = 0
+		if changedUserID == userID {
+			// We forcibly put ourselves in this list because we should be notified about our own device updates
+			// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
+			// be notified about key changes.
+			sharedUsersMap[userID] = 1
+		}
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("db.SharedUsers failed: %s", err)
 		// default to all users so we do needless queries rather than miss some important device update
-		return nil, usersWithChangedKeys
+		return sharedUsersMap
 	}
 	for _, userID := range sharedUsers {
 		sharedUsersMap[userID]++
 	}
-	// We forcibly put ourselves in this list because we should be notified about our own device updates
-	// and if we are in 0 rooms then we don't technically share any room with ourselves so we wouldn't
-	// be notified about key changes.
-	sharedUsersMap[userID] = 1
-	return sharedUsersMap, sharedUsers
+	return sharedUsersMap
 }
 
 func joinedRooms(res *types.Response, userID string) []string {

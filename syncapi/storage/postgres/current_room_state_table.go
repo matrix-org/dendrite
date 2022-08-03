@@ -112,7 +112,7 @@ const selectEventsWithEventIDsSQL = "" +
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
 	"	SELECT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
-	") AND state_key = ANY($2) AND membership='join';"
+	") AND state_key = ANY($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt                *sql.Stmt
