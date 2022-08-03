@@ -10,6 +10,7 @@
 * The media endpoint now sets the `Cache-Control` header correctly to prevent web-based clients from hitting media endpoints excessively
 * The sync API will now advance the PDU stream position correctly in all cases (contributed by [sergekh2](https://github.com/sergekh2))
 * The sync API will now delete the correct range of send-to-device messages when advancing the stream position
+* The device list `changed` key in the `/sync` response should now return the correct users 
 * A data race when looking up missing state has been fixed
 * The `/send_join` API is now applying stronger validation to the received membership event
 
