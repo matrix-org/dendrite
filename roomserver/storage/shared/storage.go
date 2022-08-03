@@ -157,7 +157,7 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
 	roomInfo, ok := d.Cache.GetRoomInfo(roomID)
-	if ok && roomInfo != nil && !roomInfo.IsStub() && roomInfo.RoomNID != 0 {
+	if ok && roomInfo != nil {
 		// The data that's in the cache is not stubby, so return it.
 		return roomInfo, nil
 	}
@@ -694,7 +694,7 @@ func (d *Database) storeEvent(
 		succeeded := false
 		if updater == nil {
 			var roomInfo *types.RoomInfo
-			roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
+			roomInfo, err = d.roomInfo(ctx, nil, event.RoomID())
 			if err != nil {
 				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
 			}

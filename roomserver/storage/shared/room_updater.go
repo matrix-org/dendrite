@@ -11,12 +11,11 @@ import (
 
 type RoomUpdater struct {
 	transaction
-	d                       *Database
-	roomInfo                *types.RoomInfo
-	latestEvents            []types.StateAtEventAndReference
-	lastEventIDSent         string
-	currentStateSnapshotNID types.StateSnapshotNID
-	roomExists              bool
+	d               *Database
+	roomInfo        *types.RoomInfo
+	latestEvents    []types.StateAtEventAndReference
+	lastEventIDSent string
+	roomExists      bool
 }
 
 func rollback(txn *sql.Tx) {
@@ -34,11 +33,11 @@ func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *typ
 	// succeed, processing a create event which creates the room, or it won't.
 	if roomInfo == nil {
 		return &RoomUpdater{
-			transaction{ctx, txn}, d, nil, nil, "", 0, false,
+			transaction{ctx, txn}, d, nil, nil, "", false,
 		}, nil
 	}
 
-	eventNIDs, lastEventNIDSent, currentStateSnapshotNID, err :=
+	eventNIDs, lastEventNIDSent, _, err :=
 		d.RoomsTable.SelectLatestEventsNIDsForUpdate(ctx, txn, roomInfo.RoomNID)
 	if err != nil {
 		rollback(txn)
@@ -58,7 +57,7 @@ func NewRoomUpdater(ctx context.Context, d *Database, txn *sql.Tx, roomInfo *typ
 		}
 	}
 	return &RoomUpdater{
-		transaction{ctx, txn}, d, roomInfo, stateAndRefs, lastEventIDSent, currentStateSnapshotNID, true,
+		transaction{ctx, txn}, d, roomInfo, stateAndRefs, lastEventIDSent, true,
 	}, nil
 }
 
@@ -100,7 +99,7 @@ func (u *RoomUpdater) LastEventIDSent() string {
 
 // CurrentStateSnapshotNID implements types.RoomRecentEventsUpdater
 func (u *RoomUpdater) CurrentStateSnapshotNID() types.StateSnapshotNID {
-	return u.currentStateSnapshotNID
+	return u.roomInfo.StateSnapshotNID()
 }
 
 // StorePreviousEvents implements types.RoomRecentEventsUpdater - This must be called from a Writer

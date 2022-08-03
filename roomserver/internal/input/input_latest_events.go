@@ -89,11 +89,9 @@ func (r *Inputer) updateLatestEvents(
 	// Since it's entirely possible that this types.RoomInfo came from the
 	// cache, we should make sure to update that entry so that the next run
 	// works from live data.
-	defer func() {
-		if succeeded {
-			u.roomInfo.Update(u.newStateNID, len(u.latest) == 0)
-		}
-	}()
+	if u.newStateNID != u.oldStateNID {
+		roomInfo.Update(u.newStateNID, len(u.latest) == 0)
+	}
 
 	succeeded = true
 	return
@@ -145,7 +143,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// that we knew about before matter anymore.
 	u.oldLatest = types.StateAtEventAndReferences{}
 	if !u.rewritesState {
-		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
+		u.oldStateNID = u.roomInfo.StateSnapshotNID()
 		u.oldLatest = u.updater.LatestEvents()
 	}
 

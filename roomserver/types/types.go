@@ -302,7 +302,6 @@ func (r *RoomInfo) IsStub() bool {
 func (r *RoomInfo) Update(nid StateSnapshotNID, isStub bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	r.stateSnapshotNID = nid
 	r.isStub = isStub
 }
