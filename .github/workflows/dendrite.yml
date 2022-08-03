@@ -131,7 +131,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: "1.16"
+          go-version: "1.18"
       - uses: actions/cache@v3
         with:
           path: |
@@ -144,6 +144,31 @@ jobs:
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade
         run: ./dendrite-upgrade-tests --head .
+
+  # run database upgrade tests, skipping over one version
+  upgrade_test_direct:
+    name: Upgrade tests from HEAD-2
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.18"
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-upgrade
+      - name: Build upgrade-tests
+        run: go build ./cmd/dendrite-upgrade-tests
+      - name: Test upgrade
+        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
 
   # run Sytest in different variations
   sytest:
@@ -280,7 +305,7 @@ jobs:
 
   integration-tests-done:
     name: Integration tests passed
-    needs: [initial-tests-done, upgrade_test, sytest, complement]
+    needs: [initial-tests-done, upgrade_test, upgrade_test_direct, sytest, complement]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:

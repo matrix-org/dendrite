@@ -17,10 +17,10 @@ package producers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -31,7 +31,6 @@ import (
 
 // SyncAPIProducer produces events for the sync API server to consume
 type SyncAPIProducer struct {
-	TopicClientData        string
 	TopicReceiptEvent      string
 	TopicSendToDeviceEvent string
 	TopicTypingEvent       string
@@ -39,36 +38,6 @@ type SyncAPIProducer struct {
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
 	UserAPI                userapi.ClientUserAPI
-}
-
-// SendData sends account data to the sync API server
-func (p *SyncAPIProducer) SendData(userID string, roomID string, dataType string, readMarker *eventutil.ReadMarkerJSON, ignoredUsers *types.IgnoredUsers) error {
-	m := &nats.Msg{
-		Subject: p.TopicClientData,
-		Header:  nats.Header{},
-	}
-	m.Header.Set(jetstream.UserID, userID)
-
-	data := eventutil.AccountData{
-		RoomID:       roomID,
-		Type:         dataType,
-		ReadMarker:   readMarker,
-		IgnoredUsers: ignoredUsers,
-	}
-	var err error
-	m.Data, err = json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	log.WithFields(log.Fields{
-		"user_id":   userID,
-		"room_id":   roomID,
-		"data_type": dataType,
-	}).Tracef("Producing to topic '%s'", p.TopicClientData)
-
-	_, err = p.JetStream.PublishMsg(m)
-	return err
 }
 
 func (p *SyncAPIProducer) SendReceipt(
@@ -83,7 +52,7 @@ func (p *SyncAPIProducer) SendReceipt(
 	m.Header.Set(jetstream.RoomID, roomID)
 	m.Header.Set(jetstream.EventID, eventID)
 	m.Header.Set("type", receiptType)
-	m.Header.Set("timestamp", strconv.Itoa(int(timestamp)))
+	m.Header.Set("timestamp", fmt.Sprintf("%d", timestamp))
 
 	log.WithFields(log.Fields{}).Tracef("Producing to topic '%s'", p.TopicReceiptEvent)
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))

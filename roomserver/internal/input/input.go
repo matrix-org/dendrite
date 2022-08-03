@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -69,6 +70,7 @@ import (
 // or C.
 type Inputer struct {
 	Cfg                 *config.RoomServer
+	Base                *base.BaseDendrite
 	ProcessContext      *process.ProcessContext
 	DB                  storage.Database
 	NATSClient          *nats.Conn
@@ -160,7 +162,9 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
 func (r *Inputer) Start() error {
-	prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
+	if r.Base.EnableMetrics {
+		prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
+	}
 	_, err := r.JetStream.Subscribe(
 		"", // This is blank because we specified it in BindStream.
 		func(m *nats.Msg) {

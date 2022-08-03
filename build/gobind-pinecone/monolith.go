@@ -239,7 +239,7 @@ func (m *DendriteMonolith) Start() {
 	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
 	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
-	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter)
+	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter, nil)
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
