@@ -407,7 +407,7 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectSharedUsersStmt)
-	rows, err := stmt.QueryContext(ctx, userID, otherUserIDs)
+	rows, err := stmt.QueryContext(ctx, userID, pq.Array(otherUserIDs))
 	if err != nil {
 		return nil, err
 	}
