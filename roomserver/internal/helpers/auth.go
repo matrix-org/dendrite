@@ -30,6 +30,7 @@ import (
 // the soft-fail bool.
 func CheckForSoftFail(
 	ctx context.Context,
+	roomInfo *types.RoomInfo,
 	db storage.Database,
 	event *gomatrixserverlib.HeaderedEvent,
 	stateEventIDs []string,
@@ -44,18 +45,11 @@ func CheckForSoftFail(
 			return true, fmt.Errorf("StateEntriesForEventIDs failed: %w", err)
 		}
 	} else {
-		// Work out if the room exists.
-		var roomInfo *types.RoomInfo
-		roomInfo, err = db.RoomInfo(ctx, event.RoomID())
-		if err != nil {
-			return false, fmt.Errorf("db.RoomNID: %w", err)
-		}
+		// Then get the state entries for the current state snapshot.
+		// We'll use this to check if the event is allowed right now.
 		if roomInfo == nil || roomInfo.IsStub() {
 			return false, nil
 		}
-
-		// Then get the state entries for the current state snapshot.
-		// We'll use this to check if the event is allowed right now.
 		roomState := state.NewStateResolution(db, roomInfo)
 		authStateEntries, err = roomState.LoadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 		if err != nil {

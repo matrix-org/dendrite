@@ -196,7 +196,7 @@ func (r *Inputer) processRoomEvent(
 	var rejectionErr error
 	if rejectionErr = gomatrixserverlib.Allowed(event, &authEvents); rejectionErr != nil {
 		isRejected = true
-		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
+		logger.WithError(rejectionErr).Warnf("Event %s rejected by auth events", event.EventID())
 	}
 
 	// Accumulate the auth event NIDs.
@@ -231,9 +231,10 @@ func (r *Inputer) processRoomEvent(
 		// Check that the event passes authentication checks based on the
 		// current room state.
 		var err error
-		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
+		softfail, err = helpers.CheckForSoftFail(ctx, roomInfo, r.DB, headered, input.StateEventIDs)
 		if err != nil {
-			logger.WithError(err).Warn("Error authing soft-failed event")
+			logger.WithError(err).Warnf("Event %s rejected by current room state", event.EventID())
+			rejectionErr = fmt.Errorf("rejected by current room state: %w", err)
 		}
 	}
 
@@ -307,7 +308,7 @@ func (r *Inputer) processRoomEvent(
 			return fmt.Errorf("r.processStateBefore: %w", err)
 		}
 		if rejectionErr != nil {
-			rejectionErr = fmt.Errorf("rejected by state before event: %w", rejectionErr)
+			logger.WithError(err).Warnf("Event %s rejected by state before event", event.EventID())
 			isRejected = true
 		}
 	}
