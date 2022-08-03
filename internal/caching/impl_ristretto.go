@@ -35,7 +35,6 @@ const (
 	roomNIDsCache
 	roomIDsCache
 	roomEventsCache
-	roomInfosCache
 	federationPDUsCache
 	federationEDUsCache
 	spaceSummaryRoomsCache
