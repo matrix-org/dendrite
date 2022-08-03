@@ -113,6 +113,11 @@ global:
     addresses:
     # - localhost:4222
 
+    # Disable the validation of TLS certificates of NATS. This is
+    # not recommended in production since it may allow NATS traffic
+    # to be sent to an insecure endpoint.
+    disable_tls_validation: false
+
     # Persistent directory to store JetStream streams in. This directory should be
     # preserved across Dendrite restarts.
     storage_path: ./
@@ -187,7 +192,7 @@ client_api:
   # and appservice users are exempt from rate limiting by default.
   rate_limiting:
     enabled: true
-    threshold: 5
+    threshold: 20
     cooloff_ms: 500
     exempt_user_ids:
     #  - "@user:domain.com"
