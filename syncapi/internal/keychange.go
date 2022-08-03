@@ -233,6 +233,7 @@ func filterSharedUsers(
 	}
 	sharedUsers, err := db.SharedUsers(ctx, userID, usersWithChangedKeys)
 	if err != nil {
+		util.GetLogger(ctx).WithError(err).Errorf("db.SharedUsers failed: %s", err)
 		// default to all users so we do needless queries rather than miss some important device update
 		return nil, usersWithChangedKeys
 	}
