@@ -668,15 +668,17 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 	var stateIDs gomatrixserverlib.RespStateIDs
 	var err error
 	count := 0
+	totalctx, totalcancel := context.WithTimeout(ctx, time.Minute*5)
 	for _, serverName := range t.servers {
-		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		reqctx, reqcancel := context.WithTimeout(totalctx, time.Second*20)
 		stateIDs, err = t.federation.LookupStateIDs(reqctx, serverName, roomID, eventID)
-		cancel()
+		reqcancel()
 		if err == nil {
 			break
 		}
 		count++
 	}
+	totalcancel()
 	if err != nil {
 		return nil, fmt.Errorf("t.federation.LookupStateIDs tried %d server(s), last error: %w", count, err)
 	}
