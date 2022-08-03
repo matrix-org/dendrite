@@ -157,7 +157,7 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
 	roomInfo, ok := d.Cache.GetRoomInfo(roomID)
-	if ok && roomInfo != nil && !roomInfo.IsStub() {
+	if ok && roomInfo != nil && !roomInfo.IsStub() && roomInfo.RoomNID != 0 {
 		// The data that's in the cache is not stubby, so return it.
 		return roomInfo, nil
 	}

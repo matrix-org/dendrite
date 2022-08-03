@@ -137,7 +137,7 @@ func (r *Inputer) processRoomEvent(
 		return fmt.Errorf("r.DB.RoomInfo: %w", rerr)
 	}
 	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
-	if !isCreateEvent && (roomInfo == nil || roomInfo.IsStub()) {
+	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
 
