@@ -109,12 +109,11 @@ func (p *PDUStreamProvider) CompleteSync(
 		p.queue(func() {
 			defer reqWaitGroup.Done()
 
-			var jr *types.JoinResponse
-			jr, err = p.getJoinResponseForCompleteSync(
+			jr, jerr := p.getJoinResponseForCompleteSync(
 				ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 			)
-			if err != nil {
-				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
+			if jerr != nil {
+				req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
 				return
 			}
 
@@ -262,9 +261,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		var pos types.StreamPosition
 		if _, pos, err = p.DB.PositionInTopology(ctx, mostRecentEventID); err == nil {
 			switch {
-			case r.Backwards && pos > latestPosition:
+			case r.Backwards && pos < latestPosition:
 				fallthrough
-			case !r.Backwards && pos < latestPosition:
+			case !r.Backwards && pos > latestPosition:
 				latestPosition = pos
 			}
 		}

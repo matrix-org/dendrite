@@ -154,6 +154,12 @@ func MissingParam(msg string) *MatrixError {
 	return &MatrixError{"M_MISSING_PARAM", msg}
 }
 
+// UnableToAuthoriseJoin is an error that is returned when a server can't
+// determine whether to allow a restricted join or not.
+func UnableToAuthoriseJoin(msg string) *MatrixError {
+	return &MatrixError{"M_UNABLE_TO_AUTHORISE_JOIN", msg}
+}
+
 // LeaveServerNoticeError is an error returned when trying to reject an invite
 // for a server notice room.
 func LeaveServerNoticeError() *MatrixError {

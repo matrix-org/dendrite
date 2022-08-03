@@ -24,7 +24,7 @@ Unfortunately we can't accept contributions without it.
 
 ## Getting up and running
 
-See the [Installation](INSTALL.md) section for information on how to build an
+See the [Installation](installation) section for information on how to build an
 instance of Dendrite. You will likely need this in order to test your changes.
 
 ## Code style

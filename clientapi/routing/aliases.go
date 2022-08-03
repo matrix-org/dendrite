@@ -44,7 +44,7 @@ func GetAliases(
 		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryCurrentState: %w", err))
 	}
 
-	visibility := "invite"
+	visibility := gomatrixserverlib.HistoryVisibilityInvited
 	if historyVisEvent, ok := stateRes.StateEvents[stateTuple]; ok {
 		var err error
 		visibility, err = historyVisEvent.HistoryVisibility()

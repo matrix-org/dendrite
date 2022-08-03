@@ -72,7 +72,24 @@ func (d *Database) eventTypeNIDs(
 func (d *Database) EventStateKeys(
 	ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]string, error) {
-	return d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, eventStateKeyNIDs)
+	result := make(map[types.EventStateKeyNID]string, len(eventStateKeyNIDs))
+	fetch := make([]types.EventStateKeyNID, 0, len(eventStateKeyNIDs))
+	for _, nid := range eventStateKeyNIDs {
+		if key, ok := d.Cache.GetEventStateKey(nid); ok {
+			result[nid] = key
+		} else {
+			fetch = append(fetch, nid)
+		}
+	}
+	fromDB, err := d.EventStateKeysTable.BulkSelectEventStateKey(ctx, nil, fetch)
+	if err != nil {
+		return nil, err
+	}
+	for nid, key := range fromDB {
+		result[nid] = key
+		d.Cache.StoreEventStateKey(nid, key)
+	}
+	return result, nil
 }
 
 func (d *Database) EventStateKeyNIDs(
@@ -139,15 +156,30 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-		return &roomInfo, nil
+	roomInfo, ok := d.Cache.GetRoomInfo(roomID)
+	if ok && roomInfo != nil && !roomInfo.IsStub() {
+		// The data that's in the cache is not stubby, so return it.
+		return roomInfo, nil
 	}
-	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
-	if err == nil && roomInfo != nil {
-		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, *roomInfo)
+	// At this point we either don't have an entry in the cache, or
+	// it is stubby, so let's check the roomserver_rooms table again.
+	roomInfoFromDB, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
+	if err != nil {
+		return nil, err
 	}
-	return roomInfo, err
+	// If we have a stubby cache entry already, update it and return
+	// the reference to the cache entry.
+	if roomInfo != nil {
+		roomInfo.CopyFrom(roomInfoFromDB)
+		return roomInfo, nil
+	}
+	// Otherwise, try to admit the data into the cache and return the
+	// new reference from the database.
+	if roomInfoFromDB != nil {
+		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
+		d.Cache.StoreRoomInfo(roomID, roomInfoFromDB)
+	}
+	return roomInfoFromDB, err
 }
 
 func (d *Database) AddState(
@@ -263,6 +295,12 @@ func (d *Database) snapshotNIDFromEventID(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (types.StateSnapshotNID, error) {
 	_, stateNID, err := d.EventsTable.SelectEvent(ctx, txn, eventID)
+	if err != nil {
+		return 0, err
+	}
+	if stateNID == 0 {
+		return 0, sql.ErrNoRows // effectively there's no state entry
+	}
 	return stateNID, err
 }
 
@@ -433,8 +471,18 @@ func (d *Database) Events(
 }
 
 func (d *Database) events(
-	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
+	ctx context.Context, txn *sql.Tx, inputEventNIDs types.EventNIDs,
 ) ([]types.Event, error) {
+	sort.Sort(inputEventNIDs)
+	events := make(map[types.EventNID]*gomatrixserverlib.Event, len(inputEventNIDs))
+	eventNIDs := make([]types.EventNID, 0, len(inputEventNIDs))
+	for _, nid := range inputEventNIDs {
+		if event, ok := d.Cache.GetRoomServerEvent(nid); ok && event != nil {
+			events[nid] = event
+		} else {
+			eventNIDs = append(eventNIDs, nid)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -470,18 +518,29 @@ func (d *Database) events(
 	for n, v := range dbRoomVersions {
 		roomVersions[n] = v
 	}
-	results := make([]types.Event, len(eventJSONs))
-	for i, eventJSON := range eventJSONs {
-		result := &results[i]
-		result.EventNID = eventJSON.EventNID
-		roomNID := roomNIDs[result.EventNID]
+	for _, eventJSON := range eventJSONs {
+		roomNID := roomNIDs[eventJSON.EventNID]
 		roomVersion := roomVersions[roomNID]
-		result.Event, err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
+		events[eventJSON.EventNID], err = gomatrixserverlib.NewEventFromTrustedJSONWithEventID(
 			eventIDs[eventJSON.EventNID], eventJSON.EventJSON, false, roomVersion,
 		)
 		if err != nil {
 			return nil, err
 		}
+		if event := events[eventJSON.EventNID]; event != nil {
+			d.Cache.StoreRoomServerEvent(eventJSON.EventNID, event)
+		}
+	}
+	results := make([]types.Event, 0, len(inputEventNIDs))
+	for _, nid := range inputEventNIDs {
+		event, ok := events[nid]
+		if !ok || event == nil {
+			return nil, fmt.Errorf("event %d missing", nid)
+		}
+		results = append(results, types.Event{
+			EventNID: nid,
+			Event:    event,
+		})
 	}
 	if !redactionsArePermanent {
 		d.applyRedactions(results)
@@ -632,7 +691,7 @@ func (d *Database) storeEvent(
 		succeeded := false
 		if updater == nil {
 			var roomInfo *types.RoomInfo
-			roomInfo, err = d.RoomInfo(ctx, event.RoomID())
+			roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
 			if err != nil {
 				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
 			}
@@ -823,13 +882,42 @@ func (d *Database) handleRedactions(
 		return nil, "", nil
 	}
 
+	// Get the power level from the database, so we can verify the user is allowed to redact the event
+	powerLevels, err := d.GetStateEvent(ctx, event.RoomID(), gomatrixserverlib.MRoomPowerLevels, "")
+	if err != nil {
+		return nil, "", fmt.Errorf("d.GetStateEvent: %w", err)
+	}
+	if powerLevels == nil {
+		return nil, "", fmt.Errorf("unable to fetch m.room.power_levels event from database for room %s", event.RoomID())
+	}
+	pl, err := powerLevels.PowerLevels()
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to get powerlevels for room: %w", err)
+	}
+
+	redactUser := pl.UserLevel(redactionEvent.Sender())
+	switch {
+	case redactUser >= pl.Redact:
+		// The power level of the redaction event’s sender is greater than or equal to the redact level.
+	case redactedEvent.Origin() == redactionEvent.Origin() && redactedEvent.Sender() == redactionEvent.Sender():
+		// The domain of the redaction event’s sender matches that of the original event’s sender.
+	default:
+		return nil, "", nil
+	}
+
 	// mark the event as redacted
+	if redactionsArePermanent {
+		redactedEvent.Redact()
+	}
+
 	err = redactedEvent.SetUnsignedField("redacted_because", redactionEvent)
 	if err != nil {
 		return nil, "", fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 	}
-	if redactionsArePermanent {
-		redactedEvent.Event = redactedEvent.Redact()
+	// NOTSPEC: sytest relies on this unspecced field existing :(
+	err = redactedEvent.SetUnsignedField("redacted_by", redactionEvent.EventID())
+	if err != nil {
+		return nil, "", fmt.Errorf("redactedEvent.SetUnsignedField: %w", err)
 	}
 	// overwrite the eventJSON table
 	err = d.EventJSONTable.InsertEventJSON(ctx, txn, redactedEvent.EventNID, redactedEvent.JSON())
@@ -891,7 +979,7 @@ func (d *Database) loadRedactionPair(
 func (d *Database) applyRedactions(events []types.Event) {
 	for i := range events {
 		if result := gjson.GetBytes(events[i].Unsigned(), "redacted_because"); result.Exists() {
-			events[i].Event = events[i].Redact()
+			events[i].Redact()
 		}
 	}
 }
@@ -915,6 +1003,38 @@ func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
 	return &evs[0]
 }
 
+func (d *Database) GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error) {
+	eventStates, err := d.EventsTable.BulkSelectStateAtEventByID(ctx, nil, []string{eventID})
+	if err != nil {
+		return nil, err
+	}
+	stateSnapshotNID := eventStates[0].BeforeStateSnapshotNID
+	if stateSnapshotNID == 0 {
+		return nil, nil
+	}
+	eventNIDs, err := d.StateSnapshotTable.BulkSelectStateForHistoryVisibility(ctx, nil, stateSnapshotNID, domain)
+	if err != nil {
+		return nil, err
+	}
+	eventIDs, _ := d.EventsTable.BulkSelectEventID(ctx, nil, eventNIDs)
+	if err != nil {
+		eventIDs = map[types.EventNID]string{}
+	}
+	events := make([]*gomatrixserverlib.Event, 0, len(eventNIDs))
+	for _, eventNID := range eventNIDs {
+		data, err := d.EventJSONTable.BulkSelectEventJSON(ctx, nil, []types.EventNID{eventNID})
+		if err != nil {
+			return nil, err
+		}
+		ev, err := gomatrixserverlib.NewEventFromTrustedJSONWithEventID(eventIDs[eventNID], data[0].EventJSON, false, roomInfo.RoomVersion)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
 // GetStateEvent returns the current state event of a given type for a given room with a given state key
 // If no event could be found, returns nil
 // If there was an issue during the retrieval, returns an error
@@ -927,7 +1047,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -946,7 +1066,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -992,7 +1112,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1003,7 +1123,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1120,10 +1240,10 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load room info for room %s : %w", roomID, err2)
 		}
 		// for unknown rooms or rooms which we don't have the current state, skip them.
-		if roomInfo == nil || roomInfo.IsStub {
+		if roomInfo == nil || roomInfo.IsStub() {
 			continue
 		}
-		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 		if err2 != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load state for room %s : %w", roomID, err2)
 		}
@@ -1187,6 +1307,13 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	for nid := range userNIDToCount {
 		stateKeyNIDs[i] = nid
 		i++
+	}
+	// If we didn't have any userIDs to look up, get the UserIDs for the returned userNIDToCount now
+	if len(userIDs) == 0 {
+		nidToUserID, err = d.EventStateKeys(ctx, stateKeyNIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
 	result := make(map[string]int, len(userNIDToCount))
 	for nid, count := range userNIDToCount {

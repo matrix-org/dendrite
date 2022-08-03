@@ -17,13 +17,10 @@ package roomserver
 import (
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/inthttp"
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/roomserver/internal"
+	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,11 +37,6 @@ func NewInternalAPI(
 ) api.RoomserverInternalAPI {
 	cfg := &base.Cfg.RoomServer
 
-	var perspectiveServerNames []gomatrixserverlib.ServerName
-	for _, kp := range base.Cfg.FederationAPI.KeyPerspectives {
-		perspectiveServerNames = append(perspectiveServerNames, kp.ServerName)
-	}
-
 	roomserverDB, err := storage.Open(base, &cfg.Database, base.Caches)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to room server db")
@@ -53,9 +45,6 @@ func NewInternalAPI(
 	js, nc := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	return internal.NewRoomserverAPI(
-		base.ProcessContext, cfg, roomserverDB, js, nc,
-		cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
-		cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		base.Caches, perspectiveServerNames,
+		base, roomserverDB, js, nc,
 	)
 }

@@ -27,6 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
+	"github.com/sirupsen/logrus"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
@@ -54,7 +56,11 @@ func (r *Inputer) updateLatestEvents(
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "updateLatestEvents")
+	defer span.Finish()
+
 	var succeeded bool
 	updater, err := r.DB.GetRoomUpdater(ctx, roomInfo)
 	if err != nil {
@@ -64,15 +70,16 @@ func (r *Inputer) updateLatestEvents(
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
 	u := latestEventsUpdater{
-		ctx:           ctx,
-		api:           r,
-		updater:       updater,
-		roomInfo:      roomInfo,
-		stateAtEvent:  stateAtEvent,
-		event:         event,
-		sendAsServer:  sendAsServer,
-		transactionID: transactionID,
-		rewritesState: rewritesState,
+		ctx:               ctx,
+		api:               r,
+		updater:           updater,
+		roomInfo:          roomInfo,
+		stateAtEvent:      stateAtEvent,
+		event:             event,
+		sendAsServer:      sendAsServer,
+		transactionID:     transactionID,
+		rewritesState:     rewritesState,
+		historyVisibility: historyVisibility,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -101,8 +108,8 @@ type latestEventsUpdater struct {
 	// The eventID of the event that was processed before this one.
 	lastEventIDSent string
 	// The latest events in the room after processing this event.
-	oldLatest []types.StateAtEventAndReference
-	latest    []types.StateAtEventAndReference
+	oldLatest types.StateAtEventAndReferences
+	latest    types.StateAtEventAndReferences
 	// The state entries removed from and added to the current state of the
 	// room as a result of processing this event. They are sorted lists.
 	removed []types.StateEntry
@@ -114,6 +121,8 @@ type latestEventsUpdater struct {
 	// The snapshots of current state before and after processing this event
 	oldStateNID types.StateSnapshotNID
 	newStateNID types.StateSnapshotNID
+	// The history visibility of the event itself (from the state before the event).
+	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
@@ -125,7 +134,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// state snapshot from somewhere else, e.g. a federated room join,
 	// then start with an empty set - none of the forward extremities
 	// that we knew about before matter anymore.
-	u.oldLatest = []types.StateAtEventAndReference{}
+	u.oldLatest = types.StateAtEventAndReferences{}
 	if !u.rewritesState {
 		u.oldStateNID = u.updater.CurrentStateSnapshotNID()
 		u.oldLatest = u.updater.LatestEvents()
@@ -183,7 +192,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
 
@@ -199,13 +208,16 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 }
 
 func (u *latestEventsUpdater) latestState() error {
+	span, ctx := opentracing.StartSpanFromContext(u.ctx, "processEventWithMissingState")
+	defer span.Finish()
+
 	var err error
 	roomState := state.NewStateResolution(u.updater, u.roomInfo)
 
 	// Work out if the state at the extremities has actually changed
 	// or not. If they haven't then we won't bother doing all of the
 	// hard work.
-	if u.event.StateKey() == nil {
+	if !u.stateAtEvent.IsStateEvent() {
 		stateChanged := false
 		oldStateNIDs := make([]types.StateSnapshotNID, 0, len(u.oldLatest))
 		newStateNIDs := make([]types.StateSnapshotNID, 0, len(u.latest))
@@ -233,36 +245,22 @@ func (u *latestEventsUpdater) latestState() error {
 		}
 	}
 
-	// Take the old set of extremities and the new set of extremities and
-	// mash them together into a list. This may or may not include the new event
-	// from the input path, depending on whether it became a forward extremity
-	// or not. We'll then run state resolution across all of them to determine
-	// the new current state of the room. Including the old extremities here
-	// ensures that new forward extremities with bad state snapshots (from
-	// possible malicious actors) can't completely corrupt the room state
-	// away from what it was before.
-	combinedExtremities := types.StateAtEventAndReferences(append(u.oldLatest, u.latest...))
-	combinedExtremities = combinedExtremities[:util.SortAndUnique(combinedExtremities)]
-	latestStateAtEvents := make([]types.StateAtEvent, len(combinedExtremities))
-	for i := range combinedExtremities {
-		latestStateAtEvents[i] = combinedExtremities[i].StateAtEvent
+	// Get a list of the current latest events. This may or may not
+	// include the new event from the input path, depending on whether
+	// it is a forward extremity or not.
+	latestStateAtEvents := make([]types.StateAtEvent, len(u.latest))
+	for i := range u.latest {
+		latestStateAtEvents[i] = u.latest[i].StateAtEvent
 	}
 
 	// Takes the NIDs of the latest events and creates a state snapshot
 	// of the state after the events. The snapshot state will be resolved
 	// using the correct state resolution algorithm for the room.
 	u.newStateNID, err = roomState.CalculateAndStoreStateAfterEvents(
-		u.ctx, latestStateAtEvents,
+		ctx, latestStateAtEvents,
 	)
 	if err != nil {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
-	}
-
-	// If we are overwriting the state then we should make sure that we
-	// don't send anything out over federation again, it will very likely
-	// be a repeat.
-	if u.stateAtEvent.Overwrite {
-		u.sendAsServer = ""
 	}
 
 	// Now that we have a new state snapshot based on the latest events,
@@ -271,16 +269,27 @@ func (u *latestEventsUpdater) latestState() error {
 	// another list of added ones. Replacing a value for a state-key tuple
 	// will result one removed (the old event) and one added (the new event).
 	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
-		u.ctx, u.oldStateNID, u.newStateNID,
+		ctx, u.oldStateNID, u.newStateNID,
 	)
 	if err != nil {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
 
+	if removed := len(u.removed) - len(u.added); removed > 0 {
+		logrus.WithFields(logrus.Fields{
+			"event_id":      u.event.EventID(),
+			"room_id":       u.event.RoomID(),
+			"old_state_nid": u.oldStateNID,
+			"new_state_nid": u.newStateNID,
+			"old_latest":    u.oldLatest.EventIDs(),
+			"new_latest":    u.latest.EventIDs(),
+		}).Errorf("Unexpected state deletion (removing %d events)", removed)
+	}
+
 	// Also work out the state before the event removes and the event
 	// adds.
 	u.stateBeforeEventRemoves, u.stateBeforeEventAdds, err = roomState.DifferenceBetweeenStateSnapshots(
-		u.ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
+		ctx, u.newStateNID, u.stateAtEvent.BeforeStateSnapshotNID,
 	)
 	if err != nil {
 		return fmt.Errorf("roomState.DifferenceBetweeenStateSnapshots: %w", err)
@@ -296,6 +305,9 @@ func (u *latestEventsUpdater) calculateLatest(
 	newEvent *gomatrixserverlib.Event,
 	newStateAndRef types.StateAtEventAndReference,
 ) (bool, error) {
+	span, _ := opentracing.StartSpanFromContext(u.ctx, "calculateLatest")
+	defer span.Finish()
+
 	// First of all, get a list of all of the events in our current
 	// set of forward extremities.
 	existingRefs := make(map[string]*types.StateAtEventAndReference)
@@ -357,12 +369,13 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:           u.event.Headered(u.roomInfo.RoomVersion),
-		RewritesState:   u.rewritesState,
-		LastSentEventID: u.lastEventIDSent,
-		LatestEventIDs:  latestEventIDs,
-		TransactionID:   u.transactionID,
-		SendAsServer:    u.sendAsServer,
+		Event:             u.event.Headered(u.roomInfo.RoomVersion),
+		RewritesState:     u.rewritesState,
+		LastSentEventID:   u.lastEventIDSent,
+		LatestEventIDs:    latestEventIDs,
+		TransactionID:     u.transactionID,
+		SendAsServer:      u.sendAsServer,
+		HistoryVisibility: u.historyVisibility,
 	}
 
 	eventIDMap, err := u.stateEventMap()

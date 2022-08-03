@@ -30,10 +30,13 @@ import (
 
 	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	synctypes "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -49,6 +52,7 @@ type UserInternalAPI struct {
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
 	KeyAPI      keyapi.UserKeyAPI
+	RSAPI       rsapi.UserRoomserverAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -62,7 +66,24 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
-	return a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData)
+	if err := a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
+		return fmt.Errorf("failed to save account data: %w", err)
+	}
+	var ignoredUsers *synctypes.IgnoredUsers
+	if req.DataType == "m.ignored_user_list" {
+		ignoredUsers = &synctypes.IgnoredUsers{}
+		_ = json.Unmarshal(req.AccountData, ignoredUsers)
+	}
+	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+		RoomID:       req.RoomID,
+		Type:         req.DataType,
+		IgnoredUsers: ignoredUsers,
+	}); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
+		return fmt.Errorf("failed to send account data to output: %w", err)
+	}
+	return nil
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -91,7 +112,9 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	}
 
 	// Inform the SyncAPI about the newly created push_rules
-	if err = a.SyncProducer.SendAccountData(acc.UserID, "", "m.push_rules"); err != nil {
+	if err = a.SyncProducer.SendAccountData(acc.UserID, eventutil.AccountData{
+		Type: "m.push_rules",
+	}); err != nil {
 		util.GetLogger(ctx).WithFields(logrus.Fields{
 			"user_id": acc.UserID,
 		}).WithError(err).Warn("failed to send account data to the SyncAPI")
@@ -452,6 +475,30 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 
 // PerformAccountDeactivation deactivates the user's account, removing all ability for the user to login again.
 func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
+	a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes)
+	if err := evacuateRes.Error; err != nil {
+		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
+	}
+
+	deviceReq := &api.PerformDeviceDeletionRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	deviceRes := &api.PerformDeviceDeletionResponse{}
+	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
+		return err
+	}
+
+	pusherReq := &api.PerformPusherDeletionRequest{
+		Localpart: req.Localpart,
+	}
+	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+		return err
+	}
+
 	err := a.DB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err
@@ -706,11 +753,11 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-
-	if err := a.SyncProducer.SendAccountData(req.UserID, "" /* roomID */, pushRulesAccountDataType); err != nil {
+	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+		Type: pushRulesAccountDataType,
+	}); err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
 	}
-
 	return nil
 }
 

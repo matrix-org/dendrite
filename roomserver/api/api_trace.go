@@ -113,6 +113,15 @@ func (t *RoomserverInternalAPITrace) PerformAdminEvacuateRoom(
 	util.GetLogger(ctx).Infof("PerformAdminEvacuateRoom req=%+v res=%+v", js(req), js(res))
 }
 
+func (t *RoomserverInternalAPITrace) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *PerformAdminEvacuateUserRequest,
+	res *PerformAdminEvacuateUserResponse,
+) {
+	t.Impl.PerformAdminEvacuateUser(ctx, req, res)
+	util.GetLogger(ctx).Infof("PerformAdminEvacuateUser req=%+v res=%+v", js(req), js(res))
+}
+
 func (t *RoomserverInternalAPITrace) PerformInboundPeek(
 	ctx context.Context,
 	req *PerformInboundPeekRequest,
@@ -351,6 +360,16 @@ func (t *RoomserverInternalAPITrace) QueryAuthChain(
 ) error {
 	err := t.Impl.QueryAuthChain(ctx, request, response)
 	util.GetLogger(ctx).WithError(err).Infof("QueryAuthChain req=%+v res=%+v", js(request), js(response))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) QueryRestrictedJoinAllowed(
+	ctx context.Context,
+	request *QueryRestrictedJoinAllowedRequest,
+	response *QueryRestrictedJoinAllowedResponse,
+) error {
+	err := t.Impl.QueryRestrictedJoinAllowed(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryRestrictedJoinAllowed req=%+v res=%+v", js(request), js(response))
 	return err
 }
 

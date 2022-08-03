@@ -1,5 +1,100 @@
 # Changelog
 
+## Dendrite 0.9.0 (2022-08-01)
+
+### Features
+
+* Dendrite now uses Ristretto for managing in-memory caches
+  * Should improve cache utilisation considerably over time by more intelligently selecting and managing cache entries compared to the previous LRU-based cache
+  * Defaults to a 1GB cache size if not configured otherwise
+  * The estimated cache size in memory and maximum age can now be configured with new [configuration options](https://github.com/matrix-org/dendrite/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L44-L61) to prevent unbounded cache growth
+* Added support for serving the `/.well-known/matrix/client` hint directly from Dendrite
+  * Configurable with the new [configuration option](https://github.com/matrix-org/dendrite/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L67-L69)
+* Refactored membership updater, which should eliminate some bugs caused by the membership table getting out of sync with the room state
+* The User API is now responsible for sending account data updates to other components, which may fix some races and duplicate account data events
+* Optimised database query for checking whether a remote server is allowed to request an event over federation without using anywhere near as much CPU time (PostgreSQL only)
+* Database migrations have been refactored to eliminate some problems that were present with `goose` and upgrading from older Dendrite versions
+* Media fetching will now use the `/v3` endpoints for downloading media from remote homeservers
+* HTTP 404 and HTTP 405 errors from the client-facing APIs should now be returned with CORS headers so that web-based clients do not produce incorrect access control warnings for unknown endpoints
+* Some preparation work for full history visibility support
+
+### Fixes
+
+* Fixes a crash that could occur during event redaction
+* The `/members` endpoint will no longer incorrectly return HTTP 500 as a result of some invite events
+* Send-to-device messages should now be ordered more reliably and the last position in the stream updated correctly
+* Parsing of appservice configuration files is now less strict (contributed by [Kab1r](https://github.com/Kab1r))
+* The sync API should now identify shared users correctly when waking up for E2EE key changes
+* The federation `/state` endpoint will now return a HTTP 403 when the state before an event isn't known instead of a HTTP 500
+* Presence timestamps should now be calculated with the correct precision
+* A race condition in the roomserver's room info has been fixed
+* A race condition in the sync API has been fixed
+
+## Dendrite 0.8.9 (2022-07-01)
+
+### Features
+
+* Incoming device list updates over federation are now queued in JetStream for processing so that they will no longer block incoming federation transactions and should never end up dropped, which will hopefully help E2EE reliability
+* The `/context` endpoint now returns `"start"` and `"end"` parameters to allow pagination from a context call
+* The `/messages` endpoint will no longer return `"end"` when there are no more messages remaining
+* Deactivated user accounts will now leave all rooms automatically
+* New admin endpoint `/_dendrite/admin/evacuateUser/{userID}` has been added for forcing a local user to leave all joined rooms
+* Dendrite will now automatically attempt to raise the file descriptor limit at startup if it is too low
+
+### Fixes
+
+* A rare crash when retrieving remote device lists has been fixed
+* Fixes a bug where events were not redacted properly over federation
+* The `/invite` endpoints will now return an error instead of silently proceeding if the user ID is obviously malformed
+
+## Dendrite 0.8.8 (2022-06-09)
+
+### Features
+
+* The performance of state resolution has been increased significantly for larger rooms
+* A number of changes have been made to rate limiting:
+  * Logged in users will now be rate-limited on a per-session basis rather than by remote IP
+  * Rate limiting no longer applies to admin or appservice users
+  * It is now possible to configure additional users that are exempt from rate limiting using the `exempt_user_ids` option in the `rate_limiting` section of the Dendrite config
+* Setting state is now idempotent via the client API state endpoints
+
+### Fixes
+
+* Room upgrades now properly propagate tombstone events to remote servers
+* Room upgrades will no longer send tombstone events if creating the upgraded room fails
+* A crash has been fixed when evaluating restricted room joins
+
+## Dendrite 0.8.7 (2022-06-01)
+
+### Features
+
+* Support added for room version 10
+
+### Fixes
+
+* A number of state handling bugs have been fixed, which previously resulted in missing state events, unexpected state deletions, reverted memberships and unexpectedly rejected/soft-failed events in some specific cases
+* Fixed destination queue performance issues as a result of missing indexes, which speeds up outbound federation considerably
+* A bug which could cause the `/register` endpoint to return HTTP 500 has been fixed
+
+## Dendrite 0.8.6 (2022-05-26)
+
+### Features
+
+* Room versions 8 and 9 are now marked as stable
+* Dendrite can now assist remote users to join restricted rooms via `/make_join` and `/send_join`
+
+### Fixes
+
+* The sync API no longer returns immediately on `/sync` requests unnecessarily if it can be avoided
+* A race condition has been fixed in the sync API when updating presence via `/sync`
+* A race condition has been fixed sending E2EE keys to remote servers over federation when joining rooms
+* The `trusted_private_chat` preset should now grant power level 100 to all participant users, which should improve the user experience of direct messages
+* Invited users are now authed correctly in restricted rooms
+* The `join_authorised_by_users_server` key is now correctly stripped in restricted rooms when updating the membership event
+* Appservices should now receive invite events correctly
+* Device list updates should no longer contain optional fields with `null` values
+* The `/deactivate` endpoint has been fixed to no longer confuse Element with incorrect completed flows
+
 ## Dendrite 0.8.5 (2022-05-13)
 
 ### Features

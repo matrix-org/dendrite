@@ -85,7 +85,6 @@ func Test_EventsTable(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			stateAtEvent := types.StateAtEvent{
-				Overwrite:              false,
 				BeforeStateSnapshotNID: types.StateSnapshotNID(stateSnapshot),
 				IsRejected:             false,
 				StateEntry: types.StateEntry{

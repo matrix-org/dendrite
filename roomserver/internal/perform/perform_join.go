@@ -24,6 +24,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/internal/input"
@@ -160,6 +161,7 @@ func (r *Joiner) performJoinRoomByAlias(
 }
 
 // TODO: Break this function up a bit
+// nolint:gocyclo
 func (r *Joiner) performJoinRoomByID(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
@@ -210,6 +212,11 @@ func (r *Joiner) performJoinRoomByID(
 		req.Content = map[string]interface{}{}
 	}
 	req.Content["membership"] = gomatrixserverlib.Join
+	if authorisedVia, aerr := r.populateAuthorisedViaUserForRestrictedJoin(ctx, req); aerr != nil {
+		return "", "", aerr
+	} else if authorisedVia != "" {
+		req.Content["join_authorised_via_users_server"] = authorisedVia
+	}
 	if err = eb.SetContent(req.Content); err != nil {
 		return "", "", fmt.Errorf("eb.SetContent: %w", err)
 	}
@@ -261,21 +268,19 @@ func (r *Joiner) performJoinRoomByID(
 	case nil:
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
-		// a member of the room.
-		alreadyJoined := false
-		for _, se := range buildRes.StateEvents {
-			if !se.StateKeyEquals(userID) {
-				continue
-			}
-			if membership, merr := se.Membership(); merr == nil {
-				alreadyJoined = (membership == gomatrixserverlib.Join)
-				break
-			}
+		// a member of the room. This is best-effort (as in we won't
+		// fail if we can't find the existing membership) because there
+		// is really no harm in just sending another membership event.
+		membershipReq := &api.QueryMembershipForUserRequest{
+			RoomID: req.RoomIDOrAlias,
+			UserID: userID,
 		}
+		membershipRes := &api.QueryMembershipForUserResponse{}
+		_ = r.Queryer.QueryMembershipForUser(ctx, membershipReq, membershipRes)
 
 		// If we haven't already joined the room then send an event
 		// into the room changing our membership status.
-		if !alreadyJoined {
+		if !membershipRes.RoomExists || !membershipRes.IsInRoom {
 			inputReq := rsAPI.InputRoomEventsRequest{
 				InputRoomEvents: []rsAPI.InputRoomEvent{
 					{
@@ -348,6 +353,33 @@ func (r *Joiner) performFederatedJoinRoomByID(
 		}
 	}
 	return fedRes.JoinedVia, nil
+}
+
+func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
+	ctx context.Context,
+	joinReq *rsAPI.PerformJoinRequest,
+) (string, error) {
+	req := &api.QueryRestrictedJoinAllowedRequest{
+		UserID: joinReq.UserID,
+		RoomID: joinReq.RoomIDOrAlias,
+	}
+	res := &api.QueryRestrictedJoinAllowedResponse{}
+	if err := r.Queryer.QueryRestrictedJoinAllowed(ctx, req, res); err != nil {
+		return "", fmt.Errorf("r.Queryer.QueryRestrictedJoinAllowed: %w", err)
+	}
+	if !res.Restricted {
+		return "", nil
+	}
+	if !res.Resident {
+		return "", nil
+	}
+	if !res.Allowed {
+		return "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorNotAllowed,
+			Msg:  fmt.Sprintf("The join to room %s was not allowed.", joinReq.RoomIDOrAlias),
+		}
+	}
+	return res.AuthorisedVia, nil
 }
 
 func buildEvent(

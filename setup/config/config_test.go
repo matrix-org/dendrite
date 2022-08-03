@@ -17,6 +17,8 @@ package config
 import (
 	"fmt"
 	"testing"
+
+	"gopkg.in/yaml.v2"
 )
 
 func TestLoadConfigRelative(t *testing.T) {
@@ -40,6 +42,7 @@ global:
   key_id: ed25519:auto
   key_validity_period: 168h0m0s
   well_known_server_name: "localhost:443"
+  well_known_client_name: "localhost:443"
   trusted_third_party_id_servers:
   - matrix.org
   - vector.im
@@ -268,3 +271,22 @@ n0Xq64k7fc42HXJpF8CGBkSaIhtlzcruO+vqR80B9r62+D0V7VmHOnP135MT6noU
 ANAf5kxmMsM0zlN2hkxl0H6o7wKlBSw3RI3cjfilXiMWRPJrzlc4
 -----END CERTIFICATE-----
 `
+
+func TestUnmarshalDataUnit(t *testing.T) {
+	target := struct {
+		Got DataUnit `yaml:"value"`
+	}{}
+	for input, expect := range map[string]DataUnit{
+		"value: 0.6tb": 659706976665,
+		"value: 1.2gb": 1288490188,
+		"value: 256mb": 268435456,
+		"value: 128kb": 131072,
+		"value: 128":   128,
+	} {
+		if err := yaml.Unmarshal([]byte(input), &target); err != nil {
+			t.Fatal(err)
+		} else if target.Got != expect {
+			t.Fatalf("expected value %d but got %d", expect, target.Got)
+		}
+	}
+}

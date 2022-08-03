@@ -138,13 +138,13 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	presence := msg.Header.Get("presence")
 	timestamp := msg.Header.Get("last_active_ts")
 	fromSync, _ := strconv.ParseBool(msg.Header.Get("from_sync"))
-	logrus.Debugf("syncAPI received presence event: %+v", msg.Header)
+	logrus.Tracef("syncAPI received presence event: %+v", msg.Header)
 
 	if fromSync { // do not process local presence changes; we already did this synchronously.
 		return true
 	}
 
-	ts, err := strconv.Atoi(timestamp)
+	ts, err := strconv.ParseUint(timestamp, 10, 64)
 	if err != nil {
 		return true
 	}
@@ -157,12 +157,12 @@ func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
 	// already checked, so no need to check error
 	p, _ := types.PresenceFromString(presence)
 
-	s.EmitPresence(ctx, userID, p, statusMsg, ts, fromSync)
+	s.EmitPresence(ctx, userID, p, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
 	return true
 }
 
-func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
-	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, gomatrixserverlib.Timestamp(ts), fromSync)
+func (s *PresenceConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool) {
+	pos, err := s.db.UpdatePresence(ctx, userID, presence, statusMsg, ts, fromSync)
 	if err != nil {
 		logrus.WithError(err).WithField("user", userID).WithField("presence", presence).Warn("failed to updated presence for user")
 		return

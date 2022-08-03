@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -173,10 +174,6 @@ func DeduplicateStateEntries(a []StateEntry) []StateEntry {
 
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
-	// Should this state overwrite the latest events and memberships of the room?
-	// This might be necessary when rejoining a federated room after a period of
-	// absence, as our state and latest events will be out of date.
-	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
 	// True if this StateEntry is rejected. State resolution should then treat this
@@ -212,6 +209,14 @@ func (s StateAtEventAndReferences) Len() int {
 
 func (s StateAtEventAndReferences) Swap(a, b int) {
 	s[a], s[b] = s[b], s[a]
+}
+
+func (s StateAtEventAndReferences) EventIDs() string {
+	strs := make([]string, 0, len(s))
+	for _, r := range s {
+		strs = append(strs, r.EventID)
+	}
+	return "[" + strings.Join(strs, " ") + "]"
 }
 
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
@@ -275,8 +280,46 @@ func (e RejectedError) Error() string { return string(e) }
 
 // RoomInfo contains metadata about a room
 type RoomInfo struct {
+	mu               sync.RWMutex
 	RoomNID          RoomNID
 	RoomVersion      gomatrixserverlib.RoomVersion
-	StateSnapshotNID StateSnapshotNID
-	IsStub           bool
+	stateSnapshotNID StateSnapshotNID
+	isStub           bool
+}
+
+func (r *RoomInfo) StateSnapshotNID() StateSnapshotNID {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.stateSnapshotNID
+}
+
+func (r *RoomInfo) IsStub() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.isStub
+}
+
+func (r *RoomInfo) SetStateSnapshotNID(nid StateSnapshotNID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stateSnapshotNID = nid
+}
+
+func (r *RoomInfo) SetIsStub(isStub bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.isStub = isStub
+}
+
+func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r2.mu.RLock()
+	defer r2.mu.RUnlock()
+
+	r.RoomNID = r2.RoomNID
+	r.RoomVersion = r2.RoomVersion
+	r.stateSnapshotNID = r2.stateSnapshotNID
+	r.isStub = r2.isStub
 }
