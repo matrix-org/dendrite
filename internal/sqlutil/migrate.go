@@ -48,9 +48,6 @@ type Migration struct {
 	Down func(ctx context.Context, txn *sql.Tx) error
 }
 
-// Gaurs the internal state of Goose from being modified by concurrent tests or goroutines
-var gooseMutex sync.Mutex
-
 // Migrator
 type Migrator struct {
 	db              *sql.DB
@@ -84,8 +81,6 @@ func (m *Migrator) AddMigrations(migrations ...Migration) {
 
 // Up executes all migrations in order they were added.
 func (m *Migrator) Up(ctx context.Context) error {
-	gooseMutex.Lock()
-	defer gooseMutex.Unlock()
 	var (
 		err             error
 		dendriteVersion = internal.VersionString()

@@ -58,7 +58,7 @@ const selectSendToDeviceMessagesSQL = `
 
 const deleteSendToDeviceMessagesSQL = `
 	DELETE FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id < $3
+	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
 `
 
 const selectMaxSendToDeviceIDSQL = "" +

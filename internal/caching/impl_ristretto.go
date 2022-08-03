@@ -35,7 +35,6 @@ const (
 	roomNIDsCache
 	roomIDsCache
 	roomEventsCache
-	roomInfosCache
 	federationPDUsCache
 	federationEDUsCache
 	spaceSummaryRoomsCache
@@ -105,12 +104,6 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			cache:  cache,
 			Prefix: eventStateKeyCache,
 			MaxAge: maxAge,
-		},
-		RoomInfos: &RistrettoCachePartition[string, *types.RoomInfo]{ // room ID -> room info
-			cache:   cache,
-			Prefix:  roomInfosCache,
-			Mutable: true,
-			MaxAge:  maxAge,
 		},
 		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{ // queue NID -> PDU
 			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{
