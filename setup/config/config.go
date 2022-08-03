@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
@@ -279,9 +280,19 @@ func (config *Dendrite) Derive() error {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
-	} else {
+	} else if !config.ClientAPI.PasswordAuthenticationDisabled {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+	}
+	if config.ClientAPI.PublicKeyAuthentication.Enabled() {
+		pkFlows := config.ClientAPI.PublicKeyAuthentication.GetPublicKeyRegistrationFlows()
+		if pkFlows != nil {
+			config.Derived.Registration.Flows = append(config.Derived.Registration.Flows, pkFlows...)
+		}
+		pkParams := config.ClientAPI.PublicKeyAuthentication.GetPublicKeyRegistrationParams()
+		if pkParams != nil {
+			config.Derived.Registration.Params = mapsutil.MapsUnion(config.Derived.Registration.Params, pkParams)
+		}
 	}
 
 	// Load application service configuration files
