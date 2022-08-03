@@ -15,25 +15,21 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-func LoadAddExpiresAt(m *sqlutil.Migrations) {
-	m.AddMigration(upAddexpiresat, downAddexpiresat)
-}
-
-func upAddexpiresat(tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER TABLE federationsender_queue_edus RENAME TO federationsender_queue_edus_old;")
+func UpAddexpiresat(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, "ALTER TABLE federationsender_queue_edus RENAME TO federationsender_queue_edus_old;")
 	if err != nil {
 		return fmt.Errorf("failed to rename table: %w", err)
 	}
 
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 CREATE TABLE IF NOT EXISTS federationsender_queue_edus (
 	edu_type TEXT NOT NULL,
 	server_name TEXT NOT NULL,
@@ -47,7 +43,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_edus_json_nid_idx
 	if err != nil {
 		return fmt.Errorf("failed to create new table: %w", err)
 	}
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 INSERT
     INTO federationsender_queue_edus (
         edu_type, server_name, json_nid, expires_at
@@ -56,15 +52,15 @@ INSERT
 	if err != nil {
 		return fmt.Errorf("failed to update queue_edus: %w", err)
 	}
-	_, err = tx.Exec("UPDATE federationsender_queue_edus SET expires_at = $1", gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour*24)))
+	_, err = tx.ExecContext(ctx, "UPDATE federationsender_queue_edus SET expires_at = $1", gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour*24)))
 	if err != nil {
 		return fmt.Errorf("failed to update queue_edus: %w", err)
 	}
 	return nil
 }
 
-func downAddexpiresat(tx *sql.Tx) error {
-	_, err := tx.Exec("ALTER TABLE federationsender_queue_edus DROP COLUMN expires_at;")
+func DownAddexpiresat(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, "ALTER TABLE federationsender_queue_edus DROP COLUMN expires_at;")
 	if err != nil {
 		return fmt.Errorf("failed to rename table: %w", err)
 	}

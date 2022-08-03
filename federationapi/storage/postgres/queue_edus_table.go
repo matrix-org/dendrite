@@ -19,6 +19,7 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/federationapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -90,7 +91,22 @@ func NewPostgresQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 		db: db,
 	}
 	_, err = s.db.Exec(queueEDUsSchema)
-	return s, err
+	if err != nil {
+		return s, err
+	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "federationapi: add expiresat column",
+			Up:      deltas.UpAddexpiresat,
+		},
+	)
+	if err := m.Up(context.Background()); err != nil {
+		return s, err
+	}
+
+	return s, nil
 }
 
 func (s *queueEDUsStatements) Prepare() error {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -91,7 +92,22 @@ func NewSQLiteQueueEDUsTable(db *sql.DB) (s *queueEDUsStatements, err error) {
 		db: db,
 	}
 	_, err = db.Exec(queueEDUsSchema)
-	return s, err
+	if err != nil {
+		return s, err
+	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "federationapi: add expiresat column",
+			Up:      deltas.UpAddexpiresat,
+		},
+	)
+	if err := m.Up(context.Background()); err != nil {
+		return s, err
+	}
+
+	return s, nil
 }
 
 func (s *queueEDUsStatements) Prepare() error {
