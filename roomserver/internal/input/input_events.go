@@ -300,13 +300,14 @@ func (r *Inputer) processRoomEvent(
 	// bother doing this if the event was already rejected as it just ends up
 	// burning CPU time.
 	historyVisibility := gomatrixserverlib.HistoryVisibilityJoined // Default to restrictive.
-	if rejectionErr == nil && !isRejected && !softfail {
+	if !isCreateEvent && rejectionErr == nil && !isRejected && !softfail {
 		var err error
 		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
 		if err != nil {
 			return fmt.Errorf("r.processStateBefore: %w", err)
 		}
 		if rejectionErr != nil {
+			rejectionErr = fmt.Errorf("rejected by state before event: %w", rejectionErr)
 			isRejected = true
 		}
 	}
