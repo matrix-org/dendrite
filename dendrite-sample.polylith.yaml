@@ -195,7 +195,7 @@ client_api:
   # and appservice users are exempt from rate limiting by default.
   rate_limiting:
     enabled: true
-    threshold: 5
+    threshold: 20
     cooloff_ms: 500
     exempt_user_ids:
     #  - "@user:domain.com"
