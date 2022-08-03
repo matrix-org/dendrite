@@ -430,28 +430,23 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 	for result := range resultCh {
 		for userID, nest := range result.DeviceKeys {
-			respMu.Lock()
 			res.DeviceKeys[userID] = make(map[string]json.RawMessage)
-			respMu.Unlock()
 			for deviceID, deviceKey := range nest {
 				keyJSON, err := json.Marshal(deviceKey)
 				if err != nil {
 					continue
 				}
-				respMu.Lock()
 				res.DeviceKeys[userID][deviceID] = keyJSON
-				respMu.Unlock()
 			}
 		}
 
-		respMu.Lock()
 		for userID, body := range result.MasterKeys {
 			res.MasterKeys[userID] = body
 		}
+
 		for userID, body := range result.SelfSigningKeys {
 			res.SelfSigningKeys[userID] = body
 		}
-		respMu.Unlock()
 
 		// TODO: do we want to persist these somewhere now
 		// that we have fetched them?
@@ -525,10 +520,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 		resultCh <- &queryKeysResp
 		return
 	}
-
 	respMu.Lock()
-	defer respMu.Unlock()
-
 	res.Failures[serverName] = map[string]interface{}{
 		"message": err.Error(),
 	}
@@ -545,6 +537,8 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	if len(res.DeviceKeys) > 0 {
 		delete(res.Failures, serverName)
 	}
+	respMu.Unlock()
+
 }
 
 func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
