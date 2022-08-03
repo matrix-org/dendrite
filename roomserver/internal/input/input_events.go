@@ -341,7 +341,7 @@ func (r *Inputer) processRoomEvent(
 	if err != nil {
 		return fmt.Errorf("updater.RoomInfo: %w", err)
 	}
-	if roomInfo == nil || (!isCreateEvent && roomInfo.IsStub()) {
+	if roomInfo == nil {
 		return fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
 	}
 
