@@ -60,8 +60,9 @@ import (
 // per-room durable consumers will only progress through the stream
 // as events are processed.
 //
-//       A BC *  -> positions of each consumer (* = ephemeral)
-//       ⌄ ⌄⌄ ⌄
+//	A BC *  -> positions of each consumer (* = ephemeral)
+//	⌄ ⌄⌄ ⌄
+//
 // ABAABCAABCAA  -> newest (letter = subject for each message)
 //
 // In this example, A is still processing an event but has two

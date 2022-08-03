@@ -178,7 +178,7 @@ func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*t
 	}
 	// Otherwise, try to admit the data into the cache and return the
 	// new reference from the database.
-	if roomInfoFromDB != nil {
+	if err == nil && roomInfoFromDB != nil {
 		d.Cache.StoreRoomInfo(roomID, roomInfoFromDB)
 		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
 	}
@@ -840,8 +840,9 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 // "servers should not apply or send redactions to clients until both the redaction event and original event have been seen, and are valid."
 // https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
 // These cases are:
-//  - This is a redaction event, redact the event it references if we know about it.
-//  - This is a normal event which may have been previously redacted.
+//   - This is a redaction event, redact the event it references if we know about it.
+//   - This is a normal event which may have been previously redacted.
+//
 // In the first case, check if we have the referenced event then apply the redaction, else store it
 // in the redactions table with validated=FALSE. In the second case, check if there is a redaction for it:
 // if there is then apply the redactions and set validated=TRUE.
