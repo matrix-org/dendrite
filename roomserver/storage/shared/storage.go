@@ -156,30 +156,15 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	roomInfo, ok := d.Cache.GetRoomInfo(roomID)
-	if ok && roomInfo != nil && !roomInfo.IsStub() {
-		// The data that's in the cache is not stubby, so return it.
-		return roomInfo, nil
-	}
-	// At this point we either don't have an entry in the cache, or
-	// it is stubby, so let's check the roomserver_rooms table again.
-	roomInfoFromDB, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
+	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
 	if err != nil {
 		return nil, err
 	}
-	// If we have a stubby cache entry already, update it and return
-	// the reference to the cache entry.
 	if roomInfo != nil {
-		roomInfo.CopyFrom(roomInfoFromDB)
-		return roomInfo, nil
+		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
+		d.Cache.StoreRoomVersion(roomID, roomInfo.RoomVersion)
 	}
-	// Otherwise, try to admit the data into the cache and return the
-	// new reference from the database.
-	if roomInfoFromDB != nil {
-		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, roomInfoFromDB)
-	}
-	return roomInfoFromDB, err
+	return roomInfo, err
 }
 
 func (d *Database) AddState(
@@ -504,8 +489,8 @@ func (d *Database) events(
 	fetchNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
 	for n := range uniqueRoomNIDs {
 		if roomID, ok := d.Cache.GetRoomServerRoomID(n); ok {
-			if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-				roomVersions[n] = roomInfo.RoomVersion
+			if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
+				roomVersions[n] = roomVersion
 				continue
 			}
 		}
@@ -762,9 +747,6 @@ func (d *Database) MissingAuthPrevEvents(
 func (d *Database) assignRoomNID(
 	ctx context.Context, roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-		return roomInfo.RoomNID, nil
-	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
 	if err == sql.ErrNoRows {
@@ -837,8 +819,9 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 // "servers should not apply or send redactions to clients until both the redaction event and original event have been seen, and are valid."
 // https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
 // These cases are:
-//  - This is a redaction event, redact the event it references if we know about it.
-//  - This is a normal event which may have been previously redacted.
+//   - This is a redaction event, redact the event it references if we know about it.
+//   - This is a normal event which may have been previously redacted.
+//
 // In the first case, check if we have the referenced event then apply the redaction, else store it
 // in the redactions table with validated=FALSE. In the second case, check if there is a redaction for it:
 // if there is then apply the redactions and set validated=TRUE.
