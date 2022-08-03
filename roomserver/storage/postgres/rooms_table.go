@@ -155,8 +155,7 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	info.SetStateSnapshotNID(stateSnapshotNID)
-	info.SetIsStub(len(latestNIDs) == 0)
+	info.Update(stateSnapshotNID, len(latestNIDs) == 0)
 	return &info, err
 }
 

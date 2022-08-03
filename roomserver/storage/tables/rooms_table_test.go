@@ -67,7 +67,7 @@ func TestRoomsTable(t *testing.T) {
 			RoomNID:     wantRoomNID,
 			RoomVersion: room.Version,
 		}
-		expected.SetIsStub(true) // there are no latestEventNIDs
+		expected.Update(0, true) // there are no latestEventNIDs
 		assert.Equal(t, expected, roomInfo)
 
 		roomInfo, err = tab.SelectRoomInfo(ctx, nil, "!doesnotexist:localhost")
@@ -107,7 +107,7 @@ func TestRoomsTable(t *testing.T) {
 			RoomNID:     wantRoomNID,
 			RoomVersion: room.Version,
 		}
-		expected.SetStateSnapshotNID(1)
+		expected.Update(1, false)
 		assert.Equal(t, expected, roomInfo)
 
 		eventNIDs, snapshotNID, err := tab.SelectLatestEventNIDs(ctx, nil, wantRoomNID)

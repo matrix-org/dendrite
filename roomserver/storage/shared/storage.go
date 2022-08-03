@@ -170,14 +170,17 @@ func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*t
 	// If we have a stubby cache entry already, update it and return
 	// the reference to the cache entry.
 	if roomInfo != nil {
-		roomInfo.CopyFrom(roomInfoFromDB)
+		roomInfo.Update(
+			roomInfoFromDB.StateSnapshotNID(),
+			roomInfoFromDB.IsStub(),
+		)
 		return roomInfo, nil
 	}
 	// Otherwise, try to admit the data into the cache and return the
 	// new reference from the database.
 	if roomInfoFromDB != nil {
-		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
 		d.Cache.StoreRoomInfo(roomID, roomInfoFromDB)
+		d.Cache.StoreRoomServerRoomID(roomInfoFromDB.RoomNID, roomID)
 	}
 	return roomInfoFromDB, err
 }

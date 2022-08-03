@@ -176,10 +176,6 @@ func (u *RoomUpdater) EventStateKeyNIDs(
 	return u.d.eventStateKeyNIDs(ctx, u.txn, eventStateKeys)
 }
 
-func (u *RoomUpdater) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo, error) {
-	return u.d.roomInfo(ctx, u.txn, roomID)
-}
-
 func (u *RoomUpdater) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {
@@ -237,10 +233,7 @@ func (u *RoomUpdater) SetLatestEvents(
 		// Since it's entirely possible that this types.RoomInfo came from the
 		// cache, we should make sure to update that entry so that the next run
 		// works from live data.
-		if u.roomInfo != nil {
-			u.roomInfo.SetStateSnapshotNID(currentStateSnapshotNID)
-			u.roomInfo.SetIsStub(false)
-		}
+		u.roomInfo.Update(currentStateSnapshotNID, len(eventNIDs) == 0)
 		return nil
 	})
 }

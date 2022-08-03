@@ -144,8 +144,7 @@ func (s *roomStatements) SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID
 	if err = json.Unmarshal([]byte(latestNIDsJSON), &latestNIDs); err != nil {
 		return nil, err
 	}
-	info.SetStateSnapshotNID(stateSnapshotNID)
-	info.SetIsStub(len(latestNIDs) == 0)
+	info.Update(stateSnapshotNID, len(latestNIDs) == 0)
 	return &info, err
 }
 
