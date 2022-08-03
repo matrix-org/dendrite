@@ -326,8 +326,10 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 		return respState, true, nil
 	}
 
+	logrus.WithContext(ctx).Warnf("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
 	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
+		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up state before event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
 	}
 
@@ -339,6 +341,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	case nil:
 		// do nothing
 	default:
+		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
 	h = t.cacheAndReturn(h)
@@ -662,9 +665,22 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 	util.GetLogger(ctx).WithField("room_id", roomID).Infof("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
-	stateIDs, err := t.federation.LookupStateIDs(ctx, t.origin, roomID, eventID)
+	var stateIDs gomatrixserverlib.RespStateIDs
+	var err error
+	count := 0
+	totalctx, totalcancel := context.WithTimeout(ctx, time.Minute*5)
+	for _, serverName := range t.servers {
+		reqctx, reqcancel := context.WithTimeout(totalctx, time.Second*20)
+		stateIDs, err = t.federation.LookupStateIDs(reqctx, serverName, roomID, eventID)
+		reqcancel()
+		if err == nil {
+			break
+		}
+		count++
+	}
+	totalcancel()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("t.federation.LookupStateIDs tried %d server(s), last error: %w", count, err)
 	}
 	// work out which auth/state IDs are missing
 	wantIDs := append(stateIDs.StateEventIDs, stateIDs.AuthEventIDs...)
