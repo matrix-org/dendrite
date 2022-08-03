@@ -229,11 +229,6 @@ func (u *RoomUpdater) SetLatestEvents(
 		if err := u.d.RoomsTable.UpdateLatestEventNIDs(u.ctx, txn, roomNID, eventNIDs, lastEventNIDSent, currentStateSnapshotNID); err != nil {
 			return fmt.Errorf("u.d.RoomsTable.updateLatestEventNIDs: %w", err)
 		}
-
-		// Since it's entirely possible that this types.RoomInfo came from the
-		// cache, we should make sure to update that entry so that the next run
-		// works from live data.
-		u.roomInfo.Update(currentStateSnapshotNID, len(eventNIDs) == 0)
 		return nil
 	})
 }

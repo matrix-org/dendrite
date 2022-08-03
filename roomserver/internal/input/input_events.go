@@ -233,7 +233,7 @@ func (r *Inputer) processRoomEvent(
 		var err error
 		softfail, err = helpers.CheckForSoftFail(ctx, roomInfo, r.DB, headered, input.StateEventIDs)
 		if err != nil {
-			logger.WithError(err).Warnf("Event %s rejected by current room state", event.EventID())
+			logger.WithError(err).Warnf("Event %s rejected by current room state (roominfo %+v)", event.EventID(), roomInfo)
 			rejectionErr = fmt.Errorf("rejected by current room state: %w", err)
 		}
 	}
@@ -337,10 +337,12 @@ func (r *Inputer) processRoomEvent(
 
 	// Request the room info again — it's possible that the room has been
 	// created by now if it didn't exist already.
+	logrus.Printf("Room info before: %+v", roomInfo)
 	roomInfo, err = r.DB.RoomInfo(ctx, event.RoomID())
 	if err != nil {
 		return fmt.Errorf("updater.RoomInfo: %w", err)
 	}
+	logrus.Printf("Room info after: %+v", roomInfo)
 	if roomInfo == nil {
 		return fmt.Errorf("updater.RoomInfo missing for room %s", event.RoomID())
 	}

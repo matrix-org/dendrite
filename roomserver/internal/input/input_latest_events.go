@@ -86,6 +86,15 @@ func (r *Inputer) updateLatestEvents(
 		return fmt.Errorf("u.doUpdateLatestEvents: %w", err)
 	}
 
+	// Since it's entirely possible that this types.RoomInfo came from the
+	// cache, we should make sure to update that entry so that the next run
+	// works from live data.
+	defer func() {
+		if succeeded {
+			u.roomInfo.Update(u.newStateNID, len(u.latest) == 0)
+		}
+	}()
+
 	succeeded = true
 	return
 }
