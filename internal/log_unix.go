@@ -20,7 +20,6 @@ package internal
 import (
 	"log/syslog"
 
-	"github.com/MFAshby/stdemuxerhook"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
@@ -70,10 +69,6 @@ func checkSyslogHookParams(params map[string]interface{}) {
 		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
 	}
 
-}
-
-func setupStdLogHook(level logrus.Level) {
-	logrus.AddHook(&logLevelHook{level, stdemuxerhook.New(logrus.StandardLogger())})
 }
 
 func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {

@@ -157,15 +157,17 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	existingPresence, ok := rp.Presence.LoadOrStore(userID, newPresence)
 	if ok {
 		p := existingPresence.(types.PresenceInternal)
-		if dbPresence != nil && p.Presence == newPresence.Presence && newPresence.LastActiveTS-dbPresence.LastActiveTS < types.PresenceNoOpMs {
-			return
-		}
-		if dbPresence.Presence == types.PresenceOnline && presenceID == types.PresenceOnline && newPresence.LastActiveTS-dbPresence.LastActiveTS >= types.PresenceNoOpMs {
-			err := db.UpdateLastActive(context.Background(), userID, uint64(newPresence.LastActiveTS))
-			if err != nil {
-				logrus.WithError(err).Error("failed to update last active")
+		if dbPresence != nil {
+			if p.Presence == newPresence.Presence && newPresence.LastActiveTS-dbPresence.LastActiveTS < types.PresenceNoOpMs {
+				return
 			}
-			return
+			if dbPresence.Presence == types.PresenceOnline && presenceID == types.PresenceOnline && newPresence.LastActiveTS-dbPresence.LastActiveTS >= types.PresenceNoOpMs {
+				err := db.UpdateLastActive(context.Background(), userID, uint64(newPresence.LastActiveTS))
+				if err != nil {
+					logrus.WithError(err).Error("failed to update last active")
+				}
+				return
+			}
 		}
 	}
 
