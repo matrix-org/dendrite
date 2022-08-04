@@ -721,6 +721,3 @@ Joining room twice is idempotent
 Inbound federation can return missing events for shared visibility
 Inbound federation ignores redactions from invalid servers room > v3
 Newly joined room includes presence in incremental sync
-Messages that notify from another user increment notification_count
-Messages that highlight from another user increment unread highlight count
-Notifications can be viewed with GET /notifications
