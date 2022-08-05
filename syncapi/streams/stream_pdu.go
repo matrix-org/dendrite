@@ -104,12 +104,12 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
-	// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
+	// InvalidateLazyLoadedUser the lazyLoadCache, otherwise we end up with missing displaynames/avatars
 	// TODO: This might be inefficient, when joined to many and/or large rooms.
 	for _, roomID := range joinedRoomIDs {
 		joinedUsers := p.notifier.JoinedUsers(roomID)
 		for _, sharedUser := range joinedUsers {
-			p.lazyLoadCache.Invalidate(req.Device, roomID, sharedUser)
+			p.lazyLoadCache.InvalidateLazyLoadedUser(req.Device, roomID, sharedUser)
 		}
 	}
 
