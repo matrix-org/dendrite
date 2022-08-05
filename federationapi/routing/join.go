@@ -21,13 +21,14 @@ import (
 	"sort"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // MakeJoin implements the /make_join API
@@ -435,13 +436,13 @@ func SendJoin(
 // a restricted room join. If the room version does not support restricted
 // joins then this function returns with no side effects. This returns three
 // values:
-// * an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
-//   should always be sent back to the client if one is specified
-// * a user ID of an authorising user, typically a user that has power to
-//   issue invites in the room, if one has been found
-// * an error if there was a problem finding out if this was allowable,
-//   like if the room version isn't known or a problem happened talking to
-//   the roomserver
+//   - an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
+//     should always be sent back to the client if one is specified
+//   - a user ID of an authorising user, typically a user that has power to
+//     issue invites in the room, if one has been found
+//   - an error if there was a problem finding out if this was allowable,
+//     like if the room version isn't known or a problem happened talking to
+//     the roomserver
 func checkRestrictedJoin(
 	httpReq *http.Request,
 	rsAPI api.FederationRoomserverAPI,
