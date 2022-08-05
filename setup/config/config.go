@@ -19,8 +19,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -192,7 +192,7 @@ type ConfigErrors []string
 // Load a yaml config file for a server run as multiple processes or as a monolith.
 // Checks the config to ensure that it is valid.
 func Load(configPath string, monolith bool) (*Dendrite, error) {
-	configData, err := ioutil.ReadFile(configPath)
+	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +200,9 @@ func Load(configPath string, monolith bool) (*Dendrite, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Pass the current working directory and ioutil.ReadFile so that they can
+	// Pass the current working directory and os.ReadFile so that they can
 	// be mocked in the tests
-	return loadConfig(basePath, configData, ioutil.ReadFile, monolith)
+	return loadConfig(basePath, configData, os.ReadFile, monolith)
 }
 
 func loadConfig(
@@ -541,7 +541,7 @@ func (config *Dendrite) KeyServerURL() string {
 // SetupTracing configures the opentracing using the supplied configuration.
 func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err error) {
 	if !config.Tracing.Enabled {
-		return ioutil.NopCloser(bytes.NewReader([]byte{})), nil
+		return io.NopCloser(bytes.NewReader([]byte{})), nil
 	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
 		serviceName,

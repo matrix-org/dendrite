@@ -19,7 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -388,7 +388,7 @@ func validateRecaptcha(
 
 	// Grab the body of the response from the captcha server
 	var r recaptchaResponse
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusGatewayTimeout,
@@ -556,7 +556,7 @@ func Register(
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	defer req.Body.Close() // nolint: errcheck
-	reqBody, err := ioutil.ReadAll(req.Body)
+	reqBody, err := io.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
