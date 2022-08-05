@@ -22,12 +22,13 @@ import (
 	"sync"
 	"time"
 
-	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
 var (
@@ -66,12 +67,14 @@ func init() {
 //   - We don't have unbounded growth in proportion to the number of servers (this is more important in a P2P world where
 //     we have many many servers)
 //   - We can adjust concurrency (at the cost of memory usage) by tuning N, to accommodate mobile devices vs servers.
+//
 // The downsides are that:
 //   - Query requests can get queued behind other servers if they hash to the same worker, even if there are other free
 //     workers elsewhere. Whilst suboptimal, provided we cap how long a single request can last (e.g using context timeouts)
 //     we guarantee we will get around to it. Also, more users on a given server does not increase the number of requests
 //     (as /keys/query allows multiple users to be specified) so being stuck behind matrix.org won't materially be any worse
 //     than being stuck behind foo.bar
+//
 // In the event that the query fails, a lock is acquired and the server name along with the time to wait before retrying is
 // set in a map. A restarter goroutine periodically probes this map and injects servers which are ready to be retried.
 type DeviceListUpdater struct {

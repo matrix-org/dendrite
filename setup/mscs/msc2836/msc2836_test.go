@@ -33,15 +33,17 @@ var (
 )
 
 // Basic sanity check of MSC2836 logic. Injects a thread that looks like:
-//	 A
-//   |
-//   B
-//  / \
-// C   D
-//    /|\
-//   E F G
-//   |
-//   H
+//
+//	  A
+//	  |
+//	  B
+//	 / \
+//	C   D
+//	   /|\
+//	  E F G
+//	  |
+//	  H
+//
 // And makes sure POST /event_relationships works with various parameters
 func TestMSC2836(t *testing.T) {
 	alice := "@alice:localhost"
