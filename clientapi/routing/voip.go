@@ -30,7 +30,8 @@ import (
 )
 
 // RequestTurnServer implements:
-//     GET /voip/turnServer
+//
+//	GET /voip/turnServer
 func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.ClientAPI) util.JSONResponse {
 	turnConfig := cfg.TURN
 

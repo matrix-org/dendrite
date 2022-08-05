@@ -364,13 +364,14 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 
 // tests that joining/leaving the SAME room puts users in `left` if the final state is leave.
 // NB: Consider the case:
-// - Alice and Bob are in a room.
-// - Alice goes offline, Charlie joins, sends encrypted messages then leaves the room.
-// - Alice comes back online. Technically nothing has changed in the set of users between those two points in time,
-//   it's still just (Alice,Bob) but then we won't be tracking Charlie -- is this okay though? It's device keys
-//   which are only relevant when actively sending events I think? And if Alice does need the keys she knows
-//   charlie's (user_id, device_id) so can just hit /keys/query - no need to keep updated about it because she
-//   doesn't share any rooms with him.
+//   - Alice and Bob are in a room.
+//   - Alice goes offline, Charlie joins, sends encrypted messages then leaves the room.
+//   - Alice comes back online. Technically nothing has changed in the set of users between those two points in time,
+//     it's still just (Alice,Bob) but then we won't be tracking Charlie -- is this okay though? It's device keys
+//     which are only relevant when actively sending events I think? And if Alice does need the keys she knows
+//     charlie's (user_id, device_id) so can just hit /keys/query - no need to keep updated about it because she
+//     doesn't share any rooms with him.
+//
 // Ergo, we put them in `left` as it is simpler.
 func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	newShareUser := "@berta:localhost"

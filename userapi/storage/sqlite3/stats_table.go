@@ -297,7 +297,9 @@ func (s *statsStatements) monthlyUsers(ctx context.Context, txn *sql.Tx) (result
 	return
 }
 
-/* R30Users counts the number of 30 day retained users, defined as:
+/*
+	R30Users counts the number of 30 day retained users, defined as:
+
 - Users who have created their accounts more than 30 days ago
 - Where last seen at most 30 days ago
 - Where account creation and last_seen are > 30 days apart
@@ -334,7 +336,9 @@ func (s *statsStatements) r30Users(ctx context.Context, txn *sql.Tx) (map[string
 	return result, rows.Err()
 }
 
-/* R30UsersV2 counts the number of 30 day retained users, defined as users that:
+/*
+	R30UsersV2 counts the number of 30 day retained users, defined as users that:
+
 - Appear more than once in the past 60 days
 - Have more than 30 days between the most and least recent appearances that occurred in the past 60 days.
 */
