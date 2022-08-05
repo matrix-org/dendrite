@@ -17,7 +17,7 @@ package routing
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -101,9 +101,9 @@ func SaveAccountData(
 		}
 	}
 
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("ioutil.ReadAll failed")
+		util.GetLogger(req.Context()).WithError(err).Error("io.ReadAll failed")
 		return jsonerror.InternalServerError()
 	}
 

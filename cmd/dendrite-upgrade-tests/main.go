@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -128,7 +128,7 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 		return nil, err
 	}
 	// add top level Dockerfile
-	err = ioutil.WriteFile(path.Join(tmpDir, "Dockerfile"), dockerfile, os.ModePerm)
+	err = os.WriteFile(path.Join(tmpDir, "Dockerfile"), dockerfile, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject /Dockerfile: %w", err)
 	}
@@ -150,7 +150,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 	if branchOrTagName == HEAD && *flagHead != "" {
 		log.Printf("%s: Using %s as HEAD", branchOrTagName, *flagHead)
 		// add top level Dockerfile
-		err = ioutil.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
+		err = os.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
 		if err != nil {
 			return "", fmt.Errorf("custom HEAD: failed to inject /Dockerfile: %w", err)
 		}
@@ -388,7 +388,7 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 		})
 		// ignore errors when cannot get logs, it's just for debugging anyways
 		if err == nil {
-			logbody, err := ioutil.ReadAll(logs)
+			logbody, err := io.ReadAll(logs)
 			if err == nil {
 				log.Printf("Container logs:\n\n%s\n\n", string(logbody))
 			}
