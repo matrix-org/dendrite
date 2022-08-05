@@ -14,10 +14,13 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"go.uber.org/atomic"
+
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 )
 
 // The max number of per-room goroutines to have running.
@@ -37,6 +40,7 @@ type PDUStreamProvider struct {
 	// userID+deviceID -> lazy loading cache
 	lazyLoadCache caching.LazyLoadCache
 	rsAPI         roomserverAPI.SyncRoomserverAPI
+	notifier      *notifier.Notifier
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -101,6 +105,15 @@ func (p *PDUStreamProvider) CompleteSync(
 
 	if err = p.addIgnoredUsersToFilter(ctx, req, &eventFilter); err != nil {
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
+	}
+
+	// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
+	// TODO: This might be inefficient, when joined to many and/or large rooms.
+	for _, roomID := range joinedRoomIDs {
+		joinedUsers := p.notifier.JoinedUsers(roomID)
+		for _, sharedUser := range joinedUsers {
+			p.lazyLoadCache.InvalidateLazyLoadedUser(req.Device, roomID, sharedUser)
+		}
 	}
 
 	// Build up a /sync response. Add joined rooms.

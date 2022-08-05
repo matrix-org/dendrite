@@ -34,6 +34,7 @@ func NewSyncStreamProviders(
 			StreamProvider: StreamProvider{DB: d},
 			lazyLoadCache:  lazyLoadCache,
 			rsAPI:          rsAPI,
+			notifier:       notifier,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
 			StreamProvider: StreamProvider{DB: d},

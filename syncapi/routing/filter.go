@@ -16,16 +16,17 @@ package routing
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 )
 
 // GetFilter implements GET /_matrix/client/r0/user/{userId}/filter/{filterId}
@@ -65,7 +66,9 @@ type filterResponse struct {
 	FilterID string `json:"filter_id"`
 }
 
-//PutFilter implements POST /_matrix/client/r0/user/{userId}/filter
+// PutFilter implements
+//
+//	POST /_matrix/client/r0/user/{userId}/filter
 func PutFilter(
 	req *http.Request, device *api.Device, syncDB storage.Database, userID string,
 ) util.JSONResponse {
@@ -85,7 +88,7 @@ func PutFilter(
 	var filter gomatrixserverlib.Filter
 
 	defer req.Body.Close() // nolint:errcheck
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

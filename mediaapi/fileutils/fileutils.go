@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -180,7 +179,7 @@ func createTempDir(baseDirectory config.Path) (types.Path, error) {
 	if err := os.MkdirAll(baseTmpDir, 0770); err != nil {
 		return "", fmt.Errorf("failed to create base temp dir: %w", err)
 	}
-	tmpDir, err := ioutil.TempDir(baseTmpDir, "")
+	tmpDir, err := os.MkdirTemp(baseTmpDir, "")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}

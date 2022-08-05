@@ -97,7 +97,7 @@ func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	notificationData, err := NewSqliteNotificationDataTable(d.db)
+	notificationData, err := NewSqliteNotificationDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
