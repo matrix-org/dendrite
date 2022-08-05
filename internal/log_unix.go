@@ -18,10 +18,8 @@
 package internal
 
 import (
-	"io/ioutil"
 	"log/syslog"
 
-	"github.com/MFAshby/stdemuxerhook"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
@@ -31,18 +29,11 @@ import (
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
 func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
-	stdLogAdded := false
 	for _, hook := range hooks {
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)
 		if err != nil {
 			logrus.Fatalf("Unrecognised logging level %s: %q", hook.Level, err)
-		}
-
-		// Perform a first filter on the logs according to the lowest level of all
-		// (Eg: If we have hook for info and above, prevent logrus from processing debug logs)
-		if logrus.GetLevel() < level {
-			logrus.SetLevel(level)
 		}
 
 		switch hook.Type {
@@ -53,17 +44,10 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 			checkSyslogHookParams(hook.Params)
 			setupSyslogHook(hook, level, componentName)
 		case "std":
-			setupStdLogHook(level)
-			stdLogAdded = true
 		default:
 			logrus.Fatalf("Unrecognised logging hook type: %s", hook.Type)
 		}
 	}
-	if !stdLogAdded {
-		setupStdLogHook(logrus.InfoLevel)
-	}
-	// Hooks are now configured for stdout/err, so throw away the default logger output
-	logrus.SetOutput(ioutil.Discard)
 }
 
 func checkSyslogHookParams(params map[string]interface{}) {
@@ -85,10 +69,6 @@ func checkSyslogHookParams(params map[string]interface{}) {
 		logrus.Fatalf("Parameter \"protocol\" for logging hook of type \"syslog\" should be a string")
 	}
 
-}
-
-func setupStdLogHook(level logrus.Level) {
-	logrus.AddHook(&logLevelHook{level, stdemuxerhook.New(logrus.StandardLogger())})
 }
 
 func setupSyslogHook(hook config.LogrusHook, level logrus.Level, componentName string) {

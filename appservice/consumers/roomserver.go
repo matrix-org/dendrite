@@ -39,7 +39,7 @@ type OutputRoomEventConsumer struct {
 	asDB         storage.Database
 	rsAPI        api.AppserviceRoomserverAPI
 	serverName   string
-	workerStates []types.ApplicationServiceWorkerState
+	workerStates []*types.ApplicationServiceWorkerState
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
@@ -50,7 +50,7 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	appserviceDB storage.Database,
 	rsAPI api.AppserviceRoomserverAPI,
-	workerStates []types.ApplicationServiceWorkerState,
+	workerStates []*types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
@@ -140,13 +140,13 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 			// Check if this event is interesting to this application service
 			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
 				// Queue this event to be sent off to the application service
-				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
-					log.WithError(err).Warn("failed to insert incoming event into appservices database")
+				if id, err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
+					log.WithError(err).Warnf("failed to insert incoming event into appservices database. id: %d", id)
 					return err
 				} else {
 					// Tell our worker to send out new messages by updating remaining message
 					// count and waking them up with a broadcast
-					ws.NotifyNewEvents()
+					ws.NotifyNewEvents(id)
 				}
 			}
 		}

@@ -207,7 +207,6 @@ Deleted tags appear in an incremental v2 /sync
 /event/ on non world readable room does not work
 Outbound federation can query profile data
 /event/ on joined room works
-/event/ does not allow access to events before the user joined
 Federation key API allows unsigned requests for keys
 GET /publicRooms lists rooms
 GET /publicRooms includes avatar URLs
@@ -721,3 +720,4 @@ Joining room twice is idempotent
 Inbound federation can return missing events for shared visibility
 Inbound federation ignores redactions from invalid servers room > v3
 Newly joined room includes presence in incremental sync
+Existing members see new member's presence

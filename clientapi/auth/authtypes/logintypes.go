@@ -11,4 +11,6 @@ const (
 	LoginTypeRecaptcha          = "m.login.recaptcha"
 	LoginTypeApplicationService = "m.login.application_service"
 	LoginTypeToken              = "m.login.token"
+	LoginTypeJwt                = "org.matrix.login.jwt"
+	LoginTypeEmail              = "m.login.email.identity"
 )

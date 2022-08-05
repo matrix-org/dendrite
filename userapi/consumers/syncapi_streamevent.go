@@ -529,7 +529,9 @@ func (s *OutputStreamEventConsumer) notifyHTTP(ctx context.Context, event *gomat
 	case "event_id_only":
 		req = pushgateway.NotifyRequest{
 			Notification: pushgateway.Notification{
-				Counts:  &pushgateway.Counts{},
+				Counts: &pushgateway.Counts{
+					Unread: userNumUnreadNotifs,
+				},
 				Devices: devices,
 				EventID: event.EventID(),
 				RoomID:  event.RoomID(),

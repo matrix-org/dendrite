@@ -105,12 +105,6 @@ func SetAvatarURL(
 	if resErr := httputil.UnmarshalJSONRequest(req, &r); resErr != nil {
 		return *resErr
 	}
-	if r.AvatarURL == "" {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("'avatar_url' must be supplied."),
-		}
-	}
 
 	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

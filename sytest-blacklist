@@ -53,3 +53,7 @@ Guest users can join guest_access rooms
 # You'll be shocked to discover this is flakey too
 
 Inbound /v1/send_join rejects joins from other servers
+
+# For notifications extension on iOS
+
+/event/ does not allow access to events before the user joined
