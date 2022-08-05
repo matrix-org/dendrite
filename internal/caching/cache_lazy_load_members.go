@@ -14,6 +14,7 @@ type lazyLoadingCacheKey struct {
 type LazyLoadCache interface {
 	StoreLazyLoadedUser(device *userapi.Device, roomID, userID, eventID string)
 	IsLazyLoadedUserCached(device *userapi.Device, roomID, userID string) (string, bool)
+	Invalidate(device *userapi.Device, roomID, userID string)
 }
 
 func (c Caches) StoreLazyLoadedUser(device *userapi.Device, roomID, userID, eventID string) {
@@ -27,6 +28,15 @@ func (c Caches) StoreLazyLoadedUser(device *userapi.Device, roomID, userID, even
 
 func (c Caches) IsLazyLoadedUserCached(device *userapi.Device, roomID, userID string) (string, bool) {
 	return c.LazyLoading.Get(lazyLoadingCacheKey{
+		UserID:       device.UserID,
+		DeviceID:     device.ID,
+		RoomID:       roomID,
+		TargetUserID: userID,
+	})
+}
+
+func (c Caches) Invalidate(device *userapi.Device, roomID, userID string) {
+	c.LazyLoading.Unset(lazyLoadingCacheKey{
 		UserID:       device.UserID,
 		DeviceID:     device.ID,
 		RoomID:       roomID,
