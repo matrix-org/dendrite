@@ -6,13 +6,12 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 var (
