@@ -178,7 +178,9 @@ type StrippedEvent struct {
 }
 
 // ExtractContentValue from the given state event. For example, given an m.room.name event with:
-//    content: { name: "Foo" }
+//
+//	content: { name: "Foo" }
+//
 // this returns "Foo".
 func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 	content := ev.Content()

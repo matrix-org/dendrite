@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18"]
+        go: ["1.18", "1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18"]
+        go: ["1.18", "1.19"]
         goos: ["linux"]
         goarch: ["amd64"]
     steps:
@@ -106,6 +106,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 1
+          CGO_CFLAGS: -fno-stack-protector
         run: go build -trimpath -v -o "bin/" ./cmd/...
 
   # Dummy step to gate other tests on without repeating the whole list
@@ -305,7 +306,14 @@ jobs:
 
   integration-tests-done:
     name: Integration tests passed
-    needs: [initial-tests-done, upgrade_test, upgrade_test_direct, sytest, complement]
+    needs:
+      [
+        initial-tests-done,
+        upgrade_test,
+        upgrade_test_direct,
+        sytest,
+        complement,
+      ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:

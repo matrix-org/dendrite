@@ -523,7 +523,8 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 
 // joinEventsFromHistoryVisibility returns all CURRENTLY joined members if our server can read the room history
 // TODO: Long term we probably want a history_visibility table which stores eventNID | visibility_enum so we can just
-//       pull all events and then filter by that table.
+//
+//	pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
 	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry,
 	thisServer gomatrixserverlib.ServerName) ([]types.Event, error) {

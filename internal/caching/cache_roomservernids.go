@@ -7,7 +7,6 @@ import (
 type RoomServerCaches interface {
 	RoomServerNIDsCache
 	RoomVersionCache
-	RoomInfoCache
 	RoomServerEventsCache
 	EventStateKeyCache
 }

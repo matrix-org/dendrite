@@ -18,9 +18,9 @@ type user struct {
 }
 
 // runTests performs the following operations:
-//  - register alice and bob with branch name muxed into the localpart
-//  - create a DM room for the 2 users and exchange messages
-//  - create/join a public #global room and exchange messages
+//   - register alice and bob with branch name muxed into the localpart
+//   - create a DM room for the 2 users and exchange messages
+//   - create/join a public #global room and exchange messages
 func runTests(baseURL, branchName string) error {
 	// register 2 users
 	users := []user{
