@@ -38,8 +38,9 @@ type threePIDsResponse struct {
 }
 
 // RequestEmailToken implements:
-//		POST /account/3pid/email/requestToken
-//		POST /register/email/requestToken
+//
+//	POST /account/3pid/email/requestToken
+//	POST /register/email/requestToken
 func RequestEmailToken(req *http.Request, threePIDAPI api.ClientUserAPI, cfg *config.ClientAPI) util.JSONResponse {
 	var body threepid.EmailAssociationRequest
 	if reqErr := httputil.UnmarshalJSONRequest(req, &body); reqErr != nil {

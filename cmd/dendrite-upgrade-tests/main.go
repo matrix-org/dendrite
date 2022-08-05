@@ -95,7 +95,9 @@ CMD /build/run_dendrite.sh `
 const dendriteUpgradeTestLabel = "dendrite_upgrade_test"
 
 // downloadArchive downloads an arbitrary github archive of the form:
-//   https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//
+//	https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//
 // and re-tarballs it without the top-level directory which contains branch information. It inserts
 // the contents of `dockerfile` as a root file `Dockerfile` in the re-tarballed directory such that
 // you can directly feed the retarballed archive to `ImageBuild` to have it run said dockerfile.

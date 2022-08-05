@@ -298,11 +298,10 @@ func (s *statsStatements) monthlyUsers(ctx context.Context, txn *sql.Tx) (result
 	return
 }
 
-/* R30Users counts the number of 30 day retained users, defined as:
-- Users who have created their accounts more than 30 days ago
-- Where last seen at most 30 days ago
-- Where account creation and last_seen are > 30 days apart
-*/
+// R30Users counts the number of 30 day retained users, defined as:
+//   - Users who have created their accounts more than 30 days ago
+//   - Where last seen at most 30 days ago
+//   - Where account creation and last_seen are > 30 days apart
 func (s *statsStatements) r30Users(ctx context.Context, txn *sql.Tx) (map[string]int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.countR30UsersStmt)
 	lastSeenAfter := time.Now().AddDate(0, 0, -30)

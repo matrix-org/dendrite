@@ -63,6 +63,7 @@ var sendEventDuration = prometheus.NewHistogramVec(
 )
 
 // SendEvent implements:
+//
 //	/rooms/{roomID}/send/{eventType}
 //	/rooms/{roomID}/send/{eventType}/{txnID}
 //	/rooms/{roomID}/state/{eventType}/{stateKey}

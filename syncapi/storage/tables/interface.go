@@ -123,12 +123,14 @@ type CurrentRoomState interface {
 //
 // We persist the previous event IDs as well, one per row, so when we do fetch even
 // earlier events we can simply delete rows which referenced it. Consider the graph:
-//        A
-//        |   Event C has 1 prev_event ID: A.
-//    B   C
-//    |___|   Event D has 2 prev_event IDs: B and C.
-//      |
-//      D
+//
+//	    A
+//	    |   Event C has 1 prev_event ID: A.
+//	B   C
+//	|___|   Event D has 2 prev_event IDs: B and C.
+//	  |
+//	  D
+//
 // The earliest known event we have is D, so this table has 2 rows.
 // A backfill request gives us C but not B. We delete rows where prev_event=C. This
 // still means that D is a backwards extremity as we do not have event B. However, event
