@@ -21,8 +21,7 @@ As of October 2020 (current [progress below](#progress)), Dendrite has now enter
 This does not mean:
 
 - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
-- All of the CS/Federation APIs are implemented. We are tracking progress via a script called 'Are We Synapse Yet?'. In particular,
-  presence and push notifications are entirely missing from Dendrite. See [CHANGES.md](CHANGES.md) for updates.
+- Dendrite is feature-complete. There may be client or federation APIs that are not implemented.
 - Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
@@ -35,6 +34,9 @@ If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or j
 - **[#dendrite-alerts:matrix.org](https://matrix.to/#/#dendrite-alerts:matrix.org)** - Release notifications and important info, highly recommended for all Dendrite server admins
 
 ## Requirements
+
+See the [Planning your Installation](https://matrix-org.github.io/dendrite/installation/planning) page for
+more information on requirements.
 
 To build Dendrite, you will need Go 1.18 or later.
 
@@ -83,11 +85,11 @@ $ ./bin/create-account --config dendrite.yaml -username alice
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
-## <a id="progress"></a> Progress
+## Progress
 
 We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of April 2022 we're at around 83% CS API coverage and 95% Federation coverage, though check
+updates with CI. As of August 2022 we're at around 83% CS API coverage and 95% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
 servers such as matrix.org reasonably well, although there are still some missing features (like Search).
 
@@ -119,53 +121,8 @@ We would be grateful for any help on issues marked as
 all have related Sytests which need to pass in order for the issue to be closed. Once you've written your
 code, you can quickly run Sytest to ensure that the test names are now passing.
 
-For example, if the test `Local device key changes get to remote servers` was marked as failing, find the
-test file (e.g via `grep` or via the
-[CI log output](https://buildkite.com/matrix-dot-org/dendrite/builds/2826#39cff5de-e032-4ad0-ad26-f819e6919c42)
-it's `tests/50federation/40devicelists.pl` ) then to run Sytest:
-
-```
-docker run --rm --name sytest
--v "/Users/kegan/github/sytest:/sytest"
--v "/Users/kegan/github/dendrite:/src"
--v "/Users/kegan/logs:/logs"
--v "/Users/kegan/go/:/gopath"
--e "POSTGRES=1" -e "DENDRITE_TRACE_HTTP=1"
-matrixdotorg/sytest-dendrite:latest tests/50federation/40devicelists.pl
-```
-
-See [sytest.md](docs/sytest.md) for the full description of these flags.
-
-You can try running sytest outside of docker for faster runs, but the dependencies can be temperamental
-and we recommend using docker where possible.
-
-```
-cd sytest
-export PERL5LIB=$HOME/lib/perl5
-export PERL_MB_OPT=--install_base=$HOME
-export PERL_MM_OPT=INSTALL_BASE=$HOME
-./install-deps.pl
-
-./run-tests.pl -I Dendrite::Monolith -d $PATH_TO_DENDRITE_BINARIES
-```
-
-Sometimes Sytest is testing the wrong thing or is flakey, so it will need to be patched.
-Ask on `#dendrite-dev:matrix.org` if you think this is the case for you and we'll be happy to help.
-
-If you're new to the project, see [CONTRIBUTING.md](docs/CONTRIBUTING.md) to get up to speed then
+If you're new to the project, see our
+[Contributing page](https://matrix-org.github.io/dendrite/development/contributing) to get up to speed, then
 look for [Good First Issues](https://github.com/matrix-org/dendrite/labels/good%20first%20issue). If you're
 familiar with the project, look for [Help Wanted](https://github.com/matrix-org/dendrite/labels/help-wanted)
 issues.
-
-## Hardware requirements
-
-Dendrite in Monolith + SQLite works in a range of environments including iOS and in-browser via WASM.
-
-For small homeserver installations joined on ~10s rooms on matrix.org with ~100s of users in those rooms, including some
-encrypted rooms:
-
-- Memory: uses around 100MB of RAM, with peaks at around 200MB.
-- Disk space: After a few months of usage, the database grew to around 2GB (in Monolith mode).
-- CPU: Brief spikes when processing events, typically idles at 1% CPU.
-
-This means Dendrite should comfortably work on things like Raspberry Pis.

@@ -188,13 +188,16 @@ client_api:
 
   # TURN server information that this homeserver should send to clients.
   turn:
-    turn_user_lifetime: ""
+    turn_user_lifetime: "5m"
     turn_uris:
     #  - turn:turn.server.org?transport=udp
     #  - turn:turn.server.org?transport=tcp
     turn_shared_secret: ""
-    turn_username: ""
-    turn_password: ""
+    # If your TURN server requires static credentials, then you will need to enter
+    # them here instead of supplying a shared secret. Note that these credentials
+    # will be visible to clients!
+    # turn_username: ""
+    # turn_password: ""
 
   # Settings for rate-limited endpoints. Rate limiting kicks in after the threshold
   # number of "slots" have been taken by requests from a specific host. Each "slot"
