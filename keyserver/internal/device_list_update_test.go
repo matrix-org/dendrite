@@ -18,7 +18,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -202,7 +202,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 		}
 		return &http.Response{
 			StatusCode: 200,
-			Body: ioutil.NopCloser(strings.NewReader(`
+			Body: io.NopCloser(strings.NewReader(`
 			{
 				"user_id": "` + remoteUserID + `",
 				"stream_id": 5,
@@ -317,7 +317,7 @@ func TestDebounce(t *testing.T) {
 	// now send the response over federation
 	fedCh <- &http.Response{
 		StatusCode: 200,
-		Body: ioutil.NopCloser(strings.NewReader(`
+		Body: io.NopCloser(strings.NewReader(`
 		{
 			"user_id": "` + userID + `",
 			"stream_id": 5,
