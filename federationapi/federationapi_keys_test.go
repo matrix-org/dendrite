@@ -6,7 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 			s.cache = caching.NewRistrettoCache(8*1024*1024, time.Hour, false)
 
 			// Create a temporary directory for JetStream.
-			d, err := ioutil.TempDir("./", "jetstream*")
+			d, err := os.MkdirTemp("./", "jetstream*")
 			if err != nil {
 				panic(err)
 			}
@@ -136,7 +136,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	// And respond.
 	res = &http.Response{
 		StatusCode: 200,
-		Body:       ioutil.NopCloser(bytes.NewReader(body)),
+		Body:       io.NopCloser(bytes.NewReader(body)),
 	}
 	return
 }

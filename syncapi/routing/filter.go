@@ -16,7 +16,7 @@ package routing
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -88,7 +88,7 @@ func PutFilter(
 	var filter gomatrixserverlib.Filter
 
 	defer req.Body.Close() // nolint:errcheck
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
