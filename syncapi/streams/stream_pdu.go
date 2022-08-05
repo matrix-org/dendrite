@@ -509,11 +509,6 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// Add all users the client doesn't know about yet to a list
 	for _, event := range timelineEvents {
-		// If we're doing an initial sync, add all users to the state events, bypassing the cache
-		if !incremental {
-			timelineUsers[event.Sender()] = struct{}{}
-			continue
-		}
 		// Membership is not yet cached, add it to the list
 		if _, ok := p.lazyLoadCache.IsLazyLoadedUserCached(device, roomID, event.Sender()); !ok {
 			timelineUsers[event.Sender()] = struct{}{}
