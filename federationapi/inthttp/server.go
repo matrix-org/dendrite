@@ -13,20 +13,30 @@ import (
 // AddRoutes adds the FederationInternalAPI handlers to the http.ServeMux.
 // nolint:gocyclo
 func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
-	internalAPIMux.Handle(
+	httputil.NewInternalAPIServer(
+		"QueryJoinedHostServerNamesInRoom",
 		FederationAPIQueryJoinedHostServerNamesInRoomPath,
-		httputil.MakeInternalAPI("QueryJoinedHostServerNamesInRoom", func(req *http.Request) util.JSONResponse {
-			var request api.QueryJoinedHostServerNamesInRoomRequest
-			var response api.QueryJoinedHostServerNamesInRoomResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := intAPI.QueryJoinedHostServerNamesInRoom(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
+		intAPI.QueryJoinedHostServerNamesInRoom,
+	).Serve(internalAPIMux)
+
+	httputil.NewInternalAPIServer(
+		"PerformLeave",
+		FederationAPIPerformLeaveRequestPath,
+		intAPI.PerformLeave,
+	).Serve(internalAPIMux)
+
+	httputil.NewInternalAPIServer(
+		"PerformDirectoryLookupRequest",
+		FederationAPIPerformDirectoryLookupRequestPath,
+		intAPI.PerformDirectoryLookup,
+	).Serve(internalAPIMux)
+
+	httputil.NewInternalAPIServer(
+		"PerformBroadcastEDU",
+		FederationAPIPerformBroadcastEDUPath,
+		intAPI.PerformBroadcastEDU,
+	).Serve(internalAPIMux)
+
 	internalAPIMux.Handle(
 		FederationAPIPerformJoinRequestPath,
 		httputil.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
@@ -39,62 +49,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(
-		FederationAPIPerformLeaveRequestPath,
-		httputil.MakeInternalAPI("PerformLeaveRequest", func(req *http.Request) util.JSONResponse {
-			var request api.PerformLeaveRequest
-			var response api.PerformLeaveResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.PerformLeave(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
-		FederationAPIPerformInviteRequestPath,
-		httputil.MakeInternalAPI("PerformInviteRequest", func(req *http.Request) util.JSONResponse {
-			var request api.PerformInviteRequest
-			var response api.PerformInviteResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.PerformInvite(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
-		FederationAPIPerformDirectoryLookupRequestPath,
-		httputil.MakeInternalAPI("PerformDirectoryLookupRequest", func(req *http.Request) util.JSONResponse {
-			var request api.PerformDirectoryLookupRequest
-			var response api.PerformDirectoryLookupResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.PerformDirectoryLookup(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(
-		FederationAPIPerformBroadcastEDUPath,
-		httputil.MakeInternalAPI("PerformBroadcastEDU", func(req *http.Request) util.JSONResponse {
-			var request api.PerformBroadcastEDURequest
-			var response api.PerformBroadcastEDUResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.PerformBroadcastEDU(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
+
 	internalAPIMux.Handle(
 		FederationAPIGetUserDevicesPath,
 		httputil.MakeInternalAPI("GetUserDevices", func(req *http.Request) util.JSONResponse {

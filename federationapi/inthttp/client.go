@@ -48,13 +48,31 @@ func NewFederationAPIClient(federationSenderURL string, httpClient *http.Client,
 	if httpClient == nil {
 		return nil, errors.New("NewFederationInternalAPIHTTP: httpClient is <nil>")
 	}
-	return &httpFederationInternalAPI{federationSenderURL, httpClient, cache}, nil
+	return &httpFederationInternalAPI{
+		federationAPIURL: federationSenderURL,
+		httpClient:       httpClient,
+		cache:            cache,
+
+		performLeave: httputil.NewInternalAPIClient[api.PerformLeaveRequest, api.PerformLeaveResponse](
+			"PerformLeave", federationSenderURL+FederationAPIPerformLeaveRequestPath, httpClient,
+		),
+		performInvite: httputil.NewInternalAPIClient[api.PerformInviteRequest, api.PerformInviteResponse](
+			"PerformInvite", federationSenderURL+FederationAPIPerformInviteRequestPath, httpClient,
+		),
+		performOutboundPeek: httputil.NewInternalAPIClient[api.PerformOutboundPeekRequest, api.PerformOutboundPeekResponse](
+			"PerformOutboundPeek", federationSenderURL+FederationAPIPerformOutboundPeekRequestPath, httpClient,
+		),
+	}, nil
 }
 
 type httpFederationInternalAPI struct {
 	federationAPIURL string
 	httpClient       *http.Client
 	cache            caching.ServerKeyCache
+
+	performLeave        *httputil.InternalAPIClient[api.PerformLeaveRequest, api.PerformLeaveResponse]
+	performInvite       *httputil.InternalAPIClient[api.PerformInviteRequest, api.PerformInviteResponse]
+	performOutboundPeek *httputil.InternalAPIClient[api.PerformOutboundPeekRequest, api.PerformOutboundPeekResponse]
 }
 
 // Handle an instruction to make_leave & send_leave with a remote server.
@@ -63,11 +81,7 @@ func (h *httpFederationInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformLeaveRequest")
-	defer span.Finish()
-
-	apiURL := h.federationAPIURL + FederationAPIPerformLeaveRequestPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return h.performLeave.Call(ctx, request, response)
 }
 
 // Handle sending an invite to a remote server.
@@ -76,11 +90,7 @@ func (h *httpFederationInternalAPI) PerformInvite(
 	request *api.PerformInviteRequest,
 	response *api.PerformInviteResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInviteRequest")
-	defer span.Finish()
-
-	apiURL := h.federationAPIURL + FederationAPIPerformInviteRequestPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return h.performInvite.Call(ctx, request, response)
 }
 
 // Handle starting a peek on a remote server.
@@ -89,11 +99,7 @@ func (h *httpFederationInternalAPI) PerformOutboundPeek(
 	request *api.PerformOutboundPeekRequest,
 	response *api.PerformOutboundPeekResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformOutboundPeekRequest")
-	defer span.Finish()
-
-	apiURL := h.federationAPIURL + FederationAPIPerformOutboundPeekRequestPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return h.performOutboundPeek.Call(ctx, request, response)
 }
 
 // QueryJoinedHostServerNamesInRoom implements FederationInternalAPI
