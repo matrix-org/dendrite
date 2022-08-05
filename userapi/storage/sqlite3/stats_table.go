@@ -20,13 +20,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 const userDailyVisitsSchema = `
@@ -334,7 +335,8 @@ func (s *statsStatements) r30Users(ctx context.Context, txn *sql.Tx) (map[string
 	return result, rows.Err()
 }
 
-/* R30UsersV2 counts the number of 30 day retained users, defined as users that:
+/*
+R30UsersV2 counts the number of 30 day retained users, defined as users that:
 - Appear more than once in the past 60 days
 - Have more than 30 days between the most and least recent appearances that occurred in the past 60 days.
 */
