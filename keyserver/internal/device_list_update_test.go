@@ -27,8 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
 var (

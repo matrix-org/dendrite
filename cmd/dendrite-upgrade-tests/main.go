@@ -47,9 +47,7 @@ const HEAD = "HEAD"
 // We cannot use the dockerfile associated with the repo with each version sadly due to changes in
 // Docker versions. Specifically, earlier Dendrite versions are incompatible with newer Docker clients
 // due to the error:
-//
-//	When using COPY with more than one source file, the destination must be a directory and end with a /
-//
+// When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
 const Dockerfile = `FROM golang:1.18-stretch as build
 RUN apt-get update && apt-get install -y postgresql
