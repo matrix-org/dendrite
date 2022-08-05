@@ -129,6 +129,7 @@ type wantCatchup struct {
 }
 
 func assertCatchup(t *testing.T, hasNew bool, syncResponse *types.Response, want wantCatchup) {
+	t.Helper()
 	if hasNew != want.hasNew {
 		t.Errorf("got hasNew=%v want %v", hasNew, want.hasNew)
 	}

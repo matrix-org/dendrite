@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -93,9 +94,9 @@ const selectEventsWithEventIDsSQL = "" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 const selectSharedUsersSQL = "" +
-	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
+	"SELECT state_key FROM syncapi_current_room_state WHERE room_id IN(" +
 	"	SELECT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
-	") AND state_key IN ($2) AND membership='join';"
+	") AND state_key IN ($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
 	db                                 *sql.DB
@@ -120,6 +121,17 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: add history visibility column (current_room_state)",
+		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
 		return nil, err
 	}
@@ -408,25 +420,28 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 func (s *currentRoomStateStatements) SelectSharedUsers(
 	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
 ) ([]string, error) {
-	query := strings.Replace(selectSharedUsersSQL, "($2)", sqlutil.QueryVariadicOffset(len(otherUserIDs), 1), 1)
-	stmt, err := s.db.Prepare(query)
-	if err != nil {
-		return nil, fmt.Errorf("SelectSharedUsers s.db.Prepare: %w", err)
-	}
-	defer internal.CloseAndLogIfError(ctx, stmt, "SelectSharedUsers: stmt.close() failed")
-	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, userID, otherUserIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectSharedUsersStmt: rows.close() failed")
 
-	var stateKey string
-	result := make([]string, 0, len(otherUserIDs))
-	for rows.Next() {
-		if err := rows.Scan(&stateKey); err != nil {
-			return nil, err
-		}
-		result = append(result, stateKey)
+	params := make([]interface{}, len(otherUserIDs)+1)
+	params[0] = userID
+	for k, v := range otherUserIDs {
+		params[k+1] = v
 	}
-	return result, rows.Err()
+
+	result := make([]string, 0, len(otherUserIDs))
+	query := strings.Replace(selectSharedUsersSQL, "($2)", sqlutil.QueryVariadicOffset(len(otherUserIDs), 1), 1)
+	err := sqlutil.RunLimitedVariablesQuery(
+		ctx, query, s.db, params, sqlutil.SQLite3MaxVariables,
+		func(rows *sql.Rows) error {
+			var stateKey string
+			for rows.Next() {
+				if err := rows.Scan(&stateKey); err != nil {
+					return err
+				}
+				result = append(result, stateKey)
+			}
+			return nil
+		},
+	)
+
+	return result, err
 }

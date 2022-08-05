@@ -1,5 +1,49 @@
 # Changelog
 
+## Dendrite 0.9.1 (2022-08-03)
+
+### Fixes
+
+* Upgrades a dependency which caused issues building Dendrite with Go 1.19
+* The roomserver will no longer give up prematurely after failing to call `/state_ids`
+* Removes the faulty room info cache, which caused of a number of race conditions and occasional bugs (including when creating and joining rooms)
+* The media endpoint now sets the `Cache-Control` header correctly to prevent web-based clients from hitting media endpoints excessively
+* The sync API will now advance the PDU stream position correctly in all cases (contributed by [sergekh2](https://github.com/sergekh2))
+* The sync API will now delete the correct range of send-to-device messages when advancing the stream position
+* The device list `changed` key in the `/sync` response should now return the correct users 
+* A data race when looking up missing state has been fixed
+* The `/send_join` API is now applying stronger validation to the received membership event
+
+## Dendrite 0.9.0 (2022-08-01)
+
+### Features
+
+* Dendrite now uses Ristretto for managing in-memory caches
+  * Should improve cache utilisation considerably over time by more intelligently selecting and managing cache entries compared to the previous LRU-based cache
+  * Defaults to a 1GB cache size if not configured otherwise
+  * The estimated cache size in memory and maximum age can now be configured with new [configuration options](https://github.com/matrix-org/dendrite/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L44-L61) to prevent unbounded cache growth
+* Added support for serving the `/.well-known/matrix/client` hint directly from Dendrite
+  * Configurable with the new [configuration option](https://github.com/matrix-org/dendrite/blob/e94ef84aaba30e12baf7f524c4e7a36d2fdeb189/dendrite-sample.monolith.yaml#L67-L69)
+* Refactored membership updater, which should eliminate some bugs caused by the membership table getting out of sync with the room state
+* The User API is now responsible for sending account data updates to other components, which may fix some races and duplicate account data events
+* Optimised database query for checking whether a remote server is allowed to request an event over federation without using anywhere near as much CPU time (PostgreSQL only)
+* Database migrations have been refactored to eliminate some problems that were present with `goose` and upgrading from older Dendrite versions
+* Media fetching will now use the `/v3` endpoints for downloading media from remote homeservers
+* HTTP 404 and HTTP 405 errors from the client-facing APIs should now be returned with CORS headers so that web-based clients do not produce incorrect access control warnings for unknown endpoints
+* Some preparation work for full history visibility support
+
+### Fixes
+
+* Fixes a crash that could occur during event redaction
+* The `/members` endpoint will no longer incorrectly return HTTP 500 as a result of some invite events
+* Send-to-device messages should now be ordered more reliably and the last position in the stream updated correctly
+* Parsing of appservice configuration files is now less strict (contributed by [Kab1r](https://github.com/Kab1r))
+* The sync API should now identify shared users correctly when waking up for E2EE key changes
+* The federation `/state` endpoint will now return a HTTP 403 when the state before an event isn't known instead of a HTTP 500
+* Presence timestamps should now be calculated with the correct precision
+* A race condition in the roomserver's room info has been fixed
+* A race condition in the sync API has been fixed
+
 ## Dendrite 0.8.9 (2022-07-01)
 
 ### Features

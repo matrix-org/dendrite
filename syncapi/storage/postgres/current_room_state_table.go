@@ -23,6 +23,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -111,7 +112,7 @@ const selectEventsWithEventIDsSQL = "" +
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
 	"	SELECT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
-	") AND state_key = ANY($2) AND membership='join';"
+	") AND state_key = ANY($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt                *sql.Stmt
@@ -133,6 +134,17 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: add history visibility column (current_room_state)",
+		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
 		return nil, err
 	}
@@ -395,7 +407,7 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
 ) ([]string, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectSharedUsersStmt)
-	rows, err := stmt.QueryContext(ctx, userID, otherUserIDs)
+	rows, err := stmt.QueryContext(ctx, userID, pq.Array(otherUserIDs))
 	if err != nil {
 		return nil, err
 	}

@@ -8,7 +8,6 @@ COPY . /build
 
 RUN mkdir -p bin
 RUN go build -trimpath -o bin/ ./cmd/dendrite-polylith-multi
-RUN go build -trimpath -o bin/ ./cmd/goose
 RUN go build -trimpath -o bin/ ./cmd/create-account
 RUN go build -trimpath -o bin/ ./cmd/generate-keys
 

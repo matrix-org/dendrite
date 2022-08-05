@@ -732,7 +732,6 @@ func stripped(ev *gomatrixserverlib.Event) *gomatrixserverlib.MSC2946StrippedEve
 		StateKey:       *ev.StateKey(),
 		Content:        ev.Content(),
 		Sender:         ev.Sender(),
-		RoomID:         ev.RoomID(),
 		OriginServerTS: ev.OriginServerTS(),
 	}
 }
