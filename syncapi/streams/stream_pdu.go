@@ -105,6 +105,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
+	// TODO: This might be inefficient, when joined to many and/or large rooms.
 	for _, roomID := range joinedRoomIDs {
 		joinedUsers := p.notifier.JoinedUsers(roomID)
 		for _, sharedUser := range joinedUsers {
