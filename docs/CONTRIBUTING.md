@@ -64,7 +64,7 @@ comment. Please avoid doing this if you can.
 We also have unit tests which we run via:
 
 ```bash
-go test ./...
+go test --race ./...
 ```
 
 In general, we like submissions that come with tests. Anything that proves that the

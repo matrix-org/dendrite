@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
@@ -22,7 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs/msc2836"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var (
@@ -32,15 +33,17 @@ var (
 )
 
 // Basic sanity check of MSC2836 logic. Injects a thread that looks like:
-//   A
-//   |
-//   B
-//  / \
-// C   D
-//    /|\
-//   E F G
-//   |
-//   H
+//
+//	  A
+//	  |
+//	  B
+//	 / \
+//	C   D
+//	   /|\
+//	  E F G
+//	  |
+//	  H
+//
 // And makes sure POST /event_relationships works with various parameters
 func TestMSC2836(t *testing.T) {
 	alice := "@alice:localhost"

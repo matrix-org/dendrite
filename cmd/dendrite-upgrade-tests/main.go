@@ -47,7 +47,7 @@ const HEAD = "HEAD"
 // We cannot use the dockerfile associated with the repo with each version sadly due to changes in
 // Docker versions. Specifically, earlier Dendrite versions are incompatible with newer Docker clients
 // due to the error:
-//   When using COPY with more than one source file, the destination must be a directory and end with a /
+// When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
 const Dockerfile = `FROM golang:1.18-stretch as build
 RUN apt-get update && apt-get install -y postgresql
@@ -95,7 +95,9 @@ CMD /build/run_dendrite.sh `
 const dendriteUpgradeTestLabel = "dendrite_upgrade_test"
 
 // downloadArchive downloads an arbitrary github archive of the form:
-//   https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//
+//	https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//
 // and re-tarballs it without the top-level directory which contains branch information. It inserts
 // the contents of `dockerfile` as a root file `Dockerfile` in the re-tarballed directory such that
 // you can directly feed the retarballed archive to `ImageBuild` to have it run said dockerfile.
