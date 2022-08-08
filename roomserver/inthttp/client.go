@@ -152,10 +152,12 @@ func (h *httpRoomserverInternalAPI) InputRoomEvents(
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
 ) error {
-	response.ErrMsg = httputil.CallInternalRPCAPI(
+	if err := httputil.CallInternalRPCAPI(
 		"InputRoomEvents", h.roomserverURL+RoomserverInputRoomEventsPath,
 		h.httpClient, ctx, request, response,
-	).Error()
+	); err != nil {
+		response.ErrMsg = err.Error()
+	}
 	return nil
 }
 

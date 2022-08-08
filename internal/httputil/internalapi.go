@@ -55,7 +55,15 @@ func CallInternalRPCAPI[req, res any](name, url string, client *http.Client, ctx
 	span, ctx := opentracing.StartSpanFromContext(ctx, name)
 	defer span.Finish()
 
-	return PostJSON[req, res, error](ctx, span, client, url, request, response)
+	remoteErr, localErr := PostJSON[req, res, error](ctx, span, client, url, request, response)
+	switch {
+	case localErr != nil:
+		return localErr
+	case remoteErr != nil:
+		return *remoteErr
+	default:
+		return nil
+	}
 }
 
 func CallInternalProxyAPI[req, res any, errtype error](name, url string, client *http.Client, ctx context.Context, request *req) (res, error) {
@@ -63,5 +71,13 @@ func CallInternalProxyAPI[req, res any, errtype error](name, url string, client 
 	defer span.Finish()
 
 	var response res
-	return response, PostJSON[req, res, errtype](ctx, span, client, url, request, &response)
+	remoteErr, localErr := PostJSON[req, res, errtype](ctx, span, client, url, request, &response)
+	switch {
+	case localErr != nil:
+		return response, localErr
+	case remoteErr != nil:
+		return response, *remoteErr
+	default:
+		return response, nil
+	}
 }
