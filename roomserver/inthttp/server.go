@@ -11,191 +11,191 @@ import (
 func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
 		RoomserverInputRoomEventsPath,
-		httputil.MakeInternalRPCAPI(RoomserverInputRoomEventsPath, r.InputRoomEvents),
+		httputil.MakeInternalRPCAPI("InputRoomEvents", r.InputRoomEvents),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformInvitePath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformInvitePath, r.PerformInvite),
+		httputil.MakeInternalRPCAPI("PerformInvite", r.PerformInvite),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformJoinPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformJoinPath, r.PerformJoin),
+		httputil.MakeInternalRPCAPI("PerformJoin", r.PerformJoin),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformLeavePath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformLeavePath, r.PerformLeave),
+		httputil.MakeInternalRPCAPI("PerformLeave", r.PerformLeave),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformPeekPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformPeekPath, r.PerformPeek),
+		httputil.MakeInternalRPCAPI("PerformPeek", r.PerformPeek),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformInboundPeekPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformInboundPeekPath, r.PerformInboundPeek),
+		httputil.MakeInternalRPCAPI("PerformInboundPeek", r.PerformInboundPeek),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformUnpeekPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformUnpeekPath, r.PerformUnpeek),
+		httputil.MakeInternalRPCAPI("PerformUnpeek", r.PerformUnpeek),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformRoomUpgradePath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformRoomUpgradePath, r.PerformRoomUpgrade),
+		httputil.MakeInternalRPCAPI("PerformRoomUpgrade", r.PerformRoomUpgrade),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformPublishPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformPublishPath, r.PerformPublish),
+		httputil.MakeInternalRPCAPI("PerformPublish", r.PerformPublish),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformAdminEvacuateRoomPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformAdminEvacuateRoomPath, r.PerformAdminEvacuateRoom),
+		httputil.MakeInternalRPCAPI("PerformAdminEvacuateRoom", r.PerformAdminEvacuateRoom),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformAdminEvacuateUserPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformAdminEvacuateUserPath, r.PerformAdminEvacuateUser),
+		httputil.MakeInternalRPCAPI("PerformAdminEvacuateUser", r.PerformAdminEvacuateUser),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryPublishedRoomsPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryPublishedRoomsPath, r.QueryPublishedRooms),
+		httputil.MakeInternalRPCAPI("QueryPublishedRooms", r.QueryPublishedRooms),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryLatestEventsAndStatePath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryLatestEventsAndStatePath, r.QueryLatestEventsAndState),
+		httputil.MakeInternalRPCAPI("QueryLatestEventsAndState", r.QueryLatestEventsAndState),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryStateAfterEventsPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryStateAfterEventsPath, r.QueryStateAfterEvents),
+		httputil.MakeInternalRPCAPI("QueryStateAfterEvents", r.QueryStateAfterEvents),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryEventsByIDPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryEventsByIDPath, r.QueryEventsByID),
+		httputil.MakeInternalRPCAPI("QueryEventsByID", r.QueryEventsByID),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryMembershipForUserPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryMembershipForUserPath, r.QueryMembershipForUser),
+		httputil.MakeInternalRPCAPI("QueryMembershipForUser", r.QueryMembershipForUser),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryMembershipsForRoomPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryMembershipsForRoomPath, r.QueryMembershipsForRoom),
+		httputil.MakeInternalRPCAPI("QueryMembershipsForRoom", r.QueryMembershipsForRoom),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryServerJoinedToRoomPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryServerJoinedToRoomPath, r.QueryServerJoinedToRoom),
+		httputil.MakeInternalRPCAPI("QueryServerJoinedToRoom", r.QueryServerJoinedToRoom),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryServerJoinedToRoomPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryServerJoinedToRoomPath, r.QueryServerJoinedToRoom),
+		httputil.MakeInternalRPCAPI("QueryServerJoinedToRoom", r.QueryServerJoinedToRoom),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryServerAllowedToSeeEventPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryServerAllowedToSeeEventPath, r.QueryServerAllowedToSeeEvent),
+		httputil.MakeInternalRPCAPI("QueryServerAllowedToSeeEvent", r.QueryServerAllowedToSeeEvent),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryMissingEventsPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryMissingEventsPath, r.QueryMissingEvents),
+		httputil.MakeInternalRPCAPI("QueryMissingEvents", r.QueryMissingEvents),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryStateAndAuthChainPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryStateAndAuthChainPath, r.QueryStateAndAuthChain),
+		httputil.MakeInternalRPCAPI("QueryStateAndAuthChain", r.QueryStateAndAuthChain),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformBackfillPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformBackfillPath, r.PerformBackfill),
+		httputil.MakeInternalRPCAPI("PerformBackfill", r.PerformBackfill),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverPerformForgetPath,
-		httputil.MakeInternalRPCAPI(RoomserverPerformForgetPath, r.PerformForget),
+		httputil.MakeInternalRPCAPI("PerformForget", r.PerformForget),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryRoomVersionCapabilitiesPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryRoomVersionCapabilitiesPath, r.QueryRoomVersionCapabilities),
+		httputil.MakeInternalRPCAPI("QueryRoomVersionCapabilities", r.QueryRoomVersionCapabilities),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryRoomVersionForRoomPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryRoomVersionForRoomPath, r.QueryRoomVersionForRoom),
+		httputil.MakeInternalRPCAPI("QueryRoomVersionForRoom", r.QueryRoomVersionForRoom),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverSetRoomAliasPath,
-		httputil.MakeInternalRPCAPI(RoomserverSetRoomAliasPath, r.SetRoomAlias),
+		httputil.MakeInternalRPCAPI("SetRoomAlias", r.SetRoomAlias),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverGetRoomIDForAliasPath,
-		httputil.MakeInternalRPCAPI(RoomserverGetRoomIDForAliasPath, r.GetRoomIDForAlias),
+		httputil.MakeInternalRPCAPI("GetRoomIDForAlias", r.GetRoomIDForAlias),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverGetAliasesForRoomIDPath,
-		httputil.MakeInternalRPCAPI(RoomserverGetAliasesForRoomIDPath, r.GetAliasesForRoomID),
+		httputil.MakeInternalRPCAPI("GetAliasesForRoomID", r.GetAliasesForRoomID),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverRemoveRoomAliasPath,
-		httputil.MakeInternalRPCAPI(RoomserverRemoveRoomAliasPath, r.RemoveRoomAlias),
+		httputil.MakeInternalRPCAPI("RemoveRoomAlias", r.RemoveRoomAlias),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryCurrentStatePath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryCurrentStatePath, r.QueryCurrentState),
+		httputil.MakeInternalRPCAPI("QueryCurrentState", r.QueryCurrentState),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryRoomsForUserPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryRoomsForUserPath, r.QueryRoomsForUser),
+		httputil.MakeInternalRPCAPI("QueryRoomsForUser", r.QueryRoomsForUser),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryBulkStateContentPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryBulkStateContentPath, r.QueryBulkStateContent),
+		httputil.MakeInternalRPCAPI("QueryBulkStateContent", r.QueryBulkStateContent),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQuerySharedUsersPath,
-		httputil.MakeInternalRPCAPI(RoomserverQuerySharedUsersPath, r.QuerySharedUsers),
+		httputil.MakeInternalRPCAPI("QuerySharedUsers", r.QuerySharedUsers),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryKnownUsersPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryKnownUsersPath, r.QueryKnownUsers),
+		httputil.MakeInternalRPCAPI("QueryKnownUsers", r.QueryKnownUsers),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryServerBannedFromRoomPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryServerBannedFromRoomPath, r.QueryServerBannedFromRoom),
+		httputil.MakeInternalRPCAPI("QueryServerBannedFromRoom", r.QueryServerBannedFromRoom),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryAuthChainPath,
-		httputil.MakeInternalRPCAPI(RoomserverQueryAuthChainPath, r.QueryAuthChain),
+		httputil.MakeInternalRPCAPI("QueryAuthChain", r.QueryAuthChain),
 	)
 
 	internalAPIMux.Handle(
 		RoomserverQueryRestrictedJoinAllowed,
-		httputil.MakeInternalRPCAPI(RoomserverQueryRestrictedJoinAllowed, r.QueryRestrictedJoinAllowed),
+		httputil.MakeInternalRPCAPI("QueryRestrictedJoinAllowed", r.QueryRestrictedJoinAllowed),
 	)
 }

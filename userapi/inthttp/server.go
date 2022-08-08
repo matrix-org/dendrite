@@ -29,137 +29,137 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 
 	internalAPIMux.Handle(
 		PerformAccountCreationPath,
-		httputil.MakeInternalRPCAPI(PerformAccountCreationPath, s.PerformAccountCreation),
+		httputil.MakeInternalRPCAPI("PerformAccountCreation", s.PerformAccountCreation),
 	)
 
 	internalAPIMux.Handle(
 		PerformPasswordUpdatePath,
-		httputil.MakeInternalRPCAPI(PerformPasswordUpdatePath, s.PerformPasswordUpdate),
+		httputil.MakeInternalRPCAPI("PerformPasswordUpdate", s.PerformPasswordUpdate),
 	)
 
 	internalAPIMux.Handle(
 		PerformDeviceCreationPath,
-		httputil.MakeInternalRPCAPI(PerformDeviceCreationPath, s.PerformDeviceCreation),
+		httputil.MakeInternalRPCAPI("PerformDeviceCreation", s.PerformDeviceCreation),
 	)
 
 	internalAPIMux.Handle(
 		PerformLastSeenUpdatePath,
-		httputil.MakeInternalRPCAPI(PerformLastSeenUpdatePath, s.PerformLastSeenUpdate),
+		httputil.MakeInternalRPCAPI("PerformLastSeenUpdate", s.PerformLastSeenUpdate),
 	)
 
 	internalAPIMux.Handle(
 		PerformDeviceUpdatePath,
-		httputil.MakeInternalRPCAPI(PerformDeviceUpdatePath, s.PerformDeviceUpdate),
+		httputil.MakeInternalRPCAPI("PerformDeviceUpdate", s.PerformDeviceUpdate),
 	)
 
 	internalAPIMux.Handle(
 		PerformDeviceDeletionPath,
-		httputil.MakeInternalRPCAPI(PerformDeviceDeletionPath, s.PerformDeviceDeletion),
+		httputil.MakeInternalRPCAPI("PerformDeviceDeletion", s.PerformDeviceDeletion),
 	)
 
 	internalAPIMux.Handle(
 		PerformAccountDeactivationPath,
-		httputil.MakeInternalRPCAPI(PerformAccountDeactivationPath, s.PerformAccountDeactivation),
+		httputil.MakeInternalRPCAPI("PerformAccountDeactivation", s.PerformAccountDeactivation),
 	)
 
 	internalAPIMux.Handle(
 		PerformOpenIDTokenCreationPath,
-		httputil.MakeInternalRPCAPI(PerformOpenIDTokenCreationPath, s.PerformOpenIDTokenCreation),
+		httputil.MakeInternalRPCAPI("PerformOpenIDTokenCreation", s.PerformOpenIDTokenCreation),
 	)
 
 	internalAPIMux.Handle(
 		QueryProfilePath,
-		httputil.MakeInternalRPCAPI(QueryProfilePath, s.QueryProfile),
+		httputil.MakeInternalRPCAPI("QueryProfile", s.QueryProfile),
 	)
 
 	internalAPIMux.Handle(
 		QueryAccessTokenPath,
-		httputil.MakeInternalRPCAPI(QueryAccessTokenPath, s.QueryAccessToken),
+		httputil.MakeInternalRPCAPI("QueryAccessToken", s.QueryAccessToken),
 	)
 
 	internalAPIMux.Handle(
 		QueryAccessTokenPath,
-		httputil.MakeInternalRPCAPI(QueryAccessTokenPath, s.QueryAccessToken),
+		httputil.MakeInternalRPCAPI("QueryAccessToken", s.QueryAccessToken),
 	)
 
 	internalAPIMux.Handle(
 		QueryDevicesPath,
-		httputil.MakeInternalRPCAPI(QueryDevicesPath, s.QueryDevices),
+		httputil.MakeInternalRPCAPI("QueryDevices", s.QueryDevices),
 	)
 
 	internalAPIMux.Handle(
 		QueryAccountDataPath,
-		httputil.MakeInternalRPCAPI(QueryAccountDataPath, s.QueryAccountData),
+		httputil.MakeInternalRPCAPI("QueryAccountData", s.QueryAccountData),
 	)
 
 	internalAPIMux.Handle(
 		QueryDeviceInfosPath,
-		httputil.MakeInternalRPCAPI(QueryDeviceInfosPath, s.QueryDeviceInfos),
+		httputil.MakeInternalRPCAPI("QueryDeviceInfos", s.QueryDeviceInfos),
 	)
 
 	internalAPIMux.Handle(
 		QuerySearchProfilesPath,
-		httputil.MakeInternalRPCAPI(QuerySearchProfilesPath, s.QuerySearchProfiles),
+		httputil.MakeInternalRPCAPI("QuerySearchProfiles", s.QuerySearchProfiles),
 	)
 
 	internalAPIMux.Handle(
 		QueryOpenIDTokenPath,
-		httputil.MakeInternalRPCAPI(QueryOpenIDTokenPath, s.QueryOpenIDToken),
+		httputil.MakeInternalRPCAPI("QueryOpenIDToken", s.QueryOpenIDToken),
 	)
 
 	internalAPIMux.Handle(
 		InputAccountDataPath,
-		httputil.MakeInternalRPCAPI(InputAccountDataPath, s.InputAccountData),
+		httputil.MakeInternalRPCAPI("InputAccountData", s.InputAccountData),
 	)
 
 	internalAPIMux.Handle(
 		QueryKeyBackupPath,
-		httputil.MakeInternalRPCAPI(QueryKeyBackupPath, s.QueryKeyBackup),
+		httputil.MakeInternalRPCAPI("QueryKeyBackup", s.QueryKeyBackup),
 	)
 
 	internalAPIMux.Handle(
 		PerformKeyBackupPath,
-		httputil.MakeInternalRPCAPI(PerformKeyBackupPath, s.PerformKeyBackup),
+		httputil.MakeInternalRPCAPI("PerformKeyBackup", s.PerformKeyBackup),
 	)
 
 	internalAPIMux.Handle(
 		QueryNotificationsPath,
-		httputil.MakeInternalRPCAPI(QueryNotificationsPath, s.QueryNotifications),
+		httputil.MakeInternalRPCAPI("QueryNotifications", s.QueryNotifications),
 	)
 
 	internalAPIMux.Handle(
 		PerformPusherSetPath,
-		httputil.MakeInternalRPCAPI(PerformPusherSetPath, s.PerformPusherSet),
+		httputil.MakeInternalRPCAPI("PerformPusherSet", s.PerformPusherSet),
 	)
 
 	internalAPIMux.Handle(
 		PerformPusherDeletionPath,
-		httputil.MakeInternalRPCAPI(PerformPusherDeletionPath, s.PerformPusherDeletion),
+		httputil.MakeInternalRPCAPI("PerformPusherDeletion", s.PerformPusherDeletion),
 	)
 
 	internalAPIMux.Handle(
 		QueryPushersPath,
-		httputil.MakeInternalRPCAPI(QueryPushersPath, s.QueryPushers),
+		httputil.MakeInternalRPCAPI("QueryPushers", s.QueryPushers),
 	)
 
 	internalAPIMux.Handle(
 		PerformPushRulesPutPath,
-		httputil.MakeInternalRPCAPI(PerformPushRulesPutPath, s.PerformPushRulesPut),
+		httputil.MakeInternalRPCAPI("PerformPushRulesPut", s.PerformPushRulesPut),
 	)
 
 	internalAPIMux.Handle(
 		QueryPushRulesPath,
-		httputil.MakeInternalRPCAPI(QueryPushRulesPath, s.QueryPushRules),
+		httputil.MakeInternalRPCAPI("QueryPushRules", s.QueryPushRules),
 	)
 
 	internalAPIMux.Handle(
 		PerformSetAvatarURLPath,
-		httputil.MakeInternalRPCAPI(PerformSetAvatarURLPath, s.SetAvatarURL),
+		httputil.MakeInternalRPCAPI("PerformSetAvatarURL", s.SetAvatarURL),
 	)
 
 	// TODO: Look at the shape of this
 	internalAPIMux.Handle(QueryNumericLocalpartPath,
-		httputil.MakeInternalAPI(QueryNumericLocalpartPath, func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("queryNumericLocalpart", func(req *http.Request) util.JSONResponse {
 			response := api.QueryNumericLocalpartResponse{}
 			if err := s.QueryNumericLocalpart(req.Context(), &response); err != nil {
 				return util.ErrorResponse(err)
@@ -170,36 +170,36 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 
 	internalAPIMux.Handle(
 		QueryAccountAvailabilityPath,
-		httputil.MakeInternalRPCAPI(QueryAccountAvailabilityPath, s.QueryAccountAvailability),
+		httputil.MakeInternalRPCAPI("QueryAccountAvailability", s.QueryAccountAvailability),
 	)
 
 	internalAPIMux.Handle(
 		QueryAccountByPasswordPath,
-		httputil.MakeInternalRPCAPI(QueryAccountByPasswordPath, s.QueryAccountByPassword),
+		httputil.MakeInternalRPCAPI("QueryAccountByPassword", s.QueryAccountByPassword),
 	)
 
 	internalAPIMux.Handle(
 		PerformSetDisplayNamePath,
-		httputil.MakeInternalRPCAPI(PerformSetDisplayNamePath, s.SetDisplayName),
+		httputil.MakeInternalRPCAPI("SetDisplayName", s.SetDisplayName),
 	)
 
 	internalAPIMux.Handle(
 		QueryLocalpartForThreePIDPath,
-		httputil.MakeInternalRPCAPI(QueryLocalpartForThreePIDPath, s.QueryLocalpartForThreePID),
+		httputil.MakeInternalRPCAPI("QueryLocalpartForThreePID", s.QueryLocalpartForThreePID),
 	)
 
 	internalAPIMux.Handle(
 		QueryThreePIDsForLocalpartPath,
-		httputil.MakeInternalRPCAPI(QueryThreePIDsForLocalpartPath, s.QueryThreePIDsForLocalpart),
+		httputil.MakeInternalRPCAPI("QueryThreePIDsForLocalpart", s.QueryThreePIDsForLocalpart),
 	)
 
 	internalAPIMux.Handle(
 		PerformForgetThreePIDPath,
-		httputil.MakeInternalRPCAPI(PerformForgetThreePIDPath, s.PerformForgetThreePID),
+		httputil.MakeInternalRPCAPI("PerformForgetThreePID", s.PerformForgetThreePID),
 	)
 
 	internalAPIMux.Handle(
 		PerformSaveThreePIDAssociationPath,
-		httputil.MakeInternalRPCAPI(PerformSaveThreePIDAssociationPath, s.PerformSaveThreePIDAssociation),
+		httputil.MakeInternalRPCAPI("PerformSaveThreePIDAssociation", s.PerformSaveThreePIDAssociation),
 	)
 }

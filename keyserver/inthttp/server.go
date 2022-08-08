@@ -23,51 +23,51 @@ import (
 func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 	internalAPIMux.Handle(
 		PerformClaimKeysPath,
-		httputil.MakeInternalRPCAPI(PerformClaimKeysPath, s.PerformClaimKeys),
+		httputil.MakeInternalRPCAPI("PerformClaimKeys", s.PerformClaimKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformClaimKeysPath,
-		httputil.MakeInternalRPCAPI(PerformClaimKeysPath, s.PerformDeleteKeys),
+		httputil.MakeInternalRPCAPI("PerformDeleteKeys", s.PerformDeleteKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformUploadKeysPath,
-		httputil.MakeInternalRPCAPI(PerformUploadKeysPath, s.PerformUploadKeys),
+		httputil.MakeInternalRPCAPI("PerformUploadKeys", s.PerformUploadKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformUploadDeviceKeysPath,
-		httputil.MakeInternalRPCAPI(PerformUploadDeviceKeysPath, s.PerformUploadDeviceKeys),
+		httputil.MakeInternalRPCAPI("PerformUploadDeviceKeys", s.PerformUploadDeviceKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformUploadDeviceSignaturesPath,
-		httputil.MakeInternalRPCAPI(PerformUploadDeviceSignaturesPath, s.PerformUploadDeviceSignatures),
+		httputil.MakeInternalRPCAPI("PerformUploadDeviceSignatures", s.PerformUploadDeviceSignatures),
 	)
 
 	internalAPIMux.Handle(
 		QueryKeysPath,
-		httputil.MakeInternalRPCAPI(QueryKeysPath, s.QueryKeys),
+		httputil.MakeInternalRPCAPI("QueryKeys", s.QueryKeys),
 	)
 
 	internalAPIMux.Handle(
 		QueryOneTimeKeysPath,
-		httputil.MakeInternalRPCAPI(QueryOneTimeKeysPath, s.QueryOneTimeKeys),
+		httputil.MakeInternalRPCAPI("QueryOneTimeKeys", s.QueryOneTimeKeys),
 	)
 
 	internalAPIMux.Handle(
 		QueryDeviceMessagesPath,
-		httputil.MakeInternalRPCAPI(QueryDeviceMessagesPath, s.QueryDeviceMessages),
+		httputil.MakeInternalRPCAPI("QueryDeviceMessages", s.QueryDeviceMessages),
 	)
 
 	internalAPIMux.Handle(
 		QueryKeyChangesPath,
-		httputil.MakeInternalRPCAPI(QueryKeyChangesPath, s.QueryKeyChanges),
+		httputil.MakeInternalRPCAPI("queryKeyChanges", s.QueryKeyChanges),
 	)
 
 	internalAPIMux.Handle(
 		QuerySignaturesPath,
-		httputil.MakeInternalRPCAPI(QuerySignaturesPath, s.QuerySignatures),
+		httputil.MakeInternalRPCAPI("QuerySignatures", s.QuerySignatures),
 	)
 }
