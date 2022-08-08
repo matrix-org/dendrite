@@ -91,10 +91,12 @@ func CreateKeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, de
 // Implements GET  /_matrix/client/r0/room_keys/version and GET /_matrix/client/r0/room_keys/version/{version}
 func KeyBackupVersion(req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version string) util.JSONResponse {
 	var queryResp userapi.QueryKeyBackupResponse
-	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
+	if err := userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
 		UserID:  device.UserID,
 		Version: version,
-	}, &queryResp)
+	}, &queryResp); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if queryResp.Error != "" {
 		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", queryResp.Error))
 	}
@@ -233,13 +235,15 @@ func GetBackupKeys(
 	req *http.Request, userAPI userapi.ClientUserAPI, device *userapi.Device, version, roomID, sessionID string,
 ) util.JSONResponse {
 	var queryResp userapi.QueryKeyBackupResponse
-	userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
+	if err := userAPI.QueryKeyBackup(req.Context(), &userapi.QueryKeyBackupRequest{
 		UserID:           device.UserID,
 		Version:          version,
 		ReturnKeys:       true,
 		KeysForRoomID:    roomID,
 		KeysForSessionID: sessionID,
-	}, &queryResp)
+	}, &queryResp); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if queryResp.Error != "" {
 		return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", queryResp.Error))
 	}

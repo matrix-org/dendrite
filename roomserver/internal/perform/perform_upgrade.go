@@ -287,22 +287,24 @@ func publishNewRoomAndUnpublishOldRoom(
 ) {
 	// expose this room in the published room list
 	var pubNewRoomRes api.PerformPublishResponse
-	URSAPI.PerformPublish(ctx, &api.PerformPublishRequest{
+	if err := URSAPI.PerformPublish(ctx, &api.PerformPublishRequest{
 		RoomID:     newRoomID,
 		Visibility: "public",
-	}, &pubNewRoomRes)
-	if pubNewRoomRes.Error != nil {
+	}, &pubNewRoomRes); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("failed to reach internal API")
+	} else if pubNewRoomRes.Error != nil {
 		// treat as non-fatal since the room is already made by this point
 		util.GetLogger(ctx).WithError(pubNewRoomRes.Error).Error("failed to visibility:public")
 	}
 
 	var unpubOldRoomRes api.PerformPublishResponse
 	// remove the old room from the published room list
-	URSAPI.PerformPublish(ctx, &api.PerformPublishRequest{
+	if err := URSAPI.PerformPublish(ctx, &api.PerformPublishRequest{
 		RoomID:     oldRoomID,
 		Visibility: "private",
-	}, &unpubOldRoomRes)
-	if unpubOldRoomRes.Error != nil {
+	}, &unpubOldRoomRes); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("failed to reach internal API")
+	} else if unpubOldRoomRes.Error != nil {
 		// treat as non-fatal since the room is already made by this point
 		util.GetLogger(ctx).WithError(unpubOldRoomRes.Error).Error("failed to visibility:private")
 	}

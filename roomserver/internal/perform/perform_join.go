@@ -292,7 +292,12 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := rsAPI.InputRoomEventsResponse{}
-			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+				return "", "", &rsAPI.PerformError{
+					Code: rsAPI.PerformErrorNoOperation,
+					Msg:  fmt.Sprintf("InputRoomEvents failed: %s", err),
+				}
+			}
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,

@@ -192,7 +192,9 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 		deleteReq.KeyIDs = append(deleteReq.KeyIDs, gomatrixserverlib.KeyID(keyID))
 	}
 	deleteRes := &keyapi.PerformDeleteKeysResponse{}
-	a.KeyAPI.PerformDeleteKeys(ctx, deleteReq, deleteRes)
+	if err := a.KeyAPI.PerformDeleteKeys(ctx, deleteReq, deleteRes); err != nil {
+		return err
+	}
 	if err := deleteRes.Error; err != nil {
 		return fmt.Errorf("a.KeyAPI.PerformDeleteKeys: %w", err)
 	}
@@ -211,10 +213,12 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 	}
 
 	var uploadRes keyapi.PerformUploadKeysResponse
-	a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+	if err := a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
 		UserID:     userID,
 		DeviceKeys: deviceKeys,
-	}, &uploadRes)
+	}, &uploadRes); err != nil {
+		return err
+	}
 	if uploadRes.Error != nil {
 		return fmt.Errorf("failed to delete device keys: %v", uploadRes.Error)
 	}
@@ -268,7 +272,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	if req.DisplayName != nil && dev.DisplayName != *req.DisplayName {
 		// display name has changed: update the device key
 		var uploadRes keyapi.PerformUploadKeysResponse
-		a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+		if err := a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
 			UserID: req.RequestingUserID,
 			DeviceKeys: []keyapi.DeviceKeys{
 				{
@@ -279,7 +283,9 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 				},
 			},
 			OnlyDisplayNameUpdates: true,
-		}, &uploadRes)
+		}, &uploadRes); err != nil {
+			return err
+		}
 		if uploadRes.Error != nil {
 			return fmt.Errorf("failed to update device key display name: %v", uploadRes.Error)
 		}
@@ -479,7 +485,9 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
 	}
 	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
-	a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes)
+	if err := a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes); err != nil {
+		return err
+	}
 	if err := evacuateRes.Error; err != nil {
 		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
 	}
