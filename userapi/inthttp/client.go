@@ -269,8 +269,8 @@ func (h *httpUserInternalAPI) QueryKeyBackup(
 	ctx context.Context,
 	request *api.QueryKeyBackupRequest,
 	response *api.QueryKeyBackupResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"QueryKeyBackup", h.apiURL+QueryKeyBackupPath,
 		h.httpClient, ctx, request, response,
 	)

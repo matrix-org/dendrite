@@ -151,11 +151,12 @@ func (h *httpRoomserverInternalAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) {
+) error {
 	response.ErrMsg = httputil.CallInternalRPCAPI(
 		"InputRoomEvents", h.roomserverURL+RoomserverInputRoomEventsPath,
 		h.httpClient, ctx, request, response,
 	).Error()
+	return nil
 }
 
 func (h *httpRoomserverInternalAPI) PerformInvite(
@@ -173,8 +174,8 @@ func (h *httpRoomserverInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
 	response *api.PerformJoinResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformJoin", h.roomserverURL+RoomserverPerformJoinPath,
 		h.httpClient, ctx, request, response,
 	)
@@ -184,8 +185,8 @@ func (h *httpRoomserverInternalAPI) PerformPeek(
 	ctx context.Context,
 	request *api.PerformPeekRequest,
 	response *api.PerformPeekResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformPeek", h.roomserverURL+RoomserverPerformPeekPath,
 		h.httpClient, ctx, request, response,
 	)
@@ -206,8 +207,8 @@ func (h *httpRoomserverInternalAPI) PerformUnpeek(
 	ctx context.Context,
 	request *api.PerformUnpeekRequest,
 	response *api.PerformUnpeekResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformUnpeek", h.roomserverURL+RoomserverPerformUnpeekPath,
 		h.httpClient, ctx, request, response,
 	)
@@ -217,8 +218,8 @@ func (h *httpRoomserverInternalAPI) PerformRoomUpgrade(
 	ctx context.Context,
 	request *api.PerformRoomUpgradeRequest,
 	response *api.PerformRoomUpgradeResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformRoomUpgrade", h.roomserverURL+RoomserverPerformRoomUpgradePath,
 		h.httpClient, ctx, request, response,
 	)
@@ -239,8 +240,8 @@ func (h *httpRoomserverInternalAPI) PerformPublish(
 	ctx context.Context,
 	request *api.PerformPublishRequest,
 	response *api.PerformPublishResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformPublish", h.roomserverURL+RoomserverPerformPublishPath,
 		h.httpClient, ctx, request, response,
 	)
@@ -250,8 +251,8 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 	ctx context.Context,
 	request *api.PerformAdminEvacuateRoomRequest,
 	response *api.PerformAdminEvacuateRoomResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformAdminEvacuateRoom", h.roomserverURL+RoomserverPerformAdminEvacuateRoomPath,
 		h.httpClient, ctx, request, response,
 	)
@@ -261,8 +262,8 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateUser(
 	ctx context.Context,
 	request *api.PerformAdminEvacuateUserRequest,
 	response *api.PerformAdminEvacuateUserResponse,
-) {
-	_ = httputil.CallInternalRPCAPI(
+) error {
+	return httputil.CallInternalRPCAPI(
 		"PerformAdminEvacuateUser", h.roomserverURL+RoomserverPerformAdminEvacuateUserPath,
 		h.httpClient, ctx, request, response,
 	)

@@ -44,7 +44,7 @@ func (r *Peeker) PerformPeek(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
 	res *api.PerformPeekResponse,
-) {
+) error {
 	roomID, err := r.performPeek(ctx, req)
 	if err != nil {
 		perr, ok := err.(*api.PerformError)
@@ -57,6 +57,7 @@ func (r *Peeker) PerformPeek(
 		}
 	}
 	res.RoomID = roomID
+	return nil
 }
 
 func (r *Peeker) performPeek(

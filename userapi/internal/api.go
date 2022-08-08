@@ -627,16 +627,16 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 	res.KeyETag = etag
 }
 
-func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
+func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) error {
 	version, algorithm, authData, etag, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, req.Version)
 	res.Version = version
 	if err != nil {
 		if err == sql.ErrNoRows {
 			res.Exists = false
-			return
+			return nil
 		}
 		res.Error = fmt.Sprintf("failed to query key backup: %s", err)
-		return
+		return nil
 	}
 	res.Algorithm = algorithm
 	res.AuthData = authData
@@ -648,15 +648,16 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 		if err != nil {
 			res.Error = fmt.Sprintf("failed to count keys: %s", err)
 		}
-		return
+		return nil
 	}
 
 	result, err := a.DB.GetBackupKeys(ctx, version, req.UserID, req.KeysForRoomID, req.KeysForSessionID)
 	if err != nil {
 		res.Error = fmt.Sprintf("failed to query keys: %s", err)
-		return
+		return nil
 	}
 	res.Keys = result
+	return nil
 }
 
 func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.QueryNotificationsRequest, res *api.QueryNotificationsResponse) error {

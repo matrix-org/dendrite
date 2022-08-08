@@ -45,12 +45,13 @@ func (r *Upgrader) PerformRoomUpgrade(
 	ctx context.Context,
 	req *api.PerformRoomUpgradeRequest,
 	res *api.PerformRoomUpgradeResponse,
-) {
+) error {
 	res.NewRoomID, res.Error = r.performRoomUpgrade(ctx, req)
 	if res.Error != nil {
 		res.NewRoomID = ""
 		logrus.WithContext(ctx).WithError(res.Error).Error("Room upgrade failed")
 	}
+	return nil
 }
 
 func (r *Upgrader) performRoomUpgrade(
