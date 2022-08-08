@@ -20,6 +20,10 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -28,9 +32,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 type messagesReq struct {
@@ -262,7 +263,7 @@ func (m *messagesResp) applyLazyLoadMembers(
 		}
 	}
 	for _, evt := range membershipToUser {
-		m.State = append(m.State, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatSync))
+		m.State = append(m.State, gomatrixserverlib.HeaderedToClientEvent(evt, gomatrixserverlib.FormatAll))
 	}
 }
 
@@ -594,6 +595,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 			[]string{},
 			[]string{},
 			nil, true,
+			gomatrixserverlib.HistoryVisibilityShared,
 		)
 		if err != nil {
 			return nil, err

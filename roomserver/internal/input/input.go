@@ -25,6 +25,11 @@ import (
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -35,10 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -60,9 +61,9 @@ import (
 // per-room durable consumers will only progress through the stream
 // as events are processed.
 //
-//       A BC *  -> positions of each consumer (* = ephemeral)
-//       ⌄ ⌄⌄ ⌄
-// ABAABCAABCAA  -> newest (letter = subject for each message)
+//	      A BC *  -> positions of each consumer (* = ephemeral)
+//	      ⌄ ⌄⌄ ⌄
+//	ABAABCAABCAA  -> newest (letter = subject for each message)
 //
 // In this example, A is still processing an event but has two
 // pending events to process afterwards. Both B and C are caught

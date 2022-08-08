@@ -54,6 +54,10 @@ global:
   # e.g. localhost:443
   well_known_server_name: ""
 
+  # The server name to delegate client-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_client_name: ""
+
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
   trusted_third_party_id_servers:
@@ -99,6 +103,11 @@ global:
     addresses:
       - hostname:4222
 
+    # Disable the validation of TLS certificates of NATS. This is
+    # not recommended in production since it may allow NATS traffic
+    # to be sent to an insecure endpoint.
+    disable_tls_validation: false
+
     # The prefix to use for stream names for this homeserver - really only useful
     # if you are running more than one Dendrite server on the same NATS deployment.
     topic_prefix: Dendrite
@@ -125,7 +134,7 @@ app_service_api:
 
   # Database configuration for this component.
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_appservice?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_appservice?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -182,13 +191,16 @@ client_api:
 
   # TURN server information that this homeserver should send to clients.
   turn:
-    turn_user_lifetime: ""
+    turn_user_lifetime: "5m"
     turn_uris:
     #  - turn:turn.server.org?transport=udp
     #  - turn:turn.server.org?transport=tcp
     turn_shared_secret: ""
-    turn_username: ""
-    turn_password: ""
+    # If your TURN server requires static credentials, then you will need to enter
+    # them here instead of supplying a shared secret. Note that these credentials
+    # will be visible to clients!
+    # turn_username: ""
+    # turn_password: ""
 
   # Settings for rate-limited endpoints. Rate limiting kicks in after the threshold
   # number of "slots" have been taken by requests from a specific host. Each "slot"
@@ -196,7 +208,7 @@ client_api:
   # and appservice users are exempt from rate limiting by default.
   rate_limiting:
     enabled: true
-    threshold: 5
+    threshold: 20
     cooloff_ms: 500
     exempt_user_ids:
     #  - "@user:domain.com"
@@ -209,7 +221,7 @@ federation_api:
   external_api:
     listen: http://[::]:8072
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_federationapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_federationapi?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -246,7 +258,7 @@ key_server:
     listen: http://[::]:7779 # The listen address for incoming API requests
     connect: http://key_server:7779 # The connect address for other components to use
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_keyserver?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_keyserver?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -259,7 +271,7 @@ media_api:
   external_api:
     listen: http://[::]:8074
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_mediaapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_mediaapi?sslmode=disable
     max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -296,7 +308,7 @@ mscs:
   #  - msc2836  # (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
   #  - msc2946  # (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_mscs?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_mscs?sslmode=disable
     max_open_conns: 5
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -307,7 +319,7 @@ room_server:
     listen: http://[::]:7770 # The listen address for incoming API requests
     connect: http://room_server:7770 # The connect address for other components to use
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_roomserver?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_roomserver?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -320,7 +332,7 @@ sync_api:
   external_api:
     listen: http://[::]:8073
   database:
-    connection_string: postgresql://username@password:hostname/dendrite_syncapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_syncapi?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
@@ -336,7 +348,7 @@ user_api:
     listen: http://[::]:7781 # The listen address for incoming API requests
     connect: http://user_api:7781 # The connect address for other components to use
   account_database:
-    connection_string: postgresql://username@password:hostname/dendrite_userapi?sslmode=disable
+    connection_string: postgresql://username:password@hostname/dendrite_userapi?sslmode=disable
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1

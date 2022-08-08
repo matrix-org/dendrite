@@ -20,6 +20,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
@@ -27,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // A Database is used to store room events and stream offsets.
@@ -54,22 +55,31 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 	// db.SetMaxOpenConns(20)
 
 	// Create the tables.
-	if err := d.create(db); err != nil {
+	if err = d.create(db); err != nil {
 		return nil, err
 	}
 
-	// Then execute the migrations. By this point the tables are created with the latest
-	// schemas.
-	m := sqlutil.NewMigrations()
-	deltas.LoadAddForgottenColumn(m)
-	deltas.LoadStateBlocksRefactor(m)
-	if err := m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
+	// Special case, since this migration uses several tables, so it needs to
+	// be sure that all tables are created first.
+	// TODO: Remove when we are sure we are not having goose artefacts in the db
+	// This forces an error, which indicates the migration is already applied, since the
+	// column event_nid was removed from the table
+	var eventNID int
+	err = db.QueryRow("SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan(&eventNID)
+	if err == nil {
+		m := sqlutil.NewMigrator(db)
+		m.AddMigrations(sqlutil.Migration{
+			Version: "roomserver: state blocks refactor",
+			Up:      deltas.UpStateBlocksRefactor,
+		})
+		if err = m.Up(base.Context()); err != nil {
+			return nil, err
+		}
 	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err := d.prepare(db, writer, cache); err != nil {
+	if err = d.prepare(db, writer, cache); err != nil {
 		return nil, err
 	}
 

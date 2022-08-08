@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 
@@ -30,7 +29,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	data, err := ioutil.ReadFile(*requestKey)
+	data, err := os.ReadFile(*requestKey)
 	if err != nil {
 		panic(err)
 	}

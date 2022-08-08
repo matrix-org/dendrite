@@ -22,7 +22,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"strings"
@@ -144,7 +143,7 @@ func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPat
 	}
 
 	// load the authority key
-	dat, err := ioutil.ReadFile(authorityKeyPath)
+	dat, err := os.ReadFile(authorityKeyPath)
 	if err != nil {
 		return err
 	}
@@ -158,7 +157,7 @@ func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPat
 	}
 
 	// load the authority certificate
-	dat, err = ioutil.ReadFile(authorityCertPath)
+	dat, err = os.ReadFile(authorityCertPath)
 	if err != nil {
 		return err
 	}

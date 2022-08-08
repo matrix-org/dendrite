@@ -23,7 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 )
 
@@ -96,12 +95,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	}
 	presence, err := NewPostgresPresenceTable(d.db)
 	if err != nil {
-		return nil, err
-	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{

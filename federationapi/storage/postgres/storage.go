@@ -82,9 +82,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadRemoveRoomsTable(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "federationsender: drop federationsender_rooms",
+		Up:      deltas.UpRemoveRoomsTable,
+	})
+	err = m.Up(base.Context())
+	if err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{

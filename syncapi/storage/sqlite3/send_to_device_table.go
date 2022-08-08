@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/sirupsen/logrus"
@@ -54,7 +55,7 @@ const selectSendToDeviceMessagesSQL = `
 
 const deleteSendToDeviceMessagesSQL = `
 	DELETE FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id < $3
+	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
 `
 
 const selectMaxSendToDeviceIDSQL = "" +
@@ -73,6 +74,15 @@ func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 		db: db,
 	}
 	_, err := db.Exec(sendToDeviceSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: drop sent_by_token",
+		Up:      deltas.UpRemoveSendToDeviceSentColumn,
+	})
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}

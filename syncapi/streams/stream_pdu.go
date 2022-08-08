@@ -12,9 +12,12 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
 	"go.uber.org/atomic"
+
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 )
 
 // The max number of per-room goroutines to have running.
@@ -34,6 +37,7 @@ type PDUStreamProvider struct {
 	// userID+deviceID -> lazy loading cache
 	lazyLoadCache caching.LazyLoadCache
 	rsAPI         roomserverAPI.SyncRoomserverAPI
+	notifier      *notifier.Notifier
 }
 
 func (p *PDUStreamProvider) worker() {
@@ -100,6 +104,15 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
+	// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
+	// TODO: This might be inefficient, when joined to many and/or large rooms.
+	for _, roomID := range joinedRoomIDs {
+		joinedUsers := p.notifier.JoinedUsers(roomID)
+		for _, sharedUser := range joinedUsers {
+			p.lazyLoadCache.InvalidateLazyLoadedUser(req.Device, roomID, sharedUser)
+		}
+	}
+
 	// Build up a /sync response. Add joined rooms.
 	var reqMutex sync.Mutex
 	var reqWaitGroup sync.WaitGroup
@@ -109,12 +122,11 @@ func (p *PDUStreamProvider) CompleteSync(
 		p.queue(func() {
 			defer reqWaitGroup.Done()
 
-			var jr *types.JoinResponse
-			jr, err = p.getJoinResponseForCompleteSync(
+			jr, jerr := p.getJoinResponseForCompleteSync(
 				ctx, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device,
 			)
-			if err != nil {
-				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
+			if jerr != nil {
+				req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
 				return
 			}
 
@@ -262,9 +274,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		var pos types.StreamPosition
 		if _, pos, err = p.DB.PositionInTopology(ctx, mostRecentEventID); err == nil {
 			switch {
-			case r.Backwards && pos > latestPosition:
+			case r.Backwards && pos < latestPosition:
 				fallthrough
-			case !r.Backwards && pos < latestPosition:
+			case !r.Backwards && pos > latestPosition:
 				latestPosition = pos
 			}
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -21,14 +22,14 @@ import (
 // Move these to a more sensible place.
 
 func UpdateToInviteMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) ([]api.OutputEvent, error) {
 	// We may have already sent the invite to the user, either because we are
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, err := mu.SetToInvite(add)
+	needsSending, retired, err := mu.Update(tables.MembershipStateInvite, add)
 	if err != nil {
 		return nil, err
 	}
@@ -38,13 +39,23 @@ func UpdateToInviteMembership(
 		// room event stream. This ensures that the consumers only have to
 		// consider a single stream of events when determining whether a user
 		// is invited, rather than having to combine multiple streams themselves.
-		onie := api.OutputNewInviteEvent{
-			Event:       add.Headered(roomVersion),
-			RoomVersion: roomVersion,
-		}
 		updates = append(updates, api.OutputEvent{
-			Type:           api.OutputTypeNewInviteEvent,
-			NewInviteEvent: &onie,
+			Type: api.OutputTypeNewInviteEvent,
+			NewInviteEvent: &api.OutputNewInviteEvent{
+				Event:       add.Headered(roomVersion),
+				RoomVersion: roomVersion,
+			},
+		})
+	}
+	for _, eventID := range retired {
+		updates = append(updates, api.OutputEvent{
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:          eventID,
+				Membership:       gomatrixserverlib.Join,
+				RetiredByEventID: add.EventID(),
+				TargetUserID:     *add.StateKey(),
+			},
 		})
 	}
 	return updates, nil
@@ -225,13 +236,34 @@ func LoadStateEvents(
 func CheckServerAllowedToSeeEvent(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName, isServerInRoom bool,
 ) (bool, error) {
+	stateAtEvent, err := db.GetHistoryVisibilityState(ctx, info, eventID, string(serverName))
+	switch err {
+	case nil:
+		// No error, so continue normally
+	case tables.OptimisationNotSupportedError:
+		// The database engine didn't support this optimisation, so fall back to using
+		// the old and slow method
+		stateAtEvent, err = slowGetHistoryVisibilityState(ctx, db, info, eventID, serverName)
+		if err != nil {
+			return false, err
+		}
+	default:
+		// Something else went wrong
+		return false, err
+	}
+	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
+}
+
+func slowGetHistoryVisibilityState(
+	ctx context.Context, db storage.Database, info *types.RoomInfo, eventID string, serverName gomatrixserverlib.ServerName,
+) ([]*gomatrixserverlib.Event, error) {
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtEvent(ctx, eventID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
+			return nil, nil
 		}
-		return false, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)
+		return nil, fmt.Errorf("roomState.LoadStateAtEvent: %w", err)
 	}
 
 	// Extract all of the event state key NIDs from the room state.
@@ -243,7 +275,7 @@ func CheckServerAllowedToSeeEvent(
 	// Then request those state key NIDs from the database.
 	stateKeys, err := db.EventStateKeys(ctx, stateKeyNIDs)
 	if err != nil {
-		return false, fmt.Errorf("db.EventStateKeys: %w", err)
+		return nil, fmt.Errorf("db.EventStateKeys: %w", err)
 	}
 
 	// If the event state key doesn't match the given servername
@@ -266,15 +298,10 @@ func CheckServerAllowedToSeeEvent(
 	}
 
 	if len(filteredEntries) == 0 {
-		return false, nil
+		return nil, nil
 	}
 
-	stateAtEvent, err := LoadStateEvents(ctx, db, filteredEntries)
-	if err != nil {
-		return false, err
-	}
-
-	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
+	return LoadStateEvents(ctx, db, filteredEntries)
 }
 
 // TODO: Remove this when we have tests to assert correctness of this function
@@ -382,7 +409,7 @@ func QueryLatestEventsAndState(
 	if err != nil {
 		return err
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		response.RoomExists = false
 		return nil
 	}

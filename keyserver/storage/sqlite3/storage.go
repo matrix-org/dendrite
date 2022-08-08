@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
-	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
@@ -52,12 +51,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 		return nil, err
 	}
 
-	m := sqlutil.NewMigrations()
-	deltas.LoadRefactorKeyChanges(m)
-	deltas.LoadFixCrossSigningSignatureIndexes(m)
-	if err = m.RunDeltas(db, dbProperties); err != nil {
-		return nil, err
-	}
 	if err = kc.Prepare(); err != nil {
 		return nil, err
 	}
