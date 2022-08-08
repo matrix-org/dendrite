@@ -109,8 +109,8 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		FederationAPILookupStateIDsPath,
 		httputil.MakeInternalProxyAPI(
 			"LookupStateIDs",
-			func(ctx context.Context, req *lookupState) {
-				res, err := intAPI.LookupState(ctx, req.S, req.RoomID, req.EventID, req.RoomVersion)
+			func(ctx context.Context, req *lookupStateIDs) {
+				res, err := intAPI.LookupStateIDs(ctx, req.S, req.RoomID, req.EventID)
 				req.Res, req.Err = &res, federationClientError(err)
 			},
 		),
