@@ -23,15 +23,16 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/matrix-org/dendrite/userapi/api"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
 
-// PostJSON performs a POST request with JSON on an internal HTTP API
-func PostJSON(
+// PostJSON performs a POST request with JSON on an internal HTTP API.
+// The error will match the errtype if returned from the remote API, or
+// will be a different type if there was a problem reaching the API.
+func PostJSON[reqtype, restype any, errtype error](
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
-	apiURL string, request, response interface{},
+	apiURL string, request *reqtype, response *restype,
 ) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
@@ -70,16 +71,14 @@ func PostJSON(
 		return err
 	}
 	if res.StatusCode != http.StatusOK {
-		var errorBody struct {
-			Message string `json:"message"`
-		}
-		if _, ok := response.(*api.PerformKeyBackupResponse); ok { // TODO: remove this, once cross-boundary errors are a thing
-			return nil
-		}
+		var errorBody errtype
 		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr == nil {
-			return fmt.Errorf("internal API: %d from %s: %s", res.StatusCode, apiURL, errorBody.Message)
+			return fmt.Errorf("internal API: %d from %s with unparsable error body", res.StatusCode, apiURL)
 		}
-		return fmt.Errorf("internal API: %d from %s", res.StatusCode, apiURL)
+		return errorBody
 	}
-	return json.NewDecoder(res.Body).Decode(response)
+	if err := json.NewDecoder(res.Body).Decode(response); err != nil {
+		return fmt.Errorf("json.NewDecoder.Decode: %w", err)
+	}
+	return nil
 }
