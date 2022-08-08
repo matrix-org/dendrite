@@ -21,6 +21,7 @@ import (
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
@@ -53,21 +54,22 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 	// TODO: Remove when we are sure we are not having goose artefacts in the db
 	// This forces an error, which indicates the migration is already applied, since the
 	// column event_nid was removed from the table
-	err = db.QueryRow("SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan()
+	var eventNID int
+	err = db.QueryRow("SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan(&eventNID)
 	if err == nil {
 		m := sqlutil.NewMigrator(db)
 		m.AddMigrations(sqlutil.Migration{
 			Version: "roomserver: state blocks refactor",
 			Up:      deltas.UpStateBlocksRefactor,
 		})
-		if err := m.Up(base.Context()); err != nil {
+		if err = m.Up(base.Context()); err != nil {
 			return nil, err
 		}
 	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err := d.prepare(db, writer, cache); err != nil {
+	if err = d.prepare(db, writer, cache); err != nil {
 		return nil, err
 	}
 
