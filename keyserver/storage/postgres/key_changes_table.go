@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/postgres/deltas"
@@ -73,6 +75,16 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 			Up:      deltas.UpRefactorKeyChanges,
 		})
 		return s, m.Up(context.Background())
+	} else {
+		switch e := err.(type) {
+		case *pq.Error:
+			// ignore undefined_column (42703) errors, as this is expected at this point
+			if e.Code == "42703" {
+				return s, nil
+			}
+		default:
+			return nil, err
+		}
 	}
 	return s, nil
 }

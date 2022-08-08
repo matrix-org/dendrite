@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/lib/pq"
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 
@@ -63,6 +64,16 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 			Up:      deltas.UpStateBlocksRefactor,
 		})
 		if err = m.Up(base.Context()); err != nil {
+			return nil, err
+		}
+	} else {
+		switch e := err.(type) {
+		case *pq.Error:
+			// ignore undefined_column (42703) errors, as this is expected at this point
+			if e.Code != "42703" {
+				return nil, err
+			}
+		default:
 			return nil, err
 		}
 	}
