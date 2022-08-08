@@ -189,6 +189,9 @@ func (p *presenceStatements) ExpirePresence(
 	ctx context.Context,
 ) ([]types.PresenceNotify, error) {
 	rows, err := p.expirePresenceStmt.QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	presences := make([]types.PresenceNotify, 0)
 	i := 0
 	for rows.Next() {
