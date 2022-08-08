@@ -20,6 +20,12 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	).Serve(internalAPIMux)
 
 	httputil.NewInternalAPIServer(
+		"PerformInvite",
+		FederationAPIPerformInviteRequestPath,
+		intAPI.PerformInvite,
+	).Serve(internalAPIMux)
+
+	httputil.NewInternalAPIServer(
 		"PerformLeave",
 		FederationAPIPerformLeaveRequestPath,
 		intAPI.PerformLeave,
