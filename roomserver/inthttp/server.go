@@ -100,11 +100,6 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 
 	internalAPIMux.Handle(
-		RoomserverQueryServerJoinedToRoomPath,
-		httputil.MakeInternalRPCAPI("RoomserverQueryServerJoinedToRoom", r.QueryServerJoinedToRoom),
-	)
-
-	internalAPIMux.Handle(
 		RoomserverQueryServerAllowedToSeeEventPath,
 		httputil.MakeInternalRPCAPI("RoomserverQueryServerAllowedToSeeEvent", r.QueryServerAllowedToSeeEvent),
 	)
