@@ -79,8 +79,8 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 		switch e := err.(type) {
 		case *pq.Error:
 			// ignore undefined_column (42703) errors, as this is expected at this point
-			if e.Code == "42703" {
-				return s, nil
+			if e.Code != "42703" {
+				return nil, err
 			}
 		default:
 			return nil, err
