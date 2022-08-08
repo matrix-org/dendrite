@@ -78,11 +78,6 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	)
 
 	internalAPIMux.Handle(
-		QueryAccessTokenPath,
-		httputil.MakeInternalRPCAPI("UserAPIQueryAccessToken", s.QueryAccessToken),
-	)
-
-	internalAPIMux.Handle(
 		QueryDevicesPath,
 		httputil.MakeInternalRPCAPI("UserAPIQueryDevices", s.QueryDevices),
 	)
