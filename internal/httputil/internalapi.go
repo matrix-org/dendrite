@@ -63,8 +63,5 @@ func CallInternalProxyAPI[req, res any, errtype error](name, url string, client 
 	defer span.Finish()
 
 	var response res
-	if err := PostJSON[req, res, errtype](ctx, span, client, url, request, &response); err != nil {
-		return response, err
-	}
-	return response, nil
+	return response, PostJSON[req, res, errtype](ctx, span, client, url, request, &response)
 }

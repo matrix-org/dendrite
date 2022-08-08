@@ -72,8 +72,8 @@ func PostJSON[reqtype, restype any, errtype error](
 	}
 	if res.StatusCode != http.StatusOK {
 		var errorBody errtype
-		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr == nil {
-			return fmt.Errorf("internal API: %d from %s with unparsable error body", res.StatusCode, apiURL)
+		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr != nil {
+			return fmt.Errorf("internal API: %d from %s (failed to decode error: %s)", res.StatusCode, apiURL, msgerr)
 		}
 		return errorBody
 	}
