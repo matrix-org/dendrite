@@ -24,16 +24,16 @@ import (
 func addRoutesLoginToken(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	internalAPIMux.Handle(
 		PerformLoginTokenCreationPath,
-		httputil.MakeInternalRPCAPI("PerformLoginTokenCreation", s.PerformLoginTokenCreation),
+		httputil.MakeInternalRPCAPI("UserAPIPerformLoginTokenCreation", s.PerformLoginTokenCreation),
 	)
 
 	internalAPIMux.Handle(
 		PerformLoginTokenDeletionPath,
-		httputil.MakeInternalRPCAPI("PerformLoginTokenDeletion", s.PerformLoginTokenDeletion),
+		httputil.MakeInternalRPCAPI("UserAPIPerformLoginTokenDeletion", s.PerformLoginTokenDeletion),
 	)
 
 	internalAPIMux.Handle(
 		QueryLoginTokenPath,
-		httputil.MakeInternalRPCAPI("QueryLoginToken", s.QueryLoginToken),
+		httputil.MakeInternalRPCAPI("UserAPIQueryLoginToken", s.QueryLoginToken),
 	)
 }
