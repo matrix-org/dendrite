@@ -10,11 +10,11 @@ import (
 func AddRoutes(a api.AppServiceInternalAPI, internalAPIMux *mux.Router) {
 	internalAPIMux.Handle(
 		AppServiceRoomAliasExistsPath,
-		httputil.MakeInternalRPCAPI("AppserviceRoomAliasExists", a.RoomAliasExists),
+		httputil.MakeInternalRPCAPI(AppServiceRoomAliasExistsPath, a.RoomAliasExists),
 	)
 
 	internalAPIMux.Handle(
 		AppServiceUserIDExistsPath,
-		httputil.MakeInternalRPCAPI("AppserviceUserIDExists", a.UserIDExists),
+		httputil.MakeInternalRPCAPI(AppServiceUserIDExistsPath, a.UserIDExists),
 	)
 }
