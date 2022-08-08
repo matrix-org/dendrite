@@ -36,7 +36,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 
 	internalAPIMux.Handle(
 		FederationAPIPerformBroadcastEDUPath,
-		httputil.MakeInternalRPCAPI("PerformJoinRequest", intAPI.PerformBroadcastEDU),
+		httputil.MakeInternalRPCAPI("PerformBroadcastEDU", intAPI.PerformBroadcastEDU),
 	)
 
 	internalAPIMux.Handle(
