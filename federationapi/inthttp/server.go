@@ -1,6 +1,7 @@
 package inthttp
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -13,333 +14,189 @@ import (
 // AddRoutes adds the FederationInternalAPI handlers to the http.ServeMux.
 // nolint:gocyclo
 func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
-	httputil.NewInternalAPIServer(
-		"QueryJoinedHostServerNamesInRoom",
+	internalAPIMux.Handle(
 		FederationAPIQueryJoinedHostServerNamesInRoomPath,
-		intAPI.QueryJoinedHostServerNamesInRoom,
-	).Serve(internalAPIMux)
+		httputil.MakeInternalRPCAPI("QueryJoinedHostServerNamesInRoom", intAPI.QueryJoinedHostServerNamesInRoom),
+	)
 
-	httputil.NewInternalAPIServer(
-		"PerformInvite",
+	internalAPIMux.Handle(
 		FederationAPIPerformInviteRequestPath,
-		intAPI.PerformInvite,
-	).Serve(internalAPIMux)
+		httputil.MakeInternalRPCAPI("PerformInvite", intAPI.PerformInvite),
+	)
 
-	httputil.NewInternalAPIServer(
-		"PerformLeave",
+	internalAPIMux.Handle(
 		FederationAPIPerformLeaveRequestPath,
-		intAPI.PerformLeave,
-	).Serve(internalAPIMux)
+		httputil.MakeInternalRPCAPI("PerformLeave", intAPI.PerformLeave),
+	)
 
-	httputil.NewInternalAPIServer(
-		"PerformDirectoryLookupRequest",
+	internalAPIMux.Handle(
 		FederationAPIPerformDirectoryLookupRequestPath,
-		intAPI.PerformDirectoryLookup,
-	).Serve(internalAPIMux)
+		httputil.MakeInternalRPCAPI("PerformDirectoryLookupRequest", intAPI.PerformDirectoryLookup),
+	)
 
-	httputil.NewInternalAPIServer(
-		"PerformBroadcastEDU",
+	internalAPIMux.Handle(
 		FederationAPIPerformBroadcastEDUPath,
-		intAPI.PerformBroadcastEDU,
-	).Serve(internalAPIMux)
+		httputil.MakeInternalRPCAPI("PerformJoinRequest", intAPI.PerformBroadcastEDU),
+	)
 
 	internalAPIMux.Handle(
 		FederationAPIPerformJoinRequestPath,
-		httputil.MakeInternalAPI("PerformJoinRequest", func(req *http.Request) util.JSONResponse {
-			var request api.PerformJoinRequest
-			var response api.PerformJoinResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			intAPI.PerformJoin(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+		httputil.MakeInternalRPCAPI(
+			"PerformJoinRequest",
+			func(ctx context.Context, req *api.PerformJoinRequest, res *api.PerformJoinResponse) error {
+				intAPI.PerformJoin(ctx, req, res)
+				return nil
+			},
+		),
 	)
 
 	internalAPIMux.Handle(
-		FederationAPIGetUserDevicesPath,
-		httputil.MakeInternalAPI("GetUserDevices", func(req *http.Request) util.JSONResponse {
-			var request getUserDevices
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.GetUserDevices(req.Context(), request.S, request.UserID)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		FederationAPIPerformJoinRequestPath,
+		httputil.MakeInternalProxyAPI(
+			"GetUserDevices",
+			func(ctx context.Context, req *getUserDevices) {
+				res, err := intAPI.GetUserDevices(ctx, req.S, req.UserID)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIClaimKeysPath,
-		httputil.MakeInternalAPI("ClaimKeys", func(req *http.Request) util.JSONResponse {
-			var request claimKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.ClaimKeys(req.Context(), request.S, request.OneTimeKeys)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"ClaimKeys",
+			func(ctx context.Context, req *claimKeys) {
+				res, err := intAPI.ClaimKeys(ctx, req.S, req.OneTimeKeys)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIQueryKeysPath,
-		httputil.MakeInternalAPI("QueryKeys", func(req *http.Request) util.JSONResponse {
-			var request queryKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.QueryKeys(req.Context(), request.S, request.Keys)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"QueryKeys",
+			func(ctx context.Context, req *queryKeys) {
+				res, err := intAPI.QueryKeys(ctx, req.S, req.Keys)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIBackfillPath,
-		httputil.MakeInternalAPI("Backfill", func(req *http.Request) util.JSONResponse {
-			var request backfill
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.Backfill(req.Context(), request.S, request.RoomID, request.Limit, request.EventIDs)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"Backfill",
+			func(ctx context.Context, req *backfill) {
+				res, err := intAPI.Backfill(ctx, req.S, req.RoomID, req.Limit, req.EventIDs)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPILookupStatePath,
-		httputil.MakeInternalAPI("LookupState", func(req *http.Request) util.JSONResponse {
-			var request lookupState
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.LookupState(req.Context(), request.S, request.RoomID, request.EventID, request.RoomVersion)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"LookupState",
+			func(ctx context.Context, req *lookupState) {
+				res, err := intAPI.LookupState(ctx, req.S, req.RoomID, req.EventID, req.RoomVersion)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPILookupStateIDsPath,
-		httputil.MakeInternalAPI("LookupStateIDs", func(req *http.Request) util.JSONResponse {
-			var request lookupStateIDs
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.LookupStateIDs(req.Context(), request.S, request.RoomID, request.EventID)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"LookupStateIDs",
+			func(ctx context.Context, req *lookupState) {
+				res, err := intAPI.LookupState(ctx, req.S, req.RoomID, req.EventID, req.RoomVersion)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPILookupMissingEventsPath,
-		httputil.MakeInternalAPI("LookupMissingEvents", func(req *http.Request) util.JSONResponse {
-			var request lookupMissingEvents
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.LookupMissingEvents(req.Context(), request.S, request.RoomID, request.Missing, request.RoomVersion)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
+		httputil.MakeInternalProxyAPI(
+			"LookupMissingEvents",
+			func(ctx context.Context, req *lookupMissingEvents) {
+				res, err := intAPI.LookupMissingEvents(ctx, req.S, req.RoomID, req.Missing, req.RoomVersion)
+				for _, event := range res.Events {
+					var js []byte
+					js, err = json.Marshal(event)
+					if err != nil {
+						req.Err = federationClientError(err)
+						return
 					}
+					req.Res.Events = append(req.Res.Events, js)
 				}
-			}
-			for _, event := range res.Events {
-				js, err := json.Marshal(event)
-				if err != nil {
-					return util.MessageResponse(http.StatusInternalServerError, err.Error())
-				}
-				request.Res.Events = append(request.Res.Events, js)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+				req.Err = federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIGetEventPath,
-		httputil.MakeInternalAPI("GetEvent", func(req *http.Request) util.JSONResponse {
-			var request getEvent
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.GetEvent(req.Context(), request.S, request.EventID)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"GetEvent",
+			func(ctx context.Context, req *getEvent) {
+				res, err := intAPI.GetEvent(ctx, req.S, req.EventID)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIGetEventAuthPath,
-		httputil.MakeInternalAPI("GetEventAuth", func(req *http.Request) util.JSONResponse {
-			var request getEventAuth
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.GetEventAuth(req.Context(), request.S, request.RoomVersion, request.RoomID, request.EventID)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = &res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"GetEventAuth",
+			func(ctx context.Context, req *getEventAuth) {
+				res, err := intAPI.GetEventAuth(ctx, req.S, req.RoomVersion, req.RoomID, req.EventID)
+				req.Res, req.Err = &res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIQueryServerKeysPath,
-		httputil.MakeInternalAPI("QueryServerKeys", func(req *http.Request) util.JSONResponse {
-			var request api.QueryServerKeysRequest
-			var response api.QueryServerKeysResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := intAPI.QueryServerKeys(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+		httputil.MakeInternalRPCAPI("QueryServerKeys", intAPI.QueryServerKeys),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPILookupServerKeysPath,
-		httputil.MakeInternalAPI("LookupServerKeys", func(req *http.Request) util.JSONResponse {
-			var request lookupServerKeys
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.LookupServerKeys(req.Context(), request.S, request.KeyRequests)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.ServerKeys = res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"LookupServerKeys",
+			func(ctx context.Context, req *lookupServerKeys) {
+				res, err := intAPI.LookupServerKeys(ctx, req.S, req.KeyRequests)
+				req.ServerKeys, req.Err = res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPIEventRelationshipsPath,
-		httputil.MakeInternalAPI("MSC2836EventRelationships", func(req *http.Request) util.JSONResponse {
-			var request eventRelationships
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.MSC2836EventRelationships(req.Context(), request.S, request.Req, request.RoomVer)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"MSC2836EventRelationships",
+			func(ctx context.Context, req *eventRelationships) {
+				res, err := intAPI.MSC2836EventRelationships(ctx, req.S, req.Req, req.RoomVer)
+				req.Res, req.Err = res, federationClientError(err)
+			},
+		),
 	)
+
 	internalAPIMux.Handle(
 		FederationAPISpacesSummaryPath,
-		httputil.MakeInternalAPI("MSC2946SpacesSummary", func(req *http.Request) util.JSONResponse {
-			var request spacesReq
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			res, err := intAPI.MSC2946Spaces(req.Context(), request.S, request.RoomID, request.SuggestedOnly)
-			if err != nil {
-				ferr, ok := err.(*api.FederationClientError)
-				if ok {
-					request.Err = ferr
-				} else {
-					request.Err = &api.FederationClientError{
-						Err: err.Error(),
-					}
-				}
-			}
-			request.Res = res
-			return util.JSONResponse{Code: http.StatusOK, JSON: request}
-		}),
+		httputil.MakeInternalProxyAPI(
+			"MSC2946SpacesSummary",
+			func(ctx context.Context, req *spacesReq) {
+				res, err := intAPI.MSC2946Spaces(ctx, req.S, req.RoomID, req.SuggestedOnly)
+				req.Res, req.Err = res, federationClientError(err)
+			},
+		),
 	)
+
+	// TODO: Look at this shape
 	internalAPIMux.Handle(FederationAPIQueryPublicKeyPath,
 		httputil.MakeInternalAPI("queryPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.QueryPublicKeysRequest{}
@@ -355,6 +212,8 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+
+	// TODO: Look at this shape
 	internalAPIMux.Handle(FederationAPIInputPublicKeyPath,
 		httputil.MakeInternalAPI("inputPublicKeys", func(req *http.Request) util.JSONResponse {
 			request := api.InputPublicKeysRequest{}
@@ -368,4 +227,17 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
+}
+
+func federationClientError(err error) *api.FederationClientError {
+	if err == nil {
+		return nil
+	}
+	if ferr, ok := err.(*api.FederationClientError); ok {
+		return ferr
+	} else {
+		return &api.FederationClientError{
+			Err: err.Error(),
+		}
+	}
 }

@@ -19,10 +19,34 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 )
+
+func MakeInternalRPCAPI[reqtype, restype any](metricsName string, f func(context.Context, *reqtype, *restype) error) http.Handler {
+	return MakeInternalAPI(metricsName, func(req *http.Request) util.JSONResponse {
+		var request reqtype
+		var response restype
+		if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			return util.MessageResponse(http.StatusBadRequest, err.Error())
+		}
+		if err := f(req.Context(), &request, &response); err != nil {
+			return util.ErrorResponse(err)
+		}
+		return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+	})
+}
+
+func MakeInternalProxyAPI[reqtype any](metricsName string, f func(context.Context, *reqtype)) http.Handler {
+	return MakeInternalAPI(metricsName, func(req *http.Request) util.JSONResponse {
+		var request reqtype
+		if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+			return util.MessageResponse(http.StatusBadRequest, err.Error())
+		}
+		f(req.Context(), &request)
+		return util.JSONResponse{Code: http.StatusOK, JSON: &request}
+	})
+}
 
 type InternalAPIClient[req, res any] struct {
 	name   string
@@ -43,35 +67,4 @@ func (h *InternalAPIClient[req, res]) Call(ctx context.Context, request *req, re
 	defer span.Finish()
 
 	return PostJSON(ctx, span, h.client, h.url, request, response)
-}
-
-type InternalAPIServer[req, res any] struct {
-	name string
-	url  string
-	f    func(context.Context, *req, *res) error
-}
-
-func NewInternalAPIServer[req, res any](name, url string, f func(context.Context, *req, *res) error) *InternalAPIServer[req, res] {
-	return &InternalAPIServer[req, res]{
-		name: name,
-		url:  url,
-		f:    f,
-	}
-}
-
-func (h *InternalAPIServer[req, res]) Serve(mux *mux.Router) {
-	mux.Handle(
-		h.url,
-		MakeInternalAPI(h.name, func(httpReq *http.Request) util.JSONResponse {
-			var request req
-			var response res
-			if err := json.NewDecoder(httpReq.Body).Decode(&request); err != nil {
-				return util.ErrorResponse(err)
-			}
-			if err := h.f(httpReq.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
 }
