@@ -71,11 +71,11 @@ func PostJSON[reqtype, restype any, errtype error](
 		return err
 	}
 	if res.StatusCode != http.StatusOK {
-		errorBody := new(errtype)
-		if err = json.NewDecoder(res.Body).Decode(errorBody); err != nil {
+		var errorBody errtype
+		if err = json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
 			return fmt.Errorf("HTTP %d from %s", res.StatusCode, apiURL)
 		}
-		return *errorBody
+		return errorBody
 	}
 	if err = json.NewDecoder(res.Body).Decode(response); err != nil {
 		return fmt.Errorf("json.NewDecoder.Decode: %w", err)
