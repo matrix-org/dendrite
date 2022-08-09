@@ -26,6 +26,8 @@ INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("invite", 0)
   ON CONFLICT DO NOTHING;
 INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("presence", 0)
   ON CONFLICT DO NOTHING;
+INSERT INTO syncapi_stream_id (stream_name, stream_id) VALUES ("notification", 0)
+  ON CONFLICT DO NOTHING;
 `
 
 const increaseStreamIDStmt = "" +
@@ -76,5 +78,11 @@ func (s *StreamIDStatements) nextAccountDataID(ctx context.Context, txn *sql.Tx)
 func (s *StreamIDStatements) nextPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
 	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
 	err = increaseStmt.QueryRowContext(ctx, "presence").Scan(&pos)
+	return
+}
+
+func (s *StreamIDStatements) nextNotificationID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error) {
+	increaseStmt := sqlutil.TxStmt(txn, s.increaseStreamIDStmt)
+	err = increaseStmt.QueryRowContext(ctx, "notification").Scan(&pos)
 	return
 }

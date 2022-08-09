@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -69,7 +68,7 @@ func Setup(instanceName, storageDirectory, peerURI string) (*Node, error) {
 
 	yggfile := fmt.Sprintf("%s/%s-yggdrasil.conf", storageDirectory, instanceName)
 	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
-		yggconf, e := ioutil.ReadFile(yggfile)
+		yggconf, e := os.ReadFile(yggfile)
 		if e != nil {
 			panic(err)
 		}
@@ -88,7 +87,7 @@ func Setup(instanceName, storageDirectory, peerURI string) (*Node, error) {
 	if err != nil {
 		panic(err)
 	}
-	if e := ioutil.WriteFile(yggfile, j, 0600); e != nil {
+	if e := os.WriteFile(yggfile, j, 0600); e != nil {
 		n.log.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
 	}
 

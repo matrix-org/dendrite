@@ -18,7 +18,7 @@
 package internal
 
 import (
-	"io/ioutil"
+	"io"
 	"log/syslog"
 
 	"github.com/MFAshby/stdemuxerhook"
@@ -63,7 +63,7 @@ func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
 		setupStdLogHook(logrus.InfoLevel)
 	}
 	// Hooks are now configured for stdout/err, so throw away the default logger output
-	logrus.SetOutput(ioutil.Discard)
+	logrus.SetOutput(io.Discard)
 }
 
 func checkSyslogHookParams(params map[string]interface{}) {
