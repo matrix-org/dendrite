@@ -52,7 +52,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	)
 
 	internalAPIMux.Handle(
-		FederationAPIPerformJoinRequestPath,
+		FederationAPIGetUserDevicesPath,
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIGetUserDevices",
 			func(ctx context.Context, req *getUserDevices) (*gomatrixserverlib.RespUserDevices, error) {

@@ -187,8 +187,6 @@ func (h *httpFederationInternalAPI) ClaimKeys(
 type queryKeys struct {
 	S    gomatrixserverlib.ServerName
 	Keys map[string][]string
-	Res  *gomatrixserverlib.RespQueryKeys
-	Err  *api.FederationClientError
 }
 
 func (h *httpFederationInternalAPI) QueryKeys(
@@ -208,8 +206,6 @@ type backfill struct {
 	RoomID   string
 	Limit    int
 	EventIDs []string
-	Res      *gomatrixserverlib.Transaction
-	Err      *api.FederationClientError
 }
 
 func (h *httpFederationInternalAPI) Backfill(
@@ -377,8 +373,6 @@ type spacesReq struct {
 	S             gomatrixserverlib.ServerName
 	SuggestedOnly bool
 	RoomID        string
-	Res           gomatrixserverlib.MSC2946SpacesResponse
-	Err           *api.FederationClientError
 }
 
 func (h *httpFederationInternalAPI) MSC2946Spaces(
