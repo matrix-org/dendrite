@@ -67,10 +67,7 @@ func MakeInternalProxyAPI[reqtype, restype any](metricsName string, f func(conte
 		if err != nil {
 			return util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: &InternalAPIError{
-					Type:    reflect.TypeOf(err).String(),
-					Message: fmt.Sprintf("%s", err),
-				},
+				JSON: err,
 			}
 		}
 		return util.JSONResponse{
@@ -80,11 +77,17 @@ func MakeInternalProxyAPI[reqtype, restype any](metricsName string, f func(conte
 	})
 }
 
-func CallInternalRPCAPI[req, res any](name, url string, client *http.Client, ctx context.Context, request *req, response *res) error {
+func CallInternalRPCAPI[reqtype, restype any](name, url string, client *http.Client, ctx context.Context, request *reqtype, response *restype) error {
 	span, ctx := opentracing.StartSpanFromContext(ctx, name)
 	defer span.Finish()
 
-	return PostJSON[req, res, InternalAPIError](ctx, span, client, url, request, response)
+	var reserr *InternalAPIError
+	if err := PostJSON(ctx, span, client, url, request, response, reserr); err != nil {
+		return err
+	} else if reserr != nil {
+		return reserr
+	}
+	return nil // must be untyped nil
 }
 
 func CallInternalProxyAPI[req, res any, errtype error](name, url string, client *http.Client, ctx context.Context, request *req) (res, error) {
@@ -92,5 +95,11 @@ func CallInternalProxyAPI[req, res any, errtype error](name, url string, client 
 	defer span.Finish()
 
 	var response res
-	return response, PostJSON[req, res, errtype](ctx, span, client, url, request, &response)
+	var reserr *errtype
+	if err := PostJSON(ctx, span, client, url, request, &response, &reserr); err != nil {
+		return response, err
+	} else if reserr != nil {
+		return response, *reserr
+	}
+	return response, nil // must be untyped nil
 }

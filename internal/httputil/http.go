@@ -30,9 +30,9 @@ import (
 // PostJSON performs a POST request with JSON on an internal HTTP API.
 // The error will match the errtype if returned from the remote API, or
 // will be a different type if there was a problem reaching the API.
-func PostJSON[reqtype, restype any, errtype error](
+func PostJSON[reqtype, restype, errtype any](
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
-	apiURL string, request *reqtype, response *restype,
+	apiURL string, request *reqtype, response *restype, reserr *errtype,
 ) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
@@ -71,11 +71,10 @@ func PostJSON[reqtype, restype any, errtype error](
 		return err
 	}
 	if res.StatusCode != http.StatusOK {
-		var errorBody errtype
-		if err = json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
+		if err = json.NewDecoder(res.Body).Decode(reserr); err != nil {
 			return fmt.Errorf("HTTP %d from %s", res.StatusCode, apiURL)
 		}
-		return errorBody
+		return nil
 	}
 	if err = json.NewDecoder(res.Body).Decode(response); err != nil {
 		return fmt.Errorf("json.NewDecoder.Decode: %w", err)

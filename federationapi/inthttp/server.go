@@ -225,9 +225,12 @@ func federationClientError(err error) *api.FederationClientError {
 	if err == nil {
 		return nil
 	}
-	if ferr, ok := err.(*api.FederationClientError); ok {
+	switch ferr := err.(type) {
+	case api.FederationClientError:
+		return &ferr
+	case *api.FederationClientError:
 		return ferr
-	} else {
+	default:
 		return &api.FederationClientError{
 			Err: err.Error(),
 		}
