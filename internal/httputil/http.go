@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,9 +31,9 @@ import (
 // PostJSON performs a POST request with JSON on an internal HTTP API.
 // The error will match the errtype if returned from the remote API, or
 // will be a different type if there was a problem reaching the API.
-func PostJSON[reqtype, restype, errtype any](
+func PostJSON[reqtype, restype any, errtype error](
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
-	apiURL string, request *reqtype, response *restype, reserr *errtype,
+	apiURL string, request *reqtype, response *restype,
 ) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
@@ -70,14 +71,23 @@ func PostJSON[reqtype, restype, errtype any](
 	if err != nil {
 		return err
 	}
+	var body []byte
+	body, err = io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
 	if res.StatusCode != http.StatusOK {
-		if err = json.NewDecoder(res.Body).Decode(reserr); err != nil {
+		if len(body) == 0 {
 			return fmt.Errorf("HTTP %d from %s", res.StatusCode, apiURL)
 		}
-		return nil
+		var reserr errtype
+		if err = json.Unmarshal(body, reserr); err != nil {
+			return fmt.Errorf("HTTP %d from %s", res.StatusCode, apiURL)
+		}
+		return reserr
 	}
-	if err = json.NewDecoder(res.Body).Decode(response); err != nil {
-		return fmt.Errorf("json.NewDecoder.Decode: %w", err)
+	if err = json.Unmarshal(body, response); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
 	return nil
 }

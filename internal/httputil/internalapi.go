@@ -81,25 +81,13 @@ func CallInternalRPCAPI[reqtype, restype any](name, url string, client *http.Cli
 	span, ctx := opentracing.StartSpanFromContext(ctx, name)
 	defer span.Finish()
 
-	var reserr *InternalAPIError
-	if err := PostJSON(ctx, span, client, url, request, response, reserr); err != nil {
-		return err
-	} else if reserr != nil {
-		return reserr
-	}
-	return nil // must be untyped nil
+	return PostJSON[reqtype, restype, InternalAPIError](ctx, span, client, url, request, response)
 }
 
-func CallInternalProxyAPI[req, res any, errtype error](name, url string, client *http.Client, ctx context.Context, request *req) (res, error) {
+func CallInternalProxyAPI[reqtype, restype any, errtype error](name, url string, client *http.Client, ctx context.Context, request *reqtype) (restype, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, name)
 	defer span.Finish()
 
-	var response res
-	var reserr *errtype
-	if err := PostJSON(ctx, span, client, url, request, &response, &reserr); err != nil {
-		return response, err
-	} else if reserr != nil {
-		return response, *reserr
-	}
-	return response, nil // must be untyped nil
+	var response restype
+	return response, PostJSON[reqtype, restype, errtype](ctx, span, client, url, request, &response)
 }
