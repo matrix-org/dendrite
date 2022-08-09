@@ -17,11 +17,22 @@ package httputil
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"reflect"
 
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
 )
+
+type InternalAPIError struct {
+	Type    string
+	Message string
+}
+
+func (e InternalAPIError) Error() string {
+	return fmt.Sprintf("internal API returned %q error: %s", e.Type, e.Message)
+}
 
 func MakeInternalRPCAPI[reqtype, restype any](metricsName string, f func(context.Context, *reqtype, *restype) error) http.Handler {
 	return MakeInternalAPI(metricsName, func(req *http.Request) util.JSONResponse {
@@ -31,9 +42,18 @@ func MakeInternalRPCAPI[reqtype, restype any](metricsName string, f func(context
 			return util.MessageResponse(http.StatusBadRequest, err.Error())
 		}
 		if err := f(req.Context(), &request, &response); err != nil {
-			return util.ErrorResponse(err)
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: &InternalAPIError{
+					Type:    reflect.TypeOf(err).String(),
+					Message: fmt.Sprintf("%s", err),
+				},
+			}
 		}
-		return util.JSONResponse{Code: http.StatusOK, JSON: &response}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: &response,
+		}
 	})
 }
 
@@ -45,9 +65,18 @@ func MakeInternalProxyAPI[reqtype, restype any](metricsName string, f func(conte
 		}
 		response, err := f(req.Context(), &request)
 		if err != nil {
-			return util.ErrorResponse(err)
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: &InternalAPIError{
+					Type:    reflect.TypeOf(err).String(),
+					Message: fmt.Sprintf("%s", err),
+				},
+			}
 		}
-		return util.JSONResponse{Code: http.StatusOK, JSON: response}
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: response,
+		}
 	})
 }
 
@@ -55,7 +84,7 @@ func CallInternalRPCAPI[req, res any](name, url string, client *http.Client, ctx
 	span, ctx := opentracing.StartSpanFromContext(ctx, name)
 	defer span.Finish()
 
-	return PostJSON[req, res, error](ctx, span, client, url, request, response)
+	return PostJSON[req, res, InternalAPIError](ctx, span, client, url, request, response)
 }
 
 func CallInternalProxyAPI[req, res any, errtype error](name, url string, client *http.Client, ctx context.Context, request *req) (res, error) {
