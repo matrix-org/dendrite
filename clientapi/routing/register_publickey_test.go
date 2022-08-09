@@ -340,7 +340,6 @@ func TestNewRegistrationSession(t *testing.T) {
 		"[object]")
 	ethParams := params.(config.EthereumAuthParams)
 	assert.NotEmptyf(ethParams.ChainIDs, "ChainIDs actual: empty, expected not empty")
-	assert.NotEmptyf(ethParams.Nonce, "Nonce actual: \"\", expected: not empty")
 	assert.NotEmptyf(ethParams.Version, "Version actual: \"\", expected: not empty")
 }
 
