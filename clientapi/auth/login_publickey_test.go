@@ -61,7 +61,6 @@ func TestLoginPublicKeyNewSession(t *testing.T) {
 		"err.Code actual: %v, expected: %v", err.Code, http.StatusUnauthorized)
 	challenge := err.JSON.(Challenge)
 	assert.NotEmptyf(challenge.Session, "challenge.Session")
-	assert.NotEmptyf(challenge.Completed, "challenge.Completed")
 	assert.Truef(
 		authtypes.LoginTypePublicKeyEthereum == challenge.Flows[0].Stages[0],
 		"challenge.Flows[0].Stages[0] actual: %v, expected: %v", challenge.Flows[0].Stages[0], authtypes.LoginTypePublicKeyEthereum)
@@ -74,7 +73,6 @@ func TestLoginPublicKeyNewSession(t *testing.T) {
 		"[object]")
 	ethParams := params.(config.EthereumAuthParams)
 	assert.NotEmptyf(ethParams.ChainIDs, "ChainIDs actual: empty, expected not empty")
-	assert.NotEmptyf(ethParams.Nonce, "Nonce actual: \"\", expected: not empty")
 	assert.NotEmptyf(ethParams.Version, "Version actual: \"\", expected: not empty")
 }
 
