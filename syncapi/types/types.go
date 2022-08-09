@@ -21,9 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
 )
 
 var (
@@ -341,8 +342,8 @@ type Response struct {
 		Leave  map[string]LeaveResponse  `json:"leave"`
 	} `json:"rooms"`
 	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
-	} `json:"to_device"`
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
+	} `json:"to_device,omitempty"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
