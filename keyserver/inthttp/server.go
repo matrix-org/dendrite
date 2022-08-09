@@ -27,7 +27,7 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 	)
 
 	internalAPIMux.Handle(
-		PerformClaimKeysPath,
+		PerformDeleteKeysPath,
 		httputil.MakeInternalRPCAPI("KeyserverPerformDeleteKeys", s.PerformDeleteKeys),
 	)
 
