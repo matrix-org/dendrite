@@ -176,7 +176,7 @@ func (h *httpFederationInternalAPI) ClaimKeys(
 	ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string,
 ) (gomatrixserverlib.RespClaimKeys, error) {
 	return httputil.CallInternalProxyAPI[claimKeys, gomatrixserverlib.RespClaimKeys, api.FederationClientError](
-		"GetUserDevices", h.federationAPIURL+FederationAPIGetUserDevicesPath, h.httpClient,
+		"ClaimKeys", h.federationAPIURL+FederationAPIClaimKeysPath, h.httpClient,
 		ctx, &claimKeys{
 			S:           s,
 			OneTimeKeys: oneTimeKeys,
