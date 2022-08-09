@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const queueEDUsSchema = `
@@ -70,10 +71,10 @@ const selectQueueServerNamesSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_queue_edus"
 
 const selectExpiredEDUsSQL = "" +
-	"SELECT DISTINCT json_nid FROM federationsender_queue_edus WHERE expires_at IS NOT NULL AND expires_at <= $1"
+	"SELECT DISTINCT json_nid FROM federationsender_queue_edus WHERE expires_at > 0 AND expires_at <= $1"
 
 const deleteExpiredEDUsSQL = "" +
-	"DELETE FROM federationsender_queue_edus WHERE expires_at IS NOT NULL AND expires_at <= $1"
+	"DELETE FROM federationsender_queue_edus WHERE expires_at > 0 AND expires_at <= $1"
 
 type queueEDUsStatements struct {
 	db                 *sql.DB

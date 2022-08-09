@@ -28,7 +28,7 @@ func UpAddexpiresat(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE federationsender_queue_edus SET expires_at = $1", gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour*24)))
+	_, err = tx.ExecContext(ctx, "UPDATE federationsender_queue_edus SET expires_at = $1 WHERE edu_type != 'm.direct_to_device'", gomatrixserverlib.AsTimestamp(time.Now().Add(time.Hour*24)))
 	if err != nil {
 		return fmt.Errorf("failed to update queue_edus: %w", err)
 	}
