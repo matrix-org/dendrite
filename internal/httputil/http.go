@@ -33,15 +33,15 @@ import (
 func PostJSON[reqtype, restype any, errtype error](
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
 	apiURL string, request *reqtype, response *restype,
-) (*errtype, error) {
+) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	parsedAPIURL, err := url.Parse(apiURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	parsedAPIURL.Path = InternalPathPrefix + strings.TrimLeft(parsedAPIURL.Path, "/")
@@ -49,7 +49,7 @@ func PostJSON[reqtype, restype any, errtype error](
 
 	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(jsonBytes))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Mark the span as being an RPC client.
@@ -58,7 +58,7 @@ func PostJSON[reqtype, restype any, errtype error](
 	tracer := opentracing.GlobalTracer()
 
 	if err = tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier); err != nil {
-		return nil, err
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -68,17 +68,17 @@ func PostJSON[reqtype, restype any, errtype error](
 		defer (func() { err = res.Body.Close() })()
 	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if res.StatusCode != http.StatusOK {
 		var errorBody errtype
 		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr != nil {
-			return nil, fmt.Errorf("internal API: %d from %s", res.StatusCode, apiURL)
+			return fmt.Errorf("internal API: %d from %s", res.StatusCode, apiURL)
 		}
-		return &errorBody, nil
+		return errorBody
 	}
 	if err := json.NewDecoder(res.Body).Decode(response); err != nil {
-		return nil, fmt.Errorf("json.NewDecoder.Decode: %w", err)
+		return fmt.Errorf("json.NewDecoder.Decode: %w", err)
 	}
-	return nil, nil
+	return nil
 }
