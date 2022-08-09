@@ -178,12 +178,6 @@ func (u *UserInteractive) Challenge(sessionID string) *util.JSONResponse {
 			// If an auth flow has params,
 			// send it as part of the challenge.
 			paramsCopy[key] = p
-
-			// If an auth flow generated a nonce, add it to the session.
-			nonce := getAuthParamNonce(p)
-			if nonce != "" {
-				u.Sessions[sessionID] = append(u.Sessions[sessionID], nonce)
-			}
 		}
 	}
 
@@ -287,12 +281,4 @@ func GetAuthParams(params interface{}) interface{} {
 		return p
 	}
 	return nil
-}
-
-func getAuthParamNonce(p interface{}) string {
-	v, ok := p.(config.AuthParams)
-	if ok {
-		return v.GetNonce()
-	}
-	return ""
 }
