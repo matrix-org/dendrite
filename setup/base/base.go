@@ -418,7 +418,7 @@ func (b *BaseDendrite) configureHTTPErrors() {
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
 	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
-	certFile, keyFile *string,
+	certFile, keyFile string,
 ) {
 	// Manually unlocked right before actually serving requests,
 	// as we don't return from this method (defer doesn't work).
@@ -518,8 +518,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					logrus.Infof("Stopped internal HTTP listener")
 				}
 			})
-			if certFile != nil && keyFile != nil {
-				if err := internalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+			if certFile != "" && keyFile != "" {
+				if err := internalServ.ListenAndServeTLS(certFile, keyFile); err != nil {
 					if err != http.ErrServerClosed {
 						logrus.WithError(err).Fatal("failed to serve HTTPS")
 					}
@@ -546,8 +546,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 					logrus.Infof("Stopped external HTTP listener")
 				}
 			})
-			if certFile != nil && keyFile != nil {
-				if err := externalServ.ListenAndServeTLS(*certFile, *keyFile); err != nil {
+			if certFile != "" && keyFile != "" {
+				if err := externalServ.ListenAndServeTLS(certFile, keyFile); err != nil {
 					if err != http.ErrServerClosed {
 						logrus.WithError(err).Fatal("failed to serve HTTPS")
 					}

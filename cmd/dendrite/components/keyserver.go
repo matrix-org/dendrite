@@ -12,33 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package personalities
+package components
 
 import (
-	"github.com/matrix-org/dendrite/clientapi"
-	"github.com/matrix-org/dendrite/internal/transactions"
+	"github.com/matrix-org/dendrite/keyserver"
 	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func ClientAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
-	federation := base.CreateFederationClient()
-
-	asQuery := base.AppserviceHTTPClient()
-	rsAPI := base.RoomserverHTTPClient()
+func KeyServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	fsAPI := base.FederationAPIHTTPClient()
-	userAPI := base.UserAPIClient()
-	keyAPI := base.KeyServerHTTPClient()
+	intAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	intAPI.SetUserAPI(base.UserAPIClient())
 
-	clientapi.AddPublicRoutes(
-		base, federation, rsAPI, asQuery,
-		transactions.New(), fsAPI, userAPI, userAPI,
-		keyAPI, nil,
-	)
+	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.ClientAPI.InternalAPI.Listen,
-		base.Cfg.ClientAPI.ExternalAPI.Listen,
-		nil, nil,
+		base.Cfg.KeyServer.InternalAPI.Listen, // internal listener
+		basepkg.NoListener,                    // external listener
+		"", "",
 	)
 }

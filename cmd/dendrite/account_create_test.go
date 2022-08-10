@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func Test_getPassword(t *testing.T) {
+func TestgetPassword(t *testing.T) {
 	type args struct {
 		password string
 		pwdFile  string

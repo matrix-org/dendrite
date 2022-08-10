@@ -12,78 +12,78 @@ import (
 
 type Global struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+	ServerName gomatrixserverlib.ServerName `config:"server_name"`
 
 	// The secondary server names, used for virtual hosting.
 	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"-"`
 
 	// Path to the private key which will be used to sign requests and events.
-	PrivateKeyPath Path `yaml:"private_key"`
+	PrivateKeyPath Path `config:"private_key"`
 
 	// The private key which will be used to sign requests and events.
-	PrivateKey ed25519.PrivateKey `yaml:"-"`
+	PrivateKey ed25519.PrivateKey `config:"-"`
 
 	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
 	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+	KeyID gomatrixserverlib.KeyID `config:"-"`
 
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
 	// servers that ask for them to help verify old events.
-	OldVerifyKeys []*OldVerifyKeys `yaml:"old_private_keys"`
+	OldVerifyKeys []*OldVerifyKeys `config:"old_private_keys"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
 	// for our key, but increases the period a compromised key will be considered valid
 	// by remote servers.
 	// Defaults to 24 hours.
-	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+	KeyValidityPeriod time.Duration `config:"key_validity_period"`
 
 	// Global pool of database connections, which is used only in monolith mode. If a
 	// component does not specify any database options of its own, then this pool of
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
 	// In a polylith deployment, this will be ignored.
-	DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
+	DatabaseOptions DatabaseOptions `config:"database,omitempty"`
 
 	// The server name to delegate server-server communications to, with optional port
-	WellKnownServerName string `yaml:"well_known_server_name"`
+	WellKnownServerName string `config:"well_known_server_name"`
 
 	// The server name to delegate client-server communications to, with optional port
-	WellKnownClientName string `yaml:"well_known_client_name"`
+	WellKnownClientName string `config:"well_known_client_name"`
 
 	// Disables federation. Dendrite will not be able to make any outbound HTTP requests
 	// to other servers and the federation API will not be exposed.
-	DisableFederation bool `yaml:"disable_federation"`
+	DisableFederation bool `config:"disable_federation"`
 
 	// Configures the handling of presence events.
-	Presence PresenceOptions `yaml:"presence"`
+	Presence PresenceOptions `config:"presence"`
 
 	// List of domains that the server will trust as identity servers to
 	// verify third-party identifiers.
 	// Defaults to an empty array.
-	TrustedIDServers []string `yaml:"trusted_third_party_id_servers"`
+	TrustedIDServers []string `config:"trusted_third_party_id_servers"`
 
 	// JetStream configuration
-	JetStream JetStream `yaml:"jetstream"`
+	JetStream JetStream `config:"jetstream"`
 
 	// Metrics configuration
-	Metrics Metrics `yaml:"metrics"`
+	Metrics Metrics `config:"metrics"`
 
 	// Sentry configuration
-	Sentry Sentry `yaml:"sentry"`
+	Sentry Sentry `config:"sentry"`
 
 	// DNS caching options for all outbound HTTP requests
-	DNSCache DNSCacheOptions `yaml:"dns_cache"`
+	DNSCache DNSCacheOptions `config:"dns_cache"`
 
 	// ServerNotices configuration used for sending server notices
-	ServerNotices ServerNotices `yaml:"server_notices"`
+	ServerNotices ServerNotices `config:"server_notices"`
 
 	// ReportStats configures opt-in phone-home statistics reporting.
-	ReportStats ReportStats `yaml:"report_stats"`
+	ReportStats ReportStats `config:"report_stats"`
 
 	// Configuration for the caches.
-	Cache Cache `yaml:"cache"`
+	Cache Cache `config:"cache"`
 }
 
 func (c *Global) Defaults(opts DefaultOpts) {
@@ -137,33 +137,33 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 
 type OldVerifyKeys struct {
 	// Path to the private key.
-	PrivateKeyPath Path `yaml:"private_key"`
+	PrivateKeyPath Path `config:"private_key"`
 
 	// The private key itself.
-	PrivateKey ed25519.PrivateKey `yaml:"-"`
+	PrivateKey ed25519.PrivateKey `config:"-"`
 
 	// The public key, in case only that part is known.
 	PublicKey gomatrixserverlib.Base64Bytes `yaml:"public_key"`
 
 	// The key ID of the private key.
-	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
+	KeyID gomatrixserverlib.KeyID `config:"key_id"`
 
 	// When the private key was designed as "expired", as a UNIX timestamp
 	// in millisecond precision.
-	ExpiredAt gomatrixserverlib.Timestamp `yaml:"expired_at"`
+	ExpiredAt gomatrixserverlib.Timestamp `config:"expired_at"`
 }
 
 // The configuration to use for Prometheus metrics
 type Metrics struct {
 	// Whether or not the metrics are enabled
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `config:"enabled"`
 	// Use BasicAuth for Authorization
 	BasicAuth struct {
 		// Authorization via Static Username & Password
 		// Hardcoded Username and Password
-		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-	} `yaml:"basic_auth"`
+		Username string `config:"username"`
+		Password string `config:"password"`
+	} `config:"basic_auth"`
 }
 
 func (c *Metrics) Defaults(opts DefaultOpts) {
@@ -179,15 +179,15 @@ func (c *Metrics) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 // ServerNotices defines the configuration used for sending server notices
 type ServerNotices struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `config:"enabled"`
 	// The localpart to be used when sending notices
-	LocalPart string `yaml:"local_part"`
+	LocalPart string `config:"local_part"`
 	// The displayname to be used when sending notices
-	DisplayName string `yaml:"display_name"`
+	DisplayName string `config:"display_name"`
 	// The avatar of this user
-	AvatarURL string `yaml:"avatar_url"`
+	AvatarURL string `config:"avatar_url"`
 	// The roomname to be used when creating messages
-	RoomName string `yaml:"room_name"`
+	RoomName string `config:"room_name"`
 }
 
 func (c *ServerNotices) Defaults(opts DefaultOpts) {
@@ -203,8 +203,8 @@ func (c *ServerNotices) Defaults(opts DefaultOpts) {
 func (c *ServerNotices) Verify(errors *ConfigErrors, isMonolith bool) {}
 
 type Cache struct {
-	EstimatedMaxSize DataUnit      `yaml:"max_size_estimated"`
-	MaxAge           time.Duration `yaml:"max_age"`
+	EstimatedMaxSize DataUnit      `config:"max_size_estimated"`
+	MaxAge           time.Duration `config:"max_age"`
 }
 
 func (c *Cache) Defaults() {
@@ -219,10 +219,10 @@ func (c *Cache) Verify(errors *ConfigErrors, isMonolith bool) {
 // ReportStats configures opt-in phone-home statistics reporting.
 type ReportStats struct {
 	// Enabled configures phone-home statistics of the server
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `config:"enabled"`
 
 	// Endpoint the endpoint to report stats to
-	Endpoint string `yaml:"endpoint"`
+	Endpoint string `config:"endpoint"`
 }
 
 func (c *ReportStats) Defaults() {
@@ -238,13 +238,13 @@ func (c *ReportStats) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 // The configuration to use for Sentry error reporting
 type Sentry struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `config:"enabled"`
 	// The DSN to connect to e.g "https://examplePublicKey@o0.ingest.sentry.io/0"
 	// See https://docs.sentry.io/platforms/go/configuration/options/
-	DSN string `yaml:"dsn"`
+	DSN string `config:"dsn"`
 	// The environment e.g "production"
 	// See https://docs.sentry.io/platforms/go/configuration/environments/
-	Environment string `yaml:"environment"`
+	Environment string `config:"environment"`
 }
 
 func (c *Sentry) Defaults() {
@@ -256,13 +256,13 @@ func (c *Sentry) Verify(configErrs *ConfigErrors, isMonolith bool) {
 
 type DatabaseOptions struct {
 	// The connection string, file:filename.db or postgres://server....
-	ConnectionString DataSource `yaml:"connection_string"`
+	ConnectionString DataSource `config:"connection_string"`
 	// Maximum open connections to the DB (0 = use default, negative means unlimited)
-	MaxOpenConnections int `yaml:"max_open_conns"`
+	MaxOpenConnections int `config:"max_open_conns"`
 	// Maximum idle connections to the DB (0 = use default, negative means unlimited)
-	MaxIdleConnections int `yaml:"max_idle_conns"`
+	MaxIdleConnections int `config:"max_idle_conns"`
 	// maximum amount of time (in seconds) a connection may be reused (<= 0 means unlimited)
-	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime"`
+	ConnMaxLifetimeSeconds int `config:"conn_max_lifetime"`
 }
 
 func (c *DatabaseOptions) Defaults(conns int) {
@@ -291,11 +291,11 @@ func (c DatabaseOptions) ConnMaxLifetime() time.Duration {
 
 type DNSCacheOptions struct {
 	// Whether the DNS cache is enabled or not
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `config:"enabled"`
 	// How many entries to store in the DNS cache at a given time
-	CacheSize int `yaml:"cache_size"`
+	CacheSize int `config:"cache_size"`
 	// How long a cache entry should be considered valid for
-	CacheLifetime time.Duration `yaml:"cache_lifetime"`
+	CacheLifetime time.Duration `config:"cache_lifetime"`
 }
 
 func (c *DNSCacheOptions) Defaults() {
@@ -312,9 +312,9 @@ func (c *DNSCacheOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // PresenceOptions defines possible configurations for presence events.
 type PresenceOptions struct {
 	// Whether inbound presence events are allowed
-	EnableInbound bool `yaml:"enable_inbound"`
+	EnableInbound bool `config:"enable_inbound"`
 	// Whether outbound presence events are allowed
-	EnableOutbound bool `yaml:"enable_outbound"`
+	EnableOutbound bool `config:"enable_outbound"`
 }
 
 type DataUnit int64

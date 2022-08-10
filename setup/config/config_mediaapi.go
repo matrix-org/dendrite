@@ -5,34 +5,34 @@ import (
 )
 
 type MediaAPI struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `config:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
+	InternalAPI InternalAPIOptions `config:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `config:"external_api,omitempty"`
 
 	// The MediaAPI database stores information about files uploaded and downloaded
 	// by local users. It is only accessed by the MediaAPI.
-	Database DatabaseOptions `yaml:"database,omitempty"`
+	Database DatabaseOptions `config:"database,omitempty"`
 
 	// The base path to where the media files will be stored. May be relative or absolute.
-	BasePath Path `yaml:"base_path"`
+	BasePath Path `config:"base_path"`
 
 	// The absolute base path to where media files will be stored.
-	AbsBasePath Path `yaml:"-"`
+	AbsBasePath Path `config:"-"`
 
 	// The maximum file size in bytes that is allowed to be stored on this server.
 	// Note: if max_file_size_bytes is set to 0, the size is unlimited.
 	// Note: if max_file_size_bytes is not set, it will default to 10485760 (10MB)
-	MaxFileSizeBytes FileSizeBytes `yaml:"max_file_size_bytes,omitempty"`
+	MaxFileSizeBytes FileSizeBytes `config:"max_file_size_bytes,omitempty"`
 
 	// Whether to dynamically generate thumbnails on-the-fly if the requested resolution is not already generated
-	DynamicThumbnails bool `yaml:"dynamic_thumbnails"`
+	DynamicThumbnails bool `config:"dynamic_thumbnails"`
 
 	// The maximum number of simultaneous thumbnail generators. default: 10
-	MaxThumbnailGenerators int `yaml:"max_thumbnail_generators"`
+	MaxThumbnailGenerators int `config:"max_thumbnail_generators"`
 
 	// A list of thumbnail sizes to be pre-generated for downloaded remote / uploaded content
-	ThumbnailSizes []ThumbnailSize `yaml:"thumbnail_sizes"`
+	ThumbnailSizes []ThumbnailSize `config:"thumbnail_sizes"`
 }
 
 // DefaultMaxFileSizeBytes defines the default file size allowed in transfers

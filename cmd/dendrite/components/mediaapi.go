@@ -12,25 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package personalities
+package components
 
 import (
-	"github.com/matrix-org/dendrite/appservice"
-	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/mediaapi"
 	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func Appservice(base *base.BaseDendrite, cfg *config.Dendrite) {
+func MediaAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
-	rsAPI := base.RoomserverHTTPClient()
+	client := base.CreateClient()
 
-	intAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
+	mediaapi.AddPublicRoutes(
+		base, userAPI, client,
+	)
 
 	base.SetupAndServeHTTP(
-		base.Cfg.AppServiceAPI.InternalAPI.Listen, // internal listener
-		basepkg.NoListener,                        // external listener
-		nil, nil,
+		base.Cfg.MediaAPI.InternalAPI.Listen,
+		base.Cfg.MediaAPI.ExternalAPI.Listen,
+		"", "",
 	)
 }

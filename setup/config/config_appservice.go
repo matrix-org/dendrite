@@ -16,26 +16,28 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/file"
+
 	log "github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v2"
 )
 
 type AppServiceAPI struct {
-	Matrix  *Global  `yaml:"-"`
-	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
+	Matrix  *Global  `config:"-"`
+	Derived *Derived `config:"-"` // TODO: Nuke Derived from orbit
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	InternalAPI InternalAPIOptions `config:"internal_api,omitempty"`
 
 	// DisableTLSValidation disables the validation of X.509 TLS certs
 	// on appservice endpoints. This is not recommended in production!
-	DisableTLSValidation bool `yaml:"disable_tls_validation"`
+	DisableTLSValidation bool `config:"disable_tls_validation"`
 
-	ConfigFiles []string `yaml:"config_files"`
+	ConfigFiles []string `config:"config_files"`
 }
 
 func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
@@ -57,9 +59,9 @@ func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 // service has management over.
 type ApplicationServiceNamespace struct {
 	// Whether or not the namespace is managed solely by this application service
-	Exclusive bool `yaml:"exclusive"`
+	Exclusive bool `config:"exclusive"`
 	// A regex pattern that represents the namespace
-	Regex string `yaml:"regex"`
+	Regex string `config:"regex"`
 	// The ID of an existing group that all users of this application service will
 	// be added to. This field is only relevant to the `users` namespace.
 	// Note that users who are joined to this group through an application service
@@ -67,7 +69,7 @@ type ApplicationServiceNamespace struct {
 	// group should be listed when querying an application service user's groups.
 	// This is to prevent making spamming all users of an application service
 	// trivial.
-	GroupID string `yaml:"group_id"`
+	GroupID string `config:"group_id"`
 	// Regex object representing our pattern. Saves having to recompile every time
 	RegexpObject *regexp.Regexp
 }
@@ -76,22 +78,22 @@ type ApplicationServiceNamespace struct {
 // https://matrix.org/docs/spec/application_service/unstable.html
 type ApplicationService struct {
 	// User-defined, unique, persistent ID of the application service
-	ID string `yaml:"id"`
+	ID string `config:"id"`
 	// Base URL of the application service
-	URL string `yaml:"url"`
+	URL string `config:"url"`
 	// Application service token provided in requests to a homeserver
-	ASToken string `yaml:"as_token"`
+	ASToken string `config:"as_token"`
 	// Homeserver token provided in requests to an application service
-	HSToken string `yaml:"hs_token"`
+	HSToken string `config:"hs_token"`
 	// Localpart of application service user
-	SenderLocalpart string `yaml:"sender_localpart"`
+	SenderLocalpart string `config:"sender_localpart"`
 	// Information about an application service's namespaces. Key is either
 	// "users", "aliases" or "rooms"
-	NamespaceMap map[string][]ApplicationServiceNamespace `yaml:"namespaces"`
+	NamespaceMap map[string][]ApplicationServiceNamespace `config:"namespaces"`
 	// Whether rate limiting is applied to each application service user
-	RateLimited bool `yaml:"rate_limited"`
+	RateLimited bool `config:"rate_limited"`
 	// Any custom protocols that this application service provides (e.g. IRC)
-	Protocols []string `yaml:"protocols"`
+	Protocols []string `config:"protocols"`
 }
 
 // IsInterestedInRoomID returns a bool on whether an application service's
@@ -174,13 +176,13 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Read the application service's config file
-		configData, err := os.ReadFile(absPath)
-		if err != nil {
+		k := koanf.New("/")
+		if err := k.Load(file.Provider(absPath), yaml.Parser()); err != nil {
 			return err
 		}
 
 		// Load the config data into our struct
-		if err = yaml.Unmarshal(configData, &appservice); err != nil {
+		if err = k.UnmarshalWithConf("", &appservice, koanf.UnmarshalConf{Tag: "config"}); err != nil {
 			return err
 		}
 

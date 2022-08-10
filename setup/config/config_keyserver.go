@@ -1,11 +1,11 @@
 package config
 
 type KeyServer struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `config:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	InternalAPI InternalAPIOptions `config:"internal_api,omitempty"`
 
-	Database DatabaseOptions `yaml:"database,omitempty"`
+	Database DatabaseOptions `config:"database,omitempty"`
 }
 
 func (c *KeyServer) Defaults(opts DefaultOpts) {

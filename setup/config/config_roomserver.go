@@ -1,11 +1,11 @@
 package config
 
 type RoomServer struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `config:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	InternalAPI InternalAPIOptions `config:"internal_api,omitempty"`
 
-	Database DatabaseOptions `yaml:"database,omitempty"`
+	Database DatabaseOptions `config:"database,omitempty"`
 }
 
 func (c *RoomServer) Defaults(opts DefaultOpts) {

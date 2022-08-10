@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package personalities
+package components
 
 import (
 	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/dendrite/syncapi"
 )
 
-func UserAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
-	userAPI := userapi.NewInternalAPI(
-		base, &cfg.UserAPI, cfg.Derived.ApplicationServices,
-		base.KeyServerHTTPClient(), base.RoomserverHTTPClient(),
-		base.PushGatewayHTTPClient(),
+func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
+	userAPI := base.UserAPIClient()
+
+	rsAPI := base.RoomserverHTTPClient()
+
+	syncapi.AddPublicRoutes(
+		base,
+		userAPI, rsAPI,
+		base.KeyServerHTTPClient(),
 	)
 
-	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
-
 	base.SetupAndServeHTTP(
-		base.Cfg.UserAPI.InternalAPI.Listen, // internal listener
-		basepkg.NoListener,                  // external listener
-		nil, nil,
+		base.Cfg.SyncAPI.InternalAPI.Listen,
+		base.Cfg.SyncAPI.ExternalAPI.Listen,
+		"", "",
 	)
 }

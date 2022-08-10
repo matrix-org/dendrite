@@ -29,7 +29,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -51,35 +50,35 @@ type Dendrite struct {
 	// to update their config file to the current version.
 	// The version of the file should only be different if there has
 	// been a breaking change to the config file format.
-	Version int `yaml:"version"`
+	Version int `config:"version"`
 
-	Global        Global        `yaml:"global"`
-	AppServiceAPI AppServiceAPI `yaml:"app_service_api"`
-	ClientAPI     ClientAPI     `yaml:"client_api"`
-	FederationAPI FederationAPI `yaml:"federation_api"`
-	KeyServer     KeyServer     `yaml:"key_server"`
-	MediaAPI      MediaAPI      `yaml:"media_api"`
-	RoomServer    RoomServer    `yaml:"room_server"`
-	SyncAPI       SyncAPI       `yaml:"sync_api"`
-	UserAPI       UserAPI       `yaml:"user_api"`
+	Global        Global        `config:"global"`
+	AppServiceAPI AppServiceAPI `config:"app_service_api"`
+	ClientAPI     ClientAPI     `config:"client_api"`
+	FederationAPI FederationAPI `config:"federation_api"`
+	KeyServer     KeyServer     `config:"key_server"`
+	MediaAPI      MediaAPI      `config:"media_api"`
+	RoomServer    RoomServer    `config:"room_server"`
+	SyncAPI       SyncAPI       `config:"sync_api"`
+	UserAPI       UserAPI       `config:"user_api"`
 
-	MSCs MSCs `yaml:"mscs"`
+	MSCs MSCs `config:"mscs"`
 
 	// The config for tracing the dendrite servers.
 	Tracing struct {
 		// Set to true to enable tracer hooks. If false, no tracing is set up.
-		Enabled bool `yaml:"enabled"`
+		Enabled bool `config:"enabled"`
 		// The config for the jaeger opentracing reporter.
-		Jaeger jaegerconfig.Configuration `yaml:"jaeger"`
-	} `yaml:"tracing"`
+		Jaeger jaegerconfig.Configuration `config:"jaeger"`
+	} `config:"tracing"`
 
 	// The config for logging informations. Each hook will be added to logrus.
-	Logging []LogrusHook `yaml:"logging"`
+	Logging []LogrusHook `config:"logging"`
 
 	// Any information derived from the configuration options for later use.
-	Derived Derived `yaml:"-"`
+	Derived Derived `config:"-"`
 
-	IsMonolith bool `yaml:"-"`
+	IsMonolith bool `config:"-"`
 }
 
 // TODO: Kill Derived
@@ -114,12 +113,12 @@ type Derived struct {
 }
 
 type InternalAPIOptions struct {
-	Listen  HTTPAddress `yaml:"listen"`
-	Connect HTTPAddress `yaml:"connect"`
+	Listen  HTTPAddress `config:"listen"`
+	Connect HTTPAddress `config:"connect"`
 }
 
 type ExternalAPIOptions struct {
-	Listen HTTPAddress `yaml:"listen"`
+	Listen HTTPAddress `config:"listen"`
 }
 
 // A Path on the filesystem.
@@ -161,13 +160,13 @@ type FileSizeBytes int64
 // ThumbnailSize contains a single thumbnail size configuration
 type ThumbnailSize struct {
 	// Maximum width of the thumbnail image
-	Width int `yaml:"width"`
+	Width int `config:"width"`
 	// Maximum height of the thumbnail image
-	Height int `yaml:"height"`
+	Height int `config:"height"`
 	// ResizeMethod is one of crop or scale.
 	// crop scales to fill the requested dimensions and crops the excess.
 	// scale scales to fit the requested dimensions and one dimension may be smaller than requested.
-	ResizeMethod string `yaml:"method,omitempty"`
+	ResizeMethod string `config:"method,omitempty"`
 }
 
 // LogrusHook represents a single logrus hook. At this point, only parsing and
@@ -175,60 +174,35 @@ type ThumbnailSize struct {
 // Validity/integrity checks on the parameters are done when configuring logrus.
 type LogrusHook struct {
 	// The type of hook, currently only "file" is supported.
-	Type string `yaml:"type"`
+	Type string `config:"type"`
 
 	// The level of the logs to produce. Will output only this level and above.
-	Level string `yaml:"level"`
+	Level string `config:"level"`
 
 	// The parameters for this hook.
-	Params map[string]interface{} `yaml:"params"`
+	Params map[string]interface{} `config:"params"`
 }
 
 // ConfigErrors stores problems encountered when parsing a config file.
 // It implements the error interface.
 type ConfigErrors []string
 
-// Load a yaml config file for a server run as multiple processes or as a monolith.
-// Checks the config to ensure that it is valid.
-func Load(configPath string, monolith bool) (*Dendrite, error) {
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-	basePath, err := filepath.Abs(".")
-	if err != nil {
-		return nil, err
-	}
-	// Pass the current working directory and os.ReadFile so that they can
-	// be mocked in the tests
-	return loadConfig(basePath, configData, os.ReadFile, monolith)
-}
-
-func loadConfig(
+func (c *Dendrite) Load(
 	basePath string,
-	configData []byte,
-	readFile func(string) ([]byte, error),
 	monolithic bool,
-) (*Dendrite, error) {
-	var c Dendrite
-	c.Defaults(DefaultOpts{
-		Generate:   false,
-		Monolithic: monolithic,
-	})
-	c.IsMonolith = monolithic
-
-	var err error
-	if err = yaml.Unmarshal(configData, &c); err != nil {
-		return nil, err
-	}
-
+) (err error) {
 	if err = c.check(monolithic); err != nil {
-		return nil, err
+		return err
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
-	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-		return nil, err
+	privateKeyData, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return err
+	}
+
+	if c.Global.KeyID, c.Global.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData, true); err != nil {
+		return err
 	}
 
 	for _, key := range c.Global.OldVerifyKeys {
@@ -236,9 +210,9 @@ func loadConfig(
 		case key.PrivateKeyPath != "":
 			var oldPrivateKeyData []byte
 			oldPrivateKeyPath := absPath(basePath, key.PrivateKeyPath)
-			oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
+			oldPrivateKeyData, err = os.ReadFile(oldPrivateKeyPath)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read %q: %w", oldPrivateKeyPath, err)
+				return fmt.Errorf("failed to read %q: %w", oldPrivateKeyPath, err)
 			}
 
 			// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
@@ -246,7 +220,7 @@ func loadConfig(
 			// to lack of validation in Synapse, we won't enforce that for old verify keys.
 			keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
 			if perr != nil {
-				return nil, fmt.Errorf("failed to parse %q: %w", oldPrivateKeyPath, perr)
+				return fmt.Errorf("failed to parse %q: %w", oldPrivateKeyPath, perr)
 			}
 
 			key.KeyID = keyID
@@ -254,16 +228,16 @@ func loadConfig(
 			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
 
 		case key.KeyID == "":
-			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
+			return fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
 
 		case len(key.PublicKey) == ed25519.PublicKeySize:
 			continue
 
 		case len(key.PublicKey) > 0:
-			return nil, fmt.Errorf("the supplied 'public_key' is the wrong length")
+			return fmt.Errorf("the supplied 'public_key' is the wrong length")
 
 		default:
-			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
+			return fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
 		}
 	}
 
@@ -272,11 +246,11 @@ func loadConfig(
 	// Generate data from config options
 	err = c.Derive()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	c.Wiring()
-	return &c, nil
+	return nil
 }
 
 func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error)) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {

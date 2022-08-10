@@ -1,16 +1,16 @@
 package config
 
 type SyncAPI struct {
-	Matrix *Global `yaml:"-"`
+	Matrix *Global `config:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
+	InternalAPI InternalAPIOptions `config:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `config:"external_api,omitempty"`
 
-	Database DatabaseOptions `yaml:"database,omitempty"`
+	Database DatabaseOptions `config:"database,omitempty"`
 
-	RealIPHeader string `yaml:"real_ip_header"`
+	RealIPHeader string `config:"real_ip_header"`
 
-	Fulltext Fulltext `yaml:"search"`
+	Fulltext Fulltext `config:"search"`
 }
 
 func (c *SyncAPI) Defaults(opts DefaultOpts) {

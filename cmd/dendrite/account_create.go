@@ -20,7 +20,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,11 +31,11 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
-
-	"github.com/matrix-org/dendrite/setup"
 )
 
+// TODO still needed, should be imported ?
 const usage = `Usage: %s
 
 Creates a new user account on the homeserver.
@@ -58,65 +57,76 @@ Arguments:
 `
 
 var (
-	username           = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
-	password           = flag.String("password", "", "The password to associate with the account")
-	pwdFile            = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
-	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	isAdmin            = flag.Bool("admin", false, "Create an admin account")
-	resetPassword      = flag.Bool("reset-password", false, "Deprecated")
-	serverURL          = flag.String("url", "http://localhost:8008", "The URL to connect to.")
+	username           string
+	password           string
+	pwdFile            string
+	pwdStdin           bool
+	isAdmin            bool
+	resetPassword      bool
+	serverURL          string
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
-	timeout            = flag.Duration("timeout", time.Second*30, "Timeout for the http client when connecting to the server")
+	timeout            time.Duration
 )
 
 var cl = http.Client{
-	Timeout:   time.Second * 30,
 	Transport: http.DefaultTransport,
 }
 
-func main() {
-	name := os.Args[0]
-	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name)
-		flag.PrintDefaults()
-	}
-	cfg := setup.ParseFlags(true)
+func init() {
+	createAccountCmd.Flags().StringVarP(&configPath, "config", "c", "", "config file")
 
-	if *resetPassword {
-		logrus.Fatalf("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
-	}
+	createAccountCmd.Flags().StringVarP(&username, "username", "", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	createAccountCmd.Flags().StringVarP(&password, "password", "", "", "The password to associate with the account")
+	createAccountCmd.Flags().StringVarP(&pwdFile, "passwordfile", "", "", "The file to use for the password (e.g. for automated account creation)")
+	createAccountCmd.Flags().BoolVarP(&pwdStdin, "passwordstdin", "", false, "Reads the password from stdin")
+	createAccountCmd.Flags().BoolVarP(&isAdmin, "admin", "", false, "Create an admin account")
+	createAccountCmd.Flags().StringVarP(&serverURL, "url", "", "http://localhost:8008", "The URL to connect to.")
+	createAccountCmd.Flags().DurationVar(&timeout, "timeout", time.Second*30, "Timeout for the http client when connecting to the server")
+	// maybe drop now?
+	createAccountCmd.Flags().BoolVarP(&resetPassword, "reset-password", "", false, "Deprecated")
 
-	if cfg.ClientAPI.RegistrationSharedSecret == "" {
-		logrus.Fatalln("Shared secret registration is not enabled, enable it by setting a shared secret in the config: 'client_api.registration_shared_secret'")
-	}
+	createAccountCmd.MarkFlagRequired("username")
 
-	if *username == "" {
-		flag.Usage()
-		os.Exit(1)
-	}
+	accountCmd.AddCommand(createAccountCmd)
+}
 
-	if !validUsernameRegex.MatchString(*username) {
-		logrus.Warn("Username can only contain characters a-z, 0-9, or '_-./='")
-		os.Exit(1)
-	}
+var createAccountCmd = &cobra.Command{
+	Use:    "create",
+	Short:  "Creates a new user account on the homeserver.",
+	Long:   `Creates a new user account on the homeserver.`,
+	PreRun: readConfigCmd(true),
+	Run: func(cmd *cobra.Command, args []string) {
+		if resetPassword {
+			logrus.Fatalf("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
+		}
 
-	if len(fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName)) > 255 {
-		logrus.Fatalf("Username can not be longer than 255 characters: %s", fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName))
-	}
+		if cfg.ClientAPI.RegistrationSharedSecret == "" {
+			logrus.Fatalln("Shared secret registration is not enabled, enable it by setting a shared secret in the config: 'client_api.registration_shared_secret'")
+		}
 
-	pass, err := getPassword(*password, *pwdFile, *pwdStdin, os.Stdin)
-	if err != nil {
-		logrus.Fatalln(err)
-	}
+		if !validUsernameRegex.MatchString(username) {
+			logrus.Warn("Username can only contain characters a-z, 0-9, or '_-./='")
+			os.Exit(1)
+		}
 
-	cl.Timeout = *timeout
+		if len(fmt.Sprintf("@%s:%s", username, cfg.Global.ServerName)) > 255 {
+			logrus.Fatalf("Username can not be longer than 255 characters: %s", fmt.Sprintf("@%s:%s", username, cfg.Global.ServerName))
+		}
 
-	accessToken, err := sharedSecretRegister(cfg.ClientAPI.RegistrationSharedSecret, *serverURL, *username, pass, *isAdmin)
-	if err != nil {
-		logrus.Fatalln("Failed to create the account:", err.Error())
-	}
+		pass, err := getPassword(password, pwdFile, pwdStdin, os.Stdin)
+		if err != nil {
+			logrus.Fatalln(err)
+		}
 
-	logrus.Infof("Created account: %s (AccessToken: %s)", *username, accessToken)
+		cl.Timeout = timeout
+
+		accessToken, err := sharedSecretRegister(cfg.ClientAPI.RegistrationSharedSecret, serverURL, username, pass, isAdmin)
+		if err != nil {
+			logrus.Fatalln("Failed to create the account:", err.Error())
+		}
+
+		logrus.Infof("Created account: %s (AccessToken: %s)", username, accessToken)
+	},
 }
 
 type sharedSecretRegistrationRequest struct {

@@ -6,55 +6,55 @@ import (
 )
 
 type ClientAPI struct {
-	Matrix  *Global  `yaml:"-"`
-	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
+	Matrix  *Global  `config:"-"`
+	Derived *Derived `config:"-"` // TODO: Nuke Derived from orbit
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
+	InternalAPI InternalAPIOptions `config:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `config:"external_api,omitempty"`
 
 	// If set disables new users from registering (except via shared
 	// secrets)
-	RegistrationDisabled bool `yaml:"registration_disabled"`
+	RegistrationDisabled bool `config:"registration_disabled"`
 
 	// Enable registration without captcha verification or shared secret.
 	// This option is populated by the -really-enable-open-registration
 	// command line parameter as it is not recommended.
-	OpenRegistrationWithoutVerificationEnabled bool `yaml:"-"`
+	OpenRegistrationWithoutVerificationEnabled bool `config:"-"`
 
 	// If set, allows registration by anyone who also has the shared
 	// secret, even if registration is otherwise disabled.
-	RegistrationSharedSecret string `yaml:"registration_shared_secret"`
+	RegistrationSharedSecret string `config:"registration_shared_secret"`
 	// If set, prevents guest accounts from being created. Only takes
 	// effect if registration is enabled, otherwise guests registration
 	// is forbidden either way.
-	GuestsDisabled bool `yaml:"guests_disabled"`
+	GuestsDisabled bool `config:"guests_disabled"`
 
 	// Boolean stating whether catpcha registration is enabled
 	// and required
-	RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
+	RecaptchaEnabled bool `config:"enable_registration_captcha"`
 	// Recaptcha api.js Url, for compatible with hcaptcha.com, etc.
-	RecaptchaApiJsUrl string `yaml:"recaptcha_api_js_url"`
+	RecaptchaApiJsUrl string `config:"recaptcha_api_js_url"`
 	// Recaptcha div class for sitekey, for compatible with hcaptcha.com, etc.
-	RecaptchaSitekeyClass string `yaml:"recaptcha_sitekey_class"`
+	RecaptchaSitekeyClass string `config:"recaptcha_sitekey_class"`
 	// Recaptcha form field, for compatible with hcaptcha.com, etc.
-	RecaptchaFormField string `yaml:"recaptcha_form_field"`
+	RecaptchaFormField string `config:"recaptcha_form_field"`
 	// This Home Server's ReCAPTCHA public key.
-	RecaptchaPublicKey string `yaml:"recaptcha_public_key"`
+	RecaptchaPublicKey string `config:"recaptcha_public_key"`
 	// This Home Server's ReCAPTCHA private key.
-	RecaptchaPrivateKey string `yaml:"recaptcha_private_key"`
+	RecaptchaPrivateKey string `config:"recaptcha_private_key"`
 	// Secret used to bypass the captcha registration entirely
-	RecaptchaBypassSecret string `yaml:"recaptcha_bypass_secret"`
+	RecaptchaBypassSecret string `config:"recaptcha_bypass_secret"`
 	// HTTP API endpoint used to verify whether the captcha response
 	// was successful
-	RecaptchaSiteVerifyAPI string `yaml:"recaptcha_siteverify_api"`
+	RecaptchaSiteVerifyAPI string `config:"recaptcha_siteverify_api"`
 
 	// TURN options
-	TURN TURN `yaml:"turn"`
+	TURN TURN `config:"turn"`
 
 	// Rate-limiting options
-	RateLimiting RateLimiting `yaml:"rate_limiting"`
+	RateLimiting RateLimiting `config:"rate_limiting"`
 
-	MSCs *MSCs `yaml:"-"`
+	MSCs *MSCs `config:"-"`
 }
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {
@@ -118,20 +118,20 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 type TURN struct {
 	// TODO Guest Support
 	// Whether or not guests can request TURN credentials
-	// AllowGuests bool `yaml:"turn_allow_guests"`
+	// AllowGuests bool `config:"turn_allow_guests"`
 	// How long the authorization should last
-	UserLifetime string `yaml:"turn_user_lifetime"`
+	UserLifetime string `config:"turn_user_lifetime"`
 	// The list of TURN URIs to pass to clients
-	URIs []string `yaml:"turn_uris"`
+	URIs []string `config:"turn_uris"`
 
 	// Authorization via Shared Secret
 	// The shared secret from coturn
-	SharedSecret string `yaml:"turn_shared_secret"`
+	SharedSecret string `config:"turn_shared_secret"`
 
 	// Authorization via Static Username & Password
 	// Hardcoded Username and Password
-	Username string `yaml:"turn_username"`
-	Password string `yaml:"turn_password"`
+	Username string `config:"turn_username"`
+	Password string `config:"turn_password"`
 }
 
 func (c *TURN) Verify(configErrs *ConfigErrors) {
@@ -145,19 +145,19 @@ func (c *TURN) Verify(configErrs *ConfigErrors) {
 
 type RateLimiting struct {
 	// Is rate limiting enabled or disabled?
-	Enabled bool `yaml:"enabled"`
+	Enabled bool `config:"enabled"`
 
 	// How many "slots" a user can occupy sending requests to a rate-limited
 	// endpoint before we apply rate-limiting
-	Threshold int64 `yaml:"threshold"`
+	Threshold int64 `config:"threshold"`
 
 	// The cooloff period in milliseconds after a request before the "slot"
 	// is freed again
-	CooloffMS int64 `yaml:"cooloff_ms"`
+	CooloffMS int64 `config:"cooloff_ms"`
 
 	// A list of users that are exempt from rate limiting, i.e. if you want
 	// to run Mjolnir or other bots.
-	ExemptUserIDs []string `yaml:"exempt_user_ids"`
+	ExemptUserIDs []string `config:"exempt_user_ids"`
 }
 
 func (r *RateLimiting) Verify(configErrs *ConfigErrors) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package personalities
+package components
 
 import (
 	"github.com/matrix-org/dendrite/federationapi"
@@ -39,6 +39,6 @@ func FederationAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	base.SetupAndServeHTTP(
 		base.Cfg.FederationAPI.InternalAPI.Listen,
 		base.Cfg.FederationAPI.ExternalAPI.Listen,
-		nil, nil,
+		"", "",
 	)
 }

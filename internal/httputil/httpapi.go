@@ -38,8 +38,8 @@ import (
 
 // BasicAuth is used for authorization on /metrics handlers
 type BasicAuth struct {
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Username string `config:"username"`
+	Password string `config:"password"`
 }
 
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
