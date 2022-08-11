@@ -546,9 +546,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		if req.Version == "" {
 			res.BadInput = true
 			res.Error = "must specify a version to delete"
-			if res.Error != "" {
-				return fmt.Errorf(res.Error)
-			}
 			return nil
 		}
 		exists, err := a.DB.DeleteKeyBackup(ctx, req.UserID, req.Version)
@@ -557,9 +554,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = exists
 		res.Version = req.Version
-		if res.Error != "" {
-			return fmt.Errorf(res.Error)
-		}
 		return nil
 	}
 	// Create metadata
@@ -570,9 +564,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = err == nil
 		res.Version = version
-		if res.Error != "" {
-			return fmt.Errorf(res.Error)
-		}
 		return nil
 	}
 	// Update metadata
@@ -583,16 +574,10 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = err == nil
 		res.Version = req.Version
-		if res.Error != "" {
-			return fmt.Errorf(res.Error)
-		}
 		return nil
 	}
 	// Upload Keys for a specific version metadata
 	a.uploadBackupKeys(ctx, req, res)
-	if res.Error != "" {
-		return fmt.Errorf(res.Error)
-	}
 	return nil
 }
 
