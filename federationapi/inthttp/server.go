@@ -221,11 +221,10 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	)
 }
 
-func federationClientError(err error) *api.FederationClientError {
-	if err == nil {
-		return nil
-	}
+func federationClientError(err error) error {
 	switch ferr := err.(type) {
+	case nil:
+		return nil
 	case api.FederationClientError:
 		return &ferr
 	case *api.FederationClientError:

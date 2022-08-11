@@ -78,7 +78,7 @@ func PostJSON[reqtype, restype any, errtype error](
 	}
 	if res.StatusCode != http.StatusOK {
 		if len(body) == 0 {
-			return fmt.Errorf("HTTP %d from %s", res.StatusCode, apiURL)
+			return fmt.Errorf("HTTP %d from %s (no response body)", res.StatusCode, apiURL)
 		}
 		var reserr errtype
 		if err = json.Unmarshal(body, reserr); err != nil {
