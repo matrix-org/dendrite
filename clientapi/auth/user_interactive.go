@@ -164,7 +164,9 @@ func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 }
 
 func (u *UserInteractive) DeleteSession(sessionID string) {
+	u.Lock()
 	delete(u.Sessions, sessionID)
+	u.Unlock()
 }
 
 type Challenge struct {
