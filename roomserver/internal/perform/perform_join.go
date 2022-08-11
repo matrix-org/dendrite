@@ -52,7 +52,7 @@ func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
 	res *rsAPI.PerformJoinResponse,
-) {
+) error {
 	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
 		"room_id": req.RoomIDOrAlias,
 		"user_id": req.UserID,
@@ -71,11 +71,12 @@ func (r *Joiner) PerformJoin(
 				Msg: err.Error(),
 			}
 		}
-		return
+		return nil
 	}
 	logger.Info("User joined room successfully")
 	res.RoomID = roomID
 	res.JoinedVia = joinedVia
+	return nil
 }
 
 func (r *Joiner) performJoin(
@@ -291,7 +292,12 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := rsAPI.InputRoomEventsResponse{}
-			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+				return "", "", &rsAPI.PerformError{
+					Code: rsAPI.PerformErrorNoOperation,
+					Msg:  fmt.Sprintf("InputRoomEvents failed: %s", err),
+				}
+			}
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,

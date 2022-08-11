@@ -30,9 +30,11 @@ func GetUserDevices(
 	userID string,
 ) util.JSONResponse {
 	var res keyapi.QueryDeviceMessagesResponse
-	keyAPI.QueryDeviceMessages(req.Context(), &keyapi.QueryDeviceMessagesRequest{
+	if err := keyAPI.QueryDeviceMessages(req.Context(), &keyapi.QueryDeviceMessagesRequest{
 		UserID: userID,
-	}, &res)
+	}, &res); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if res.Error != nil {
 		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
 		return jsonerror.InternalServerError()
@@ -47,7 +49,9 @@ func GetUserDevices(
 	for _, dev := range res.Devices {
 		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
 	}
-	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
+	if err := keyAPI.QuerySignatures(req.Context(), sigReq, sigRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	response := gomatrixserverlib.RespUserDevices{
 		UserID:   userID,

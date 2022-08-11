@@ -91,6 +91,9 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
+	if err = queueEDUs.Prepare(); err != nil {
+		return nil, err
+	}
 	d.Database = shared.Database{
 		DB:                       d.db,
 		ServerName:               serverName,

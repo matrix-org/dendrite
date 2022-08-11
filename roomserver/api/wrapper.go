@@ -90,7 +90,9 @@ func SendInputRoomEvents(
 		Asynchronous:    async,
 	}
 	var response InputRoomEventsResponse
-	rsAPI.InputRoomEvents(ctx, &request, &response)
+	if err := rsAPI.InputRoomEvents(ctx, &request, &response); err != nil {
+		return err
+	}
 	return response.Err()
 }
 

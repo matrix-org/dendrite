@@ -3,7 +3,6 @@ package inthttp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
@@ -13,7 +12,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -106,11 +104,10 @@ func (h *httpRoomserverInternalAPI) SetRoomAlias(
 	request *api.SetRoomAliasRequest,
 	response *api.SetRoomAliasResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "SetRoomAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverSetRoomAliasPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"SetRoomAlias", h.roomserverURL+RoomserverSetRoomAliasPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // GetRoomIDForAlias implements RoomserverAliasAPI
@@ -119,11 +116,10 @@ func (h *httpRoomserverInternalAPI) GetRoomIDForAlias(
 	request *api.GetRoomIDForAliasRequest,
 	response *api.GetRoomIDForAliasResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetRoomIDForAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetRoomIDForAliasPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"GetRoomIDForAlias", h.roomserverURL+RoomserverGetRoomIDForAliasPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // GetAliasesForRoomID implements RoomserverAliasAPI
@@ -132,11 +128,10 @@ func (h *httpRoomserverInternalAPI) GetAliasesForRoomID(
 	request *api.GetAliasesForRoomIDRequest,
 	response *api.GetAliasesForRoomIDResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "GetAliasesForRoomID")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverGetAliasesForRoomIDPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"GetAliasesForRoomID", h.roomserverURL+RoomserverGetAliasesForRoomIDPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // RemoveRoomAlias implements RoomserverAliasAPI
@@ -145,11 +140,10 @@ func (h *httpRoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "RemoveRoomAlias")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverRemoveRoomAliasPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"RemoveRoomAlias", h.roomserverURL+RoomserverRemoveRoomAliasPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // InputRoomEvents implements RoomserverInputAPI
@@ -157,15 +151,14 @@ func (h *httpRoomserverInternalAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "InputRoomEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverInputRoomEventsPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
+) error {
+	if err := httputil.CallInternalRPCAPI(
+		"InputRoomEvents", h.roomserverURL+RoomserverInputRoomEventsPath,
+		h.httpClient, ctx, request, response,
+	); err != nil {
 		response.ErrMsg = err.Error()
 	}
+	return nil
 }
 
 func (h *httpRoomserverInternalAPI) PerformInvite(
@@ -173,45 +166,32 @@ func (h *httpRoomserverInternalAPI) PerformInvite(
 	request *api.PerformInviteRequest,
 	response *api.PerformInviteResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInvite")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformInvitePath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"PerformInvite", h.roomserverURL+RoomserverPerformInvitePath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformJoin(
 	ctx context.Context,
 	request *api.PerformJoinRequest,
 	response *api.PerformJoinResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformJoin")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformJoinPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformJoin", h.roomserverURL+RoomserverPerformJoinPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformPeek(
 	ctx context.Context,
 	request *api.PerformPeekRequest,
 	response *api.PerformPeekResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPeek")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformPeekPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformPeek", h.roomserverURL+RoomserverPerformPeekPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformInboundPeek(
@@ -219,45 +199,32 @@ func (h *httpRoomserverInternalAPI) PerformInboundPeek(
 	request *api.PerformInboundPeekRequest,
 	response *api.PerformInboundPeekResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformInboundPeek")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformInboundPeekPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"PerformInboundPeek", h.roomserverURL+RoomserverPerformInboundPeekPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformUnpeek(
 	ctx context.Context,
 	request *api.PerformUnpeekRequest,
 	response *api.PerformUnpeekResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUnpeek")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformUnpeekPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformUnpeek", h.roomserverURL+RoomserverPerformUnpeekPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformRoomUpgrade(
 	ctx context.Context,
 	request *api.PerformRoomUpgradeRequest,
 	response *api.PerformRoomUpgradeResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformRoomUpgrade")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformRoomUpgradePath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformRoomUpgrade", h.roomserverURL+RoomserverPerformRoomUpgradePath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformLeave(
@@ -265,62 +232,43 @@ func (h *httpRoomserverInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformLeave")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformLeavePath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"PerformLeave", h.roomserverURL+RoomserverPerformLeavePath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformPublish(
 	ctx context.Context,
-	req *api.PerformPublishRequest,
-	res *api.PerformPublishResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformPublish")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformPublishPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-	if err != nil {
-		res.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+	request *api.PerformPublishRequest,
+	response *api.PerformPublishResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformPublish", h.roomserverURL+RoomserverPerformPublishPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 	ctx context.Context,
-	req *api.PerformAdminEvacuateRoomRequest,
-	res *api.PerformAdminEvacuateRoomResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateRoomPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-	if err != nil {
-		res.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+	request *api.PerformAdminEvacuateRoomRequest,
+	response *api.PerformAdminEvacuateRoomResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformAdminEvacuateRoom", h.roomserverURL+RoomserverPerformAdminEvacuateRoomPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) PerformAdminEvacuateUser(
 	ctx context.Context,
-	req *api.PerformAdminEvacuateUserRequest,
-	res *api.PerformAdminEvacuateUserResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformAdminEvacuateUser")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformAdminEvacuateUserPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
-	if err != nil {
-		res.Error = &api.PerformError{
-			Msg: fmt.Sprintf("failed to communicate with roomserver: %s", err),
-		}
-	}
+	request *api.PerformAdminEvacuateUserRequest,
+	response *api.PerformAdminEvacuateUserResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformAdminEvacuateUser", h.roomserverURL+RoomserverPerformAdminEvacuateUserPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryLatestEventsAndState implements RoomserverQueryAPI
@@ -329,11 +277,10 @@ func (h *httpRoomserverInternalAPI) QueryLatestEventsAndState(
 	request *api.QueryLatestEventsAndStateRequest,
 	response *api.QueryLatestEventsAndStateResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryLatestEventsAndState")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryLatestEventsAndStatePath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryLatestEventsAndState", h.roomserverURL+RoomserverQueryLatestEventsAndStatePath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryStateAfterEvents implements RoomserverQueryAPI
@@ -342,11 +289,10 @@ func (h *httpRoomserverInternalAPI) QueryStateAfterEvents(
 	request *api.QueryStateAfterEventsRequest,
 	response *api.QueryStateAfterEventsResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAfterEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryStateAfterEventsPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryStateAfterEvents", h.roomserverURL+RoomserverQueryStateAfterEventsPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryEventsByID implements RoomserverQueryAPI
@@ -355,11 +301,10 @@ func (h *httpRoomserverInternalAPI) QueryEventsByID(
 	request *api.QueryEventsByIDRequest,
 	response *api.QueryEventsByIDResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryEventsByID")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryEventsByIDPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryEventsByID", h.roomserverURL+RoomserverQueryEventsByIDPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryPublishedRooms(
@@ -367,11 +312,10 @@ func (h *httpRoomserverInternalAPI) QueryPublishedRooms(
 	request *api.QueryPublishedRoomsRequest,
 	response *api.QueryPublishedRoomsResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryPublishedRooms")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryPublishedRoomsPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryPublishedRooms", h.roomserverURL+RoomserverQueryPublishedRoomsPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryMembershipForUser implements RoomserverQueryAPI
@@ -380,11 +324,10 @@ func (h *httpRoomserverInternalAPI) QueryMembershipForUser(
 	request *api.QueryMembershipForUserRequest,
 	response *api.QueryMembershipForUserResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershipForUser")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMembershipForUserPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryMembershipForUser", h.roomserverURL+RoomserverQueryMembershipForUserPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryMembershipsForRoom implements RoomserverQueryAPI
@@ -393,11 +336,10 @@ func (h *httpRoomserverInternalAPI) QueryMembershipsForRoom(
 	request *api.QueryMembershipsForRoomRequest,
 	response *api.QueryMembershipsForRoomResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershipsForRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMembershipsForRoomPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryMembershipsForRoom", h.roomserverURL+RoomserverQueryMembershipsForRoomPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryMembershipsForRoom implements RoomserverQueryAPI
@@ -406,11 +348,10 @@ func (h *httpRoomserverInternalAPI) QueryServerJoinedToRoom(
 	request *api.QueryServerJoinedToRoomRequest,
 	response *api.QueryServerJoinedToRoomResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerJoinedToRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryServerJoinedToRoomPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryServerJoinedToRoom", h.roomserverURL+RoomserverQueryServerJoinedToRoomPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryServerAllowedToSeeEvent implements RoomserverQueryAPI
@@ -419,11 +360,10 @@ func (h *httpRoomserverInternalAPI) QueryServerAllowedToSeeEvent(
 	request *api.QueryServerAllowedToSeeEventRequest,
 	response *api.QueryServerAllowedToSeeEventResponse,
 ) (err error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerAllowedToSeeEvent")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryServerAllowedToSeeEventPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryServerAllowedToSeeEvent", h.roomserverURL+RoomserverQueryServerAllowedToSeeEventPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryMissingEvents implements RoomServerQueryAPI
@@ -432,11 +372,10 @@ func (h *httpRoomserverInternalAPI) QueryMissingEvents(
 	request *api.QueryMissingEventsRequest,
 	response *api.QueryMissingEventsResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMissingEvents")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMissingEventsPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryMissingEvents", h.roomserverURL+RoomserverQueryMissingEventsPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryStateAndAuthChain implements RoomserverQueryAPI
@@ -445,11 +384,10 @@ func (h *httpRoomserverInternalAPI) QueryStateAndAuthChain(
 	request *api.QueryStateAndAuthChainRequest,
 	response *api.QueryStateAndAuthChainResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryStateAndAuthChain")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryStateAndAuthChainPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryStateAndAuthChain", h.roomserverURL+RoomserverQueryStateAndAuthChainPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // PerformBackfill implements RoomServerQueryAPI
@@ -458,11 +396,10 @@ func (h *httpRoomserverInternalAPI) PerformBackfill(
 	request *api.PerformBackfillRequest,
 	response *api.PerformBackfillResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformBackfill")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformBackfillPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"PerformBackfill", h.roomserverURL+RoomserverPerformBackfillPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryRoomVersionCapabilities implements RoomServerQueryAPI
@@ -471,11 +408,10 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionCapabilities(
 	request *api.QueryRoomVersionCapabilitiesRequest,
 	response *api.QueryRoomVersionCapabilitiesResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionCapabilities")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryRoomVersionCapabilitiesPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryRoomVersionCapabilities", h.roomserverURL+RoomserverQueryRoomVersionCapabilitiesPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 // QueryRoomVersionForRoom implements RoomServerQueryAPI
@@ -488,16 +424,10 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionForRoom(
 		response.RoomVersion = roomVersion
 		return nil
 	}
-
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomVersionForRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryRoomVersionForRoomPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err == nil {
-		h.cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
-	}
-	return err
+	return httputil.CallInternalRPCAPI(
+		"QueryRoomVersionForRoom", h.roomserverURL+RoomserverQueryRoomVersionForRoomPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryCurrentState(
@@ -505,11 +435,10 @@ func (h *httpRoomserverInternalAPI) QueryCurrentState(
 	request *api.QueryCurrentStateRequest,
 	response *api.QueryCurrentStateResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryCurrentState")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryCurrentStatePath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryCurrentState", h.roomserverURL+RoomserverQueryCurrentStatePath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryRoomsForUser(
@@ -517,11 +446,10 @@ func (h *httpRoomserverInternalAPI) QueryRoomsForUser(
 	request *api.QueryRoomsForUserRequest,
 	response *api.QueryRoomsForUserResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRoomsForUser")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryRoomsForUserPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryRoomsForUser", h.roomserverURL+RoomserverQueryRoomsForUserPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryBulkStateContent(
@@ -529,69 +457,76 @@ func (h *httpRoomserverInternalAPI) QueryBulkStateContent(
 	request *api.QueryBulkStateContentRequest,
 	response *api.QueryBulkStateContentResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryBulkStateContent")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryBulkStateContentPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryBulkStateContent", h.roomserverURL+RoomserverQueryBulkStateContentPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QuerySharedUsers(
-	ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse,
+	ctx context.Context,
+	request *api.QuerySharedUsersRequest,
+	response *api.QuerySharedUsersResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QuerySharedUsers")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQuerySharedUsersPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	return httputil.CallInternalRPCAPI(
+		"QuerySharedUsers", h.roomserverURL+RoomserverQuerySharedUsersPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryKnownUsers(
-	ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse,
+	ctx context.Context,
+	request *api.QueryKnownUsersRequest,
+	response *api.QueryKnownUsersResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKnownUsers")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryKnownUsersPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	return httputil.CallInternalRPCAPI(
+		"QueryKnownUsers", h.roomserverURL+RoomserverQueryKnownUsersPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryAuthChain(
-	ctx context.Context, req *api.QueryAuthChainRequest, res *api.QueryAuthChainResponse,
+	ctx context.Context,
+	request *api.QueryAuthChainRequest,
+	response *api.QueryAuthChainResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryAuthChain")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryAuthChainPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	return httputil.CallInternalRPCAPI(
+		"QueryAuthChain", h.roomserverURL+RoomserverQueryAuthChainPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryServerBannedFromRoom(
-	ctx context.Context, req *api.QueryServerBannedFromRoomRequest, res *api.QueryServerBannedFromRoomResponse,
+	ctx context.Context,
+	request *api.QueryServerBannedFromRoomRequest,
+	response *api.QueryServerBannedFromRoomResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryServerBannedFromRoom")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryServerBannedFromRoomPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	return httputil.CallInternalRPCAPI(
+		"QueryServerBannedFromRoom", h.roomserverURL+RoomserverQueryServerBannedFromRoomPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpRoomserverInternalAPI) QueryRestrictedJoinAllowed(
-	ctx context.Context, req *api.QueryRestrictedJoinAllowedRequest, res *api.QueryRestrictedJoinAllowedResponse,
+	ctx context.Context,
+	request *api.QueryRestrictedJoinAllowedRequest,
+	response *api.QueryRestrictedJoinAllowedResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryRestrictedJoinAllowed")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryRestrictedJoinAllowed
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+	return httputil.CallInternalRPCAPI(
+		"QueryRestrictedJoinAllowed", h.roomserverURL+RoomserverQueryRestrictedJoinAllowed,
+		h.httpClient, ctx, request, response,
+	)
 }
 
-func (h *httpRoomserverInternalAPI) PerformForget(ctx context.Context, req *api.PerformForgetRequest, res *api.PerformForgetResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformForget")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverPerformForgetPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+func (h *httpRoomserverInternalAPI) PerformForget(
+	ctx context.Context,
+	request *api.PerformForgetRequest,
+	response *api.PerformForgetResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformForget", h.roomserverURL+RoomserverPerformForgetPath,
+		h.httpClient, ctx, request, response,
+	)
 
 }
 

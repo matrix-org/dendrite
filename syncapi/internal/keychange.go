@@ -31,7 +31,7 @@ import (
 // DeviceOTKCounts adds one-time key counts to the /sync response
 func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
 	var queryRes keyapi.QueryOneTimeKeysResponse
-	keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
+	_ = keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
 		UserID:   userID,
 		DeviceID: deviceID,
 	}, &queryRes)
@@ -73,7 +73,7 @@ func DeviceListCatchup(
 		offset = int64(from)
 	}
 	var queryRes keyapi.QueryKeyChangesResponse
-	keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
+	_ = keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
 		Offset:   offset,
 		ToOffset: toOffset,
 	}, &queryRes)
