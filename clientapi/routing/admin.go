@@ -30,13 +30,15 @@ func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserv
 		}
 	}
 	res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
-	rsAPI.PerformAdminEvacuateRoom(
+	if err := rsAPI.PerformAdminEvacuateRoom(
 		req.Context(),
 		&roomserverAPI.PerformAdminEvacuateRoomRequest{
 			RoomID: roomID,
 		},
 		res,
-	)
+	); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if err := res.Error; err != nil {
 		return err.JSONResponse()
 	}
@@ -67,13 +69,15 @@ func AdminEvacuateUser(req *http.Request, device *userapi.Device, rsAPI roomserv
 		}
 	}
 	res := &roomserverAPI.PerformAdminEvacuateUserResponse{}
-	rsAPI.PerformAdminEvacuateUser(
+	if err := rsAPI.PerformAdminEvacuateUser(
 		req.Context(),
 		&roomserverAPI.PerformAdminEvacuateUserRequest{
 			UserID: userID,
 		},
 		res,
-	)
+	); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if err := res.Error; err != nil {
 		return err.JSONResponse()
 	}
