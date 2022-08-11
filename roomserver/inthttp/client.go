@@ -5,13 +5,14 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsInputAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const (
@@ -530,10 +531,9 @@ func (h *httpRoomserverInternalAPI) PerformForget(
 
 }
 
-func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, req *api.QueryMembershipAtEventRequest, res *api.QueryMembershipAtEventResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryMembershiptAtEvent")
-	defer span.Finish()
-
-	apiURL := h.roomserverURL + RoomserverQueryMembershipAtEventPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, request *api.QueryMembershipAtEventRequest, response *api.QueryMembershipAtEventResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryMembershiptAtEvent", h.roomserverURL+RoomserverQueryMembershipAtEventPath,
+		h.httpClient, ctx, request, response,
+	)
 }

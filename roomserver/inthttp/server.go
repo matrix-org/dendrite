@@ -2,6 +2,7 @@ package inthttp
 
 import (
 	"github.com/gorilla/mux"
+
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 )
@@ -193,17 +194,8 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 		RoomserverQueryRestrictedJoinAllowed,
 		httputil.MakeInternalRPCAPI("RoomserverQueryRestrictedJoinAllowed", r.QueryRestrictedJoinAllowed),
 	)
-	internalAPIMux.Handle(RoomserverQueryMembershipAtEventPath,
-		httputil.MakeInternalAPI("queryMembershipAtEventPath", func(req *http.Request) util.JSONResponse {
-			request := api.QueryMembershipAtEventRequest{}
-			response := api.QueryMembershipAtEventResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := r.QueryMembershipAtEvent(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		RoomserverQueryMembershipAtEventPath,
+		httputil.MakeInternalRPCAPI("RoomserverQueryMembershipAtEventPath", r.QueryMembershipAtEvent),
 	)
 }
