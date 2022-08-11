@@ -146,7 +146,7 @@ func (c *RistrettoCostedCachePartition[K, V]) Set(key K, value V) {
 }
 
 type RistrettoCachePartition[K keyable, V any] struct {
-	cache   *ristretto.Cache
+	cache   *ristretto.Cache //nolint:all,unused
 	Prefix  byte
 	Mutable bool
 	MaxAge  time.Duration
