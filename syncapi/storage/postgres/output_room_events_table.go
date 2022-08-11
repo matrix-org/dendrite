@@ -191,10 +191,12 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 	}
 
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: add history visibility column (output_room_events)",
-		Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
-	})
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "syncapi: add history visibility column (output_room_events)",
+			Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
+		},
+	)
 	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err

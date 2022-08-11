@@ -5,14 +5,14 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsInputAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const (
@@ -61,6 +61,7 @@ const (
 	RoomserverQueryServerBannedFromRoomPath    = "/roomserver/queryServerBannedFromRoom"
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
+	RoomserverQueryMembershipAtEventPath       = "/roomserver/queryMembershipAtEvent"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -528,4 +529,11 @@ func (h *httpRoomserverInternalAPI) PerformForget(
 		h.httpClient, ctx, request, response,
 	)
 
+}
+
+func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, request *api.QueryMembershipAtEventRequest, response *api.QueryMembershipAtEventResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryMembershiptAtEvent", h.roomserverURL+RoomserverQueryMembershipAtEventPath,
+		h.httpClient, ctx, request, response,
+	)
 }

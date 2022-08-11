@@ -382,6 +382,16 @@ func (t *RoomserverInternalAPITrace) QueryRestrictedJoinAllowed(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) QueryMembershipAtEvent(
+	ctx context.Context,
+	request *QueryMembershipAtEventRequest,
+	response *QueryMembershipAtEventResponse,
+) error {
+	err := t.Impl.QueryMembershipAtEvent(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryMembershipAtEvent req=%+v res=%+v", js(request), js(response))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {
