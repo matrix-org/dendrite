@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -76,11 +75,11 @@ func main() {
 		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
 			panic(err)
 		}
-		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
+		if err = os.WriteFile(keyfile, sk, 0644); err != nil {
 			panic(err)
 		}
 	} else if err == nil {
-		if sk, err = ioutil.ReadFile(keyfile); err != nil {
+		if sk, err = os.ReadFile(keyfile); err != nil {
 			panic(err)
 		}
 		if len(sk) != ed25519.PrivateKeySize {

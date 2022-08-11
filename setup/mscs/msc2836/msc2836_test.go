@@ -7,7 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -429,12 +429,12 @@ func postRelationships(t *testing.T, expectCode int, accessToken string, req *ms
 		t.Fatalf("failed to do request: %s", err)
 	}
 	if res.StatusCode != expectCode {
-		body, _ := ioutil.ReadAll(res.Body)
+		body, _ := io.ReadAll(res.Body)
 		t.Fatalf("wrong response code, got %d want %d - body: %s", res.StatusCode, expectCode, string(body))
 	}
 	if res.StatusCode == 200 {
 		var result msc2836.EventRelationshipResponse
-		body, err := ioutil.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("response 200 OK but failed to read response body: %s", err)
 		}

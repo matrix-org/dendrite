@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -35,7 +34,7 @@ import (
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
 func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.ClientUserAPI, cfg *config.ClientAPI, rt *ratelimit.RtFailedLogin) (*Login, LoginCleanupFunc, *util.JSONResponse) {
-	reqBytes, err := ioutil.ReadAll(r)
+	reqBytes, err := io.ReadAll(r)
 	if err != nil {
 		err := &util.JSONResponse{
 			Code: http.StatusBadRequest,
