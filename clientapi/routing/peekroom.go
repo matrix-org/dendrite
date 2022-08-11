@@ -17,6 +17,7 @@ package routing
 import (
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -54,7 +55,9 @@ func PeekRoomByIDOrAlias(
 	}
 
 	// Ask the roomserver to perform the peek.
-	rsAPI.PerformPeek(req.Context(), &peekReq, &peekRes)
+	if err := rsAPI.PerformPeek(req.Context(), &peekReq, &peekRes); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if peekRes.Error != nil {
 		return peekRes.Error.JSONResponse()
 	}
@@ -89,7 +92,9 @@ func UnpeekRoomByID(
 	}
 	unpeekRes := roomserverAPI.PerformUnpeekResponse{}
 
-	rsAPI.PerformUnpeek(req.Context(), &unpeekReq, &unpeekRes)
+	if err := rsAPI.PerformUnpeek(req.Context(), &unpeekReq, &unpeekRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if unpeekRes.Error != nil {
 		return unpeekRes.Error.JSONResponse()
 	}
