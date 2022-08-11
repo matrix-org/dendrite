@@ -425,10 +425,14 @@ func (h *httpRoomserverInternalAPI) QueryRoomVersionForRoom(
 		response.RoomVersion = roomVersion
 		return nil
 	}
-	return httputil.CallInternalRPCAPI(
+	err := httputil.CallInternalRPCAPI(
 		"QueryRoomVersionForRoom", h.roomserverURL+RoomserverQueryRoomVersionForRoomPath,
 		h.httpClient, ctx, request, response,
 	)
+	if err == nil {
+		h.cache.StoreRoomVersion(request.RoomID, response.RoomVersion)
+	}
+	return err
 }
 
 func (h *httpRoomserverInternalAPI) QueryCurrentState(
