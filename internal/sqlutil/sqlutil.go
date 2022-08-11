@@ -46,6 +46,9 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 		db.SetMaxOpenConns(dbProperties.MaxOpenConns())
 		db.SetMaxIdleConns(dbProperties.MaxIdleConns())
 		db.SetConnMaxLifetime(dbProperties.ConnMaxLifetime())
+	} else {
+		db.Exec("PRAGMA busy_timeout = 10000;")
+		db.Exec("PRAGMA journal_mode=WAL;")
 	}
 	return db, nil
 }
