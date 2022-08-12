@@ -334,8 +334,9 @@ type PerformAccountCreationResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformPasswordUpdateRequest struct {
-	Localpart string // Required: The localpart for this account.
-	Password  string // Required: The new password to set.
+	Localpart     string // Required: The localpart for this account.
+	Password      string // Required: The new password to set.
+	LogoutDevices bool   // Optional: Whether to log out all user devices.
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
