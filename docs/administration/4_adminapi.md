@@ -38,7 +38,35 @@ Request body format:
 Reset the password of a local user. The `localpart` is the username only, i.e. if
 the full user ID is `@alice:domain.com` then the local part is `alice`.
 
+## POST `/_synapse/admin/v1/send_server_notice`
+
+Request body format:
+```
+    {
+        "user_id": "@target_user:server_name",
+        "content": {
+           "msgtype": "m.text",
+           "body": "This is my message"
+        }
+    }
+```
+
+Send a server notice to a specific user. If user_id is not supplied, the server notice is sent to all users.
+
+If successfully sent, the API will return the following response:
+
+```
+   {
+        "event_id": "<event_id>"
+   }
+```
+
 ## GET `/_synapse/admin/v1/register`
 
 Shared secret registration — please see the [user creation page](createusers) for
 guidance on configuring and using this endpoint.
+
+## GET `/_matrix/client/v3/admin/whois/{userId}`
+
+From [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3adminwhoisuserid)
+Gets information about from about a particular user. 
