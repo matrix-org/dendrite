@@ -83,6 +83,10 @@ func main() {
 	}
 	cfg := setup.ParseFlags(true)
 
+	if *resetPassword {
+		logrus.Fatalf("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
+	}
+
 	if *username == "" {
 		flag.Usage()
 		os.Exit(1)
@@ -102,52 +106,12 @@ func main() {
 		logrus.Fatalln(err)
 	}
 
-	if *resetPassword {
-		if err = passwordReset(*serverURL, *username, pass); err != nil {
-			logrus.Fatalln("Failed to reset the password:", err.Error())
-		}
-		return
-	}
-
 	accessToken, err := sharedSecretRegister(cfg.ClientAPI.RegistrationSharedSecret, *serverURL, *username, pass, *isAdmin)
 	if err != nil {
 		logrus.Fatalln("Failed to create the account:", err.Error())
 	}
 
 	logrus.Infof("Created account: %s (AccessToken: %s)", *username, accessToken)
-}
-
-func passwordReset(serverURL, localpart, password string) error {
-	resetURL := fmt.Sprintf("%s/_dendrite/admin/resetPassword/%s", serverURL, localpart)
-	request := struct {
-		Password string `json:"password"`
-	}{
-		Password: password,
-	}
-	response := struct {
-		Updated bool `json:"password_updated"`
-	}{}
-	js, err := json.Marshal(request)
-	if err != nil {
-		return fmt.Errorf("unable to marshal json: %w", err)
-	}
-	registerReq, err := http.NewRequest(http.MethodPost, resetURL, bytes.NewBuffer(js))
-	if err != nil {
-		return fmt.Errorf("unable to create http request: %w", err)
-	}
-	httpResp, err := cl.Do(registerReq)
-	if err != nil {
-		return fmt.Errorf("unable to create account: %w", err)
-	}
-	if err := json.NewDecoder(httpResp.Body).Decode(&response); err != nil {
-		return fmt.Errorf("unable to decode response: %w", err)
-	}
-	if response.Updated {
-		logrus.Infof("Reset password for user %q and invalidated all user sessions", localpart)
-	} else {
-		logrus.Infof("Failed to reset password for user %q", localpart)
-	}
-	return nil
 }
 
 type sharedSecretRegistrationRequest struct {
