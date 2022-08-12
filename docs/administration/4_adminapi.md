@@ -74,5 +74,5 @@ guidance on configuring and using this endpoint.
 
 ## GET `/_matrix/client/v3/admin/whois/{userId}`
 
-From [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3adminwhoisuserid). 
+From the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3adminwhoisuserid). 
 Gets information about a particular user. ```userId``` is the full user ID e.g. ```@alice:domain.com```
