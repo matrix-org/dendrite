@@ -58,8 +58,7 @@ Request body format:
     }
 ```
 
-Send a server notice to a specific user. If user_id is not supplied, the server notice is sent to all users.
-
+Send a server notice to a specific user.
 If successfully sent, the API will return the following response:
 
 ```
