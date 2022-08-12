@@ -935,12 +935,12 @@ func Setup(
 			return SearchUserDirectory(
 				req.Context(),
 				device,
-				userAPI,
 				rsAPI,
 				userDirectoryProvider,
-				cfg.Matrix.ServerName,
 				postContent.SearchString,
 				postContent.Limit,
+				federation,
+				cfg.Matrix.ServerName,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
