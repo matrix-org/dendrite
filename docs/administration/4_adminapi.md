@@ -17,7 +17,7 @@ Endpoints may be used directly through curl.:
 
 
 ```
-curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Content>'"
+curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Content>'
 ```
 
 ## GET `/_dendrite/admin/evacuateRoom/{roomID}`
