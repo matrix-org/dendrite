@@ -57,7 +57,7 @@ Request body format:
 }
 ```
 
-Send a server notice to a specific user. See the (Matrix Spec)[https://spec.matrix.org/v1.3/client-server-api/#server-notices] for additional details on server notice behaviour.
+Send a server notice to a specific user. See the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#server-notices) for additional details on server notice behaviour.
 If successfully sent, the API will return the following response:
 
 ```
