@@ -52,8 +52,6 @@ Example:
 	# read password from stdin
 	%s --config dendrite.yaml -username alice -passwordstdin < my.pass
 	cat my.pass | %s --config dendrite.yaml -username alice -passwordstdin
-	# reset password for a user, can be used with a combination above to read the password
-	%s --config dendrite.yaml -reset-password -username alice -password foobarbaz
 
 Arguments:
 
@@ -65,7 +63,7 @@ var (
 	pwdFile            = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
 	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
 	isAdmin            = flag.Bool("admin", false, "Create an admin account")
-	resetPassword      = flag.Bool("reset-password", false, "Resets the password for the given username")
+	resetPassword      = flag.Bool("reset-password", false, "Deprecated")
 	serverURL          = flag.String("url", "https://localhost:8448", "The URL to connect to.")
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
@@ -78,7 +76,7 @@ var cl = http.Client{
 func main() {
 	name := os.Args[0]
 	flag.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name, name)
+		_, _ = fmt.Fprintf(os.Stderr, usage, name, name, name, name, name, name)
 		flag.PrintDefaults()
 	}
 	cfg := setup.ParseFlags(true)
