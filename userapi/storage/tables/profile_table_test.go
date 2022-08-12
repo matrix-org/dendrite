@@ -4,18 +4,19 @@ import (
 	"context"
 	"testing"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi/storage/postgres"
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const serverNotice = "notice"
 
-func mustCreateProfileTable(t *testing.T, dbType test.DBType) (tab tables.ProfileTable, close func()) {
+func mustCreateProfileTable(t *testing.T, dbType test.DBType, serverName gomatrixserverlib.ServerName) (tab tables.ProfileTable, close func()) {
 	var connStr string
 	connStr, close = test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
@@ -26,9 +27,9 @@ func mustCreateProfileTable(t *testing.T, dbType test.DBType) (tab tables.Profil
 	}
 	switch dbType {
 	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresProfilesTable(db, serverNotice)
+		tab, err = postgres.NewPostgresProfilesTable(db, serverNotice, serverName)
 	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSQLiteProfilesTable(db, serverNotice)
+		tab, err = sqlite3.NewSQLiteProfilesTable(db, serverNotice, serverName)
 	}
 	if err != nil {
 		t.Fatalf("failed to create profiles table: %v", err)
@@ -50,7 +51,7 @@ func TestProfileTable(t *testing.T) {
 	displayName := "newDisplayName"
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, close := mustCreateProfileTable(t, dbType)
+		tab, close := mustCreateProfileTable(t, dbType, serverName1)
 		defer close()
 		// Create serverNotice user
 		if err := tab.InsertProfile(ctx, nil, serverNotice, serverName1); err != nil {
