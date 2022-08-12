@@ -13,11 +13,11 @@ without warning.
 
 More endpoints will be added in the future.
 
-Endpoints may be used directly through curl.:
+Endpoints may be used directly through curl:
 
 
 ```
-curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Content>'
+curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Contents>'
 ```
 
 ## GET `/_dendrite/admin/evacuateRoom/{roomID}`
