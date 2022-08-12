@@ -25,12 +25,14 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
-func NewSqliteNotificationDataTable(db *sql.DB) (tables.NotificationData, error) {
+func NewSqliteNotificationDataTable(db *sql.DB, streamID *StreamIDStatements) (tables.NotificationData, error) {
 	_, err := db.Exec(notificationDataSchema)
 	if err != nil {
 		return nil, err
 	}
-	r := &notificationDataStatements{}
+	r := &notificationDataStatements{
+		streamIDStatements: streamID,
+	}
 	return r, sqlutil.StatementList{
 		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
 		{&r.selectUserUnreadCounts, selectUserUnreadNotificationCountsSQL},
@@ -39,6 +41,7 @@ func NewSqliteNotificationDataTable(db *sql.DB) (tables.NotificationData, error)
 }
 
 type notificationDataStatements struct {
+	streamIDStatements     *StreamIDStatements
 	upsertRoomUnreadCounts *sql.Stmt
 	selectUserUnreadCounts *sql.Stmt
 	selectMaxID            *sql.Stmt
@@ -58,8 +61,7 @@ const upsertRoomUnreadNotificationCountsSQL = `INSERT INTO syncapi_notification_
   (user_id, room_id, notification_count, highlight_count)
   VALUES ($1, $2, $3, $4)
   ON CONFLICT (user_id, room_id)
-  DO UPDATE SET notification_count = $3, highlight_count = $4
-  RETURNING id`
+  DO UPDATE SET id = $5, notification_count = $6, highlight_count = $7`
 
 const selectUserUnreadNotificationCountsSQL = `SELECT
   id, room_id, notification_count, highlight_count
@@ -71,7 +73,11 @@ const selectUserUnreadNotificationCountsSQL = `SELECT
 const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(id) END FROM syncapi_notification_data`
 
 func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = r.upsertRoomUnreadCounts.QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
+	pos, err = r.streamIDStatements.nextNotificationID(ctx, nil)
+	if err != nil {
+		return
+	}
+	_, err = r.upsertRoomUnreadCounts.ExecContext(ctx, userID, roomID, notificationCount, highlightCount, pos, notificationCount, highlightCount)
 	return
 }
 

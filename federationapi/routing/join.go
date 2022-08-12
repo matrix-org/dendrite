@@ -21,13 +21,14 @@ import (
 	"sort"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // MakeJoin implements the /make_join API
@@ -202,6 +203,14 @@ func SendJoin(
 		}
 	}
 
+	// Check that the event is from the server sending the request.
+	if event.Origin() != request.Origin() {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
+		}
+	}
+
 	// Check that a state key is provided.
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
@@ -213,6 +222,22 @@ func SendJoin(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
+		}
+	}
+
+	// Check that the sender belongs to the server that is sending us
+	// the request. By this point we've already asserted that the sender
+	// and the state key are equal so we don't need to check both.
+	var domain gomatrixserverlib.ServerName
+	if _, domain, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
+		}
+	} else if domain != request.Origin() {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender of the join must belong to the origin server"),
 		}
 	}
 
@@ -239,14 +264,6 @@ func SendJoin(
 					eventID, event.EventID(),
 				),
 			),
-		}
-	}
-
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
 		}
 	}
 
@@ -375,7 +392,7 @@ func SendJoin(
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
 		var response api.InputRoomEventsResponse
-		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+		if err := rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
@@ -384,7 +401,9 @@ func SendJoin(
 					TransactionID: nil,
 				},
 			},
-		}, &response)
+		}, &response); err != nil {
+			return jsonerror.InternalAPIError(httpReq.Context(), err)
+		}
 		if response.ErrMsg != "" {
 			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
 			if response.NotAllowed {
@@ -419,13 +438,13 @@ func SendJoin(
 // a restricted room join. If the room version does not support restricted
 // joins then this function returns with no side effects. This returns three
 // values:
-// * an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
-//   should always be sent back to the client if one is specified
-// * a user ID of an authorising user, typically a user that has power to
-//   issue invites in the room, if one has been found
-// * an error if there was a problem finding out if this was allowable,
-//   like if the room version isn't known or a problem happened talking to
-//   the roomserver
+//   - an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
+//     should always be sent back to the client if one is specified
+//   - a user ID of an authorising user, typically a user that has power to
+//     issue invites in the room, if one has been found
+//   - an error if there was a problem finding out if this was allowable,
+//     like if the room version isn't known or a problem happened talking to
+//     the roomserver
 func checkRestrictedJoin(
 	httpReq *http.Request,
 	rsAPI api.FederationRoomserverAPI,

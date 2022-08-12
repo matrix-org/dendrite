@@ -19,6 +19,10 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -26,9 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // the max number of servers to backfill from per request. If this is too low we may fail to backfill when
@@ -73,7 +74,7 @@ func (r *Backfiller) PerformBackfill(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("PerformBackfill: missing room info for room %s", request.RoomID)
 	}
 
@@ -106,7 +107,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
 	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities, r.PreferServers)
@@ -434,7 +435,7 @@ FindSuccessor:
 		logrus.WithError(err).WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room")
 		return nil
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		logrus.WithField("room_id", roomID).Error("ServersAtEvent: failed to get RoomInfo for room, room is missing")
 		return nil
 	}
@@ -522,8 +523,9 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 }
 
 // joinEventsFromHistoryVisibility returns all CURRENTLY joined members if our server can read the room history
+//
 // TODO: Long term we probably want a history_visibility table which stores eventNID | visibility_enum so we can just
-//       pull all events and then filter by that table.
+// pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
 	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry,
 	thisServer gomatrixserverlib.ServerName) ([]types.Event, error) {

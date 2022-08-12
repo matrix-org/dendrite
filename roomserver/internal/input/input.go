@@ -25,6 +25,11 @@ import (
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -35,10 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -60,9 +61,9 @@ import (
 // per-room durable consumers will only progress through the stream
 // as events are processed.
 //
-//       A BC *  -> positions of each consumer (* = ephemeral)
-//       ⌄ ⌄⌄ ⌄
-// ABAABCAABCAA  -> newest (letter = subject for each message)
+//	      A BC *  -> positions of each consumer (* = ephemeral)
+//	      ⌄ ⌄⌄ ⌄
+//	ABAABCAABCAA  -> newest (letter = subject for each message)
 //
 // In this example, A is still processing an event but has two
 // pending events to process afterwards. Both B and C are caught
@@ -336,18 +337,18 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) {
+) error {
 	// Queue up the event into the roomserver.
 	replySub, err := r.queueInputRoomEvents(ctx, request)
 	if err != nil {
 		response.ErrMsg = err.Error()
-		return
+		return nil
 	}
 
 	// If we aren't waiting for synchronous responses then we can
 	// give up here, there is nothing further to do.
 	if replySub == nil {
-		return
+		return nil
 	}
 
 	// Otherwise, we'll want to sit and wait for the responses
@@ -359,12 +360,14 @@ func (r *Inputer) InputRoomEvents(
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()
-			return
+			return nil
 		}
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
 	}
+
+	return nil
 }
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(

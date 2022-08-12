@@ -64,7 +64,9 @@ func UpgradeRoom(
 	}
 	upgradeResp := roomserverAPI.PerformRoomUpgradeResponse{}
 
-	rsAPI.PerformRoomUpgrade(req.Context(), &upgradeReq, &upgradeResp)
+	if err := rsAPI.PerformRoomUpgrade(req.Context(), &upgradeReq, &upgradeResp); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	if upgradeResp.Error != nil {
 		if upgradeResp.Error.Code == roomserverAPI.PerformErrorNoRoom {

@@ -156,13 +156,13 @@ func (d *Database) RoomInfo(ctx context.Context, roomID string) (*types.RoomInfo
 }
 
 func (d *Database) roomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok && roomInfo != nil {
-		return roomInfo, nil
-	}
 	roomInfo, err := d.RoomsTable.SelectRoomInfo(ctx, txn, roomID)
-	if err == nil && roomInfo != nil {
+	if err != nil {
+		return nil, err
+	}
+	if roomInfo != nil {
 		d.Cache.StoreRoomServerRoomID(roomInfo.RoomNID, roomID)
-		d.Cache.StoreRoomInfo(roomID, roomInfo)
+		d.Cache.StoreRoomVersion(roomID, roomInfo.RoomVersion)
 	}
 	return roomInfo, err
 }
@@ -489,8 +489,8 @@ func (d *Database) events(
 	fetchNIDList := make([]types.RoomNID, 0, len(uniqueRoomNIDs))
 	for n := range uniqueRoomNIDs {
 		if roomID, ok := d.Cache.GetRoomServerRoomID(n); ok {
-			if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-				roomVersions[n] = roomInfo.RoomVersion
+			if roomVersion, ok := d.Cache.GetRoomVersion(roomID); ok {
+				roomVersions[n] = roomVersion
 				continue
 			}
 		}
@@ -676,7 +676,7 @@ func (d *Database) storeEvent(
 		succeeded := false
 		if updater == nil {
 			var roomInfo *types.RoomInfo
-			roomInfo, err = d.RoomInfo(ctx, event.RoomID())
+			roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
 			if err != nil {
 				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
 			}
@@ -747,9 +747,6 @@ func (d *Database) MissingAuthPrevEvents(
 func (d *Database) assignRoomNID(
 	ctx context.Context, roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
-	if roomInfo, ok := d.Cache.GetRoomInfo(roomID); ok {
-		return roomInfo.RoomNID, nil
-	}
 	// Check if we already have a numeric ID in the database.
 	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
 	if err == sql.ErrNoRows {
@@ -822,8 +819,9 @@ func extractRoomVersionFromCreateEvent(event *gomatrixserverlib.Event) (
 // "servers should not apply or send redactions to clients until both the redaction event and original event have been seen, and are valid."
 // https://matrix.org/docs/spec/rooms/v3#authorization-rules-for-events
 // These cases are:
-//  - This is a redaction event, redact the event it references if we know about it.
-//  - This is a normal event which may have been previously redacted.
+//   - This is a redaction event, redact the event it references if we know about it.
+//   - This is a normal event which may have been previously redacted.
+//
 // In the first case, check if we have the referenced event then apply the redaction, else store it
 // in the redactions table with validated=FALSE. In the second case, check if there is a redaction for it:
 // if there is then apply the redactions and set validated=TRUE.
@@ -1032,7 +1030,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1051,7 +1049,7 @@ func (d *Database) GetStateEvent(ctx context.Context, roomID, evType, stateKey s
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1097,7 +1095,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 		return nil, fmt.Errorf("room %s doesn't exist", roomID)
 	}
 	// e.g invited rooms
-	if roomInfo.IsStub {
+	if roomInfo.IsStub() {
 		return nil, nil
 	}
 	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, evType)
@@ -1108,7 +1106,7 @@ func (d *Database) GetStateEventsWithEventType(ctx context.Context, roomID, evTy
 	if err != nil {
 		return nil, err
 	}
-	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+	entries, err := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 	if err != nil {
 		return nil, err
 	}
@@ -1225,10 +1223,10 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load room info for room %s : %w", roomID, err2)
 		}
 		// for unknown rooms or rooms which we don't have the current state, skip them.
-		if roomInfo == nil || roomInfo.IsStub {
+		if roomInfo == nil || roomInfo.IsStub() {
 			continue
 		}
-		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID)
+		entries, err2 := d.loadStateAtSnapshot(ctx, roomInfo.StateSnapshotNID())
 		if err2 != nil {
 			return nil, fmt.Errorf("GetBulkStateContent: failed to load state for room %s : %w", roomID, err2)
 		}

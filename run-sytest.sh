@@ -17,7 +17,7 @@ main() {
 
     if [ -d ../sytest ]; then
         local tmpdir
-        tmpdir="$(mktemp -d --tmpdir run-systest.XXXXXXXXXX)"
+        tmpdir="$(mktemp -d -t run-systest.XXXXXXXXXX)"
         trap "rm -r '$tmpdir'" EXIT
 
         if [ -z "$DISABLE_BUILDING_SYTEST" ]; then

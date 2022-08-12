@@ -125,7 +125,7 @@ func (r *Inviter) PerformInvite(
 		return outputUpdates, nil
 	}
 
-	if (info == nil || info.IsStub) && !isOriginLocal && isTargetLocal {
+	if (info == nil || info.IsStub()) && !isOriginLocal && isTargetLocal {
 		// The invite came in over federation for a room that we don't know about
 		// yet. We need to handle this a bit differently to most invites because
 		// we don't know the room state, therefore the roomserver can't process
@@ -241,7 +241,9 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+	if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
+	}
 	if err = inputRes.Err(); err != nil {
 		res.Error = &api.PerformError{
 			Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
@@ -276,7 +278,7 @@ func buildInviteStrippedState(
 	}
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
-		ctx, info.StateSnapshotNID, stateWanted,
+		ctx, info.StateSnapshotNID(), stateWanted,
 	)
 	if err != nil {
 		return nil, err

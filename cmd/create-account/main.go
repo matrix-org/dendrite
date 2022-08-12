@@ -24,8 +24,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -232,7 +230,7 @@ func getRegisterMac(sharedSecret, nonce, localpart, password, adminStr string) (
 func getPassword(password, pwdFile string, pwdStdin bool, r io.Reader) (string, error) {
 	// read password from file
 	if pwdFile != "" {
-		pw, err := ioutil.ReadFile(pwdFile)
+		pw, err := os.ReadFile(pwdFile)
 		if err != nil {
 			return "", fmt.Errorf("Unable to read password from file: %v", err)
 		}
@@ -241,7 +239,7 @@ func getPassword(password, pwdFile string, pwdStdin bool, r io.Reader) (string, 
 
 	// read password from stdin
 	if pwdStdin {
-		data, err := ioutil.ReadAll(r)
+		data, err := io.ReadAll(r)
 		if err != nil {
 			return "", fmt.Errorf("Unable to read password from stdin: %v", err)
 		}
