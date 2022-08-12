@@ -13,6 +13,13 @@ without warning.
 
 More endpoints will be added in the future.
 
+Endpoints may be used directly through curl.:
+
+
+```
+curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Content>'"
+```
+
 ## GET `/_dendrite/admin/evacuateRoom/{roomID}`
 
 This endpoint will instruct Dendrite to part all local users from the given `roomID`
@@ -69,4 +76,4 @@ guidance on configuring and using this endpoint.
 ## GET `/_matrix/client/v3/admin/whois/{userId}`
 
 From [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3adminwhoisuserid)
-Gets information about from about a particular user. 
+Gets information about a particular user. 
