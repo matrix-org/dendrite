@@ -41,7 +41,7 @@ func (r *Unpeeker) PerformUnpeek(
 	ctx context.Context,
 	req *api.PerformUnpeekRequest,
 	res *api.PerformUnpeekResponse,
-) {
+) error {
 	if err := r.performUnpeek(ctx, req); err != nil {
 		perr, ok := err.(*api.PerformError)
 		if ok {
@@ -52,6 +52,7 @@ func (r *Unpeeker) PerformUnpeek(
 			}
 		}
 	}
+	return nil
 }
 
 func (r *Unpeeker) performUnpeek(

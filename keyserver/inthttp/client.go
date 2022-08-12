@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/opentracing/opentracing-go"
 )
 
 // HTTP paths for the internal HTTP APIs
@@ -68,168 +67,108 @@ func (h *httpKeyInternalAPI) PerformClaimKeys(
 	ctx context.Context,
 	request *api.PerformClaimKeysRequest,
 	response *api.PerformClaimKeysResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformClaimKeys")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformClaimKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformClaimKeys", h.apiURL+PerformClaimKeysPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) PerformDeleteKeys(
 	ctx context.Context,
 	request *api.PerformDeleteKeysRequest,
 	response *api.PerformDeleteKeysResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformClaimKeys")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformClaimKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformDeleteKeys", h.apiURL+PerformDeleteKeysPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) PerformUploadKeys(
 	ctx context.Context,
 	request *api.PerformUploadKeysRequest,
 	response *api.PerformUploadKeysResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUploadKeys")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformUploadKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformUploadKeys", h.apiURL+PerformUploadKeysPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) QueryKeys(
 	ctx context.Context,
 	request *api.QueryKeysRequest,
 	response *api.QueryKeysResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeys")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryKeys", h.apiURL+QueryKeysPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) QueryOneTimeKeys(
 	ctx context.Context,
 	request *api.QueryOneTimeKeysRequest,
 	response *api.QueryOneTimeKeysResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryOneTimeKeys")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryOneTimeKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryOneTimeKeys", h.apiURL+QueryOneTimeKeysPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) QueryDeviceMessages(
 	ctx context.Context,
 	request *api.QueryDeviceMessagesRequest,
 	response *api.QueryDeviceMessagesResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryDeviceMessages")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryDeviceMessagesPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryDeviceMessages", h.apiURL+QueryDeviceMessagesPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) QueryKeyChanges(
 	ctx context.Context,
 	request *api.QueryKeyChangesRequest,
 	response *api.QueryKeyChangesResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryKeyChanges")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryKeyChangesPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryKeyChanges", h.apiURL+QueryKeyChangesPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) PerformUploadDeviceKeys(
 	ctx context.Context,
 	request *api.PerformUploadDeviceKeysRequest,
 	response *api.PerformUploadDeviceKeysResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUploadDeviceKeys")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformUploadDeviceKeysPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformUploadDeviceKeys", h.apiURL+PerformUploadDeviceKeysPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) PerformUploadDeviceSignatures(
 	ctx context.Context,
 	request *api.PerformUploadDeviceSignaturesRequest,
 	response *api.PerformUploadDeviceSignaturesResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformUploadDeviceSignatures")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformUploadDeviceSignaturesPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformUploadDeviceSignatures", h.apiURL+PerformUploadDeviceSignaturesPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpKeyInternalAPI) QuerySignatures(
 	ctx context.Context,
 	request *api.QuerySignaturesRequest,
 	response *api.QuerySignaturesResponse,
-) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QuerySignatures")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QuerySignaturesPath
-	err := httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
-	if err != nil {
-		response.Error = &api.KeyError{
-			Err: err.Error(),
-		}
-	}
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QuerySignatures", h.apiURL+QuerySignaturesPath,
+		h.httpClient, ctx, request, response,
+	)
 }
