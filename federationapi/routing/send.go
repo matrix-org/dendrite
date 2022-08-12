@@ -469,7 +469,9 @@ func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverli
 		UserID:           updatePayload.UserID,
 	}
 	uploadRes := &keyapi.PerformUploadDeviceKeysResponse{}
-	t.keyAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+	if err := t.keyAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes); err != nil {
+		return err
+	}
 	if uploadRes.Error != nil {
 		return uploadRes.Error
 	}

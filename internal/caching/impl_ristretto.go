@@ -35,18 +35,18 @@ const (
 	roomNIDsCache
 	roomIDsCache
 	roomEventsCache
-	roomInfosCache
 	federationPDUsCache
 	federationEDUsCache
 	spaceSummaryRoomsCache
 	lazyLoadingCache
+	eventStateKeyCache
 )
 
 func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enablePrometheus bool) *Caches {
 	cache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 1e5, // 10x number of expected cache items, affects bloom filter size, gives us room for 10,000 currently
-		BufferItems: 64,  // recommended by the ristretto godocs as a sane buffer size value
-		MaxCost:     int64(maxCost),
+		NumCounters: int64((maxCost / 1024) * 10), // 10 counters per 1KB data, affects bloom filter size
+		BufferItems: 64,                           // recommended by the ristretto godocs as a sane buffer size value
+		MaxCost:     int64(maxCost),               // max cost is in bytes, as per the Dendrite config
 		Metrics:     true,
 		KeyToHash: func(key interface{}) (uint64, uint64) {
 			return z.KeyToHash(key)
@@ -88,7 +88,7 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 			Prefix: roomNIDsCache,
 			MaxAge: maxAge,
 		},
-		RoomServerRoomIDs: &RistrettoCachePartition[int64, string]{ // room NID -> room ID
+		RoomServerRoomIDs: &RistrettoCachePartition[types.RoomNID, string]{ // room NID -> room ID
 			cache:  cache,
 			Prefix: roomIDsCache,
 			MaxAge: maxAge,
@@ -100,11 +100,10 @@ func NewRistrettoCache(maxCost config.DataUnit, maxAge time.Duration, enableProm
 				MaxAge: maxAge,
 			},
 		},
-		RoomInfos: &RistrettoCachePartition[string, types.RoomInfo]{ // room ID -> room info
-			cache:   cache,
-			Prefix:  roomInfosCache,
-			Mutable: true,
-			MaxAge:  maxAge,
+		RoomServerStateKeys: &RistrettoCachePartition[types.EventStateKeyNID, string]{ // event NID -> event state key
+			cache:  cache,
+			Prefix: eventStateKeyCache,
+			MaxAge: maxAge,
 		},
 		FederationPDUs: &RistrettoCostedCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{ // queue NID -> PDU
 			&RistrettoCachePartition[int64, *gomatrixserverlib.HeaderedEvent]{

@@ -23,13 +23,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 var (
@@ -196,14 +197,14 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 
 // sliceInto returns a subslice of `slice` which honours the since/limit values given.
 //
-//    0  1  2  3  4  5  6   index
-//   [A, B, C, D, E, F, G]  slice
+//	  0  1  2  3  4  5  6   index
+//	 [A, B, C, D, E, F, G]  slice
 //
-//   limit=3          => A,B,C (prev='', next='3')
-//   limit=3&since=3  => D,E,F (prev='0', next='6')
-//   limit=3&since=6  => G     (prev='3', next='')
+//	 limit=3          => A,B,C (prev='', next='3')
+//	 limit=3&since=3  => D,E,F (prev='0', next='6')
+//	 limit=3&since=6  => G     (prev='3', next='')
 //
-//  A value of '-1' for prev/next indicates no position.
+//	A value of '-1' for prev/next indicates no position.
 func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int16) (subset []gomatrixserverlib.PublicRoom, prev, next int) {
 	prev = -1
 	next = -1

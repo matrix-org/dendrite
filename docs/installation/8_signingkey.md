@@ -1,7 +1,7 @@
 ---
 title: Generating signing keys
 parent: Installation
-nav_order: 4
+nav_order: 8
 permalink: /installation/signingkeys
 ---
 

@@ -369,6 +369,25 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	return client
 }
 
+func (b *BaseDendrite) configureHTTPErrors() {
+	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
+	}
+
+	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
+	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
+
+	for _, router := range []*mux.Router{
+		b.PublicClientAPIMux, b.PublicMediaAPIMux,
+		b.DendriteAdminMux, b.SynapseAdminMux,
+		b.PublicWellKnownAPIMux,
+	} {
+		router.NotFoundHandler = notFoundCORSHandler
+		router.MethodNotAllowedHandler = notAllowedCORSHandler
+	}
+}
+
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
@@ -408,6 +427,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			},
 		}
 	}
+
+	b.configureHTTPErrors()
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {

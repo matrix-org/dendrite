@@ -64,6 +64,10 @@ global:
   # e.g. localhost:443
   well_known_server_name: ""
 
+  # The server name to delegate client-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_client_name: ""
+
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
   trusted_third_party_id_servers:
@@ -108,6 +112,11 @@ global:
     # of at least one NATS Server node.
     addresses:
     # - localhost:4222
+
+    # Disable the validation of TLS certificates of NATS. This is
+    # not recommended in production since it may allow NATS traffic
+    # to be sent to an insecure endpoint.
+    disable_tls_validation: false
 
     # Persistent directory to store JetStream streams in. This directory should be
     # preserved across Dendrite restarts.
@@ -169,13 +178,16 @@ client_api:
 
   # TURN server information that this homeserver should send to clients.
   turn:
-    turn_user_lifetime: ""
+    turn_user_lifetime: "5m"
     turn_uris:
     #  - turn:turn.server.org?transport=udp
     #  - turn:turn.server.org?transport=tcp
     turn_shared_secret: ""
-    turn_username: ""
-    turn_password: ""
+    # If your TURN server requires static credentials, then you will need to enter
+    # them here instead of supplying a shared secret. Note that these credentials
+    # will be visible to clients!
+    # turn_username: ""
+    # turn_password: ""
 
   # Settings for rate-limited endpoints. Rate limiting kicks in after the threshold
   # number of "slots" have been taken by requests from a specific host. Each "slot"
@@ -183,7 +195,7 @@ client_api:
   # and appservice users are exempt from rate limiting by default.
   rate_limiting:
     enabled: true
-    threshold: 5
+    threshold: 20
     cooloff_ms: 500
     exempt_user_ids:
     #  - "@user:domain.com"

@@ -15,23 +15,13 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/pressly/goose"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpRemoveRoomsTable, DownRemoveRoomsTable)
-}
-
-func LoadRemoveRoomsTable(m *sqlutil.Migrations) {
-	m.AddMigration(UpRemoveRoomsTable, DownRemoveRoomsTable)
-}
-
-func UpRemoveRoomsTable(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func UpRemoveRoomsTable(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 		DROP TABLE IF EXISTS federationsender_rooms;
 	`)
 	if err != nil {

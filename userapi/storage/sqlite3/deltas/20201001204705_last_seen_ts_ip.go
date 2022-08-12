@@ -1,18 +1,13 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadLastSeenTSIP(m *sqlutil.Migrations) {
-	m.AddMigration(UpLastSeenTSIP, DownLastSeenTSIP)
-}
-
-func UpLastSeenTSIP(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func UpLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
     ALTER TABLE device_devices RENAME TO device_devices_tmp;
     CREATE TABLE device_devices (
         access_token TEXT PRIMARY KEY,
@@ -39,8 +34,8 @@ func UpLastSeenTSIP(tx *sql.Tx) error {
 	return nil
 }
 
-func DownLastSeenTSIP(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func DownLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 ALTER TABLE device_devices RENAME TO device_devices_tmp;
 CREATE TABLE IF NOT EXISTS device_devices (
     access_token TEXT PRIMARY KEY,

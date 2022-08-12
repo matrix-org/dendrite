@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/sirupsen/logrus"
@@ -49,12 +50,12 @@ const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content
 	  FROM syncapi_send_to_device
 	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
-	  ORDER BY id DESC
+	  ORDER BY id ASC
 `
 
 const deleteSendToDeviceMessagesSQL = `
 	DELETE FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id < $3
+	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
 `
 
 const selectMaxSendToDeviceIDSQL = "" +
@@ -73,6 +74,15 @@ func NewSqliteSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 		db: db,
 	}
 	_, err := db.Exec(sendToDeviceSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: drop sent_by_token",
+		Up:      deltas.UpRemoveSendToDeviceSentColumn,
+	})
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -120,9 +130,6 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 			logrus.WithError(err).Errorf("Failed to retrieve send-to-device message")
 			return
 		}
-		if id > lastPos {
-			lastPos = id
-		}
 		event := types.SendToDeviceEvent{
 			ID:       id,
 			UserID:   userID,
@@ -131,6 +138,9 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
 			logrus.WithError(err).Errorf("Failed to unmarshal send-to-device message")
 			continue
+		}
+		if id > lastPos {
+			lastPos = id
 		}
 		events = append(events, event)
 	}

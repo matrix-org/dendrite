@@ -16,6 +16,7 @@ package query
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,7 +61,7 @@ func (r *Queryer) QueryStateAfterEvents(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return nil
 	}
 
@@ -203,6 +204,54 @@ func (r *Queryer) QueryMembershipForUser(
 	return err
 }
 
+func (r *Queryer) QueryMembershipAtEvent(
+	ctx context.Context,
+	request *api.QueryMembershipAtEventRequest,
+	response *api.QueryMembershipAtEventResponse,
+) error {
+	response.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return fmt.Errorf("unable to get roomInfo: %w", err)
+	}
+	if info == nil {
+		return fmt.Errorf("no roomInfo found")
+	}
+
+	// get the users stateKeyNID
+	stateKeyNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.UserID})
+	if err != nil {
+		return fmt.Errorf("unable to get stateKeyNIDs for %s: %w", request.UserID, err)
+	}
+	if _, ok := stateKeyNIDs[request.UserID]; !ok {
+		return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
+	}
+
+	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, request.EventIDs, stateKeyNIDs[request.UserID])
+	if err != nil {
+		return fmt.Errorf("unable to get state before event: %w", err)
+	}
+
+	for _, eventID := range request.EventIDs {
+		stateEntry := stateEntries[eventID]
+		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+		if err != nil {
+			return fmt.Errorf("unable to get memberships at state: %w", err)
+		}
+		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
+
+		for i := range memberships {
+			ev := memberships[i]
+			if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
+				res = append(res, ev.Headered(info.RoomVersion))
+			}
+		}
+		response.Memberships[eventID] = res
+	}
+
+	return nil
+}
+
 // QueryMembershipsForRoom implements api.RoomserverInternalAPI
 func (r *Queryer) QueryMembershipsForRoom(
 	ctx context.Context,
@@ -225,6 +274,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, request.LocalOnly)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
 			return fmt.Errorf("r.DB.GetMembershipEventNIDsForRoom: %w", err)
 		}
 		events, err = r.DB.Events(ctx, eventNIDs)
@@ -260,6 +312,9 @@ func (r *Queryer) QueryMembershipsForRoom(
 		var eventNIDs []types.EventNID
 		eventNIDs, err = r.DB.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, request.JoinedOnly, false)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
 			return err
 		}
 
@@ -295,7 +350,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return nil
 	}
 	response.RoomExists = true
@@ -344,8 +399,8 @@ func (r *Queryer) QueryServerAllowedToSeeEvent(
 	if err != nil {
 		return err
 	}
-	if info == nil {
-		return fmt.Errorf("QueryServerAllowedToSeeEvent: no room info for room %s", roomID)
+	if info == nil || info.IsStub() {
+		return nil
 	}
 	response.AllowedToSeeEvent, err = helpers.CheckServerAllowedToSeeEvent(
 		ctx, r.DB, info, request.EventID, request.ServerName, inRoomRes.IsInRoom,
@@ -383,7 +438,7 @@ func (r *Queryer) QueryMissingEvents(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
@@ -422,7 +477,7 @@ func (r *Queryer) QueryStateAndAuthChain(
 	if err != nil {
 		return err
 	}
-	if info == nil || info.IsStub {
+	if info == nil || info.IsStub() {
 		return nil
 	}
 	response.RoomExists = true
@@ -767,7 +822,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	if err != nil {
 		return fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		return nil // fmt.Errorf("room %q doesn't exist or is stub room", req.RoomID)
 	}
 	// If the room version doesn't allow restricted joins then don't
@@ -830,7 +885,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 		// See if the room exists. If it doesn't exist or if it's a stub
 		// room entry then we can't check memberships.
 		targetRoomInfo, err := r.DB.RoomInfo(ctx, rule.RoomID)
-		if err != nil || targetRoomInfo == nil || targetRoomInfo.IsStub {
+		if err != nil || targetRoomInfo == nil || targetRoomInfo.IsStub() {
 			res.Resident = false
 			continue
 		}

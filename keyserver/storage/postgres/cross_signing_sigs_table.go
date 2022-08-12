@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/keyserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -66,6 +67,16 @@ func NewPostgresCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, erro
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "keyserver: cross signing signature indexes",
+		Up:      deltas.UpFixCrossSigningSignatureIndexes,
+	})
+	if err = m.Up(context.Background()); err != nil {
+		return nil, err
+	}
+
 	return s, sqlutil.StatementList{
 		{&s.selectCrossSigningSigsForTargetStmt, selectCrossSigningSigsForTargetSQL},
 		{&s.upsertCrossSigningSigsForTargetStmt, upsertCrossSigningSigsForTargetSQL},

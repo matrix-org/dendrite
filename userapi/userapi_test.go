@@ -117,16 +117,20 @@ func TestQueryProfile(t *testing.T) {
 		},
 	}
 
-	runCases := func(testAPI api.UserInternalAPI) {
+	runCases := func(testAPI api.UserInternalAPI, http bool) {
+		mode := "monolith"
+		if http {
+			mode = "HTTP"
+		}
 		for _, tc := range testCases {
 			var gotRes api.QueryProfileResponse
 			gotErr := testAPI.QueryProfile(context.TODO(), &tc.req, &gotRes)
 			if tc.wantErr == nil && gotErr != nil || tc.wantErr != nil && gotErr == nil {
-				t.Errorf("QueryProfile error, got %s want %s", gotErr, tc.wantErr)
+				t.Errorf("QueryProfile %s error, got %s want %s", mode, gotErr, tc.wantErr)
 				continue
 			}
 			if !reflect.DeepEqual(tc.wantRes, gotRes) {
-				t.Errorf("QueryProfile response got %+v want %+v", gotRes, tc.wantRes)
+				t.Errorf("QueryProfile %s response got %+v want %+v", mode, gotRes, tc.wantRes)
 			}
 		}
 	}
@@ -140,10 +144,10 @@ func TestQueryProfile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create HTTP client")
 		}
-		runCases(httpAPI)
+		runCases(httpAPI, true)
 	})
 	t.Run("Monolith", func(t *testing.T) {
-		runCases(userAPI)
+		runCases(userAPI, false)
 	})
 }
 

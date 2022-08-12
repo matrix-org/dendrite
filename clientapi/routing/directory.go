@@ -302,10 +302,12 @@ func SetVisibility(
 	}
 
 	var publishRes roomserverAPI.PerformPublishResponse
-	rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
 		RoomID:     roomID,
 		Visibility: v.Visibility,
-	}, &publishRes)
+	}, &publishRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if publishRes.Error != nil {
 		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
 		return publishRes.Error.JSONResponse()
