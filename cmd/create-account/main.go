@@ -16,7 +16,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/hex"
@@ -24,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -35,8 +35,6 @@ import (
 	"golang.org/x/term"
 
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/userapi/storage"
 )
 
 const usage = `Usage: %s
@@ -72,6 +70,11 @@ var (
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
 
+var cl = http.Client{
+	Timeout:   time.Second * 10,
+	Transport: http.DefaultTransport,
+}
+
 func main() {
 	name := os.Args[0]
 	flag.Usage = func() {
@@ -100,40 +103,9 @@ func main() {
 	}
 
 	if *resetPassword {
-		var (
-			accountDB storage.Database
-			available bool
-		)
-		b := base.NewBaseDendrite(cfg, "")
-		defer b.Close() // nolint: errcheck
-		accountDB, err = storage.NewUserAPIDatabase(
-			b,
-			&cfg.UserAPI.AccountDatabase,
-			cfg.Global.ServerName,
-			cfg.UserAPI.BCryptCost,
-			cfg.UserAPI.OpenIDTokenLifetimeMS,
-			0, // TODO
-			cfg.Global.ServerNotices.LocalPart,
-		)
-		if err != nil {
-			logrus.WithError(err).Fatalln("Failed to connect to the database")
+		if err = passwordReset(*serverURL, *username, pass); err != nil {
+			logrus.Fatalln("Failed to reset the password:", err.Error())
 		}
-
-		available, err = accountDB.CheckAccountAvailability(context.Background(), *username)
-		if err != nil {
-			logrus.Fatalln("Unable check username existence.")
-		}
-		if available {
-			logrus.Fatalln("Username could not be found.")
-		}
-		err = accountDB.SetPassword(context.Background(), *username, pass)
-		if err != nil {
-			logrus.Fatalf("Failed to update password for user %s: %s", *username, err.Error())
-		}
-		if _, err = accountDB.RemoveAllDevices(context.Background(), *username, ""); err != nil {
-			logrus.Fatalf("Failed to remove all devices: %s", err.Error())
-		}
-		logrus.Infof("Updated password for user %s and invalidated all logins\n", *username)
 		return
 	}
 
@@ -143,6 +115,39 @@ func main() {
 	}
 
 	logrus.Infof("Created account: %s (AccessToken: %s)", *username, accessToken)
+}
+
+func passwordReset(serverURL, localpart, password string) error {
+	resetURL := fmt.Sprintf("%s/_dendrite/admin/resetPassword/%s", serverURL, localpart)
+	request := struct {
+		Password string `json:"password"`
+	}{
+		Password: password,
+	}
+	response := struct {
+		Updated bool `json:"password_updated"`
+	}{}
+	js, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("unable to marshal json: %w", err)
+	}
+	registerReq, err := http.NewRequest(http.MethodPost, resetURL, bytes.NewBuffer(js))
+	if err != nil {
+		return fmt.Errorf("unable to create http request: %w", err)
+	}
+	httpResp, err := cl.Do(registerReq)
+	if err != nil {
+		return fmt.Errorf("unable to create account: %w", err)
+	}
+	if err := json.NewDecoder(httpResp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("unable to decode response: %w", err)
+	}
+	if response.Updated {
+		logrus.Infof("Reset password for user %q and invalidated all user sessions", localpart)
+	} else {
+		logrus.Infof("Failed to reset password for user %q", localpart)
+	}
+	return nil
 }
 
 type sharedSecretRegistrationRequest struct {
@@ -155,20 +160,15 @@ type sharedSecretRegistrationRequest struct {
 
 func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, admin bool) (accesToken string, err error) {
 	registerURL := fmt.Sprintf("%s/_synapse/admin/v1/register", serverURL)
-	cl := http.Client{
-		Timeout:   time.Second * 10,
-		Transport: http.DefaultTransport,
-	}
 	nonceReq, err := http.NewRequest(http.MethodGet, registerURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("unable to create http request: %w", err)
 	}
-
 	nonceResp, err := cl.Do(nonceReq)
 	if err != nil {
 		return "", fmt.Errorf("unable to get nonce: %w", err)
 	}
-	body, err := ioutil.ReadAll(nonceResp.Body)
+	body, err := io.ReadAll(nonceResp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -207,10 +207,10 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 	}
 	defer regResp.Body.Close() // nolint: errcheck
 	if regResp.StatusCode < 200 || regResp.StatusCode >= 300 {
-		body, _ = ioutil.ReadAll(regResp.Body)
+		body, _ = io.ReadAll(regResp.Body)
 		return "", fmt.Errorf(gjson.GetBytes(body, "error").Str)
 	}
-	r, _ := ioutil.ReadAll(regResp.Body)
+	r, _ := io.ReadAll(regResp.Body)
 
 	return gjson.GetBytes(r, "access_token").Str, nil
 }

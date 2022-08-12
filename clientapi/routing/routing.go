@@ -144,16 +144,22 @@ func Setup(
 	}
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
-		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateRoom(req, device, rsAPI)
+		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateRoom(req, cfg, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
-		httputil.MakeAuthAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateUser(req, device, rsAPI)
+		httputil.MakeAdminAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateUser(req, cfg, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/resetPassword/{userID}",
+		httputil.MakeAdminAPI("admin_reset_password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminResetPassword(req, cfg, device, userAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
