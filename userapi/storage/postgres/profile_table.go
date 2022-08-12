@@ -19,11 +19,13 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const profilesSchema = `
@@ -69,7 +71,7 @@ type profilesStatements struct {
 	deleteProfileStmt            *sql.Stmt
 }
 
-func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables.ProfileTable, error) {
+func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string, serverName gomatrixserverlib.ServerName) (tables.ProfileTable, error) {
 	s := &profilesStatements{
 		serverNoticesLocalpart: serverNoticesLocalpart,
 	}
@@ -77,6 +79,16 @@ func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: add server_name column (account_profiles)",
+		Up:      deltas.UpProfilePrimaryKey(serverName),
+	})
+	if err := m.Up(context.Background()); err != nil {
+		return nil, err
+	}
+
 	return s, sqlutil.StatementList{
 		{&s.insertProfileStmt, insertProfileSQL},
 		{&s.selectProfileByLocalpartStmt, selectProfileByLocalpartSQL},

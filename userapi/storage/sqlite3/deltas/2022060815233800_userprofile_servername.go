@@ -1,22 +1,16 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-var serverName gomatrixserverlib.ServerName
-
-func LoadProfilePrimaryKey(m *sqlutil.Migrations, s gomatrixserverlib.ServerName) {
-	serverName = s
-	m.AddMigration(UpProfilePrimaryKey, DownProfilePrimaryKey)
-}
-
-func UpProfilePrimaryKey(tx *sql.Tx) error {
-	_, err := tx.Exec(fmt.Sprintf(`
+func UpProfilePrimaryKey(serverName gomatrixserverlib.ServerName) func(context.Context, *sql.Tx) error {
+	return func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
     ALTER TABLE account_profiles RENAME TO account_profiles_tmp;
 	CREATE TABLE IF NOT EXISTS account_profiles (
     	localpart TEXT NOT NULL,
@@ -32,14 +26,15 @@ func UpProfilePrimaryKey(tx *sql.Tx) error {
            localpart, '%s', display_name, avatar_url
     FROM account_profiles_tmp;
     DROP TABLE account_profiles_tmp;`, serverName))
-	if err != nil {
-		return fmt.Errorf("failed to execute upgrade: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to execute upgrade: %w", err)
+		}
+		return nil
 	}
-	return nil
 }
 
-func DownProfilePrimaryKey(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func DownProfilePrimaryKey(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
     ALTER TABLE account_profiles RENAME TO account_profiles_tmp;
 	CREATE TABLE IF NOT EXISTS account_profiles (
     	localpart TEXT NOT NULL PRIMARY KEY,

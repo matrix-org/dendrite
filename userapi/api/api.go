@@ -61,7 +61,7 @@ type MediaUserAPI interface {
 type FederationUserAPI interface {
 	QueryOpenIDToken(ctx context.Context, req *QueryOpenIDTokenRequest, res *QueryOpenIDTokenResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
-	DeleteProfile(ctx context.Context, req *PerformDeleteProfileRequest, res *struct{}) error
+	PerformDeleteProfile(ctx context.Context, req *PerformDeleteProfileRequest, res *struct{}) error
 }
 
 // api functions required by the sync api

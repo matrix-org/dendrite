@@ -441,10 +441,9 @@ func (h *httpUserInternalAPI) PerformSaveThreePIDAssociation(
 	)
 }
 
-func (h *httpUserInternalAPI) DeleteProfile(ctx context.Context, req *api.PerformDeleteProfileRequest, res *struct{}) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, PerformDeleteUserProfilePath)
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformDeleteUserProfilePath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+func (h *httpUserInternalAPI) PerformDeleteProfile(ctx context.Context, request *api.PerformDeleteProfileRequest, response *struct{}) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformDeleteProfile", h.apiURL+PerformDeleteUserProfilePath,
+		h.httpClient, ctx, request, response,
+	)
 }

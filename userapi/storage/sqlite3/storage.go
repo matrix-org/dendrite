@@ -62,7 +62,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteOpenIDTable: %w", err)
 	}
-	profilesTable, err := NewSQLiteProfilesTable(db, serverNoticesLocalpart)
+	profilesTable, err := NewSQLiteProfilesTable(db, serverNoticesLocalpart, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteProfilesTable: %w", err)
 	}

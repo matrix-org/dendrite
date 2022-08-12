@@ -64,7 +64,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresOpenIDTable: %w", err)
 	}
-	profilesTable, err := NewPostgresProfilesTable(db, serverNoticesLocalpart)
+	profilesTable, err := NewPostgresProfilesTable(db, serverNoticesLocalpart, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresProfilesTable: %w", err)
 	}

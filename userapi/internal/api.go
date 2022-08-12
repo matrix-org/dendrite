@@ -873,7 +873,7 @@ func (a *UserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context, re
 	return a.DB.SaveThreePIDAssociation(ctx, req.ThreePID, req.Localpart, req.Medium)
 }
 
-func (a *UserInternalAPI) DeleteProfile(ctx context.Context, req *api.PerformDeleteProfileRequest, res *struct{}) error {
+func (a *UserInternalAPI) PerformDeleteProfile(ctx context.Context, req *api.PerformDeleteProfileRequest, res *struct{}) error {
 	localpart, serverName, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return err
