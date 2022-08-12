@@ -255,7 +255,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(rp.db, req.FormValue("set_presence"), device.UserID)
+	rp.updatePresence(rp.db, "", device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
