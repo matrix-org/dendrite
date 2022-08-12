@@ -299,7 +299,7 @@ func (r *Inputer) processRoomEvent(
 	// allowed at the time, and also to get the history visibility. We won't
 	// bother doing this if the event was already rejected as it just ends up
 	// burning CPU time.
-	historyVisibility := gomatrixserverlib.HistoryVisibilityJoined // Default to restrictive.
+	historyVisibility := gomatrixserverlib.HistoryVisibilityShared // Default to shared.
 	if rejectionErr == nil && !isRejected && !softfail {
 		var err error
 		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
@@ -429,7 +429,7 @@ func (r *Inputer) processStateBefore(
 	input *api.InputRoomEvent,
 	missingPrev bool,
 ) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
-	historyVisibility = gomatrixserverlib.HistoryVisibilityJoined // Default to restrictive.
+	historyVisibility = gomatrixserverlib.HistoryVisibilityShared // Default to shared.
 	event := input.Event.Unwrap()
 	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
 	var stateBeforeEvent []*gomatrixserverlib.Event

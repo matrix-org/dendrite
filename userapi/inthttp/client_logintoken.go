@@ -19,7 +19,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -33,11 +32,10 @@ func (h *httpUserInternalAPI) PerformLoginTokenCreation(
 	request *api.PerformLoginTokenCreationRequest,
 	response *api.PerformLoginTokenCreationResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformLoginTokenCreation")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformLoginTokenCreationPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"PerformLoginTokenCreation", h.apiURL+PerformLoginTokenCreationPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpUserInternalAPI) PerformLoginTokenDeletion(
@@ -45,11 +43,10 @@ func (h *httpUserInternalAPI) PerformLoginTokenDeletion(
 	request *api.PerformLoginTokenDeletionRequest,
 	response *api.PerformLoginTokenDeletionResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "PerformLoginTokenDeletion")
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformLoginTokenDeletionPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"PerformLoginTokenDeletion", h.apiURL+PerformLoginTokenDeletionPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
 func (h *httpUserInternalAPI) QueryLoginToken(
@@ -57,9 +54,8 @@ func (h *httpUserInternalAPI) QueryLoginToken(
 	request *api.QueryLoginTokenRequest,
 	response *api.QueryLoginTokenResponse,
 ) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "QueryLoginToken")
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryLoginTokenPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, request, response)
+	return httputil.CallInternalRPCAPI(
+		"QueryLoginToken", h.apiURL+QueryLoginTokenPath,
+		h.httpClient, ctx, request, response,
+	)
 }
