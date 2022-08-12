@@ -106,7 +106,10 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 		Password string `json:"password"`
 	}{}
 	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-		return util.MessageResponse(http.StatusBadRequest, err.Error())
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Failed to decode request body: " + err.Error()),
+		}
 	}
 	if request.Password == "" {
 		return util.JSONResponse{
@@ -121,7 +124,10 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	}
 	updateRes := &userapi.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), updateReq, updateRes); err != nil {
-		return util.MessageResponse(http.StatusBadRequest, err.Error())
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Failed to perform password update: " + err.Error()),
+		}
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
