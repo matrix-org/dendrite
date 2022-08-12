@@ -15,7 +15,6 @@ More endpoints will be added in the future.
 
 Endpoints may be used directly through curl:
 
-
 ```
 curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Contents>'
 ```
@@ -49,22 +48,22 @@ the full user ID is `@alice:domain.com` then the local part is `alice`.
 
 Request body format:
 ```
-    {
-        "user_id": "@target_user:server_name",
-        "content": {
-           "msgtype": "m.text",
-           "body": "This is my message"
-        }
+{
+    "user_id": "@target_user:server_name",
+    "content": {
+       "msgtype": "m.text",
+       "body": "This is my message"
     }
+}
 ```
 
 Send a server notice to a specific user.
 If successfully sent, the API will return the following response:
 
 ```
-   {
-        "event_id": "<event_id>"
-   }
+{
+     "event_id": "<event_id>"
+}
 ```
 
 ## GET `/_synapse/admin/v1/register`
@@ -75,4 +74,4 @@ guidance on configuring and using this endpoint.
 ## GET `/_matrix/client/v3/admin/whois/{userId}`
 
 From the [Matrix Spec](https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3adminwhoisuserid). 
-Gets information about a particular user. ```userId``` is the full user ID e.g. ```@alice:domain.com```
+Gets information about a particular user. `userId` is the full user ID (e.g. `@alice:domain.com`)
