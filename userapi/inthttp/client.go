@@ -43,7 +43,6 @@ const (
 	PerformSetDisplayNamePath          = "/userapi/performSetDisplayName"
 	PerformForgetThreePIDPath          = "/userapi/performForgetThreePID"
 	PerformSaveThreePIDAssociationPath = "/userapi/performSaveThreePIDAssociation"
-	PerformDeleteUserProfilePath       = "/userapi/performDeleteUserProfile"
 
 	QueryKeyBackupPath             = "/userapi/queryKeyBackup"
 	QueryProfilePath               = "/userapi/queryProfile"
@@ -437,13 +436,6 @@ func (h *httpUserInternalAPI) PerformSaveThreePIDAssociation(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformSaveThreePIDAssociation", h.apiURL+PerformSaveThreePIDAssociationPath,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpUserInternalAPI) PerformDeleteProfile(ctx context.Context, request *api.PerformDeleteProfileRequest, response *struct{}) error {
-	return httputil.CallInternalRPCAPI(
-		"PerformDeleteProfile", h.apiURL+PerformDeleteUserProfilePath,
 		h.httpClient, ctx, request, response,
 	)
 }

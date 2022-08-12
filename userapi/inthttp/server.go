@@ -198,8 +198,4 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		PerformSaveThreePIDAssociationPath,
 		httputil.MakeInternalRPCAPI("UserAPIPerformSaveThreePIDAssociation", s.PerformSaveThreePIDAssociation),
 	)
-	internalAPIMux.Handle(
-		PerformDeleteUserProfilePath,
-		httputil.MakeInternalRPCAPI("UserAPIPerformDeleteUserProfilePath", s.PerformDeleteProfile),
-	)
 }
