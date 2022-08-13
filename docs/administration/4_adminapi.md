@@ -19,6 +19,18 @@ Endpoints may be used directly through curl:
 curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint URI> -d '<Request Body Contents>'
 ```
 
+An `access_token` can be obtained through most Element-based matrix clients by going to `Settings` -> `Help & About` -> `Advanced` -> `Access Token`.
+
+The user must be an administrator in the `account_accounts` table in order to use these endpoints.
+
+Existing user accounts can be set to administrative accounts by changing `account_type` to `3` in `account_accounts`
+
+```
+UPDATE account_accounts SET account_type = 3 WHERE localpart = '$localpart';
+```
+
+Where `$localpart` is the username only (e.g. `alice`).
+
 ## GET `/_dendrite/admin/evacuateRoom/{roomID}`
 
 This endpoint will instruct Dendrite to part all local users from the given `roomID`
