@@ -14,7 +14,7 @@ Mostly, although there are still bugs and missing features. If you are a confide
 
 No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](../README.md) at the root of the repository for more information.
 
-## Why doesn't Dendrite have <blank> yet?
+## Why doesn't Dendrite have "x" yet?
 
 Dendrite development is currently supported by a small team of developers and due to those limited resources, the majority of the effort is focused on getting Dendrite to be 
 specification complete. If there are major features you're requesting (e.g. new administration endpoints), we'd like to strongly encourage you to join the community in supporting 
