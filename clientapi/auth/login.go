@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -41,7 +42,7 @@ func LoginFromJSONReader(
 	userInteractiveAuth *UserInteractive,
 	cfg *config.ClientAPI,
 ) (*Login, LoginCleanupFunc, *util.JSONResponse) {
-	reqBytes, err := io.ReadAll(r)
+	reqBytes, err := ioutil.ReadAll(r)
 	if err != nil {
 		err := &util.JSONResponse{
 			Code: http.StatusBadRequest,

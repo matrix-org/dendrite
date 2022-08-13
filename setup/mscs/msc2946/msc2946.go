@@ -45,9 +45,6 @@ const (
 	ConstCreateEventContentValueSpace = "m.space"
 	ConstSpaceChildEventType          = "m.space.child"
 	ConstSpaceParentEventType         = "m.space.parent"
-	ConstJoinRulePublic               = "public"
-	ConstJoinRuleKnock                = "knock"
-	ConstJoinRuleRestricted           = "restricted"
 )
 
 type MSC2946ClientResponse struct {
@@ -524,11 +521,11 @@ func (w *walker) authorisedServer(roomID string) bool {
 			return false
 		}
 
-		if rule == ConstJoinRulePublic || rule == ConstJoinRuleKnock {
+		if rule == gomatrixserverlib.Public || rule == gomatrixserverlib.Knock {
 			return true
 		}
 
-		if rule == ConstJoinRuleRestricted {
+		if rule == gomatrixserverlib.Restricted {
 			allowJoinedToRoomIDs = append(allowJoinedToRoomIDs, w.restrictedJoinRuleAllowedRooms(joinRuleEv, "m.room_membership")...)
 		}
 	}
@@ -600,9 +597,9 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 		rule, ruleErr := joinRuleEv.JoinRule()
 		if ruleErr != nil {
 			util.GetLogger(w.ctx).WithError(ruleErr).WithField("parent_room_id", parentRoomID).Warn("failed to get join rule")
-		} else if rule == ConstJoinRulePublic || rule == ConstJoinRuleKnock {
+		} else if rule == gomatrixserverlib.Public || rule == gomatrixserverlib.Knock {
 			allowed = true
-		} else if rule == ConstJoinRuleRestricted {
+		} else if rule == gomatrixserverlib.Restricted {
 			allowedRoomIDs := w.restrictedJoinRuleAllowedRooms(joinRuleEv, "m.room_membership")
 			// check parent is in the allowed set
 			for _, a := range allowedRoomIDs {
@@ -639,7 +636,7 @@ func (w *walker) authorisedUser(roomID, parentRoomID string) (authed bool, isJoi
 
 func (w *walker) restrictedJoinRuleAllowedRooms(joinRuleEv *gomatrixserverlib.HeaderedEvent, allowType string) (allows []string) {
 	rule, _ := joinRuleEv.JoinRule()
-	if rule != ConstJoinRuleRestricted {
+	if rule != gomatrixserverlib.Restricted {
 		return nil
 	}
 	var jrContent gomatrixserverlib.JoinRuleContent
