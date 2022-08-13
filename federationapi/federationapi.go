@@ -15,6 +15,8 @@
 package federationapi
 
 import (
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
@@ -167,5 +169,16 @@ func NewInternalAPI(
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")
 	}
+
+	var cleanExpiredEDUs func()
+	cleanExpiredEDUs = func() {
+		logrus.Infof("Cleaning expired EDUs")
+		if err := federationDB.DeleteExpiredEDUs(base.Context()); err != nil {
+			logrus.WithError(err).Error("Failed to clean expired EDUs")
+		}
+		time.AfterFunc(time.Hour, cleanExpiredEDUs)
+	}
+	time.AfterFunc(time.Minute, cleanExpiredEDUs)
+
 	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
 }

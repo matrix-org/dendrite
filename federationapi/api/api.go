@@ -110,7 +110,7 @@ type FederationClientError struct {
 	Blacklisted bool
 }
 
-func (e *FederationClientError) Error() string {
+func (e FederationClientError) Error() string {
 	return fmt.Sprintf("%s - (retry_after=%s, blacklisted=%v)", e.Err, e.RetryAfter.String(), e.Blacklisted)
 }
 

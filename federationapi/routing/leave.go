@@ -277,7 +277,7 @@ func SendLeave(
 	// We are responsible for notifying other servers that the user has left
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	var response api.InputRoomEventsResponse
-	rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+	if err := rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 		InputRoomEvents: []api.InputRoomEvent{
 			{
 				Kind:          api.KindNew,
@@ -286,7 +286,9 @@ func SendLeave(
 				TransactionID: nil,
 			},
 		},
-	}, &response)
+	}, &response); err != nil {
+		return jsonerror.InternalAPIError(httpReq.Context(), err)
+	}
 
 	if response.ErrMsg != "" {
 		util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).WithField("not_allowed", response.NotAllowed).Error("producer.SendEvents failed")

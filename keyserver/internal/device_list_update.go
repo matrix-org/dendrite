@@ -119,7 +119,7 @@ type DeviceListUpdaterDatabase interface {
 }
 
 type DeviceListUpdaterAPI interface {
-	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse)
+	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) error
 }
 
 // KeyChangeProducer is the interface for producers.KeyChange useful for testing.
@@ -421,7 +421,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 					uploadReq.SelfSigningKey = *res.SelfSigningKey
 				}
 			}
-			u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+			_ = u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 		}
 		err = u.updateDeviceList(&res)
 		if err != nil {
