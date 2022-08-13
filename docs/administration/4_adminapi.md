@@ -20,6 +20,7 @@ curl --header "Authorization: Bearer <access_token>" -X <POST|GET|PUT> <Endpoint
 ```
 
 An `access_token` can be obtained through most Element-based matrix clients by going to `Settings` -> `Help & About` -> `Advanced` -> `Access Token`.
+Be aware that an `access_token` allows a client to perform actions as an user and should be kept **secret**.
 
 The user must be an administrator in the `account_accounts` table in order to use these endpoints.
 
