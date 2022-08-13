@@ -12,7 +12,13 @@ Mostly, although there are still bugs and missing features. If you are a confide
 
 ## Is Dendrite feature-complete?
 
-No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the readme at the root of the repository for more information.
+No, although a good portion of the Matrix specification has been implemented. Mostly missing are client features - see the [readme](../README.md) at the root of the repository for more information.
+
+## Why doesn't Dendrite have <blank> yet?
+
+Dendrite development is currently supported by a small team of developers and due to those limited resources, the majority of the effort is focused on getting Dendrite to be 
+specification complete. If there are major features you're requesting (e.g. new administration endpoints), we'd like to strongly encourage you to join the community in supporting 
+the development efforts through [contributing](https://matrix-org.github.io/dendrite/development/contributing). 
 
 ## Is there a migration path from Synapse to Dendrite?
 
@@ -42,6 +48,20 @@ It should do, although we are aware of some minor issues:
 
 * **Element Android**: registration does not work, but logging in with an existing account does
 * **Hydrogen**: occasionally sync can fail due to gaps in the `since` parameter, but clearing the cache fixes this
+
+## Does Dendrite support Space Summaries?
+
+Yes, [Space Summaries](https://github.com/matrix-org/matrix-spec-proposals/pull/2946) were merged into the Matrix Spec as of 2022-01-17 however, they are still treated as an MSC (Matrix Specification Change) in Dendrite. In order to enable Space Summaries in Dendrite, you must add the MSC to the MSC configuration section in the configuration YAML. If the MSC is not enabled, a user will typically see a perpetual loading icon on the summary page. See below for a demonstration of how to add to the Dendrite configuration:
+
+```
+mscs:
+  mscs:
+    - msc2946
+```
+
+Similarly, [msc2836](https://github.com/matrix-org/matrix-spec-proposals/pull/2836) would need to be added to mscs configuration in order to support Threading. Other MSCs are not currently supported.
+
+Please note that MSCs should be considered experimental and can result in significant usability issues when enabled. If you'd like more details on how MSCs are ratified or the current status of MSCs, please see the [Matrix specification documentation](https://spec.matrix.org/proposals/) on the subject.
 
 ## Does Dendrite support push notifications?
 
@@ -85,6 +105,10 @@ would be a huge help too, as that will help us to understand where the memory us
 ## Dendrite is running out of PostgreSQL database connections
 
 You may need to revisit the connection limit of your PostgreSQL server and/or make changes to the `max_connections` lines in your Dendrite configuration. Be aware that each Dendrite component opens its own database connections and has its own connection limit, even in monolith mode!
+
+## VOIP and Video Calls don't appear to work on Dendrite
+
+There is likely an issue with your STUN/TURN configuration on the server. If you believe your configuration to be correct, please see the [troubleshooting](administration/5_troubleshooting.md) for troubleshooting recommendations.
 
 ## What is being reported when enabling phone-home statistics?
 
