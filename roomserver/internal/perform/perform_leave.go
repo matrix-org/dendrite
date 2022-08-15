@@ -79,7 +79,7 @@ func (r *Leaver) performLeaveRoomByID(
 ) ([]api.OutputEvent, error) {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
+	isInvitePending, senderUser, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
 		var host gomatrixserverlib.ServerName
 		_, host, err = gomatrixserverlib.SplitID('@', senderUser)
@@ -87,7 +87,7 @@ func (r *Leaver) performLeaveRoomByID(
 			return nil, fmt.Errorf("sender %q is invalid", senderUser)
 		}
 		if host != r.Cfg.Matrix.ServerName {
-			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
+			return r.performFederatedRejectInvite(ctx, req, res, senderUser)
 		}
 		// check that this is not a "server notice room"
 		accData := &userapi.QueryAccountDataResponse{}
@@ -200,7 +200,7 @@ func (r *Leaver) performFederatedRejectInvite(
 	ctx context.Context,
 	req *api.PerformLeaveRequest,
 	res *api.PerformLeaveResponse, // nolint:unparam
-	senderUser, eventID string,
+	senderUser string,
 ) ([]api.OutputEvent, error) {
 	_, domain, err := gomatrixserverlib.SplitID('@', senderUser)
 	if err != nil {
