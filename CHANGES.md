@@ -1,5 +1,15 @@
 # Changelog
 
+## Dendrite 0.9.3 (2022-08-15)
+
+### Important
+
+* This is a **security release** to fix a vulnerability within event auth, affecting all versions of Dendrite before 0.9.3. Upgrading to this version is highly recommended. For more information, [see here](https://github.com/matrix-org/gomatrixserverlib/security/advisories/GHSA-grvv-h2f9-7v9c).
+
+### Fixes
+
+* Dendrite will now correctly parse the `"events_default"` power level value for event auth.
+
 ## Dendrite 0.9.2 (2022-08-12)
 
 ### Features
