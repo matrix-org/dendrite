@@ -29,7 +29,7 @@ func UpdateToInviteMembership(
 	// reprocessing this event, or because the we received this invite from a
 	// remote server via the federation invite API. In those cases we don't need
 	// to send the event.
-	needsSending, retired, err := mu.Update(tables.MembershipStateInvite, add)
+	needsSending, _, err := mu.Update(tables.MembershipStateInvite, add)
 	if err != nil {
 		return nil, err
 	}
@@ -47,17 +47,15 @@ func UpdateToInviteMembership(
 			},
 		})
 	}
-	for _, eventID := range retired {
-		updates = append(updates, api.OutputEvent{
-			Type: api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &api.OutputRetireInviteEvent{
-				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
-				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
-			},
-		})
-	}
+	updates = append(updates, api.OutputEvent{
+		Type: api.OutputTypeRetireInviteEvent,
+		RetireInviteEvent: &api.OutputRetireInviteEvent{
+			RoomID:           add.RoomID(),
+			Membership:       gomatrixserverlib.Join,
+			RetiredByEventID: add.EventID(),
+			TargetUserID:     *add.StateKey(),
+		},
+	})
 	return updates, nil
 }
 

@@ -207,8 +207,8 @@ type OutputNewInviteEvent struct {
 // active. An invite stops being active if the user joins the room or if the
 // invite is rejected by the user.
 type OutputRetireInviteEvent struct {
-	// The ID of the "m.room.member" invite event.
-	EventID string
+	// The room ID we are retiring the invite for.
+	RoomID string
 	// The target user ID of the "m.room.member" invite event that was retired.
 	TargetUserID string
 	// Optional event ID of the event that replaced the invite.

@@ -102,7 +102,7 @@ type Database interface {
 	AddInviteEvent(ctx context.Context, inviteEvent *gomatrixserverlib.HeaderedEvent) (types.StreamPosition, error)
 	// RetireInviteEvent removes an old invite event from the database. Returns the new position of the retired invite.
 	// Returns an error if there was a problem communicating with the database.
-	RetireInviteEvent(ctx context.Context, inviteEventID string) (types.StreamPosition, error)
+	RetireInviteEvent(ctx context.Context, targetUserID, roomID string) (types.StreamPosition, error)
 	// AddPeek adds a new peek to our DB for a given room by a given user's device.
 	// Returns an error if there was a problem communicating with the database.
 	AddPeek(ctx context.Context, RoomID, UserID, DeviceID string) (types.StreamPosition, error)

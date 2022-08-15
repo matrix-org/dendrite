@@ -150,21 +150,18 @@ func updateToJoinMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	_, retired, err := mu.Update(tables.MembershipStateJoin, add)
-	if err != nil {
+	if _, _, err := mu.Update(tables.MembershipStateJoin, add); err != nil {
 		return nil, err
 	}
-	for _, eventID := range retired {
-		updates = append(updates, api.OutputEvent{
-			Type: api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &api.OutputRetireInviteEvent{
-				EventID:          eventID,
-				Membership:       gomatrixserverlib.Join,
-				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
-			},
-		})
-	}
+	updates = append(updates, api.OutputEvent{
+		Type: api.OutputTypeRetireInviteEvent,
+		RetireInviteEvent: &api.OutputRetireInviteEvent{
+			RoomID:           add.RoomID(),
+			Membership:       gomatrixserverlib.Join,
+			RetiredByEventID: add.EventID(),
+			TargetUserID:     *add.StateKey(),
+		},
+	})
 	return updates, nil
 }
 
@@ -176,21 +173,18 @@ func updateToLeaveMembership(
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	_, retired, err := mu.Update(tables.MembershipStateLeaveOrBan, add)
-	if err != nil {
+	if _, _, err := mu.Update(tables.MembershipStateLeaveOrBan, add); err != nil {
 		return nil, err
 	}
-	for _, eventID := range retired {
-		updates = append(updates, api.OutputEvent{
-			Type: api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &api.OutputRetireInviteEvent{
-				EventID:          eventID,
-				Membership:       newMembership,
-				RetiredByEventID: add.EventID(),
-				TargetUserID:     *add.StateKey(),
-			},
-		})
-	}
+	updates = append(updates, api.OutputEvent{
+		Type: api.OutputTypeRetireInviteEvent,
+		RetireInviteEvent: &api.OutputRetireInviteEvent{
+			RoomID:           add.RoomID(),
+			Membership:       newMembership,
+			RetiredByEventID: add.EventID(),
+			TargetUserID:     *add.StateKey(),
+		},
+	})
 	return updates, nil
 }
 

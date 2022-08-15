@@ -209,10 +209,10 @@ func (d *Database) AddInviteEvent(
 // RetireInviteEvent removes an old invite event from the database.
 // Returns an error if there was a problem communicating with the database.
 func (d *Database) RetireInviteEvent(
-	ctx context.Context, inviteEventID string,
+	ctx context.Context, targetUserID, roomID string,
 ) (sp types.StreamPosition, err error) {
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, inviteEventID)
+		sp, err = d.Invites.DeleteInviteEvent(ctx, txn, targetUserID, roomID)
 		return err
 	})
 	return

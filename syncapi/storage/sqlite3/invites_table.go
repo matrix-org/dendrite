@@ -47,7 +47,7 @@ const insertInviteEventSQL = "" +
 	" VALUES ($1, $2, $3, $4, $5, false)"
 
 const deleteInviteEventSQL = "" +
-	"UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2 AND deleted=false"
+	"UPDATE syncapi_invite_events SET deleted=true, target_user_id = $1 WHERE room_id = $2 AND deleted=false"
 
 const selectInviteEventsInRangeSQL = "" +
 	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
@@ -117,14 +117,14 @@ func (s *inviteEventsStatements) InsertInviteEvent(
 }
 
 func (s *inviteEventsStatements) DeleteInviteEvent(
-	ctx context.Context, txn *sql.Tx, inviteEventID string,
+	ctx context.Context, txn *sql.Tx, targetUserID, roomID string,
 ) (types.StreamPosition, error) {
 	streamPos, err := s.streamIDStatements.nextInviteID(ctx, txn)
 	if err != nil {
 		return streamPos, err
 	}
 	stmt := sqlutil.TxStmt(txn, s.deleteInviteEventStmt)
-	_, err = stmt.ExecContext(ctx, streamPos, inviteEventID)
+	_, err = stmt.ExecContext(ctx, targetUserID, roomID)
 	return streamPos, err
 }
 

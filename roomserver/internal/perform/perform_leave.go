@@ -248,7 +248,7 @@ func (r *Leaver) performFederatedRejectInvite(
 		{
 			Type: api.OutputTypeRetireInviteEvent,
 			RetireInviteEvent: &api.OutputRetireInviteEvent{
-				EventID:      eventID,
+				RoomID:       req.RoomID,
 				Membership:   "leave",
 				TargetUserID: req.UserID,
 			},
