@@ -107,19 +107,17 @@ func (r *Inputer) processRoomEvent(
 		})
 	}
 
-	// If we already know about this outlier and it hasn't been rejected
+	// If we already know about this event and it hasn't been rejected
 	// then we won't attempt to reprocess it. If it was rejected then we
 	// can attempt to reprocess, in case we have learned something new
 	// that will allow us to accept the event this time.
-	if input.Kind == api.KindOutlier {
-		rejected, err := r.DB.IsEventRejected(ctx, event.EventID())
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-		if !rejected {
-			logger.Debugf("Already processed event %q, ignoring", event.EventID())
-			return nil
-		}
+	wasRejected, werr := r.DB.IsEventRejected(ctx, event.EventID())
+	if werr != nil && werr != sql.ErrNoRows {
+		return werr
+	}
+	if !wasRejected {
+		logger.Debugf("Already processed event %q, ignoring", event.EventID())
+		return nil
 	}
 
 	// Don't waste time processing the event if the room doesn't exist.
