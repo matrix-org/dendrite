@@ -279,8 +279,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			log.WithFields(log.Fields{
 				"since":   r.From,
 				"current": r.To,
-				"adds":    addIDs,
-				"dels":    delIDs,
+				"adds":    len(addIDs),
+				"dels":    len(delIDs),
 			}).Warn("StateBetween: ignoring deleted state")
 		}
 
