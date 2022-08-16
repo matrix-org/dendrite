@@ -20,12 +20,11 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const inviteEventsSchema = `
@@ -57,7 +56,7 @@ const deleteInviteEventSQL = "" +
 
 const selectInviteEventsInRangeSQL = "" +
 	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
-	" WHERE target_user_id = $1 AND id > $2 AND id <= $3 AND deleted = false" +
+	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 
 const selectMaxInviteIDSQL = "" +
