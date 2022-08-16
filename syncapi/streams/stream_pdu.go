@@ -498,7 +498,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := p.DB.StreamEventsToEvents(device, recentStreamEvents)
-	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
@@ -508,6 +507,8 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
 	}
+
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
