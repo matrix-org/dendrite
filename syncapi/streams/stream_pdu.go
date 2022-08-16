@@ -560,14 +560,13 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			// If this is a gapped incremental sync, we still want this membership
 			isGappedIncremental := limited && incremental
 			// We want this users membership event, keep it in the list
-			_, ok := timelineUsers[event.Sender()]
-			wantMembership := ok || isGappedIncremental
-			if wantMembership {
+			stateKey := *event.StateKey()
+			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
 				newStateEvents = append(newStateEvents, event)
 				if !includeRedundant {
-					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, event.Sender(), event.EventID())
+					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
 				}
-				delete(timelineUsers, event.Sender())
+				delete(timelineUsers, stateKey)
 			}
 		} else {
 			newStateEvents = append(newStateEvents, event)
@@ -578,17 +577,16 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 		wantUsers = append(wantUsers, userID)
 	}
 	// Query missing membership events
-	memberships, err := p.DB.GetStateEventsForRoom(ctx, roomID, &gomatrixserverlib.StateFilter{
-		Limit:   100,
-		Senders: &wantUsers,
-		Types:   &[]string{gomatrixserverlib.MRoomMember},
-	})
+	filter := gomatrixserverlib.DefaultStateFilter()
+	filter.Senders = &wantUsers
+	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
+	memberships, err := p.DB.GetStateEventsForRoom(ctx, roomID, &filter)
 	if err != nil {
 		return stateEvents, err
 	}
 	// cache the membership events
 	for _, membership := range memberships {
-		p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, membership.Sender(), membership.EventID())
+		p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, *membership.StateKey(), membership.EventID())
 	}
 	stateEvents = append(newStateEvents, memberships...)
 	return stateEvents, nil
