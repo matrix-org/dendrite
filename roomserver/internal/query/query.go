@@ -77,7 +77,7 @@ func (r *Queryer) QueryStateAfterEvents(
 			util.GetLogger(ctx).Errorf("QueryStateAfterEvents: MissingEventError: %s", err)
 			return nil
 		default:
-			return err
+			return fmt.Errorf("r.DB.StateAtEventIDs: %w", err)
 		}
 	}
 	response.PrevEventsExist = true
@@ -88,19 +88,22 @@ func (r *Queryer) QueryStateAfterEvents(
 		stateEntries, err = roomState.LoadCombinedStateAfterEvents(
 			ctx, prevStates,
 		)
+		if err != nil {
+			return fmt.Errorf("roomState.LoadCombinedStateAfterEvents: %w", err)
+		}
 	} else {
 		// Look up the current state for the requested tuples.
 		stateEntries, err = roomState.LoadStateAfterEventsForStringTuples(
 			ctx, prevStates, request.StateToFetch,
 		)
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return fmt.Errorf("roomState.LoadStateAfterEventsForStringTuples: %w", err)
+		}
 	}
 
 	stateEvents, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
 	if err != nil {
-		return err
+		return fmt.Errorf("helpers.LoadStateEvents: %w", err)
 	}
 
 	if len(request.PrevEventIDs) > 1 && len(request.StateToFetch) == 0 {
