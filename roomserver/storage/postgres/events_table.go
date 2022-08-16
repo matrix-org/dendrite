@@ -137,7 +137,7 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const selectEventRejectedSQL = "" +
-	"SELECT is_rejected FROM roomserver_Events WHERE event_id = $1"
+	"SELECT is_rejected FROM roomserver_events WHERE event_id = $1"
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
