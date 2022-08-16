@@ -114,8 +114,7 @@ func (r *Inputer) processRoomEvent(
 	wasRejected, werr := r.DB.IsEventRejected(ctx, event.EventID())
 	if werr != nil && werr != sql.ErrNoRows {
 		return werr
-	}
-	if !wasRejected {
+	} else if werr == nil && !wasRejected {
 		logger.Debugf("Already processed event %q, ignoring", event.EventID())
 		return nil
 	}
