@@ -109,6 +109,9 @@ const selectMaxEventDepthSQL = "" +
 const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 
+const selectEventRejectedSQL = "" +
+	"SELECT is_rejected FROM roomserver_Events WHERE event_id = $1"
+
 type eventStatements struct {
 	db                                     *sql.DB
 	insertEventStmt                        *sql.Stmt
@@ -122,6 +125,7 @@ type eventStatements struct {
 	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
 	bulkSelectEventReferenceStmt           *sql.Stmt
 	bulkSelectEventIDStmt                  *sql.Stmt
+	selectEventRejectedStmt                *sql.Stmt
 	//bulkSelectEventNIDStmt               *sql.Stmt
 	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
 	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
@@ -152,6 +156,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		//{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
+		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
 	}.Prepare(db)
 }
 
@@ -613,4 +618,12 @@ func eventNIDsAsArray(eventNIDs []types.EventNID) string {
 	}
 	b, _ := json.Marshal(eventNIDs)
 	return string(b)
+}
+
+func (s *eventStatements) SelectEventRejected(
+	ctx context.Context, txn *sql.Tx, eventID string,
+) (rejected bool, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
+	err = stmt.QueryRowContext(ctx, eventID).Scan(&rejected)
+	return
 }

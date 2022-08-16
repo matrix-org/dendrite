@@ -17,8 +17,8 @@
 package input
 
 import (
-	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -107,25 +107,18 @@ func (r *Inputer) processRoomEvent(
 		})
 	}
 
-	// if we have already got this event then do not process it again, if the input kind is an outlier.
-	// Outliers contain no extra information which may warrant a re-processing.
+	// If we already know about this outlier and it hasn't been rejected
+	// then we won't attempt to reprocess it. If it was rejected then we
+	// can attempt to reprocess, in case we have learned something new
+	// that will allow us to accept the event this time.
 	if input.Kind == api.KindOutlier {
-		evs, err2 := r.DB.EventsFromIDs(ctx, []string{event.EventID()})
-		if err2 == nil && len(evs) == 1 {
-			// check hash matches if we're on early room versions where the event ID was a random string
-			idFormat, err2 := headered.RoomVersion.EventIDFormat()
-			if err2 == nil {
-				switch idFormat {
-				case gomatrixserverlib.EventIDFormatV1:
-					if bytes.Equal(event.EventReference().EventSHA256, evs[0].EventReference().EventSHA256) {
-						logger.Debugf("Already processed event; ignoring")
-						return nil
-					}
-				default:
-					logger.Debugf("Already processed event; ignoring")
-					return nil
-				}
-			}
+		rejected, err := r.DB.IsEventRejected(ctx, event.EventID())
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if !rejected {
+			logger.Debugf("Already processed event %q, ignoring", event.EventID())
+			return nil
 		}
 	}
 

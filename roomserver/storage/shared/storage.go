@@ -567,6 +567,10 @@ func (d *Database) GetRoomUpdater(
 	return updater, err
 }
 
+func (d *Database) IsEventRejected(ctx context.Context, eventID string) (bool, error) {
+	return d.EventsTable.SelectEventRejected(ctx, nil, eventID)
+}
+
 func (d *Database) StoreEvent(
 	ctx context.Context, event *gomatrixserverlib.Event,
 	authEventNIDs []types.EventNID, isRejected bool,

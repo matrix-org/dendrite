@@ -66,6 +66,7 @@ type Events interface {
 	BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error)
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
 	SelectRoomNIDsForEventNIDs(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
+	SelectEventRejected(ctx context.Context, txn *sql.Tx, eventID string) (rejected bool, err error)
 }
 
 type Rooms interface {
