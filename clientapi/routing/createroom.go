@@ -500,6 +500,8 @@ func createRoom(
 		// Build some stripped state for the invite.
 		var globalStrippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range builtEvents {
+			// Chosen events from the spec:
+			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
 			switch event.Type() {
 			case gomatrixserverlib.MRoomCreate:
 				fallthrough
