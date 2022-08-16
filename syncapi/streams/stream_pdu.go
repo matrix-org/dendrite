@@ -304,7 +304,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	// Applies the history visibility rules
-	events, err := applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
+	events, err := applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents, nil)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 	}
@@ -364,15 +364,19 @@ func applyHistoryVisibilityFilter(
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	roomID, userID string,
 	limit int,
+	stateEvents []*gomatrixserverlib.HeaderedEvent,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	// We need to make sure we always include the latest states events, if they are in the timeline.
 	// We grep at least limit * 2 events, to ensure we really get the needed events.
-	stateEvents, err := db.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: limit * 2}, nil)
-	if err != nil {
-		// Not a fatal error, we can continue without the stateEvents,
-		// they are only needed if there are state events in the timeline.
-		logrus.WithError(err).Warnf("failed to get current room state")
+	if stateEvents == nil {
+		var err error
+		stateEvents, err = db.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: limit * 2}, nil)
+		if err != nil {
+			// Not a fatal error, we can continue without the stateEvents,
+			// they are only needed if there are state events in the timeline.
+			logrus.WithError(err).Warnf("failed to get current room state")
+		}
 	}
 	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
 	for _, ev := range stateEvents {
@@ -499,7 +503,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
 	if !isPeek {
-		events, err = applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, roomID, device.UserID, eventFilter.Limit, recentEvents)
+		events, err = applyHistoryVisibilityFilter(ctx, p.DB, p.rsAPI, roomID, device.UserID, eventFilter.Limit, recentEvents, stateEvents)
 		if err != nil {
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
