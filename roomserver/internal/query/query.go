@@ -72,13 +72,7 @@ func (r *Queryer) QueryStateAfterEvents(
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
-		switch err.(type) {
-		case types.MissingEventError:
-			util.GetLogger(ctx).Errorf("QueryStateAfterEvents: MissingEventError: %s", err)
-			return nil
-		default:
-			return fmt.Errorf("r.DB.StateAtEventIDs: %w", err)
-		}
+		return nil
 	}
 	response.PrevEventsExist = true
 
