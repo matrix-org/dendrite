@@ -75,7 +75,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		if _, ok := err.(types.MissingEventError); ok {
 			return nil
 		}
-		return nil
+		return err
 	}
 	response.PrevEventsExist = true
 
