@@ -112,9 +112,17 @@ func (r *Inputer) processRoomEvent(
 	// can attempt to reprocess, in case we have learned something new
 	// that will allow us to accept the event this time.
 	wasRejected, werr := r.DB.IsEventRejected(ctx, event.EventID())
-	if werr != nil && werr != sql.ErrNoRows {
+	switch {
+	case werr == sql.ErrNoRows:
+		// We haven't seen this event before so continue.
+	case werr != nil:
+		// Something has gone wrong trying to find out if we rejected
+		// this event already.
+		logger.WithError(werr).Errorf("Failed to check if event %q is already seen", event.EventID())
 		return werr
-	} else if werr == nil && !wasRejected {
+	case !wasRejected:
+		// We've seen this event before and it wasn't rejected so we
+		// should ignore it.
 		logger.Debugf("Already processed event %q, ignoring", event.EventID())
 		return nil
 	}
