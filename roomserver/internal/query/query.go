@@ -95,6 +95,9 @@ func (r *Queryer) QueryStateAfterEvents(
 		if _, ok := err.(types.MissingEventError); ok {
 			return nil
 		}
+		if _, ok := err.(types.MissingStateError); ok {
+			return nil
+		}
 		return err
 	}
 
