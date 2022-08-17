@@ -107,26 +107,6 @@ func (r *Inputer) processRoomEvent(
 		})
 	}
 
-	// If we already know about this event and it hasn't been rejected
-	// then we won't attempt to reprocess it. If it was rejected then we
-	// can attempt to reprocess, in case we have learned something new
-	// that will allow us to accept the event this time.
-	wasRejected, werr := r.DB.IsEventRejected(ctx, event.EventID())
-	switch {
-	case werr == sql.ErrNoRows:
-		// We haven't seen this event before so continue.
-	case werr != nil:
-		// Something has gone wrong trying to find out if we rejected
-		// this event already.
-		logger.WithError(werr).Errorf("Failed to check if event %q is already seen", event.EventID())
-		return werr
-	case !wasRejected:
-		// We've seen this event before and it wasn't rejected so we
-		// should ignore it.
-		logger.Debugf("Already processed event %q, ignoring", event.EventID())
-		return nil
-	}
-
 	// Don't waste time processing the event if the room doesn't exist.
 	// A room entry locally will only be created in response to a create
 	// event.
@@ -137,6 +117,28 @@ func (r *Inputer) processRoomEvent(
 	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
+	}
+
+	// If we already know about this event and it hasn't been rejected
+	// then we won't attempt to reprocess it. If it was rejected then we
+	// can attempt to reprocess, in case we have learned something new
+	// that will allow us to accept the event this time.
+	if roomInfo != nil {
+		wasRejected, werr := r.DB.IsEventRejected(ctx, roomInfo.RoomNID, event.EventID())
+		switch {
+		case werr == sql.ErrNoRows:
+			// We haven't seen this event before so continue.
+		case werr != nil:
+			// Something has gone wrong trying to find out if we rejected
+			// this event already.
+			logger.WithError(werr).Errorf("Failed to check if event %q is already seen", event.EventID())
+			return werr
+		case !wasRejected:
+			// We've seen this event before and it wasn't rejected so we
+			// should ignore it.
+			logger.Debugf("Already processed event %q, ignoring", event.EventID())
+			return nil
+		}
 	}
 
 	var missingAuth, missingPrev bool

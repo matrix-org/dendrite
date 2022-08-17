@@ -567,8 +567,8 @@ func (d *Database) GetRoomUpdater(
 	return updater, err
 }
 
-func (d *Database) IsEventRejected(ctx context.Context, eventID string) (bool, error) {
-	return d.EventsTable.SelectEventRejected(ctx, nil, eventID)
+func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error) {
+	return d.EventsTable.SelectEventRejected(ctx, nil, roomNID, eventID)
 }
 
 func (d *Database) StoreEvent(

@@ -137,7 +137,7 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid = ANY($1)"
 
 const selectEventRejectedSQL = "" +
-	"SELECT is_rejected FROM roomserver_events WHERE event_id = $1"
+	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
@@ -547,9 +547,9 @@ func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
 }
 
 func (s *eventStatements) SelectEventRejected(
-	ctx context.Context, txn *sql.Tx, eventID string,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string,
 ) (rejected bool, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
-	err = stmt.QueryRowContext(ctx, eventID).Scan(&rejected)
+	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
 }
