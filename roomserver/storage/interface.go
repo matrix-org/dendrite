@@ -17,10 +17,11 @@ package storage
 import (
 	"context"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
@@ -168,4 +169,6 @@ type Database interface {
 	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
 
 	GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error)
+
+	GetInvitesJSON(ctx context.Context, userID string, nid types.RoomNID) ([]byte, error)
 }

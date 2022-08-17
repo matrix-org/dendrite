@@ -116,6 +116,10 @@ type Invites interface {
 	UpdateInviteRetired(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) ([]string, error)
 	// SelectInviteActiveForUserInRoom returns a list of sender state key NIDs and invite event IDs matching those nids.
 	SelectInviteActiveForUserInRoom(ctx context.Context, txn *sql.Tx, targetUserNID types.EventStateKeyNID, roomNID types.RoomNID) ([]types.EventStateKeyNID, []string, error)
+	SelectInviteJSON(
+		ctx context.Context, txn *sql.Tx,
+		targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
+	) ([]byte, error)
 }
 
 type MembershipState int64

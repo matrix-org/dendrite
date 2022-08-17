@@ -75,10 +75,16 @@ const updateInviteRetiredSQL = "" +
 	" WHERE room_nid = $1 AND target_nid = $2 AND NOT retired" +
 	" RETURNING invite_event_id"
 
+const selectInviteJSONSQL = "" +
+	"SELECT invite_event_json FROM roomserver_invites" +
+	" WHERE target_nid = $1 and room_nid = $2" +
+	" AND NOT retired"
+
 type inviteStatements struct {
 	insertInviteEventStmt               *sql.Stmt
 	selectInviteActiveForUserInRoomStmt *sql.Stmt
 	updateInviteRetiredStmt             *sql.Stmt
+	selectInviteJSONStmt                *sql.Stmt
 }
 
 func CreateInvitesTable(db *sql.DB) error {
@@ -93,6 +99,7 @@ func PrepareInvitesTable(db *sql.DB) (tables.Invites, error) {
 		{&s.insertInviteEventStmt, insertInviteEventSQL},
 		{&s.selectInviteActiveForUserInRoomStmt, selectInviteActiveForUserInRoomSQL},
 		{&s.updateInviteRetiredStmt, updateInviteRetiredSQL},
+		{&s.selectInviteJSONStmt, selectInviteJSONSQL},
 	}.Prepare(db)
 }
 
@@ -162,4 +169,14 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 		eventIDs = append(eventIDs, inviteEventID)
 	}
 	return result, eventIDs, rows.Err()
+}
+
+func (s *inviteStatements) SelectInviteJSON(
+	ctx context.Context, txn *sql.Tx,
+	targetUserNID types.EventStateKeyNID, roomNID types.RoomNID,
+) ([]byte, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectInviteJSONStmt)
+	var resBytes []byte
+	err := stmt.QueryRowContext(ctx, targetUserNID, roomNID).Scan(&resBytes)
+	return resBytes, err
 }

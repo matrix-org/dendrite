@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 )
 
 // Ideally, when we have both events we should redact the event JSON and forget about the redaction, but we currently
@@ -1386,6 +1387,14 @@ func (d *Database) loadStateAtSnapshot(
 	// Unique returns the last entry and hence the most recent entry for each state key.
 	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
 	return fullState, nil
+}
+
+func (d *Database) GetInvitesJSON(ctx context.Context, userID string, roomNID types.RoomNID) ([]byte, error) {
+	userNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, userID)
+	if err != nil {
+		return nil, err
+	}
+	return d.InvitesTable.SelectInviteJSON(ctx, nil, userNID, roomNID)
 }
 
 type stateEntryListMap []types.StateEntryList

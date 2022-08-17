@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -301,6 +302,41 @@ func (r *Queryer) QueryMembershipsForRoom(
 	if membershipEventNID == 0 {
 		response.HasBeenInRoom = false
 		response.JoinEvents = nil
+
+		// The sender didn't join this room, maybe a pending invite?
+		var data []byte
+		data, err = r.DB.GetInvitesJSON(ctx, request.Sender, info.RoomNID)
+		if err != nil {
+			logrus.WithError(err).Error("Failed to get invites JSON")
+			return nil
+		}
+
+		// For now, we only care about 1:1 rooms
+		if !gjson.GetBytes(data, "content.is_direct").Bool() {
+			return nil
+		}
+
+		// reconstruct membership events
+		for _, res := range gjson.GetBytes(data, "unsigned.invite_room_state").Array() {
+			sKey := res.Get("state_key").Str
+			if res.Get("type").Str == gomatrixserverlib.MRoomMember && sKey != "" {
+				ev := gomatrixserverlib.ClientEvent{
+					Content:  gomatrixserverlib.RawJSON(res.Get("content").Raw),
+					RoomID:   request.RoomID,
+					StateKey: &sKey,
+					Type:     gomatrixserverlib.MRoomMember,
+					Sender:   res.Get("sender").Str,
+				}
+				// Add the unsigned data, as this seems to make Element Web happy and put the
+				// room under "People"
+				if sKey == request.Sender {
+					ev.Unsigned = gomatrixserverlib.RawJSON(gjson.GetBytes(data, "unsigned").Raw)
+				}
+				response.JoinEvents = append(response.JoinEvents, ev)
+			}
+		}
+		response.HasBeenInRoom = response.JoinEvents != nil && len(response.JoinEvents) > 0
+
 		return nil
 	}
 
