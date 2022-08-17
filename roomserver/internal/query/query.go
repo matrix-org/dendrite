@@ -103,7 +103,7 @@ func (r *Queryer) QueryStateAfterEvents(
 
 	stateEvents, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
 	if err != nil {
-		return fmt.Errorf("helpers.LoadStateEvents: %w", err)
+		return err
 	}
 
 	if len(request.PrevEventIDs) > 1 && len(request.StateToFetch) == 0 {
@@ -851,7 +851,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	}
 	var joinRules gomatrixserverlib.JoinRuleContent
 	if err = json.Unmarshal(joinRulesEvent.Content(), &joinRules); err != nil {
-		return fmt.Errorf("json.Unmarshal: %w (JSON content: %s)", err, joinRulesEvent.Content())
+		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
 	// If the join rule isn't "restricted" then there's nothing more to do.
 	res.Restricted = joinRules.JoinRule == gomatrixserverlib.Restricted
