@@ -88,17 +88,14 @@ func (r *Queryer) QueryStateAfterEvents(
 		stateEntries, err = roomState.LoadCombinedStateAfterEvents(
 			ctx, prevStates,
 		)
-		if err != nil {
-			return fmt.Errorf("roomState.LoadCombinedStateAfterEvents: %w", err)
-		}
 	} else {
 		// Look up the current state for the requested tuples.
 		stateEntries, err = roomState.LoadStateAfterEventsForStringTuples(
 			ctx, prevStates, request.StateToFetch,
 		)
-		if err != nil {
-			return fmt.Errorf("roomState.LoadStateAfterEventsForStringTuples: %w", err)
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	stateEvents, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
