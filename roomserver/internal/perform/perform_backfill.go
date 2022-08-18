@@ -140,11 +140,11 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 			continue
 		}
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, false); err != nil {
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true); err != nil {
 			// attempt to fetch the missing events
 			r.fetchAndStoreMissingEvents(ctx, info.RoomVersion, requester, stateIDs)
 			// try again
-			entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, false)
+			entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true)
 			if err != nil {
 				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to get state entries for event")
 				return err
