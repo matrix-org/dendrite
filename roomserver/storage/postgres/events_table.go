@@ -231,7 +231,9 @@ func (s *eventStatements) SelectEvent(
 }
 
 // bulkSelectStateEventByID lookups a list of state events by event ID.
-// If any of the requested events are missing from the database it returns a types.MissingEventError
+// If not excluding rejected events, and any of the requested events are missing from
+// the database it returns a types.MissingEventError. If excluding rejected events,
+// the events will be silently omitted without error.
 func (s *eventStatements) BulkSelectStateEventByID(
 	ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {

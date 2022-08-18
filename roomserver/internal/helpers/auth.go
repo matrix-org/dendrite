@@ -39,7 +39,7 @@ func CheckForSoftFail(
 	var authStateEntries []types.StateEntry
 	var err error
 	if rewritesState {
-		authStateEntries, err = db.StateEntriesForEventIDs(ctx, stateEventIDs, false)
+		authStateEntries, err = db.StateEntriesForEventIDs(ctx, stateEventIDs, true)
 		if err != nil {
 			return true, fmt.Errorf("StateEntriesForEventIDs failed: %w", err)
 		}
@@ -97,7 +97,7 @@ func CheckAuthEvents(
 	authEventIDs []string,
 ) ([]types.EventNID, error) {
 	// Grab the numeric IDs for the supplied auth state events from the database.
-	authStateEntries, err := db.StateEntriesForEventIDs(ctx, authEventIDs, false)
+	authStateEntries, err := db.StateEntriesForEventIDs(ctx, authEventIDs, true)
 	if err != nil {
 		return nil, fmt.Errorf("db.StateEntriesForEventIDs: %w", err)
 	}

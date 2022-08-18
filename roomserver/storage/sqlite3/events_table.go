@@ -204,7 +204,9 @@ func (s *eventStatements) SelectEvent(
 }
 
 // bulkSelectStateEventByID lookups a list of state events by event ID.
-// If any of the requested events are missing from the database it returns a types.MissingEventError
+// If not excluding rejected events, and any of the requested events are missing from
+// the database it returns a types.MissingEventError. If excluding rejected events,
+// the events will be silently omitted without error.
 func (s *eventStatements) BulkSelectStateEventByID(
 	ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
@@ -250,7 +252,7 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		}
 		results = append(results, result)
 	}
-	if i != len(eventIDs) {
+	if !excludeRejected && i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
