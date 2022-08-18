@@ -65,6 +65,14 @@ const bulkSelectStateEventByIDSQL = "" +
 	" WHERE event_id IN ($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+// Bulk lookup of events by string ID that aren't rejected.
+// Sort by the numeric IDs for event type and state key.
+// This means we can use binary search to lookup entries by type and state key.
+const bulkSelectStateEventByIDExcludingRejectedSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+	" WHERE event_id IN ($1) AND Is_rejected = 0" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
 const bulkSelectStateEventByNIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
 	" WHERE event_nid IN ($1)"
@@ -113,19 +121,20 @@ const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
 type eventStatements struct {
-	db                                     *sql.DB
-	insertEventStmt                        *sql.Stmt
-	selectEventStmt                        *sql.Stmt
-	bulkSelectStateEventByIDStmt           *sql.Stmt
-	bulkSelectStateAtEventByIDStmt         *sql.Stmt
-	updateEventStateStmt                   *sql.Stmt
-	selectEventSentToOutputStmt            *sql.Stmt
-	updateEventSentToOutputStmt            *sql.Stmt
-	selectEventIDStmt                      *sql.Stmt
-	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
-	bulkSelectEventReferenceStmt           *sql.Stmt
-	bulkSelectEventIDStmt                  *sql.Stmt
-	selectEventRejectedStmt                *sql.Stmt
+	db                                            *sql.DB
+	insertEventStmt                               *sql.Stmt
+	selectEventStmt                               *sql.Stmt
+	bulkSelectStateEventByIDStmt                  *sql.Stmt
+	bulkSelectStateEventByIDExcludingRejectedStmt *sql.Stmt
+	bulkSelectStateAtEventByIDStmt                *sql.Stmt
+	updateEventStateStmt                          *sql.Stmt
+	selectEventSentToOutputStmt                   *sql.Stmt
+	updateEventSentToOutputStmt                   *sql.Stmt
+	selectEventIDStmt                             *sql.Stmt
+	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
+	bulkSelectEventReferenceStmt                  *sql.Stmt
+	bulkSelectEventIDStmt                         *sql.Stmt
+	selectEventRejectedStmt                       *sql.Stmt
 	//bulkSelectEventNIDStmt               *sql.Stmt
 	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
 	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
@@ -145,6 +154,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
+		{&s.bulkSelectStateEventByIDExcludingRejectedStmt, bulkSelectStateEventByIDExcludingRejectedSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
 		{&s.updateEventStateStmt, updateEventStateSQL},
 		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
@@ -196,14 +206,20 @@ func (s *eventStatements) SelectEvent(
 // bulkSelectStateEventByID lookups a list of state events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
 func (s *eventStatements) BulkSelectStateEventByID(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
 	///////////////
+	var sql string
+	if excludeRejected {
+		sql = bulkSelectStateEventByIDExcludingRejectedSQL
+	} else {
+		sql = bulkSelectStateEventByIDSQL
+	}
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(sql, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err

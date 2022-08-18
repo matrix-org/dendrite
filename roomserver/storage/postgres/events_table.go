@@ -88,6 +88,14 @@ const bulkSelectStateEventByIDSQL = "" +
 	" WHERE event_id = ANY($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+// Bulk lookup of events by string ID that aren't excluded.
+// Sort by the numeric IDs for event type and state key.
+// This means we can use binary search to lookup entries by type and state key.
+const bulkSelectStateEventByIDExcludingRejectedSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+	" WHERE event_id = ANY($1) AND is_rejected = FALSE" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
 // Bulk look up of events by event NID, optionally filtering by the event type
 // or event state key NIDs if provided. (The CARDINALITY check will return true
 // if the provided arrays are empty, ergo no filtering).
@@ -140,23 +148,24 @@ const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
 type eventStatements struct {
-	insertEventStmt                        *sql.Stmt
-	selectEventStmt                        *sql.Stmt
-	bulkSelectStateEventByIDStmt           *sql.Stmt
-	bulkSelectStateEventByNIDStmt          *sql.Stmt
-	bulkSelectStateAtEventByIDStmt         *sql.Stmt
-	updateEventStateStmt                   *sql.Stmt
-	selectEventSentToOutputStmt            *sql.Stmt
-	updateEventSentToOutputStmt            *sql.Stmt
-	selectEventIDStmt                      *sql.Stmt
-	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
-	bulkSelectEventReferenceStmt           *sql.Stmt
-	bulkSelectEventIDStmt                  *sql.Stmt
-	bulkSelectEventNIDStmt                 *sql.Stmt
-	bulkSelectUnsentEventNIDStmt           *sql.Stmt
-	selectMaxEventDepthStmt                *sql.Stmt
-	selectRoomNIDsForEventNIDsStmt         *sql.Stmt
-	selectEventRejectedStmt                *sql.Stmt
+	insertEventStmt                               *sql.Stmt
+	selectEventStmt                               *sql.Stmt
+	bulkSelectStateEventByIDStmt                  *sql.Stmt
+	bulkSelectStateEventByIDExcludingRejectedStmt *sql.Stmt
+	bulkSelectStateEventByNIDStmt                 *sql.Stmt
+	bulkSelectStateAtEventByIDStmt                *sql.Stmt
+	updateEventStateStmt                          *sql.Stmt
+	selectEventSentToOutputStmt                   *sql.Stmt
+	updateEventSentToOutputStmt                   *sql.Stmt
+	selectEventIDStmt                             *sql.Stmt
+	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
+	bulkSelectEventReferenceStmt                  *sql.Stmt
+	bulkSelectEventIDStmt                         *sql.Stmt
+	bulkSelectEventNIDStmt                        *sql.Stmt
+	bulkSelectUnsentEventNIDStmt                  *sql.Stmt
+	selectMaxEventDepthStmt                       *sql.Stmt
+	selectRoomNIDsForEventNIDsStmt                *sql.Stmt
+	selectEventRejectedStmt                       *sql.Stmt
 }
 
 func CreateEventsTable(db *sql.DB) error {
@@ -171,6 +180,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
+		{&s.bulkSelectStateEventByIDExcludingRejectedStmt, bulkSelectStateEventByIDExcludingRejectedSQL},
 		{&s.bulkSelectStateEventByNIDStmt, bulkSelectStateEventByNIDSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
 		{&s.updateEventStateStmt, updateEventStateSQL},
@@ -223,9 +233,14 @@ func (s *eventStatements) SelectEvent(
 // bulkSelectStateEventByID lookups a list of state events by event ID.
 // If any of the requested events are missing from the database it returns a types.MissingEventError
 func (s *eventStatements) BulkSelectStateEventByID(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectStateEventByIDStmt)
+	var stmt *sql.Stmt
+	if excludeRejected {
+		stmt = sqlutil.TxStmt(txn, s.bulkSelectStateEventByIDExcludingRejectedStmt)
+	} else {
+		stmt = sqlutil.TxStmt(txn, s.bulkSelectStateEventByIDStmt)
+	}
 	rows, err := stmt.QueryContext(ctx, pq.StringArray(eventIDs))
 	if err != nil {
 		return nil, err
@@ -250,7 +265,7 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	if i != len(eventIDs) {
+	if !excludeRejected && i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
