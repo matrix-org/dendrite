@@ -164,9 +164,9 @@ func TestMSC2836(t *testing.T) {
 	// make everyone joined to each other's rooms
 	nopRsAPI := &testRoomserverAPI{
 		userToJoinedRooms: map[string][]string{
-			alice:   []string{roomID},
-			bob:     []string{roomID},
-			charlie: []string{roomID},
+			alice:   {roomID},
+			bob:     {roomID},
+			charlie: {roomID},
 		},
 		events: map[string]*gomatrixserverlib.HeaderedEvent{
 			eventA.EventID(): eventA,

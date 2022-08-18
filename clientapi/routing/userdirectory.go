@@ -18,10 +18,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -34,12 +37,12 @@ type UserDirectoryResponse struct {
 func SearchUserDirectory(
 	ctx context.Context,
 	device *userapi.Device,
-	userAPI userapi.ClientUserAPI,
 	rsAPI api.ClientRoomserverAPI,
 	provider userapi.QuerySearchProfilesAPI,
-	serverName gomatrixserverlib.ServerName,
 	searchString string,
 	limit int,
+	federation *gomatrixserverlib.FederationClient,
+	localServerName gomatrixserverlib.ServerName,
 ) util.JSONResponse {
 	if limit < 10 {
 		limit = 10
@@ -51,59 +54,74 @@ func SearchUserDirectory(
 		Limited: false,
 	}
 
-	// First start searching local users.
-	userReq := &userapi.QuerySearchProfilesRequest{
-		SearchString: searchString,
-		Limit:        limit,
+	// Get users we share a room with
+	knownUsersReq := &api.QueryKnownUsersRequest{
+		UserID: device.UserID,
+		Limit:  limit,
 	}
-	userRes := &userapi.QuerySearchProfilesResponse{}
-	if err := provider.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
-		return util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
+	knownUsersRes := &api.QueryKnownUsersResponse{}
+	if err := rsAPI.QueryKnownUsers(ctx, knownUsersReq, knownUsersRes); err != nil && err != sql.ErrNoRows {
+		return util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
 	}
 
-	for _, user := range userRes.Profiles {
+knownUsersLoop:
+	for _, profile := range knownUsersRes.Users {
 		if len(results) == limit {
 			response.Limited = true
 			break
 		}
-
-		var userID string
-		if user.ServerName != "" {
-			userID = fmt.Sprintf("@%s:%s", user.Localpart, user.ServerName)
+		userID := profile.UserID
+		// get the full profile of the local user
+		localpart, serverName, _ := gomatrixserverlib.SplitID('@', userID)
+		if serverName == localServerName {
+			userReq := &userapi.QuerySearchProfilesRequest{
+				SearchString: localpart,
+				Limit:        limit,
+			}
+			userRes := &userapi.QuerySearchProfilesResponse{}
+			if err := provider.QuerySearchProfiles(ctx, userReq, userRes); err != nil {
+				return util.ErrorResponse(fmt.Errorf("userAPI.QuerySearchProfiles: %w", err))
+			}
+			for _, p := range userRes.Profiles {
+				if strings.Contains(p.DisplayName, searchString) ||
+					strings.Contains(p.Localpart, searchString) {
+					profile.DisplayName = p.DisplayName
+					profile.AvatarURL = p.AvatarURL
+					results[userID] = profile
+					if len(results) == limit {
+						response.Limited = true
+						break knownUsersLoop
+					}
+				}
+			}
 		} else {
-			userID = fmt.Sprintf("@%s:%s", user.Localpart, serverName)
-		}
-		if _, ok := results[userID]; !ok {
-			results[userID] = authtypes.FullyQualifiedProfile{
-				UserID:      userID,
-				DisplayName: user.DisplayName,
-				AvatarURL:   user.AvatarURL,
+			// If the username already contains the search string, don't bother hitting federation.
+			// This will result in missing avatars and displaynames, but saves the federation roundtrip.
+			if strings.Contains(localpart, searchString) {
+				results[userID] = profile
+				if len(results) == limit {
+					response.Limited = true
+					break knownUsersLoop
+				}
+				continue
 			}
-		}
-	}
-
-	// Then, if we have enough room left in the response,
-	// start searching for known users from joined rooms.
-
-	if len(results) <= limit {
-		stateReq := &api.QueryKnownUsersRequest{
-			UserID:       device.UserID,
-			SearchString: searchString,
-			Limit:        limit - len(results),
-		}
-		stateRes := &api.QueryKnownUsersResponse{}
-		if err := rsAPI.QueryKnownUsers(ctx, stateReq, stateRes); err != nil && err != sql.ErrNoRows {
-			return util.ErrorResponse(fmt.Errorf("rsAPI.QueryKnownUsers: %w", err))
-		}
-
-		for _, user := range stateRes.Users {
-			if len(results) == limit {
-				response.Limited = true
-				break
+			// TODO: We should probably cache/store this
+			fedProfile, fedErr := federation.LookupProfile(ctx, serverName, userID, "")
+			if fedErr != nil {
+				if x, ok := fedErr.(gomatrix.HTTPError); ok {
+					if x.Code == http.StatusNotFound {
+						continue
+					}
+				}
 			}
-
-			if _, ok := results[user.UserID]; !ok {
-				results[user.UserID] = user
+			if strings.Contains(fedProfile.DisplayName, searchString) {
+				profile.DisplayName = fedProfile.DisplayName
+				profile.AvatarURL = fedProfile.AvatarURL
+				results[userID] = profile
+				if len(results) == limit {
+					response.Limited = true
+					break knownUsersLoop
+				}
 			}
 		}
 	}

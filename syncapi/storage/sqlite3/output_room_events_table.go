@@ -139,10 +139,12 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 	}
 
 	m := sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "syncapi: add history visibility column (output_room_events)",
-		Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
-	})
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "syncapi: add history visibility column (output_room_events)",
+			Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
+		},
+	)
 	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
@@ -232,8 +234,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			log.WithFields(log.Fields{
 				"since":   r.From,
 				"current": r.To,
-				"adds":    addIDsJSON,
-				"dels":    delIDsJSON,
+				"adds":    len(addIDsJSON),
+				"dels":    len(delIDsJSON),
 			}).Warn("StateBetween: ignoring deleted state")
 		}
 
