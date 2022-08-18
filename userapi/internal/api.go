@@ -139,6 +139,11 @@ func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.Pe
 	if err := a.DB.SetPassword(ctx, req.Localpart, req.Password); err != nil {
 		return err
 	}
+	if req.LogoutDevices {
+		if _, err := a.DB.RemoveAllDevices(context.Background(), req.Localpart, ""); err != nil {
+			return err
+		}
+	}
 	res.PasswordUpdated = true
 	return nil
 }

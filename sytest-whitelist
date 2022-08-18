@@ -740,3 +740,7 @@ Current state appears in timeline in private history
 Current state appears in timeline in private history with many messages before
 Local users can peek into world_readable rooms by room ID
 Newly joined room includes presence in incremental sync
+User in private room doesn't appear in user directory
+User joining then leaving public room appears and dissappears from directory
+User in remote room doesn't appear in user directory after server left room
+User in shared private room does appear in user directory until leave

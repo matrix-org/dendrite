@@ -21,12 +21,12 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220801083850-5ff38e2c2839
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220815094957-74b7ff4ae09c
 	github.com/matrix-org/pinecone v0.0.0-20220803093810-b7a830c08fb9
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.13
-	github.com/nats-io/nats-server/v2 v2.8.5-0.20220731184415-903a06a5b4ee
-	github.com/nats-io/nats.go v1.16.1-0.20220731182438-87bbea85922b
+	github.com/nats-io/nats-server/v2 v2.8.5-0.20220811224153-d8d25d9b0b1c
+	github.com/nats-io/nats.go v1.16.1-0.20220810192301-fb5ca2cbc995
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
