@@ -363,7 +363,6 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 			// Don't retry a server that we're already waiting for.
 			continue
 		}
-		retriesMu.Unlock()
 		waitTime, shouldRetry := u.processServer(serverName)
 		if shouldRetry {
 			retriesMu.Lock()
