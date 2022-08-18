@@ -335,8 +335,9 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 	retriesMu := &sync.Mutex{}
 	// restarter goroutine which will inject failed servers into ch when it is time
 	go func() {
+		var serversToRetry []gomatrixserverlib.ServerName
 		for {
-			var serversToRetry []gomatrixserverlib.ServerName
+			serversToRetry = serversToRetry[:0] // reuse memory
 			time.Sleep(time.Second)
 			retriesMu.Lock()
 			now := time.Now()
@@ -355,11 +356,18 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 		}
 	}()
 	for serverName := range ch {
+		retriesMu.Lock()
+		_, exists := retries[serverName]
+		retriesMu.Unlock()
+		if exists {
+			// Don't retry a server that we're already waiting for.
+			continue
+		}
+		retriesMu.Unlock()
 		waitTime, shouldRetry := u.processServer(serverName)
 		if shouldRetry {
 			retriesMu.Lock()
-			_, exists := retries[serverName]
-			if !exists {
+			if _, exists = retries[serverName]; !exists {
 				retries[serverName] = time.Now().Add(waitTime)
 			}
 			retriesMu.Unlock()
