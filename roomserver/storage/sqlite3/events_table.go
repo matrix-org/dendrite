@@ -70,7 +70,7 @@ const bulkSelectStateEventByIDSQL = "" +
 // This means we can use binary search to lookup entries by type and state key.
 const bulkSelectStateEventByIDExcludingRejectedSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
-	" WHERE event_id IN ($1) AND Is_rejected = 0" +
+	" WHERE event_id IN ($1) AND is_rejected = 0" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
 const bulkSelectStateEventByNIDSQL = "" +
@@ -237,10 +237,10 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
 	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
-	results := make([]types.StateEntry, len(eventIDs))
+	results := make([]types.StateEntry, 0, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
-		result := &results[i]
+		var result types.StateEntry
 		if err = rows.Scan(
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
@@ -248,6 +248,7 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		); err != nil {
 			return nil, err
 		}
+		results = append(results, result)
 	}
 	if i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.

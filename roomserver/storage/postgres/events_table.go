@@ -250,10 +250,10 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
 	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
-	results := make([]types.StateEntry, len(eventIDs))
+	results := make([]types.StateEntry, 0, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
-		result := &results[i]
+		var result types.StateEntry
 		if err = rows.Scan(
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
@@ -261,6 +261,7 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		); err != nil {
 			return nil, err
 		}
+		results = append(results, result)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
