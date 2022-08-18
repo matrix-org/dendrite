@@ -136,6 +136,9 @@ const selectMaxEventDepthSQL = "" +
 const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid = ANY($1)"
 
+const selectEventRejectedSQL = "" +
+	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
+
 type eventStatements struct {
 	insertEventStmt                        *sql.Stmt
 	selectEventStmt                        *sql.Stmt
@@ -153,6 +156,7 @@ type eventStatements struct {
 	bulkSelectUnsentEventNIDStmt           *sql.Stmt
 	selectMaxEventDepthStmt                *sql.Stmt
 	selectRoomNIDsForEventNIDsStmt         *sql.Stmt
+	selectEventRejectedStmt                *sql.Stmt
 }
 
 func CreateEventsTable(db *sql.DB) error {
@@ -180,6 +184,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
+		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
 	}.Prepare(db)
 }
 
@@ -539,4 +544,12 @@ func eventNIDsAsArray(eventNIDs []types.EventNID) pq.Int64Array {
 		nids[i] = int64(eventNIDs[i])
 	}
 	return nids
+}
+
+func (s *eventStatements) SelectEventRejected(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string,
+) (rejected bool, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
+	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
+	return
 }

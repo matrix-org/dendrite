@@ -49,6 +49,7 @@ type createRoomRequest struct {
 	GuestCanJoin              bool                          `json:"guest_can_join"`
 	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
 	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
+	IsDirect                  bool                          `json:"is_direct"`
 }
 
 const (
@@ -499,8 +500,16 @@ func createRoom(
 		// Build some stripped state for the invite.
 		var globalStrippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range builtEvents {
+			// Chosen events from the spec:
+			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
 			switch event.Type() {
+			case gomatrixserverlib.MRoomCreate:
+				fallthrough
 			case gomatrixserverlib.MRoomName:
+				fallthrough
+			case gomatrixserverlib.MRoomAvatar:
+				fallthrough
+			case gomatrixserverlib.MRoomTopic:
 				fallthrough
 			case gomatrixserverlib.MRoomCanonicalAlias:
 				fallthrough
@@ -522,7 +531,7 @@ func createRoom(
 			// Build the invite event.
 			inviteEvent, err := buildMembershipEvent(
 				ctx, invitee, "", profileAPI, device, gomatrixserverlib.Invite,
-				roomID, true, cfg, evTime, rsAPI, asAPI,
+				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
 			)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
