@@ -119,11 +119,12 @@ func (r *Inputer) processRoomEvent(
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
 
-	// If we already know about this event and it hasn't been rejected
-	// then we won't attempt to reprocess it. If it was rejected then we
-	// can attempt to reprocess, in case we have learned something new
-	// that will allow us to accept the event this time.
-	if roomInfo != nil {
+	// If we already know about this outlier and it hasn't been rejected
+	// then we won't attempt to reprocess it. If it was rejected or has now
+	// arrived as a different kind of event, then we can attempt to reprocess,
+	// in case we have learned something new or need to weave the event into
+	// the DAG now.
+	if input.Kind == api.KindOutlier && roomInfo != nil {
 		wasRejected, werr := r.DB.IsEventRejected(ctx, roomInfo.RoomNID, event.EventID())
 		switch {
 		case werr == sql.ErrNoRows:
