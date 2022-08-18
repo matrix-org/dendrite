@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -21,9 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/tidwall/gjson"
 )
 
 type syncRoomserverAPI struct {
@@ -422,6 +423,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
+				time.Sleep(100 * time.Millisecond) // TODO: find a better way
 
 				// There is only one event, we expect only to be able to see this, if the room is world_readable
 				w := httptest.NewRecorder()
@@ -454,6 +456,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
+				time.Sleep(100 * time.Millisecond) // TODO: find a better way
 
 				// Verify the messages after/before invite are visible or not
 				w = httptest.NewRecorder()
