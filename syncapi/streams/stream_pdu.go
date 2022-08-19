@@ -231,8 +231,9 @@ func (p *PDUStreamProvider) IncrementalSync(
 			delete(req.Response.Rooms.Join, x)
 		}
 		r = types.Range{
-			From: 0,
-			To:   p.latest,
+			From:      p.latest,
+			To:        0,
+			Backwards: true,
 		}
 		// We only care about the newly joined rooms, so update the stateFilter to reflect that
 		stateFilter.Rooms = &newlyJoinedRooms
@@ -241,6 +242,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 			return newPos
 		}
 		for _, delta := range stateDeltas {
+			// Ignore deltas for rooms we didn't newly join
+			if _, ok := req.Response.Rooms.Join[delta.RoomID]; ok {
+				continue
+			}
 			if _, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, &stateFilter, req.Response); err != nil {
 				req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 				return newPos
