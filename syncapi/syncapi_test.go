@@ -155,7 +155,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 		},
 	}
 
-	syncUntil(t, base, alice.AccessToken, nil, func(syncBody string) bool {
+	syncUntil(t, base, alice.AccessToken, false, func(syncBody string) bool {
 		// wait for the last sent eventID to come down sync
 		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
 		return gjson.Get(syncBody, path).Exists()
@@ -435,7 +435,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
-				syncUntil(t, base, aliceDev.AccessToken, nil,
+				syncUntil(t, base, aliceDev.AccessToken, false,
 					func(syncBody string) bool {
 						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
 						return gjson.Get(syncBody, path).Exists()
@@ -474,7 +474,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
-				syncUntil(t, base, aliceDev.AccessToken, nil,
+				syncUntil(t, base, aliceDev.AccessToken, false,
 					func(syncBody string) bool {
 						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
 						return gjson.Get(syncBody, path).Exists()
@@ -632,9 +632,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 		}
 
 		syncUntil(t, base, alice.AccessToken,
-			func() bool {
-				return len(tc.want) == 0
-			},
+			len(tc.want) == 0,
 			func(body string) bool {
 				return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
 			},
@@ -664,19 +662,21 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 
 func syncUntil(t *testing.T,
 	base *base.BaseDendrite, accessToken string,
-	skipFunc func() bool,
+	skip bool,
 	checkFunc func(syncBody string) bool,
 ) {
+	if checkFunc == nil {
+		t.Fatalf("No checkFunc defined")
+	}
+	if skip {
+		return
+	}
 	// loop on /sync until we receive the last send message or timeout after 5 seconds, since we don't know if the message made it
 	// to the syncAPI when hitting /sync
 	done := make(chan bool)
 	defer close(done)
 	go func() {
 		for {
-			if skipFunc != nil && skipFunc() {
-				done <- true
-				return
-			}
 			w := httptest.NewRecorder()
 			base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
 				"access_token": accessToken,
