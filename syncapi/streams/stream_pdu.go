@@ -231,7 +231,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 			delete(req.Response.Rooms.Join, x)
 		}
 		r = types.Range{
-			From:      p.latest,
+			From:      to,
 			To:        0,
 			Backwards: true,
 		}
