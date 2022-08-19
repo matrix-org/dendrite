@@ -350,8 +350,10 @@ func (r *messagesReq) retrieveEvents() (
 	startTime := time.Now()
 	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.db, r.rsAPI, events, nil, r.device.UserID, "messages")
 	logrus.WithFields(logrus.Fields{
-		"duration": time.Since(startTime),
-		"room_id":  r.roomID,
+		"duration":      time.Since(startTime),
+		"room_id":       r.roomID,
+		"events_before": len(events),
+		"events_after":  len(filteredEvents),
 	}).Debug("applied history visibility (messages)")
 	return gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll), start, end, err
 }
@@ -513,6 +515,9 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 
 	// Store the events in the database, while marking them as unfit to show
 	// up in responses to sync requests.
+	if res.HistoryVisibility == "" {
+		res.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
+	}
 	for i := range res.Events {
 		_, err = r.db.WriteEvent(
 			context.Background(),
@@ -521,7 +526,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 			[]string{},
 			[]string{},
 			nil, true,
-			gomatrixserverlib.HistoryVisibilityShared,
+			res.HistoryVisibility,
 		)
 		if err != nil {
 			return nil, err
@@ -533,6 +538,9 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	if len(events) > limit {
 		// last `limit` events
 		events = events[len(events)-limit:]
+	}
+	for _, ev := range events {
+		ev.Visibility = res.HistoryVisibility
 	}
 
 	return events, nil
