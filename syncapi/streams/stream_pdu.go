@@ -178,24 +178,24 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	var err error
 	var stateDeltas []types.StateDelta
-	var joinedRooms []string
+	var syncJoinedRooms []string
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
 
 	if req.WantFullState {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
 			return
 		}
 	} else {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
 			return
 		}
 	}
 
-	for _, roomID := range joinedRooms {
+	for _, roomID := range syncJoinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
 
@@ -219,6 +219,32 @@ func (p *PDUStreamProvider) IncrementalSync(
 			fallthrough
 		case !r.Backwards && pos > newPos:
 			newPos = pos
+		}
+	}
+
+	// If we joined a new room in this sync, make sure we add enough information about it.
+	// This does an "initial sync" for the newly joined rooms
+	newlyJoinedRooms := joinedRooms(req.Response, req.Device.UserID)
+	if len(newlyJoinedRooms) > 0 {
+		// remove already added rooms, as we're doing an "initial sync"
+		for _, x := range newlyJoinedRooms {
+			delete(req.Response.Rooms.Join, x)
+		}
+		r = types.Range{
+			From: 0,
+			To:   p.latest,
+		}
+		// We only care about the newly joined rooms, so update the stateFilter to reflect that
+		stateFilter.Rooms = &newlyJoinedRooms
+		if stateDeltas, _, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
+			return newPos
+		}
+		for _, delta := range stateDeltas {
+			if _, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, &stateFilter, req.Response); err != nil {
+				req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
+				return newPos
+			}
 		}
 	}
 
