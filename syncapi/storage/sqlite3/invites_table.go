@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -182,4 +183,10 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 		id = nullableID.Int64
 	}
 	return
+}
+
+func (s *inviteEventsStatements) PurgeInvites(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

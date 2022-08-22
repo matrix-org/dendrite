@@ -148,3 +148,9 @@ func (s *receiptStatements) SelectMaxReceiptID(
 	}
 	return
 }
+
+func (s *receiptStatements) PurgeReceipts(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
+}

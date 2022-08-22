@@ -167,6 +167,9 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+const purgeEventsSQL = "" +
+	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
+
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -181,6 +184,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
+	purgeEventsStmt               *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -216,6 +220,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.purgeEventsStmt, purgeEventsSQL},
 	}.Prepare(db)
 }
 
@@ -642,4 +647,11 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		})
 	}
 	return result, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) PurgeEvents(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomID)
+	return err
 }

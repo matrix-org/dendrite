@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
@@ -189,4 +190,10 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
 	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
+}
+
+func (s *outputRoomEventsTopologyStatements) PurgeEventsTopology(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

@@ -79,6 +79,9 @@ const selectStreamToTopologicalPositionAscSQL = "" +
 const selectStreamToTopologicalPositionDescSQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE room_id = $1 AND stream_position <= $2 ORDER BY topological_position DESC LIMIT 1;"
 
+const purgeEventsTopologySQL = "" +
+	"DELETE FROM syncapi_output_room_events_topology WHERE room_id = $1"
+
 type outputRoomEventsTopologyStatements struct {
 	insertEventInTopologyStmt                 *sql.Stmt
 	selectEventIDsInRangeASCStmt              *sql.Stmt
@@ -87,6 +90,7 @@ type outputRoomEventsTopologyStatements struct {
 	selectMaxPositionInTopologyStmt           *sql.Stmt
 	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
 	selectStreamToTopologicalPositionDescStmt *sql.Stmt
+	purgeEventsTopologyStmt                   *sql.Stmt
 }
 
 func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
@@ -114,6 +118,9 @@ func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
 		return nil, err
 	}
 	if s.selectStreamToTopologicalPositionDescStmt, err = db.Prepare(selectStreamToTopologicalPositionDescSQL); err != nil {
+		return nil, err
+	}
+	if s.purgeEventsTopologyStmt, err = db.Prepare(purgeEventsTopologySQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -195,4 +202,11 @@ func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	err = s.selectMaxPositionInTopologyStmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
+}
+
+func (s *outputRoomEventsTopologyStatements) PurgeEventsTopology(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeEventsTopologyStmt).ExecContext(ctx, roomID)
+	return err
 }

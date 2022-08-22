@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -108,4 +109,10 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
 	return err
+}
+
+func (s *backwardExtremitiesStatements) PurgeBackwardExtremities(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

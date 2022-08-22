@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -122,6 +123,8 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 		s.onRetirePeek(s.ctx, *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
 		err = s.onRedactEvent(s.ctx, *output.RedactedEvent)
+	case api.OutputTypePurgeRoom:
+		err = s.onPurgeRoom(s.ctx, *output.PurgeRoom)
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -431,6 +434,15 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	// index as PDUs, but we should fix this
 	s.pduStream.Advance(sp)
 	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
+}
+
+func (s *OutputRoomEventConsumer) onPurgeRoom(
+	ctx context.Context, req api.OutputPurgeRoom,
+) error {
+	logrus.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
+	defer logrus.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
+
+	return nil
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {

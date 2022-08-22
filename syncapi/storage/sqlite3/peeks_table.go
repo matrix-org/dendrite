@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -203,4 +204,10 @@ func (s *peekStatements) SelectMaxPeekID(
 		id = nullableID.Int64
 	}
 	return
+}
+
+func (s *peekStatements) PurgePeeks(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

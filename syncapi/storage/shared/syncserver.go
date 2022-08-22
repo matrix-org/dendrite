@@ -1078,3 +1078,36 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
+
+func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		if err := d.BackwardExtremities.PurgeBackwardExtremities(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge backward extremities: %w", err)
+		}
+		if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge current room state: %w", err)
+		}
+		if err := d.Invites.PurgeInvites(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge invites: %w", err)
+		}
+		if err := d.Memberships.PurgeMemberships(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge memberships: %w", err)
+		}
+		if err := d.NotificationData.PurgeNotificationData(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge notification data: %w", err)
+		}
+		if err := d.OutputEvents.PurgeEvents(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge events: %w", err)
+		}
+		if err := d.Topology.PurgeEventsTopology(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge events topology: %w", err)
+		}
+		if err := d.Peeks.PurgePeeks(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge peeks: %w", err)
+		}
+		if err := d.Receipts.PurgeReceipts(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge receipts: %w", err)
+		}
+		return nil
+	})
+}

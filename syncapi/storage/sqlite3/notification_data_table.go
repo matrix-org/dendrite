@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -111,4 +112,10 @@ func (r *notificationDataStatements) SelectMaxID(ctx context.Context) (int64, er
 	var id int64
 	err := r.selectMaxID.QueryRowContext(ctx).Scan(&id)
 	return id, err
+}
+
+func (s *notificationDataStatements) PurgeNotificationData(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

@@ -69,11 +69,15 @@ const selectHeroesSQL = "" +
 const selectMembershipBeforeSQL = "" +
 	"SELECT membership, topological_pos FROM syncapi_memberships WHERE room_id = $1 and user_id = $2 AND topological_pos <= $3 ORDER BY topological_pos DESC LIMIT 1"
 
+const purgeMembershipsSQL = "" +
+	"DELETE FROM syncapi_memberships WHERE room_id = $1"
+
 type membershipsStatements struct {
 	upsertMembershipStmt        *sql.Stmt
 	selectMembershipCountStmt   *sql.Stmt
 	selectHeroesStmt            *sql.Stmt
 	selectMembershipForUserStmt *sql.Stmt
+	purgeMembershipsStmt        *sql.Stmt
 }
 
 func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -87,6 +91,7 @@ func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
 		{&s.selectHeroesStmt, selectHeroesSQL},
 		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
+		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
 	}.Prepare(db)
 }
 
@@ -153,4 +158,11 @@ func (s *membershipsStatements) SelectMembershipForUser(
 		return "", 0, err
 	}
 	return membership, topologyPos, nil
+}
+
+func (s *membershipsStatements) PurgeMemberships(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomID)
+	return err
 }

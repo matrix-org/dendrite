@@ -62,11 +62,15 @@ const selectInviteEventsInRangeSQL = "" +
 const selectMaxInviteIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_invite_events"
 
+const purgeInvitesSQL = "" +
+	"DELETE FROM syncapi_invite_events WHERE room_id = $1"
+
 type inviteEventsStatements struct {
 	insertInviteEventStmt         *sql.Stmt
 	selectInviteEventsInRangeStmt *sql.Stmt
 	deleteInviteEventStmt         *sql.Stmt
 	selectMaxInviteIDStmt         *sql.Stmt
+	purgeInvitesStmt              *sql.Stmt
 }
 
 func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
@@ -85,6 +89,9 @@ func NewPostgresInvitesTable(db *sql.DB) (tables.Invites, error) {
 		return nil, err
 	}
 	if s.selectMaxInviteIDStmt, err = db.Prepare(selectMaxInviteIDSQL); err != nil {
+		return nil, err
+	}
+	if s.purgeInvitesStmt, err = db.Prepare(purgeInvitesSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -172,4 +179,11 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 		id = nullableID.Int64
 	}
 	return
+}
+
+func (s *inviteEventsStatements) PurgeInvites(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeInvitesStmt).ExecContext(ctx, roomID)
+	return err
 }

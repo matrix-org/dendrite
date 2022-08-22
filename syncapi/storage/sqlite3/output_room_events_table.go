@@ -640,3 +640,9 @@ func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs [
 	}
 	return
 }
+
+func (s *outputRoomEventsStatements) PurgeEvents(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
+}
