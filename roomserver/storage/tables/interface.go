@@ -89,12 +89,14 @@ type StateSnapshot interface {
 	// which users are in a room faster than having to load the entire room state. In the
 	// case of SQLite, this will return tables.OptimisationNotSupportedError.
 	BulkSelectStateForHistoryVisibility(ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string) ([]types.EventNID, error)
+	PurgeStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type StateBlock interface {
 	BulkInsertStateData(ctx context.Context, txn *sql.Tx, entries types.StateEntries) (types.StateBlockNID, error)
 	BulkSelectStateBlockEntries(ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs) ([][]types.EventNID, error)
 	//BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
+	PurgeStateBlocks(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type RoomAliases interface {
@@ -103,6 +105,7 @@ type RoomAliases interface {
 	SelectAliasesFromRoomID(ctx context.Context, txn *sql.Tx, roomID string) ([]string, error)
 	SelectCreatorIDFromAlias(ctx context.Context, txn *sql.Tx, alias string) (creatorID string, err error)
 	DeleteRoomAlias(ctx context.Context, txn *sql.Tx, alias string) (err error)
+	PurgeRoomAliases(ctx context.Context, txn *sql.Tx, roomID string) error
 }
 
 type PreviousEvents interface {
@@ -117,6 +120,7 @@ type Invites interface {
 	UpdateInviteRetired(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) ([]string, error)
 	// SelectInviteActiveForUserInRoom returns a list of sender state key NIDs and invite event IDs matching those nids.
 	SelectInviteActiveForUserInRoom(ctx context.Context, txn *sql.Tx, targetUserNID types.EventStateKeyNID, roomNID types.RoomNID) ([]types.EventStateKeyNID, []string, error)
+	PurgeInvites(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type MembershipState int64
@@ -143,12 +147,14 @@ type Membership interface {
 	SelectLocalServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) (bool, error)
 	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
 	DeleteMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) error
+	PurgeMemberships(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type Published interface {
 	UpsertRoomPublished(ctx context.Context, txn *sql.Tx, roomID string, published bool) (err error)
 	SelectPublishedFromRoomID(ctx context.Context, txn *sql.Tx, roomID string) (published bool, err error)
 	SelectAllPublishedRooms(ctx context.Context, txn *sql.Tx, published bool) ([]string, error)
+	PurgePublished(ctx context.Context, txn *sql.Tx, roomID string) error
 }
 
 type RedactionInfo struct {

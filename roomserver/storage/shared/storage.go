@@ -1352,6 +1352,43 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 	})
 }
 
+// PurgeRoom removes all information about a given room from the roomserver.
+// For large rooms this operation may take a considerable amount of time.
+func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+		if err != nil {
+			return fmt.Errorf("failed to find room NID: %w", err)
+		}
+		if err := d.StateBlockTable.PurgeStateBlocks(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge state blocks: %w", err)
+		}
+		if err := d.StateSnapshotTable.PurgeStateSnapshots(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge state blocks: %w", err)
+		}
+		if err := d.InvitesTable.PurgeInvites(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge invites: %w", err)
+		}
+		if err := d.MembershipTable.PurgeMemberships(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge memberships: %w", err)
+		}
+		if err := d.RoomAliasesTable.PurgeRoomAliases(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge memberships: %w", err)
+		}
+		if err := d.PublishedTable.PurgePublished(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge memberships: %w", err)
+		}
+
+		// List:
+		// * events table
+		//   * previous events table
+		//   * event JSONs table
+		//   * redactions table
+
+		return nil
+	})
+}
+
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops
 // it should live in this package!
 
