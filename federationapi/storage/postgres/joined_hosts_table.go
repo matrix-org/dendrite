@@ -18,7 +18,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -222,5 +221,6 @@ func joinedHostsFromStmt(
 func (s *joinedHostsStatements) PurgeJoinedHosts(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	return fmt.Errorf("not implemented on SQLite")
+	_, err := sqlutil.TxStmt(txn, s.purgeJoinedHostsStmt).ExecContext(ctx, roomID)
+	return err
 }
