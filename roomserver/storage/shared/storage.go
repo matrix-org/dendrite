@@ -1373,18 +1373,23 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 			return fmt.Errorf("failed to purge memberships: %w", err)
 		}
 		if err := d.RoomAliasesTable.PurgeRoomAliases(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("failed to purge memberships: %w", err)
+			return fmt.Errorf("failed to purge room aliases: %w", err)
 		}
 		if err := d.PublishedTable.PurgePublished(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("failed to purge memberships: %w", err)
+			return fmt.Errorf("failed to purge published: %w", err)
 		}
-
-		// List:
-		// * events table
-		//   * previous events table
-		//   * event JSONs table
-		//   * redactions table
-
+		if err := d.PrevEventsTable.PurgePreviousEvents(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge previous events: %w", err)
+		}
+		if err := d.EventJSONTable.PurgeEventJSONs(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge event JSONs: %w", err)
+		}
+		if err := d.RedactionsTable.PurgeRedactions(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge redactions: %w", err)
+		}
+		if err := d.EventsTable.PurgeEvents(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge events: %w", err)
+		}
 		return nil
 	})
 }

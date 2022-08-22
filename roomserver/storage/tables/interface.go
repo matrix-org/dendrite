@@ -22,6 +22,7 @@ type EventJSON interface {
 	// Insert the event JSON. On conflict, replace the event JSON with the new value (for redactions).
 	InsertEventJSON(ctx context.Context, tx *sql.Tx, eventNID types.EventNID, eventJSON []byte) error
 	BulkSelectEventJSON(ctx context.Context, tx *sql.Tx, eventNIDs []types.EventNID) ([]EventJSONPair, error)
+	PurgeEventJSONs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type EventTypes interface {
@@ -67,6 +68,7 @@ type Events interface {
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
 	SelectRoomNIDsForEventNIDs(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
 	SelectEventRejected(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string) (rejected bool, err error)
+	PurgeEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type Rooms interface {
@@ -113,6 +115,7 @@ type PreviousEvents interface {
 	// Check if the event reference exists
 	// Returns sql.ErrNoRows if the event reference doesn't exist.
 	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
+	PurgePreviousEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type Invites interface {
@@ -175,6 +178,7 @@ type Redactions interface {
 	// Mark this redaction event as having been validated. This means we have both sides of the redaction and have
 	// successfully redacted the event JSON.
 	MarkRedactionValidated(ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool) error
+	PurgeRedactions(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.
