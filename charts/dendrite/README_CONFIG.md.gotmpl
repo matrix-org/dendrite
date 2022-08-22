@@ -1,0 +1,17 @@
+{{- define "custom.custom.configuration.header" -}}
+## Custom configuration
+{{- end -}}
+
+{{- define "custom.custom.configuration" -}}
+{{ template "custom.custom.configuration.header" . }}
+
+### Polylith Ingress
+
+Due to the complexity of setting up ingress for each individual component it
+is left up to the individual to add the necessary ingress fields to polylith deployments.
+
+For more information see:
+- https://github.com/matrix-org/dendrite/blob/master/docs/INSTALL.md#nginx-or-other-reverse-proxy
+- and https://github.com/matrix-org/dendrite/blob/master/docs/nginx/polylith-sample.conf
+
+{{- end -}}

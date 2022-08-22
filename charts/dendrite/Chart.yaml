@@ -1,0 +1,81 @@
+---
+apiVersion: v2
+appVersion: v0.9.4
+description: Dendrite Matrix Homeserver
+name: dendrite
+version: 7.1.2
+kubeVersion: ">=1.19.0-0"
+keywords:
+  - dendrite
+  - matrix
+  - homeserver
+  - monolith
+  - federation
+  - polylith
+home: https://github.com/samipsolutions/helm-charts/tree/master/charts/stable/dendrite
+maintainers:
+  - name: Skyler Mäntysaari
+    url: https://github.com/samip5
+sources:
+  - https://github.com/matrix-org/dendrite
+  - https://github.com/matrix-org/dendrite/tree/master/build/docker
+dependencies:
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+  - name: nats
+    version: 0.17.5
+    repository: https://nats-io.github.io/k8s/helm/charts/
+    condition: nats.enabled
+  # Client API
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: clientapi
+    condition: dendrite.polylithEnabled
+  # Media API
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: mediaapi
+    condition: dendrite.polylithEnabled
+  # Sync API
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: syncapi
+    condition: dendrite.polylithEnabled
+  # Room Server
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: roomserver
+    condition: dendrite.polylithEnabled
+  # Federation API
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: federationapi
+    condition: dendrite.polylithEnabled
+  # Key Server
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: keyserver
+    condition: dendrite.polylithEnabled
+  # User API
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: userapi
+    condition: dendrite.polylithEnabled
+  # App Service API
+  - name: common
+    repository: https://bjw-s.github.io/helm-charts/
+    version: 0.1.0
+    alias: appserviceapi
+    condition: dendrite.polylithEnabled
+annotations:
+  artifacthub.io/changes: |-
+    - kind: changed
+      description: Upgrade nats chart dep.

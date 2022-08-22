@@ -1,0 +1,57 @@
+{{- if .Values.dendrite.polylith_ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  {{- if .Values.dendrite.polylith_ingress.annotations }}
+  annotations: {{ toYaml .Values.dendrite.polylith_ingress.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.dendrite.tls_secret.enabled }}
+  tls:
+  - hosts:
+      - {{ .Values.dendrite.polylith_ingress.host | quote }}
+    secretName: {{ .Values.dendrite.tls_secret.existingSecret }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.dendrite.polylith_ingress.host | quote }}
+      http:
+        paths:
+        {{- range .Values.dendrite.polylith_ingress.syncapi_paths }}
+        - path: {{ . | quote }}
+          pathType: Exact
+          backend:
+            service:
+              name: {{ include "common.names.fullname" (index $.Subcharts  "syncapi") }}
+              port:
+                number: {{ $.Values.syncapi.service.main.ports.external.port }}
+        {{- end }}
+        - path: /_matrix/client
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ include "common.names.fullname" (index $.Subcharts  "clientapi") }}
+              port:
+                number: {{ .Values.clientapi.service.main.ports.external.port }}
+        - path: /_matrix/federation
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ include "common.names.fullname" (index $.Subcharts  "federationapi") }}
+              port:
+                number: {{ .Values.federationapi.service.main.ports.external.port }}
+        - path: /_matrix/key
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ include "common.names.fullname" (index $.Subcharts  "federationapi") }}
+              port:
+                number: {{ .Values.federationapi.service.main.ports.external.port }}
+        - path: /_matrix/media
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ include "common.names.fullname" (index $.Subcharts  "mediaapi") }}
+              port:
+                number: {{ .Values.mediaapi.service.main.ports.external.port }}
+{{- end -}}

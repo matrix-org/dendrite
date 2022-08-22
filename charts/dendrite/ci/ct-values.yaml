@@ -1,0 +1,10 @@
+---
+dendrite:
+  matrix_key_secret:
+    create: true
+    keyBody: |
+      -----BEGIN MATRIX PRIVATE KEY-----
+      Key-ID: ed25519:P8gZqV
+
+      qVzy2Cwokt15RjGy8OzFSq6z0JFmI6QX/1Zw1VP73uU=
+      -----END MATRIX PRIVATE KEY-----

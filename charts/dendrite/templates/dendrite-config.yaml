@@ -1,0 +1,208 @@
+{{- $componentSpecificDatabaseConfig := or .Values.dendrite.polylithEnabled -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "common.names.fullname" . }}-config
+type: Opaque
+stringData:
+  dendrite.yaml: |
+    version: 2
+    global:
+      server_name: {{ required "A server_name must be provided." .Values.dendrite.global.server_name | quote }}
+      private_key: matrix_key.pem
+      key_validity_period: {{ default "168h0m0s" .Values.dendrite.global.key_validity_period | quote }}
+      cache:
+        max_size_estimated: {{ default "1gb" .Values.dendrite.global.cache.max_size_estimated | quote }}
+        max_age: {{ default "1h" .Values.dendrite.global.cache.max_age | quote }}
+      well_known_server_name: {{ default "" .Values.dendrite.global.well_known_server_name | quote }}
+      well_known_client_name: {{ default "" .Values.dendrite.global.well_known_client_name | quote }}
+      trusted_third_party_id_servers:
+      {{- toYaml .Values.dendrite.global.trusted_third_party_id_servers | nindent 8 }}
+      disable_federation: {{ default false .Values.dendrite.global.disable_federation }}
+      presence:
+        enable_inbound: {{ default false .Values.dendrite.global.presence.enable_inbound}}
+        enable_outbound: {{ default false .Values.dendrite.global.presence.enable_outbound }}
+      report_stats:
+        enabled: {{ default false .Values.dendrite.report_stats.enabled }}
+        endpoint: {{ default "https://matrix.org/report-usage-stats/push" .Values.dendrite.report_stats.endpoint }}
+      server_notices:
+        enabled: {{ default false .Values.dendrite.global.server_notices.enabled }}
+        local_part: {{ default "_server" .Values.dendrite.global.server_notices.local_part | quote }}
+        display_name: {{ default "Server alerts" .Values.dendrite.global.server_notices.display_name | quote }}
+        avatar_url: {{ default "" .Values.dendrite.global.server_notices.avatar_url | quote }}
+        room_name: {{ default "Server Alerts" .Values.dendrite.global.server_notices.room_name | quote }}
+      jetstream:
+        addresses:
+          {{- if .Values.nats.enabled }}
+          - {{ template "common.names.fullname" $.Subcharts.nats }}:4222
+          {{- else }}
+          []
+          {{- end }}
+        in_memory: {{ not .Values.persistence.jetstream.enabled }}
+        storage_path: {{ .Values.persistence.jetstream.mountPath }}
+        topic_prefix: "Dendrite"
+      metrics:
+        enabled: {{ default false .Values.dendrite.global.metrics.enabled }}
+        basic_auth:
+          username: {{ default "metrics" .Values.dendrite.global.metrics.basic_auth.username | quote }}
+          password: {{ default "metrics" .Values.dendrite.global.metrics.basic_auth.password | quote }}
+      dns_cache:
+        enabled: {{ default false .Values.dendrite.global.dns_cache.enabled }}
+        cache_size: {{ default 256 .Values.dendrite.global.dns_cache.cache_size }}
+        cache_lifetime: {{ default "5m" .Values.dendrite.global.dns_cache.cache_lifetime }}
+      {{- if not $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.database.connection_string }}
+        max_open_conns: {{ default 100 .Values.database.max_open_conns }}
+        max_idle_conns: {{ default 5 .Values.database.max_idle_conns }}
+        conn_max_lifetime: {{default -1 .Values.database.conn_max_lifetime }}
+      {{- end }}
+    app_service_api:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:{{ .Values.appserviceapi.service.main.ports.internal.port }}
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "appserviceapi") }}:{{ .Values.appserviceapi.service.main.ports.internal.port }}
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.appserviceapi.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.appserviceapi.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.appserviceapi.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.appserviceapi.database.conn_max_lifetime }}
+      {{- end }}
+      config_files: {{- toYaml .Values.appserviceapi.config.config_files | nindent 8 }}
+    client_api:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:{{ .Values.clientapi.service.main.ports.internal.port }}
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "clientapi") }}:{{ .Values.clientapi.service.main.ports.internal.port }}
+      external_api:
+        listen: http://0.0.0.0:{{ .Values.clientapi.service.main.ports.external.port }}
+      {{- end }}
+      registration_disabled: {{ .Values.clientapi.config.registration_disabled }}
+      registration_shared_secret: {{ default "" .Values.clientapi.config.registration_shared_secret | quote }}
+      enable_registration_captcha: {{ default false .Values.clientapi.config.captcha.enabled }}
+      recaptcha_public_key: {{ default "" .Values.clientapi.config.captcha.recaptcha_public_key | quote }}
+      recaptcha_private_key: {{ default "" .Values.clientapi.config.captcha.recaptcha_private_key | quote }}
+      recaptcha_bypass_secret: {{ default "" .Values.clientapi.config.captcha.recaptcha_bypass_secret | quote }}
+      recaptcha_siteverify_api: {{ default "" .Values.clientapi.config.captcha.recaptcha_siteverify_api | quote }}
+      turn: {{- toYaml .Values.clientapi.config.turn | nindent 8 }}
+      rate_limiting:
+        enabled: {{ default true .Values.clientapi.config.rate_limiting.enabled }}
+        threshold: {{ default 5 .Values.clientapi.config.rate_limiting.threshold }}
+        cooloff_ms: {{ default 500 .Values.clientapi.config.rate_limiting.cooloff_ms }}
+        exempt_user_ids: {{ .Values.clientapi.config.exempt_user_ids }}
+    federation_api:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:7772
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "federationapi") }}:7772
+      external_api:
+        listen: http://0.0.0.0:8072
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.federationapi.database.conn_max_lifetime }}
+      federation_certificates: {{- toYaml .Values.federationapi.config.federation_certificates | nindent 8 }}
+      proxy_outbound:
+        enabled: {{ default false .Values.federationapi.config.proxy_outbound.enabled }}
+        protocol: {{ default "http" .Values.federationapi.config.proxy_outbound.protocol | quote }}
+        host: {{ default "localhost" .Values.federationapi.config.proxy_outbound.host | quote }}
+        port: {{ default 8080 .Values.federationapi.config.proxy_outbound.port }}
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.federationapi.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.federationapi.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.federationapi.database.max_idle_conns }}
+      {{- end }}
+      send_max_retries: {{ default 16 .Values.federationapi.config.send_max_retries }}
+      disable_tls_validation: {{ default false .Values.federationapi.config.disable_tls_validation }}
+      key_perspectives: {{- toYaml .Values.federationapi.config.key_perspectives | nindent 8 }}
+      prefer_direct_fetch: {{ default false .Values.federationapi.config.prefer_direct_fetch }}
+    key_server:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:7779
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "keyserver") }}:7779
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.keyserver.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.keyserver.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.keyserver.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.keyserver.database.conn_max_lifetime }}
+      {{- end }}
+    media_api:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:7774
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "mediaapi") }}:7774
+      external_api:
+        listen: http://0.0.0.0:8074
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.mediaapi.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.mediaapi.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.mediaapi.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.mediaapi.database.conn_max_lifetime }}
+      {{- end }}
+      base_path: {{ default "/var/dendrite/media" .Values.mediaapi.config.base_path | quote }}
+      max_file_size_bytes: {{ int ( default 10485760 .Values.mediaapi.config.max_file_size_bytes ) }}
+      dynamic_thumbnails: {{ default false .Values.mediaapi.config.dynamic_thumbnails }}
+      max_thumbnail_generators: {{ default 10 .Values.mediaapi.config.max_thumbnail_generators }}
+      thumbnail_sizes: {{- toYaml .Values.mediaapi.config.thumbnail_sizes | nindent 8 }}
+    mscs:
+      mscs: {{ .Values.dendrite.global.mscs | toYaml | nindent 8 }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.mscs.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.mscs.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.mscs.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.mscs.database.conn_max_lifetime }}
+      {{- end }}
+    room_server:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:7770
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "roomserver") }}:7770
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.roomserver.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.roomserver.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.roomserver.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.roomserver.database.conn_max_lifetime }}
+      {{- end }}
+    sync_api:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:7773
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "syncapi") }}:7773
+      external_api:
+          listen: http://0.0.0.0:8073
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      database:
+        connection_string: {{ .Values.syncapi.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.syncapi.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.syncapi.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.syncapi.database.conn_max_lifetime }}
+      {{- end }}
+    user_api:
+      {{- if .Values.dendrite.polylithEnabled }}
+      internal_api:
+        listen: http://0.0.0.0:7781
+        connect: http://{{ include "common.names.fullname" (index $.Subcharts "userapi") }}:7781
+      {{- end }}
+      {{- if $componentSpecificDatabaseConfig }}
+      account_database:
+        connection_string: {{ .Values.userapi.database.connection_string }}
+        max_open_conns: {{ default .Values.dendrite.database.max_open_conns .Values.userapi.database.max_open_conns }}
+        max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.userapi.database.max_idle_conns }}
+        conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.userapi.database.conn_max_lifetime }}
+      {{- end }}
+      bcrypt_cost: {{ default 10 .Values.userapi.config.bcrypt_cost }}
+    tracing:
+      enabled: {{ .Values.dendrite.tracing.enabled }}
+      jaeger: {{- toYaml .Values.dendrite.tracing.jaeger | nindent 8 }}
+    logging: {{- toYaml .Values.dendrite.logging | nindent 6 }}

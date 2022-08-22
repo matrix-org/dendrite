@@ -1,0 +1,599 @@
+#
+# IMPORTANT NOTE
+#
+# This chart inherits from our common library chart. You can check the default
+# values/options here:
+# https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml
+#
+---
+image:
+  # -- image repository
+  repository: ghcr.io/matrix-org/dendrite-monolith
+  # -- image tag
+  # @default -- chart.appVersion
+  tag:
+  # -- image pull policy
+  pullPolicy: IfNotPresent
+
+# -- If added dendrite will start a HTTP and HTTPS listener
+# args:
+#   - "--tls-cert=server.crt"
+#   - "--tls-key=server.key"
+
+# -- Configures service settings for the chart.
+# @default -- See values.yaml
+service:
+  main:
+    ports:
+      # -- Configures the default HTTP listener for dendrite
+      # @default -- See values.yaml
+      http:
+        port: 8008
+      # -- Configures the HTTPS listener for dendrite
+      # @default -- See values.yaml
+      https:
+        enabled: true
+        port: 8448
+        protocol: HTTPS
+
+ingress:
+  # -- (Monolith Only) Enable and configure ingress settings for the chart under
+  # this key.
+  # @default -- See values.yaml
+  main:
+    enabled: false
+
+# -- Configure persistence settings for the chart under this key.
+# @default -- See values.yaml
+persistence:
+  media:
+    enabled: false
+    mountPath: &mediaPath /var/dendrite/media
+    accessMode: ReadWriteOnce
+    size: 5Gi
+  # -- Configure Jetsream persistence. This is highly recommended in production.
+  # @default -- See values.yaml
+  jetstream:
+    enabled: false
+    mountPath: /var/dendrite/jetstream
+    accessMode: ReadWriteOnce
+    size: 1Gi
+
+# Configure global database settings
+# @default -- see values.yaml
+database:
+  connection_string: file:dendrite?sslmode=disable
+  max_open_conns: 100
+  max_idle_conns: 2
+  conn_max_lifetime: -1
+
+# -- Configure the key server.
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- See values.yaml
+keyserver:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7779
+  args: "keyserver"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+
+# -- Configure the app service api.
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- See values.yaml
+appserviceapi:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7777
+  ingress:
+
+  args: "appservice"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+  config:
+    config_files: []
+
+# -- Configuration for the client api component.
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- See values.yaml
+clientapi:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7771
+        external:
+          enabled: true
+          port: 8071
+  args: "clientapi"
+  config:
+    # -- Enable or disable registration for this homeserver.
+    registration_disabled: true
+    # -- Shared secret that allows registration, despite registration_disabled.
+    registration_shared_secret: ""
+    # -- Configure captcha for registration
+    # @default -- See values.yaml
+    captcha:
+      enabled: false
+      recaptcha_public_key: ""
+      recaptcha_private_key: ""
+      recaptcha_bypass_secret: ""
+      recaptcha_siteverify_api: ""
+    # -- Configure TURN
+    # @default -- See values.yaml
+    turn:
+      turn_user_lifetime: ""
+      turn_uris: []
+      turn_shared_secret: ""
+      turn_username: ""
+      turn_password: ""
+    # -- Configure rate limiting.
+    # @default -- values.yaml
+    rate_limiting:
+      enabled: true
+      threshold: 5
+      cooloff_ms: 500
+      exempt_user_ids: []
+
+# -- Configure the Federation API
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- values.yaml
+federationapi:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7772
+        external:
+          enabled: true
+          port: 8072
+  args: "federationapi"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+  config:
+    federation-certificates: []
+    send-max_retires: 16
+    disable_tls_validation: false
+    proxy_outbound:
+      enabled: false
+      protocol: http
+      host: localhost
+      port: 8080
+    key_perspectives:
+      - server_name: matrix.org
+        keys:
+          - key_id: ed25519:auto
+            public_key: Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw
+          - key_id: ed25519:a_RXGa
+            public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
+    prefer_direct_fetch: false
+
+# -- Configure the User API
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- values.yaml
+userapi:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7781
+  args: "userapi"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+  config:
+    # -- bcrypt cost (2^[cost] = rounds)
+    # @default -- 10
+    bcrypt_cost: 10
+
+# -- Configure the Sync API
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- values.yaml
+syncapi:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7773
+        external:
+          enabled: true
+          port: 8073
+  args: "syncapi"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+
+# -- Configure the Room Server
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- values.yaml
+roomserver:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7770
+  args: "roomserver"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+
+# -- Configure the Media API
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- values.yaml
+mediaapi:
+  image:
+    # -- image repository
+    repository: matrixdotorg/dendrite-polylith
+    # -- image tag
+    # @default -- chart.appVersion
+    tag:
+    # -- image pull policy
+    pullPolicy: IfNotPresent
+  service:
+    main:
+      ports:
+        http:
+          enabled: false
+        internal:
+          enabled: true
+          port: 7774
+        external:
+          enabled: true
+          port: 8074
+  args: "mediaapi"
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+  config:
+    base_path: *mediaPath
+    max_file_size_bytes: 10485760
+    dynamic_thumbnails: false
+    max_thumbnail_generators: 10
+    thumbnail_sizes:
+      - width: 32
+        height: 32
+        method: crop
+      - width: 96
+        height: 96
+        method: crop
+      - width: 640
+        height: 480
+        method: scale
+
+# -- Configuration for experimental MSCs
+# For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- values.yaml
+mscs:
+  # -- Override general dendrite.database parameters.
+  # @default -- See values.yaml
+  database:
+    # -- Custom connection string
+    # @default -- file or derived from included postgresql deployment
+    connection_string: null
+    # -- Maximum open connections
+    # @default -- dendrite.database.max_open_conns
+    max_open_conns: null
+    # -- Maximum dile connections
+    # @default -- dendrite.database.max_idle_conns
+    max_idle_conns: null
+    # -- Maximum connection lifetime
+    # @default -- dendrite.database.conn_max_lifetime
+    conn_max_lifetime: null
+
+# -- Configuration for Dendrite.
+# For more information see [the sample
+# denrite-config.yaml](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
+# @default -- See values.yaml
+dendrite:
+  # -- Enable polylith deployment
+  polylithEnabled: false
+  # -- Usage statistics reporting configuration
+  report_stats:
+    # -- Enable or disable usage reporting
+    # @default -- false
+    enabled: false
+    # -- Push endpoint for usage statistics
+    endpoint: ""
+  # -- If enabled, use an existing secrets for the TLS certificate and key.
+  # Otherwise, to enable TLS a `server.crt` and `server.key` must be mounted at
+  # `/etc/dendrite`.
+  # @default -- See values.yaml
+  tls_secret:
+    enabled: false
+    existingSecret: ""
+    crtPath: tls.crt
+    keyPath: tls.key
+
+  matrix_key_secret:
+    # -- Create matrix_key secret using the keyBody below.
+    create: false
+    # -- New Key Body
+    keyBody: ""
+    # -- Use an existing secret
+    existingSecret: ""
+    # -- Field in the secret to get the key from
+    secretPath: matrix_key.pem
+
+  # -- Enable and configure polylith ingress as per
+  # https://github.com/matrix-org/dendrite/blob/main/docs/nginx/polylith-sample.conf
+  # @default -- See values.yaml
+  polylith_ingress:
+    enabled: false
+    host: ""
+    annotations: {}
+    # -- Sync API Paths are a little tricky since they require regular expressions. Therefore
+    # the paths will depend on the ingress controller used. See values.yaml for nginx and traefik.
+    # @default -- See values.yaml
+    syncapi_paths: []
+      # For Traefik uncomment these lines
+      # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/messages
+      # - /_matrix/client/{version:.*?}/keys/changes
+      # - /_matrix/client/{version:.*?}/user/{userid:.*?}/filter/{filterid:.*?}
+      # - /_matrix/client/{version:.*?}/user/{userid:.*?}/filter
+      # - /_matrix/client/{version:.*?}/sync
+      #
+      # For nginx uncomment these lines and add the annotations here:
+      # https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#use-regex
+      # - /_matrix/client/.*?/(sync|user/.*?/filter/?.*|keys/changes|rooms/.*?/messages)$
+
+  # -- Configure the global settings for dendrite.
+  # @default -- See values.yaml
+  global:
+    # -- (required) Configure the server name for the dendrite instance.
+    server_name: localhost
+    # -- Configure the key_validity period
+    key_validity_period: 168h0m0s
+    # -- Congigure the in-memory caches
+    cache:
+      # -- Configure the maximum estimated cache size (not a hard limit)
+      max_size_estimated: "1gb"
+      # -- The maximum amount of time that a cache entry can live for in memory
+      max_age: "1h"
+    # -- Configure the well-known server name and optional port
+    well_known_server_name: ""
+    # -- Configure the well-known client name and optional port
+    well_known_client_name: ""
+    # -- Configure the list of domains the server will trust as identity servers
+    trusted_third_party_id_servers:
+      - matrix.org
+      - vector.im
+    # -- Disables federation
+    disable_federation: false
+    # -- Configure handling of presence events
+    presence:
+      # -- Whether inbound presence events are allowed, e.g. receiving presence events from other servers
+      enable_inbound: false
+      # -- Whether outbound presence events are allowed, e.g. sending presence events to other servers
+      enable_outbound: false
+
+    # -- Server notices allows server admins to send messages to all users.
+    server_notices:
+      enabled: false
+      # -- The server localpart to be used when sending notices, ensure this is not yet taken
+      local_part: "_server"
+      # -- The displayname to be used when sending notices
+      display_name: "Server alerts"
+      # -- The mxid of the avatar to use
+      avatar_url: ""
+      # -- The roomname to be used when creating messages
+      room_name: "Server Alerts"
+    # -- Configure prometheus metrics collection for dendrite.
+    # @default -- See values.yaml
+    metrics:
+      # -- If enabled, metrics collection will be enabled
+      # @default -- See values.yaml
+      enabled: false
+      basic_auth:
+        username: metrics
+        password: metrics
+    # -- Configure DNS cache.
+    # @default -- See values.yaml
+    dns_cache:
+      # -- If enabled, dns cache will be enabled.
+      # @default -- See values.yaml
+      enabled: false
+      cache_size: 256
+      cache_lifetime: "5m"
+    # -- Configure experimental MSC's
+    mscs: []
+
+  # -- Configure opentracing.
+  # @default -- See values.yaml
+  tracing:
+    enabled: false
+    jaeger:
+      serviceName: ""
+      disabled: false
+      rpc_metrics: false
+      tags: []
+      sampler: null
+      reporter: null
+      headers: null
+      baggage_restrictions: null
+      throttler: null
+
+  # -- Configure logging.
+  # @default -- See values.yaml
+  logging:
+    - type: file
+      level: info
+      params:
+        path: /var/log/dendrite
+
+nats:
+  # -- Enable and configure NATS for dendrite. Can be disabled for monolith
+  # deployments - an internal NATS server will be used in its place.
+  # @default -- See value.yaml
+  enabled: false
+  nats:
+    image: nats:2.7.1-alpine
+    jetstream:
+      enabled: true
