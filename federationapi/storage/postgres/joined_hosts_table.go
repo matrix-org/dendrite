@@ -18,6 +18,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -66,6 +67,9 @@ const selectAllJoinedHostsSQL = "" +
 const selectJoinedHostsForRoomsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id = ANY($1)"
 
+const purgeJoinedHostsSQL = "" +
+	"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
+
 type joinedHostsStatements struct {
 	db                            *sql.DB
 	insertJoinedHostsStmt         *sql.Stmt
@@ -74,6 +78,7 @@ type joinedHostsStatements struct {
 	selectJoinedHostsStmt         *sql.Stmt
 	selectAllJoinedHostsStmt      *sql.Stmt
 	selectJoinedHostsForRoomsStmt *sql.Stmt
+	purgeJoinedHostsStmt          *sql.Stmt
 }
 
 func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
@@ -100,6 +105,9 @@ func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err erro
 		return
 	}
 	if s.selectJoinedHostsForRoomsStmt, err = s.db.Prepare(selectJoinedHostsForRoomsSQL); err != nil {
+		return
+	}
+	if s.purgeJoinedHostsStmt, err = s.db.Prepare(purgeJoinedHostsSQL); err != nil {
 		return
 	}
 	return
@@ -209,4 +217,10 @@ func joinedHostsFromStmt(
 	}
 
 	return result, rows.Err()
+}
+
+func (s *joinedHostsStatements) PurgeJoinedHosts(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/queue"
@@ -107,6 +108,14 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 				log.ErrorKey: err,
 			}).Panicf("roomserver output log: remote peek event failure")
 			return false
+		}
+
+	case api.OutputTypePurgeRoom:
+		log.WithField("room_id", output.PurgeRoom.RoomID).Warn("Purging room from federation API")
+		if err := s.db.PurgeRoom(ctx, output.PurgeRoom.RoomID); err != nil {
+			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from federation API")
+		} else {
+			logrus.WithField("room_id", output.PurgeRoom.RoomID).Warn("Room purged from federation API")
 		}
 
 	default:

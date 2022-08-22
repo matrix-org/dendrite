@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -216,4 +217,10 @@ func joinedHostsFromStmt(
 	}
 
 	return result, nil
+}
+
+func (s *joinedHostsStatements) PurgeJoinedHosts(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }
