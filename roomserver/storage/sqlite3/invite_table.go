@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -157,4 +158,10 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 		eventIDs = append(eventIDs, eventID)
 	}
 	return result, eventIDs, nil
+}
+
+func (s *inviteStatements) PurgeInvites(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

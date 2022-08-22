@@ -141,3 +141,9 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	}
 	return results, err
 }
+
+func (s *stateBlockStatements) PurgeStateBlocks(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
+}

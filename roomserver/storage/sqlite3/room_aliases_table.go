@@ -18,6 +18,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -142,4 +143,10 @@ func (s *roomAliasesStatements) DeleteRoomAlias(
 	stmt := sqlutil.TxStmt(txn, s.deleteRoomAliasStmt)
 	_, err := stmt.ExecContext(ctx, alias)
 	return err
+}
+
+func (s *roomAliasesStatements) PurgeRoomAliases(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
 }

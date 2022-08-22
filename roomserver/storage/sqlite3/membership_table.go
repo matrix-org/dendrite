@@ -407,3 +407,9 @@ func (s *membershipStatements) DeleteMembership(
 	)
 	return err
 }
+
+func (s *membershipStatements) PurgeMemberships(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) error {
+	return fmt.Errorf("not implemented on SQLite")
+}
