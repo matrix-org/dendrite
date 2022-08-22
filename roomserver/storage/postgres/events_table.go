@@ -147,9 +147,6 @@ const selectRoomNIDsForEventNIDsSQL = "" +
 const selectEventRejectedSQL = "" +
 	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
 
-const purgeEventsSQL = "" +
-	"DELETE FROM roomserver_events WHERE room_nid = $1"
-
 type eventStatements struct {
 	insertEventStmt                               *sql.Stmt
 	selectEventStmt                               *sql.Stmt
@@ -169,7 +166,6 @@ type eventStatements struct {
 	selectMaxEventDepthStmt                       *sql.Stmt
 	selectRoomNIDsForEventNIDsStmt                *sql.Stmt
 	selectEventRejectedStmt                       *sql.Stmt
-	purgeEventsStmt                               *sql.Stmt
 }
 
 func CreateEventsTable(db *sql.DB) error {
@@ -199,7 +195,6 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectMaxEventDepthStmt, selectMaxEventDepthSQL},
 		{&s.selectRoomNIDsForEventNIDsStmt, selectRoomNIDsForEventNIDsSQL},
 		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
-		{&s.purgeEventsStmt, purgeEventsSQL},
 	}.Prepare(db)
 }
 
@@ -575,11 +570,4 @@ func (s *eventStatements) SelectEventRejected(
 	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
 	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
-}
-
-func (s *eventStatements) PurgeEvents(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomNID)
-	return err
 }

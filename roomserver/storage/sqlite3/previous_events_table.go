@@ -129,9 +129,3 @@ func (s *previousEventStatements) SelectPreviousEventExists(
 	stmt := sqlutil.TxStmt(txn, s.selectPreviousEventExistsStmt)
 	return stmt.QueryRowContext(ctx, eventID, eventReferenceSHA256).Scan(&ok)
 }
-
-func (s *previousEventStatements) PurgePreviousEvents(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	return fmt.Errorf("not implemented on SQLite")
-}

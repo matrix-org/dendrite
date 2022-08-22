@@ -72,11 +72,6 @@ const bulkSelectStateBlockNIDsSQL = "" +
 	"SELECT state_snapshot_nid, state_block_nids FROM roomserver_state_snapshots" +
 	" WHERE state_snapshot_nid = ANY($1) ORDER BY state_snapshot_nid ASC"
 
-// Look up state snapshot NIDs for the given room.
-const purgeStateSnapshotEntriesSQL = `
-	DELETE FROM roomserver_state_snapshots WHERE room_nid = $1
-`
-
 // Looks up both the history visibility event and relevant membership events from
 // a given domain name from a given state snapshot. This is used to optimise the
 // helpers.CheckServerAllowedToSeeEvent function.
@@ -106,7 +101,6 @@ type stateSnapshotStatements struct {
 	insertStateStmt                         *sql.Stmt
 	bulkSelectStateBlockNIDsStmt            *sql.Stmt
 	bulkSelectStateForHistoryVisibilityStmt *sql.Stmt
-	purgeStateSnapshotEntriesStmt           *sql.Stmt
 }
 
 func CreateStateSnapshotTable(db *sql.DB) error {
@@ -121,7 +115,6 @@ func PrepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 		{&s.insertStateStmt, insertStateSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
 		{&s.bulkSelectStateForHistoryVisibilityStmt, bulkSelectStateForHistoryVisibilitySQL},
-		{&s.purgeStateSnapshotEntriesStmt, purgeStateSnapshotEntriesSQL},
 	}.Prepare(db)
 }
 
@@ -189,11 +182,4 @@ func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 		results = append(results, eventNID)
 	}
 	return results, rows.Err()
-}
-
-func (s *stateSnapshotStatements) PurgeStateSnapshots(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeStateSnapshotEntriesStmt).ExecContext(ctx, roomNID)
-	return err
 }

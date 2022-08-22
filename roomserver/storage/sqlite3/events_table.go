@@ -646,9 +646,3 @@ func (s *eventStatements) SelectEventRejected(
 	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
 	return
 }
-
-func (s *eventStatements) PurgeEvents(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	return fmt.Errorf("not implemented on SQLite")
-}

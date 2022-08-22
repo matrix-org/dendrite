@@ -309,9 +309,3 @@ func (s *roomStatements) BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, ro
 	}
 	return roomNIDs, nil
 }
-
-func (s *roomStatements) PurgeRoom(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	return fmt.Errorf("not implemented on SQLite")
-}

@@ -22,7 +22,6 @@ type EventJSON interface {
 	// Insert the event JSON. On conflict, replace the event JSON with the new value (for redactions).
 	InsertEventJSON(ctx context.Context, tx *sql.Tx, eventNID types.EventNID, eventJSON []byte) error
 	BulkSelectEventJSON(ctx context.Context, tx *sql.Tx, eventNIDs []types.EventNID) ([]EventJSONPair, error)
-	PurgeEventJSONs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type EventTypes interface {
@@ -68,7 +67,6 @@ type Events interface {
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
 	SelectRoomNIDsForEventNIDs(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
 	SelectEventRejected(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string) (rejected bool, err error)
-	PurgeEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type Rooms interface {
@@ -82,7 +80,6 @@ type Rooms interface {
 	SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error)
 	BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error)
 	BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error)
-	PurgeRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type StateSnapshot interface {
@@ -92,14 +89,12 @@ type StateSnapshot interface {
 	// which users are in a room faster than having to load the entire room state. In the
 	// case of SQLite, this will return tables.OptimisationNotSupportedError.
 	BulkSelectStateForHistoryVisibility(ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string) ([]types.EventNID, error)
-	PurgeStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type StateBlock interface {
 	BulkInsertStateData(ctx context.Context, txn *sql.Tx, entries types.StateEntries) (types.StateBlockNID, error)
 	BulkSelectStateBlockEntries(ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs) ([][]types.EventNID, error)
 	//BulkSelectFilteredStateBlockEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
-	PurgeStateBlocks(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type RoomAliases interface {
@@ -108,7 +103,6 @@ type RoomAliases interface {
 	SelectAliasesFromRoomID(ctx context.Context, txn *sql.Tx, roomID string) ([]string, error)
 	SelectCreatorIDFromAlias(ctx context.Context, txn *sql.Tx, alias string) (creatorID string, err error)
 	DeleteRoomAlias(ctx context.Context, txn *sql.Tx, alias string) (err error)
-	PurgeRoomAliases(ctx context.Context, txn *sql.Tx, roomID string) error
 }
 
 type PreviousEvents interface {
@@ -116,7 +110,6 @@ type PreviousEvents interface {
 	// Check if the event reference exists
 	// Returns sql.ErrNoRows if the event reference doesn't exist.
 	SelectPreviousEventExists(ctx context.Context, txn *sql.Tx, eventID string, eventReferenceSHA256 []byte) error
-	PurgePreviousEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type Invites interface {
@@ -124,7 +117,6 @@ type Invites interface {
 	UpdateInviteRetired(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) ([]string, error)
 	// SelectInviteActiveForUserInRoom returns a list of sender state key NIDs and invite event IDs matching those nids.
 	SelectInviteActiveForUserInRoom(ctx context.Context, txn *sql.Tx, targetUserNID types.EventStateKeyNID, roomNID types.RoomNID) ([]types.EventStateKeyNID, []string, error)
-	PurgeInvites(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type MembershipState int64
@@ -151,14 +143,12 @@ type Membership interface {
 	SelectLocalServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) (bool, error)
 	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
 	DeleteMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) error
-	PurgeMemberships(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type Published interface {
 	UpsertRoomPublished(ctx context.Context, txn *sql.Tx, roomID string, published bool) (err error)
 	SelectPublishedFromRoomID(ctx context.Context, txn *sql.Tx, roomID string) (published bool, err error)
 	SelectAllPublishedRooms(ctx context.Context, txn *sql.Tx, published bool) ([]string, error)
-	PurgePublished(ctx context.Context, txn *sql.Tx, roomID string) error
 }
 
 type RedactionInfo struct {
@@ -179,7 +169,20 @@ type Redactions interface {
 	// Mark this redaction event as having been validated. This means we have both sides of the redaction and have
 	// successfully redacted the event JSON.
 	MarkRedactionValidated(ctx context.Context, txn *sql.Tx, redactionEventID string, validated bool) error
+}
+
+type Purge interface {
+	PurgeEventJSONs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeStateBlocks(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgePreviousEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeInvites(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeMemberships(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgePublished(ctx context.Context, txn *sql.Tx, roomID string) error
 	PurgeRedactions(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
+	PurgeRoomAliases(ctx context.Context, txn *sql.Tx, roomID string) error
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

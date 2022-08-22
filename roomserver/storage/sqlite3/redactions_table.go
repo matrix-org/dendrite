@@ -17,11 +17,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
-	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 const redactionsSchema = `
@@ -122,10 +120,4 @@ func (s *redactionStatements) MarkRedactionValidated(
 	stmt := sqlutil.TxStmt(txn, s.markRedactionValidatedStmt)
 	_, err := stmt.ExecContext(ctx, validated, redactionEventID)
 	return err
-}
-
-func (s *redactionStatements) PurgeRedactions(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	return fmt.Errorf("not implemented on SQLite")
 }

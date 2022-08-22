@@ -43,14 +43,10 @@ const selectAllPublishedSQL = "" +
 const selectPublishedSQL = "" +
 	"SELECT published FROM roomserver_published WHERE room_id = $1"
 
-const purgePublishedSQL = "" +
-	"DELETE FROM roomserver_published WHERE room_id = $1"
-
 type publishedStatements struct {
 	upsertPublishedStmt    *sql.Stmt
 	selectAllPublishedStmt *sql.Stmt
 	selectPublishedStmt    *sql.Stmt
-	purgePublishedStmt     *sql.Stmt
 }
 
 func CreatePublishedTable(db *sql.DB) error {
@@ -65,7 +61,6 @@ func PreparePublishedTable(db *sql.DB) (tables.Published, error) {
 		{&s.upsertPublishedStmt, upsertPublishedSQL},
 		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
 		{&s.selectPublishedStmt, selectPublishedSQL},
-		{&s.purgePublishedStmt, purgePublishedSQL},
 	}.Prepare(db)
 }
 
@@ -108,11 +103,4 @@ func (s *publishedStatements) SelectAllPublishedRooms(
 		roomIDs = append(roomIDs, roomID)
 	}
 	return roomIDs, rows.Err()
-}
-
-func (s *publishedStatements) PurgePublished(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgePublishedStmt).ExecContext(ctx, roomID)
-	return err
 }

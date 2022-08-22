@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -106,10 +105,4 @@ func (s *publishedStatements) SelectAllPublishedRooms(
 		roomIDs = append(roomIDs, roomID)
 	}
 	return roomIDs, rows.Err()
-}
-
-func (s *publishedStatements) PurgePublished(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	return fmt.Errorf("not implemented on SQLite")
 }
