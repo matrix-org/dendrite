@@ -1,5 +1,18 @@
 # Changelog
 
+## Dendrite 0.9.4 (2022-08-19)
+
+### Fixes
+
+* A bug in the roomserver around handling rejected outliers has been fixed
+* Backfilled events will now use the correct history visibility where possible
+* The device list updater backoff has been fixed, which should reduce the number of outbound HTTP requests and `Failed to query device keys for some users` log entries for dead servers
+* The `/sync` endpoint will no longer incorrectly return room entries for retired invites which could cause some rooms to show up in the client "Historical" section
+* The `/createRoom` endpoint will now correctly populate `is_direct` in invite membership events, which may help clients to classify direct messages correctly
+* The `create-account` tool will now log an error if the shared secret is not set in the Dendrite config
+* A couple of minor bugs have been fixed in the membership lazy-loading
+* Queued EDUs in the federation API are now cached properly
+
 ## Dendrite 0.9.3 (2022-08-15)
 
 ### Important

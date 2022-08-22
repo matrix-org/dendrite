@@ -85,6 +85,10 @@ func main() {
 		logrus.Fatalf("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
 	}
 
+	if cfg.ClientAPI.RegistrationSharedSecret == "" {
+		logrus.Fatalln("Shared secret registration is not enabled, enable it by setting a shared secret in the config: 'client_api.registration_shared_secret'")
+	}
+
 	if *username == "" {
 		flag.Usage()
 		os.Exit(1)
