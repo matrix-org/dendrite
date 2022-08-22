@@ -90,6 +90,37 @@ func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, device *userapi
 	}
 }
 
+func AdminPurgeRoom(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	roomID, ok := vars["roomID"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting room ID."),
+		}
+	}
+	res := &roomserverAPI.PerformAdminPurgeRoomResponse{}
+	if err := rsAPI.PerformAdminPurgeRoom(
+		req.Context(),
+		&roomserverAPI.PerformAdminPurgeRoomRequest{
+			RoomID: roomID,
+		},
+		res,
+	); err != nil {
+		return util.ErrorResponse(err)
+	}
+	if err := res.Error; err != nil {
+		return err.JSONResponse()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: res,
+	}
+}
+
 func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {

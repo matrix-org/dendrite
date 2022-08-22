@@ -155,6 +155,12 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	dendriteAdminRouter.Handle("/admin/purgeRoom/{roomID}",
+		httputil.MakeAdminAPI("admin_purge_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminPurgeRoom(req, cfg, device, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	dendriteAdminRouter.Handle("/admin/resetPassword/{localpart}",
 		httputil.MakeAdminAPI("admin_reset_password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return AdminResetPassword(req, cfg, device, userAPI)

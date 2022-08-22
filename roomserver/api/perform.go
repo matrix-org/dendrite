@@ -234,3 +234,11 @@ type PerformAdminEvacuateUserResponse struct {
 	Affected []string `json:"affected"`
 	Error    *PerformError
 }
+
+type PerformAdminPurgeRoomRequest struct {
+	RoomID string `json:"room_id"`
+}
+
+type PerformAdminPurgeRoomResponse struct {
+	Error *PerformError `json:"error,omitempty"`
+}

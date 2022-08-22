@@ -150,6 +150,7 @@ type ClientRoomserverAPI interface {
 	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse) error
 	PerformAdminEvacuateRoom(ctx context.Context, req *PerformAdminEvacuateRoomRequest, res *PerformAdminEvacuateRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformAdminPurgeRoom(ctx context.Context, req *PerformAdminPurgeRoomRequest, res *PerformAdminPurgeRoomResponse) error
 	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse) error
 	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse) error
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error

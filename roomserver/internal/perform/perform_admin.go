@@ -231,3 +231,27 @@ func (r *Admin) PerformAdminEvacuateUser(
 	}
 	return nil
 }
+
+func (r *Admin) PerformAdminPurgeRoom(
+	ctx context.Context,
+	req *api.PerformAdminPurgeRoomRequest,
+	res *api.PerformAdminPurgeRoomResponse,
+) error {
+	if _, _, err := gomatrixserverlib.SplitID('!', req.RoomID); err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("Malformed room ID: %s", err),
+		}
+		return nil
+	}
+
+	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  err.Error(),
+		}
+		return nil
+	}
+
+	return nil
+}
