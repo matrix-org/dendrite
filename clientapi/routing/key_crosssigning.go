@@ -72,7 +72,9 @@ func UploadCrossSigningDeviceKeys(
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	uploadReq.UserID = device.UserID
-	keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes)
+	if err := keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	if err := uploadRes.Error; err != nil {
 		switch {
@@ -114,7 +116,9 @@ func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.Clie
 	}
 
 	uploadReq.UserID = device.UserID
-	keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes)
+	if err := keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	if err := uploadRes.Error; err != nil {
 		switch {

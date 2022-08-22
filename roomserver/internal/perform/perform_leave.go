@@ -186,7 +186,9 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	inputRes := api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+	if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
+	}
 	if err = inputRes.Err(); err != nil {
 		return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 	}

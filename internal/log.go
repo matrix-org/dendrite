@@ -27,9 +27,10 @@ import (
 
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 type utcFormatter struct {

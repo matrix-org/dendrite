@@ -22,12 +22,13 @@ import (
 	"sync"
 	"time"
 
-	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
 var (
@@ -118,7 +119,7 @@ type DeviceListUpdaterDatabase interface {
 }
 
 type DeviceListUpdaterAPI interface {
-	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse)
+	PerformUploadDeviceKeys(ctx context.Context, req *api.PerformUploadDeviceKeysRequest, res *api.PerformUploadDeviceKeysResponse) error
 }
 
 // KeyChangeProducer is the interface for producers.KeyChange useful for testing.
@@ -420,7 +421,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 					uploadReq.SelfSigningKey = *res.SelfSigningKey
 				}
 			}
-			u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+			_ = u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
 		}
 		err = u.updateDeviceList(&res)
 		if err != nil {

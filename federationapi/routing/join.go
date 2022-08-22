@@ -21,13 +21,14 @@ import (
 	"sort"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // MakeJoin implements the /make_join API
@@ -391,7 +392,7 @@ func SendJoin(
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
 		var response api.InputRoomEventsResponse
-		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+		if err := rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
@@ -400,7 +401,9 @@ func SendJoin(
 					TransactionID: nil,
 				},
 			},
-		}, &response)
+		}, &response); err != nil {
+			return jsonerror.InternalAPIError(httpReq.Context(), err)
+		}
 		if response.ErrMsg != "" {
 			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
 			if response.NotAllowed {

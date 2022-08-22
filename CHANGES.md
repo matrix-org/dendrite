@@ -1,5 +1,40 @@
 # Changelog
 
+## Dendrite 0.9.3 (2022-08-15)
+
+### Important
+
+* This is a **security release** to fix a vulnerability within event auth, affecting all versions of Dendrite before 0.9.3. Upgrading to this version is highly recommended. For more information, [see here](https://github.com/matrix-org/gomatrixserverlib/security/advisories/GHSA-grvv-h2f9-7v9c).
+
+### Fixes
+
+* Dendrite will now correctly parse the `"events_default"` power level value for event auth.
+
+## Dendrite 0.9.2 (2022-08-12)
+
+### Features
+
+* Dendrite now supports history visibility on the `/sync`, `/messages` and `/context` endpoints
+  * It should now be possible to view the history of a room in more cases (as opposed to limiting scrollback to the join event or defaulting to the restrictive `"join"` visibility rule as before)
+* The default room version for newly created rooms is now room version 9
+* New admin endpoint `/_dendrite/admin/resetPassword/{userID}` has been added, which replaces the `-reset-password` flag in `create-account`
+* The `create-account` binary now uses shared secret registration over HTTP to create new accounts, which fixes a number of problems with account data and push rules not being configured correctly for new accounts
+* The internal HTTP APIs for polylith deployments have been refactored for correctness and consistency
+* The federation API will now automatically clean up some EDUs that have failed to send within a certain period of time
+* The `/hierarchy` endpoint will now return potentially joinable rooms (contributed by [texuf](https://github.com/texuf))
+* The user directory will now show or hide users correctly
+
+### Fixes
+
+* Send-to-device messages should no longer be incorrectly duplicated in `/sync`
+* The federation sender will no longer create unnecessary destination queues as a result of a logic error
+* A bug where database migrations may not execute properly when upgrading from older versions has been fixed
+* A crash when failing to update user account data has been fixed
+* A race condition when generating notification counts has been fixed
+* A race condition when setting up NATS has been fixed (contributed by [brianathere](https://github.com/brianathere))
+* Stale cache data for membership lazy-loading is now correctly invalidated when doing a complete sync
+* Data races within user-interactive authentication have been fixed (contributed by [tak-hntlabs](https://github.com/tak-hntlabs))
+
 ## Dendrite 0.9.1 (2022-08-03)
 
 ### Fixes
@@ -10,7 +45,7 @@
 * The media endpoint now sets the `Cache-Control` header correctly to prevent web-based clients from hitting media endpoints excessively
 * The sync API will now advance the PDU stream position correctly in all cases (contributed by [sergekh2](https://github.com/sergekh2))
 * The sync API will now delete the correct range of send-to-device messages when advancing the stream position
-* The device list `changed` key in the `/sync` response should now return the correct users 
+* The device list `changed` key in the `/sync` response should now return the correct users
 * A data race when looking up missing state has been fixed
 * The `/send_join` API is now applying stronger validation to the received membership event
 
