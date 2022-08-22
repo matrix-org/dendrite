@@ -82,6 +82,7 @@ type Rooms interface {
 	SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error)
 	BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error)
 	BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error)
+	PurgeRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
 }
 
 type StateSnapshot interface {

@@ -1390,6 +1390,9 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 		if err := d.EventsTable.PurgeEvents(ctx, txn, roomNID); err != nil {
 			return fmt.Errorf("failed to purge events: %w", err)
 		}
+		if err := d.RoomsTable.PurgeRoom(ctx, txn, roomNID); err != nil {
+			return fmt.Errorf("failed to purge room: %w", err)
+		}
 		return nil
 	})
 }
