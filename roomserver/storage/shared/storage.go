@@ -1357,7 +1357,11 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
-		if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil // return nil anyway so we can generate output event for other components
+		case nil:
+		default:
 			return fmt.Errorf("failed to find room NID: %w", err)
 		}
 		if err := d.StateBlockTable.PurgeStateBlocks(ctx, txn, roomNID); err != nil {
