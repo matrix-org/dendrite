@@ -154,7 +154,7 @@ const selectServerInRoomSQL = "" +
 	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
 
 const purgeMembershipsSQL = "" +
-	"DELETE FROM roomserver_memberships WHERE room_nid = $1"
+	"DELETE FROM roomserver_membership WHERE room_nid = $1"
 
 type membershipStatements struct {
 	insertMembershipStmt                            *sql.Stmt
