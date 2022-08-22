@@ -440,9 +440,14 @@ func (s *OutputRoomEventConsumer) onPurgeRoom(
 	ctx context.Context, req api.OutputPurgeRoom,
 ) error {
 	logrus.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
-	defer logrus.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
 
-	return nil
+	if err := s.db.PurgeRoom(ctx, req.RoomID); err != nil {
+		logrus.WithField("room_id", req.RoomID).WithError(err).Error("Failed to purge room from sync API")
+		return err
+	} else {
+		logrus.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
+		return nil
+	}
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {
