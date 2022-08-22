@@ -61,7 +61,7 @@ const selectPreviousEventExistsSQL = "" +
 
 const purgePreviousEventsSQL = `
 	DELETE FROM roomserver_previous_events WHERE event_nids && ANY(
-		SELECT ARRAY_AGG(event_nid) FROM roomserver_events WHERE room_nid = 42
+		SELECT ARRAY_AGG(event_nid) FROM roomserver_events WHERE room_nid = $1
 	)
 `
 
