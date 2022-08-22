@@ -70,14 +70,14 @@ func NewInternalAPI(
 	// Wrap application services in a type that relates the application service and
 	// a sync.Cond object that can be used to notify workers when there are new
 	// events to be sent out.
-	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
+	workerStates := make([]*types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
 	for i, appservice := range base.Cfg.Derived.ApplicationServices {
 		m := sync.Mutex{}
 		ws := types.ApplicationServiceWorkerState{
 			AppService: appservice,
 			Cond:       sync.NewCond(&m),
 		}
-		workerStates[i] = ws
+		workerStates[i] = &ws
 
 		// Create bot account for this AS if it doesn't already exist
 		if err = generateAppServiceAccount(userAPI, appservice); err != nil {

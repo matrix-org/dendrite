@@ -50,7 +50,7 @@ type RequestPool struct {
 	keyAPI   keyapi.SyncKeyAPI
 	rsAPI    roomserverAPI.SyncRoomserverAPI
 	lastseen *sync.Map
-	presence *sync.Map
+	Presence *sync.Map
 	streams  *streams.Streams
 	Notifier *notifier.Notifier
 	producer PresencePublisher
@@ -85,14 +85,14 @@ func NewRequestPool(
 		keyAPI:   keyAPI,
 		rsAPI:    rsAPI,
 		lastseen: &sync.Map{},
-		presence: &sync.Map{},
+		Presence: &sync.Map{},
 		streams:  streams,
 		Notifier: notifier,
 		producer: producer,
 		consumer: consumer,
 	}
 	go rp.cleanLastSeen()
-	go rp.cleanPresence(db, time.Minute*5)
+	// go rp.cleanPresence(db, time.Minute*5)
 	return rp
 }
 
@@ -111,11 +111,11 @@ func (rp *RequestPool) cleanPresence(db storage.Presence, cleanupTime time.Durat
 		return
 	}
 	for {
-		rp.presence.Range(func(key interface{}, v interface{}) bool {
+		rp.Presence.Range(func(key interface{}, v interface{}) bool {
 			p := v.(types.PresenceInternal)
 			if time.Since(p.LastActiveTS.Time()) > cleanupTime {
 				rp.updatePresence(db, types.PresenceUnavailable.String(), p.UserID)
-				rp.presence.Delete(key)
+				rp.Presence.Delete(key)
 			}
 			return true
 		})
@@ -153,13 +153,22 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	}
 	newPresence.ClientFields.Presence = presenceID.String()
 
-	defer rp.presence.Store(userID, newPresence)
+	defer rp.Presence.Store(userID, newPresence)
 	// avoid spamming presence updates when syncing
-	existingPresence, ok := rp.presence.LoadOrStore(userID, newPresence)
+	existingPresence, ok := rp.Presence.LoadOrStore(userID, newPresence)
 	if ok {
 		p := existingPresence.(types.PresenceInternal)
-		if p.ClientFields.Presence == newPresence.ClientFields.Presence {
-			return
+		if dbPresence != nil {
+			if p.Presence == newPresence.Presence && newPresence.LastActiveTS-dbPresence.LastActiveTS < types.PresenceNoOpMs {
+				return
+			}
+			if dbPresence.Presence == types.PresenceOnline && presenceID == types.PresenceOnline && newPresence.LastActiveTS-dbPresence.LastActiveTS >= types.PresenceNoOpMs {
+				err := db.UpdateLastActive(context.Background(), userID, uint64(newPresence.LastActiveTS))
+				if err != nil {
+					logrus.WithError(err).Error("failed to update last active")
+				}
+				return
+			}
 		}
 	}
 
@@ -247,7 +256,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	defer activeSyncRequests.Dec()
 
 	rp.updateLastSeen(req, device)
-	rp.updatePresence(rp.db, req.FormValue("set_presence"), device.UserID)
+	rp.updatePresence(rp.db, "", device.UserID)
 
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()

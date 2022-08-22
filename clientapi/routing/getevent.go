@@ -82,7 +82,7 @@ func GetEvent(
 		}},
 	}
 	var stateResp api.QueryStateAfterEventsResponse
-	if err := rsAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
+	if err = rsAPI.QueryStateAfterEvents(req.Context(), &stateReq, &stateResp); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("queryAPI.QueryStateAfterEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -118,12 +118,13 @@ func GetEvent(
 		} else if !stateEvent.StateKeyEquals(device.UserID) {
 			continue
 		}
-		membership, err := stateEvent.Membership()
+		var membership string
+		membership, err = stateEvent.Membership()
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("stateEvent.Membership failed")
 			return jsonerror.InternalServerError()
 		}
-		if membership == gomatrixserverlib.Join {
+		if membership == gomatrixserverlib.Join || membership == gomatrixserverlib.Invite {
 			return util.JSONResponse{
 				Code: http.StatusOK,
 				JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
@@ -131,8 +132,28 @@ func GetEvent(
 		}
 	}
 
-	return util.JSONResponse{
-		Code: http.StatusNotFound,
-		JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
+	// we might fail to retrieve correct state above, let's check user membership and allow to fetch event if they are invited or joined, since we always use m.room.history_visibility shared.
+	var membershipRes api.QueryMembershipForUserResponse
+	ctx := req.Context()
+	err = rsAPI.QueryMembershipForUser(ctx, &api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: device.UserID,
+	}, &membershipRes)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("Failed to QueryMembershipForUser")
+		return jsonerror.InternalServerError()
+	}
+	// If the user has never been in the room then stop at this point.
+	// We won't tell the user about a room they have never joined.
+	if !membershipRes.HasBeenInRoom && membershipRes.Membership != gomatrixserverlib.Invite || membershipRes.Membership == gomatrixserverlib.Ban {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("The event was not found or you do not have permission to read this event"),
+		}
+	} else {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: gomatrixserverlib.ToClientEvent(r.requestedEvent, gomatrixserverlib.FormatAll),
+		}
 	}
 }

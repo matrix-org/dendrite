@@ -1,12 +1,14 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -24,6 +26,7 @@ type newPasswordAuth struct {
 	Type    string `json:"type"`
 	Session string `json:"session"`
 	auth.PasswordRequest
+	ThreePidCreds threepid.Credentials `json:"threepid_creds"`
 }
 
 func Password(
@@ -33,13 +36,17 @@ func Password(
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	// Check that the existing password is right.
+	var fields logrus.Fields
+	if device != nil {
+		fields = logrus.Fields{
+			"sessionId": device.SessionID,
+			"userId":    device.UserID,
+		}
+	}
 	var r newPasswordRequest
 	r.LogoutDevices = true
 
-	logrus.WithFields(logrus.Fields{
-		"sessionId": device.SessionID,
-		"userId":    device.UserID,
-	}).Debug("Changing password")
+	logrus.WithFields(fields).Debug("Changing password")
 
 	// Unmarshal the request.
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
@@ -53,43 +60,93 @@ func Password(
 		// Generate a new, random session ID
 		sessionID = util.RandomString(sessionIDLength)
 	}
-
-	// Require password auth to change the password.
-	if r.Auth.Type != authtypes.LoginTypePassword {
-		return util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: newUserInteractiveResponse(
-				sessionID,
-				[]authtypes.Flow{
-					{
-						Stages: []authtypes.LoginType{authtypes.LoginTypePassword},
-					},
+	var localpart string
+	switch r.Auth.Type {
+	case authtypes.LoginTypePassword:
+		// Check if the existing password is correct.
+		typePassword := auth.LoginTypePassword{
+			UserApi: userAPI,
+			Config:  cfg,
+		}
+		if _, authErr := typePassword.Login(req.Context(), &r.Auth.PasswordRequest); authErr != nil {
+			return *authErr
+		}
+		// Get the local part.
+		var err error
+		localpart, _, err = gomatrixserverlib.SplitID('@', device.UserID)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+			return jsonerror.InternalServerError()
+		}
+		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
+	case authtypes.LoginTypeEmail:
+		threePid := &authtypes.ThreePID{}
+		r.Auth.ThreePidCreds.IDServer = cfg.ThreePidDelegate
+		var (
+			bound bool
+			err   error
+		)
+		bound, threePid.Address, threePid.Medium, err = threepid.CheckAssociation(req.Context(), r.Auth.ThreePidCreds, cfg)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
+			return jsonerror.InternalServerError()
+		}
+		if !bound {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.MatrixError{
+					ErrCode: "M_THREEPID_AUTH_FAILED",
+					Err:     "Failed to auth 3pid",
 				},
-				nil,
-			),
+			}
+		}
+		var res api.QueryLocalpartForThreePIDResponse
+		err = userAPI.QueryLocalpartForThreePID(req.Context(), &api.QueryLocalpartForThreePIDRequest{
+			Medium:   threePid.Medium,
+			ThreePID: threePid.Address,
+		}, &res)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryLocalpartForThreePID failed")
+			return jsonerror.InternalServerError()
+		}
+		if res.Localpart == "" {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.MatrixError{
+					ErrCode: "M_THREEPID_NOT_FOUND",
+					Err:     "3pid is not bound to any account",
+				},
+			}
+		}
+		localpart = res.Localpart
+		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeEmail)
+	default:
+		flows := []authtypes.Flow{
+			{
+				Stages: []authtypes.LoginType{authtypes.LoginTypePassword},
+			},
+		}
+		if cfg.ThreePidDelegate != "" {
+			flows = append(flows, authtypes.Flow{
+				Stages: []authtypes.LoginType{authtypes.LoginTypeEmail},
+			})
+		}
+		// Require password auth to change the password.
+		if r.Auth.Type == authtypes.LoginTypePassword {
+			return util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: newUserInteractiveResponse(
+					sessionID,
+					flows,
+					nil,
+				),
+			}
 		}
 	}
-
-	// Check if the existing password is correct.
-	typePassword := auth.LoginTypePassword{
-		GetAccountByPassword: userAPI.QueryAccountByPassword,
-		Config:               cfg,
-	}
-	if _, authErr := typePassword.Login(req.Context(), &r.Auth.PasswordRequest); authErr != nil {
-		return *authErr
-	}
-	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	// Check the new password strength.
 	if resErr = validatePassword(r.NewPassword); resErr != nil {
 		return *resErr
-	}
-
-	// Get the local part.
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
 	}
 
 	// Ask the user API to perform the password change.
@@ -109,11 +166,23 @@ func Password(
 
 	// If the request asks us to log out all other devices then
 	// ask the user API to do that.
+
 	if r.LogoutDevices {
-		logoutReq := &api.PerformDeviceDeletionRequest{
-			UserID:         device.UserID,
-			DeviceIDs:      nil,
-			ExceptDeviceID: device.ID,
+		var logoutReq *api.PerformDeviceDeletionRequest
+		var sessionId int64
+		if device == nil {
+			logoutReq = &api.PerformDeviceDeletionRequest{
+				UserID:    fmt.Sprintf("@%s:%s", localpart, cfg.Matrix.ServerName),
+				DeviceIDs: []string{},
+			}
+			sessionId = 0
+		} else {
+			logoutReq = &api.PerformDeviceDeletionRequest{
+				UserID:         device.UserID,
+				DeviceIDs:      nil,
+				ExceptDeviceID: device.ID,
+			}
+			sessionId = device.SessionID
 		}
 		logoutRes := &api.PerformDeviceDeletionResponse{}
 		if err := userAPI.PerformDeviceDeletion(req.Context(), logoutReq, logoutRes); err != nil {
@@ -123,7 +192,7 @@ func Password(
 
 		pushersReq := &api.PerformPusherDeletionRequest{
 			Localpart: localpart,
-			SessionID: device.SessionID,
+			SessionID: sessionId,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")

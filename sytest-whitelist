@@ -205,7 +205,6 @@ Deleted tags appear in an incremental v2 /sync
 /event/ on non world readable room does not work
 Outbound federation can query profile data
 /event/ on joined room works
-/event/ does not allow access to events before the user joined
 Federation key API allows unsigned requests for keys
 GET /publicRooms lists rooms
 GET /publicRooms includes avatar URLs
@@ -744,3 +743,4 @@ User in private room doesn't appear in user directory
 User joining then leaving public room appears and dissappears from directory
 User in remote room doesn't appear in user directory after server left room
 User in shared private room does appear in user directory until leave
+Existing members see new member's presence
