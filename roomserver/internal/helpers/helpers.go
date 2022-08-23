@@ -254,8 +254,15 @@ func CheckServerAllowedToSeeEvent(
 			return false, err
 		}
 	default:
-		// Something else went wrong
-		return false, err
+		switch err.(type) {
+		case types.MissingStateError:
+			// TODO: This may prevent other servers from requesting outliers from us.
+			// Is this the right thing to do?
+			return false, nil
+		default:
+			// Something else went wrong
+			return false, err
+		}
 	}
 	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
 }
