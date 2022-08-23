@@ -142,7 +142,8 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 	return result, rows.Err()
 }
 
-// InsertMigration inserts a migration given there name to the database.
+// InsertMigration creates the migrations table if it doesn't exist and
+// inserts a migration given their name to the database.
 // This should only be used when manually inserting migrations.
 func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) error {
 	_, err := db.ExecContext(ctx, createDBMigrationsSQL)
