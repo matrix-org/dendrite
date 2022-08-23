@@ -256,9 +256,9 @@ func CheckServerAllowedToSeeEvent(
 	default:
 		switch err.(type) {
 		case types.MissingStateError:
-			// TODO: This may prevent other servers from requesting outliers from us.
-			// Is this the right thing to do?
-			return false, nil
+			// If there's no state then we assume it's open visibility, as Synapse does:
+			// https://github.com/matrix-org/synapse/blob/aec87a0f9369a3015b2a53469f88d1de274e8b71/synapse/visibility.py#L654-L655
+			return true, nil
 		default:
 			// Something else went wrong
 			return false, err
