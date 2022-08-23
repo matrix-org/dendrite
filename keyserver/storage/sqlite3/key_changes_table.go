@@ -75,7 +75,8 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	// column partition was removed from the table
 	migrationName := "keyserver: refactor key changes"
 
-	err := db.QueryRowContext(ctx, `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'keyserver_key_changes' AND p.name = 'partition'`).Err()
+	var cName string
+	err := db.QueryRowContext(ctx, `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'keyserver_key_changes' AND p.name = 'partition'`).Scan(&cName)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
