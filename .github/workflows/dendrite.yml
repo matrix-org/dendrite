@@ -376,6 +376,8 @@ jobs:
       # Build initial Dendrite image
       - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Run Complement
       - run: |
