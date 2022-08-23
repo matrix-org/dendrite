@@ -26,7 +26,7 @@ EXPOSE 8008 8448
 
 # At runtime, generate TLS cert based on the CA now mounted at /ca
 # At runtime, replace the SERVER_NAME with what we are told
-CMD ./generate-keys -keysize 64 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
+CMD ./generate-keys -keysize 1024 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
     ./generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
     exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}

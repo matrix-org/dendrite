@@ -30,7 +30,7 @@ RUN echo '\
 RUN echo '\
     #!/bin/bash -eu \n\
     ./generate-keys --private-key matrix_key.pem \n\
-    ./generate-keys -keysize 64 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key \n\
+    ./generate-keys -keysize 1024 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key \n\
     ./generate-config -server $SERVER_NAME --ci > dendrite.yaml \n\
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates \n\
     exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml \n\
