@@ -18,11 +18,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -92,35 +91,23 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 
-	var eventNID int
-	err = db.QueryRowContext(ctx, "SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan(&eventNID)
-	if err == nil {
-		m := sqlutil.NewMigrator(db)
-		m.AddMigrations(sqlutil.Migration{
-			Version: migrationName,
-			Up:      deltas.UpStateBlocksRefactor,
-		})
-		if err = m.Up(ctx); err != nil {
-			return err
-		}
-	} else {
-		switch e := err.(type) {
-		case *sqlite3.Error:
-			// ignore "no such column" errors, as this is expected at this point
-			if !strings.Contains(e.Error(), "no such column") {
-				return err
-			}
-
-			// reset the error to nil, so the deferred function will insert the migration
+	err = db.QueryRowContext(ctx, `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'roomserver_state_block' AND p.name = 'event_nid'`).Err()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
 				// not a fatal error, log and continue
 				logrus.WithError(err).Warnf("unable to manually insert migration '%s'", migrationName)
 			}
-		default:
-			return err
+			return nil
 		}
+		return err
 	}
-	return nil
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpStateBlocksRefactor,
+	})
+	return m.Up(ctx)
 }
 
 func (d *Database) create(db *sql.DB) error {
