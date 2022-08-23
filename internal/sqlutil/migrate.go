@@ -21,8 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const createDBMigrationsSQL = "" +
@@ -95,11 +96,11 @@ func (m *Migrator) Up(ctx context.Context) error {
 		for i := range m.migrations {
 			now := time.Now().UTC().Format(time.RFC3339)
 			migration := m.migrations[i]
-			logrus.Debugf("Executing database migration '%s'", migration.Version)
 			// Skip migration if it was already executed
 			if _, ok := executedMigrations[migration.Version]; ok {
 				continue
 			}
+			logrus.Debugf("Executing database migration '%s'", migration.Version)
 			err = migration.Up(ctx, txn)
 			if err != nil {
 				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
@@ -139,4 +140,15 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 	}
 
 	return result, rows.Err()
+}
+
+// InsertMigration inserts a migration given there name to the database.
+// This should only be used when manually inserting migrations.
+func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) error {
+	_, err := db.ExecContext(ctx, insertVersionSQL,
+		migrationName,
+		time.Now().Format(time.RFC3339),
+		internal.VersionString(),
+	)
+	return err
 }
