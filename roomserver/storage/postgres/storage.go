@@ -18,9 +18,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
-	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
 	// Import the postgres database driver.
@@ -83,31 +83,24 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 
-	var eventNID int
-	err = db.QueryRowContext(ctx, "SELECT event_nid FROM roomserver_state_block LIMIT 1;").Scan(&eventNID)
-	if err == nil {
-		m := sqlutil.NewMigrator(db)
-		m.AddMigrations(sqlutil.Migration{
-			Version: migrationName,
-			Up:      deltas.UpStateBlocksRefactor,
-		})
-		if err = m.Up(ctx); err != nil {
-			return err
-		}
-	} else {
-		switch e := err.(type) {
-		case *pq.Error:
-			// ignore undefined_column (42703) errors, as this is expected at this point
-			if e.Code != "42703" {
-				return err
-			}
+	err = db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'roomserver_state_block' AND column_name = 'event_nid'").Err()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
 				// not a fatal error, log and continue
 				logrus.WithError(err).Warnf("unable to manually insert migration '%s'", migrationName)
 			}
-		default:
-			return err
+			return nil
 		}
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpStateBlocksRefactor,
+	})
+	if err = m.Up(ctx); err != nil {
+		return err
 	}
 	return nil
 }

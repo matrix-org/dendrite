@@ -17,8 +17,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
-	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -85,32 +85,26 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 
-	var partition int
-	err = db.QueryRowContext(ctx, "SELECT partition FROM keyserver_key_changes LIMIT 1;").Scan(&partition)
-	if err == nil {
-		m := sqlutil.NewMigrator(db)
-		m.AddMigrations(sqlutil.Migration{
-			Version: migrationName,
-			Up:      deltas.UpRefactorKeyChanges,
-		})
-		if err = m.Up(ctx); err != nil {
-			return err
-		}
-	} else {
-		switch e := err.(type) {
-		case *pq.Error:
-			// ignore undefined_column (42703) errors, as this is expected at this point
-			if e.Code != "42703" {
-				return err
-			}
+	err = db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Err()
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
 				// not a fatal error, log and continue
 				logrus.WithError(err).Warnf("unable to manually insert migration '%s'", migrationName)
 			}
-		default:
-			return err
+			return nil
 		}
+		return err
 	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpRefactorKeyChanges,
+	})
+	if err = m.Up(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
