@@ -101,11 +101,8 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 		Version: migrationName,
 		Up:      deltas.UpRefactorKeyChanges,
 	})
-	if err = m.Up(ctx); err != nil {
-		return err
-	}
 
-	return nil
+	return m.Up(ctx)
 }
 
 func (s *keyChangesStatements) Prepare() (err error) {

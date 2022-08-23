@@ -99,10 +99,8 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 		Version: migrationName,
 		Up:      deltas.UpStateBlocksRefactor,
 	})
-	if err = m.Up(ctx); err != nil {
-		return err
-	}
-	return nil
+
+	return m.Up(ctx)
 }
 
 func (d *Database) create(db *sql.DB) error {
