@@ -75,17 +75,8 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	// This forces an error, which indicates the migration is already applied, since the
 	// column partition was removed from the table
 	migrationName := "keyserver: refactor key changes"
-	var migrationCount int
 
-	err := db.QueryRowContext(ctx, "SELECT count(*) FROM db_migrations WHERE version = $1", migrationName).Scan(&migrationCount)
-	if err != nil {
-		return err
-	}
-	if migrationCount > 0 {
-		return nil
-	}
-
-	err = db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Err()
+	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Err()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {

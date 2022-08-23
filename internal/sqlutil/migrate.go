@@ -145,7 +145,11 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 // InsertMigration inserts a migration given there name to the database.
 // This should only be used when manually inserting migrations.
 func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) error {
-	_, err := db.ExecContext(ctx, insertVersionSQL,
+	_, err := db.ExecContext(ctx, createDBMigrationsSQL)
+	if err != nil {
+		return fmt.Errorf("unable to create db_migrations: %w", err)
+	}
+	_, err = db.ExecContext(ctx, insertVersionSQL,
 		migrationName,
 		time.Now().Format(time.RFC3339),
 		internal.VersionString(),

@@ -73,17 +73,8 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	// This forces an error, which indicates the migration is already applied, since the
 	// column event_nid was removed from the table
 	migrationName := "roomserver: state blocks refactor"
-	var migrationCount int
 
-	err := db.QueryRowContext(ctx, "SELECT count(*) FROM db_migrations WHERE version = $1", migrationName).Scan(&migrationCount)
-	if err != nil {
-		return err
-	}
-	if migrationCount > 0 {
-		return nil
-	}
-
-	err = db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'roomserver_state_block' AND column_name = 'event_nid'").Err()
+	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'roomserver_state_block' AND column_name = 'event_nid'").Err()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
