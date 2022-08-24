@@ -768,7 +768,7 @@ func (d *Database) GetStateDeltas(
 	}
 
 	// handle newly joined rooms and non-joined rooms
-	newlyJoinedRooms := make(map[string]struct{}, len(state))
+	newlyJoinedRooms := make(map[string]bool, len(state))
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
 			if membership, prevMembership := getMembershipFromEvent(ev.Event, userID); membership != "" {
@@ -783,7 +783,7 @@ func (d *Database) GetStateDeltas(
 						return nil, nil, err
 					}
 					state[roomID] = s
-					newlyJoinedRooms[roomID] = struct{}{}
+					newlyJoinedRooms[roomID] = true
 					continue // we'll add this room in when we do joined rooms
 				}
 
@@ -800,15 +800,12 @@ func (d *Database) GetStateDeltas(
 
 	// Add in currently joined rooms
 	for _, joinedRoomID := range joinedRoomIDs {
-		delta := types.StateDelta{
+		deltas = append(deltas, types.StateDelta{
 			Membership:  gomatrixserverlib.Join,
 			StateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
 			RoomID:      joinedRoomID,
-		}
-		if _, ok := newlyJoinedRooms[joinedRoomID]; ok {
-			delta.NewlyJoined = true
-		}
-		deltas = append(deltas, delta)
+			NewlyJoined: newlyJoinedRooms[joinedRoomID],
+		})
 	}
 
 	succeeded = true
