@@ -23,12 +23,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 const defaultSyncTimeout = time.Duration(0)
@@ -46,15 +47,9 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			return nil, err
 		}
 	}
-	// TODO: read from stored filters too
+
+	// Create a default filter and apply a stored filter on top of it (if specified)
 	filter := gomatrixserverlib.DefaultFilter()
-	if since.IsEmpty() {
-		// Send as much account data down for complete syncs as possible
-		// by default, otherwise clients do weird things while waiting
-		// for the rest of the data to trickle down.
-		filter.AccountData.Limit = math.MaxInt32
-		filter.Room.AccountData.Limit = math.MaxInt32
-	}
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
 		if filterQuery[0] == '{' {
@@ -74,6 +69,17 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}
 		}
+	}
+
+	// A loaded filter might have overwritten these values,
+	// so set them after loading the filter.
+	if since.IsEmpty() {
+		// Send as much account data down for complete syncs as possible
+		// by default, otherwise clients do weird things while waiting
+		// for the rest of the data to trickle down.
+		filter.AccountData.Limit = math.MaxInt32
+		filter.Room.AccountData.Limit = math.MaxInt32
+		filter.Room.State.Limit = math.MaxInt32
 	}
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{

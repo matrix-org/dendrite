@@ -340,11 +340,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 	}
 
-	if len(events) > 0 {
-		updateLatestPosition(events[len(events)-1].EventID())
-	}
 	if len(delta.StateEvents) > 0 {
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
+	}
+	if len(events) > 0 {
+		updateLatestPosition(events[len(events)-1].EventID())
 	}
 
 	switch delta.Membership {
