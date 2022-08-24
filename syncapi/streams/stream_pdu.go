@@ -178,24 +178,25 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	var err error
 	var stateDeltas []types.StateDelta
-	var joinedRooms []string
+	var syncJoinedRooms []string
+	var newlyJoinedRooms map[string]struct{}
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
 
 	if req.WantFullState {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
 			return
 		}
 	} else {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, newlyJoinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
 			return
 		}
 	}
 
-	for _, roomID := range joinedRooms {
+	for _, roomID := range syncJoinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
 
@@ -209,8 +210,20 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	newPos = from
 	for _, delta := range stateDeltas {
+		newRange := r
+		// If this room was joined in this sync, try to fetch
+		// as much timeline events as allowed by the filter.
+		if _, ok := newlyJoinedRooms[delta.RoomID]; ok {
+			// Reverse the range, so we get the most recent first.
+			// This will be limited by the eventFilter.
+			newRange = types.Range{
+				From:      r.To,
+				To:        0,
+				Backwards: true,
+			}
+		}
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, &stateFilter, req.Response); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, newRange, delta, &eventFilter, &stateFilter, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return to
 		}

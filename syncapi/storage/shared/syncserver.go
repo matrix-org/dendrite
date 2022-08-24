@@ -686,7 +686,7 @@ func (d *Database) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]types.StateDelta, []string, error) {
+) (deltas []types.StateDelta, joinedRoomsIDs []string, newlyJoinedRooms map[string]struct{}, err error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
 	// - For each room which has membership list changes:
@@ -697,7 +697,7 @@ func (d *Database) GetStateDeltas(
 	// - Get all CURRENTLY joined rooms, and add them to 'joined' block.
 	txn, err := d.readOnlySnapshot(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("d.readOnlySnapshot: %w", err)
+		return nil, nil, nil, fmt.Errorf("d.readOnlySnapshot: %w", err)
 	}
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(txn, &succeeded, &err)
@@ -707,9 +707,9 @@ func (d *Database) GetStateDeltas(
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil, nil
+			return nil, nil, nil, nil
 		}
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	allRoomIDs := make([]string, 0, len(memberships))
@@ -721,29 +721,27 @@ func (d *Database) GetStateDeltas(
 		}
 	}
 
-	var deltas []types.StateDelta
-
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil, nil
+			return nil, nil, nil, nil
 		}
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil, nil
+			return nil, nil, nil, nil
 		}
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// add peek blocks
@@ -756,7 +754,7 @@ func (d *Database) GetStateDeltas(
 				if err == sql.ErrNoRows {
 					continue
 				}
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			state[peek.RoomID] = s
 		}
@@ -770,10 +768,12 @@ func (d *Database) GetStateDeltas(
 	}
 
 	// handle newly joined rooms and non-joined rooms
+	newlyJoinedRoomIDs := make(map[string]struct{}, len(memberships))
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
 			if membership, prevMembership := getMembershipFromEvent(ev.Event, userID); membership != "" {
 				if membership == gomatrixserverlib.Join && prevMembership != membership {
+					newlyJoinedRoomIDs[roomID] = struct{}{}
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
@@ -781,7 +781,7 @@ func (d *Database) GetStateDeltas(
 						if err == sql.ErrNoRows {
 							continue
 						}
-						return nil, nil, err
+						return nil, nil, nil, err
 					}
 					state[roomID] = s
 					continue // we'll add this room in when we do joined rooms
@@ -808,7 +808,7 @@ func (d *Database) GetStateDeltas(
 	}
 
 	succeeded = true
-	return deltas, joinedRoomIDs, nil
+	return deltas, joinedRoomIDs, newlyJoinedRoomIDs, nil
 }
 
 // GetStateDeltasForFullStateSync is a variant of getStateDeltas used for /sync
