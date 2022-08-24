@@ -179,7 +179,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 	var err error
 	var stateDeltas []types.StateDelta
 	var syncJoinedRooms []string
-	var newlyJoinedRooms map[string]struct{}
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
@@ -190,7 +189,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 			return
 		}
 	} else {
-		if stateDeltas, syncJoinedRooms, newlyJoinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
 			return
 		}
@@ -213,7 +212,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 		newRange := r
 		// If this room was joined in this sync, try to fetch
 		// as much timeline events as allowed by the filter.
-		if _, ok := newlyJoinedRooms[delta.RoomID]; ok {
+		if delta.NewlyJoined {
 			// Reverse the range, so we get the most recent first.
 			// This will be limited by the eventFilter.
 			newRange = types.Range{
@@ -226,6 +225,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, newRange, delta, &eventFilter, &stateFilter, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return to
+		}
+		// Reset the position, as it is only for the special case of newly joined rooms
+		if delta.NewlyJoined {
+			pos = newRange.From
 		}
 		switch {
 		case r.Backwards && pos < newPos:
@@ -400,6 +403,8 @@ func applyHistoryVisibilityFilter(
 	logrus.WithFields(logrus.Fields{
 		"duration": time.Since(startTime),
 		"room_id":  roomID,
+		"before":   len(recentEvents),
+		"after":    len(events),
 	}).Debug("applied history visibility (sync)")
 	return events, nil
 }
