@@ -5,7 +5,7 @@
 ### Fixes
 
 * The roomserver will now correctly unreject previously rejected events if necessary when reprocessing
-* The handling of event soft-failure has been improved on the roomserver input
+* The handling of event soft-failure has been improved on the roomserver input by no longer applying rejection rules and still calculating state before the event if possible
 * The federation `/state` and `/state_ids` endpoints should now return the correct error code when the state isn't known instead of returning a HTTP 500
 * The federation `/event` should now return outlier events correctly instead of returning a HTTP 500
 * A bug in the federation backoff allowing zero intervals has been corrected
