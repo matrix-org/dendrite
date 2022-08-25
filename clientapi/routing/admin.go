@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -104,7 +105,7 @@ func AdminPurgeRoom(req *http.Request, cfg *config.ClientAPI, device *userapi.De
 	}
 	res := &roomserverAPI.PerformAdminPurgeRoomResponse{}
 	if err := rsAPI.PerformAdminPurgeRoom(
-		req.Context(),
+		context.Background(),
 		&roomserverAPI.PerformAdminPurgeRoomRequest{
 			RoomID: roomID,
 		},

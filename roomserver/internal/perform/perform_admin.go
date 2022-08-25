@@ -253,6 +253,7 @@ func (r *Admin) PerformAdminPurgeRoom(
 			Code: api.PerformErrorBadRequest,
 			Msg:  err.Error(),
 		}
+		return nil
 	} else {
 		logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
 	}
