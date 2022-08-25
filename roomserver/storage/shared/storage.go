@@ -1362,6 +1362,9 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		roomNID, err := d.RoomsTable.SelectRoomNIDForUpdate(ctx, txn, roomID)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
 			return fmt.Errorf("failed to lock the room: %w", err)
 		}
 		if err := d.Purge.PurgeStateBlocks(ctx, txn, roomNID); err != nil {

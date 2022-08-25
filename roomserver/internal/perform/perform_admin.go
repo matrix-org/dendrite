@@ -246,21 +246,6 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return nil
 	}
 
-	if err := r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
-		{
-			Type: api.OutputTypePurgeRoom,
-			PurgeRoom: &api.OutputPurgeRoom{
-				RoomID: req.RoomID,
-			},
-		},
-	}); err != nil {
-		res.Error = &api.PerformError{
-			Code: api.PerformErrorBadRequest,
-			Msg:  err.Error(),
-		}
-		return nil
-	}
-
 	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
 	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
 		logrus.WithField("room_id", req.RoomID).WithError(err).Warn("Failed to purge room from roomserver")
@@ -272,5 +257,12 @@ func (r *Admin) PerformAdminPurgeRoom(
 		logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
 	}
 
-	return nil
+	return r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
+		{
+			Type: api.OutputTypePurgeRoom,
+			PurgeRoom: &api.OutputPurgeRoom{
+				RoomID: req.RoomID,
+			},
+		},
+	})
 }
