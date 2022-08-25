@@ -169,6 +169,12 @@ func (s *roomStatements) SelectRoomNID(
 	return types.RoomNID(roomNID), err
 }
 
+func (s *roomStatements) SelectRoomNIDForUpdate(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) (types.RoomNID, error) {
+	return 0, fmt.Errorf("not supported on SQLite")
+}
+
 func (s *roomStatements) SelectLatestEventNIDs(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.EventNID, types.StateSnapshotNID, error) {

@@ -1360,9 +1360,9 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 		return fmt.Errorf("not supported on this database engine")
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
+		roomNID, err := d.RoomsTable.SelectRoomNIDForUpdate(ctx, txn, roomID)
 		if err != nil {
-			return fmt.Errorf("failed to find room NID: %w", err)
+			return fmt.Errorf("failed to lock the room: %w", err)
 		}
 		if err := d.Purge.PurgeStateBlocks(ctx, txn, roomNID); err != nil {
 			return fmt.Errorf("failed to purge state blocks: %w", err)
