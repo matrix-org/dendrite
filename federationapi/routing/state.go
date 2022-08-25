@@ -135,6 +135,12 @@ func getState(
 		return nil, nil, &resErr
 	}
 
+	if !response.StateKnown {
+		return nil, nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("State not known"),
+		}
+	}
 	if response.IsRejected {
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,

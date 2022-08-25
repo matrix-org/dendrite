@@ -503,10 +503,11 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	var stateEvents []*gomatrixserverlib.Event
-	stateEvents, rejected, err := r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
+	stateEvents, rejected, stateMissing, err := r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
 	if err != nil {
 		return err
 	}
+	response.StateKnown = !stateMissing
 	response.IsRejected = rejected
 	response.PrevEventsExist = true
 
@@ -542,15 +543,18 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, bool, error) {
+// first bool: is rejected, second bool: state missing
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, bool, bool, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
 		switch err.(type) {
 		case types.MissingEventError:
-			return nil, false, nil
+			return nil, false, true, nil
+		case types.MissingStateError:
+			return nil, false, true, nil
 		default:
-			return nil, false, err
+			return nil, false, false, err
 		}
 	}
 	// Currently only used on /state and /state_ids
@@ -567,12 +571,11 @@ func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomI
 		ctx, prevStates,
 	)
 	if err != nil {
-		return nil, rejected, err
+		return nil, rejected, false, err
 	}
 
 	events, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
-
-	return events, rejected, err
+	return events, rejected, false, err
 }
 
 type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
