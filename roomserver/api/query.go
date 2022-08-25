@@ -227,6 +227,7 @@ type QueryStateAndAuthChainResponse struct {
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
+	StateKnown      bool `json:"state_known"`
 	// The state and auth chain events that were requested.
 	// The lists will be in an arbitrary order.
 	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
