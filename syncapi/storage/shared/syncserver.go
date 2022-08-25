@@ -20,15 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/tidwall/gjson"
+
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
@@ -683,7 +686,7 @@ func (d *Database) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]types.StateDelta, []string, error) {
+) (deltas []types.StateDelta, joinedRoomsIDs []string, err error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
 	// - For each room which has membership list changes:
@@ -717,8 +720,6 @@ func (d *Database) GetStateDeltas(
 			joinedRoomIDs = append(joinedRoomIDs, roomID)
 		}
 	}
-
-	var deltas []types.StateDelta
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
@@ -767,15 +768,11 @@ func (d *Database) GetStateDeltas(
 	}
 
 	// handle newly joined rooms and non-joined rooms
+	newlyJoinedRooms := make(map[string]bool, len(state))
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
-			//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
-			//       dupe join events will result in the entire room state coming down to the client again. This is added in
-			//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
-			//       the timeline.
-			if membership := getMembershipFromEvent(ev.Event, userID); membership != "" {
-				if membership == gomatrixserverlib.Join {
+			if membership, prevMembership := getMembershipFromEvent(ev.Event, userID); membership != "" {
+				if membership == gomatrixserverlib.Join && prevMembership != membership {
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
@@ -786,6 +783,7 @@ func (d *Database) GetStateDeltas(
 						return nil, nil, err
 					}
 					state[roomID] = s
+					newlyJoinedRooms[roomID] = true
 					continue // we'll add this room in when we do joined rooms
 				}
 
@@ -806,6 +804,7 @@ func (d *Database) GetStateDeltas(
 			Membership:  gomatrixserverlib.Join,
 			StateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
 			RoomID:      joinedRoomID,
+			NewlyJoined: newlyJoinedRooms[joinedRoomID],
 		})
 	}
 
@@ -892,7 +891,7 @@ func (d *Database) GetStateDeltasForFullStateSync(
 
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership := getMembershipFromEvent(ev.Event, userID); membership != "" {
+			if membership, _ := getMembershipFromEvent(ev.Event, userID); membership != "" {
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
 					deltas[roomID] = types.StateDelta{
 						Membership:    membership,
@@ -1003,15 +1002,16 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
+func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) (string, string) {
 	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
-		return ""
+		return "", ""
 	}
 	membership, err := ev.Membership()
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	return membership
+	prevMembership := gjson.GetBytes(ev.Unsigned(), "prev_content.membership").Str
+	return membership, prevMembership
 }
 
 // StoreReceipt stores user receipts
