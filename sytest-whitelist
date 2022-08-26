@@ -110,8 +110,6 @@ Newly joined room is included in an incremental sync
 User is offline if they set_presence=offline in their sync
 Changes to state are included in an incremental sync
 A change to displayname should appear in incremental /sync
-Current state appears in timeline in private history
-Current state appears in timeline in private history with many messages before
 Rooms a user is invited to appear in an initial sync
 Rooms a user is invited to appear in an incremental sync
 Sync can be polled for updates
@@ -146,7 +144,6 @@ Server correctly handles incoming m.device_list_update
 If remote user leaves room, changes device and rejoins we see update in sync
 If remote user leaves room, changes device and rejoins we see update in /keys/changes
 If remote user leaves room we no longer receive device updates
-If a device list update goes missing, the server resyncs on the next one
 Server correctly resyncs when client query keys and there is no remote cache
 Server correctly resyncs when server leaves and rejoins a room
 Device list doesn't change if remote server is down
@@ -458,7 +455,6 @@ After changing password, a different session no longer works by default
 Read markers appear in incremental v2 /sync
 Read markers appear in initial v2 /sync
 Read markers can be updated
-Local users can peek into world_readable rooms by room ID
 We can't peek into rooms with shared history_visibility
 We can't peek into rooms with invited history_visibility
 We can't peek into rooms with joined history_visibility
@@ -636,7 +632,6 @@ Test that rejected pushers are removed.
 Trying to add push rule with no scope fails with 400
 Trying to add push rule with invalid scope fails with 400
 Forward extremities remain so even after the next events are populated as outliers
-If a device list update goes missing, the server resyncs on the next one
 uploading self-signing key notifies over federation
 uploading signed devices gets propagated over federation
 Device list doesn't change if remote server is down
@@ -720,4 +715,30 @@ Setting state twice is idempotent
 Joining room twice is idempotent
 Inbound federation can return missing events for shared visibility
 Inbound federation ignores redactions from invalid servers room > v3
+Joining room twice is idempotent
+Getting messages going forward is limited for a departed room (SPEC-216)
+m.room.history_visibility == "shared" allows/forbids appropriately for Guest users
+m.room.history_visibility == "invited" allows/forbids appropriately for Guest users
+m.room.history_visibility == "default" allows/forbids appropriately for Guest users
+m.room.history_visibility == "shared" allows/forbids appropriately for Real users
+m.room.history_visibility == "invited" allows/forbids appropriately for Real users
+m.room.history_visibility == "default" allows/forbids appropriately for Real users
+Guest users can sync from world_readable guest_access rooms if joined
+Guest users can sync from shared guest_access rooms if joined
+Guest users can sync from invited guest_access rooms if joined
+Guest users can sync from joined guest_access rooms if joined
+Guest users can sync from default guest_access rooms if joined
+Real users can sync from world_readable guest_access rooms if joined
+Real users can sync from shared guest_access rooms if joined
+Real users can sync from invited guest_access rooms if joined
+Real users can sync from joined guest_access rooms if joined
+Real users can sync from default guest_access rooms if joined
+Only see history_visibility changes on boundaries
+Current state appears in timeline in private history
+Current state appears in timeline in private history with many messages before
+Local users can peek into world_readable rooms by room ID
 Newly joined room includes presence in incremental sync
+User in private room doesn't appear in user directory
+User joining then leaving public room appears and dissappears from directory
+User in remote room doesn't appear in user directory after server left room
+User in shared private room does appear in user directory until leave

@@ -7,6 +7,7 @@ on:
   pull_request:
   release:
     types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,10 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ false }} # disable for now
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: 1.18
 
@@ -66,8 +67,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
 
   # run go test with different go versions
   test:
@@ -101,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
       - uses: actions/cache@v3
@@ -133,7 +138,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
       - name: Install dependencies x86
@@ -167,7 +172,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup Go ${{ matrix.go }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
       - name: Install dependencies
@@ -208,7 +213,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: "1.18"
       - uses: actions/cache@v3
@@ -233,7 +238,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: "1.18"
       - uses: actions/cache@v3
@@ -371,6 +376,8 @@ jobs:
       # Build initial Dendrite image
       - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Run Complement
       - run: |

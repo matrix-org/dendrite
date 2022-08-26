@@ -113,9 +113,9 @@ func (d *Database) eventStateKeyNIDs(
 }
 
 func (d *Database) StateEntriesForEventIDs(
-	ctx context.Context, eventIDs []string,
+	ctx context.Context, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
-	return d.EventsTable.BulkSelectStateEventByID(ctx, nil, eventIDs)
+	return d.EventsTable.BulkSelectStateEventByID(ctx, nil, eventIDs, excludeRejected)
 }
 
 func (d *Database) StateEntriesForTuples(
@@ -565,6 +565,10 @@ func (d *Database) GetRoomUpdater(
 		return err
 	})
 	return updater, err
+}
+
+func (d *Database) IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (bool, error) {
+	return d.EventsTable.SelectEventRejected(ctx, nil, roomNID, eventID)
 }
 
 func (d *Database) StoreEvent(

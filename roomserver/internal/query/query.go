@@ -21,6 +21,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/acls"
@@ -30,9 +34,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/roomserver/version"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 type Queryer struct {
@@ -71,13 +72,10 @@ func (r *Queryer) QueryStateAfterEvents(
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
-		switch err.(type) {
-		case types.MissingEventError:
-			util.GetLogger(ctx).Errorf("QueryStateAfterEvents: MissingEventError: %s", err)
+		if _, ok := err.(types.MissingEventError); ok {
 			return nil
-		default:
-			return err
 		}
+		return err
 	}
 	response.PrevEventsExist = true
 
@@ -94,6 +92,12 @@ func (r *Queryer) QueryStateAfterEvents(
 		)
 	}
 	if err != nil {
+		if _, ok := err.(types.MissingEventError); ok {
+			return nil
+		}
+		if _, ok := err.(types.MissingStateError); ok {
+			return nil
+		}
 		return err
 	}
 
@@ -202,6 +206,54 @@ func (r *Queryer) QueryMembershipForUser(
 	response.EventID = evs[0].EventID()
 	response.Membership, err = evs[0].Membership()
 	return err
+}
+
+func (r *Queryer) QueryMembershipAtEvent(
+	ctx context.Context,
+	request *api.QueryMembershipAtEventRequest,
+	response *api.QueryMembershipAtEventResponse,
+) error {
+	response.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
+	info, err := r.DB.RoomInfo(ctx, request.RoomID)
+	if err != nil {
+		return fmt.Errorf("unable to get roomInfo: %w", err)
+	}
+	if info == nil {
+		return fmt.Errorf("no roomInfo found")
+	}
+
+	// get the users stateKeyNID
+	stateKeyNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.UserID})
+	if err != nil {
+		return fmt.Errorf("unable to get stateKeyNIDs for %s: %w", request.UserID, err)
+	}
+	if _, ok := stateKeyNIDs[request.UserID]; !ok {
+		return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
+	}
+
+	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, request.EventIDs, stateKeyNIDs[request.UserID])
+	if err != nil {
+		return fmt.Errorf("unable to get state before event: %w", err)
+	}
+
+	for _, eventID := range request.EventIDs {
+		stateEntry := stateEntries[eventID]
+		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+		if err != nil {
+			return fmt.Errorf("unable to get memberships at state: %w", err)
+		}
+		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
+
+		for i := range memberships {
+			ev := memberships[i]
+			if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
+				res = append(res, ev.Headered(info.RoomVersion))
+			}
+		}
+		response.Memberships[eventID] = res
+	}
+
+	return nil
 }
 
 // QueryMembershipsForRoom implements api.RoomserverInternalAPI
@@ -451,10 +503,11 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	var stateEvents []*gomatrixserverlib.Event
-	stateEvents, rejected, err := r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
+	stateEvents, rejected, stateMissing, err := r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
 	if err != nil {
 		return err
 	}
+	response.StateKnown = !stateMissing
 	response.IsRejected = rejected
 	response.PrevEventsExist = true
 
@@ -490,15 +543,18 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, bool, error) {
+// first bool: is rejected, second bool: state missing
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, bool, bool, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
 		switch err.(type) {
 		case types.MissingEventError:
-			return nil, false, nil
+			return nil, false, true, nil
+		case types.MissingStateError:
+			return nil, false, true, nil
 		default:
-			return nil, false, err
+			return nil, false, false, err
 		}
 	}
 	// Currently only used on /state and /state_ids
@@ -515,12 +571,11 @@ func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomI
 		ctx, prevStates,
 	)
 	if err != nil {
-		return nil, rejected, err
+		return nil, rejected, false, err
 	}
 
 	events, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
-
-	return events, rejected, err
+	return events, rejected, false, err
 }
 
 type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
@@ -684,7 +739,7 @@ func (r *Queryer) QueryRoomsForUser(ctx context.Context, req *api.QueryRoomsForU
 
 func (r *Queryer) QueryKnownUsers(ctx context.Context, req *api.QueryKnownUsersRequest, res *api.QueryKnownUsersResponse) error {
 	users, err := r.DB.GetKnownUsers(ctx, req.UserID, req.SearchString, req.Limit)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 	for _, user := range users {
