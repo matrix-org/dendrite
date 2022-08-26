@@ -19,6 +19,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // SendEvents to the roomserver The events are written with KindNew.
@@ -68,6 +69,13 @@ func SendEventWithState(
 	for i := range stateEvents {
 		stateEventIDs[i] = stateEvents[i].EventID()
 	}
+
+	logrus.WithContext(ctx).WithFields(logrus.Fields{
+		"room_id":   event.RoomID(),
+		"event_id":  event.EventID(),
+		"outliers":  len(ires),
+		"state_ids": len(stateEventIDs),
+	}).Infof("Submitting %q event to roomserver with state snapshot", event.Type())
 
 	ires = append(ires, InputRoomEvent{
 		Kind:          kind,

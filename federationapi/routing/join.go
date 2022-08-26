@@ -329,6 +329,12 @@ func SendJoin(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	}
+	if !stateAndAuthChainResponse.StateKnown {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("State not known"),
+		}
+	}
 
 	// Check if the user is already in the room. If they're already in then
 	// there isn't much point in sending another join event into the room.

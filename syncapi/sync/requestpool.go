@@ -307,8 +307,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				return giveup()
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
-				syncReq.Log.Debugln("Responding to sync after wake-up")
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+				syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync after wake-up")
 			}
 		} else {
 			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
