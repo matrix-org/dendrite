@@ -164,6 +164,12 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	for _, event := range evs {
 		eventsBefore, eventsAfter, err := contextEvents(ctx, syncDB, event, roomFilter, searchReq)
 		if err != nil {
+			logrus.WithError(err).Error("failed to get context events")
+			return jsonerror.InternalServerError()
+		}
+		startToken, endToken, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
+		if err != nil {
+			logrus.WithError(err).Error("failed to get start/end")
 			return jsonerror.InternalServerError()
 		}
 
@@ -188,22 +194,16 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 			profileInfos[ev.Sender()] = profile
 		}
 
-		r := gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll)
-		s, e, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
-		if err != nil {
-			logrus.WithError(err).Error("failed to get start/end")
-			return jsonerror.InternalServerError()
-		}
 		results = append(results, Result{
 			Context: SearchContextResponse{
-				Start:        s.String(),
-				End:          e.String(),
+				Start:        startToken.String(),
+				End:          endToken.String(),
 				EventsAfter:  gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatSync),
 				EventsBefore: gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatSync),
 				ProfileInfo:  profileInfos,
 			},
 			Rank:   eventScore[event.EventID()].Score,
-			Result: r,
+			Result: gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll),
 		})
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
