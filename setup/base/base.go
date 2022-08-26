@@ -210,6 +210,20 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		logrus.Debug("Using global database connection pool")
 	}
 
+	processContext := process.NewProcessContext()
+	dendriteAdminMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath()
+
+	dendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+	dendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+		if processContext.IsDegraded() {
+			w.WriteHeader(503)
+			return
+		}
+		w.WriteHeader(200)
+	})
+
 	// Ideally we would only use SkipClean on routes which we know can allow '/' but due to
 	// https://github.com/gorilla/mux/issues/460 we have to attach this at the top router.
 	// When used in conjunction with UseEncodedPath() we get the behaviour we want when parsing
@@ -223,7 +237,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	// directory traversal attack e.g /../../../etc/passwd
 
 	return &BaseDendrite{
-		ProcessContext:         process.NewProcessContext(),
+		ProcessContext:         processContext,
 		componentName:          componentName,
 		UseHTTPAPIs:            useHTTPAPIs,
 		tracerCloser:           closer,
@@ -236,7 +250,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
-		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
+		DendriteAdminMux:       dendriteAdminMux,
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
 		NATS:                   &jetstream.NATSInstance{},
 		apiHttpClient:          &apiClient,
@@ -434,17 +448,6 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	if b.Cfg.Global.Metrics.Enabled {
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
-
-	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
-		if b.ProcessContext.IsDegraded() {
-			w.WriteHeader(503)
-			return
-		}
-		w.WriteHeader(200)
-	})
 
 	var clientHandler http.Handler
 	clientHandler = b.PublicClientAPIMux
