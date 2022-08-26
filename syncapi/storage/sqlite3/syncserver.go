@@ -16,6 +16,7 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -42,13 +43,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
-	if err = d.prepare(dbProperties); err != nil {
+	if err = d.prepare(base.Context()); err != nil {
 		return nil, err
 	}
 	return &d, nil
 }
 
-func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (err error) {
+func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
-	notificationData, err := NewSqliteNotificationDataTable(d.db)
+	notificationData, err := NewSqliteNotificationDataTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
@@ -108,10 +109,17 @@ func (d *SyncServerDatasource) prepare(dbProperties *config.DatabaseOptions) (er
 	if err != nil {
 		return err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+
+	// apply migrations which need multiple tables
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "syncapi: set history visibility for existing events",
+			Up:      deltas.UpSetHistoryVisibility, // Requires current_room_state and output_room_events to be created.
+		},
+	)
+	err = m.Up(ctx)
+	if err != nil {
 		return err
 	}
 	d.Database = shared.Database{

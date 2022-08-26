@@ -20,6 +20,12 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -34,11 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/nats-io/nats.go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
@@ -48,7 +49,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
+	publicAPIMux, wkMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
@@ -72,6 +73,26 @@ func Setup(
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
+	}
+
+	if cfg.Matrix.WellKnownClientName != "" {
+		logrus.Infof("Setting m.homeserver base_url as %s at /.well-known/matrix/client", cfg.Matrix.WellKnownClientName)
+		wkMux.Handle("/client", httputil.MakeExternalAPI("wellknown", func(r *http.Request) util.JSONResponse {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: struct {
+					HomeserverName struct {
+						BaseUrl string `json:"base_url"`
+					} `json:"m.homeserver"`
+				}{
+					HomeserverName: struct {
+						BaseUrl string `json:"base_url"`
+					}{
+						BaseUrl: cfg.Matrix.WellKnownClientName,
+					},
+				},
+			}
+		})).Methods(http.MethodGet, http.MethodOptions)
 	}
 
 	publicAPIMux.Handle("/versions",
@@ -124,16 +145,22 @@ func Setup(
 	}
 
 	dendriteAdminRouter.Handle("/admin/evacuateRoom/{roomID}",
-		httputil.MakeAuthAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateRoom(req, device, rsAPI)
+		httputil.MakeAdminAPI("admin_evacuate_room", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateRoom(req, cfg, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/evacuateUser/{userID}",
-		httputil.MakeAuthAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return AdminEvacuateUser(req, device, rsAPI)
+		httputil.MakeAdminAPI("admin_evacuate_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminEvacuateUser(req, cfg, device, rsAPI)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/resetPassword/{localpart}",
+		httputil.MakeAdminAPI("admin_reset_password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminResetPassword(req, cfg, device, userAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 
 	dendriteAdminRouter.Handle("/admin/fulltext/reindex",
 		httputil.MakeAuthAPI("admin_fultext_reindex", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -915,12 +942,12 @@ func Setup(
 			return SearchUserDirectory(
 				req.Context(),
 				device,
-				userAPI,
 				rsAPI,
 				userDirectoryProvider,
-				cfg.Matrix.ServerName,
 				postContent.SearchString,
 				postContent.Limit,
+				federation,
+				cfg.Matrix.ServerName,
 			)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)

@@ -23,6 +23,12 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -32,11 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
@@ -138,7 +139,7 @@ func (s *OutputClientDataConsumer) Start() error {
 				}
 				elements = append(elements, e)
 			}
-			if err = s.fts.BatchIndex(elements); err != nil {
+			if err = s.fts.Index(elements...); err != nil {
 				logrus.WithError(err).Error("unable to index events")
 				continue
 			}
@@ -184,7 +185,8 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg)
 			"type":       output.Type,
 			"room_id":    output.RoomID,
 			log.ErrorKey: err,
-		}).Panicf("could not save account data")
+		}).Errorf("could not save account data")
+		return false
 	}
 
 	if err = s.sendReadUpdate(ctx, userID, output); err != nil {

@@ -15,7 +15,7 @@
 package routing
 
 import (
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 
@@ -175,7 +175,7 @@ func DeleteDeviceById(
 	}()
 	ctx := req.Context()
 	defer req.Body.Close() // nolint:errcheck
-	bodyBytes, err := ioutil.ReadAll(req.Body)
+	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

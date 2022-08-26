@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -11,18 +12,13 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
-func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
-	if device.AccountType != userapi.AccountTypeAdmin {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("This API can only be used by admin users."),
-		}
-	}
+func AdminEvacuateRoom(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -35,13 +31,15 @@ func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserv
 		}
 	}
 	res := &roomserverAPI.PerformAdminEvacuateRoomResponse{}
-	rsAPI.PerformAdminEvacuateRoom(
+	if err := rsAPI.PerformAdminEvacuateRoom(
 		req.Context(),
 		&roomserverAPI.PerformAdminEvacuateRoomRequest{
 			RoomID: roomID,
 		},
 		res,
-	)
+	); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if err := res.Error; err != nil {
 		return err.JSONResponse()
 	}
@@ -53,13 +51,7 @@ func AdminEvacuateRoom(req *http.Request, device *userapi.Device, rsAPI roomserv
 	}
 }
 
-func AdminEvacuateUser(req *http.Request, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
-	if device.AccountType != userapi.AccountTypeAdmin {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("This API can only be used by admin users."),
-		}
-	}
+func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
@@ -71,14 +63,26 @@ func AdminEvacuateUser(req *http.Request, device *userapi.Device, rsAPI roomserv
 			JSON: jsonerror.MissingArgument("Expecting user ID."),
 		}
 	}
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return util.MessageResponse(http.StatusBadRequest, err.Error())
+	}
+	if domain != cfg.Matrix.ServerName {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("User ID must belong to this server."),
+		}
+	}
 	res := &roomserverAPI.PerformAdminEvacuateUserResponse{}
-	rsAPI.PerformAdminEvacuateUser(
+	if err := rsAPI.PerformAdminEvacuateUser(
 		req.Context(),
 		&roomserverAPI.PerformAdminEvacuateUserRequest{
 			UserID: userID,
 		},
 		res,
-	)
+	); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if err := res.Error; err != nil {
 		return err.JSONResponse()
 	}
@@ -86,6 +90,55 @@ func AdminEvacuateUser(req *http.Request, device *userapi.Device, rsAPI roomserv
 		Code: 200,
 		JSON: map[string]interface{}{
 			"affected": res.Affected,
+		},
+	}
+}
+
+func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	localpart, ok := vars["localpart"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting user localpart."),
+		}
+	}
+	request := struct {
+		Password string `json:"password"`
+	}{}
+	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Failed to decode request body: " + err.Error()),
+		}
+	}
+	if request.Password == "" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting non-empty password."),
+		}
+	}
+	updateReq := &userapi.PerformPasswordUpdateRequest{
+		Localpart:     localpart,
+		Password:      request.Password,
+		LogoutDevices: true,
+	}
+	updateRes := &userapi.PerformPasswordUpdateResponse{}
+	if err := userAPI.PerformPasswordUpdate(req.Context(), updateReq, updateRes); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Failed to perform password update: " + err.Error()),
+		}
+	}
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct {
+			Updated bool `json:"password_updated"`
+		}{
+			Updated: updateRes.PasswordUpdated,
 		},
 	}
 }

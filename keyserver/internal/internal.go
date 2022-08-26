@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -47,18 +48,20 @@ func (a *KeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
 	a.UserAPI = i
 }
 
-func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) {
+func (a *KeyInternalAPI) QueryKeyChanges(ctx context.Context, req *api.QueryKeyChangesRequest, res *api.QueryKeyChangesResponse) error {
 	userIDs, latest, err := a.DB.KeyChanges(ctx, req.Offset, req.ToOffset)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: err.Error(),
 		}
+		return nil
 	}
 	res.Offset = latest
 	res.UserIDs = userIDs
+	return nil
 }
 
-func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) {
+func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.PerformUploadKeysRequest, res *api.PerformUploadKeysResponse) error {
 	res.KeyErrors = make(map[string]map[string]*api.KeyError)
 	if len(req.DeviceKeys) > 0 {
 		a.uploadLocalDeviceKeys(ctx, req, res)
@@ -66,9 +69,10 @@ func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perform
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
+	return nil
 }
 
-func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) {
+func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformClaimKeysRequest, res *api.PerformClaimKeysResponse) error {
 	res.OneTimeKeys = make(map[string]map[string]map[string]json.RawMessage)
 	res.Failures = make(map[string]interface{})
 	// wrap request map in a top-level by-domain map
@@ -112,6 +116,7 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 	if len(domainToDeviceKeys) > 0 {
 		a.claimRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
 	}
+	return nil
 }
 
 func (a *KeyInternalAPI) claimRemoteKeys(
@@ -171,32 +176,34 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
 }
 
-func (a *KeyInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) {
+func (a *KeyInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) error {
 	if err := a.DB.DeleteDeviceKeys(ctx, req.UserID, req.KeyIDs); err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("Failed to delete device keys: %s", err),
 		}
 	}
+	return nil
 }
 
-func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) {
+func (a *KeyInternalAPI) QueryOneTimeKeys(ctx context.Context, req *api.QueryOneTimeKeysRequest, res *api.QueryOneTimeKeysResponse) error {
 	count, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("Failed to query OTK counts: %s", err),
 		}
-		return
+		return nil
 	}
 	res.Count = *count
+	return nil
 }
 
-func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.QueryDeviceMessagesRequest, res *api.QueryDeviceMessagesResponse) {
+func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.QueryDeviceMessagesRequest, res *api.QueryDeviceMessagesResponse) error {
 	msgs, err := a.DB.DeviceKeysForUser(ctx, req.UserID, nil, false)
 	if err != nil {
 		res.Error = &api.KeyError{
 			Err: fmt.Sprintf("failed to query DB for device keys: %s", err),
 		}
-		return
+		return nil
 	}
 	maxStreamID := int64(0)
 	for _, m := range msgs {
@@ -214,10 +221,11 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 	}
 	res.Devices = result
 	res.StreamID = maxStreamID
+	return nil
 }
 
 // nolint:gocyclo
-func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) {
+func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) error {
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.MasterKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.SelfSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
@@ -243,7 +251,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 				res.Error = &api.KeyError{
 					Err: fmt.Sprintf("failed to query local device keys: %s", err),
 				}
-				return
+				return nil
 			}
 
 			// pull out display names after we have the keys so we handle wildcards correctly
@@ -314,6 +322,11 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		for targetKeyID := range masterKey.Keys {
 			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, targetKeyID)
 			if err != nil {
+				// Stop executing the function if the context was canceled/the deadline was exceeded,
+				// as we can't continue without a valid context.
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return nil
+				}
 				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
 				continue
 			}
@@ -335,6 +348,11 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		for targetKeyID, key := range forUserID {
 			sigMap, err := a.DB.CrossSigningSigsForTarget(ctx, req.UserID, targetUserID, gomatrixserverlib.KeyID(targetKeyID))
 			if err != nil {
+				// Stop executing the function if the context was canceled/the deadline was exceeded,
+				// as we can't continue without a valid context.
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return nil
+				}
 				logrus.WithError(err).Errorf("a.DB.CrossSigningSigsForTarget failed")
 				continue
 			}
@@ -361,6 +379,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 			}
 		}
 	}
+	return nil
 }
 
 func (a *KeyInternalAPI) remoteKeysFromDatabase(

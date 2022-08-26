@@ -12,10 +12,13 @@ import (
 )
 
 type dummyPublisher struct {
+	lock  sync.Mutex
 	count int
 }
 
 func (d *dummyPublisher) SendPresence(userID string, presence types.Presence, statusMsg *string) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	d.count++
 	return nil
 }
@@ -40,7 +43,7 @@ func (d dummyDB) MaxStreamPositionForPresence(ctx context.Context) (types.Stream
 
 type dummyConsumer struct{}
 
-func (d dummyConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool) {
+func (d dummyConsumer) EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool) {
 
 }
 
@@ -125,11 +128,15 @@ func TestRequestPool_updatePresence(t *testing.T) {
 	go rp.cleanPresence(db, time.Millisecond*50)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			publisher.lock.Lock()
 			beforeCount := publisher.count
+			publisher.lock.Unlock()
 			rp.updatePresence(db, tt.args.presence, tt.args.userID)
+			publisher.lock.Lock()
 			if tt.wantIncrease && publisher.count <= beforeCount {
 				t.Fatalf("expected count to increase: %d <= %d", publisher.count, beforeCount)
 			}
+			publisher.lock.Unlock()
 			time.Sleep(tt.args.sleep)
 		})
 	}

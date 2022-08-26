@@ -25,20 +25,22 @@ import (
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/roomserver/acls"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // Inputer is responsible for consuming from the roomserver input
@@ -60,9 +62,9 @@ import (
 // per-room durable consumers will only progress through the stream
 // as events are processed.
 //
-//       A BC *  -> positions of each consumer (* = ephemeral)
-//       ⌄ ⌄⌄ ⌄
-// ABAABCAABCAA  -> newest (letter = subject for each message)
+//	      A BC *  -> positions of each consumer (* = ephemeral)
+//	      ⌄ ⌄⌄ ⌄
+//	ABAABCAABCAA  -> newest (letter = subject for each message)
 //
 // In this example, A is still processing an event but has two
 // pending events to process afterwards. Both B and C are caught
@@ -246,14 +248,24 @@ func (w *worker) _next() {
 	// it was a synchronous request.
 	var errString string
 	if err = w.r.processRoomEvent(w.r.ProcessContext.Context(), &inputRoomEvent); err != nil {
-		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-			sentry.CaptureException(err)
+		switch err.(type) {
+		case types.RejectedError:
+			// Don't send events that were rejected to Sentry
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver rejected event")
+		default:
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				sentry.CaptureException(err)
+			}
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver failed to process event")
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"room_id":  w.roomID,
-			"event_id": inputRoomEvent.Event.EventID(),
-			"type":     inputRoomEvent.Event.Type(),
-		}).Warn("Roomserver failed to process async event")
 		_ = msg.Term()
 		errString = err.Error()
 	} else {
@@ -336,18 +348,18 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) {
+) error {
 	// Queue up the event into the roomserver.
 	replySub, err := r.queueInputRoomEvents(ctx, request)
 	if err != nil {
 		response.ErrMsg = err.Error()
-		return
+		return nil
 	}
 
 	// If we aren't waiting for synchronous responses then we can
 	// give up here, there is nothing further to do.
 	if replySub == nil {
-		return
+		return nil
 	}
 
 	// Otherwise, we'll want to sit and wait for the responses
@@ -359,12 +371,14 @@ func (r *Inputer) InputRoomEvents(
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()
-			return
+			return nil
 		}
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
 	}
+
+	return nil
 }
 
 var roomserverInputBackpressure = prometheus.NewGaugeVec(

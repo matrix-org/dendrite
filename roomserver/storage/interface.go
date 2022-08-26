@@ -79,7 +79,7 @@ type Database interface {
 	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
 	// Returns a types.MissingEventError if the event IDs aren't in the database.
-	StateEntriesForEventIDs(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
+	StateEntriesForEventIDs(ctx context.Context, eventIDs []string, excludeRejected bool) ([]types.StateEntry, error)
 	// Look up the string event state keys for a list of numeric event state keys
 	// Returns an error if there was a problem talking to the database.
 	EventStateKeys(ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error)
@@ -94,6 +94,8 @@ type Database interface {
 	// Opens and returns a room updater, which locks the room and opens a transaction.
 	// The GetRoomUpdater must have Commit or Rollback called on it if this doesn't return an error.
 	// If this returns an error then no further action is required.
+	// IsEventRejected returns true if the event is known and rejected.
+	IsEventRejected(ctx context.Context, roomNID types.RoomNID, eventID string) (rejected bool, err error)
 	GetRoomUpdater(ctx context.Context, roomInfo *types.RoomInfo) (*shared.RoomUpdater, error)
 	// Look up event references for the latest events in the room and the current state snapshot.
 	// Returns the latest events, the current state and the maximum depth of the latest events plus 1.
@@ -166,4 +168,6 @@ type Database interface {
 	GetKnownRooms(ctx context.Context) ([]string, error)
 	// ForgetRoom sets a flag in the membership table, that the user wishes to forget a specific room
 	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
+
+	GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error)
 }

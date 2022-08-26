@@ -16,7 +16,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -181,7 +181,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Read the application service's config file
-		configData, err := ioutil.ReadFile(absPath)
+		configData, err := os.ReadFile(absPath)
 		if err != nil {
 			return err
 		}

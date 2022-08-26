@@ -27,9 +27,10 @@ import (
 
 	"github.com/matrix-org/util"
 
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dugong"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 type utcFormatter struct {
@@ -145,7 +146,7 @@ func setupFileHook(hook config.LogrusHook, level logrus.Level, componentName str
 	})
 }
 
-//CloseAndLogIfError Closes io.Closer and logs the error if any
+// CloseAndLogIfError Closes io.Closer and logs the error if any
 func CloseAndLogIfError(ctx context.Context, closer io.Closer, message string) {
 	if closer == nil {
 		return

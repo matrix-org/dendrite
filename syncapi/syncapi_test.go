@@ -3,12 +3,20 @@ package syncapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/clientapi/producers"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -17,9 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/tidwall/gjson"
 )
 
 type syncRoomserverAPI struct {
@@ -51,6 +56,16 @@ func (s *syncRoomserverAPI) QueryBulkStateContent(ctx context.Context, req *rsap
 	return nil
 }
 
+func (s *syncRoomserverAPI) QueryMembershipForUser(ctx context.Context, req *rsapi.QueryMembershipForUserRequest, res *rsapi.QueryMembershipForUserResponse) error {
+	res.IsRoomForgotten = false
+	res.RoomExists = true
+	return nil
+}
+
+func (s *syncRoomserverAPI) QueryMembershipAtEvent(ctx context.Context, req *rsapi.QueryMembershipAtEventRequest, res *rsapi.QueryMembershipAtEventResponse) error {
+	return nil
+}
+
 type syncUserAPI struct {
 	userapi.SyncUserAPI
 	accounts []userapi.Device
@@ -75,10 +90,11 @@ type syncKeyAPI struct {
 	keyapi.SyncKeyAPI
 }
 
-func (s *syncKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) {
+func (s *syncKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) error {
+	return nil
 }
-func (s *syncKeyAPI) QueryOneTimeKeys(ctx context.Context, req *keyapi.QueryOneTimeKeysRequest, res *keyapi.QueryOneTimeKeysResponse) {
-
+func (s *syncKeyAPI) QueryOneTimeKeys(ctx context.Context, req *keyapi.QueryOneTimeKeysRequest, res *keyapi.QueryOneTimeKeysResponse) error {
+	return nil
 }
 
 func TestSyncAPIAccessTokens(t *testing.T) {
@@ -103,7 +119,7 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
-	msgs := toNATSMsgs(t, base, room.Events())
+	msgs := toNATSMsgs(t, base, room.Events()...)
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
 	testrig.MustPublishMsgs(t, jsctx, msgs...)
 
@@ -138,8 +154,12 @@ func testSyncAccessTokens(t *testing.T, dbType test.DBType) {
 			wantJoinedRooms: []string{room.ID},
 		},
 	}
-	// TODO: find a better way
-	time.Sleep(500 * time.Millisecond)
+
+	syncUntil(t, base, alice.AccessToken, false, func(syncBody string) bool {
+		// wait for the last sent eventID to come down sync
+		path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+		return gjson.Get(syncBody, path).Exists()
+	})
 
 	for _, tc := range testCases {
 		w := httptest.NewRecorder()
@@ -175,6 +195,7 @@ func TestSyncAPICreateRoomSyncEarly(t *testing.T) {
 }
 
 func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
+	t.Skip("Skipped, possibly fixed")
 	user := test.NewUser(t)
 	room := test.NewRoom(t, user)
 	alice := userapi.Device{
@@ -196,7 +217,7 @@ func testSyncAPICreateRoomSyncEarly(t *testing.T, dbType test.DBType) {
 	// m.room.power_levels
 	// m.room.join_rules
 	// m.room.history_visibility
-	msgs := toNATSMsgs(t, base, room.Events())
+	msgs := toNATSMsgs(t, base, room.Events()...)
 	sinceTokens := make([]string, len(msgs))
 	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{rooms: []*test.Room{room}}, &syncKeyAPI{})
 	for i, msg := range msgs {
@@ -311,7 +332,372 @@ func testSyncAPIUpdatePresenceImmediately(t *testing.T, dbType test.DBType) {
 
 }
 
-func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input []*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
+// This is mainly what Sytest is doing in "test_history_visibility"
+func TestMessageHistoryVisibility(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		testHistoryVisibility(t, dbType)
+	})
+}
+
+func testHistoryVisibility(t *testing.T, dbType test.DBType) {
+	type result struct {
+		seeWithoutJoin bool
+		seeBeforeJoin  bool
+		seeAfterInvite bool
+	}
+
+	// create the users
+	alice := test.NewUser(t)
+	aliceDev := userapi.Device{
+		ID:          "ALICEID",
+		UserID:      alice.ID,
+		AccessToken: "ALICE_BEARER_TOKEN",
+		DisplayName: "ALICE",
+	}
+
+	bob := test.NewUser(t)
+
+	bobDev := userapi.Device{
+		ID:          "BOBID",
+		UserID:      bob.ID,
+		AccessToken: "BOD_BEARER_TOKEN",
+		DisplayName: "BOB",
+	}
+
+	ctx := context.Background()
+	// check guest and normal user accounts
+	for _, accType := range []userapi.AccountType{userapi.AccountTypeGuest, userapi.AccountTypeUser} {
+		testCases := []struct {
+			historyVisibility gomatrixserverlib.HistoryVisibility
+			wantResult        result
+		}{
+			{
+				historyVisibility: gomatrixserverlib.HistoryVisibilityWorldReadable,
+				wantResult: result{
+					seeWithoutJoin: true,
+					seeBeforeJoin:  true,
+					seeAfterInvite: true,
+				},
+			},
+			{
+				historyVisibility: gomatrixserverlib.HistoryVisibilityShared,
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  true,
+					seeAfterInvite: true,
+				},
+			},
+			{
+				historyVisibility: gomatrixserverlib.HistoryVisibilityInvited,
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  false,
+					seeAfterInvite: true,
+				},
+			},
+			{
+				historyVisibility: gomatrixserverlib.HistoryVisibilityJoined,
+				wantResult: result{
+					seeWithoutJoin: false,
+					seeBeforeJoin:  false,
+					seeAfterInvite: false,
+				},
+			},
+		}
+
+		bobDev.AccountType = accType
+		userType := "guest"
+		if accType == userapi.AccountTypeUser {
+			userType = "real user"
+		}
+
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
+
+		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+
+		// Use the actual internal roomserver API
+		rsAPI := roomserver.NewInternalAPI(base)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, &syncKeyAPI{})
+
+		for _, tc := range testCases {
+			testname := fmt.Sprintf("%s - %s", tc.historyVisibility, userType)
+			t.Run(testname, func(t *testing.T) {
+				// create a room with the given visibility
+				room := test.NewRoom(t, alice, test.RoomHistoryVisibility(tc.historyVisibility))
+
+				// send the events/messages to NATS to create the rooms
+				beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
+				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
+				eventsToSend := append(room.Events(), beforeJoinEv)
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
+				syncUntil(t, base, aliceDev.AccessToken, false,
+					func(syncBody string) bool {
+						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, beforeJoinBody)
+						return gjson.Get(syncBody, path).Exists()
+					},
+				)
+
+				// There is only one event, we expect only to be able to see this, if the room is world_readable
+				w := httptest.NewRecorder()
+				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": bobDev.AccessToken,
+					"dir":          "b",
+				})))
+				if w.Code != 200 {
+					t.Logf("%s", w.Body.String())
+					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+				}
+				// We only care about the returned events at this point
+				var res struct {
+					Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
+				}
+				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+					t.Errorf("failed to decode response body: %s", err)
+				}
+
+				verifyEventVisible(t, tc.wantResult.seeWithoutJoin, beforeJoinEv, res.Chunk)
+
+				// Create invite, a message, join the room and create another message.
+				inviteEv := room.CreateAndInsert(t, alice, "m.room.member", map[string]interface{}{"membership": "invite"}, test.WithStateKey(bob.ID))
+				afterInviteEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": fmt.Sprintf("After invite in a %s room", tc.historyVisibility)})
+				joinEv := room.CreateAndInsert(t, bob, "m.room.member", map[string]interface{}{"membership": "join"}, test.WithStateKey(bob.ID))
+				afterJoinBody := fmt.Sprintf("After join in a %s room", tc.historyVisibility)
+				msgEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": afterJoinBody})
+
+				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
+
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
+				syncUntil(t, base, aliceDev.AccessToken, false,
+					func(syncBody string) bool {
+						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(content.body=="%s")`, room.ID, afterJoinBody)
+						return gjson.Get(syncBody, path).Exists()
+					},
+				)
+
+				// Verify the messages after/before invite are visible or not
+				w = httptest.NewRecorder()
+				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": bobDev.AccessToken,
+					"dir":          "b",
+				})))
+				if w.Code != 200 {
+					t.Logf("%s", w.Body.String())
+					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+				}
+				if err := json.NewDecoder(w.Body).Decode(&res); err != nil {
+					t.Errorf("failed to decode response body: %s", err)
+				}
+				// verify results
+				verifyEventVisible(t, tc.wantResult.seeBeforeJoin, beforeJoinEv, res.Chunk)
+				verifyEventVisible(t, tc.wantResult.seeAfterInvite, afterInviteEv, res.Chunk)
+			})
+		}
+	}
+}
+
+func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatrixserverlib.HeaderedEvent, chunk []gomatrixserverlib.ClientEvent) {
+	t.Helper()
+	if wantVisible {
+		for _, ev := range chunk {
+			if ev.EventID == wantVisibleEvent.EventID() {
+				return
+			}
+		}
+		t.Fatalf("expected to see event %s but didn't: %+v", wantVisibleEvent.EventID(), chunk)
+	} else {
+		for _, ev := range chunk {
+			if ev.EventID == wantVisibleEvent.EventID() {
+				t.Fatalf("expected not to see event %s: %+v", wantVisibleEvent.EventID(), string(ev.Content))
+			}
+		}
+	}
+}
+
+func TestSendToDevice(t *testing.T) {
+	test.WithAllDatabases(t, testSendToDevice)
+}
+
+func testSendToDevice(t *testing.T, dbType test.DBType) {
+	user := test.NewUser(t)
+	alice := userapi.Device{
+		ID:          "ALICEID",
+		UserID:      user.ID,
+		AccessToken: "ALICE_BEARER_TOKEN",
+		DisplayName: "Alice",
+		AccountType: userapi.AccountTypeUser,
+	}
+
+	base, baseClose := testrig.CreateBaseDendrite(t, dbType)
+	defer baseClose()
+
+	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+
+	AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{alice}}, &syncRoomserverAPI{}, &syncKeyAPI{})
+
+	producer := producers.SyncAPIProducer{
+		TopicSendToDeviceEvent: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		JetStream:              jsctx,
+	}
+
+	msgCounter := 0
+
+	testCases := []struct {
+		name              string
+		since             string
+		want              []string
+		sendMessagesCount int
+	}{
+		{
+			name: "initial sync, no messages",
+			want: []string{},
+		},
+		{
+			name:              "initial sync, one new message",
+			sendMessagesCount: 1,
+			want: []string{
+				"message 1",
+			},
+		},
+		{
+			name:              "initial sync, two new messages", // we didn't advance the since token, so we'll receive two messages
+			sendMessagesCount: 1,
+			want: []string{
+				"message 1",
+				"message 2",
+			},
+		},
+		{
+			name:  "incremental sync, one message", // this deletes message 1, as we advanced the since token
+			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
+			want: []string{
+				"message 2",
+			},
+		},
+		{
+			name:  "failed incremental sync, one message", // didn't advance since, so still the same message
+			since: types.StreamingToken{SendToDevicePosition: 1}.String(),
+			want: []string{
+				"message 2",
+			},
+		},
+		{
+			name:  "incremental sync, no message",                         // this should delete message 2
+			since: types.StreamingToken{SendToDevicePosition: 2}.String(), // next_batch from previous sync
+			want:  []string{},
+		},
+		{
+			name:              "incremental sync, three new messages",
+			since:             types.StreamingToken{SendToDevicePosition: 2}.String(),
+			sendMessagesCount: 3,
+			want: []string{
+				"message 3", // message 2 was deleted in the previous test
+				"message 4",
+				"message 5",
+			},
+		},
+		{
+			name: "initial sync, three messages", // we expect three messages, as we didn't go beyond "2"
+			want: []string{
+				"message 3",
+				"message 4",
+				"message 5",
+			},
+		},
+		{
+			name:  "incremental sync, no messages", // advance the sync token, no new messages
+			since: types.StreamingToken{SendToDevicePosition: 5}.String(),
+			want:  []string{},
+		},
+	}
+
+	ctx := context.Background()
+	for _, tc := range testCases {
+		// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
+		for i := 0; i < tc.sendMessagesCount; i++ {
+			msgCounter++
+			msg := map[string]string{
+				"dummy": fmt.Sprintf("message %d", msgCounter),
+			}
+			if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
+				t.Fatalf("unable to send to device message: %v", err)
+			}
+		}
+
+		syncUntil(t, base, alice.AccessToken,
+			len(tc.want) == 0,
+			func(body string) bool {
+				return gjson.Get(body, fmt.Sprintf(`to_device.events.#(content.dummy=="message %d")`, msgCounter)).Exists()
+			},
+		)
+
+		// Execute a /sync request, recording the response
+		w := httptest.NewRecorder()
+		base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+			"access_token": alice.AccessToken,
+			"since":        tc.since,
+		})))
+
+		// Extract the to_device.events, # gets all values of an array, in this case a string slice with "message $counter" entries
+		events := gjson.Get(w.Body.String(), "to_device.events.#.content.dummy").Array()
+		got := make([]string, len(events))
+		for i := range events {
+			got[i] = events[i].String()
+		}
+
+		// Ensure the messages we received are as we expect them to be
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Logf("[%s|since=%s]: Sync: %s", tc.name, tc.since, w.Body.String())
+			t.Fatalf("[%s|since=%s]: got: %+v, want: %+v", tc.name, tc.since, got, tc.want)
+		}
+	}
+}
+
+func syncUntil(t *testing.T,
+	base *base.BaseDendrite, accessToken string,
+	skip bool,
+	checkFunc func(syncBody string) bool,
+) {
+	if checkFunc == nil {
+		t.Fatalf("No checkFunc defined")
+	}
+	if skip {
+		return
+	}
+	// loop on /sync until we receive the last send message or timeout after 5 seconds, since we don't know if the message made it
+	// to the syncAPI when hitting /sync
+	done := make(chan bool)
+	defer close(done)
+	go func() {
+		for {
+			w := httptest.NewRecorder()
+			base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", "/_matrix/client/v3/sync", test.WithQueryParams(map[string]string{
+				"access_token": accessToken,
+				"timeout":      "1000",
+			})))
+			if checkFunc(w.Body.String()) {
+				done <- true
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second * 5):
+		t.Fatalf("Timed out waiting for messages")
+	}
+}
+
+func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input ...*gomatrixserverlib.HeaderedEvent) []*nats.Msg {
 	result := make([]*nats.Msg, len(input))
 	for i, ev := range input {
 		var addsStateIDs []string
@@ -323,6 +709,7 @@ func toNATSMsgs(t *testing.T, base *base.BaseDendrite, input []*gomatrixserverli
 			NewRoomEvent: &rsapi.OutputNewRoomEvent{
 				Event:             ev,
 				AddsStateEventIDs: addsStateIDs,
+				HistoryVisibility: ev.Visibility,
 			},
 		})
 	}

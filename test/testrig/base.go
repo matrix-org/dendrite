@@ -22,22 +22,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nats-io/nats.go"
+
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/nats-io/nats.go"
 )
 
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
 	cfg.Defaults(false)
 	cfg.Global.JetStream.InMemory = true
-
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(true)           // autogen a signing key
 		cfg.MediaAPI.Defaults(true)         // autogen a media path
 		cfg.SyncAPI.Fulltext.Defaults(true) // use in memory fts
+		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
@@ -51,6 +52,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
 	case test.DBTypeSQLite:
 		cfg.Defaults(true) // sets a sqlite db per component
+		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)

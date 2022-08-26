@@ -37,10 +37,11 @@ var (
 )
 
 type Room struct {
-	ID      string
-	Version gomatrixserverlib.RoomVersion
-	preset  Preset
-	creator *User
+	ID         string
+	Version    gomatrixserverlib.RoomVersion
+	preset     Preset
+	visibility gomatrixserverlib.HistoryVisibility
+	creator    *User
 
 	authEvents   gomatrixserverlib.AuthEvents
 	currentState map[string]*gomatrixserverlib.HeaderedEvent
@@ -61,6 +62,7 @@ func NewRoom(t *testing.T, creator *User, modifiers ...roomModifier) *Room {
 		preset:       PresetPublicChat,
 		Version:      gomatrixserverlib.RoomVersionV9,
 		currentState: make(map[string]*gomatrixserverlib.HeaderedEvent),
+		visibility:   gomatrixserverlib.HistoryVisibilityShared,
 	}
 	for _, m := range modifiers {
 		m(t, r)
@@ -97,10 +99,14 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 		fallthrough
 	case PresetPrivateChat:
 		joinRule.JoinRule = "invite"
-		hisVis.HistoryVisibility = "shared"
+		hisVis.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
 	case PresetPublicChat:
 		joinRule.JoinRule = "public"
-		hisVis.HistoryVisibility = "shared"
+		hisVis.HistoryVisibility = gomatrixserverlib.HistoryVisibilityShared
+	}
+
+	if r.visibility != "" {
+		hisVis.HistoryVisibility = r.visibility
 	}
 
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomCreate, map[string]interface{}{
@@ -183,7 +189,9 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err = gomatrixserverlib.Allowed(ev, &r.authEvents); err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to verify event was allowed: %s", eventType, err)
 	}
-	return ev.Headered(r.Version)
+	headeredEvent := ev.Headered(r.Version)
+	headeredEvent.Visibility = r.visibility
+	return headeredEvent
 }
 
 // Add a new event to this room DAG. Not thread-safe.
@@ -239,6 +247,12 @@ func RoomPreset(p Preset) roomModifier {
 		default:
 			t.Errorf("invalid RoomPreset: %v", p)
 		}
+	}
+}
+
+func RoomHistoryVisibility(vis gomatrixserverlib.HistoryVisibility) roomModifier {
+	return func(t *testing.T, r *Room) {
+		r.visibility = vis
 	}
 }
 

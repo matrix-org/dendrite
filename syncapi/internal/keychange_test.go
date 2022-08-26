@@ -6,11 +6,13 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var (
@@ -20,31 +22,41 @@ var (
 
 type mockKeyAPI struct{}
 
-func (k *mockKeyAPI) PerformUploadKeys(ctx context.Context, req *keyapi.PerformUploadKeysRequest, res *keyapi.PerformUploadKeysResponse) {
+func (k *mockKeyAPI) PerformUploadKeys(ctx context.Context, req *keyapi.PerformUploadKeysRequest, res *keyapi.PerformUploadKeysResponse) error {
+	return nil
 }
 
 func (k *mockKeyAPI) SetUserAPI(i userapi.UserInternalAPI) {}
 
 // PerformClaimKeys claims one-time keys for use in pre-key messages
-func (k *mockKeyAPI) PerformClaimKeys(ctx context.Context, req *keyapi.PerformClaimKeysRequest, res *keyapi.PerformClaimKeysResponse) {
+func (k *mockKeyAPI) PerformClaimKeys(ctx context.Context, req *keyapi.PerformClaimKeysRequest, res *keyapi.PerformClaimKeysResponse) error {
+	return nil
 }
-func (k *mockKeyAPI) PerformDeleteKeys(ctx context.Context, req *keyapi.PerformDeleteKeysRequest, res *keyapi.PerformDeleteKeysResponse) {
+func (k *mockKeyAPI) PerformDeleteKeys(ctx context.Context, req *keyapi.PerformDeleteKeysRequest, res *keyapi.PerformDeleteKeysResponse) error {
+	return nil
 }
-func (k *mockKeyAPI) PerformUploadDeviceKeys(ctx context.Context, req *keyapi.PerformUploadDeviceKeysRequest, res *keyapi.PerformUploadDeviceKeysResponse) {
+func (k *mockKeyAPI) PerformUploadDeviceKeys(ctx context.Context, req *keyapi.PerformUploadDeviceKeysRequest, res *keyapi.PerformUploadDeviceKeysResponse) error {
+	return nil
 }
-func (k *mockKeyAPI) PerformUploadDeviceSignatures(ctx context.Context, req *keyapi.PerformUploadDeviceSignaturesRequest, res *keyapi.PerformUploadDeviceSignaturesResponse) {
+func (k *mockKeyAPI) PerformUploadDeviceSignatures(ctx context.Context, req *keyapi.PerformUploadDeviceSignaturesRequest, res *keyapi.PerformUploadDeviceSignaturesResponse) error {
+	return nil
 }
-func (k *mockKeyAPI) QueryKeys(ctx context.Context, req *keyapi.QueryKeysRequest, res *keyapi.QueryKeysResponse) {
+func (k *mockKeyAPI) QueryKeys(ctx context.Context, req *keyapi.QueryKeysRequest, res *keyapi.QueryKeysResponse) error {
+	return nil
 }
-func (k *mockKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) {
+func (k *mockKeyAPI) QueryKeyChanges(ctx context.Context, req *keyapi.QueryKeyChangesRequest, res *keyapi.QueryKeyChangesResponse) error {
+	return nil
 }
-func (k *mockKeyAPI) QueryOneTimeKeys(ctx context.Context, req *keyapi.QueryOneTimeKeysRequest, res *keyapi.QueryOneTimeKeysResponse) {
+func (k *mockKeyAPI) QueryOneTimeKeys(ctx context.Context, req *keyapi.QueryOneTimeKeysRequest, res *keyapi.QueryOneTimeKeysResponse) error {
+	return nil
 
 }
-func (k *mockKeyAPI) QueryDeviceMessages(ctx context.Context, req *keyapi.QueryDeviceMessagesRequest, res *keyapi.QueryDeviceMessagesResponse) {
+func (k *mockKeyAPI) QueryDeviceMessages(ctx context.Context, req *keyapi.QueryDeviceMessagesRequest, res *keyapi.QueryDeviceMessagesResponse) error {
+	return nil
 
 }
-func (k *mockKeyAPI) QuerySignatures(ctx context.Context, req *keyapi.QuerySignaturesRequest, res *keyapi.QuerySignaturesResponse) {
+func (k *mockKeyAPI) QuerySignatures(ctx context.Context, req *keyapi.QuerySignaturesRequest, res *keyapi.QuerySignaturesResponse) error {
+	return nil
 }
 
 type mockRoomserverAPI struct {
@@ -105,6 +117,22 @@ func (s *mockRoomserverAPI) QuerySharedUsers(ctx context.Context, req *api.Query
 	return nil
 }
 
+// This is actually a database function, but seeing as we track the state inside the
+// *mockRoomserverAPI, we'll just comply with the interface here instead.
+func (s *mockRoomserverAPI) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+	commonUsers := []string{}
+	for _, members := range s.roomIDToJoinedMembers {
+		for _, member := range members {
+			for _, userID := range otherUserIDs {
+				if member == userID {
+					commonUsers = append(commonUsers, userID)
+				}
+			}
+		}
+	}
+	return util.UniqueStrings(commonUsers), nil
+}
+
 type wantCatchup struct {
 	hasNew  bool
 	changed []string
@@ -112,6 +140,7 @@ type wantCatchup struct {
 }
 
 func assertCatchup(t *testing.T, hasNew bool, syncResponse *types.Response, want wantCatchup) {
+	t.Helper()
 	if hasNew != want.hasNew {
 		t.Errorf("got hasNew=%v want %v", hasNew, want.hasNew)
 	}
@@ -178,7 +207,7 @@ func TestKeyChangeCatchupOnJoinShareNewUser(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -201,7 +230,7 @@ func TestKeyChangeCatchupOnLeaveShareLeftUser(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -224,7 +253,7 @@ func TestKeyChangeCatchupOnJoinShareNoNewUsers(t *testing.T) {
 			"!another:room": {syncingUser, existingUser},
 		},
 	}
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -246,7 +275,7 @@ func TestKeyChangeCatchupOnLeaveShareNoUsers(t *testing.T) {
 			"!another:room": {syncingUser, existingUser},
 		},
 	}
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -305,7 +334,7 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 			roomID: {syncingUser, existingUser},
 		},
 	}
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)
 	}
@@ -333,7 +362,7 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 			"!another:room": {syncingUser},
 		},
 	}
-	_, hasNew, err := DeviceListCatchup(context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
+	_, hasNew, err := DeviceListCatchup(context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken)
 	if err != nil {
 		t.Fatalf("Catchup returned an error: %s", err)
 	}
@@ -346,13 +375,14 @@ func TestKeyChangeCatchupChangeAndLeft(t *testing.T) {
 
 // tests that joining/leaving the SAME room puts users in `left` if the final state is leave.
 // NB: Consider the case:
-// - Alice and Bob are in a room.
-// - Alice goes offline, Charlie joins, sends encrypted messages then leaves the room.
-// - Alice comes back online. Technically nothing has changed in the set of users between those two points in time,
-//   it's still just (Alice,Bob) but then we won't be tracking Charlie -- is this okay though? It's device keys
-//   which are only relevant when actively sending events I think? And if Alice does need the keys she knows
-//   charlie's (user_id, device_id) so can just hit /keys/query - no need to keep updated about it because she
-//   doesn't share any rooms with him.
+//   - Alice and Bob are in a room.
+//   - Alice goes offline, Charlie joins, sends encrypted messages then leaves the room.
+//   - Alice comes back online. Technically nothing has changed in the set of users between those two points in time,
+//     it's still just (Alice,Bob) but then we won't be tracking Charlie -- is this okay though? It's device keys
+//     which are only relevant when actively sending events I think? And if Alice does need the keys she knows
+//     charlie's (user_id, device_id) so can just hit /keys/query - no need to keep updated about it because she
+//     doesn't share any rooms with him.
+//
 // Ergo, we put them in `left` as it is simpler.
 func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	newShareUser := "@berta:localhost"
@@ -419,7 +449,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 		},
 	}
 	_, hasNew, err := DeviceListCatchup(
-		context.Background(), &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken,
+		context.Background(), rsAPI, &mockKeyAPI{}, rsAPI, syncingUser, syncResponse, emptyToken, emptyToken,
 	)
 	if err != nil {
 		t.Fatalf("DeviceListCatchup returned an error: %s", err)

@@ -41,9 +41,32 @@ global:
     max_idle_conns: 5
     conn_max_lifetime: -1
 
+  # Configuration for in-memory caches. Caches can often improve performance by
+  # keeping frequently accessed items (like events, identifiers etc.) in memory
+  # rather than having to read them from the database.
+  cache:
+    # The estimated maximum size for the global cache in bytes, or in terabytes,
+    # gigabytes, megabytes or kilobytes when the appropriate 'tb', 'gb', 'mb' or
+    # 'kb' suffix is specified. Note that this is not a hard limit, nor is it a
+    # memory limit for the entire process. A cache that is too small may ultimately
+    # provide little or no benefit.
+    max_size_estimated: 1gb
+
+    # The maximum amount of time that a cache entry can live for in memory before
+    # it will be evicted and/or refreshed from the database. Lower values result in
+    # easier admission of new cache entries but may also increase database load in
+    # comparison to higher values, so adjust conservatively. Higher values may make
+    # it harder for new items to make it into the cache, e.g. if new rooms suddenly
+    # become popular.
+    max_age: 1h
+
   # The server name to delegate server-server communications to, with optional port
   # e.g. localhost:443
   well_known_server_name: ""
+
+  # The server name to delegate client-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_client_name: ""
 
   # Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
@@ -89,6 +112,11 @@ global:
     # of at least one NATS Server node.
     addresses:
     # - localhost:4222
+
+    # Disable the validation of TLS certificates of NATS. This is
+    # not recommended in production since it may allow NATS traffic
+    # to be sent to an insecure endpoint.
+    disable_tls_validation: false
 
     # Persistent directory to store JetStream streams in. This directory should be
     # preserved across Dendrite restarts.
@@ -150,13 +178,16 @@ client_api:
 
   # TURN server information that this homeserver should send to clients.
   turn:
-    turn_user_lifetime: ""
+    turn_user_lifetime: "5m"
     turn_uris:
     #  - turn:turn.server.org?transport=udp
     #  - turn:turn.server.org?transport=tcp
     turn_shared_secret: ""
-    turn_username: ""
-    turn_password: ""
+    # If your TURN server requires static credentials, then you will need to enter
+    # them here instead of supplying a shared secret. Note that these credentials
+    # will be visible to clients!
+    # turn_username: ""
+    # turn_password: ""
 
   # Settings for rate-limited endpoints. Rate limiting kicks in after the threshold
   # number of "slots" have been taken by requests from a specific host. Each "slot"
@@ -164,7 +195,7 @@ client_api:
   # and appservice users are exempt from rate limiting by default.
   rate_limiting:
     enabled: true
-    threshold: 5
+    threshold: 20
     cooloff_ms: 500
     exempt_user_ids:
     #  - "@user:domain.com"
