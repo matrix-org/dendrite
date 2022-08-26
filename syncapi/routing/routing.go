@@ -18,6 +18,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/fulltext"
@@ -27,8 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // Setup configures the given mux with sync-server listeners
@@ -107,7 +108,15 @@ func Setup(
 					JSON: jsonerror.Unknown("Search has been disabled by the server administrator."),
 				}
 			}
-			return Search(req, device, syncDB, fts, req.FormValue("next_batch"))
+			var nextBatch *string
+			if err := req.ParseForm(); err != nil {
+				return jsonerror.InternalServerError()
+			}
+			if req.Form.Has("next_batch") {
+				nb := req.FormValue("next_batch")
+				nextBatch = &nb
+			}
+			return Search(req, device, syncDB, fts, nextBatch)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 }

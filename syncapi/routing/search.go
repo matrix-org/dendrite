@@ -15,23 +15,29 @@
 package routing
 
 import (
+	"context"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 )
 
-func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts *fulltext.Search, from string) util.JSONResponse {
+// nolint:gocyclo
+func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts *fulltext.Search, from *string) util.JSONResponse {
+	start := time.Now()
 	var (
 		searchReq SearchRequest
 		err       error
@@ -44,8 +50,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	}
 
 	nextBatch := 0
-	if from != "" {
-		nextBatch, err = strconv.Atoi(from)
+	if from != nil && *from != "" {
+		nextBatch, err = strconv.Atoi(*from)
 		if err != nil {
 			return jsonerror.InternalServerError()
 		}
@@ -83,23 +89,17 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	if len(rooms) == 0 {
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
+			Code: http.StatusForbidden,
 			JSON: jsonerror.Unknown("User not allowed to search in this room(s)."),
 		}
 	}
 
-	logrus.Debugf("Searching FTS for rooms %v - %s", rooms, searchReq.SearchCategories.RoomEvents.SearchTerm)
-
-	orderByTime := false
-	if searchReq.SearchCategories.RoomEvents.OrderBy == "recent" {
-		logrus.Debugf("Ordering by recently added")
-		orderByTime = true
-	}
+	orderByTime := searchReq.SearchCategories.RoomEvents.OrderBy == "recent"
 
 	result, err := fts.Search(
 		searchReq.SearchCategories.RoomEvents.SearchTerm,
 		rooms,
-		[]string{},
+		searchReq.SearchCategories.RoomEvents.Keys,
 		searchReq.SearchCategories.RoomEvents.Filter.Limit,
 		nextBatch,
 		orderByTime,
@@ -110,13 +110,27 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	}
 	logrus.Debugf("Search took %s", result.Took)
 
+	// From was specified but empty, return no results, only the count
+	if from != nil && *from == "" {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: SearchResponse{
+				SearchCategories: SearchCategories{
+					RoomEvents: RoomEvents{
+						Count:     int(result.Total),
+						NextBatch: nil,
+					},
+				},
+			},
+		}
+	}
+
 	results := []Result{}
 
-	wantEvents := make([]string, len(result.Hits))
+	wantEvents := make([]string, 0, len(result.Hits))
 	eventScore := make(map[string]*search.DocumentMatch)
 
 	for _, hit := range result.Hits {
-		logrus.Debugf("%+v\n", hit.Fields)
 		wantEvents = append(wantEvents, hit.ID)
 		eventScore[hit.ID] = hit
 	}
@@ -137,22 +151,19 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	groups := make(map[string]RoomResult)
 	knownUsersProfiles := make(map[string]ProfileInfo)
+
+	// Sort the events by depth, as the returned values aren't ordered
+	if orderByTime {
+		sort.Slice(evs, func(i, j int) bool {
+			return evs[i].Depth() > evs[j].Depth()
+		})
+	}
+
+	gotStateForRooms := make(map[string]struct{})
+	var allStates []gomatrixserverlib.ClientEvent
 	for _, event := range evs {
-		id, _, err := syncDB.SelectContextEvent(ctx, event.RoomID(), event.EventID())
+		eventsBefore, eventsAfter, err := contextEvents(ctx, syncDB, event, roomFilter, searchReq)
 		if err != nil {
-			logrus.WithError(err).Error("failed to query context event")
-			return jsonerror.InternalServerError()
-		}
-		roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
-		eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, event.RoomID(), roomFilter)
-		if err != nil {
-			logrus.WithError(err).Error("failed to query before context event")
-			return jsonerror.InternalServerError()
-		}
-		roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
-		_, eventsAfter, err := syncDB.SelectContextAfterEvent(ctx, id, event.RoomID(), roomFilter)
-		if err != nil {
-			logrus.WithError(err).Error("failed to query after context event")
 			return jsonerror.InternalServerError()
 		}
 
@@ -178,8 +189,15 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		}
 
 		r := gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll)
+		s, e, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
+		if err != nil {
+			logrus.WithError(err).Error("failed to get start/end")
+			return jsonerror.InternalServerError()
+		}
 		results = append(results, Result{
 			Context: SearchContextResponse{
+				Start:        s.String(),
+				End:          e.String(),
 				EventsAfter:  gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatSync),
 				EventsBefore: gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatSync),
 				ProfileInfo:  profileInfos,
@@ -190,6 +208,16 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
 		groups[event.RoomID()] = roomGroup
+		if _, ok := gotStateForRooms[event.RoomID()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
+			stateFilter := gomatrixserverlib.DefaultStateFilter()
+			state, err := syncDB.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
+			if err != nil {
+				logrus.WithError(err).Error("unable to get current state")
+				return jsonerror.InternalServerError()
+			}
+			gotStateForRooms[event.RoomID()] = struct{}{}
+			allStates = append(allStates, gomatrixserverlib.HeaderedToClientEvents(state, gomatrixserverlib.FormatSync)...)
+		}
 	}
 
 	nb := ""
@@ -203,16 +231,47 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				Count:      int(result.Total),
 				Groups:     Groups{RoomID: groups},
 				Results:    results,
-				NextBatch:  nb,
+				NextBatch:  &nb,
 				Highlights: strings.Split(searchReq.SearchCategories.RoomEvents.SearchTerm, " "),
+				State:      allStates,
 			},
 		},
 	}
+
+	logrus.Debugf("Full search request took %v", time.Since(start))
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
 	}
+}
+
+// contextEvents returns the events around a given eventID
+func contextEvents(
+	ctx context.Context,
+	syncDB storage.Database,
+	event *gomatrixserverlib.HeaderedEvent,
+	roomFilter *gomatrixserverlib.RoomEventFilter,
+	searchReq SearchRequest,
+) ([]*gomatrixserverlib.HeaderedEvent, []*gomatrixserverlib.HeaderedEvent, error) {
+	id, _, err := syncDB.SelectContextEvent(ctx, event.RoomID(), event.EventID())
+	if err != nil {
+		logrus.WithError(err).Error("failed to query context event")
+		return nil, nil, err
+	}
+	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
+	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, event.RoomID(), roomFilter)
+	if err != nil {
+		logrus.WithError(err).Error("failed to query before context event")
+		return nil, nil, err
+	}
+	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
+	_, eventsAfter, err := syncDB.SelectContextAfterEvent(ctx, id, event.RoomID(), roomFilter)
+	if err != nil {
+		logrus.WithError(err).Error("failed to query after context event")
+		return nil, nil, err
+	}
+	return eventsBefore, eventsAfter, err
 }
 
 type SearchRequest struct {
@@ -229,9 +288,10 @@ type SearchRequest struct {
 					Key string `json:"key"`
 				} `json:"group_by"`
 			} `json:"groupings"`
-			Keys       []string `json:"keys"`
-			OrderBy    string   `json:"order_by"`
-			SearchTerm string   `json:"search_term"`
+			IncludeState bool     `json:"include_state"`
+			Keys         []string `json:"keys"`
+			OrderBy      string   `json:"order_by"`
+			SearchTerm   string   `json:"search_term"`
 		} `json:"room_events"`
 	} `json:"search_categories"`
 }
@@ -240,7 +300,7 @@ type SearchResponse struct {
 	SearchCategories SearchCategories `json:"search_categories"`
 }
 type RoomResult struct {
-	NextBatch string   `json:"next_batch"`
+	NextBatch *string  `json:"next_batch,omitempty"`
 	Order     int      `json:"order"`
 	Results   []string `json:"results"`
 }
@@ -256,25 +316,25 @@ type Result struct {
 }
 
 type SearchContextResponse struct {
-	End          string                          `json:"end"` // TODO
+	End          string                          `json:"end"`
 	EventsAfter  []gomatrixserverlib.ClientEvent `json:"events_after"`
 	EventsBefore []gomatrixserverlib.ClientEvent `json:"events_before"`
-	Start        string                          `json:"start"`        // TODO
-	ProfileInfo  map[string]ProfileInfo          `json:"profile_info"` // TODO
+	Start        string                          `json:"start"`
+	ProfileInfo  map[string]ProfileInfo          `json:"profile_info"`
 }
 
 type ProfileInfo struct {
-	AvatarURL   string `json:"avatar_url"`   // TODO
-	DisplayName string `json:"display_name"` // TODO
+	AvatarURL   string `json:"avatar_url"`
+	DisplayName string `json:"display_name"`
 }
 
 type RoomEvents struct {
-	Count      int      `json:"count"`
-	Groups     Groups   `json:"groups"`
-	Highlights []string `json:"highlights"`
-	NextBatch  string   `json:"next_batch"`
-	Results    []Result `json:"results"`
-	State      struct{} `json:"state"` // TODO
+	Count      int                             `json:"count"`
+	Groups     Groups                          `json:"groups"`
+	Highlights []string                        `json:"highlights"`
+	NextBatch  *string                         `json:"next_batch,omitempty"`
+	Results    []Result                        `json:"results"`
+	State      []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
 }
 type SearchCategories struct {
 	RoomEvents RoomEvents `json:"room_events"`
