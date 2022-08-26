@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/httputil"
+	clienthttputil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -61,9 +61,11 @@ func QueryDeviceKeys(
 	}
 
 	var queryRes api.QueryKeysResponse
-	keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
+	if err := keyAPI.QueryKeys(httpReq.Context(), &api.QueryKeysRequest{
 		UserToDevices: qkr.DeviceKeys,
-	}, &queryRes)
+	}, &queryRes); err != nil {
+		return jsonerror.InternalAPIError(httpReq.Context(), err)
+	}
 	if queryRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(queryRes.Error).Error("Failed to QueryKeys")
 		return jsonerror.InternalServerError()
@@ -113,9 +115,11 @@ func ClaimOneTimeKeys(
 	}
 
 	var claimRes api.PerformClaimKeysResponse
-	keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
+	if err := keyAPI.PerformClaimKeys(httpReq.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: cor.OneTimeKeys,
-	}, &claimRes)
+	}, &claimRes); err != nil {
+		return jsonerror.InternalAPIError(httpReq.Context(), err)
+	}
 	if claimRes.Error != nil {
 		util.GetLogger(httpReq.Context()).WithError(claimRes.Error).Error("Failed to PerformClaimKeys")
 		return jsonerror.InternalServerError()
@@ -184,7 +188,7 @@ func NotaryKeys(
 ) util.JSONResponse {
 	if req == nil {
 		req = &gomatrixserverlib.PublicKeyNotaryLookupRequest{}
-		if reqErr := httputil.UnmarshalJSONRequest(httpReq, &req); reqErr != nil {
+		if reqErr := clienthttputil.UnmarshalJSONRequest(httpReq, &req); reqErr != nil {
 			return *reqErr
 		}
 	}

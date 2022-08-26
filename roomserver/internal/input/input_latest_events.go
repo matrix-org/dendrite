@@ -20,32 +20,32 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
-	"github.com/sirupsen/logrus"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
 // event to the output log.
 // The latest events are the events that aren't referenced by another event in the database:
 //
-//     Time goes down the page. 1 is the m.room.create event (root).
-//
-//        1                 After storing 1 the latest events are {1}
-//        |                 After storing 2 the latest events are {2}
-//        2                 After storing 3 the latest events are {3}
-//       / \                After storing 4 the latest events are {3,4}
-//      3   4               After storing 5 the latest events are {5,4}
-//      |   |               After storing 6 the latest events are {5,6}
-//      5   6 <--- latest   After storing 7 the latest events are {6,7}
-//      |
-//      7 <----- latest
+//	Time goes down the page. 1 is the m.room.create event (root).
+//	        1                 After storing 1 the latest events are {1}
+//	        |                 After storing 2 the latest events are {2}
+//	        2                 After storing 3 the latest events are {3}
+//	       / \                After storing 4 the latest events are {3,4}
+//	      3   4               After storing 5 the latest events are {5,4}
+//	      |   |               After storing 6 the latest events are {5,6}
+//	      5   6 <--- latest   After storing 7 the latest events are {6,7}
+//	      |
+//	      7 <----- latest
 //
 // Can only be called once at a time
 func (r *Inputer) updateLatestEvents(

@@ -241,7 +241,9 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+	if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
+	}
 	if err = inputRes.Err(); err != nil {
 		res.Error = &api.PerformError{
 			Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),

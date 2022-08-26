@@ -18,10 +18,11 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type AccountData interface {
@@ -122,12 +123,14 @@ type CurrentRoomState interface {
 //
 // We persist the previous event IDs as well, one per row, so when we do fetch even
 // earlier events we can simply delete rows which referenced it. Consider the graph:
-//        A
-//        |   Event C has 1 prev_event ID: A.
-//    B   C
-//    |___|   Event D has 2 prev_event IDs: B and C.
-//      |
-//      D
+//
+//	    A
+//	    |   Event C has 1 prev_event ID: A.
+//	B   C
+//	|___|   Event D has 2 prev_event IDs: B and C.
+//	  |
+//	  D
+//
 // The earliest known event we have is D, so this table has 2 rows.
 // A backfill request gives us C but not B. We delete rows where prev_event=C. This
 // still means that D is a backwards extremity as we do not have event B. However, event
@@ -182,6 +185,7 @@ type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
 	SelectHeroes(ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string) (heroes []string, err error)
+	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
 }
 
 type NotificationData interface {

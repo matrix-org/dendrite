@@ -18,20 +18,22 @@ import (
 	"context"
 	"strings"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	keytypes "github.com/matrix-org/dendrite/keyserver/types"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // DeviceOTKCounts adds one-time key counts to the /sync response
 func DeviceOTKCounts(ctx context.Context, keyAPI keyapi.SyncKeyAPI, userID, deviceID string, res *types.Response) error {
 	var queryRes keyapi.QueryOneTimeKeysResponse
-	keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
+	_ = keyAPI.QueryOneTimeKeys(ctx, &keyapi.QueryOneTimeKeysRequest{
 		UserID:   userID,
 		DeviceID: deviceID,
 	}, &queryRes)
@@ -73,7 +75,7 @@ func DeviceListCatchup(
 		offset = int64(from)
 	}
 	var queryRes keyapi.QueryKeyChangesResponse
-	keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
+	_ = keyAPI.QueryKeyChanges(ctx, &keyapi.QueryKeyChangesRequest{
 		Offset:   offset,
 		ToOffset: toOffset,
 	}, &queryRes)
@@ -125,7 +127,7 @@ func DeviceListCatchup(
 		"from":            offset,
 		"to":              toOffset,
 		"response_offset": queryRes.Offset,
-	}).Debugf("QueryKeyChanges request result: %+v", res.DeviceLists)
+	}).Tracef("QueryKeyChanges request result: %+v", res.DeviceLists)
 
 	return types.StreamPosition(queryRes.Offset), hasNew, nil
 }
@@ -277,6 +279,10 @@ func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID strin
 		// it's enough to know that we have our member event here, don't need to check membership content
 		// as it's implied by being in the respective section of the sync response.
 		if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
+			// ignore e.g. join -> join changes
+			if gjson.GetBytes(ev.Unsigned, "prev_content.membership").Str == gjson.GetBytes(ev.Content, "membership").Str {
+				continue
+			}
 			return true
 		}
 	}

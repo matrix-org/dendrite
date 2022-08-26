@@ -21,9 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 type StateDelta struct {
 	RoomID      string
 	StateEvents []*gomatrixserverlib.HeaderedEvent
+	NewlyJoined bool
 	Membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
@@ -330,23 +332,23 @@ type Response struct {
 	NextBatch   StreamingToken `json:"next_batch"`
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
-	} `json:"account_data"`
+	} `json:"account_data,omitempty"`
 	Presence struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
-	} `json:"presence"`
+	} `json:"presence,omitempty"`
 	Rooms struct {
-		Join   map[string]JoinResponse   `json:"join"`
-		Peek   map[string]JoinResponse   `json:"peek"`
-		Invite map[string]InviteResponse `json:"invite"`
-		Leave  map[string]LeaveResponse  `json:"leave"`
-	} `json:"rooms"`
+		Join   map[string]JoinResponse   `json:"join,omitempty"`
+		Peek   map[string]JoinResponse   `json:"peek,omitempty"`
+		Invite map[string]InviteResponse `json:"invite,omitempty"`
+		Leave  map[string]LeaveResponse  `json:"leave,omitempty"`
+	} `json:"rooms,omitempty"`
 	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events"`
-	} `json:"to_device"`
+		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
+	} `json:"to_device,omitempty"`
 	DeviceLists struct {
 		Changed []string `json:"changed,omitempty"`
 		Left    []string `json:"left,omitempty"`
-	} `json:"device_lists"`
+	} `json:"device_lists,omitempty"`
 	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
 }
 
