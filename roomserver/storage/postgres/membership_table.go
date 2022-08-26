@@ -23,6 +23,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -86,24 +87,24 @@ const insertMembershipSQL = "" +
 
 const selectMembershipFromRoomAndTargetSQL = "" +
 	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND target_nid = $2"
+	" WHERE room_nid = $1 AND event_nid != 0 AND target_nid = $2"
 
 const selectMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2 and forgotten = false"
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2 and forgotten = false"
 
 const selectLocalMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2" +
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2" +
 	" AND target_local = true and forgotten = false"
 
 const selectMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 and forgotten = false"
+	" WHERE room_nid = $1 AND event_nid != 0 and forgotten = false"
 
 const selectLocalMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1" +
+	" WHERE room_nid = $1 AND event_nid != 0" +
 	" AND target_local = true and forgotten = false"
 
 const selectMembershipForUpdateSQL = "" +
@@ -117,6 +118,9 @@ const updateMembershipSQL = "" +
 const updateMembershipForgetRoom = "" +
 	"UPDATE roomserver_membership SET forgotten = $3" +
 	" WHERE room_nid = $1 AND target_nid = $2"
+
+const deleteMembershipSQL = "" +
+	"DELETE FROM roomserver_membership WHERE room_nid = $1 AND target_nid = $2"
 
 const selectRoomsWithMembershipSQL = "" +
 	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
@@ -165,11 +169,20 @@ type membershipStatements struct {
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 	selectLocalServerInRoomStmt                     *sql.Stmt
 	selectServerInRoomStmt                          *sql.Stmt
+	deleteMembershipStmt                            *sql.Stmt
 }
 
 func CreateMembershipTable(db *sql.DB) error {
 	_, err := db.Exec(membershipSchema)
-	return err
+	if err != nil {
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "roomserver: add forgotten column",
+		Up:      deltas.UpAddForgottenColumn,
+	})
+	return m.Up(context.Background())
 }
 
 func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
@@ -191,6 +204,7 @@ func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 		{&s.selectLocalServerInRoomStmt, selectLocalServerInRoomSQL},
 		{&s.selectServerInRoomStmt, selectServerInRoomSQL},
+		{&s.deleteMembershipStmt, deleteMembershipSQL},
 	}.Prepare(db)
 }
 
@@ -411,4 +425,14 @@ func (s *membershipStatements) SelectServerInRoom(
 		return false, err
 	}
 	return roomNID == nid, nil
+}
+
+func (s *membershipStatements) DeleteMembership(
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.deleteMembershipStmt).ExecContext(
+		ctx, roomNID, targetUserNID,
+	)
+	return err
 }

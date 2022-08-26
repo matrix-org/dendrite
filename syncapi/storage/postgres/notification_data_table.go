@@ -58,7 +58,7 @@ const upsertRoomUnreadNotificationCountsSQL = `INSERT INTO syncapi_notification_
   (user_id, room_id, notification_count, highlight_count)
   VALUES ($1, $2, $3, $4)
   ON CONFLICT (user_id, room_id)
-  DO UPDATE SET notification_count = $3, highlight_count = $4
+  DO UPDATE SET id = nextval('syncapi_notification_data_id_seq'), notification_count = $3, highlight_count = $4
   RETURNING id`
 
 const selectUserUnreadNotificationCountsSQL = `SELECT

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -53,12 +54,10 @@ func main() {
 
 	fmt.Println("Fetching", len(snapshotNIDs), "snapshot NIDs")
 
-	cache, err := caching.NewInMemoryLRUCache(true)
-	if err != nil {
-		panic(err)
-	}
-
-	roomserverDB, err := storage.Open(base, &cfg.RoomServer.Database, cache)
+	roomserverDB, err := storage.Open(
+		base, &cfg.RoomServer.Database,
+		caching.NewRistrettoCache(128*1024*1024, time.Hour, true),
+	)
 	if err != nil {
 		panic(err)
 	}

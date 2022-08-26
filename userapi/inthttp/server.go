@@ -15,8 +15,6 @@
 package inthttp
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -29,339 +27,134 @@ import (
 func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	addRoutesLoginToken(internalAPIMux, s)
 
-	internalAPIMux.Handle(PerformAccountCreationPath,
-		httputil.MakeInternalAPI("performAccountCreation", func(req *http.Request) util.JSONResponse {
-			request := api.PerformAccountCreationRequest{}
-			response := api.PerformAccountCreationResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformAccountCreation(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformPasswordUpdatePath,
-		httputil.MakeInternalAPI("performPasswordUpdate", func(req *http.Request) util.JSONResponse {
-			request := api.PerformPasswordUpdateRequest{}
-			response := api.PerformPasswordUpdateResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformPasswordUpdate(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformDeviceCreationPath,
-		httputil.MakeInternalAPI("performDeviceCreation", func(req *http.Request) util.JSONResponse {
-			request := api.PerformDeviceCreationRequest{}
-			response := api.PerformDeviceCreationResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformDeviceCreation(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformLastSeenUpdatePath,
-		httputil.MakeInternalAPI("performLastSeenUpdate", func(req *http.Request) util.JSONResponse {
-			request := api.PerformLastSeenUpdateRequest{}
-			response := api.PerformLastSeenUpdateResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformLastSeenUpdate(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformDeviceUpdatePath,
-		httputil.MakeInternalAPI("performDeviceUpdate", func(req *http.Request) util.JSONResponse {
-			request := api.PerformDeviceUpdateRequest{}
-			response := api.PerformDeviceUpdateResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformDeviceUpdate(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformDeviceDeletionPath,
-		httputil.MakeInternalAPI("performDeviceDeletion", func(req *http.Request) util.JSONResponse {
-			request := api.PerformDeviceDeletionRequest{}
-			response := api.PerformDeviceDeletionResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformDeviceDeletion(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformAccountDeactivationPath,
-		httputil.MakeInternalAPI("performAccountDeactivation", func(req *http.Request) util.JSONResponse {
-			request := api.PerformAccountDeactivationRequest{}
-			response := api.PerformAccountDeactivationResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformAccountDeactivation(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformOpenIDTokenCreationPath,
-		httputil.MakeInternalAPI("performOpenIDTokenCreation", func(req *http.Request) util.JSONResponse {
-			request := api.PerformOpenIDTokenCreationRequest{}
-			response := api.PerformOpenIDTokenCreationResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformOpenIDTokenCreation(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryProfilePath,
-		httputil.MakeInternalAPI("queryProfile", func(req *http.Request) util.JSONResponse {
-			request := api.QueryProfileRequest{}
-			response := api.QueryProfileResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryProfile(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryAccessTokenPath,
-		httputil.MakeInternalAPI("queryAccessToken", func(req *http.Request) util.JSONResponse {
-			request := api.QueryAccessTokenRequest{}
-			response := api.QueryAccessTokenResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryAccessToken(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryDevicesPath,
-		httputil.MakeInternalAPI("queryDevices", func(req *http.Request) util.JSONResponse {
-			request := api.QueryDevicesRequest{}
-			response := api.QueryDevicesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryDevices(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryAccountDataPath,
-		httputil.MakeInternalAPI("queryAccountData", func(req *http.Request) util.JSONResponse {
-			request := api.QueryAccountDataRequest{}
-			response := api.QueryAccountDataResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryAccountData(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryDeviceInfosPath,
-		httputil.MakeInternalAPI("queryDeviceInfos", func(req *http.Request) util.JSONResponse {
-			request := api.QueryDeviceInfosRequest{}
-			response := api.QueryDeviceInfosResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryDeviceInfos(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QuerySearchProfilesPath,
-		httputil.MakeInternalAPI("querySearchProfiles", func(req *http.Request) util.JSONResponse {
-			request := api.QuerySearchProfilesRequest{}
-			response := api.QuerySearchProfilesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QuerySearchProfiles(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryOpenIDTokenPath,
-		httputil.MakeInternalAPI("queryOpenIDToken", func(req *http.Request) util.JSONResponse {
-			request := api.QueryOpenIDTokenRequest{}
-			response := api.QueryOpenIDTokenResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryOpenIDToken(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(InputAccountDataPath,
-		httputil.MakeInternalAPI("inputAccountDataPath", func(req *http.Request) util.JSONResponse {
-			request := api.InputAccountDataRequest{}
-			response := api.InputAccountDataResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.InputAccountData(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryKeyBackupPath,
-		httputil.MakeInternalAPI("queryKeyBackup", func(req *http.Request) util.JSONResponse {
-			request := api.QueryKeyBackupRequest{}
-			response := api.QueryKeyBackupResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.QueryKeyBackup(req.Context(), &request, &response)
-			if response.Error != "" {
-				return util.ErrorResponse(fmt.Errorf("QueryKeyBackup: %s", response.Error))
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformKeyBackupPath,
-		httputil.MakeInternalAPI("performKeyBackup", func(req *http.Request) util.JSONResponse {
-			request := api.PerformKeyBackupRequest{}
-			response := api.PerformKeyBackupResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			err := s.PerformKeyBackup(req.Context(), &request, &response)
-			if err != nil {
-				return util.JSONResponse{Code: http.StatusBadRequest, JSON: &response}
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(QueryNotificationsPath,
-		httputil.MakeInternalAPI("queryNotifications", func(req *http.Request) util.JSONResponse {
-			var request api.QueryNotificationsRequest
-			var response api.QueryNotificationsResponse
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryNotifications(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		PerformAccountCreationPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformAccountCreation", s.PerformAccountCreation),
 	)
 
-	internalAPIMux.Handle(PerformPusherSetPath,
-		httputil.MakeInternalAPI("performPusherSet", func(req *http.Request) util.JSONResponse {
-			request := api.PerformPusherSetRequest{}
-			response := struct{}{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformPusherSet(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
-	)
-	internalAPIMux.Handle(PerformPusherDeletionPath,
-		httputil.MakeInternalAPI("performPusherDeletion", func(req *http.Request) util.JSONResponse {
-			request := api.PerformPusherDeletionRequest{}
-			response := struct{}{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformPusherDeletion(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		PerformPasswordUpdatePath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformPasswordUpdate", s.PerformPasswordUpdate),
 	)
 
-	internalAPIMux.Handle(QueryPushersPath,
-		httputil.MakeInternalAPI("queryPushers", func(req *http.Request) util.JSONResponse {
-			request := api.QueryPushersRequest{}
-			response := api.QueryPushersResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryPushers(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		PerformDeviceCreationPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformDeviceCreation", s.PerformDeviceCreation),
 	)
 
-	internalAPIMux.Handle(PerformPushRulesPutPath,
-		httputil.MakeInternalAPI("performPushRulesPut", func(req *http.Request) util.JSONResponse {
-			request := api.PerformPushRulesPutRequest{}
-			response := struct{}{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformPushRulesPut(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		PerformLastSeenUpdatePath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformLastSeenUpdate", s.PerformLastSeenUpdate),
 	)
 
-	internalAPIMux.Handle(QueryPushRulesPath,
-		httputil.MakeInternalAPI("queryPushRules", func(req *http.Request) util.JSONResponse {
-			request := api.QueryPushRulesRequest{}
-			response := api.QueryPushRulesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryPushRules(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		PerformDeviceUpdatePath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformDeviceUpdate", s.PerformDeviceUpdate),
 	)
-	internalAPIMux.Handle(PerformSetAvatarURLPath,
-		httputil.MakeInternalAPI("performSetAvatarURL", func(req *http.Request) util.JSONResponse {
-			request := api.PerformSetAvatarURLRequest{}
-			response := api.PerformSetAvatarURLResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.SetAvatarURL(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		PerformDeviceDeletionPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformDeviceDeletion", s.PerformDeviceDeletion),
 	)
+
+	internalAPIMux.Handle(
+		PerformAccountDeactivationPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformAccountDeactivation", s.PerformAccountDeactivation),
+	)
+
+	internalAPIMux.Handle(
+		PerformOpenIDTokenCreationPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformOpenIDTokenCreation", s.PerformOpenIDTokenCreation),
+	)
+
+	internalAPIMux.Handle(
+		QueryProfilePath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryProfile", s.QueryProfile),
+	)
+
+	internalAPIMux.Handle(
+		QueryAccessTokenPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryAccessToken", s.QueryAccessToken),
+	)
+
+	internalAPIMux.Handle(
+		QueryDevicesPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryDevices", s.QueryDevices),
+	)
+
+	internalAPIMux.Handle(
+		QueryAccountDataPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryAccountData", s.QueryAccountData),
+	)
+
+	internalAPIMux.Handle(
+		QueryDeviceInfosPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryDeviceInfos", s.QueryDeviceInfos),
+	)
+
+	internalAPIMux.Handle(
+		QuerySearchProfilesPath,
+		httputil.MakeInternalRPCAPI("UserAPIQuerySearchProfiles", s.QuerySearchProfiles),
+	)
+
+	internalAPIMux.Handle(
+		QueryOpenIDTokenPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryOpenIDToken", s.QueryOpenIDToken),
+	)
+
+	internalAPIMux.Handle(
+		InputAccountDataPath,
+		httputil.MakeInternalRPCAPI("UserAPIInputAccountData", s.InputAccountData),
+	)
+
+	internalAPIMux.Handle(
+		QueryKeyBackupPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryKeyBackup", s.QueryKeyBackup),
+	)
+
+	internalAPIMux.Handle(
+		PerformKeyBackupPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformKeyBackup", s.PerformKeyBackup),
+	)
+
+	internalAPIMux.Handle(
+		QueryNotificationsPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryNotifications", s.QueryNotifications),
+	)
+
+	internalAPIMux.Handle(
+		PerformPusherSetPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformPusherSet", s.PerformPusherSet),
+	)
+
+	internalAPIMux.Handle(
+		PerformPusherDeletionPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformPusherDeletion", s.PerformPusherDeletion),
+	)
+
+	internalAPIMux.Handle(
+		QueryPushersPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryPushers", s.QueryPushers),
+	)
+
+	internalAPIMux.Handle(
+		PerformPushRulesPutPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformPushRulesPut", s.PerformPushRulesPut),
+	)
+
+	internalAPIMux.Handle(
+		QueryPushRulesPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryPushRules", s.QueryPushRules),
+	)
+
+	internalAPIMux.Handle(
+		PerformSetAvatarURLPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformSetAvatarURL", s.SetAvatarURL),
+	)
+
+	// TODO: Look at the shape of this
 	internalAPIMux.Handle(QueryNumericLocalpartPath,
-		httputil.MakeInternalAPI("queryNumericLocalpart", func(req *http.Request) util.JSONResponse {
+		httputil.MakeInternalAPI("UserAPIQueryNumericLocalpart", func(req *http.Request) util.JSONResponse {
 			response := api.QueryNumericLocalpartResponse{}
 			if err := s.QueryNumericLocalpart(req.Context(), &response); err != nil {
 				return util.ErrorResponse(err)
@@ -369,92 +162,39 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
 		}),
 	)
-	internalAPIMux.Handle(QueryAccountAvailabilityPath,
-		httputil.MakeInternalAPI("queryAccountAvailability", func(req *http.Request) util.JSONResponse {
-			request := api.QueryAccountAvailabilityRequest{}
-			response := api.QueryAccountAvailabilityResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryAccountAvailability(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryAccountAvailabilityPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryAccountAvailability", s.QueryAccountAvailability),
 	)
-	internalAPIMux.Handle(QueryAccountByPasswordPath,
-		httputil.MakeInternalAPI("queryAccountByPassword", func(req *http.Request) util.JSONResponse {
-			request := api.QueryAccountByPasswordRequest{}
-			response := api.QueryAccountByPasswordResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryAccountByPassword(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryAccountByPasswordPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryAccountByPassword", s.QueryAccountByPassword),
 	)
-	internalAPIMux.Handle(PerformSetDisplayNamePath,
-		httputil.MakeInternalAPI("performSetDisplayName", func(req *http.Request) util.JSONResponse {
-			request := api.PerformUpdateDisplayNameRequest{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.SetDisplayName(req.Context(), &request, &struct{}{}); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
-		}),
+
+	internalAPIMux.Handle(
+		PerformSetDisplayNamePath,
+		httputil.MakeInternalRPCAPI("UserAPISetDisplayName", s.SetDisplayName),
 	)
-	internalAPIMux.Handle(QueryLocalpartForThreePIDPath,
-		httputil.MakeInternalAPI("queryLocalpartForThreePID", func(req *http.Request) util.JSONResponse {
-			request := api.QueryLocalpartForThreePIDRequest{}
-			response := api.QueryLocalpartForThreePIDResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryLocalpartForThreePID(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryLocalpartForThreePIDPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryLocalpartForThreePID", s.QueryLocalpartForThreePID),
 	)
-	internalAPIMux.Handle(QueryThreePIDsForLocalpartPath,
-		httputil.MakeInternalAPI("queryThreePIDsForLocalpart", func(req *http.Request) util.JSONResponse {
-			request := api.QueryThreePIDsForLocalpartRequest{}
-			response := api.QueryThreePIDsForLocalpartResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.QueryThreePIDsForLocalpart(req.Context(), &request, &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryThreePIDsForLocalpartPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryThreePIDsForLocalpart", s.QueryThreePIDsForLocalpart),
 	)
-	internalAPIMux.Handle(PerformForgetThreePIDPath,
-		httputil.MakeInternalAPI("performForgetThreePID", func(req *http.Request) util.JSONResponse {
-			request := api.PerformForgetThreePIDRequest{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformForgetThreePID(req.Context(), &request, &struct{}{}); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
-		}),
+
+	internalAPIMux.Handle(
+		PerformForgetThreePIDPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformForgetThreePID", s.PerformForgetThreePID),
 	)
-	internalAPIMux.Handle(PerformSaveThreePIDAssociationPath,
-		httputil.MakeInternalAPI("performSaveThreePIDAssociation", func(req *http.Request) util.JSONResponse {
-			request := api.PerformSaveThreePIDAssociationRequest{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			if err := s.PerformSaveThreePIDAssociation(req.Context(), &request, &struct{}{}); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &struct{}{}}
-		}),
+
+	internalAPIMux.Handle(
+		PerformSaveThreePIDAssociationPath,
+		httputil.MakeInternalRPCAPI("UserAPIPerformSaveThreePIDAssociation", s.PerformSaveThreePIDAssociation),
 	)
 }

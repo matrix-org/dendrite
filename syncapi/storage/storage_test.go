@@ -1,7 +1,9 @@
 package storage_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -10,20 +12,22 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 var ctx = context.Background()
 
-func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+func MustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func(), func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewSyncServerDatasource(nil, &config.DatabaseOptions{
+	base, closeBase := testrig.CreateBaseDendrite(t, dbType)
+	db, err := storage.NewSyncServerDatasource(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	})
 	if err != nil {
 		t.Fatalf("NewSyncServerDatasource returned %s", err)
 	}
-	return db, close
+	return db, close, closeBase
 }
 
 func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (positions []types.StreamPosition) {
@@ -35,7 +39,7 @@ func MustWriteEvents(t *testing.T, db storage.Database, events []*gomatrixserver
 			addStateEvents = append(addStateEvents, ev)
 			addStateEventIDs = append(addStateEventIDs, ev.EventID())
 		}
-		pos, err := db.WriteEvent(ctx, ev, addStateEvents, addStateEventIDs, removeStateEventIDs, nil, false)
+		pos, err := db.WriteEvent(ctx, ev, addStateEvents, addStateEventIDs, removeStateEventIDs, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 		if err != nil {
 			t.Fatalf("WriteEvent failed: %s", err)
 		}
@@ -49,8 +53,9 @@ func TestWriteEvents(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
-		db, close := MustCreateDatabase(t, dbType)
+		db, close, closeBase := MustCreateDatabase(t, dbType)
 		defer close()
+		defer closeBase()
 		MustWriteEvents(t, db, r.Events())
 	})
 }
@@ -58,8 +63,9 @@ func TestWriteEvents(t *testing.T) {
 // These tests assert basic functionality of RecentEvents for PDUs
 func TestRecentEventsPDU(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+		db, close, closeBase := MustCreateDatabase(t, dbType)
 		defer close()
+		defer closeBase()
 		alice := test.NewUser(t)
 		// dummy room to make sure SQL queries are filtering on room ID
 		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
@@ -161,8 +167,9 @@ func TestRecentEventsPDU(t *testing.T) {
 // The purpose of this test is to ensure that backfill does indeed go backwards, using a topology token
 func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := MustCreateDatabase(t, dbType)
+		db, close, closeBase := MustCreateDatabase(t, dbType)
 		defer close()
+		defer closeBase()
 		alice := test.NewUser(t)
 		r := test.NewRoom(t, alice)
 		for i := 0; i < 10; i++ {
@@ -394,90 +401,113 @@ func TestGetEventsInRangeWithEventsInsertedLikeBackfill(t *testing.T) {
 		from = topologyTokenBefore(t, db, paginatedEvents[len(paginatedEvents)-1].EventID())
 	}
 }
+*/
 
 func TestSendToDeviceBehaviour(t *testing.T) {
-	//t.Parallel()
-	db := MustCreateDatabase(t)
+	t.Parallel()
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	deviceID := "one"
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		defer close()
+		defer closeBase()
+		// At this point there should be no messages. We haven't sent anything
+		// yet.
+		_, events, err := db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) != 0 {
+			t.Fatal("first call should have no updates")
+		}
 
-	// At this point there should be no messages. We haven't sent anything
-	// yet.
-	_, events, updates, deletions, err := db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 0 || len(updates) != 0 || len(deletions) != 0 {
-		t.Fatal("first call should have no updates")
-	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.StreamingToken{})
-	if err != nil {
-		return
-	}
+		// Try sending a message.
+		streamPos, err := db.StoreNewSendForDeviceMessage(ctx, alice.ID, deviceID, gomatrixserverlib.SendToDeviceEvent{
+			Sender:  bob.ID,
+			Type:    "m.type",
+			Content: json.RawMessage("{}"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// Try sending a message.
-	streamPos, err := db.StoreNewSendForDeviceMessage(ctx, "alice", "one", gomatrixserverlib.SendToDeviceEvent{
-		Sender:  "bob",
-		Type:    "m.type",
-		Content: json.RawMessage("{}"),
+		// At this point we should get exactly one message. We're sending the sync position
+		// that we were given from the update and the send-to-device update will be updated
+		// in the database to reflect that this was the sync position we sent the message at.
+		streamPos, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count := len(events); count != 1 {
+			t.Fatalf("second call should have one update, got %d", count)
+		}
+
+		// At this point we should still have one message because we haven't progressed the
+		// sync position yet. This is equivalent to the client failing to /sync and retrying
+		// with the same position.
+		streamPos, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) != 1 {
+			t.Fatal("third call should have one update still")
+		}
+		err = db.CleanSendToDeviceUpdates(context.Background(), alice.ID, deviceID, streamPos)
+		if err != nil {
+			return
+		}
+
+		// At this point we should now have no updates, because we've progressed the sync
+		// position. Therefore the update from before will not be sent again.
+		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) != 0 {
+			t.Fatal("fourth call should have no updates")
+		}
+
+		// At this point we should still have no updates, because no new updates have been
+		// sent.
+		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(events) != 0 {
+			t.Fatal("fifth call should have no updates")
+		}
+
+		// Send some more messages and verify the ordering is correct ("in order of arrival")
+		var lastPos types.StreamPosition = 0
+		for i := 0; i < 10; i++ {
+			streamPos, err = db.StoreNewSendForDeviceMessage(ctx, alice.ID, deviceID, gomatrixserverlib.SendToDeviceEvent{
+				Sender:  bob.ID,
+				Type:    "m.type",
+				Content: json.RawMessage(fmt.Sprintf(`{"count":%d}`, i)),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			lastPos = streamPos
+		}
+
+		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, lastPos)
+		if err != nil {
+			t.Fatalf("unable to get events: %v", err)
+		}
+
+		for i := 0; i < 10; i++ {
+			want := json.RawMessage(fmt.Sprintf(`{"count":%d}`, i))
+			got := events[i].Content
+			if !bytes.Equal(got, want) {
+				t.Fatalf("messages are out of order\nwant: %s\ngot: %s", string(want), string(got))
+			}
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// At this point we should get exactly one message. We're sending the sync position
-	// that we were given from the update and the send-to-device update will be updated
-	// in the database to reflect that this was the sync position we sent the message at.
-	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 1 || len(updates) != 1 || len(deletions) != 0 {
-		t.Fatal("second call should have one update")
-	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.StreamingToken{SendToDevicePosition: streamPos})
-	if err != nil {
-		return
-	}
-
-	// At this point we should still have one message because we haven't progressed the
-	// sync position yet. This is equivalent to the client failing to /sync and retrying
-	// with the same position.
-	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 1 || len(updates) != 0 || len(deletions) != 0 {
-		t.Fatal("third call should have one update still")
-	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.StreamingToken{SendToDevicePosition: streamPos})
-	if err != nil {
-		return
-	}
-
-	// At this point we should now have no updates, because we've progressed the sync
-	// position. Therefore the update from before will not be sent again.
-	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos + 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 0 || len(updates) != 0 || len(deletions) != 1 {
-		t.Fatal("fourth call should have no updates")
-	}
-	err = db.CleanSendToDeviceUpdates(context.Background(), updates, deletions, types.StreamingToken{SendToDevicePosition: streamPos + 1})
-	if err != nil {
-		return
-	}
-
-	// At this point we should still have no updates, because no new updates have been
-	// sent.
-	_, events, updates, deletions, err = db.SendToDeviceUpdatesForSync(ctx, "alice", "one", types.StreamingToken{SendToDevicePosition: streamPos + 2})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 0 || len(updates) != 0 || len(deletions) != 0 {
-		t.Fatal("fifth call should have no updates")
-	}
 }
 
+/*
 func TestInviteBehaviour(t *testing.T) {
 	db := MustCreateDatabase(t)
 	inviteRoom1 := "!inviteRoom1:somewhere"

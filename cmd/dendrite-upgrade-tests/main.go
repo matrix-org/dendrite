@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -37,6 +37,7 @@ var (
 	flagBuildConcurrency = flag.Int("build-concurrency", runtime.NumCPU(), "The amount of build concurrency when building images")
 	flagHead             = flag.String("head", "", "Location to a dendrite repository to treat as HEAD instead of Github")
 	flagDockerHost       = flag.String("docker-host", "localhost", "The hostname of the docker client. 'localhost' if running locally, 'host.docker.internal' if running in Docker.")
+	flagDirect           = flag.Bool("direct", false, "If a direct upgrade from the defined FROM version to TO should be done")
 	alphaNumerics        = regexp.MustCompile("[^a-zA-Z0-9]+")
 )
 
@@ -46,9 +47,9 @@ const HEAD = "HEAD"
 // We cannot use the dockerfile associated with the repo with each version sadly due to changes in
 // Docker versions. Specifically, earlier Dendrite versions are incompatible with newer Docker clients
 // due to the error:
-//   When using COPY with more than one source file, the destination must be a directory and end with a /
+// When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const Dockerfile = `FROM golang:1.16-stretch as build
+const Dockerfile = `FROM golang:1.18-stretch as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
@@ -94,7 +95,9 @@ CMD /build/run_dendrite.sh `
 const dendriteUpgradeTestLabel = "dendrite_upgrade_test"
 
 // downloadArchive downloads an arbitrary github archive of the form:
-//   https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//
+//	https://github.com/matrix-org/dendrite/archive/v0.3.11.tar.gz
+//
 // and re-tarballs it without the top-level directory which contains branch information. It inserts
 // the contents of `dockerfile` as a root file `Dockerfile` in the re-tarballed directory such that
 // you can directly feed the retarballed archive to `ImageBuild` to have it run said dockerfile.
@@ -125,7 +128,7 @@ func downloadArchive(cli *http.Client, tmpDir, archiveURL string, dockerfile []b
 		return nil, err
 	}
 	// add top level Dockerfile
-	err = ioutil.WriteFile(path.Join(tmpDir, "Dockerfile"), dockerfile, os.ModePerm)
+	err = os.WriteFile(path.Join(tmpDir, "Dockerfile"), dockerfile, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject /Dockerfile: %w", err)
 	}
@@ -147,7 +150,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 	if branchOrTagName == HEAD && *flagHead != "" {
 		log.Printf("%s: Using %s as HEAD", branchOrTagName, *flagHead)
 		// add top level Dockerfile
-		err = ioutil.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
+		err = os.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
 		if err != nil {
 			return "", fmt.Errorf("custom HEAD: failed to inject /Dockerfile: %w", err)
 		}
@@ -229,7 +232,7 @@ func getAndSortVersionsFromGithub(httpClient *http.Client) (semVers []*semver.Ve
 	return semVers, nil
 }
 
-func calculateVersions(cli *http.Client, from, to string) []string {
+func calculateVersions(cli *http.Client, from, to string, direct bool) []string {
 	semvers, err := getAndSortVersionsFromGithub(cli)
 	if err != nil {
 		log.Fatalf("failed to collect semvers from github: %s", err)
@@ -283,6 +286,9 @@ func calculateVersions(cli *http.Client, from, to string) []string {
 	}
 	if to == HEAD {
 		versions = append(versions, HEAD)
+	}
+	if direct {
+		versions = []string{versions[0], versions[len(versions)-1]}
 	}
 	return versions
 }
@@ -382,7 +388,7 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 		})
 		// ignore errors when cannot get logs, it's just for debugging anyways
 		if err == nil {
-			logbody, err := ioutil.ReadAll(logs)
+			logbody, err := io.ReadAll(logs)
 			if err == nil {
 				log.Printf("Container logs:\n\n%s\n\n", string(logbody))
 			}
@@ -461,7 +467,7 @@ func main() {
 		os.Exit(1)
 	}
 	cleanup(dockerClient)
-	versions := calculateVersions(httpClient, *flagFrom, *flagTo)
+	versions := calculateVersions(httpClient, *flagFrom, *flagTo, *flagDirect)
 	log.Printf("Testing dendrite versions: %v\n", versions)
 
 	branchToImageID := buildDendriteImages(httpClient, dockerClient, *flagTempDir, *flagBuildConcurrency, versions)

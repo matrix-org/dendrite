@@ -5,10 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
+
+	"github.com/matrix-org/dendrite/federationapi/storage"
 )
 
 // Statistics contains information about all of the remote federated
@@ -126,13 +127,13 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 
 		go func() {
 			until, ok := s.backoffUntil.Load().(time.Time)
-			if ok {
+			if ok && !until.IsZero() {
 				select {
 				case <-time.After(time.Until(until)):
 				case <-s.interrupt:
 				}
+				s.backoffStarted.Store(false)
 			}
-			s.backoffStarted.Store(false)
 		}()
 	}
 

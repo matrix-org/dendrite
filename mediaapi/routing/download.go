@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
@@ -695,7 +694,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 
 		// We successfully parsed the Content-Length, so we'll return a limited
 		// reader that restricts us to reading only up to this size.
-		reader = ioutil.NopCloser(io.LimitReader(*body, parsedLength))
+		reader = io.NopCloser(io.LimitReader(*body, parsedLength))
 		contentLength = parsedLength
 	} else {
 		// Content-Length header is missing. If we have a maximum file size
@@ -704,7 +703,7 @@ func (r *downloadRequest) GetContentLengthAndReader(contentLengthHeader string, 
 		// ultimately it will get rewritten later when the temp file is written
 		// to disk.
 		if maxFileSizeBytes > 0 {
-			reader = ioutil.NopCloser(io.LimitReader(*body, int64(maxFileSizeBytes)))
+			reader = io.NopCloser(io.LimitReader(*body, int64(maxFileSizeBytes)))
 		}
 		contentLength = 0
 	}

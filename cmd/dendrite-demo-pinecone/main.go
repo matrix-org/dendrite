@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -76,11 +75,11 @@ func main() {
 		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
 			panic(err)
 		}
-		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
+		if err = os.WriteFile(keyfile, sk, 0644); err != nil {
 			panic(err)
 		}
 	} else if err == nil {
-		if sk, err = ioutil.ReadFile(keyfile); err != nil {
+		if sk, err = os.ReadFile(keyfile); err != nil {
 			panic(err)
 		}
 		if len(sk) != ed25519.PrivateKeySize {
@@ -92,7 +91,7 @@ func main() {
 	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
 	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
-	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
 	pMulticast.Start()
 	if instancePeer != nil && *instancePeer != "" {
 		pManager.AddPeer(*instancePeer)
