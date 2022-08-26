@@ -133,7 +133,7 @@ func Setup(
 					}
 				}
 				if req.Method == http.MethodPost {
-					return handleSharedSecretRegistration(userAPI, sr, req)
+					return handleSharedSecretRegistration(cfg, userAPI, sr, req)
 				}
 				return util.JSONResponse{
 					Code: http.StatusMethodNotAllowed,
