@@ -21,6 +21,11 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -29,10 +34,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
@@ -107,7 +108,8 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg)
 			"type":       output.Type,
 			"room_id":    output.RoomID,
 			log.ErrorKey: err,
-		}).Panicf("could not save account data")
+		}).Errorf("could not save account data")
+		return false
 	}
 
 	if err = s.sendReadUpdate(ctx, userID, output); err != nil {
