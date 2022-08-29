@@ -18,8 +18,6 @@ import (
 	"flag"
 	"os"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -31,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/sirupsen/logrus"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -156,6 +155,14 @@ func main() {
 		}
 	}
 
+	// Expose the matrix APIs directly rather than putting them under a /api path.
+	go func() {
+		base.SetupAndServeHTTP(
+			httpAPIAddr, // internal API
+			httpAddr,    // external API
+			nil, nil,    // TLS settings
+		)
+	}()
 	// Handle HTTPS if certificate and key are provided
 	if *certFile != "" && *keyFile != "" {
 		go func() {
@@ -163,15 +170,6 @@ func main() {
 				basepkg.NoListener, // internal API
 				httpsAddr,          // external API
 				certFile, keyFile,  // TLS settings
-			)
-		}()
-	} else {
-		// Expose the matrix APIs directly rather than putting them under a /api path.
-		go func() {
-			base.SetupAndServeHTTP(
-				httpAPIAddr, // internal API
-				httpAddr,    // external API
-				nil, nil,    // TLS settings
 			)
 		}()
 	}
