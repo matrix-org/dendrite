@@ -7,6 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -20,9 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/util"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 type OutputStreamEventConsumer struct {
@@ -529,7 +530,9 @@ func (s *OutputStreamEventConsumer) notifyHTTP(ctx context.Context, event *gomat
 	case "event_id_only":
 		req = pushgateway.NotifyRequest{
 			Notification: pushgateway.Notification{
-				Counts:  &pushgateway.Counts{},
+				Counts: &pushgateway.Counts{
+					Unread: userNumUnreadNotifs,
+				},
 				Devices: devices,
 				EventID: event.EventID(),
 				RoomID:  event.RoomID(),
