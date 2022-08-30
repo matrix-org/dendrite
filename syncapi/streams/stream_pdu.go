@@ -303,7 +303,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	if stateFilter.LazyLoadMembers {
 		delta.StateEvents, err = p.lazyLoadMembers(
-			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
+			ctx, delta.RoomID, true, limited, stateFilter,
 			device, recentEvents, delta.StateEvents,
 		)
 		if err != nil && err != sql.ErrNoRows {
@@ -532,7 +532,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			return nil, err
 		}
 		stateEvents, err = p.lazyLoadMembers(ctx, roomID,
-			false, limited, stateFilter.IncludeRedundantMembers,
+			false, limited, stateFilter,
 			device, recentEvents, stateEvents,
 		)
 		if err != nil && err != sql.ErrNoRows {
@@ -551,7 +551,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 
 func (p *PDUStreamProvider) lazyLoadMembers(
 	ctx context.Context, roomID string,
-	incremental, limited, includeRedundant bool,
+	incremental, limited bool, stateFilter *gomatrixserverlib.StateFilter,
 	device *userapi.Device,
 	timelineEvents, stateEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
@@ -581,7 +581,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			stateKey := *event.StateKey()
 			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
 				newStateEvents = append(newStateEvents, event)
-				if !includeRedundant {
+				if !stateFilter.IncludeRedundantMembers {
 					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
 				}
 				delete(timelineUsers, stateKey)
@@ -596,6 +596,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// Query missing membership events
 	filter := gomatrixserverlib.DefaultStateFilter()
+	filter.Limit = stateFilter.Limit
 	filter.Senders = &wantUsers
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := p.DB.GetStateEventsForRoom(ctx, roomID, &filter)
