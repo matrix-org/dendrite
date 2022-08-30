@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -247,14 +248,24 @@ func (w *worker) _next() {
 	// it was a synchronous request.
 	var errString string
 	if err = w.r.processRoomEvent(w.r.ProcessContext.Context(), &inputRoomEvent); err != nil {
-		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-			sentry.CaptureException(err)
+		switch err.(type) {
+		case types.RejectedError:
+			// Don't send events that were rejected to Sentry
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver rejected event")
+		default:
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				sentry.CaptureException(err)
+			}
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver failed to process event")
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"room_id":  w.roomID,
-			"event_id": inputRoomEvent.Event.EventID(),
-			"type":     inputRoomEvent.Event.Type(),
-		}).Warn("Roomserver failed to process async event")
 		_ = msg.Term()
 		errString = err.Error()
 	} else {

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 )
 
 type PerformErrorCode int
@@ -161,7 +162,8 @@ func (r *PerformBackfillRequest) PrevEventIDs() []string {
 // PerformBackfillResponse is a response to PerformBackfill.
 type PerformBackfillResponse struct {
 	// Missing events, arbritrary order.
-	Events []*gomatrixserverlib.HeaderedEvent `json:"events"`
+	Events            []*gomatrixserverlib.HeaderedEvent  `json:"events"`
+	HistoryVisibility gomatrixserverlib.HistoryVisibility `json:"history_visibility"`
 }
 
 type PerformPublishRequest struct {

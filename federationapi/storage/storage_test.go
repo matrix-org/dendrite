@@ -31,7 +31,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 
 func TestExpireEDUs(t *testing.T) {
 	var expireEDUTypes = map[string]time.Duration{
-		gomatrixserverlib.MReceipt: time.Millisecond,
+		gomatrixserverlib.MReceipt: 0,
 	}
 
 	ctx := context.Background()
