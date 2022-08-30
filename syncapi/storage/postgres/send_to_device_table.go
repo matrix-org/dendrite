@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	-- The event content JSON.
 	content TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS syncapi_send_to_device_user_id_device_id_idx ON syncapi_send_to_device(user_id, device_id);
 `
 
 const insertSendToDeviceMessageSQL = `
