@@ -98,7 +98,7 @@ func NewInternalAPI(
 	// We can't add ASes at runtime so this is safe to do.
 	if len(workerStates) > 0 {
 		consumer := consumers.NewOutputRoomEventConsumer(
-			base.ProcessContext, base.Cfg, js, appserviceDB,
+			base.ProcessContext, &base.Cfg.AppServiceAPI, js, appserviceDB,
 			rsAPI, workerStates,
 		)
 		if err := consumer.Start(); err != nil {
