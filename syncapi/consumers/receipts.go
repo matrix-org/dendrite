@@ -16,11 +16,15 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strconv"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -28,10 +32,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
@@ -137,14 +137,8 @@ func (s *OutputReceiptEventConsumer) sendReadUpdate(ctx context.Context, output 
 	if serverName != s.serverName {
 		return nil
 	}
-	var readPos types.StreamPosition
 	if output.EventID != "" {
-		if _, readPos, err = s.db.PositionInTopology(ctx, output.EventID); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("s.db.PositionInTopology (Read): %w", err)
-		}
-	}
-	if readPos > 0 {
-		if err := s.producer.SendReadUpdate(output.UserID, output.RoomID, readPos, 0); err != nil {
+		if err := s.producer.SendReadUpdate(output.UserID, output.RoomID, output.EventID, ""); err != nil {
 			return fmt.Errorf("s.producer.SendReadUpdate: %w", err)
 		}
 	}

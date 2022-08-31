@@ -15,12 +15,10 @@
 package producers
 
 import (
-	"encoding/json"
-
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
 // UserAPIProducer produces events for the user API server to consume
@@ -30,25 +28,12 @@ type UserAPIReadProducer struct {
 }
 
 // SendData sends account data to the user API server
-func (p *UserAPIReadProducer) SendReadUpdate(userID, roomID string, readPos, fullyReadPos types.StreamPosition) error {
-	m := &nats.Msg{
-		Subject: p.Topic,
-		Header:  nats.Header{},
-	}
+func (p *UserAPIReadProducer) SendReadUpdate(userID, roomID string, readPos, fullyReadPos string) error {
+	m := nats.NewMsg(p.Topic)
 	m.Header.Set(jetstream.UserID, userID)
 	m.Header.Set(jetstream.RoomID, roomID)
-
-	data := types.ReadUpdate{
-		UserID:    userID,
-		RoomID:    roomID,
-		Read:      readPos,
-		FullyRead: fullyReadPos,
-	}
-	var err error
-	m.Data, err = json.Marshal(data)
-	if err != nil {
-		return err
-	}
+	m.Header.Set("read", readPos)
+	m.Header.Set("fully_read", fullyReadPos)
 
 	log.WithFields(log.Fields{
 		"user_id":        userID,
@@ -57,6 +42,6 @@ func (p *UserAPIReadProducer) SendReadUpdate(userID, roomID string, readPos, ful
 		"fully_read_pos": fullyReadPos,
 	}).Tracef("Producing to topic '%s'", p.Topic)
 
-	_, err = p.JetStream.PublishMsg(m)
+	_, err := p.JetStream.PublishMsg(m)
 	return err
 }

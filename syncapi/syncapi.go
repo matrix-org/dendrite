@@ -17,8 +17,9 @@ package syncapi
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/internal/caching"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -76,11 +77,6 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
-		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputStreamEvent),
-	}
-
 	userAPIReadUpdateProducer := &producers.UserAPIReadProducer{
 		JetStream: js,
 		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
@@ -97,7 +93,7 @@ func AddPublicRoutes(
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, userAPIStreamEventProducer,
+		streams.InviteStreamProvider, rsAPI,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")

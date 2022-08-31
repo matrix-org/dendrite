@@ -2,20 +2,19 @@ package consumers
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/dendrite/syncapi/types"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/util"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 type OutputReadUpdateConsumer struct {
@@ -66,17 +65,14 @@ func (s *OutputReadUpdateConsumer) Start() error {
 
 func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
-	var read types.ReadUpdate
-	if err := json.Unmarshal(msg.Data, &read); err != nil {
-		log.WithError(err).Error("userapi clientapi consumer: message parse failure")
-		return true
-	}
-	if read.FullyRead == 0 && read.Read == 0 {
-		return true
-	}
+	userID := msg.Header.Get(jetstream.UserID)
+	roomID := msg.Header.Get(jetstream.RoomID)
+	readPos := msg.Header.Get("read")
+	fullyReadPos := msg.Header.Get("fully_read")
 
-	userID := string(msg.Header.Get(jetstream.UserID))
-	roomID := string(msg.Header.Get(jetstream.RoomID))
+	if readPos == "" && fullyReadPos == "" {
+		return true
+	}
 
 	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
@@ -92,10 +88,9 @@ func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		"room_id": roomID,
 		"user_id": userID,
 	})
-	log.Tracef("Received read update from sync API: %#v", read)
 
-	if read.Read > 0 {
-		updated, err := s.db.SetNotificationsRead(ctx, localpart, roomID, int64(read.Read), true)
+	if readPos != "" {
+		updated, err := s.db.SetNotificationsRead(ctx, localpart, roomID, readPos, true)
 		if err != nil {
 			log.WithError(err).Error("userapi EDU consumer")
 			return false
@@ -113,8 +108,8 @@ func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		}
 	}
 
-	if read.FullyRead > 0 {
-		deleted, err := s.db.DeleteNotificationsUpTo(ctx, localpart, roomID, int64(read.FullyRead))
+	if fullyReadPos != "" {
+		deleted, err := s.db.DeleteNotificationsUpTo(ctx, localpart, roomID, fullyReadPos)
 		if err != nil {
 			log.WithError(err).Errorf("userapi clientapi consumer: DeleteNotificationsUpTo failed")
 			return false
@@ -126,7 +121,7 @@ func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 				return false
 			}
 
-			if err := s.syncProducer.GetAndSendNotificationData(ctx, userID, read.RoomID); err != nil {
+			if err := s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
 				log.WithError(err).Errorf("userapi clientapi consumer: GetAndSendNotificationData failed")
 				return false
 			}

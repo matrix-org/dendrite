@@ -16,7 +16,6 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -113,7 +112,7 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		return false
 	}
 
-	if err = s.sendReadUpdate(ctx, userID, output); err != nil {
+	if err = s.sendReadUpdate(userID, output); err != nil {
 		log.WithError(err).WithFields(logrus.Fields{
 			"user_id": userID,
 			"room_id": output.RoomID,
@@ -137,7 +136,7 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	return true
 }
 
-func (s *OutputClientDataConsumer) sendReadUpdate(ctx context.Context, userID string, output eventutil.AccountData) error {
+func (s *OutputClientDataConsumer) sendReadUpdate(userID string, output eventutil.AccountData) error {
 	if output.Type != "m.fully_read" || output.ReadMarker == nil {
 		return nil
 	}
@@ -148,20 +147,8 @@ func (s *OutputClientDataConsumer) sendReadUpdate(ctx context.Context, userID st
 	if serverName != s.serverName {
 		return nil
 	}
-	var readPos types.StreamPosition
-	var fullyReadPos types.StreamPosition
-	if output.ReadMarker.Read != "" {
-		if _, readPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.Read); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("s.db.PositionInTopology (Read): %w", err)
-		}
-	}
-	if output.ReadMarker.FullyRead != "" {
-		if _, fullyReadPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.FullyRead); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("s.db.PositionInTopology (FullyRead): %w", err)
-		}
-	}
-	if readPos > 0 || fullyReadPos > 0 {
-		if err := s.producer.SendReadUpdate(userID, output.RoomID, readPos, fullyReadPos); err != nil {
+	if output.ReadMarker.Read != "" || output.ReadMarker.FullyRead != "" {
+		if err := s.producer.SendReadUpdate(userID, output.RoomID, output.ReadMarker.Read, output.ReadMarker.FullyRead); err != nil {
 			return fmt.Errorf("s.producer.SendReadUpdate: %w", err)
 		}
 	}

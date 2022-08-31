@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -31,7 +33,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/util"
-	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
@@ -89,7 +90,7 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start user API read update consumer")
 	}
 
-	eventConsumer := consumers.NewOutputStreamEventConsumer(
+	eventConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, db, pgClient, userAPI, rsAPI, syncProducer,
 	)
 	if err := eventConsumer.Start(); err != nil {
