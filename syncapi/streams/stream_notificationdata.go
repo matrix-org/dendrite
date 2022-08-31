@@ -46,9 +46,10 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		if counts == nil {
 			continue
 		}
-
-		jr.UnreadNotifications.HighlightCount = counts.UnreadHighlightCount
-		jr.UnreadNotifications.NotificationCount = counts.UnreadNotificationCount
+		jr.UnreadNotifications = &types.UnreadNotifications{
+			HighlightCount:    counts.UnreadHighlightCount,
+			NotificationCount: counts.UnreadNotificationCount,
+		}
 		req.Response.Rooms.Join[roomID] = jr
 	}
 	return to

@@ -398,6 +398,11 @@ func (r *Response) IsEmpty() bool {
 		len(r.ToDevice.Events) == 0
 }
 
+type UnreadNotifications struct {
+	HighlightCount    int `json:"highlight_count"`
+	NotificationCount int `json:"notification_count"`
+}
+
 // JoinResponse represents a /sync response for a room which is under the 'join' or 'peek' key.
 type JoinResponse struct {
 	Summary struct {
@@ -419,10 +424,7 @@ type JoinResponse struct {
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"account_data"`
-	UnreadNotifications struct {
-		HighlightCount    int `json:"highlight_count"`
-		NotificationCount int `json:"notification_count"`
-	} `json:"unread_notifications"`
+	*UnreadNotifications `json:"unread_notifications,omitempty"`
 }
 
 // NewJoinResponse creates an empty response with initialised arrays.
