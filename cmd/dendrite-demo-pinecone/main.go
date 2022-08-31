@@ -91,7 +91,7 @@ func main() {
 		keyfile := *instanceName + ".pem"
 		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
 			oldkeyfile := *instanceName + ".key"
-			if _, err := os.Stat(oldkeyfile); os.IsNotExist(err) {
+			if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
 				if err = test.NewMatrixKey(keyfile); err != nil {
 					panic("failed to generate a new PEM key: " + err.Error())
 				}
@@ -106,12 +106,13 @@ func main() {
 					panic("failed to convert the private key to PEM format: " + err.Error())
 				}
 			}
+		} else {
+			var err error
+			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+				panic(err)
+			}
 		}
-		var err error
 		cfg.Defaults(true)
-		if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
-			panic(err)
-		}
 		cfg.Global.PrivateKey = sk
 		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
