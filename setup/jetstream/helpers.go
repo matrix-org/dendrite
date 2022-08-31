@@ -3,6 +3,7 @@ package jetstream
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/nats-io/nats.go"
@@ -101,7 +102,7 @@ func JetStreamConsumer(
 					sentry.CaptureException(err)
 				}
 			} else {
-				if err = msg.Nak(nats.Context(ctx)); err != nil {
+				if err = msg.NakWithDelay(time.Second*15, nats.Context(ctx)); err != nil {
 					logrus.WithContext(ctx).WithField("subject", subj).Warn(fmt.Errorf("msg.Nak: %w", err))
 					sentry.CaptureException(err)
 				}

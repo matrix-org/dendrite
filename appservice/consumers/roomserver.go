@@ -207,7 +207,7 @@ func (s *appserviceState) backoffAndPause(err error) error {
 		s.backoff++
 	}
 	duration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
-	log.WithField("appservice", s.ID).WithError(err).Warnf("Unable to send transaction to appservice successfully, backing off for %s", duration.String())
+	log.WithField("appservice", s.ID).WithError(err).Errorf("Unable to send transaction to appservice, backing off for %s", duration.String())
 	time.Sleep(duration)
 	return err
 }
