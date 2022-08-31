@@ -68,12 +68,13 @@ func NewOutputSendToDeviceEventConsumer(
 // Start consuming send-to-device events.
 func (s *OutputSendToDeviceEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
-func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	userID := msg.Header.Get(jetstream.UserID)
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {

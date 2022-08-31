@@ -225,12 +225,7 @@ func loadConfig(
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
-	privateKeyData, err := readFile(privateKeyPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.Global.KeyID, c.Global.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData, true); err != nil {
+	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
 		return nil, err
 	}
 
@@ -264,6 +259,14 @@ func loadConfig(
 
 	c.Wiring()
 	return &c, nil
+}
+
+func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error)) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
+	privateKeyData, err := readFile(privateKeyPath)
+	if err != nil {
+		return "", nil, err
+	}
+	return readKeyPEM(privateKeyPath, privateKeyData, true)
 }
 
 // Derive generates data that is derived from various values provided in

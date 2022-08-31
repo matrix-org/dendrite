@@ -55,14 +55,15 @@ func NewDeviceListUpdateConsumer(
 // Start consuming from key servers
 func (t *DeviceListUpdateConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called in response to a message received on the
 // key change events topic from the key server.
-func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var m gomatrixserverlib.DeviceListUpdateEvent
 	if err := json.Unmarshal(msg.Data, &m); err != nil {
 		logrus.WithError(err).Errorf("Failed to read from device list update input topic")
