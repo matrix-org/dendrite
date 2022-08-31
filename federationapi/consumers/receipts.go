@@ -65,14 +65,15 @@ func NewOutputReceiptConsumer(
 // Start consuming from the clientapi
 func (t *OutputReceiptConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
+		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
 
 // onMessage is called in response to a message received on the receipt
 // events topic from the client api.
-func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	receipt := syncTypes.OutputReceiptEvent{
 		UserID:  msg.Header.Get(jetstream.UserID),
 		RoomID:  msg.Header.Get(jetstream.RoomID),
