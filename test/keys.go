@@ -67,7 +67,7 @@ func SaveMatrixKey(matrixKeyPath string, data ed25519.PrivateKey) error {
 		Headers: map[string]string{
 			"Key-ID": fmt.Sprintf("ed25519:%s", keyID[:6]),
 		},
-		Bytes: data[3:],
+		Bytes: data,
 	})
 	return err
 }
