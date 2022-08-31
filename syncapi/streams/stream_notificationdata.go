@@ -39,16 +39,16 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		return from
 	}
 
-	// We're merely decorating existing rooms. Note that the Join map
-	// values are not pointers.
-	for roomID, jr := range req.Response.Rooms.Join {
-		counts := countsByRoom[roomID]
-		if counts == nil {
-			continue
+	// Add notification data to rooms.
+	// Create an empty JoinResponse if the room isn't in this response
+	for roomID, notificationData := range countsByRoom {
+		jr, exists := req.Response.Rooms.Join[roomID]
+		if !exists {
+			jr = *types.NewJoinResponse()
 		}
 		jr.UnreadNotifications = &types.UnreadNotifications{
-			HighlightCount:    counts.UnreadHighlightCount,
-			NotificationCount: counts.UnreadNotificationCount,
+			HighlightCount:    notificationData.UnreadHighlightCount,
+			NotificationCount: notificationData.UnreadNotificationCount,
 		}
 		req.Response.Rooms.Join[roomID] = jr
 	}
