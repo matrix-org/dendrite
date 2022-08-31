@@ -15,15 +15,18 @@
 package consumers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 
-	"github.com/matrix-org/dendrite/appservice/storage"
-	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -34,14 +37,17 @@ import (
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
 type OutputRoomEventConsumer struct {
-	ctx          context.Context
-	cfg          *config.AppServiceAPI
-	jetstream    nats.JetStreamContext
-	topic        string
-	asDB         storage.Database
-	rsAPI        api.AppserviceRoomserverAPI
-	serverName   string
-	workerStates []types.ApplicationServiceWorkerState
+	ctx       context.Context
+	cfg       *config.AppServiceAPI
+	client    *http.Client
+	jetstream nats.JetStreamContext
+	topic     string
+	rsAPI     api.AppserviceRoomserverAPI
+}
+
+type appserviceState struct {
+	*config.ApplicationService
+	backoff int
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call
@@ -49,32 +55,33 @@ type OutputRoomEventConsumer struct {
 func NewOutputRoomEventConsumer(
 	process *process.ProcessContext,
 	cfg *config.AppServiceAPI,
+	client *http.Client,
 	js nats.JetStreamContext,
-	appserviceDB storage.Database,
 	rsAPI api.AppserviceRoomserverAPI,
-	workerStates []types.ApplicationServiceWorkerState,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:          process.Context(),
-		cfg:          cfg,
-		jetstream:    js,
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		asDB:         appserviceDB,
-		rsAPI:        rsAPI,
-		serverName:   string(cfg.Matrix.ServerName),
-		workerStates: workerStates,
+		ctx:       process.Context(),
+		cfg:       cfg,
+		client:    client,
+		jetstream: js,
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		rsAPI:     rsAPI,
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	for _, as := range s.cfg.Derived.ApplicationServices {
-		appsvc, token := as, jetstream.Tokenise(as.ID)
+		appsvc := as
+		state := &appserviceState{
+			ApplicationService: &appsvc,
+		}
+		token := jetstream.Tokenise(as.ID)
 		if err := jetstream.JetStreamConsumer(
 			s.ctx, s.jetstream, s.topic,
-			s.cfg.Matrix.JetStream.Durable("Appservice_"+token), 10,
+			s.cfg.Matrix.JetStream.Durable("Appservice_"+token), 50,
 			func(ctx context.Context, msgs []*nats.Msg) bool {
-				return s.onMessage(ctx, &appsvc, msgs)
+				return s.onMessage(ctx, state, msgs)
 			},
 			nats.DeliverAll(), nats.ManualAck(),
 		); err != nil {
@@ -86,8 +93,10 @@ func (s *OutputRoomEventConsumer) Start() error {
 
 // onMessage is called when the appservice component receives a new event from
 // the room server output log.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, as *config.ApplicationService, msgs []*nats.Msg) bool {
-	log.WithField("appservice", as.ID).Debugf("Appservice worker received %d message(s) from roomserver", len(msgs))
+func (s *OutputRoomEventConsumer) onMessage(
+	ctx context.Context, state *appserviceState, msgs []*nats.Msg,
+) bool {
+	log.WithField("appservice", state.ID).Debugf("Appservice worker received %d message(s) from roomserver", len(msgs))
 	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(msgs))
 	for _, msg := range msgs {
 		// Parse out the event JSON
@@ -135,7 +144,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, as *config.Appl
 	}
 
 	// Send event to any relevant application services
-	if err := s.filterRoomserverEvents(ctx, events); err != nil {
+	if err := s.filterRoomserverEvents(ctx, state, events); err != nil {
 		log.WithError(err).Errorf("roomserver output log: filter error")
 		return false
 	}
@@ -149,67 +158,66 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, as *config.Appl
 // match, adds the event to the queue for events to be sent to a particular
 // application service.
 func (s *OutputRoomEventConsumer) filterRoomserverEvents(
-	ctx context.Context,
+	ctx context.Context, state *appserviceState,
 	events []*gomatrixserverlib.HeaderedEvent,
 ) error {
-	for _, ws := range s.workerStates {
-		for _, event := range events {
-			// Check if this event is interesting to this application service
-			if s.appserviceIsInterestedInEvent(ctx, event, ws.AppService) {
-				// Queue this event to be sent off to the application service
-				if err := s.asDB.StoreEvent(ctx, ws.AppService.ID, event); err != nil {
-					log.WithError(err).Warn("failed to insert incoming event into appservices database")
-					return err
-				} else {
-					// Tell our worker to send out new messages by updating remaining message
-					// count and waking them up with a broadcast
-					ws.NotifyNewEvents()
-				}
-			}
+	filteredEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	for _, event := range events {
+		if s.appserviceIsInterestedInEvent(ctx, event, state.ApplicationService) {
+			continue
 		}
+		filteredEvents = append(filteredEvents, event)
 	}
 
-	return nil
+	transaction, err := json.Marshal(gomatrixserverlib.ApplicationServiceTransaction{
+		Events: gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll),
+	})
+	if err != nil {
+		return err
+	}
+
+	txnID := 0 // TODO
+
+	// PUT a transaction to our AS
+	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
+	address := fmt.Sprintf("%s/transactions/%d?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
+	req, err := http.NewRequest("PUT", address, bytes.NewBuffer(transaction))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		state.backoffAndPause(err)
+		return err
+	}
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		state.backoff = 0
+		return nil
+	default:
+		return fmt.Errorf("non-OK status code %d returned from AS", resp.StatusCode)
+	}
 }
 
-// appserviceJoinedAtEvent returns a boolean depending on whether a given
-// appservice has membership at the time a given event was created.
-func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
-	// TODO: This is only checking the current room state, not the state at
-	// the event in question. Pretty sure this is what Synapse does too, but
-	// until we have a lighter way of checking the state before the event that
-	// doesn't involve state res, then this is probably OK.
-	membershipReq := &api.QueryMembershipsForRoomRequest{
-		RoomID:     event.RoomID(),
-		JoinedOnly: true,
+// backoff pauses the calling goroutine for a 2^some backoff exponent seconds
+func (s *appserviceState) backoffAndPause(err error) {
+	if s.backoff < 6 {
+		s.backoff++
 	}
-	membershipRes := &api.QueryMembershipsForRoomResponse{}
 
-	// XXX: This could potentially race if the state for the event is not known yet
-	// e.g. the event came over federation but we do not have the full state persisted.
-	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
-		for _, ev := range membershipRes.JoinEvents {
-			var membership gomatrixserverlib.MemberContent
-			if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
-				continue
-			}
-			if appservice.IsInterestedInUserID(*ev.StateKey) {
-				return true
-			}
-		}
-	} else {
-		log.WithFields(log.Fields{
-			"room_id": event.RoomID(),
-		}).WithError(err).Errorf("Unable to get membership for room")
-	}
-	return false
+	duration := time.Second * time.Duration(math.Pow(2, float64(s.backoff)))
+	log.WithField("appservice", s.ID).WithError(err).Warnf("Unable to send transaction to appservice successfully, backing off for %s", duration.String())
+	time.Sleep(duration)
 }
 
 // appserviceIsInterestedInEvent returns a boolean depending on whether a given
 // event falls within one of a given application service's namespaces.
 //
 // TODO: This should be cached, see https://github.com/matrix-org/dendrite/issues/1682
-func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice config.ApplicationService) bool {
+func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice *config.ApplicationService) bool {
 	// No reason to queue events if they'll never be sent to the application
 	// service
 	if appservice.URL == "" {
@@ -245,4 +253,37 @@ func (s *OutputRoomEventConsumer) appserviceIsInterestedInEvent(ctx context.Cont
 
 	// Check if any of the members in the room match the appservice
 	return s.appserviceJoinedAtEvent(ctx, event, appservice)
+}
+
+// appserviceJoinedAtEvent returns a boolean depending on whether a given
+// appservice has membership at the time a given event was created.
+func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, appservice *config.ApplicationService) bool {
+	// TODO: This is only checking the current room state, not the state at
+	// the event in question. Pretty sure this is what Synapse does too, but
+	// until we have a lighter way of checking the state before the event that
+	// doesn't involve state res, then this is probably OK.
+	membershipReq := &api.QueryMembershipsForRoomRequest{
+		RoomID:     event.RoomID(),
+		JoinedOnly: true,
+	}
+	membershipRes := &api.QueryMembershipsForRoomResponse{}
+
+	// XXX: This could potentially race if the state for the event is not known yet
+	// e.g. the event came over federation but we do not have the full state persisted.
+	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
+		for _, ev := range membershipRes.JoinEvents {
+			var membership gomatrixserverlib.MemberContent
+			if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
+				continue
+			}
+			if appservice.IsInterestedInUserID(*ev.StateKey) {
+				return true
+			}
+		}
+	} else {
+		log.WithFields(log.Fields{
+			"room_id": event.RoomID(),
+		}).WithError(err).Errorf("Unable to get membership for room")
+	}
+	return false
 }

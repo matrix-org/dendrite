@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -28,9 +27,6 @@ import (
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/inthttp"
 	"github.com/matrix-org/dendrite/appservice/query"
-	"github.com/matrix-org/dendrite/appservice/storage"
-	"github.com/matrix-org/dendrite/appservice/types"
-	"github.com/matrix-org/dendrite/appservice/workers"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -59,57 +55,40 @@ func NewInternalAPI(
 			Proxy: http.ProxyFromEnvironment,
 		},
 	}
-	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	// Create appserivce query API with an HTTP client that will be used for all
+	// outbound and inbound requests (inbound only for the internal API)
+	appserviceQueryAPI := &query.AppServiceQueryAPI{
+		HTTPClient: client,
+		Cfg:        &base.Cfg.AppServiceAPI,
+	}
 
-	// Create a connection to the appservice postgres DB
-	appserviceDB, err := storage.NewDatabase(base, &base.Cfg.AppServiceAPI.Database)
-	if err != nil {
-		logrus.WithError(err).Panicf("failed to connect to appservice db")
+	if len(base.Cfg.Derived.ApplicationServices) == 0 {
+		return appserviceQueryAPI
 	}
 
 	// Wrap application services in a type that relates the application service and
 	// a sync.Cond object that can be used to notify workers when there are new
 	// events to be sent out.
-	workerStates := make([]types.ApplicationServiceWorkerState, len(base.Cfg.Derived.ApplicationServices))
-	for i, appservice := range base.Cfg.Derived.ApplicationServices {
-		m := sync.Mutex{}
-		ws := types.ApplicationServiceWorkerState{
-			AppService: appservice,
-			Cond:       sync.NewCond(&m),
-		}
-		workerStates[i] = ws
-
+	for _, appservice := range base.Cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
-		if err = generateAppServiceAccount(userAPI, appservice); err != nil {
+		if err := generateAppServiceAccount(userAPI, appservice); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
 		}
 	}
 
-	// Create appserivce query API with an HTTP client that will be used for all
-	// outbound and inbound requests (inbound only for the internal API)
-	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient: client,
-		Cfg:        base.Cfg,
-	}
-
 	// Only consume if we actually have ASes to track, else we'll just chew cycles needlessly.
 	// We can't add ASes at runtime so this is safe to do.
-	if len(workerStates) > 0 {
-		consumer := consumers.NewOutputRoomEventConsumer(
-			base.ProcessContext, &base.Cfg.AppServiceAPI, js, appserviceDB,
-			rsAPI, workerStates,
-		)
-		if err := consumer.Start(); err != nil {
-			logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
-		}
+	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	consumer := consumers.NewOutputRoomEventConsumer(
+		base.ProcessContext, &base.Cfg.AppServiceAPI,
+		client, js, rsAPI,
+	)
+	if err := consumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start appservice roomserver consumer")
 	}
 
-	// Create application service transaction workers
-	if err := workers.SetupTransactionWorkers(client, appserviceDB, workerStates); err != nil {
-		logrus.WithError(err).Panicf("failed to start app service transaction workers")
-	}
 	return appserviceQueryAPI
 }
 
