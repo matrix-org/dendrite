@@ -20,12 +20,13 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
 )
 
 type notificationsStatements struct {
@@ -196,40 +197,12 @@ func (s *notificationsStatements) Select(ctx context.Context, txn *sql.Tx, local
 	return notifs, maxID, rows.Err()
 }
 
-func (s *notificationsStatements) SelectCount(ctx context.Context, txn *sql.Tx, localpart string, filter tables.NotificationFilter) (int64, error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectCountStmt).QueryContext(ctx, localpart, uint32(filter))
-
-	if err != nil {
-		return 0, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "notifications.Select: rows.Close() failed")
-
-	if rows.Next() {
-		var count int64
-		if err := rows.Scan(&count); err != nil {
-			return 0, err
-		}
-
-		return count, nil
-	}
-	return 0, rows.Err()
+func (s *notificationsStatements) SelectCount(ctx context.Context, txn *sql.Tx, localpart string, filter tables.NotificationFilter) (count int64, err error) {
+	err = sqlutil.TxStmt(txn, s.selectCountStmt).QueryRowContext(ctx, localpart, uint32(filter)).Scan(&count)
+	return
 }
 
-func (s *notificationsStatements) SelectRoomCounts(ctx context.Context, txn *sql.Tx, localpart, roomID string) (total int64, highlight int64, _ error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectRoomCountsStmt).QueryContext(ctx, localpart, roomID)
-
-	if err != nil {
-		return 0, 0, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "notifications.Select: rows.Close() failed")
-
-	if rows.Next() {
-		var total, highlight int64
-		if err := rows.Scan(&total, &highlight); err != nil {
-			return 0, 0, err
-		}
-
-		return total, highlight, nil
-	}
-	return 0, 0, rows.Err()
+func (s *notificationsStatements) SelectRoomCounts(ctx context.Context, txn *sql.Tx, localpart, roomID string) (total int64, highlight int64, err error) {
+	err = sqlutil.TxStmt(txn, s.selectRoomCountsStmt).QueryRowContext(ctx, localpart, roomID).Scan(&total, &highlight)
+	return
 }
