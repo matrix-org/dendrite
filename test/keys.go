@@ -15,6 +15,7 @@
 package test
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -44,6 +45,10 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 	if err != nil {
 		return err
 	}
+	return SaveMatrixKey(matrixKeyPath, data[3:])
+}
+
+func SaveMatrixKey(matrixKeyPath string, data ed25519.PrivateKey) error {
 	keyOut, err := os.OpenFile(matrixKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
@@ -62,7 +67,7 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 		Headers: map[string]string{
 			"Key-ID": fmt.Sprintf("ed25519:%s", keyID[:6]),
 		},
-		Bytes: data[3:],
+		Bytes: data,
 	})
 	return err
 }
