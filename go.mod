@@ -1,5 +1,7 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/nats-io/nats.go => github.com/neilalexander/nats.go v1.13.1-0.20220831132052-bb31b65499b8
+
 require (
 	github.com/Arceliar/ironwood v0.0.0-20220306165321-319147a02d98
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
