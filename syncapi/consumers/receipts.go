@@ -111,7 +111,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return true
 	}
 
-	if err = s.sendReadUpdate(ctx, output); err != nil {
+	if err = s.sendReadUpdate(output); err != nil {
 		log.WithError(err).WithFields(logrus.Fields{
 			"user_id": output.UserID,
 			"room_id": output.RoomID,
@@ -126,7 +126,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 	return true
 }
 
-func (s *OutputReceiptEventConsumer) sendReadUpdate(ctx context.Context, output types.OutputReceiptEvent) error {
+func (s *OutputReceiptEventConsumer) sendReadUpdate(output types.OutputReceiptEvent) error {
 	if output.Type != "m.read" {
 		return nil
 	}
