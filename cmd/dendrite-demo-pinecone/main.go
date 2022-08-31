@@ -95,6 +95,9 @@ func main() {
 				if err = test.NewMatrixKey(keyfile); err != nil {
 					panic("failed to generate a new PEM key: " + err.Error())
 				}
+				if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+					panic("failed to load PEM key: " + err.Error())
+				}
 			} else {
 				if sk, err = os.ReadFile(oldkeyfile); err != nil {
 					panic("failed to read the old private key: " + err.Error())
@@ -109,7 +112,7 @@ func main() {
 		} else {
 			var err error
 			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
-				panic(err)
+				panic("failed to load PEM key: " + err.Error())
 			}
 		}
 		cfg.Defaults(true)
