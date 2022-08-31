@@ -72,9 +72,9 @@ func (s *OutputRoomEventConsumer) Start() error {
 		appsvc, token := as, jetstream.Tokenise(as.ID)
 		if err := jetstream.JetStreamConsumer(
 			s.ctx, s.jetstream, s.topic,
-			s.cfg.Matrix.JetStream.Durable("Appservice_"+token),
-			func(ctx context.Context, msg *nats.Msg) bool {
-				return s.onMessage(ctx, &appsvc, msg)
+			s.cfg.Matrix.JetStream.Durable("Appservice_"+token), 10,
+			func(ctx context.Context, msgs []*nats.Msg) bool {
+				return s.onMessage(ctx, &appsvc, msgs)
 			},
 			nats.DeliverAll(), nats.ManualAck(),
 		); err != nil {
@@ -86,54 +86,58 @@ func (s *OutputRoomEventConsumer) Start() error {
 
 // onMessage is called when the appservice component receives a new event from
 // the room server output log.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, as *config.ApplicationService, msg *nats.Msg) bool {
-	// Parse out the event JSON
-	var output api.OutputEvent
-	if err := json.Unmarshal(msg.Data, &output); err != nil {
-		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return true
-	}
-
-	log.WithFields(log.Fields{
-		"type": output.Type,
-	}).Debug("Got a message in OutputRoomEventConsumer")
-
-	events := []*gomatrixserverlib.HeaderedEvent{}
-	if output.Type == api.OutputTypeNewRoomEvent && output.NewRoomEvent != nil {
-		newEventID := output.NewRoomEvent.Event.EventID()
-		events = append(events, output.NewRoomEvent.Event)
-		if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
-			eventsReq := &api.QueryEventsByIDRequest{
-				EventIDs: make([]string, 0, len(output.NewRoomEvent.AddsStateEventIDs)),
-			}
-			eventsRes := &api.QueryEventsByIDResponse{}
-			for _, eventID := range output.NewRoomEvent.AddsStateEventIDs {
-				if eventID != newEventID {
-					eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
-				}
-			}
-			if len(eventsReq.EventIDs) > 0 {
-				if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
-					log.WithError(err).Errorf("s.rsAPI.QueryEventsByID failed")
-					return false
-				}
-				events = append(events, eventsRes.Events...)
-			}
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, as *config.ApplicationService, msgs []*nats.Msg) bool {
+	log.WithField("appservice", as.ID).Debugf("Appservice worker received %d message(s) from roomserver", len(msgs))
+	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(msgs))
+	for _, msg := range msgs {
+		// Parse out the event JSON
+		var output api.OutputEvent
+		if err := json.Unmarshal(msg.Data, &output); err != nil {
+			// If the message was invalid, log it and move on to the next message in the stream
+			log.WithError(err).Errorf("roomserver output log: message parse failure")
+			continue
 		}
-	} else if output.Type == api.OutputTypeNewInviteEvent && output.NewInviteEvent != nil {
-		events = append(events, output.NewInviteEvent.Event)
-	} else {
-		log.WithFields(log.Fields{
-			"type": output.Type,
-		}).Debug("appservice OutputRoomEventConsumer ignoring event", string(msg.Data))
-		return true
+		switch output.Type {
+		case api.OutputTypeNewRoomEvent:
+			if output.NewRoomEvent == nil {
+				continue
+			}
+			events = append(events, output.NewRoomEvent.Event)
+			if len(output.NewRoomEvent.AddsStateEventIDs) > 0 {
+				newEventID := output.NewRoomEvent.Event.EventID()
+				eventsReq := &api.QueryEventsByIDRequest{
+					EventIDs: make([]string, 0, len(output.NewRoomEvent.AddsStateEventIDs)),
+				}
+				eventsRes := &api.QueryEventsByIDResponse{}
+				for _, eventID := range output.NewRoomEvent.AddsStateEventIDs {
+					if eventID != newEventID {
+						eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
+					}
+				}
+				if len(eventsReq.EventIDs) > 0 {
+					if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
+						log.WithError(err).Errorf("s.rsAPI.QueryEventsByID failed")
+						return false
+					}
+					events = append(events, eventsRes.Events...)
+				}
+			}
+
+		case api.OutputTypeNewInviteEvent:
+			if output.NewInviteEvent == nil {
+				continue
+			}
+			events = append(events, output.NewInviteEvent.Event)
+
+		default:
+			continue
+		}
 	}
 
 	// Send event to any relevant application services
 	if err := s.filterRoomserverEvents(ctx, events); err != nil {
 		log.WithError(err).Errorf("roomserver output log: filter error")
-		return true
+		return false
 	}
 
 	return true

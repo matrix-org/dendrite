@@ -63,14 +63,15 @@ func NewOutputSendToDeviceConsumer(
 // Start consuming from the client api
 func (t *OutputSendToDeviceConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called in response to a message received on the
 // send-to-device events topic from the client api.
-func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// only send send-to-device events which originated from us
 	sender := msg.Header.Get("sender")
 	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)
