@@ -224,7 +224,7 @@ func loadConfig(
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
-	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, os.ReadFile); err != nil {
+	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
 		return nil, err
 	}
 
