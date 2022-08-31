@@ -147,7 +147,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 	}
 
 	// Send event to any relevant application services
-	if err := s.filterRoomserverEvents(ctx, state, events); err != nil {
+	if err := s.sendEvents(ctx, state, events); err != nil {
 		log.WithField("appservice", state.ID).WithError(err).Errorf("Appservice failed to filter events")
 		return false
 	}
@@ -155,12 +155,9 @@ func (s *OutputRoomEventConsumer) onMessage(
 	return true
 }
 
-// filterRoomserverEvents takes in events and decides whether any of them need
-// to be passed on to an external application service. It does this by checking
-// each namespace of each registered application service, and if there is a
-// match, adds the event to the queue for events to be sent to a particular
-// application service.
-func (s *OutputRoomEventConsumer) filterRoomserverEvents(
+// sendEvents passes events to the appservice by using the transactions
+// endpoint. It will block for the backoff period if necessary.
+func (s *OutputRoomEventConsumer) sendEvents(
 	ctx context.Context, state *appserviceState,
 	events []*gomatrixserverlib.HeaderedEvent,
 ) error {
