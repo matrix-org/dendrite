@@ -166,7 +166,7 @@ func (s *OutputRoomEventConsumer) filterRoomserverEvents(
 	// TODO: We can probably benefit from some caching here somewhere.
 	filteredEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
 	for _, event := range events {
-		if s.appserviceIsInterestedInEvent(ctx, event, state.ApplicationService) {
+		if !s.appserviceIsInterestedInEvent(ctx, event, state.ApplicationService) {
 			continue
 		}
 		filteredEvents = append(filteredEvents, event)
