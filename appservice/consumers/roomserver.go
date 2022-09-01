@@ -196,7 +196,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	case http.StatusOK:
 		state.backoff = 0
 	default:
-		return state.backoffAndPause(err)
+		return state.backoffAndPause(fmt.Errorf("received HTTP status code %d from appservice", resp.StatusCode))
 	}
 	return nil
 }
