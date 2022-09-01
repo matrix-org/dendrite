@@ -41,7 +41,7 @@ type Global struct {
 	// connections will be used instead. This way we don't have to manage connection
 	// counts on a per-component basis, but can instead do it for the entire monolith.
 	// In a polylith deployment, this will be ignored.
-	DatabaseOptions DatabaseOptions `yaml:"database"`
+	DatabaseOptions DatabaseOptions `yaml:"database,omitempty"`
 
 	// The server name to delegate server-server communications to, with optional port
 	WellKnownServerName string `yaml:"well_known_server_name"`
@@ -83,22 +83,28 @@ type Global struct {
 	Cache Cache `yaml:"cache"`
 }
 
-func (c *Global) Defaults(generate bool) {
-	if generate {
+func (c *Global) Defaults(opts DefaultOpts) {
+	if opts.Generate {
 		c.ServerName = "localhost"
 		c.PrivateKeyPath = "matrix_key.pem"
 		_, c.PrivateKey, _ = ed25519.GenerateKey(rand.New(rand.NewSource(0)))
 		c.KeyID = "ed25519:auto"
+		c.TrustedIDServers = []string{
+			"matrix.org",
+			"vector.im",
+		}
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
-
-	c.JetStream.Defaults(generate)
-	c.Metrics.Defaults(generate)
+	if opts.Monolithic {
+		c.DatabaseOptions.Defaults(90)
+	}
+	c.JetStream.Defaults(opts)
+	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
 	c.Sentry.Defaults()
-	c.ServerNotices.Defaults(generate)
+	c.ServerNotices.Defaults(opts)
 	c.ReportStats.Defaults()
-	c.Cache.Defaults(generate)
+	c.Cache.Defaults()
 }
 
 func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
@@ -142,9 +148,9 @@ type Metrics struct {
 	} `yaml:"basic_auth"`
 }
 
-func (c *Metrics) Defaults(generate bool) {
+func (c *Metrics) Defaults(opts DefaultOpts) {
 	c.Enabled = false
-	if generate {
+	if opts.Generate {
 		c.BasicAuth.Username = "metrics"
 		c.BasicAuth.Password = "metrics"
 	}
@@ -166,8 +172,8 @@ type ServerNotices struct {
 	RoomName string `yaml:"room_name"`
 }
 
-func (c *ServerNotices) Defaults(generate bool) {
-	if generate {
+func (c *ServerNotices) Defaults(opts DefaultOpts) {
+	if opts.Generate {
 		c.Enabled = true
 		c.LocalPart = "_server"
 		c.DisplayName = "Server Alert"
@@ -183,7 +189,7 @@ type Cache struct {
 	MaxAge           time.Duration `yaml:"max_age"`
 }
 
-func (c *Cache) Defaults(generate bool) {
+func (c *Cache) Defaults() {
 	c.EstimatedMaxSize = 1024 * 1024 * 1024 // 1GB
 	c.MaxAge = time.Hour
 }
