@@ -9,8 +9,8 @@ type ClientAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
 
 	// If set disables new users from registering (except via shared
 	// secrets)
@@ -48,7 +48,7 @@ type ClientAPI struct {
 	// Rate-limiting options
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
-	MSCs *MSCs `yaml:"mscs"`
+	MSCs *MSCs `yaml:"-"`
 
 	// Disable password authentication.
 	PasswordAuthenticationDisabled bool `yaml:"password_authentication_disabled"`
@@ -57,10 +57,12 @@ type ClientAPI struct {
 	PublicKeyAuthentication PublicKeyAuthentication `yaml:"public_key_authentication"`
 }
 
-func (c *ClientAPI) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7771"
-	c.InternalAPI.Connect = "http://localhost:7771"
-	c.ExternalAPI.Listen = "http://[::]:8071"
+func (c *ClientAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
+		c.InternalAPI.Listen = "http://localhost:7771"
+		c.InternalAPI.Connect = "http://localhost:7771"
+		c.ExternalAPI.Listen = "http://[::]:8071"
+	}
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""
