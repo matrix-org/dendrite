@@ -36,18 +36,25 @@ func main() {
 	if *serverName != "" {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 	}
-	if uri := config.DataSource(*dbURI); uri != "" {
-		if *polylith || uri.IsSQLite() {
-			cfg.FederationAPI.Database.ConnectionString = uri
-			cfg.KeyServer.Database.ConnectionString = uri
-			cfg.MSCs.Database.ConnectionString = uri
-			cfg.MediaAPI.Database.ConnectionString = uri
-			cfg.RoomServer.Database.ConnectionString = uri
-			cfg.SyncAPI.Database.ConnectionString = uri
-			cfg.UserAPI.AccountDatabase.ConnectionString = uri
-		} else {
-			cfg.Global.DatabaseOptions.ConnectionString = uri
+	uri := config.DataSource(*dbURI)
+	if *polylith || uri.IsSQLite() || uri == "" {
+		for name, db := range map[string]*config.DatabaseOptions{
+			"federationapi": &cfg.FederationAPI.Database,
+			"keyserver":     &cfg.KeyServer.Database,
+			"mscs":          &cfg.MSCs.Database,
+			"mediaapi":      &cfg.MediaAPI.Database,
+			"roomserver":    &cfg.RoomServer.Database,
+			"syncapi":       &cfg.SyncAPI.Database,
+			"userapi":       &cfg.UserAPI.AccountDatabase,
+		} {
+			if uri == "" {
+				db.ConnectionString = config.DataSource(fmt.Sprintf("file:dendrite_%s.db", name))
+			} else {
+				db.ConnectionString = uri
+			}
 		}
+	} else {
+		cfg.Global.DatabaseOptions.ConnectionString = uri
 	}
 	cfg.Logging = []config.LogrusHook{
 		{
