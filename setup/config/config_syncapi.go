@@ -16,7 +16,7 @@ func (c *SyncAPI) Defaults(opts DefaultOpts) {
 		c.InternalAPI.Listen = "http://localhost:7773"
 		c.InternalAPI.Connect = "http://localhost:7773"
 		c.ExternalAPI.Listen = "http://localhost:8073"
-		c.Database.Defaults(10)
+		c.Database.Defaults(20)
 	}
 	if opts.Generate {
 		if !opts.Monolithic {

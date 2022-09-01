@@ -12,7 +12,7 @@ func (c *RoomServer) Defaults(opts DefaultOpts) {
 	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7770"
 		c.InternalAPI.Connect = "http://localhost:7770"
-		c.Database.Defaults(10)
+		c.Database.Defaults(20)
 	}
 	if opts.Generate {
 		if !opts.Monolithic {
