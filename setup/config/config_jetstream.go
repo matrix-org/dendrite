@@ -31,10 +31,10 @@ func (c *JetStream) Durable(name string) string {
 	return c.Prefixed(name)
 }
 
-func (c *JetStream) Defaults(generate bool) {
+func (c *JetStream) Defaults(opts DefaultOpts) {
 	c.Addresses = []string{}
 	c.TopicPrefix = "Dendrite"
-	if generate {
+	if opts.Generate {
 		c.StoragePath = Path("./")
 		c.NoLog = true
 		c.DisableTLSValidation = true
