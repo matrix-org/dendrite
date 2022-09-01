@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"path/filepath"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -13,7 +14,8 @@ import (
 func main() {
 	defaultsForCI := flag.Bool("ci", false, "Populate the configuration with sane defaults for use in CI")
 	serverName := flag.String("server", "", "The domain name of the server if not 'localhost'")
-	dbURI := flag.String("db", "", "The DB URI to use for all components if not SQLite files")
+	dbURI := flag.String("db", "", "The DB URI to use for all components (PostgreSQL only)")
+	dirPath := flag.String("dir", "./", "The folder to use for paths (like SQLite databases, media storage)")
 	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
 	polylith := flag.Bool("polylith", false, "Generate a config that makes sense for polylith deployments")
 	flag.Parse()
@@ -42,7 +44,8 @@ func main() {
 				"userapi":       &cfg.UserAPI.AccountDatabase,
 			} {
 				if uri == "" {
-					db.ConnectionString = config.DataSource(fmt.Sprintf("file:dendrite_%s.db", name))
+					path := filepath.Join(*dirPath, fmt.Sprintf("dendrite_%s.db", name))
+					db.ConnectionString = config.DataSource(fmt.Sprintf("file:%s", path))
 				} else {
 					db.ConnectionString = uri
 				}
@@ -55,7 +58,7 @@ func main() {
 				Type:  "file",
 				Level: "info",
 				Params: map[string]interface{}{
-					"path": "/var/log/dendrite",
+					"path": filepath.Join(*dirPath, "log"),
 				},
 			},
 		}
@@ -65,11 +68,13 @@ func main() {
 			cfg.FederationAPI.DisableTLSValidation = false
 			// don't hit matrix.org when running tests!!!
 			cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
+			cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 			cfg.MSCs.MSCs = []string{"msc2836", "msc2946", "msc2444", "msc2753"}
 			cfg.Logging[0].Level = "trace"
 			cfg.Logging[0].Type = "std"
 			cfg.UserAPI.BCryptCost = bcrypt.MinCost
 			cfg.Global.JetStream.InMemory = true
+			cfg.Global.JetStream.StoragePath = config.Path(*dirPath)
 			cfg.ClientAPI.RegistrationDisabled = false
 			cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 			cfg.ClientAPI.RegistrationSharedSecret = "complement"
