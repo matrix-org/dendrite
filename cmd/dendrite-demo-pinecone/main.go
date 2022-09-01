@@ -21,10 +21,10 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -43,6 +43,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -71,23 +72,76 @@ func main() {
 	var pk ed25519.PublicKey
 	var sk ed25519.PrivateKey
 
-	keyfile := *instanceName + ".key"
-	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
-		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
-			panic(err)
+	// iterate through the cli args and check if the config flag was set
+	configFlagSet := false
+	for _, arg := range os.Args {
+		if arg == "--config" || arg == "-config" {
+			configFlagSet = true
+			break
 		}
-		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
-			panic(err)
-		}
-	} else if err == nil {
-		if sk, err = ioutil.ReadFile(keyfile); err != nil {
-			panic(err)
-		}
-		if len(sk) != ed25519.PrivateKeySize {
-			panic("the private key is not long enough")
-		}
-		pk = sk.Public().(ed25519.PublicKey)
 	}
+
+	cfg := &config.Dendrite{}
+
+	// use custom config if config flag is set
+	if configFlagSet {
+		cfg = setup.ParseFlags(true)
+		sk = cfg.Global.PrivateKey
+	} else {
+		keyfile := *instanceName + ".pem"
+		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
+			oldkeyfile := *instanceName + ".key"
+			if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
+				if err = test.NewMatrixKey(keyfile); err != nil {
+					panic("failed to generate a new PEM key: " + err.Error())
+				}
+				if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+					panic("failed to load PEM key: " + err.Error())
+				}
+			} else {
+				if sk, err = os.ReadFile(oldkeyfile); err != nil {
+					panic("failed to read the old private key: " + err.Error())
+				}
+				if len(sk) != ed25519.PrivateKeySize {
+					panic("the private key is not long enough")
+				}
+				if err := test.SaveMatrixKey(keyfile, sk); err != nil {
+					panic("failed to convert the private key to PEM format: " + err.Error())
+				}
+			}
+		} else {
+			var err error
+			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+				panic("failed to load PEM key: " + err.Error())
+			}
+		}
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: true,
+		})
+		cfg.Global.PrivateKey = sk
+		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
+		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
+		cfg.ClientAPI.RegistrationDisabled = false
+		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+		if err := cfg.Derive(); err != nil {
+			panic(err)
+		}
+	}
+
+	pk = sk.Public().(ed25519.PublicKey)
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+
+	base := base.NewBaseDendrite(cfg, "Monolith")
+	defer base.Close() // nolint: errcheck
 
 	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
@@ -95,7 +149,9 @@ func main() {
 	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
 	pMulticast.Start()
 	if instancePeer != nil && *instancePeer != "" {
-		pManager.AddPeer(*instancePeer)
+		for _, peer := range strings.Split(*instancePeer, ",") {
+			pManager.AddPeer(strings.Trim(peer, " \t\r\n"))
+		}
 	}
 
 	go func() {
@@ -125,32 +181,6 @@ func main() {
 			fmt.Println("Inbound connection", conn.RemoteAddr(), "is connected to port", port)
 		}
 	}()
-
-	cfg := &config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
-	})
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	cfg.Global.PrivateKey = sk
-	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
-	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
-	cfg.ClientAPI.RegistrationDisabled = false
-	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
-	if err := cfg.Derive(); err != nil {
-		panic(err)
-	}
-
-	base := base.NewBaseDendrite(cfg, "Monolith")
-	defer base.Close() // nolint: errcheck
 
 	federation := conn.CreateFederationClient(base, pQUIC)
 

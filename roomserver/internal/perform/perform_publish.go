@@ -29,11 +29,12 @@ func (r *Publisher) PerformPublish(
 	ctx context.Context,
 	req *api.PerformPublishRequest,
 	res *api.PerformPublishResponse,
-) {
+) error {
 	err := r.DB.PublishRoom(ctx, req.RoomID, req.Visibility == "public")
 	if err != nil {
 		res.Error = &api.PerformError{
 			Msg: err.Error(),
 		}
 	}
+	return nil
 }

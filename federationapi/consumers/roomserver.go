@@ -68,8 +68,8 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
@@ -77,7 +77,8 @@ func (s *OutputRoomEventConsumer) Start() error {
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
@@ -208,9 +209,11 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 // joinedHostsAtEvent works out a list of matrix servers that were joined to
 // the room at the event (including peeking ones)
 // It is important to use the state at the event for sending messages because:
-//   1) We shouldn't send messages to servers that weren't in the room.
-//   2) If a server is kicked from the rooms it should still be told about the
-//      kick event,
+//
+//  1. We shouldn't send messages to servers that weren't in the room.
+//  2. If a server is kicked from the rooms it should still be told about the
+//     kick event.
+//
 // Usually the list can be calculated locally, but sometimes it will need fetch
 // events from the room server.
 // Returns an error if there was a problem talking to the room server.

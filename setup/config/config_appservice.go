@@ -16,7 +16,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -31,8 +31,6 @@ type AppServiceAPI struct {
 
 	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
 
-	Database DatabaseOptions `yaml:"database,omitempty"`
-
 	// DisableTLSValidation disables the validation of X.509 TLS certs
 	// on appservice endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
@@ -44,21 +42,12 @@ func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
 	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7777"
 		c.InternalAPI.Connect = "http://localhost:7777"
-		c.Database.Defaults(5)
-	}
-	if opts.Generate {
-		if !opts.Monolithic {
-			c.Database.ConnectionString = "file:appservice.db"
-		}
 	}
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if isMonolith { // polylith required configs below
 		return
-	}
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
 	}
 	checkURL(configErrs, "app_service_api.internal_api.listen", string(c.InternalAPI.Listen))
 	checkURL(configErrs, "app_service_api.internal_api.connect", string(c.InternalAPI.Connect))
@@ -185,7 +174,7 @@ func loadAppServices(config *AppServiceAPI, derived *Derived) error {
 		}
 
 		// Read the application service's config file
-		configData, err := ioutil.ReadFile(absPath)
+		configData, err := os.ReadFile(absPath)
 		if err != nil {
 			return err
 		}

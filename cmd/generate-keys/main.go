@@ -38,6 +38,7 @@ var (
 	authorityCertFile = flag.String("tls-authority-cert", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for integration testing.")
 	authorityKeyFile  = flag.String("tls-authority-key", "", "Optional: Create TLS certificate/keys based on this CA authority. Useful for integration testing.")
 	serverName        = flag.String("server", "", "Optional: Create TLS certificate/keys with this domain name set. Useful for integration testing.")
+	keySize           = flag.Int("keysize", 4096, "Optional: Create TLS RSA private key with the given key size")
 )
 
 func main() {
@@ -58,12 +59,12 @@ func main() {
 			log.Fatal("Zero or both of --tls-key and --tls-cert must be supplied")
 		}
 		if *authorityCertFile == "" && *authorityKeyFile == "" {
-			if err := test.NewTLSKey(*tlsKeyFile, *tlsCertFile); err != nil {
+			if err := test.NewTLSKey(*tlsKeyFile, *tlsCertFile, *keySize); err != nil {
 				panic(err)
 			}
 		} else {
 			// generate the TLS cert/key based on the authority given.
-			if err := test.NewTLSKeyWithAuthority(*serverName, *tlsKeyFile, *tlsCertFile, *authorityKeyFile, *authorityCertFile); err != nil {
+			if err := test.NewTLSKeyWithAuthority(*serverName, *tlsKeyFile, *tlsCertFile, *authorityKeyFile, *authorityCertFile, *keySize); err != nil {
 				panic(err)
 			}
 		}

@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type InviteStreamProvider struct {
@@ -62,6 +63,11 @@ func (p *InviteStreamProvider) IncrementalSync(
 		req.Response.Rooms.Invite[roomID] = *ir
 	}
 
+	// When doing an initial sync, we don't want to add retired invites, as this
+	// can add rooms we were invited to, but already left.
+	if from == 0 {
+		return to
+	}
 	for roomID := range retiredInvites {
 		if _, ok := req.Response.Rooms.Join[roomID]; !ok {
 			lr := types.NewLeaveResponse()

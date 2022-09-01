@@ -35,7 +35,6 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		Monolithic: true,
 	})
 	cfg.Global.JetStream.InMemory = true
-
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
@@ -46,6 +45,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Generate:   true,
 			Monolithic: true,
 		})
+		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
@@ -62,13 +62,13 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Generate:   true,
 			Monolithic: false, // because we need a database per component
 		})
+		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), func() {
 			// cleanup db files. This risks getting out of sync as we add more database strings :(
 			dbFiles := []config.DataSource{
-				cfg.AppServiceAPI.Database.ConnectionString,
 				cfg.FederationAPI.Database.ConnectionString,
 				cfg.KeyServer.Database.ConnectionString,
 				cfg.MSCs.Database.ConnectionString,

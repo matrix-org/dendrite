@@ -79,15 +79,16 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
@@ -240,6 +241,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
 		false,
+		msg.HistoryVisibility,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -289,7 +291,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
-		ev.StateKey() != nil, // exclude from sync?
+		ev.StateKey() != nil, // exclude from sync?,
+		msg.HistoryVisibility,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -363,7 +366,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write invite failure")
+		}).Errorf("roomserver output log: write invite failure")
 		return
 	}
 
@@ -383,7 +386,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: remove invite failure")
+		}).Errorf("roomserver output log: remove invite failure")
 		return
 	}
 
@@ -401,7 +404,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write peek failure")
+		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
 
@@ -420,7 +423,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write peek failure")
+		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
 

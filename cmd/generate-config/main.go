@@ -38,7 +38,6 @@ func main() {
 	}
 	if uri := config.DataSource(*dbURI); uri != "" {
 		if *polylith || uri.IsSQLite() {
-			cfg.AppServiceAPI.Database.ConnectionString = uri
 			cfg.FederationAPI.Database.ConnectionString = uri
 			cfg.KeyServer.Database.ConnectionString = uri
 			cfg.MSCs.Database.ConnectionString = uri

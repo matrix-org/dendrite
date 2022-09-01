@@ -24,7 +24,7 @@ Unfortunately we can't accept contributions without it.
 
 ## Getting up and running
 
-See the [Installation](INSTALL.md) section for information on how to build an
+See the [Installation](installation) section for information on how to build an
 instance of Dendrite. You will likely need this in order to test your changes.
 
 ## Code style
@@ -64,7 +64,7 @@ comment. Please avoid doing this if you can.
 We also have unit tests which we run via:
 
 ```bash
-go test ./...
+go test --race ./...
 ```
 
 In general, we like submissions that come with tests. Anything that proves that the

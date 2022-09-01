@@ -62,7 +62,9 @@ func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Devi
 	}
 
 	var uploadRes api.PerformUploadKeysResponse
-	keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes)
+	if err := keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if uploadRes.Error != nil {
 		util.GetLogger(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
 		return jsonerror.InternalServerError()
@@ -107,12 +109,14 @@ func QueryKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Devic
 		return *resErr
 	}
 	queryRes := api.QueryKeysResponse{}
-	keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
+	if err := keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
 		UserID:        device.UserID,
 		UserToDevices: r.DeviceKeys,
 		Timeout:       r.GetTimeout(),
 		// TODO: Token?
-	}, &queryRes)
+	}, &queryRes); err != nil {
+		return util.ErrorResponse(err)
+	}
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
@@ -145,10 +149,12 @@ func ClaimKeys(req *http.Request, keyAPI api.ClientKeyAPI) util.JSONResponse {
 		return *resErr
 	}
 	claimRes := api.PerformClaimKeysResponse{}
-	keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
+	if err := keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: r.OneTimeKeys,
 		Timeout:     r.GetTimeout(),
-	}, &claimRes)
+	}, &claimRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if claimRes.Error != nil {
 		util.GetLogger(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
 		return jsonerror.InternalServerError()

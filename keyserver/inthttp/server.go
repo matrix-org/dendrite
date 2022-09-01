@@ -15,124 +15,59 @@
 package inthttp
 
 import (
-	"encoding/json"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver/api"
-	"github.com/matrix-org/util"
 )
 
 func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
-	internalAPIMux.Handle(PerformClaimKeysPath,
-		httputil.MakeInternalAPI("performClaimKeys", func(req *http.Request) util.JSONResponse {
-			request := api.PerformClaimKeysRequest{}
-			response := api.PerformClaimKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.PerformClaimKeys(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		PerformClaimKeysPath,
+		httputil.MakeInternalRPCAPI("KeyserverPerformClaimKeys", s.PerformClaimKeys),
 	)
-	internalAPIMux.Handle(PerformDeleteKeysPath,
-		httputil.MakeInternalAPI("performDeleteKeys", func(req *http.Request) util.JSONResponse {
-			request := api.PerformDeleteKeysRequest{}
-			response := api.PerformDeleteKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.PerformDeleteKeys(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		PerformDeleteKeysPath,
+		httputil.MakeInternalRPCAPI("KeyserverPerformDeleteKeys", s.PerformDeleteKeys),
 	)
-	internalAPIMux.Handle(PerformUploadKeysPath,
-		httputil.MakeInternalAPI("performUploadKeys", func(req *http.Request) util.JSONResponse {
-			request := api.PerformUploadKeysRequest{}
-			response := api.PerformUploadKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.PerformUploadKeys(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		PerformUploadKeysPath,
+		httputil.MakeInternalRPCAPI("KeyserverPerformUploadKeys", s.PerformUploadKeys),
 	)
-	internalAPIMux.Handle(PerformUploadDeviceKeysPath,
-		httputil.MakeInternalAPI("performUploadDeviceKeys", func(req *http.Request) util.JSONResponse {
-			request := api.PerformUploadDeviceKeysRequest{}
-			response := api.PerformUploadDeviceKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.PerformUploadDeviceKeys(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		PerformUploadDeviceKeysPath,
+		httputil.MakeInternalRPCAPI("KeyserverPerformUploadDeviceKeys", s.PerformUploadDeviceKeys),
 	)
-	internalAPIMux.Handle(PerformUploadDeviceSignaturesPath,
-		httputil.MakeInternalAPI("performUploadDeviceSignatures", func(req *http.Request) util.JSONResponse {
-			request := api.PerformUploadDeviceSignaturesRequest{}
-			response := api.PerformUploadDeviceSignaturesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.PerformUploadDeviceSignatures(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		PerformUploadDeviceSignaturesPath,
+		httputil.MakeInternalRPCAPI("KeyserverPerformUploadDeviceSignatures", s.PerformUploadDeviceSignatures),
 	)
-	internalAPIMux.Handle(QueryKeysPath,
-		httputil.MakeInternalAPI("queryKeys", func(req *http.Request) util.JSONResponse {
-			request := api.QueryKeysRequest{}
-			response := api.QueryKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.QueryKeys(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryKeysPath,
+		httputil.MakeInternalRPCAPI("KeyserverQueryKeys", s.QueryKeys),
 	)
-	internalAPIMux.Handle(QueryOneTimeKeysPath,
-		httputil.MakeInternalAPI("queryOneTimeKeys", func(req *http.Request) util.JSONResponse {
-			request := api.QueryOneTimeKeysRequest{}
-			response := api.QueryOneTimeKeysResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.QueryOneTimeKeys(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryOneTimeKeysPath,
+		httputil.MakeInternalRPCAPI("KeyserverQueryOneTimeKeys", s.QueryOneTimeKeys),
 	)
-	internalAPIMux.Handle(QueryDeviceMessagesPath,
-		httputil.MakeInternalAPI("queryDeviceMessages", func(req *http.Request) util.JSONResponse {
-			request := api.QueryDeviceMessagesRequest{}
-			response := api.QueryDeviceMessagesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.QueryDeviceMessages(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryDeviceMessagesPath,
+		httputil.MakeInternalRPCAPI("KeyserverQueryDeviceMessages", s.QueryDeviceMessages),
 	)
-	internalAPIMux.Handle(QueryKeyChangesPath,
-		httputil.MakeInternalAPI("queryKeyChanges", func(req *http.Request) util.JSONResponse {
-			request := api.QueryKeyChangesRequest{}
-			response := api.QueryKeyChangesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.QueryKeyChanges(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QueryKeyChangesPath,
+		httputil.MakeInternalRPCAPI("KeyserverQueryKeyChanges", s.QueryKeyChanges),
 	)
-	internalAPIMux.Handle(QuerySignaturesPath,
-		httputil.MakeInternalAPI("querySignatures", func(req *http.Request) util.JSONResponse {
-			request := api.QuerySignaturesRequest{}
-			response := api.QuerySignaturesResponse{}
-			if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
-				return util.MessageResponse(http.StatusBadRequest, err.Error())
-			}
-			s.QuerySignatures(req.Context(), &request, &response)
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+
+	internalAPIMux.Handle(
+		QuerySignaturesPath,
+		httputil.MakeInternalRPCAPI("KeyserverQuerySignatures", s.QuerySignatures),
 	)
 }

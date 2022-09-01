@@ -25,20 +25,22 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
-	"github.com/matrix-org/dendrite/internal/caching"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/pushgateway"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
+
+	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/internal/pushgateway"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -46,6 +48,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
+
+	"github.com/sirupsen/logrus"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	asinthttp "github.com/matrix-org/dendrite/appservice/inthttp"
@@ -58,7 +62,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
-	"github.com/sirupsen/logrus"
 )
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
@@ -87,6 +90,7 @@ type BaseDendrite struct {
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
 	EnableMetrics          bool
+	startupLock            sync.Mutex
 }
 
 const NoListener = ""
@@ -369,12 +373,34 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	return client
 }
 
+func (b *BaseDendrite) configureHTTPErrors() {
+	notAllowedHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
+	}
+
+	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
+	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
+
+	for _, router := range []*mux.Router{
+		b.PublicClientAPIMux, b.PublicMediaAPIMux,
+		b.DendriteAdminMux, b.SynapseAdminMux,
+		b.PublicWellKnownAPIMux,
+	} {
+		router.NotFoundHandler = notFoundCORSHandler
+		router.MethodNotAllowedHandler = notAllowedCORSHandler
+	}
+}
+
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
 	internalHTTPAddr, externalHTTPAddr config.HTTPAddress,
 	certFile, keyFile *string,
 ) {
+	// Manually unlocked right before actually serving requests,
+	// as we don't return from this method (defer doesn't work).
+	b.startupLock.Lock()
 	internalAddr, _ := internalHTTPAddr.Address()
 	externalAddr, _ := externalHTTPAddr.Address()
 
@@ -408,6 +434,8 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			},
 		}
 	}
+
+	b.configureHTTPErrors()
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {
@@ -451,6 +479,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
 
+	b.startupLock.Unlock()
 	if internalAddr != NoListener && internalAddr != externalAddr {
 		go func() {
 			var internalShutdown atomic.Bool // RegisterOnShutdown can be called more than once

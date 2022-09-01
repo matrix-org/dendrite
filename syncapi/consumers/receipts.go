@@ -74,12 +74,13 @@ func NewOutputReceiptEventConsumer(
 // Start consuming receipts events.
 func (s *OutputReceiptEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
-func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	output := types.OutputReceiptEvent{
 		UserID:  msg.Header.Get(jetstream.UserID),
 		RoomID:  msg.Header.Get(jetstream.RoomID),

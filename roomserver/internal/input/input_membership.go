@@ -21,6 +21,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/opentracing/opentracing-go"
@@ -60,20 +61,14 @@ func (r *Inputer) updateMemberships(
 	var updates []api.OutputEvent
 
 	for _, change := range changes {
-		var ae *gomatrixserverlib.Event
-		var re *gomatrixserverlib.Event
+		var ae *types.Event
+		var re *types.Event
 		targetUserNID := change.EventStateKeyNID
 		if change.removedEventNID != 0 {
-			ev, _ := helpers.EventMap(events).Lookup(change.removedEventNID)
-			if ev != nil {
-				re = ev.Event
-			}
+			re, _ = helpers.EventMap(events).Lookup(change.removedEventNID)
 		}
 		if change.addedEventNID != 0 {
-			ev, _ := helpers.EventMap(events).Lookup(change.addedEventNID)
-			if ev != nil {
-				ae = ev.Event
-			}
+			ae, _ = helpers.EventMap(events).Lookup(change.addedEventNID)
 		}
 		if updates, err = r.updateMembership(updater, targetUserNID, re, ae, updates); err != nil {
 			return nil, err
@@ -85,30 +80,27 @@ func (r *Inputer) updateMemberships(
 func (r *Inputer) updateMembership(
 	updater *shared.RoomUpdater,
 	targetUserNID types.EventStateKeyNID,
-	remove, add *gomatrixserverlib.Event,
+	remove, add *types.Event,
 	updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
 	var err error
 	// Default the membership to Leave if no event was added or removed.
-	oldMembership := gomatrixserverlib.Leave
 	newMembership := gomatrixserverlib.Leave
-
-	if remove != nil {
-		oldMembership, err = remove.Membership()
-		if err != nil {
-			return nil, err
-		}
-	}
 	if add != nil {
 		newMembership, err = add.Membership()
 		if err != nil {
 			return nil, err
 		}
 	}
-	if oldMembership == newMembership && newMembership != gomatrixserverlib.Join {
-		// If the membership is the same then nothing changed and we can return
-		// immediately, unless it's a Join update (e.g. profile update).
-		return updates, nil
+
+	var targetLocal bool
+	if add != nil {
+		targetLocal = r.isLocalTarget(add)
+	}
+
+	mu, err := updater.MembershipUpdater(targetUserNID, targetLocal)
+	if err != nil {
+		return nil, err
 	}
 
 	// In an ideal world, we shouldn't ever have "add" be nil and "remove" be
@@ -120,17 +112,10 @@ func (r *Inputer) updateMembership(
 	// after a state reset, often thinking that the user was still joined to
 	// the room even though the room state said otherwise, and this would prevent
 	// the user from being able to attempt to rejoin the room without modifying
-	// the database. So instead what we'll do is we'll just update the membership
-	// table to say that the user is "leave" and we'll use the old event to
-	// avoid nil pointer exceptions on the code path that follows.
-	if add == nil {
-		add = remove
-		newMembership = gomatrixserverlib.Leave
-	}
-
-	mu, err := updater.MembershipUpdater(targetUserNID, r.isLocalTarget(add))
-	if err != nil {
-		return nil, err
+	// the database. So instead we're going to remove the membership from the
+	// database altogether, so that it doesn't create future problems.
+	if add == nil && remove != nil {
+		return nil, mu.Delete()
 	}
 
 	switch newMembership {
@@ -149,7 +134,7 @@ func (r *Inputer) updateMembership(
 	}
 }
 
-func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
+func (r *Inputer) isLocalTarget(event *types.Event) bool {
 	isTargetLocalUser := false
 	if statekey := event.StateKey(); statekey != nil {
 		_, domain, _ := gomatrixserverlib.SplitID('@', *statekey)
@@ -159,81 +144,61 @@ func (r *Inputer) isLocalTarget(event *gomatrixserverlib.Event) bool {
 }
 
 func updateToJoinMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	// If the user is already marked as being joined, we call SetToJoin to update
-	// the event ID then we can return immediately. Retired is ignored as there
-	// is no invite event to retire.
-	if mu.IsJoin() {
-		_, err := mu.SetToJoin(add.Sender(), add.EventID(), true)
-		if err != nil {
-			return nil, err
-		}
-		return updates, nil
-	}
 	// When we mark a user as being joined we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToJoin(add.Sender(), add.EventID(), false)
+	_, retired, err := mu.Update(tables.MembershipStateJoin, add)
 	if err != nil {
 		return nil, err
 	}
 	for _, eventID := range retired {
-		orie := api.OutputRetireInviteEvent{
-			EventID:          eventID,
-			Membership:       gomatrixserverlib.Join,
-			RetiredByEventID: add.EventID(),
-			TargetUserID:     *add.StateKey(),
-		}
 		updates = append(updates, api.OutputEvent{
-			Type:              api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &orie,
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:          eventID,
+				Membership:       gomatrixserverlib.Join,
+				RetiredByEventID: add.EventID(),
+				TargetUserID:     *add.StateKey(),
+			},
 		})
 	}
 	return updates, nil
 }
 
 func updateToLeaveMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event,
+	mu *shared.MembershipUpdater, add *types.Event,
 	newMembership string, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	// If the user is already neither joined, nor invited to the room then we
-	// can return immediately.
-	if mu.IsLeave() {
-		return updates, nil
-	}
 	// When we mark a user as having left we will invalidate any invites that
 	// are active for that user. We notify the consumers that the invites have
 	// been retired using a special event, even though they could infer this
 	// by studying the state changes in the room event stream.
-	retired, err := mu.SetToLeave(add.Sender(), add.EventID())
+	_, retired, err := mu.Update(tables.MembershipStateLeaveOrBan, add)
 	if err != nil {
 		return nil, err
 	}
 	for _, eventID := range retired {
-		orie := api.OutputRetireInviteEvent{
-			EventID:          eventID,
-			Membership:       newMembership,
-			RetiredByEventID: add.EventID(),
-			TargetUserID:     *add.StateKey(),
-		}
 		updates = append(updates, api.OutputEvent{
-			Type:              api.OutputTypeRetireInviteEvent,
-			RetireInviteEvent: &orie,
+			Type: api.OutputTypeRetireInviteEvent,
+			RetireInviteEvent: &api.OutputRetireInviteEvent{
+				EventID:          eventID,
+				Membership:       newMembership,
+				RetiredByEventID: add.EventID(),
+				TargetUserID:     *add.StateKey(),
+			},
 		})
 	}
 	return updates, nil
 }
 
 func updateToKnockMembership(
-	mu *shared.MembershipUpdater, add *gomatrixserverlib.Event, updates []api.OutputEvent,
+	mu *shared.MembershipUpdater, add *types.Event, updates []api.OutputEvent,
 ) ([]api.OutputEvent, error) {
-	if mu.IsLeave() {
-		_, err := mu.SetToKnock(add)
-		if err != nil {
-			return nil, err
-		}
+	if _, _, err := mu.Update(tables.MembershipStateKnock, add); err != nil {
+		return nil, err
 	}
 	return updates, nil
 }

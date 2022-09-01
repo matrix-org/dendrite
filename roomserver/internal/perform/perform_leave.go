@@ -186,7 +186,9 @@ func (r *Leaver) performLeaveRoomByID(
 		},
 	}
 	inputRes := api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+	if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
+	}
 	if err = inputRes.Err(); err != nil {
 		return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 	}
@@ -228,14 +230,14 @@ func (r *Leaver) performFederatedRejectInvite(
 		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
-		if _, err = updater.SetToLeave(req.UserID, eventID); err != nil {
-			util.GetLogger(ctx).WithError(err).Errorf("failed to set membership to leave, still retiring invite event")
+		if err = updater.Delete(); err != nil {
+			util.GetLogger(ctx).WithError(err).Errorf("failed to delete membership, still retiring invite event")
 			if err = updater.Rollback(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback membership leave, still retiring invite event")
+				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback deleting membership, still retiring invite event")
 			}
 		} else {
 			if err = updater.Commit(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to commit membership update, still retiring invite event")
+				util.GetLogger(ctx).WithError(err).Errorf("failed to commit deleting membership, still retiring invite event")
 			}
 		}
 	}
