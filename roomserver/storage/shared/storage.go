@@ -113,9 +113,9 @@ func (d *Database) eventStateKeyNIDs(
 }
 
 func (d *Database) StateEntriesForEventIDs(
-	ctx context.Context, eventIDs []string,
+	ctx context.Context, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
-	return d.EventsTable.BulkSelectStateEventByID(ctx, nil, eventIDs)
+	return d.EventsTable.BulkSelectStateEventByID(ctx, nil, eventIDs, excludeRejected)
 }
 
 func (d *Database) StateEntriesForTuples(

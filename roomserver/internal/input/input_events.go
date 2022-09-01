@@ -301,7 +301,7 @@ func (r *Inputer) processRoomEvent(
 	// bother doing this if the event was already rejected as it just ends up
 	// burning CPU time.
 	historyVisibility := gomatrixserverlib.HistoryVisibilityShared // Default to shared.
-	if rejectionErr == nil && !isRejected && !softfail {
+	if input.Kind != api.KindOutlier && rejectionErr == nil && !isRejected {
 		var err error
 		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
 		if err != nil {
@@ -313,7 +313,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Store the event.
-	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected || softfail)
+	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
 		return fmt.Errorf("updater.StoreEvent: %w", err)
 	}
@@ -353,12 +353,18 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
-	if isRejected || softfail {
-		logger.WithError(rejectionErr).WithFields(logrus.Fields{
-			"soft_fail":    softfail,
-			"missing_prev": missingPrev,
-		}).Warn("Stored rejected event")
+	// We stop here if the event is rejected: We've stored it but won't update
+	// forward extremities or notify downstream components about it.
+	switch {
+	case isRejected:
+		logger.WithError(rejectionErr).Warn("Stored rejected event")
+		if rejectionErr != nil {
+			return types.RejectedError(rejectionErr.Error())
+		}
+		return nil
+
+	case softfail:
+		logger.WithError(rejectionErr).Warn("Stored soft-failed event")
 		if rejectionErr != nil {
 			return types.RejectedError(rejectionErr.Error())
 		}
@@ -661,7 +667,7 @@ func (r *Inputer) calculateAndSetState(
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs, true); err != nil {
 			return fmt.Errorf("updater.StateEntriesForEventIDs: %w", err)
 		}
 		entries = types.DeduplicateStateEntries(entries)

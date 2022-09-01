@@ -67,14 +67,15 @@ func NewKeyChangeConsumer(
 // Start consuming from key servers
 func (t *KeyChangeConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		t.ctx, t.jetstream, t.topic, t.durable, 1,
+		t.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called in response to a message received on the
 // key change events topic from the key server.
-func (t *KeyChangeConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (t *KeyChangeConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var m api.DeviceMessage
 	if err := json.Unmarshal(msg.Data, &m); err != nil {
 		logrus.WithError(err).Errorf("failed to read device message from key change topic")

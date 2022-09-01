@@ -144,7 +144,6 @@ Server correctly handles incoming m.device_list_update
 If remote user leaves room, changes device and rejoins we see update in sync
 If remote user leaves room, changes device and rejoins we see update in /keys/changes
 If remote user leaves room we no longer receive device updates
-If a device list update goes missing, the server resyncs on the next one
 Server correctly resyncs when client query keys and there is no remote cache
 Server correctly resyncs when server leaves and rejoins a room
 Device list doesn't change if remote server is down
@@ -633,7 +632,6 @@ Test that rejected pushers are removed.
 Trying to add push rule with no scope fails with 400
 Trying to add push rule with invalid scope fails with 400
 Forward extremities remain so even after the next events are populated as outliers
-If a device list update goes missing, the server resyncs on the next one
 uploading self-signing key notifies over federation
 uploading signed devices gets propagated over federation
 Device list doesn't change if remote server is down

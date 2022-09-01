@@ -79,7 +79,7 @@ type Database interface {
 	// Look up the state entries for a list of string event IDs
 	// Returns an error if the there is an error talking to the database
 	// Returns a types.MissingEventError if the event IDs aren't in the database.
-	StateEntriesForEventIDs(ctx context.Context, eventIDs []string) ([]types.StateEntry, error)
+	StateEntriesForEventIDs(ctx context.Context, eventIDs []string, excludeRejected bool) ([]types.StateEntry, error)
 	// Look up the string event state keys for a list of numeric event state keys
 	// Returns an error if there was a problem talking to the database.
 	EventStateKeys(ctx context.Context, eventStateKeyNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]string, error)
