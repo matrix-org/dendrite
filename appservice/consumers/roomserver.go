@@ -196,7 +196,7 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	case http.StatusOK:
 		state.backoff = 0
 	default:
-		_ = state.backoffAndPause(err)
+		return state.backoffAndPause(err)
 	}
 	return nil
 }
@@ -269,11 +269,18 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 	// e.g. the event came over federation but we do not have the full state persisted.
 	if err := s.rsAPI.QueryMembershipsForRoom(ctx, membershipReq, membershipRes); err == nil {
 		for _, ev := range membershipRes.JoinEvents {
-			var membership gomatrixserverlib.MemberContent
-			if err = json.Unmarshal(ev.Content, &membership); err != nil || ev.StateKey == nil {
+			switch {
+			case ev.StateKey == nil:
+				continue
+			case ev.Type != gomatrixserverlib.MRoomMember:
 				continue
 			}
-			if appservice.IsInterestedInUserID(*ev.StateKey) {
+			var membership gomatrixserverlib.MemberContent
+			err = json.Unmarshal(ev.Content, &membership)
+			switch {
+			case err != nil:
+				continue
+			case membership.Membership == gomatrixserverlib.Join:
 				return true
 			}
 		}
