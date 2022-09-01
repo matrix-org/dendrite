@@ -31,8 +31,6 @@ type AppServiceAPI struct {
 
 	InternalAPI InternalAPIOptions `yaml:"internal_api"`
 
-	Database DatabaseOptions `yaml:"database"`
-
 	// DisableTLSValidation disables the validation of X.509 TLS certs
 	// on appservice endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
@@ -43,16 +41,9 @@ type AppServiceAPI struct {
 func (c *AppServiceAPI) Defaults(generate bool) {
 	c.InternalAPI.Listen = "http://localhost:7777"
 	c.InternalAPI.Connect = "http://localhost:7777"
-	c.Database.Defaults(5)
-	if generate {
-		c.Database.ConnectionString = "file:appservice.db"
-	}
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
 	}

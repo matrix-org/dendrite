@@ -24,7 +24,6 @@ func main() {
 		cfg.Global.ServerName = gomatrixserverlib.ServerName(*serverName)
 	}
 	if *dbURI != "" {
-		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(*dbURI)
 		cfg.MSCs.Database.ConnectionString = config.DataSource(*dbURI)
