@@ -57,7 +57,6 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), func() {
 			// cleanup db files. This risks getting out of sync as we add more database strings :(
 			dbFiles := []config.DataSource{
-				cfg.AppServiceAPI.Database.ConnectionString,
 				cfg.FederationAPI.Database.ConnectionString,
 				cfg.KeyServer.Database.ConnectionString,
 				cfg.MSCs.Database.ConnectionString,
