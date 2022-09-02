@@ -1,19 +1,19 @@
 #syntax=docker/dockerfile:1.2
 
-FROM golang:1.18-stretch as build
+FROM golang:1.19-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
 # No password when connecting over localhost
-RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/9.6/main/pg_hba.conf && \
+RUN sed -i "s%127.0.0.1/32            md5%127.0.0.1/32            trust%g" /etc/postgresql/11/main/pg_hba.conf && \
     # Bump up max conns for moar concurrency
-    sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/9.6/main/postgresql.conf
+    sed -i 's/max_connections = 100/max_connections = 2000/g' /etc/postgresql/11/main/postgresql.conf
 
 # This entry script starts postgres, waits for it to be up then starts dendrite
 RUN echo '\
     #!/bin/bash -eu \n\
     pg_lsclusters \n\
-    pg_ctlcluster 9.6 main start \n\
+    pg_ctlcluster 11 main start \n\
     \n\
     until pg_isready \n\
     do \n\
@@ -31,9 +31,9 @@ RUN mkdir /dendrite
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o /dendrite ./cmd/generate-config && \
-    go build -o /dendrite ./cmd/generate-keys && \
-    go build -o /dendrite ./cmd/dendrite-monolith-server
+    go build --race -o /dendrite ./cmd/generate-config && \
+    go build --race -o /dendrite ./cmd/generate-keys && \
+    go build --race -o /dendrite ./cmd/dendrite-monolith-server
 
 WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem

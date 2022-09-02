@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -178,14 +179,19 @@ func verifyTestsRan(baseURL string, branchNames []string) error {
 	}
 	// we expect 4 messages per version
 	msgCount := 0
+	// To aid debugging when some messages are missing
+	msgArray := make([]gomatrix.Event, 0)
+
 	for _, ev := range history.Chunk {
 		if ev.Type == "m.room.message" {
 			msgCount += 1
+			msgArray = append(msgArray, ev)
 		}
 	}
 	wantMsgCount := len(branchNames) * 4
 	if msgCount != wantMsgCount {
-		return fmt.Errorf("got %d messages in global room, want %d", msgCount, wantMsgCount)
+		msgArrayJSON, _ := json.Marshal(msgArray)
+		return fmt.Errorf("got %d messages in global room, want %d msgArray %v", msgCount, wantMsgCount, string(msgArrayJSON))
 	}
 	log.Println("    messages exist: OK")
 	return nil
