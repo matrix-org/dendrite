@@ -416,7 +416,7 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 	if err = runTests(csAPIURL, v); err != nil {
 		return fmt.Errorf("failed to run tests on version %s: %s", v, err)
 	}
-	// Sleep to let the database sync before returning and destorying the dendrite container
+	// Sleep to let the database sync before returning and destroying the dendrite container
 	time.Sleep(5 * time.Second)
 
 	return nil
