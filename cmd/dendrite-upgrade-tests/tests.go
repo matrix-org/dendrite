@@ -191,7 +191,7 @@ func verifyTestsRan(baseURL string, branchNames []string) error {
 	wantMsgCount := len(branchNames) * 4
 	if msgCount != wantMsgCount {
 		msgArrayJSON, _ := json.Marshal(msgArray)
-		return fmt.Errorf("got %d messages in global room, want %d msgArray %v", msgCount, wantMsgCount, msgArrayJSON)
+		return fmt.Errorf("got %d messages in global room, want %d msgArray %v", msgCount, wantMsgCount, string(msgArrayJSON))
 	}
 	log.Println("    messages exist: OK")
 	return nil
