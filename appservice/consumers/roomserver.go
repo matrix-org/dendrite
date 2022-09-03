@@ -134,7 +134,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 			}
 
 		case api.OutputTypeNewInviteEvent:
-			if output.NewInviteEvent == nil {
+			if output.NewInviteEvent == nil || !s.appserviceIsInterestedInEvent(ctx, output.NewInviteEvent.Event, state.ApplicationService) {
 				continue
 			}
 			events = append(events, output.NewInviteEvent.Event)
@@ -281,7 +281,9 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			case err != nil:
 				continue
 			case membership.Membership == gomatrixserverlib.Join:
-				return true
+				if appservice.IsInterestedInUserID(*ev.StateKey) {
+					return true
+				}
 			}
 		}
 	} else {
