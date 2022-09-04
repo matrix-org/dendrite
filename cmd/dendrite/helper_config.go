@@ -7,30 +7,7 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/knadh/koanf"
-	"github.com/knadh/koanf/parsers/json"
-	"github.com/knadh/koanf/parsers/toml"
-	"github.com/knadh/koanf/parsers/yaml"
 )
-
-var (
-	configExtParser = map[string]koanf.Parser{
-		".json": json.Parser(),
-		".toml": toml.Parser(),
-		".yaml": yaml.Parser(),
-		".yml":  yaml.Parser(),
-	}
-)
-
-func getParser(configPath string) (koanf.Parser, string) {
-	fileExt := filepath.Ext(configPath)
-	parser, ok := configExtParser[fileExt]
-	if !ok {
-		return nil, fileExt
-	}
-	return parser, fileExt
-}
 
 var (
 	serverName    string

@@ -39,19 +39,7 @@ var generateConfigCmd = &cobra.Command{
 
 		k.Load(structs.Provider(cfg, "config"), nil)
 
-		var parser koanf.Parser
-		if configPath != "" {
-			var fileExt string
-			parser, fileExt = getParser(configPath)
-			if parser == nil {
-				fmt.Println("unsupported file extention:", fileExt)
-				os.Exit(1)
-			}
-		} else {
-			parser = yaml.Parser()
-		}
-
-		b, err := k.Marshal(parser)
+		b, err := k.Marshal(yaml.Parser())
 		if err != nil {
 			fmt.Println("unable to generate yaml", err)
 			os.Exit(1)

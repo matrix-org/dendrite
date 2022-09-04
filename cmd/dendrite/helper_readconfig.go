@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/spf13/cobra"
@@ -31,12 +32,7 @@ func readConfig(generate bool, monolithic bool, configPath, dirPath string) {
 	k := koanf.New("/")
 
 	if configPath != "" {
-		parser, fileExt := getParser(configPath)
-		if parser == nil {
-			fmt.Println("unsupported file extention:", fileExt)
-			os.Exit(1)
-		}
-		if err := k.Load(file.Provider(configPath), parser); err != nil {
+		if err := k.Load(file.Provider(configPath), yaml.Parser()); err != nil {
 			fmt.Println("read file config:", err)
 			os.Exit(1)
 		}
