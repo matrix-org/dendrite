@@ -420,7 +420,7 @@ userLoop:
 				}
 			case gomatrix.HTTPError:
 				// The remote server returned an error, give it some time to recover
-				if e.Code >= 300 {
+				if e.Code >= 500 {
 					waitTime = time.Minute * 10
 					logrus.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
 					break userLoop
