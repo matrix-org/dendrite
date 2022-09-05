@@ -61,8 +61,7 @@ func MakeAuthAPI(
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
 			hub.Scope().SetUser(sentry.User{
-				Username:  device.UserID,
-				IPAddress: req.RemoteAddr,
+				Username: device.UserID,
 			})
 			hub.Scope().SetTag("user_id", device.UserID)
 			hub.Scope().SetTag("device_id", device.ID)
