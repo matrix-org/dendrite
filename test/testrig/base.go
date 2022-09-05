@@ -42,7 +42,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Generate:   true,
 			Monolithic: true,
 		}) // autogen a signing key
-		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a signing key
+		cfg.MediaAPI.Defaults(config.DefaultOpts{
 			Generate:   true,
 			Monolithic: true,
 		}) // autogen a media path
@@ -50,14 +50,6 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Generate:   true,
 			Monolithic: true,
 		}) // use in memory fts
-		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
-			Generate:   true,
-			Monolithic: true,
-		})
-		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
-			Generate:   true,
-			Monolithic: true,
-		})
 		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
