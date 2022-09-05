@@ -178,6 +178,10 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		u.newStateNID = u.oldStateNID
 	}
 
+	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
+	}
+
 	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
@@ -194,10 +198,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
 	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
-	}
-
-	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
-		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
 	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
