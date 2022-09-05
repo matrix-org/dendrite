@@ -183,7 +183,7 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
 	}
-	updates = append(updates, *update)
+	updates = append([]api.OutputEvent{*update}, updates...)
 	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
 	}
@@ -376,7 +376,7 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 
 // retrieve an event nid -> event ID map for all events that need updating
 func (u *latestEventsUpdater) stateEventMap() (map[types.EventNID]string, error) {
-	cap := len(u.added) + len(u.removed) // + len(u.stateBeforeEventRemoves) + len(u.stateBeforeEventAdds)
+	cap := len(u.added) + len(u.removed)
 	stateEventNIDs := make(types.EventNIDs, 0, cap)
 	allStateEntries := make([]types.StateEntry, 0, cap)
 	allStateEntries = append(allStateEntries, u.added...)
