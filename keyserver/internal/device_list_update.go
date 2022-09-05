@@ -402,7 +402,7 @@ userLoop:
 		if err != nil {
 			failCount += 1
 			switch e := err.(type) {
-			case fedsenderapi.FederationClientError:
+			case *fedsenderapi.FederationClientError:
 				if e.RetryAfter > 0 {
 					waitTime = e.RetryAfter
 					break userLoop
