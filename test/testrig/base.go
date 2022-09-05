@@ -41,11 +41,11 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
 			Generate:   true,
 			Monolithic: true,
-		}) // autogen a signing key
-		cfg.MediaAPI.Defaults(config.DefaultOpts{
+		})
+		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
 			Generate:   true,
 			Monolithic: true,
-		}) // autogen a media path
+		})
 		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{
 			Generate:   true,
 			Monolithic: true,
