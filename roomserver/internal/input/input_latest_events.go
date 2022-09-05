@@ -275,7 +275,7 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
 
-	if removed := len(u.removed) - len(u.added); removed > 0 {
+	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
 			"event_id":      u.event.EventID(),
 			"room_id":       u.event.RoomID(),
@@ -283,7 +283,7 @@ func (u *latestEventsUpdater) latestState() error {
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),
 			"new_latest":    u.latest.EventIDs(),
-		}).Errorf("Unexpected state deletion (removing %d events)", removed)
+		}).Warnf("State reset detected (removing %d events)", removed)
 	}
 
 	// Also work out the state before the event removes and the event
