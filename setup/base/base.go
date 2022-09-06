@@ -135,7 +135,6 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		logrus.Fatalf("Failed to start due to configuration errors")
 	}
 
-	internal.SetupStdLogging()
 	internal.SetupHookLogging(cfg.Logging, componentName)
 	internal.SetupPprof()
 

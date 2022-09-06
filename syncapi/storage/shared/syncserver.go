@@ -1078,3 +1078,11 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
+
+func (s *Database) ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error) {
+	return s.Presence.ExpirePresence(ctx)
+}
+
+func (s *Database) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	return s.Presence.UpdateLastActive(ctx, userId, lastActiveTs)
+}
