@@ -18,22 +18,24 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 )
 
 // DeviceListUpdateConsumer consumes device list updates that came in over federation.
 type DeviceListUpdateConsumer struct {
-	ctx       context.Context
-	jetstream nats.JetStreamContext
-	durable   string
-	topic     string
-	updater   *internal.DeviceListUpdater
+	ctx        context.Context
+	jetstream  nats.JetStreamContext
+	durable    string
+	topic      string
+	updater    *internal.DeviceListUpdater
+	serverName gomatrixserverlib.ServerName
 }
 
 // NewDeviceListUpdateConsumer creates a new DeviceListConsumer. Call Start() to begin consuming from key servers.
@@ -44,11 +46,12 @@ func NewDeviceListUpdateConsumer(
 	updater *internal.DeviceListUpdater,
 ) *DeviceListUpdateConsumer {
 	return &DeviceListUpdateConsumer{
-		ctx:       process.Context(),
-		jetstream: js,
-		durable:   cfg.Matrix.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
-		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		updater:   updater,
+		ctx:        process.Context(),
+		jetstream:  js,
+		durable:    cfg.Matrix.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		updater:    updater,
+		serverName: cfg.Matrix.ServerName,
 	}
 }
 
@@ -69,6 +72,15 @@ func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		logrus.WithError(err).Errorf("Failed to read from device list update input topic")
 		return true
 	}
+	origin := gomatrixserverlib.ServerName(msg.Header.Get("origin"))
+	if _, serverName, err := gomatrixserverlib.SplitID('@', m.UserID); err != nil {
+		return true
+	} else if serverName == t.serverName {
+		return true
+	} else if serverName != origin {
+		return true
+	}
+
 	err := t.updater.Update(ctx, m)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
