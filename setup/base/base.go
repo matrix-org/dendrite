@@ -38,6 +38,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -90,6 +91,7 @@ type BaseDendrite struct {
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
 	EnableMetrics          bool
+	Fulltext               *fulltext.Search
 	startupLock            sync.Mutex
 }
 
@@ -148,6 +150,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
+	}
+
+	var fts *fulltext.Search
+	isSyncOrMonolith := componentName == "syncapi" || isMonolith
+	if cfg.SyncAPI.Fulltext.Enabled && isSyncOrMonolith {
+		fts, err = fulltext.New(cfg.SyncAPI.Fulltext)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to create full text")
+		}
 	}
 
 	if cfg.Global.Sentry.Enabled {
@@ -247,6 +258,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
 		EnableMetrics:          enableMetrics,
+		Fulltext:               fts,
 	}
 }
 

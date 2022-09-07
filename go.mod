@@ -6,6 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/blevesearch/bleve/v2 v2.3.4
 	github.com/codeclysm/extract v2.2.0+incompatible
 	github.com/dgraph-io/ristretto v0.1.1-0.20220403145359-8e850b710d6d
 	github.com/docker/docker v20.10.16+incompatible
@@ -16,7 +17,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/kardianos/minwinsvc v1.0.0
 	github.com/lib/pq v1.10.5
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
@@ -55,7 +55,24 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
+	github.com/RoaringBitmap/roaring v0.9.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bits-and-blooms/bitset v1.2.0 // indirect
+	github.com/blevesearch/bleve_index_api v1.0.3 // indirect
+	github.com/blevesearch/geo v0.1.13 // indirect
+	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect
+	github.com/blevesearch/gtreap v0.1.1 // indirect
+	github.com/blevesearch/mmap-go v1.0.4 // indirect
+	github.com/blevesearch/scorch_segment_api/v2 v2.1.2 // indirect
+	github.com/blevesearch/segment v0.9.0 // indirect
+	github.com/blevesearch/snowballstem v0.9.0 // indirect
+	github.com/blevesearch/upsidedown_store_api v1.0.1 // indirect
+	github.com/blevesearch/vellum v1.0.8 // indirect
+	github.com/blevesearch/zapx/v11 v11.3.5 // indirect
+	github.com/blevesearch/zapx/v12 v12.3.5 // indirect
+	github.com/blevesearch/zapx/v13 v13.3.5 // indirect
+	github.com/blevesearch/zapx/v14 v14.3.5 // indirect
+	github.com/blevesearch/zapx/v15 v15.3.5 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cheekybits/genny v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -66,11 +83,15 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/snappy v0.0.1 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
+	github.com/kardianos/minwinsvc v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/lucas-clemente/quic-go v0.28.1 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
@@ -81,7 +102,10 @@ require (
 	github.com/miekg/dns v1.1.49 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/nats-io/jwt/v2 v2.3.0 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
@@ -97,6 +121,7 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	go.etcd.io/bbolt v1.3.5 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/sys v0.0.0-20220731174439-a90be440212d // indirect
