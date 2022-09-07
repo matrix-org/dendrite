@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
@@ -178,6 +179,10 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		u.newStateNID = u.oldStateNID
 	}
 
+	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
+	}
+
 	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
@@ -194,10 +199,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
 	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
-	}
-
-	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
-		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
 	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
@@ -275,7 +276,7 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
 	}
 
-	if removed := len(u.removed) - len(u.added); removed > 0 {
+	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
 			"event_id":      u.event.EventID(),
 			"room_id":       u.event.RoomID(),
@@ -283,7 +284,16 @@ func (u *latestEventsUpdater) latestState() error {
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),
 			"new_latest":    u.latest.EventIDs(),
-		}).Errorf("Unexpected state deletion (removing %d events)", removed)
+		}).Warnf("State reset detected (removing %d events)", removed)
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetLevel("warning")
+			scope.SetTag("event_id", u.event.EventID())
+			scope.SetTag("old_state_nid", fmt.Sprintf("%d", u.oldStateNID))
+			scope.SetTag("new_state_nid", fmt.Sprintf("%d", u.newStateNID))
+			scope.SetTag("old_latest", u.oldLatest.EventIDs())
+			scope.SetTag("new_latest", u.latest.EventIDs())
+			sentry.CaptureMessage("State reset detected")
+		})
 	}
 
 	// Also work out the state before the event removes and the event
