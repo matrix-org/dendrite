@@ -28,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -454,7 +453,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	// Create a dummy device for AS user
 	dev := api.Device{
 		// Use AS dummy device ID
-		ID: types.AppServiceDeviceID,
+		ID: "AS_Device",
 		// AS dummy device has AS's token.
 		AccessToken:  token,
 		AppserviceID: appService.ID,

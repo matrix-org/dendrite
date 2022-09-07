@@ -212,7 +212,10 @@ func loadConfig(
 	monolithic bool,
 ) (*Dendrite, error) {
 	var c Dendrite
-	c.Defaults(false)
+	c.Defaults(DefaultOpts{
+		Generate:   false,
+		Monolithic: monolithic,
+	})
 	c.IsMonolith = monolithic
 
 	var err error
@@ -225,12 +228,7 @@ func loadConfig(
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
-	privateKeyData, err := readFile(privateKeyPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.Global.KeyID, c.Global.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData, true); err != nil {
+	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
 		return nil, err
 	}
 
@@ -275,6 +273,14 @@ func loadConfig(
 	return &c, nil
 }
 
+func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error)) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
+	privateKeyData, err := readFile(privateKeyPath)
+	if err != nil {
+		return "", nil, err
+	}
+	return readKeyPEM(privateKeyPath, privateKeyData, true)
+}
+
 // Derive generates data that is derived from various values provided in
 // the config file.
 func (config *Dendrite) Derive() error {
@@ -305,21 +311,25 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
+type DefaultOpts struct {
+	Generate   bool
+	Monolithic bool
+}
+
 // SetDefaults sets default config values if they are not explicitly set.
-func (c *Dendrite) Defaults(generate bool) {
+func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Version = Version
 
-	c.Global.Defaults(generate)
-	c.ClientAPI.Defaults(generate)
-	c.FederationAPI.Defaults(generate)
-	c.KeyServer.Defaults(generate)
-	c.MediaAPI.Defaults(generate)
-	c.RoomServer.Defaults(generate)
-	c.SyncAPI.Defaults(generate)
-	c.UserAPI.Defaults(generate)
-	c.AppServiceAPI.Defaults(generate)
-	c.MSCs.Defaults(generate)
-
+	c.Global.Defaults(opts)
+	c.ClientAPI.Defaults(opts)
+	c.FederationAPI.Defaults(opts)
+	c.KeyServer.Defaults(opts)
+	c.MediaAPI.Defaults(opts)
+	c.RoomServer.Defaults(opts)
+	c.SyncAPI.Defaults(opts)
+	c.UserAPI.Defaults(opts)
+	c.AppServiceAPI.Defaults(opts)
+	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
 

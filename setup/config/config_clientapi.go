@@ -12,8 +12,8 @@ type ClientAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
 
 	// If set disables new users from registering (except via shared
 	// secrets)
@@ -52,7 +52,7 @@ type ClientAPI struct {
 	RateLimiting  RateLimiting                  `yaml:"rate_limiting"`
 	RtFailedLogin ratelimit.RtFailedLoginConfig `yaml:"rate_limiting_failed_login"`
 
-	MSCs *MSCs `yaml:"mscs"`
+	MSCs *MSCs `yaml:"-"`
 
 	ThreePidDelegate string `yaml:"three_pid_delegate"`
 
@@ -68,10 +68,12 @@ type JwtConfig struct {
 	Audiences []string `yaml:"audiences"`
 }
 
-func (c *ClientAPI) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7771"
-	c.InternalAPI.Connect = "http://localhost:7771"
-	c.ExternalAPI.Listen = "http://[::]:8071"
+func (c *ClientAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
+		c.InternalAPI.Listen = "http://localhost:7771"
+		c.InternalAPI.Connect = "http://localhost:7771"
+		c.ExternalAPI.Listen = "http://[::]:8071"
+	}
 	c.RegistrationSharedSecret = ""
 	c.RecaptchaPublicKey = ""
 	c.RecaptchaPrivateKey = ""

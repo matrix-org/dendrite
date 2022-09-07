@@ -278,19 +278,19 @@ type recaptchaResponse struct {
 }
 
 // validateUsername returns an error response if the username is invalid
-func validateUsername(username string) *util.JSONResponse {
+func validateUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(username) > maxUsernameLength {
+	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
+			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
 		}
-	} else if !validUsernameRegex.MatchString(username) {
+	} else if !validUsernameRegex.MatchString(localpart) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
 		}
-	} else if username[0] == '_' { // Regex checks its not a zero length string
+	} else if localpart[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
@@ -300,13 +300,13 @@ func validateUsername(username string) *util.JSONResponse {
 }
 
 // validateApplicationServiceUsername returns an error response if the username is invalid for an application service
-func validateApplicationServiceUsername(username string) *util.JSONResponse {
-	if len(username) > maxUsernameLength {
+func validateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
+	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
+			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
 		}
-	} else if !validUsernameRegex.MatchString(username) {
+	} else if !validUsernameRegex.MatchString(localpart) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
@@ -525,7 +525,7 @@ func validateApplicationService(
 	}
 
 	// Check username application service is trying to register is valid
-	if err := validateApplicationServiceUsername(username); err != nil {
+	if err := validateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
 		return "", err
 	}
 
@@ -606,7 +606,7 @@ func Register(
 	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
 		// Spec-compliant case (the access_token is specified and the login type
 		// is correctly set, so it's an appservice registration)
-		if resErr := validateApplicationServiceUsername(r.Username); resErr != nil {
+		if resErr := validateApplicationServiceUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
 			return *resErr
 		}
 	case accessTokenErr == nil:
@@ -619,7 +619,7 @@ func Register(
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
-		if resErr := validateUsername(r.Username); resErr != nil {
+		if resErr := validateUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
 			return *resErr
 		}
 	}
@@ -1061,7 +1061,7 @@ func RegisterAvailable(
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
 
-	if err := validateUsername(username); err != nil {
+	if err := validateUsername(username, cfg.Matrix.ServerName); err != nil {
 		return *err
 	}
 
@@ -1102,7 +1102,7 @@ func RegisterAvailable(
 	}
 }
 
-func handleSharedSecretRegistration(userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
 	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
 	if err != nil {
 		return util.JSONResponse{
@@ -1123,7 +1123,7 @@ func handleSharedSecretRegistration(userAPI userapi.ClientUserAPI, sr *SharedSec
 	// downcase capitals
 	ssrr.User = strings.ToLower(ssrr.User)
 
-	if resErr := validateUsername(ssrr.User); resErr != nil {
+	if resErr := validateUsername(ssrr.User, cfg.Matrix.ServerName); resErr != nil {
 		return *resErr
 	}
 	if resErr := validatePassword(ssrr.Password); resErr != nil {

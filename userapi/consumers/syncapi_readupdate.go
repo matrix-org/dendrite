@@ -56,15 +56,16 @@ func NewOutputReadUpdateConsumer(
 
 func (s *OutputReadUpdateConsumer) Start() error {
 	if err := jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var read types.ReadUpdate
 	if err := json.Unmarshal(msg.Data, &read); err != nil {
 		log.WithError(err).Error("userapi clientapi consumer: message parse failure")
