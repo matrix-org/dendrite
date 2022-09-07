@@ -17,6 +17,7 @@ const (
 var (
 	InputRoomEvent          = "InputRoomEvent"
 	InputDeviceListUpdate   = "InputDeviceListUpdate"
+	InputSigningKeyUpdate   = "InputSigningKeyUpdate"
 	OutputRoomEvent         = "OutputRoomEvent"
 	OutputSendToDeviceEvent = "OutputSendToDeviceEvent"
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
@@ -49,6 +50,11 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      InputDeviceListUpdate,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      InputSigningKeyUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

@@ -29,9 +29,7 @@ type AppServiceAPI struct {
 	Matrix  *Global  `yaml:"-"`
 	Derived *Derived `yaml:"-"` // TODO: Nuke Derived from orbit
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
-
-	Database DatabaseOptions `yaml:"database"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
 
 	// DisableTLSValidation disables the validation of X.509 TLS certs
 	// on appservice endpoints. This is not recommended in production!
@@ -40,19 +38,14 @@ type AppServiceAPI struct {
 	ConfigFiles []string `yaml:"config_files"`
 }
 
-func (c *AppServiceAPI) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7777"
-	c.InternalAPI.Connect = "http://localhost:7777"
-	c.Database.Defaults(5)
-	if generate {
-		c.Database.ConnectionString = "file:appservice.db"
+func (c *AppServiceAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
+		c.InternalAPI.Listen = "http://localhost:7777"
+		c.InternalAPI.Connect = "http://localhost:7777"
 	}
 }
 
 func (c *AppServiceAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "app_service_api.database.connection_string", string(c.Database.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
 	}

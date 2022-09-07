@@ -5,12 +5,12 @@ import "github.com/matrix-org/gomatrixserverlib"
 type FederationAPI struct {
 	Matrix *Global `yaml:"-"`
 
-	InternalAPI InternalAPIOptions `yaml:"internal_api"`
-	ExternalAPI ExternalAPIOptions `yaml:"external_api"`
+	InternalAPI InternalAPIOptions `yaml:"internal_api,omitempty"`
+	ExternalAPI ExternalAPIOptions `yaml:"external_api,omitempty"`
 
 	// The database stores information used by the federation destination queues to
 	// send transactions to remote servers.
-	Database DatabaseOptions `yaml:"database"`
+	Database DatabaseOptions `yaml:"database,omitempty"`
 
 	// Federation failure threshold. How many consecutive failures that we should
 	// tolerate when sending federation requests to a specific server. The backoff
@@ -30,24 +30,43 @@ type FederationAPI struct {
 	PreferDirectFetch bool `yaml:"prefer_direct_fetch"`
 }
 
-func (c *FederationAPI) Defaults(generate bool) {
-	c.InternalAPI.Listen = "http://localhost:7772"
-	c.InternalAPI.Connect = "http://localhost:7772"
-	c.ExternalAPI.Listen = "http://[::]:8072"
+func (c *FederationAPI) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
+		c.InternalAPI.Listen = "http://localhost:7772"
+		c.InternalAPI.Connect = "http://localhost:7772"
+		c.ExternalAPI.Listen = "http://[::]:8072"
+		c.Database.Defaults(10)
+	}
 	c.FederationMaxRetries = 16
 	c.DisableTLSValidation = false
-	c.Database.Defaults(10)
-	if generate {
-		c.Database.ConnectionString = "file:federationapi.db"
+	if opts.Generate {
+		c.KeyPerspectives = KeyPerspectives{
+			{
+				ServerName: "matrix.org",
+				Keys: []KeyPerspectiveTrustKey{
+					{
+						KeyID:     "ed25519:auto",
+						PublicKey: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw",
+					},
+					{
+						KeyID:     "ed25519:a_RXGa",
+						PublicKey: "l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ",
+					},
+				},
+			},
+		}
+		if !opts.Monolithic {
+			c.Database.ConnectionString = "file:federationapi.db"
+		}
 	}
 }
 
 func (c *FederationAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	if c.Matrix.DatabaseOptions.ConnectionString == "" {
-		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
-	}
 	if isMonolith { // polylith required configs below
 		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "federation_api.database.connection_string", string(c.Database.ConnectionString))
 	}
 	checkURL(configErrs, "federation_api.external_api.listen", string(c.ExternalAPI.Listen))
 	checkURL(configErrs, "federation_api.internal_api.listen", string(c.InternalAPI.Listen))

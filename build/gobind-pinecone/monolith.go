@@ -22,10 +22,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +45,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -204,27 +205,37 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 
 // nolint:gocyclo
 func (m *DendriteMonolith) Start() {
-	var err error
 	var sk ed25519.PrivateKey
 	var pk ed25519.PublicKey
-	keyfile := fmt.Sprintf("%s/p2p.key", m.StorageDirectory)
-	if _, err = os.Stat(keyfile); os.IsNotExist(err) {
-		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
-			panic(err)
+
+	keyfile := filepath.Join(m.StorageDirectory, "p2p.pem")
+	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
+		oldkeyfile := filepath.Join(m.StorageDirectory, "p2p.key")
+		if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
+			if err = test.NewMatrixKey(keyfile); err != nil {
+				panic("failed to generate a new PEM key: " + err.Error())
+			}
+			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+				panic("failed to load PEM key: " + err.Error())
+			}
+		} else {
+			if sk, err = os.ReadFile(oldkeyfile); err != nil {
+				panic("failed to read the old private key: " + err.Error())
+			}
+			if len(sk) != ed25519.PrivateKeySize {
+				panic("the private key is not long enough")
+			}
+			if err = test.SaveMatrixKey(keyfile, sk); err != nil {
+				panic("failed to convert the private key to PEM format: " + err.Error())
+			}
 		}
-		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
-			panic(err)
+	} else {
+		if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+			panic("failed to load PEM key: " + err.Error())
 		}
-	} else if err == nil {
-		if sk, err = ioutil.ReadFile(keyfile); err != nil {
-			panic(err)
-		}
-		if len(sk) != ed25519.PrivateKeySize {
-			panic("the private key is not long enough")
-		}
-		pk = sk.Public().(ed25519.PublicKey)
 	}
 
+	var err error
 	m.listener, err = net.Listen("tcp", "localhost:65432")
 	if err != nil {
 		panic(err)
@@ -243,7 +254,10 @@ func (m *DendriteMonolith) Start() {
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
@@ -255,7 +269,6 @@ func (m *DendriteMonolith) Start() {
 	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
 	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
-	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
 	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}

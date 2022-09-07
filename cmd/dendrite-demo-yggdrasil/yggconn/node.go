@@ -18,15 +18,13 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"log"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/neilalexander/utp"
+	"github.com/sirupsen/logrus"
 
 	ironwoodtypes "github.com/Arceliar/ironwood/types"
 	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
@@ -57,48 +55,38 @@ func (n *Node) DialerContext(ctx context.Context, _, address string) (net.Conn, 
 	return n.utpSocket.DialAddrContext(ctx, pk)
 }
 
-func Setup(instanceName, storageDirectory, peerURI string) (*Node, error) {
+func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, listenURI string) (*Node, error) {
 	n := &Node{
 		core:      &yggdrasilcore.Core{},
 		config:    yggdrasildefaults.GenerateConfig(),
 		multicast: &yggdrasilmulticast.Multicast{},
-		log:       gologme.New(os.Stdout, "YGG ", log.Flags()),
+		log:       gologme.New(logrus.StandardLogger().Writer(), "", 0),
 		incoming:  make(chan net.Conn),
 	}
 
-	yggfile := fmt.Sprintf("%s/%s-yggdrasil.conf", storageDirectory, instanceName)
-	if _, err := os.Stat(yggfile); !os.IsNotExist(err) {
-		yggconf, e := os.ReadFile(yggfile)
-		if e != nil {
-			panic(err)
-		}
-		if err := json.Unmarshal([]byte(yggconf), &n.config); err != nil {
-			panic(err)
-		}
+	options := []yggdrasilcore.SetupOption{
+		yggdrasilcore.AdminListenAddress("none"),
 	}
-
-	n.config.Peers = []string{}
+	if listenURI != "" {
+		options = append(options, yggdrasilcore.ListenAddress(listenURI))
+	}
 	if peerURI != "" {
-		n.config.Peers = append(n.config.Peers, peerURI)
+		for _, uri := range strings.Split(peerURI, ",") {
+			options = append(options, yggdrasilcore.Peer{
+				URI: uri,
+			})
+		}
 	}
-	n.config.AdminListen = "none"
 
-	j, err := json.MarshalIndent(n.config, "", "  ")
-	if err != nil {
+	var err error
+	if n.core, err = yggdrasilcore.New(sk, options...); err != nil {
 		panic(err)
 	}
-	if e := os.WriteFile(yggfile, j, 0600); e != nil {
-		n.log.Printf("Couldn't write private key to file '%s': %s\n", yggfile, e)
-	}
-
 	n.log.EnableLevel("error")
 	n.log.EnableLevel("warn")
 	n.log.EnableLevel("info")
-	if err = n.core.Start(n.config, n.log); err != nil {
-		panic(err)
-	}
-	n.utpSocket, err = utp.NewSocketFromPacketConnNoClose(n.core)
-	if err != nil {
+	n.core.SetLogger(n.log)
+	if n.utpSocket, err = utp.NewSocketFromPacketConnNoClose(n.core); err != nil {
 		panic(err)
 	}
 	if err = n.multicast.Init(n.core, n.config, n.log, nil); err != nil {
@@ -108,7 +96,7 @@ func Setup(instanceName, storageDirectory, peerURI string) (*Node, error) {
 		panic(err)
 	}
 
-	n.log.Println("Public key:", n.core.PublicKey())
+	n.log.Printf("Public key: %x", n.core.PublicKey())
 	go n.listenFromYgg()
 
 	return n, nil
