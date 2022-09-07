@@ -359,7 +359,9 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
-			t.processDeviceListUpdate(ctx, e)
+			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, e.Origin); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
+			}
 		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := map[string]types.FederationReceiptMRead{}
@@ -453,22 +455,4 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 	}
 
 	return nil
-}
-
-func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverlib.EDU) {
-	var payload gomatrixserverlib.DeviceListUpdateEvent
-	if err := json.Unmarshal(e.Content, &payload); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal device list update event")
-		return
-	}
-	if _, serverName, err := gomatrixserverlib.SplitID('@', payload.UserID); err != nil {
-		return
-	} else if serverName == t.ourServerName {
-		return
-	} else if serverName != t.Origin {
-		return
-	}
-	if err := t.producer.SendDeviceListUpdate(ctx, &payload); err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
-	}
 }
