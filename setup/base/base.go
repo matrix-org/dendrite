@@ -38,6 +38,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -91,6 +92,7 @@ type BaseDendrite struct {
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
 	EnableMetrics          bool
+	Fulltext               *fulltext.Search
 	startupLock            sync.Mutex
 	Fulltext               *fulltext.Search
 }

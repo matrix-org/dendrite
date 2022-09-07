@@ -29,6 +29,7 @@ func (c *SyncAPI) Defaults(opts DefaultOpts) {
 }
 
 func (c *SyncAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	c.Fulltext.Verify(configErrs, isMonolith)
 	if isMonolith { // polylith required configs below
 		return
 	}

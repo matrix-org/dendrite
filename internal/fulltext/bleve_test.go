@@ -28,7 +28,10 @@ import (
 func mustOpenIndex(t *testing.T, tempDir string) *fulltext.Search {
 	t.Helper()
 	cfg := config.Fulltext{}
-	cfg.Defaults(config.DefaultOpts{Generate: true, Monolithic: true})
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	if tempDir != "" {
 		cfg.IndexPath = config.Path(tempDir)
 		cfg.InMemory = false

@@ -46,10 +46,10 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Generate:   true,
 			Monolithic: true,
 		})
-		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{
+		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{ // use in memory fts
 			Generate:   true,
 			Monolithic: true,
-		}) // use in memory fts
+		})
 		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
