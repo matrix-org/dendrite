@@ -21,12 +21,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume
@@ -36,6 +37,7 @@ type SyncAPIProducer struct {
 	TopicTypingEvent       string
 	TopicPresenceEvent     string
 	TopicDeviceListUpdate  string
+	TopicSigningKeyUpdate  string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
 	UserAPI                userapi.UserInternalAPI
@@ -175,6 +177,18 @@ func (p *SyncAPIProducer) SendDeviceListUpdate(
 	}
 
 	log.Debugf("Sending device list update: %+v", m.Header)
+	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
+	return err
+}
+
+func (p *SyncAPIProducer) SendSigningKeyUpdate(
+	ctx context.Context, data gomatrixserverlib.RawJSON, origin gomatrixserverlib.ServerName,
+) (err error) {
+	m := nats.NewMsg(p.TopicSigningKeyUpdate)
+	m.Header.Set("origin", string(origin))
+	m.Data = data
+
+	log.Debugf("Sending signing key update")
 	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }
