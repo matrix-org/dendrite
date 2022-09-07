@@ -33,7 +33,7 @@ const userIDExistsPath = "/users/"
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
 	HTTPClient *http.Client
-	Cfg        *config.Dendrite
+	Cfg        *config.AppServiceAPI
 }
 
 // RoomAliasExists performs a request to '/room/{roomAlias}' on all known

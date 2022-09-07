@@ -115,7 +115,10 @@ func main() {
 				panic("failed to load PEM key: " + err.Error())
 			}
 		}
-		cfg.Defaults(true)
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: true,
+		})
 		cfg.Global.PrivateKey = sk
 		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
@@ -124,7 +127,6 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
-		cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
 		cfg.ClientAPI.RegistrationDisabled = false

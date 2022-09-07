@@ -1,5 +1,25 @@
 # Changelog
 
+## Dendrite 0.9.6 (2022-09-01)
+
+### Features
+
+* The appservice API has been refactored for improved performance and stability
+  * The appservice database has been deprecated, as the roomserver output stream is now used as the data source instead
+* The `generate-config` tool has been updated to support additional scenarios, i.e. for CI configuration generation and generating both monolith and polylith skeleton config files
+
+### Fixes
+
+* The username length check has been fixed on new account creation
+* The length of the `type`, `sender`, `state_key` and `room_id` fields in events are now verified by number of codepoints rather than bytes, fixing the "Cat Overflow" bug
+* UTF-16 surrogate handling in the canonical JSON implementation has been fixed
+* A race condition when starting the keyserver has been fixed
+* A race condition when configuring HTTP servers and routing at startup has been fixed
+* A bug where the incorrect limit was used for lazy-loading memberships has been fixed
+* The number of push notifications will now be sent to the push gateway
+* A missing index causing slow performance on the sync API send-to-device table has been added (contributed by [PiotrKozimor](https://github.com/PiotrKozimor))
+* Event auth will now correctly check for the existence of the `"creator"` field in create events
+
 ## Dendrite 0.9.5 (2022-08-25)
 
 ### Fixes
