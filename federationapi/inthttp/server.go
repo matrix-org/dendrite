@@ -6,10 +6,12 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/httputil"
 )
 
 // AddRoutes adds the FederationInternalAPI handlers to the http.ServeMux.
@@ -229,6 +231,10 @@ func federationClientError(err error) error {
 		return &ferr
 	case *api.FederationClientError:
 		return ferr
+	case gomatrix.HTTPError:
+		return &api.FederationClientError{
+			Code: ferr.Code,
+		}
 	default:
 		return &api.FederationClientError{
 			Err: err.Error(),
