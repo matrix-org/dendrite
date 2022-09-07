@@ -408,7 +408,7 @@ userLoop:
 				} else if e.Blacklisted {
 					waitTime = time.Hour * 8
 					break userLoop
-				} else if e.Code > 0 {
+				} else if e.Code >= 300 {
 					// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
 					// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
 					waitTime = time.Hour
@@ -426,7 +426,7 @@ userLoop:
 				// The remote server returned an error, give it some time to recover.
 				// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 				if e.Code >= 300 {
-					waitTime = time.Minute * 10
+					waitTime = time.Hour
 					logrus.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
 					break userLoop
 				}
