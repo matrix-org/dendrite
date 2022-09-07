@@ -22,6 +22,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
@@ -31,10 +36,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -391,7 +392,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case types.MSigningKeyUpdate:
-			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
+			if err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin); err != nil {
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
 		case gomatrixserverlib.MPresence:
@@ -427,42 +428,6 @@ func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 		if err := t.producer.SendPresence(ctx, content.UserID, presence, content.StatusMsg, content.LastActiveAgo); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
-	var updatePayload keyapi.CrossSigningKeyUpdate
-	if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
-		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-			"user_id": updatePayload.UserID,
-		}).Debug("Failed to unmarshal signing key update")
-		return err
-	}
-	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
-		return nil
-	} else if serverName == t.ourServerName {
-		return nil
-	} else if serverName != t.Origin {
-		return nil
-	}
-	keys := gomatrixserverlib.CrossSigningKeys{}
-	if updatePayload.MasterKey != nil {
-		keys.MasterKey = *updatePayload.MasterKey
-	}
-	if updatePayload.SelfSigningKey != nil {
-		keys.SelfSigningKey = *updatePayload.SelfSigningKey
-	}
-	uploadReq := &keyapi.PerformUploadDeviceKeysRequest{
-		CrossSigningKeys: keys,
-		UserID:           updatePayload.UserID,
-	}
-	uploadRes := &keyapi.PerformUploadDeviceKeysResponse{}
-	if err := t.keyAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes); err != nil {
-		return err
-	}
-	if uploadRes.Error != nil {
-		return uploadRes.Error
 	}
 	return nil
 }
