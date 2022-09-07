@@ -405,11 +405,12 @@ userLoop:
 			case *fedsenderapi.FederationClientError:
 				if e.RetryAfter > 0 {
 					waitTime = e.RetryAfter
-					break userLoop
 				} else if e.Blacklisted {
 					waitTime = time.Hour * 8
-					break userLoop
+				} else {
+					waitTime = time.Hour
 				}
+				break userLoop
 			case net.Error:
 				// Use the default waitTime, if it's a timeout.
 				// It probably doesn't make sense to try further users.
