@@ -22,10 +22,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nats-io/nats.go"
+
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/nats-io/nats.go"
 )
 
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
@@ -42,6 +43,10 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Monolithic: true,
 		})
 		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
+			Generate:   true,
+			Monolithic: true,
+		})
+		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{ // use in memory fts
 			Generate:   true,
 			Monolithic: true,
 		})
@@ -100,6 +105,7 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 		})
 	}
 	cfg.Global.JetStream.InMemory = true
+	cfg.SyncAPI.Fulltext.InMemory = true
 	base := base.NewBaseDendrite(cfg, "Tests")
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
