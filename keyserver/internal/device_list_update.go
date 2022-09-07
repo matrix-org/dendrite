@@ -463,9 +463,10 @@ userLoop:
 	}
 	if failCount > 0 {
 		logger.WithFields(logrus.Fields{
-			"total":   len(userIDs),
-			"failed":  failCount,
-			"skipped": len(userIDs) - failCount,
+			"total":    len(userIDs),
+			"failed":   failCount,
+			"skipped":  len(userIDs) - failCount,
+			"waittime": waitTime,
 		}).Warn("Failed to query device keys for some users")
 	}
 	for _, userID := range userIDs {
