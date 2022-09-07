@@ -19,9 +19,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"net"
 	"sync"
 	"time"
 
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -388,6 +390,8 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		return waitTime, true
 	}
 	failCount := 0
+
+userLoop:
 	for _, userID := range userIDs {
 		if ctx.Err() != nil {
 			// we've timed out, give up and go to the back of the queue to let another server be processed.
@@ -397,19 +401,35 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
 		if err != nil {
 			failCount += 1
-			fcerr, ok := err.(*fedsenderapi.FederationClientError)
-			if ok {
-				if fcerr.RetryAfter > 0 {
-					waitTime = fcerr.RetryAfter
-				} else if fcerr.Blacklisted {
+			switch e := err.(type) {
+			case *fedsenderapi.FederationClientError:
+				if e.RetryAfter > 0 {
+					waitTime = e.RetryAfter
+					break userLoop
+				} else if e.Blacklisted {
 					waitTime = time.Hour * 8
-				} else {
-					// For all other errors (DNS resolution, network etc.) wait 1 hour.
-					waitTime = time.Hour
+					break userLoop
 				}
-			} else {
-				waitTime = time.Hour
-				logger.WithError(err).WithField("user_id", userID).Debug("GetUserDevices returned unknown error type")
+			case net.Error:
+				// Use the default waitTime, if it's a timeout.
+				// It probably doesn't make sense to try further users.
+				if !e.Timeout() {
+					waitTime = time.Minute * 10
+					logrus.WithError(e).Error("GetUserDevices returned net.Error")
+					break userLoop
+				}
+			case gomatrix.HTTPError:
+				// The remote server returned an error, give it some time to recover
+				if e.Code >= 500 {
+					waitTime = time.Minute * 10
+					logrus.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
+					break userLoop
+				}
+			default:
+				// Something else failed
+				waitTime = time.Minute * 10
+				logger.WithError(err).WithField("user_id", userID).Debugf("GetUserDevices returned unknown error type: %T", err)
+				break userLoop
 			}
 			continue
 		}
@@ -437,7 +457,11 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 		}
 	}
 	if failCount > 0 {
-		logger.WithField("total", len(userIDs)).WithField("failed", failCount).WithField("wait", waitTime).Warn("Failed to query device keys for some users")
+		logger.WithFields(logrus.Fields{
+			"total":   len(userIDs),
+			"failed":  failCount,
+			"skipped": len(userIDs) - failCount,
+		}).Warn("Failed to query device keys for some users")
 	}
 	for _, userID := range userIDs {
 		// always clear the channel to unblock Update calls regardless of success/failure

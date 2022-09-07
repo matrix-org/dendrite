@@ -53,9 +53,9 @@ func (d *Database) AssociateEDUWithDestination(
 		// Keep EDUs for at least x minutes before deleting them
 		expiresAt = gomatrixserverlib.AsTimestamp(time.Now().Add(duration))
 	}
-	// We forcibly set m.direct_to_device events to 0, as we always want them
-	// to be delivered. (required for E2EE)
-	if eduType == gomatrixserverlib.MDirectToDevice {
+	// We forcibly set m.direct_to_device and m.device_list_update events
+	// to 0, as we always want them to be delivered. (required for E2EE)
+	if eduType == gomatrixserverlib.MDirectToDevice || eduType == gomatrixserverlib.MDeviceListUpdate {
 		expiresAt = 0
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
