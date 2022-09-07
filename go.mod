@@ -92,6 +92,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
 	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494 // indirect
+	github.com/kardianos/minwinsvc v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/lucas-clemente/quic-go v0.28.1 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
