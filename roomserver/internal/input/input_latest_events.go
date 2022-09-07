@@ -287,7 +287,7 @@ func (u *latestEventsUpdater) latestState() error {
 		}).Warnf("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
-			scope.SetContexts(map[string]interface{}{
+			scope.SetContext("State reset", map[string]interface{}{
 				"Event ID":      u.event.EventID(),
 				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
 				"New state NID": fmt.Sprintf("%d", u.newStateNID),
