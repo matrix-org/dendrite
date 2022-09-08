@@ -29,6 +29,7 @@ var (
 	OutputReadUpdate        = "OutputReadUpdate"
 	RequestPresence         = "GetPresence"
 	OutputPresenceEvent     = "OutputPresenceEvent"
+	InputFulltextReindex    = "InputFulltextReindex"
 )
 
 var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
