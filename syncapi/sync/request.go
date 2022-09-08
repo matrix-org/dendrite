@@ -79,8 +79,9 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		// for the rest of the data to trickle down.
 		filter.AccountData.Limit = math.MaxInt32
 		filter.Room.AccountData.Limit = math.MaxInt32
-		filter.Room.State.Limit = math.MaxInt32
 	}
+	// Ignore state limit filter so that e.g. correct room name appears on clients.
+	filter.Room.State.Limit = math.MaxInt32
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"user_id":   device.UserID,
