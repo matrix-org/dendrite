@@ -10,7 +10,6 @@ import (
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -243,9 +242,11 @@ func federationClientError(err error) error {
 			Code: 400,
 		}
 	default:
-		logrus.Debugf("Unknown error: %T", ferr)
+		// We don't know what exactly failed, but we probably don't
+		// want to retry the request immediately in the device list updater
 		return &api.FederationClientError{
-			Err: err.Error(),
+			Err:  err.Error(),
+			Code: 400,
 		}
 	}
 }
