@@ -46,10 +46,19 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		if counts == nil {
 			continue
 		}
-
 		jr.UnreadNotifications.HighlightCount = counts.UnreadHighlightCount
 		jr.UnreadNotifications.NotificationCount = counts.UnreadNotificationCount
 		req.Response.Rooms.Join[roomID] = jr
 	}
+
+	// BEGIN ZION CODE but return all notifications regardless of whether they're in a room we're in.
+	for roomID, counts := range countsByRoom {
+		unreadNotificationsData := *types.NewUnreadNotificationsResponse()
+
+		unreadNotificationsData.HighlightCount = counts.UnreadHighlightCount
+		unreadNotificationsData.NotificationCount = counts.UnreadNotificationCount
+		req.Response.Rooms.UnreadNotifications[roomID] = unreadNotificationsData
+	}
+	// END ZION CODE
 	return to
 }
