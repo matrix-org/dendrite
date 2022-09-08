@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -235,7 +237,13 @@ func federationClientError(err error) error {
 		return &api.FederationClientError{
 			Code: ferr.Code,
 		}
+	case *url.Error: // e.g. certificate error, unable to connect
+		return &api.FederationClientError{
+			Err:  ferr.Error(),
+			Code: 400,
+		}
 	default:
+		logrus.Debugf("Unknown error: %T", ferr)
 		return &api.FederationClientError{
 			Err: err.Error(),
 		}

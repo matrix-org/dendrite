@@ -397,11 +397,19 @@ userLoop:
 		if ctx.Err() != nil {
 			// we've timed out, give up and go to the back of the queue to let another server be processed.
 			failCount += 1
+			waitTime = time.Minute * 10
 			break
 		}
 		res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
 		if err != nil {
 			failCount += 1
+			select {
+			case <-ctx.Done():
+				// we've timed out, give up and go to the back of the queue to let another server be processed.
+				waitTime = time.Minute * 10
+				break userLoop
+			default:
+			}
 			switch e := err.(type) {
 			case *fedsenderapi.FederationClientError:
 				if e.RetryAfter > 0 {
@@ -428,7 +436,7 @@ userLoop:
 				// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 				if e.Code >= 300 {
 					waitTime = time.Hour
-					logrus.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
+					logger.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
 					break userLoop
 				}
 			default:
