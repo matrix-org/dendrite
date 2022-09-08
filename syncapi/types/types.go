@@ -442,6 +442,16 @@ func (r *Response) IsEmpty() bool {
 		len(r.ToDevice.Events) == 0
 }
 
+type UnreadNotificationsResponse struct {
+	HighlightCount    int `json:"highlight_count"`
+	NotificationCount int `json:"notification_count"`
+}
+
+func NewUnreadNotificationsResponse() *UnreadNotificationsResponse {
+	res := UnreadNotificationsResponse{}
+	return &res
+}
+
 type UnreadNotifications struct {
 	HighlightCount    int `json:"highlight_count"`
 	NotificationCount int `json:"notification_count"`
@@ -516,16 +526,6 @@ func NewJoinResponse() *JoinResponse {
 		AccountData:         &ClientEvents{},
 		UnreadNotifications: &UnreadNotifications{},
 	}
-}
-
-type UnreadNotificationsResponse struct {
-	HighlightCount    int `json:"highlight_count"`
-	NotificationCount int `json:"notification_count"`
-}
-
-func NewUnreadNotificationsResponse() *UnreadNotificationsResponse {
-	res := UnreadNotificationsResponse{}
-	return &res
 }
 
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
