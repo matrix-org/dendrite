@@ -428,7 +428,7 @@ userLoop:
 				// It probably doesn't make sense to try further users.
 				if !e.Timeout() {
 					waitTime = time.Minute * 10
-					logrus.WithError(e).Error("GetUserDevices returned net.Error")
+					logger.WithError(e).Error("GetUserDevices returned net.Error")
 					break userLoop
 				}
 			case gomatrix.HTTPError:
