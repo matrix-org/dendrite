@@ -167,6 +167,7 @@ func (u *DeviceListUpdater) Start() error {
 		step = (time.Second * 120) / time.Duration(max)
 	}
 	for _, userID := range staleLists {
+		userID := userID // otherwise we are only sending the last entry
 		time.AfterFunc(offset, func() {
 			u.notifyWorkers(userID)
 		})
