@@ -337,10 +337,11 @@ type Response struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
 	} `json:"presence,omitempty"`
 	Rooms struct {
-		Join   map[string]JoinResponse   `json:"join,omitempty"`
-		Peek   map[string]JoinResponse   `json:"peek,omitempty"`
-		Invite map[string]InviteResponse `json:"invite,omitempty"`
-		Leave  map[string]LeaveResponse  `json:"leave,omitempty"`
+		Join                map[string]JoinResponse                `json:"join,omitempty"`
+		Peek                map[string]JoinResponse                `json:"peek,omitempty"`
+		Invite              map[string]InviteResponse              `json:"invite,omitempty"`
+		Leave               map[string]LeaveResponse               `json:"leave,omitempty"`
+		UnreadNotifications map[string]UnreadNotificationsResponse `json:"unread_notifications,omitempty"`
 	} `json:"rooms,omitempty"`
 	ToDevice struct {
 		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
@@ -360,6 +361,7 @@ func (r *Response) HasUpdates() bool {
 		len(r.Rooms.Join) > 0 ||
 		len(r.Rooms.Leave) > 0 ||
 		len(r.Rooms.Peek) > 0 ||
+		len(r.Rooms.UnreadNotifications) > 0 ||
 		len(r.ToDevice.Events) > 0 ||
 		len(r.DeviceLists.Changed) > 0 ||
 		len(r.DeviceLists.Left) > 0)
@@ -374,6 +376,7 @@ func NewResponse() *Response {
 	res.Rooms.Peek = map[string]JoinResponse{}
 	res.Rooms.Invite = map[string]InviteResponse{}
 	res.Rooms.Leave = map[string]LeaveResponse{}
+	res.Rooms.UnreadNotifications = map[string]UnreadNotificationsResponse{}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
 	// TODO: We really shouldn't have to do all this to coerce encoding/json to Do The Right Thing. We should
@@ -393,6 +396,7 @@ func (r *Response) IsEmpty() bool {
 	return len(r.Rooms.Join) == 0 &&
 		len(r.Rooms.Invite) == 0 &&
 		len(r.Rooms.Leave) == 0 &&
+		len(r.Rooms.UnreadNotifications) == 0 &&
 		len(r.AccountData.Events) == 0 &&
 		len(r.Presence.Events) == 0 &&
 		len(r.ToDevice.Events) == 0
@@ -432,6 +436,16 @@ func NewJoinResponse() *JoinResponse {
 	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
 	res.Ephemeral.Events = []gomatrixserverlib.ClientEvent{}
 	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
+	return &res
+}
+
+type UnreadNotificationsResponse struct {
+	HighlightCount    int `json:"highlight_count"`
+	NotificationCount int `json:"notification_count"`
+}
+
+func NewUnreadNotificationsResponse() *UnreadNotificationsResponse {
+	res := UnreadNotificationsResponse{}
 	return &res
 }
 
