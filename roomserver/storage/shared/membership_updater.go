@@ -26,11 +26,11 @@ func NewMembershipUpdater(
 	var targetUserNID types.EventStateKeyNID
 	var err error
 	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
-		roomNID, err = d.assignRoomNID(ctx, roomID, roomVersion)
+		roomNID, err = d.assignRoomNID(ctx, txn, roomID, roomVersion)
 		if err != nil {
 			return err
 		}
-		targetUserNID, err = d.assignStateKeyNID(ctx, targetUserID)
+		targetUserNID, err = d.assignStateKeyNID(ctx, txn, targetUserID)
 		if err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func (u *MembershipUpdater) Update(newMembership tables.MembershipState, event *
 	var inserted bool    // Did the query result in a membership change?
 	var retired []string // Did we retire any updates in the process?
 	return inserted, retired, u.d.Writer.Do(u.d.DB, u.txn, func(txn *sql.Tx) error {
-		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, event.Sender())
+		senderUserNID, err := u.d.assignStateKeyNID(u.ctx, u.txn, event.Sender())
 		if err != nil {
 			return fmt.Errorf("u.d.AssignStateKeyNID: %w", err)
 		}
