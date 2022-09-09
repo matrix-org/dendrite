@@ -11,7 +11,7 @@ import (
 // kind and a tweaks map. Returns a nil map if it would have been
 // empty.
 func ActionsToTweaks(as []*Action) (ActionKind, map[string]interface{}, error) {
-	var kind ActionKind
+	kind := UnknownAction
 	tweaks := map[string]interface{}{}
 
 	for _, a := range as {
