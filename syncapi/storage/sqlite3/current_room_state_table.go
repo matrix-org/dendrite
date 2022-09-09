@@ -95,7 +95,7 @@ const selectEventsWithEventIDsSQL = "" +
 
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id IN(" +
-	"	SELECT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
+	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
 	") AND state_key IN ($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
