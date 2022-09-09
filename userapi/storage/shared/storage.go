@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/matrix-org/dendrite/userapi/types"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -175,6 +176,41 @@ func (d *Database) createAccount(
 		return nil, err
 	}
 	return account, nil
+}
+
+func (d *Database) QueryPushRules(
+	ctx context.Context,
+	localpart string,
+) (*pushrules.AccountRuleSets, error) {
+	data, err := d.AccountDatas.SelectAccountDataByType(ctx, localpart, "", "m.push_rules")
+	if err != nil {
+		return nil, err
+	}
+
+	// If we didn't find any default push rules then we should just generate some
+	// fresh ones.
+	if len(data) == 0 {
+		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.ServerName)
+		prbs, err := json.Marshal(pushRuleSets)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
+		}
+		err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", prbs); dbErr != nil {
+				return fmt.Errorf("failed to save default push rules: %w", dbErr)
+			}
+			return nil
+		})
+
+		return pushRuleSets, err
+	}
+
+	var pushRules pushrules.AccountRuleSets
+	if err := json.Unmarshal(data, &pushRules); err != nil {
+		return nil, err
+	}
+
+	return &pushRules, nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
