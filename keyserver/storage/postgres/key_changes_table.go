@@ -17,8 +17,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 
-	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -63,30 +64,37 @@ func NewPostgresKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 		return s, err
 	}
 
+	if err = executeMigration(context.Background(), db); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func executeMigration(ctx context.Context, db *sql.DB) error {
 	// TODO: Remove when we are sure we are not having goose artefacts in the db
 	// This forces an error, which indicates the migration is already applied, since the
 	// column partition was removed from the table
-	var count int
-	err = db.QueryRow("SELECT partition FROM keyserver_key_changes LIMIT 1;").Scan(&count)
-	if err == nil {
-		m := sqlutil.NewMigrator(db)
-		m.AddMigrations(sqlutil.Migration{
-			Version: "keyserver: refactor key changes",
-			Up:      deltas.UpRefactorKeyChanges,
-		})
-		return s, m.Up(context.Background())
-	} else {
-		switch e := err.(type) {
-		case *pq.Error:
-			// ignore undefined_column (42703) errors, as this is expected at this point
-			if e.Code != "42703" {
-				return nil, err
+	migrationName := "keyserver: refactor key changes"
+
+	var cName string
+	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'keyserver_key_changes' AND column_name = 'partition'").Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
+				// not a fatal error, log and continue
+				logrus.WithError(err).Warnf("unable to manually insert migration '%s'", migrationName)
 			}
-		default:
-			return nil, err
+			return nil
 		}
+		return err
 	}
-	return s, nil
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpRefactorKeyChanges,
+	})
+
+	return m.Up(ctx)
 }
 
 func (s *keyChangesStatements) Prepare() (err error) {
