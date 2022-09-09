@@ -11,6 +11,7 @@
 ### Fixes
 
 * A race condition between the roomserver output events being generated, forward extremities being updated and room info being updated has been fixed
+* Appservices will no longer receive invite events which they are not interested in, which caused heavy load in some cases or excessive request sizes in others
 * A bug in state resolution v2 where events could incorrectly be classified as control events has been fixed
 * A bug in state resolution v2 where some specific events with unexpected non-empty state keys are dropped has been fixed
 * A bug in state resolution v2 when fetching auth events vs partial state has been fixed
