@@ -735,7 +735,9 @@ func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roo
 }
 
 func (d *Database) DeleteOldNotifications(ctx context.Context) error {
-	return d.Notifications.Clean(ctx, nil)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Notifications.Clean(ctx, txn)
+	})
 }
 
 func (d *Database) UpsertPusher(
