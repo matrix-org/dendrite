@@ -319,6 +319,10 @@ sync_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
+  fulltext:
+    enabled: false
+    index_path: "./fulltextindex"
+    language: "en" # more possible languages can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
 
   # This option controls which HTTP header to inspect to find the real remote IP
   # address of the client. This is likely required if Dendrite is running behind

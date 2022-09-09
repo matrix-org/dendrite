@@ -17,6 +17,7 @@ const (
 var (
 	InputRoomEvent          = "InputRoomEvent"
 	InputDeviceListUpdate   = "InputDeviceListUpdate"
+	InputSigningKeyUpdate   = "InputSigningKeyUpdate"
 	OutputRoomEvent         = "OutputRoomEvent"
 	OutputSendToDeviceEvent = "OutputSendToDeviceEvent"
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
@@ -28,6 +29,7 @@ var (
 	OutputReadUpdate        = "OutputReadUpdate"
 	RequestPresence         = "GetPresence"
 	OutputPresenceEvent     = "OutputPresenceEvent"
+	InputFulltextReindex    = "InputFulltextReindex"
 )
 
 var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
@@ -48,6 +50,11 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      InputDeviceListUpdate,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      InputSigningKeyUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

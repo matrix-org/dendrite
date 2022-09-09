@@ -275,11 +275,14 @@ func (u *latestEventsUpdater) latestState() error {
 		}).Warnf("State reset detected (removing %d events)", removed)
 		sentry.WithScope(func(scope *sentry.Scope) {
 			scope.SetLevel("warning")
-			scope.SetTag("event_id", u.event.EventID())
-			scope.SetTag("old_state_nid", fmt.Sprintf("%d", u.oldStateNID))
-			scope.SetTag("new_state_nid", fmt.Sprintf("%d", u.newStateNID))
-			scope.SetTag("old_latest", u.oldLatest.EventIDs())
-			scope.SetTag("new_latest", u.latest.EventIDs())
+			scope.SetContext("State reset", map[string]interface{}{
+				"Event ID":      u.event.EventID(),
+				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
+				"New state NID": fmt.Sprintf("%d", u.newStateNID),
+				"Old latest":    u.oldLatest.EventIDs(),
+				"New latest":    u.latest.EventIDs(),
+				"State removed": removed,
+			})
 			sentry.CaptureMessage("State reset detected")
 		})
 	}

@@ -24,7 +24,7 @@ import (
 	"net/url"
 	"strings"
 
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
 
@@ -81,8 +81,8 @@ func PostJSON[reqtype, restype any, errtype error](
 			return fmt.Errorf("HTTP %d from %s (no response body)", res.StatusCode, apiURL)
 		}
 		var reserr errtype
-		if err = json.Unmarshal(body, reserr); err != nil {
-			return fmt.Errorf("HTTP %d from %s", res.StatusCode, apiURL)
+		if err = json.Unmarshal(body, &reserr); err != nil {
+			return fmt.Errorf("HTTP %d from %s - %w", res.StatusCode, apiURL, err)
 		}
 		return reserr
 	}
