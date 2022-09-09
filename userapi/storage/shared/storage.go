@@ -195,10 +195,14 @@ func (d *Database) QueryPushRules(
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
 		}
-		if err := d.AccountDatas.InsertAccountData(ctx, nil, localpart, "", "m.push_rules", json.RawMessage(prbs)); err != nil {
-			return nil, fmt.Errorf("failed to save default push rules: %w", err)
-		}
-		return pushRuleSets, nil
+		err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", prbs); dbErr != nil {
+				return fmt.Errorf("failed to save default push rules: %w", dbErr)
+			}
+			return nil
+		})
+
+		return pushRuleSets, err
 	}
 
 	var pushRules pushrules.AccountRuleSets
