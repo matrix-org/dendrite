@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrix"
@@ -235,9 +236,17 @@ func federationClientError(err error) error {
 		return &api.FederationClientError{
 			Code: ferr.Code,
 		}
-	default:
+	case *url.Error: // e.g. certificate error, unable to connect
 		return &api.FederationClientError{
-			Err: err.Error(),
+			Err:  ferr.Error(),
+			Code: 400,
+		}
+	default:
+		// We don't know what exactly failed, but we probably don't
+		// want to retry the request immediately in the device list updater
+		return &api.FederationClientError{
+			Err:  err.Error(),
+			Code: 400,
 		}
 	}
 }
