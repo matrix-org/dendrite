@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -18,7 +19,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
-	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 )
@@ -44,7 +44,7 @@ type PDUStreamProvider struct {
 }
 
 func (p *PDUStreamProvider) worker() {
-	defer p.workers.Dec()
+	defer p.workers.Add(-1)
 	for {
 		select {
 		case f := <-p.tasks:
@@ -57,7 +57,7 @@ func (p *PDUStreamProvider) worker() {
 
 func (p *PDUStreamProvider) queue(f func()) {
 	if p.workers.Load() < PDU_STREAM_WORKERS {
-		p.workers.Inc()
+		p.workers.Add(1)
 		go p.worker()
 	}
 	p.tasks <- f
