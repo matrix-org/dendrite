@@ -76,9 +76,14 @@ func main() {
 			panic(err)
 		}
 
-		var eventNIDs []types.EventNID
+		eventNIDMap := map[types.EventNID]struct{}{}
 		for _, entry := range append(removed, added...) {
-			eventNIDs = append(eventNIDs, entry.EventNID)
+			eventNIDMap[entry.EventNID] = struct{}{}
+		}
+
+		eventNIDs := make([]types.EventNID, 0, len(eventNIDMap))
+		for eventNID := range eventNIDMap {
+			eventNIDs = append(eventNIDs, eventNID)
 		}
 
 		var eventEntries []types.Event
@@ -129,12 +134,17 @@ func main() {
 		stateEntries = append(stateEntries, entries...)
 	}
 
-	var eventNIDs []types.EventNID
+	eventNIDMap := map[types.EventNID]struct{}{}
 	for _, entry := range stateEntries {
-		eventNIDs = append(eventNIDs, entry.EventNID)
+		eventNIDMap[entry.EventNID] = struct{}{}
 	}
 
-	fmt.Println("Fetching", len(eventNIDs), "state events")
+	eventNIDs := make([]types.EventNID, 0, len(eventNIDMap))
+	for eventNID := range eventNIDMap {
+		eventNIDs = append(eventNIDs, eventNID)
+	}
+
+	fmt.Println("Fetching", len(eventNIDMap), "state events")
 	eventEntries, err := roomserverDB.Events(ctx, eventNIDs)
 	if err != nil {
 		panic(err)

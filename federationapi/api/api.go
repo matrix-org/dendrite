@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/federationapi/types"
 )
 
 // FederationInternalAPI is used to query information from the federation sender.
@@ -108,6 +109,7 @@ type FederationClientError struct {
 	Err         string
 	RetryAfter  time.Duration
 	Blacklisted bool
+	Code        int // HTTP Status code from the remote server
 }
 
 func (e FederationClientError) Error() string {
