@@ -166,7 +166,7 @@ func Setup(
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
 		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, cfg)
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+			logrus.WithError(err).Fatal("unable to get account for sending server notices")
 		}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
