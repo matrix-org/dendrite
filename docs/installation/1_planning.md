@@ -75,7 +75,7 @@ In order to install Dendrite, you will need to satisfy the following dependencie
 
 ### Go
 
-At this time, Dendrite supports being built with Go 1.18 or later. We do not support building
+At this time, Dendrite supports being built with Go 1.19 or later. We do not support building
 Dendrite with older versions of Go than this. If you are installing Go using a package manager,
 you should check (by running `go version`) that you are using a suitable version before you start.
 
