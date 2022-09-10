@@ -17,6 +17,9 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"errors"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -58,21 +61,38 @@ func NewSqliteKeyChangesTable(db *sql.DB) (tables.KeyChanges, error) {
 	if err != nil {
 		return s, err
 	}
-	// TODO: Remove when we are sure we are not having goose artefacts in the db
-	// This forces an error, which indicates the migration is already applied, since the
-	// column partition was removed from the table
-	var count int
-	err = db.QueryRow("SELECT partition FROM keyserver_key_changes LIMIT 1;").Scan(&count)
-	if err == nil {
-		m := sqlutil.NewMigrator(db)
-		m.AddMigrations(sqlutil.Migration{
-			Version: "keyserver: refactor key changes",
-			Up:      deltas.UpRefactorKeyChanges,
-		})
-		return s, m.Up(context.Background())
+
+	if err = executeMigration(context.Background(), db); err != nil {
+		return nil, err
 	}
 
 	return s, nil
+}
+
+func executeMigration(ctx context.Context, db *sql.DB) error {
+	// TODO: Remove when we are sure we are not having goose artefacts in the db
+	// This forces an error, which indicates the migration is already applied, since the
+	// column partition was removed from the table
+	migrationName := "keyserver: refactor key changes"
+
+	var cName string
+	err := db.QueryRowContext(ctx, `SELECT p.name FROM sqlite_master AS m JOIN pragma_table_info(m.name) AS p WHERE m.name = 'keyserver_key_changes' AND p.name = 'partition'`).Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
+				// not a fatal error, log and continue
+				logrus.WithError(err).Warnf("unable to manually insert migration '%s'", migrationName)
+			}
+			return nil
+		}
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpRefactorKeyChanges,
+	})
+	return m.Up(ctx)
 }
 
 func (s *keyChangesStatements) Prepare() (err error) {
