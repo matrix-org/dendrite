@@ -75,13 +75,13 @@ const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(
 const purgeNotificationDataSQL = "" +
 	"DELETE FROM syncapi_notification_data WHERE room_id = $1"
 
-func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = r.upsertRoomUnreadCounts.QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
+func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, txn *sql.Tx, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
+	err = sqlutil.TxStmt(txn, r.upsertRoomUnreadCounts).QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
 	return
 }
 
-func (r *notificationDataStatements) SelectUserUnreadCounts(ctx context.Context, userID string, fromExcl, toIncl types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	rows, err := r.selectUserUnreadCounts.QueryContext(ctx, userID, fromExcl, toIncl)
+func (r *notificationDataStatements) SelectUserUnreadCounts(ctx context.Context, txn *sql.Tx, userID string, fromExcl, toIncl types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
+	rows, err := sqlutil.TxStmt(txn, r.selectUserUnreadCounts).QueryContext(ctx, userID, fromExcl, toIncl)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +106,9 @@ func (r *notificationDataStatements) SelectUserUnreadCounts(ctx context.Context,
 	return roomCounts, rows.Err()
 }
 
-func (r *notificationDataStatements) SelectMaxID(ctx context.Context) (int64, error) {
+func (r *notificationDataStatements) SelectMaxID(ctx context.Context, txn *sql.Tx) (int64, error) {
 	var id int64
-	err := r.selectMaxID.QueryRowContext(ctx).Scan(&id)
+	err := sqlutil.TxStmt(txn, r.selectMaxID).QueryRowContext(ctx).Scan(&id)
 	return id, err
 }
 
