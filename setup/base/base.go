@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -33,7 +34,6 @@ import (
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -498,7 +498,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			logrus.Infof("Starting internal %s listener on %s", b.componentName, internalServ.Addr)
 			b.ProcessContext.ComponentStarted()
 			internalServ.RegisterOnShutdown(func() {
-				if internalShutdown.CAS(false, true) {
+				if internalShutdown.CompareAndSwap(false, true) {
 					b.ProcessContext.ComponentFinished()
 					logrus.Infof("Stopped internal HTTP listener")
 				}
@@ -526,7 +526,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			logrus.Infof("Starting external %s listener on %s", b.componentName, externalServ.Addr)
 			b.ProcessContext.ComponentStarted()
 			externalServ.RegisterOnShutdown(func() {
-				if externalShutdown.CAS(false, true) {
+				if externalShutdown.CompareAndSwap(false, true) {
 					b.ProcessContext.ComponentFinished()
 					logrus.Infof("Stopped external HTTP listener")
 				}

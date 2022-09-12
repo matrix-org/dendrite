@@ -3,11 +3,11 @@ package statistics
 import (
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 
 	"github.com/matrix-org/dendrite/federationapi/storage"
 )
@@ -95,7 +95,7 @@ func (s *ServerStatistics) cancel() {
 // we will unblacklist it.
 func (s *ServerStatistics) Success() {
 	s.cancel()
-	s.successCounter.Inc()
+	s.successCounter.Add(1)
 	s.backoffCount.Store(0)
 	if s.statistics.DB != nil {
 		if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
@@ -114,8 +114,8 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	// a new backoff period. Increase the failure counter and
 	// start a goroutine which will wait out the backoff and
 	// unset the backoffStarted flag when done.
-	if s.backoffStarted.CAS(false, true) {
-		if s.backoffCount.Inc() >= s.statistics.FailuresUntilBlacklist {
+	if s.backoffStarted.CompareAndSwap(false, true) {
+		if s.backoffCount.Add(1) >= s.statistics.FailuresUntilBlacklist {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {
 				if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
