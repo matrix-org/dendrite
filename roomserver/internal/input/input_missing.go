@@ -553,11 +553,14 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 
 	// Make sure events from the missingResp are using the cache - missing events
 	// will be added and duplicates will be removed.
-	logger.Debugf("get_missing_events returned %d events", len(missingResp.Events))
 	missingEvents := make([]*gomatrixserverlib.Event, 0, len(missingResp.Events))
 	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
+		if err = ev.VerifyEventSignatures(ctx, t.keys); err != nil {
+			continue
+		}
 		missingEvents = append(missingEvents, t.cacheAndReturn(ev))
 	}
+	logger.Debugf("get_missing_events returned %d events (%d passed signature checks)", len(missingResp.Events), len(missingEvents))
 
 	// topologically sort and sanity check that we are making forward progress
 	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(missingEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
