@@ -44,7 +44,7 @@ type PDUStreamProvider struct {
 }
 
 func (p *PDUStreamProvider) worker() {
-	defer p.workers.Dec()
+	defer p.workers.Add(-1)
 	for {
 		select {
 		case f := <-p.tasks:
@@ -57,7 +57,7 @@ func (p *PDUStreamProvider) worker() {
 
 func (p *PDUStreamProvider) queue(f func()) {
 	if p.workers.Load() < PDU_STREAM_WORKERS {
-		p.workers.Inc()
+		p.workers.Add(1)
 		go p.worker()
 	}
 	p.tasks <- f
