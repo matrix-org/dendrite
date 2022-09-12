@@ -38,7 +38,7 @@ If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or j
 See the [Planning your Installation](https://matrix-org.github.io/dendrite/installation/planning) page for
 more information on requirements.
 
-To build Dendrite, you will need Go 1.18 or later.
+To build Dendrite, you will need Go 1.19 or later.
 
 For a usable federating Dendrite deployment, you will also need:
 
