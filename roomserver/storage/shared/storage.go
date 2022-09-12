@@ -592,44 +592,38 @@ func (d *Database) storeEvent(
 		redactedEventID  string
 		err              error
 	)
+
+	// Get the default room version. If the client doesn't supply a room_version
+	// then we will use our configured default to create the room.
+	// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
+	// Note that the below logic depends on the m.room.create event being the
+	// first event that is persisted to the database when creating or joining a
+	// room.
+	var roomVersion gomatrixserverlib.RoomVersion
+	if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
+		return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
+	}
+
 	var txn *sql.Tx
 	if updater != nil && updater.txn != nil {
 		txn = updater.txn
 	}
 	// First writer is with a database-provided transaction, so that NIDs are assigned
 	// globally outside of the updater context, to help avoid races.
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		// TODO: Here we should aim to have two different code paths for new rooms
-		// vs existing ones.
-
-		// Get the default room version. If the client doesn't supply a room_version
-		// then we will use our configured default to create the room.
-		// https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-createroom
-		// Note that the below logic depends on the m.room.create event being the
-		// first event that is persisted to the database when creating or joining a
-		// room.
-		var roomVersion gomatrixserverlib.RoomVersion
-		if roomVersion, err = extractRoomVersionFromCreateEvent(event); err != nil {
-			return fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
-		}
-
+	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
 		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
 			return fmt.Errorf("d.assignRoomNID: %w", err)
 		}
-
 		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
 			return fmt.Errorf("d.assignEventTypeNID: %w", err)
 		}
-
-		eventStateKey := event.StateKey()
 		// Assigned a numeric ID for the state_key if there is one present.
 		// Otherwise set the numeric ID for the state_key to 0.
-		if eventStateKey != nil {
+		if eventStateKey := event.StateKey(); eventStateKey != nil {
 			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
 				return fmt.Errorf("d.assignStateKeyNID: %w", err)
 			}
 		}
-
 		return nil
 	})
 	if err != nil {
