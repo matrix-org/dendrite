@@ -44,7 +44,8 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 	}
 
 	var header struct {
-		Type string `json:"type"`
+		Type          string `json:"type"`
+		InhibitDevice bool   `json:"inhibit_device"`
 	}
 	if err := json.Unmarshal(reqBytes, &header); err != nil {
 		err := &util.JSONResponse{
@@ -58,9 +59,10 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.C
 	switch header.Type {
 	case authtypes.LoginTypePassword:
 		typ = &LoginTypePassword{
-			UserApi: useraccountAPI,
-			Config:  cfg,
-			Rt:      rt,
+			UserApi:       useraccountAPI,
+			Config:        cfg,
+			Rt:            rt,
+			InhibitDevice: header.InhibitDevice,
 		}
 	case authtypes.LoginTypeToken:
 		typ = &LoginTypeToken{
