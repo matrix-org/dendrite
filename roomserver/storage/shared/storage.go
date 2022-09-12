@@ -680,13 +680,18 @@ func (d *Database) StoreEvent(
 		if roomInfo == nil && len(prevEvents) > 0 {
 			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("expected room %q to exist", event.RoomID())
 		}
-		updater, err = d.GetRoomUpdater(ctx, roomInfo)
-		if err != nil {
-			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("GetRoomUpdater: %w", err)
-		}
-		defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
-		if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
-			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("updater.StorePreviousEvents: %w", err)
+		if err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
+			updater, err = d.GetRoomUpdater(ctx, roomInfo)
+			if err != nil {
+				return fmt.Errorf("GetRoomUpdater: %w", err)
+			}
+			defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
+			if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
+				return fmt.Errorf("updater.StorePreviousEvents: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return 0, 0, types.StateAtEvent{}, nil, "", err
 		}
 		succeeded = true
 	}
