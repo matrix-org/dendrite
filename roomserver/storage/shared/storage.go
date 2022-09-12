@@ -682,23 +682,28 @@ func (d *Database) storeEvent(
 		// any other so this is fine. If we ever update GetLatestEventsForUpdate or NewLatestEventsUpdater
 		// to do writes however then this will need to go inside `Writer.Do`.
 		succeeded := false
-		if updater == nil {
-			var roomInfo *types.RoomInfo
-			roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
-			if err != nil {
-				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.RoomInfo: %w", err)
+		if err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+			if updater == nil {
+				var roomInfo *types.RoomInfo
+				roomInfo, err = d.roomInfo(ctx, txn, event.RoomID())
+				if err != nil {
+					return fmt.Errorf("d.RoomInfo: %w", err)
+				}
+				if roomInfo == nil && len(prevEvents) > 0 {
+					return fmt.Errorf("expected room %q to exist", event.RoomID())
+				}
+				updater, err = d.GetRoomUpdater(ctx, roomInfo)
+				if err != nil {
+					return fmt.Errorf("GetRoomUpdater: %w", err)
+				}
+				defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 			}
-			if roomInfo == nil && len(prevEvents) > 0 {
-				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("expected room %q to exist", event.RoomID())
+			if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
+				return fmt.Errorf("updater.StorePreviousEvents: %w", err)
 			}
-			updater, err = d.GetRoomUpdater(ctx, roomInfo)
-			if err != nil {
-				return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("GetRoomUpdater: %w", err)
-			}
-			defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
-		}
-		if err = updater.StorePreviousEvents(eventNID, prevEvents); err != nil {
-			return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("updater.StorePreviousEvents: %w", err)
+			return nil
+		}); err != nil {
+			return 0, 0, types.StateAtEvent{}, nil, "", err
 		}
 		succeeded = true
 	}
