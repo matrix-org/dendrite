@@ -1,5 +1,5 @@
-//go:build !linux && !darwin && !netbsd && !freebsd && !openbsd && !solaris && !dragonfly && !aix
-// +build !linux,!darwin,!netbsd,!freebsd,!openbsd,!solaris,!dragonfly,!aix
+//go:build !unix
+// +build !unix
 
 package base
 
