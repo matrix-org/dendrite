@@ -341,10 +341,11 @@ type DeviceLists struct {
 }
 
 type RoomsResponse struct {
-	Join   map[string]*JoinResponse   `json:"join,omitempty"`
-	Peek   map[string]*JoinResponse   `json:"peek,omitempty"`
-	Invite map[string]*InviteResponse `json:"invite,omitempty"`
-	Leave  map[string]*LeaveResponse  `json:"leave,omitempty"`
+	Join                map[string]*JoinResponse               `json:"join,omitempty"`
+	Peek                map[string]*JoinResponse               `json:"peek,omitempty"`
+	Invite              map[string]*InviteResponse             `json:"invite,omitempty"`
+	Leave               map[string]*LeaveResponse              `json:"leave,omitempty"`
+	UnreadNotifications map[string]UnreadNotificationsResponse `json:"unread_notifications,omitempty"`
 }
 
 type ToDeviceResponse struct {
@@ -396,6 +397,7 @@ func (r *Response) HasUpdates() bool {
 		len(r.Rooms.Join) > 0 ||
 		len(r.Rooms.Leave) > 0 ||
 		len(r.Rooms.Peek) > 0 ||
+		len(r.Rooms.UnreadNotifications) > 0 ||
 		len(r.ToDevice.Events) > 0 ||
 		len(r.DeviceLists.Changed) > 0 ||
 		len(r.DeviceLists.Left) > 0)
@@ -406,11 +408,13 @@ func NewResponse() *Response {
 	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
+
 	res.Rooms = &RoomsResponse{
-		Join:   map[string]*JoinResponse{},
-		Peek:   map[string]*JoinResponse{},
-		Invite: map[string]*InviteResponse{},
-		Leave:  map[string]*LeaveResponse{},
+		Join:                map[string]*JoinResponse{},
+		Peek:                map[string]*JoinResponse{},
+		Invite:              map[string]*InviteResponse{},
+		Leave:               map[string]*LeaveResponse{},
+		UnreadNotifications: map[string]UnreadNotificationsResponse{},
 	}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
@@ -432,6 +436,7 @@ func (r *Response) IsEmpty() bool {
 	return len(r.Rooms.Join) == 0 &&
 		len(r.Rooms.Invite) == 0 &&
 		len(r.Rooms.Leave) == 0 &&
+		len(r.Rooms.UnreadNotifications) == 0 &&
 		len(r.AccountData.Events) == 0 &&
 		len(r.Presence.Events) == 0 &&
 		len(r.ToDevice.Events) == 0
@@ -511,6 +516,16 @@ func NewJoinResponse() *JoinResponse {
 		AccountData:         &ClientEvents{},
 		UnreadNotifications: &UnreadNotifications{},
 	}
+}
+
+type UnreadNotificationsResponse struct {
+	HighlightCount    int `json:"highlight_count"`
+	NotificationCount int `json:"notification_count"`
+}
+
+func NewUnreadNotificationsResponse() *UnreadNotificationsResponse {
+	res := UnreadNotificationsResponse{}
+	return &res
 }
 
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
