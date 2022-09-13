@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"
 
@@ -79,8 +77,7 @@ func executeMigration(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
 			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
-				// not a fatal error, log and continue
-				logrus.WithError(err).Warnf("unable to manually insert migration '%s'", migrationName)
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
 			}
 			return nil
 		}

@@ -19,16 +19,17 @@ import (
 	"encoding/json"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
@@ -79,16 +80,18 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	_, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		sentry.CaptureException(err)
+		log.WithError(err).Errorf("send-to-device: failed to split user id, dropping message")
 		return true
 	}
 	if domain != s.serverName {
+		log.Tracef("ignoring send-to-device event with destination %s", domain)
 		return true
 	}
 
 	var output types.OutputSendToDeviceEvent
 	if err = json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
-		log.WithError(err).Errorf("output log: message parse failure")
+		log.WithError(err).Errorf("send-to-device: message parse failure")
 		sentry.CaptureException(err)
 		return true
 	}
@@ -105,7 +108,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	)
 	if err != nil {
 		sentry.CaptureException(err)
-		log.WithError(err).Errorf("failed to store send-to-device message")
+		log.WithError(err).Errorf("send-to-device: failed to store message")
 		return false
 	}
 
