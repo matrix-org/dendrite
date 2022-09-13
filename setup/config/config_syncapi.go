@@ -59,6 +59,9 @@ func (f *Fulltext) Defaults(opts DefaultOpts) {
 }
 
 func (f *Fulltext) Verify(configErrs *ConfigErrors, isMonolith bool) {
+	if !f.Enabled {
+		return
+	}
 	checkNotEmpty(configErrs, "syncapi.fulltext.index_path", string(f.IndexPath))
 	checkNotEmpty(configErrs, "syncapi.fulltext.language", f.Language)
 }

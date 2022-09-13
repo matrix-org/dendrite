@@ -178,6 +178,41 @@ func (d *Database) createAccount(
 	return account, nil
 }
 
+func (d *Database) QueryPushRules(
+	ctx context.Context,
+	localpart string,
+) (*pushrules.AccountRuleSets, error) {
+	data, err := d.AccountDatas.SelectAccountDataByType(ctx, localpart, "", "m.push_rules")
+	if err != nil {
+		return nil, err
+	}
+
+	// If we didn't find any default push rules then we should just generate some
+	// fresh ones.
+	if len(data) == 0 {
+		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.ServerName)
+		prbs, err := json.Marshal(pushRuleSets)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
+		}
+		err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", prbs); dbErr != nil {
+				return fmt.Errorf("failed to save default push rules: %w", dbErr)
+			}
+			return nil
+		})
+
+		return pushRuleSets, err
+	}
+
+	var pushRules pushrules.AccountRuleSets
+	if err := json.Unmarshal(data, &pushRules); err != nil {
+		return nil, err
+	}
+
+	return &pushRules, nil
+}
+
 // SaveAccountData saves new account data for a given user and a given room.
 // If the account data is not specific to a room, the room ID should be an empty string
 // If an account data already exists for a given set (user, room, data type), it will
@@ -700,7 +735,9 @@ func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roo
 }
 
 func (d *Database) DeleteOldNotifications(ctx context.Context) error {
-	return d.Notifications.Clean(ctx, nil)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Notifications.Clean(ctx, txn)
+	})
 }
 
 func (d *Database) UpsertPusher(

@@ -30,7 +30,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -760,57 +759,15 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 }
 
 func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
-	userReq := api.QueryAccountDataRequest{
-		UserID:   req.UserID,
-		DataType: pushRulesAccountDataType,
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
 	}
-	var userRes api.QueryAccountDataResponse
-	if err := a.QueryAccountData(ctx, &userReq, &userRes); err != nil {
-		return err
+	pushRules, err := a.DB.QueryPushRules(ctx, localpart)
+	if err != nil {
+		return fmt.Errorf("failed to query push rules: %w", err)
 	}
-	bs, ok := userRes.GlobalAccountData[pushRulesAccountDataType]
-	if ok {
-		// Legacy Dendrite users will have completely empty push rules, so we should
-		// detect that situation and set some defaults.
-		var rules struct {
-			G struct {
-				Content   []json.RawMessage `json:"content"`
-				Override  []json.RawMessage `json:"override"`
-				Room      []json.RawMessage `json:"room"`
-				Sender    []json.RawMessage `json:"sender"`
-				Underride []json.RawMessage `json:"underride"`
-			} `json:"global"`
-		}
-		if err := json.Unmarshal([]byte(bs), &rules); err == nil {
-			count := len(rules.G.Content) + len(rules.G.Override) +
-				len(rules.G.Room) + len(rules.G.Sender) + len(rules.G.Underride)
-			ok = count > 0
-		}
-	}
-	if !ok {
-		// If we didn't find any default push rules then we should just generate some
-		// fresh ones.
-		localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
-		if err != nil {
-			return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
-		}
-		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, a.ServerName)
-		prbs, err := json.Marshal(pushRuleSets)
-		if err != nil {
-			return fmt.Errorf("failed to marshal default push rules: %w", err)
-		}
-		if err := a.DB.SaveAccountData(ctx, localpart, "", pushRulesAccountDataType, json.RawMessage(prbs)); err != nil {
-			return fmt.Errorf("failed to save default push rules: %w", err)
-		}
-		res.RuleSets = pushRuleSets
-		return nil
-	}
-	var data pushrules.AccountRuleSets
-	if err := json.Unmarshal([]byte(bs), &data); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("json.Unmarshal of push rules failed")
-		return err
-	}
-	res.RuleSets = &data
+	res.RuleSets = pushRules
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
@@ -53,6 +54,7 @@ type AccountData interface {
 	// If no account data could be found, returns nil
 	// Returns an error if there was an issue with the retrieval
 	GetAccountDataByType(ctx context.Context, localpart, roomID, dataType string) (data json.RawMessage, err error)
+	QueryPushRules(ctx context.Context, localpart string) (*pushrules.AccountRuleSets, error)
 }
 
 type Device interface {

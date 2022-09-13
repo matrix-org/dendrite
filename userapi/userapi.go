@@ -91,7 +91,7 @@ func NewInternalAPI(
 	}
 
 	eventConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, db, pgClient, userAPI, rsAPI, syncProducer,
+		base.ProcessContext, cfg, js, db, pgClient, rsAPI, syncProducer,
 	)
 	if err := eventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")

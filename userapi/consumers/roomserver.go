@@ -29,7 +29,6 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.UserAPI
-	userAPI      api.UserInternalAPI
 	rsAPI        rsapi.UserRoomserverAPI
 	jetstream    nats.JetStreamContext
 	durable      string
@@ -45,7 +44,6 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
-	userAPI api.UserInternalAPI,
 	rsAPI rsapi.UserRoomserverAPI,
 	syncProducer *producers.SyncAPI,
 ) *OutputRoomEventConsumer {
@@ -57,7 +55,6 @@ func NewOutputRoomEventConsumer(
 		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
 		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
 		pgClient:     pgClient,
-		userAPI:      userAPI,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
 	}
@@ -308,7 +305,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 			"event_id":  event.EventID(),
 			"room_id":   event.RoomID(),
 			"localpart": mem.Localpart,
-		}).Tracef("Push rule evaluation rejected the event")
+		}).Debugf("Push rule evaluation rejected the event")
 		return nil
 	}
 
@@ -425,8 +422,8 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 			return nil, fmt.Errorf("user %s is ignored", sender)
 		}
 	}
-	var res api.QueryPushRulesResponse
-	if err = s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
+	ruleSets, err := s.db.QueryPushRules(ctx, mem.Localpart)
+	if err != nil {
 		return nil, err
 	}
 
@@ -437,7 +434,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		roomID:   event.RoomID(),
 		roomSize: roomSize,
 	}
-	eval := pushrules.NewRuleSetEvaluator(ec, &res.RuleSets.Global)
+	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
 	rule, err := eval.MatchEvent(event.Event)
 	if err != nil {
 		return nil, err
