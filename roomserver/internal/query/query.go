@@ -208,6 +208,9 @@ func (r *Queryer) QueryMembershipForUser(
 	return err
 }
 
+// QueryMembershipAtEvent returns the known memberships at a given event.
+// If the state before an event is not known, an empty list will be returned
+// for that event instead.
 func (r *Queryer) QueryMembershipAtEvent(
 	ctx context.Context,
 	request *api.QueryMembershipAtEventRequest,
@@ -237,7 +240,11 @@ func (r *Queryer) QueryMembershipAtEvent(
 	}
 
 	for _, eventID := range request.EventIDs {
-		stateEntry := stateEntries[eventID]
+		stateEntry, ok := stateEntries[eventID]
+		if !ok {
+			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
+			continue
+		}
 		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
