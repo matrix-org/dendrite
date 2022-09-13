@@ -42,9 +42,10 @@ const email = "email"
 
 // LoginTypePassword implements https://matrix.org/docs/spec/client_server/r0.6.1#password-based
 type LoginTypePassword struct {
-	UserApi api.ClientUserAPI
-	Config  *config.ClientAPI
-	Rt      *ratelimit.RtFailedLogin
+	UserApi       api.ClientUserAPI
+	Config        *config.ClientAPI
+	Rt            *ratelimit.RtFailedLogin
+	InhibitDevice bool
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -61,6 +62,7 @@ func (t *LoginTypePassword) LoginFromJSON(ctx context.Context, reqBytes []byte) 
 	if err != nil {
 		return nil, nil, err
 	}
+	login.InhibitDevice = t.InhibitDevice
 
 	return login, func(context.Context, *util.JSONResponse) {}, nil
 }

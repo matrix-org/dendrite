@@ -66,6 +66,7 @@ type LoginIdentifier struct {
 type Login struct {
 	LoginIdentifier                 // Flat fields deprecated in favour of `identifier`.
 	Identifier      LoginIdentifier `json:"identifier"`
+	InhibitDevice   bool            `json:"inhibit_device,omitempty"`
 
 	// Both DeviceID and InitialDisplayName can be omitted, or empty strings ("")
 	// Thus a pointer is needed to differentiate between the two

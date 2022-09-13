@@ -69,6 +69,17 @@ func Login(
 		if authErr != nil {
 			return *authErr
 		}
+		if login.InhibitDevice {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: loginResponse{
+					UserID:      login.Username(),
+					AccessToken: "",
+					HomeServer:  cfg.Matrix.ServerName,
+					DeviceID:    "",
+				},
+			}
+		}
 		// make a device/access token
 		authErr2 := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
 		cleanup(req.Context(), &authErr2)
