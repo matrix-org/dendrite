@@ -1,5 +1,19 @@
 # Changelog
 
+## Dendrite 0.9.8 (2022-09-12)
+
+### Important
+
+* This is a **security release** to fix a vulnerability where missing events retrieved from other servers did not have their signatures verified in all cases, affecting all versions of Dendrite before 0.9.8. Upgrading to this version is highly recommended. For more information, [see here](https://github.com/matrix-org/dendrite/security/advisories/GHSA-pfw4-xjgm-267c).
+
+### Features
+
+* The built-in NATS Server has been updated to the final 2.9.0 release version
+
+### Fixes
+
+* Dendrite will now correctly verify the signatures of events retrieved using `/get_missing_events`
+
 ## Dendrite 0.9.7 (2022-09-09)
 
 ### Features
