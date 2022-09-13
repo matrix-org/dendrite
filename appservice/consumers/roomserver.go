@@ -173,9 +173,10 @@ func (s *OutputRoomEventConsumer) sendEvents(
 		return err
 	}
 
-	// TODO: We should probably be more intelligent and pick something not
-	// in the control of the event. A NATS timestamp header or something maybe.
-	txnID := events[0].Event.OriginServerTS()
+	// If the number of items in the array is different,
+	// then this should be a different transaction. Incorporate the length
+	// of events into the transaction ID.
+	txnID := events[0].Event.OriginServerTS().Time().Add(time.Duration(len(events)))
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
