@@ -106,7 +106,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		return err
 	}
 
-	if len(request.PrevEventIDs) > 1 && len(request.StateToFetch) == 0 {
+	if len(request.PrevEventIDs) > 1 {
 		var authEventIDs []string
 		for _, e := range stateEvents {
 			authEventIDs = append(authEventIDs, e.AuthEventIDs()...)
