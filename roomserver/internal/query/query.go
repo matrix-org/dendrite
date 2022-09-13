@@ -237,7 +237,11 @@ func (r *Queryer) QueryMembershipAtEvent(
 	}
 
 	for _, eventID := range request.EventIDs {
-		stateEntry := stateEntries[eventID]
+		stateEntry, ok := stateEntries[eventID]
+		if !ok {
+			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
+			continue
+		}
 		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
