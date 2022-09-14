@@ -176,11 +176,11 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	// If the number of items in the array is different,
 	// then this should be treated as a different transaction. Incorporate the length
 	// of events into the transaction ID.
-	txnID := events[0].Event.OriginServerTS().Time().Nanosecond() + len(transaction)
+	txnID := fmt.Sprintf("%d_%d", events[0].Event.OriginServerTS(), len(transaction))
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
-	address := fmt.Sprintf("%s/transactions/%d?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
+	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
 	req, err := http.NewRequestWithContext(ctx, "PUT", address, bytes.NewBuffer(transaction))
 	if err != nil {
 		return err
