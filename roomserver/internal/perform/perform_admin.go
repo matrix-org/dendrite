@@ -303,9 +303,10 @@ func (r *Admin) PerformAdminDownloadState(
 	}
 
 	builder := &gomatrixserverlib.EventBuilder{
-		Type:   "org.matrix.dendrite.state_download",
-		Sender: req.UserID,
-		RoomID: req.RoomID,
+		Type:    "org.matrix.dendrite.state_download",
+		Sender:  req.UserID,
+		RoomID:  req.RoomID,
+		Content: gomatrixserverlib.RawJSON("{}"),
 	}
 
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
