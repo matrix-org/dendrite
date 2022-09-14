@@ -208,6 +208,9 @@ func (r *Queryer) QueryMembershipForUser(
 	return err
 }
 
+// QueryMembershipAtEvent returns the known memberships at a given event.
+// If the state before an event is not known, an empty list will be returned
+// for that event instead.
 func (r *Queryer) QueryMembershipAtEvent(
 	ctx context.Context,
 	request *api.QueryMembershipAtEventRequest,

@@ -170,3 +170,43 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 		},
 	}
 }
+
+func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	roomID, ok := vars["roomID"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting room ID."),
+		}
+	}
+	serverName, ok := vars["serverName"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting remote server name."),
+		}
+	}
+	res := &roomserverAPI.PerformAdminDownloadStateResponse{}
+	if err := rsAPI.PerformAdminDownloadState(
+		req.Context(),
+		&roomserverAPI.PerformAdminDownloadStateRequest{
+			UserID:     device.UserID,
+			RoomID:     roomID,
+			ServerName: gomatrixserverlib.ServerName(serverName),
+		},
+		res,
+	); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
+	if err := res.Error; err != nil {
+		return err.JSONResponse()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{},
+	}
+}

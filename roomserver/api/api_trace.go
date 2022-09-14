@@ -141,6 +141,16 @@ func (t *RoomserverInternalAPITrace) PerformAdminPurgeRoom(
 	return err
 }
 
+func (t *RoomserverInternalAPITrace) PerformAdminDownloadState(
+	ctx context.Context,
+	req *PerformAdminDownloadStateRequest,
+	res *PerformAdminDownloadStateResponse,
+) error {
+	err := t.Impl.PerformAdminDownloadState(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformAdminDownloadState req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func (t *RoomserverInternalAPITrace) PerformInboundPeek(
 	ctx context.Context,
 	req *PerformInboundPeekRequest,

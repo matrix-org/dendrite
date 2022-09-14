@@ -27,19 +27,20 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath            = "/roomserver/performInvite"
-	RoomserverPerformPeekPath              = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath            = "/roomserver/performUnpeek"
-	RoomserverPerformRoomUpgradePath       = "/roomserver/performRoomUpgrade"
-	RoomserverPerformJoinPath              = "/roomserver/performJoin"
-	RoomserverPerformLeavePath             = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath          = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath           = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
-	RoomserverPerformForgetPath            = "/roomserver/performForget"
-	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
-	RoomserverPerformAdminEvacuateUserPath = "/roomserver/performAdminEvacuateUser"
-	RoomserverPerformAdminPurgeRoomPath    = "/roomserver/performAdminPurgeRoom"
+	RoomserverPerformInvitePath             = "/roomserver/performInvite"
+	RoomserverPerformPeekPath               = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath             = "/roomserver/performUnpeek"
+	RoomserverPerformRoomUpgradePath        = "/roomserver/performRoomUpgrade"
+	RoomserverPerformJoinPath               = "/roomserver/performJoin"
+	RoomserverPerformLeavePath              = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath           = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath            = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath        = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath             = "/roomserver/performForget"
+	RoomserverPerformAdminEvacuateRoomPath  = "/roomserver/performAdminEvacuateRoom"
+	RoomserverPerformAdminEvacuateUserPath  = "/roomserver/performAdminEvacuateUser"
+	RoomserverPerformAdminPurgeRoomPath     = "/roomserver/performAdminPurgeRoom"
+	RoomserverPerformAdminDownloadStatePath = "/roomserver/performAdminDownloadState"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -258,6 +259,17 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformAdminEvacuateRoom", h.roomserverURL+RoomserverPerformAdminEvacuateRoomPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminDownloadState(
+	ctx context.Context,
+	request *api.PerformAdminDownloadStateRequest,
+	response *api.PerformAdminDownloadStateResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformAdminDownloadState", h.roomserverURL+RoomserverPerformAdminDownloadStatePath,
 		h.httpClient, ctx, request, response,
 	)
 }
