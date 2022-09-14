@@ -151,7 +151,7 @@ func main() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
 	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
 	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
