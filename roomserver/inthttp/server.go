@@ -66,6 +66,11 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router) {
 	)
 
 	internalAPIMux.Handle(
+		RoomserverPerformAdminDownloadStatePath,
+		httputil.MakeInternalRPCAPI("RoomserverPerformAdminDownloadState", r.PerformAdminDownloadState),
+	)
+
+	internalAPIMux.Handle(
 		RoomserverQueryPublishedRoomsPath,
 		httputil.MakeInternalRPCAPI("RoomserverQueryPublishedRooms", r.QueryPublishedRooms),
 	)
