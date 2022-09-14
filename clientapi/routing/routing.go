@@ -165,7 +165,7 @@ func Setup(
 		httputil.MakeAdminAPI("admin_download_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return AdminDownloadState(req, cfg, device, rsAPI)
 		}),
-	).Methods(http.MethodPost, http.MethodOptions)
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
