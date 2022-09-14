@@ -354,6 +354,7 @@ func (r *Admin) PerformAdminDownloadState(
 		Origin:        r.Cfg.Matrix.ServerName,
 		HasState:      true,
 		StateEventIDs: stateIDs,
+		SendAsServer:  string(r.Cfg.Matrix.ServerName),
 	})
 
 	if err := r.Inputer.InputRoomEvents(ctx, inputReq, inputRes); err != nil {
