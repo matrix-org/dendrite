@@ -174,9 +174,9 @@ func (s *OutputRoomEventConsumer) sendEvents(
 	}
 
 	// If the number of items in the array is different,
-	// then this should be a different transaction. Incorporate the length
+	// then this should be treated as a different transaction. Incorporate the length
 	// of events into the transaction ID.
-	txnID := events[0].Event.OriginServerTS().Time().Add(time.Duration(len(events)))
+	txnID := events[0].Event.OriginServerTS().Time().Nanosecond() + len(transaction)
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
