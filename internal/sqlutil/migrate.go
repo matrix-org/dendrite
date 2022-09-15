@@ -146,19 +146,18 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 // inserts a migration given their name to the database.
 // This should only be used when manually inserting migrations.
 func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) error {
-	_, err := db.ExecContext(ctx, createDBMigrationsSQL)
+	m := NewMigrator(db)
+	existingMigrations, err := m.ExecutedMigrations(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to create db_migrations: %w", err)
+		return err
 	}
-	_, err = db.ExecContext(ctx, insertVersionSQL,
+	if _, ok := existingMigrations[migrationName]; ok {
+		return nil
+	}
+	_, err = m.db.ExecContext(ctx, insertVersionSQL,
 		migrationName,
 		time.Now().Format(time.RFC3339),
 		internal.VersionString(),
 	)
-	// If the migration was already executed, we'll get a unique constraint error,
-	// return nil instead, to avoid unnecessary logging.
-	if IsUniqueConstraintViolationErr(err) {
-		return nil
-	}
 	return err
 }
