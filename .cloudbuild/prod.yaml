@@ -9,4 +9,4 @@ steps:
       - CLOUDSDK_CONTAINER_CLUSTER=synapse-production
 images:
   - gcr.io/$PROJECT_ID/dendrite-monolith:$TAG_NAME
-timeout: 360s
+timeout: 480s
