@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"strings"
 
+	"runtime/debug"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,6 +43,17 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
+
+var commitHash = func() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				return setting.Value
+			}
+		}
+	}
+	return ""
+}()
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -103,6 +116,7 @@ func Setup(
 				JSON: struct {
 					Versions         []string        `json:"versions"`
 					UnstableFeatures map[string]bool `json:"unstable_features"`
+					CommitHash       string          `json:"commit_hash"`
 				}{Versions: []string{
 					"r0.0.1",
 					"r0.1.0",
@@ -114,7 +128,7 @@ func Setup(
 					"v1.0",
 					"v1.1",
 					"v1.2",
-				}, UnstableFeatures: unstableFeatures},
+				}, UnstableFeatures: unstableFeatures, CommitHash: commitHash},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
