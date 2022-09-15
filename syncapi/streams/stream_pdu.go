@@ -388,7 +388,7 @@ func applyHistoryVisibilityFilter(
 	if err != nil {
 		// Not a fatal error, we can continue without the stateEvents,
 		// they are only needed if there are state events in the timeline.
-		logrus.WithError(err).Warnf("failed to get current room state")
+		logrus.WithError(err).Warnf("Failed to get current room state for history visibility")
 	}
 	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
 	for _, ev := range stateEvents {
@@ -397,7 +397,6 @@ func applyHistoryVisibilityFilter(
 	startTime := time.Now()
 	events, err := internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
 	if err != nil {
-
 		return nil, err
 	}
 	logrus.WithFields(logrus.Fields{
@@ -405,7 +404,7 @@ func applyHistoryVisibilityFilter(
 		"room_id":  roomID,
 		"before":   len(recentEvents),
 		"after":    len(events),
-	}).Debug("applied history visibility (sync)")
+	}).Trace("Applied history visibility (sync)")
 	return events, nil
 }
 
