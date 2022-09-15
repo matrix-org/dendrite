@@ -19,8 +19,6 @@ import (
 	"net/http"
 	"strings"
 
-	"runtime/debug"
-
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
@@ -43,16 +41,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var commitHash = func() string {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" {
-				return setting.Value
-			}
-		}
-	}
-	return ""
-}()
+// Added in build script Cokerfile.monolith
+var CommitHash string
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -126,7 +116,7 @@ func Setup(
 					"v1.0",
 					"v1.1",
 					"v1.2",
-				}, UnstableFeatures: unstableFeatures, CommitHash: commitHash},
+				}, UnstableFeatures: unstableFeatures, CommitHash: CommitHash},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
