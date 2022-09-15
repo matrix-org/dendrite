@@ -159,8 +159,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		})
 	}
 
-	gotStateForRooms := make(map[string]struct{})
-	var allStates []gomatrixserverlib.ClientEvent
+	stateForRooms := make(map[string][]gomatrixserverlib.ClientEvent)
 	for _, event := range evs {
 		eventsBefore, eventsAfter, err := contextEvents(ctx, syncDB, event, roomFilter, searchReq)
 		if err != nil {
@@ -208,15 +207,14 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		roomGroup := groups[event.RoomID()]
 		roomGroup.Results = append(roomGroup.Results, event.EventID())
 		groups[event.RoomID()] = roomGroup
-		if _, ok := gotStateForRooms[event.RoomID()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
+		if _, ok := stateForRooms[event.RoomID()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
 			stateFilter := gomatrixserverlib.DefaultStateFilter()
 			state, err := syncDB.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
 			if err != nil {
 				logrus.WithError(err).Error("unable to get current state")
 				return jsonerror.InternalServerError()
 			}
-			gotStateForRooms[event.RoomID()] = struct{}{}
-			allStates = append(allStates, gomatrixserverlib.HeaderedToClientEvents(state, gomatrixserverlib.FormatSync)...)
+			stateForRooms[event.RoomID()] = gomatrixserverlib.HeaderedToClientEvents(state, gomatrixserverlib.FormatSync)
 		}
 	}
 
@@ -233,7 +231,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				Results:    results,
 				NextBatch:  &nb,
 				Highlights: strings.Split(searchReq.SearchCategories.RoomEvents.SearchTerm, " "),
-				State:      allStates,
+				State:      stateForRooms,
 			},
 		},
 	}
@@ -329,12 +327,12 @@ type ProfileInfo struct {
 }
 
 type RoomEvents struct {
-	Count      int                             `json:"count"`
-	Groups     Groups                          `json:"groups"`
-	Highlights []string                        `json:"highlights"`
-	NextBatch  *string                         `json:"next_batch,omitempty"`
-	Results    []Result                        `json:"results"`
-	State      []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
+	Count      int                                        `json:"count"`
+	Groups     Groups                                     `json:"groups"`
+	Highlights []string                                   `json:"highlights"`
+	NextBatch  *string                                    `json:"next_batch,omitempty"`
+	Results    []Result                                   `json:"results"`
+	State      map[string][]gomatrixserverlib.ClientEvent `json:"state,omitempty"`
 }
 type SearchCategories struct {
 	RoomEvents RoomEvents `json:"room_events"`
