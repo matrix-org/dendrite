@@ -49,7 +49,7 @@ type Migration struct {
 	Down func(ctx context.Context, txn *sql.Tx) error
 }
 
-// Migrator
+// Migrator contains fields required to run migrations.
 type Migrator struct {
 	db              *sql.DB
 	migrations      []Migration
@@ -82,10 +82,6 @@ func (m *Migrator) AddMigrations(migrations ...Migration) {
 
 // Up executes all migrations in order they were added.
 func (m *Migrator) Up(ctx context.Context) error {
-	var (
-		err             error
-		dendriteVersion = internal.VersionString()
-	)
 	// ensure there is a table for known migrations
 	executedMigrations, err := m.ExecutedMigrations(ctx)
 	if err != nil {
@@ -94,28 +90,35 @@ func (m *Migrator) Up(ctx context.Context) error {
 
 	return WithTransaction(m.db, func(txn *sql.Tx) error {
 		for i := range m.migrations {
-			now := time.Now().UTC().Format(time.RFC3339)
 			migration := m.migrations[i]
 			// Skip migration if it was already executed
 			if _, ok := executedMigrations[migration.Version]; ok {
 				continue
 			}
 			logrus.Debugf("Executing database migration '%s'", migration.Version)
-			err = migration.Up(ctx, txn)
-			if err != nil {
+
+			if err = migration.Up(ctx, txn); err != nil {
 				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
 			}
-			_, err = txn.ExecContext(ctx, insertVersionSQL,
-				migration.Version,
-				now,
-				dendriteVersion,
-			)
-			if err != nil {
+			if err = m.insertMigration(ctx, txn, migration.Version); err != nil {
 				return fmt.Errorf("unable to insert executed migrations: %w", err)
 			}
 		}
 		return nil
 	})
+}
+
+type execProvider interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func (m *Migrator) insertMigration(ctx context.Context, provider execProvider, migrationName string) error {
+	_, err := provider.ExecContext(ctx, insertVersionSQL,
+		migrationName,
+		time.Now().Format(time.RFC3339),
+		internal.VersionString(),
+	)
+	return err
 }
 
 // ExecutedMigrations returns a map with already executed migrations in addition to creating the
@@ -154,10 +157,5 @@ func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) erro
 	if _, ok := existingMigrations[migrationName]; ok {
 		return nil
 	}
-	_, err = m.db.ExecContext(ctx, insertVersionSQL,
-		migrationName,
-		time.Now().Format(time.RFC3339),
-		internal.VersionString(),
-	)
-	return err
+	return m.insertMigration(ctx, nil, migrationName)
 }
