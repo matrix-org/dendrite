@@ -95,22 +95,22 @@ func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	log.Tracef("Received read update from sync API: %#v", read)
 
 	if read.Read > 0 {
-		updated, err := s.db.SetNotificationsRead(ctx, localpart, roomID, int64(read.Read), true)
+		/*updated*/ _, err := s.db.SetNotificationsRead(ctx, localpart, roomID, int64(read.Read), true)
 		if err != nil {
 			log.WithError(err).Error("userapi EDU consumer")
 			return false
 		}
 
-		if updated {
-			if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
-				log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
-				return false
-			}
-			if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
-				log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
-				return false
-			}
+		// if updated {
+		if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
+			log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
+			return false
 		}
+		if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
+			log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
+			return false
+		}
+		//}
 	}
 
 	if read.FullyRead > 0 {
