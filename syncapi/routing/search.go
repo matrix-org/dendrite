@@ -218,9 +218,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		}
 	}
 
-	nb := ""
+	var nextBatchResult *string = nil
 	if int(result.Total) > nextBatch+len(results) {
-		nb = strconv.Itoa(len(results) + nextBatch)
+		nb := strconv.Itoa(len(results) + nextBatch)
+		nextBatchResult = &nb
 	}
 
 	res := SearchResponse{
@@ -229,7 +230,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 				Count:      int(result.Total),
 				Groups:     Groups{RoomID: groups},
 				Results:    results,
-				NextBatch:  &nb,
+				NextBatch:  nextBatchResult,
 				Highlights: strings.Split(searchReq.SearchCategories.RoomEvents.SearchTerm, " "),
 				State:      stateForRooms,
 			},
