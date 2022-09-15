@@ -7,7 +7,7 @@ WORKDIR /build
 COPY . /build
 
 RUN mkdir -p bin
-RUN go build -trimpath -o bin/ ./cmd/dendrite-monolith-server
+RUN go build -ldflags="-X 'routing.CommitHash=`git rev-list -1 HEAD`'" -trimpath -o bin/ ./cmd/dendrite-monolith-server
 RUN go build -trimpath -o bin/ ./cmd/create-account
 RUN go build -trimpath -o bin/ ./cmd/generate-keys
 
