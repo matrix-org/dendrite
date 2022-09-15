@@ -42,9 +42,6 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-// Added in build script Cokerfile.monolith
-var CommitHash string
-
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 //
@@ -106,7 +103,7 @@ func Setup(
 				JSON: struct {
 					Versions         []string        `json:"versions"`
 					UnstableFeatures map[string]bool `json:"unstable_features"`
-					CommitHash       string          `json:"commit_hash"`
+					BuildVersion     string          `json:"build_version"`
 				}{Versions: []string{
 					"r0.0.1",
 					"r0.1.0",
@@ -118,7 +115,7 @@ func Setup(
 					"v1.0",
 					"v1.1",
 					"v1.2",
-				}, UnstableFeatures: unstableFeatures, CommitHash: CommitHash},
+				}, UnstableFeatures: unstableFeatures, BuildVersion: "TODO"},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
