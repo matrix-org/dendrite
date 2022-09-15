@@ -120,6 +120,16 @@ func SendEvent(
 		delete(r, "join_authorised_via_users_server")
 	}
 
+	// As per the spec, m.room.message events require a msgtype, verify it is set
+	if eventType == "m.room.message" {
+		if _, ok := r["msgtype"]; !ok {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.Unknown("'msgtype' not in content"),
+			}
+		}
+	}
+
 	evTime, err := httputil.ParseTSParam(req)
 	if err != nil {
 		return util.JSONResponse{
