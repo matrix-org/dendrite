@@ -129,7 +129,12 @@ func runTests(baseURL, branchName string) error {
 	go func() {
 		syncClient := users[0].client
 		since := ""
-		for {
+		for len(wantEventIDs) > 0 {
+			select {
+			case <-doneCh:
+				return
+			default:
+			}
 			syncResp, err := syncClient.SyncRequest(1000, since, "1", false, "")
 			if err != nil {
 				continue
@@ -140,17 +145,16 @@ func runTests(baseURL, branchName string) error {
 						continue
 					}
 					delete(wantEventIDs, ev.ID)
-					if len(wantEventIDs) == 0 {
-						close(doneCh)
-					}
 				}
 			}
 			since = syncResp.NextBatch
 		}
+		close(doneCh)
 	}()
 
 	select {
 	case <-time.After(time.Second * 10):
+		close(doneCh)
 		return fmt.Errorf("failed to receive all expected messages: %+v", wantEventIDs)
 	case <-doneCh:
 	}
