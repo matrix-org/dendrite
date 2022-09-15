@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -61,10 +62,10 @@ func NewPostgresIgnoresTable(db *sql.DB) (tables.Ignores, error) {
 }
 
 func (s *ignoresStatements) SelectIgnores(
-	ctx context.Context, userID string,
+	ctx context.Context, txn *sql.Tx, userID string,
 ) (*types.IgnoredUsers, error) {
 	var ignoresData []byte
-	err := s.selectIgnoresStmt.QueryRowContext(ctx, userID).Scan(&ignoresData)
+	err := sqlutil.TxStmt(txn, s.selectIgnoresStmt).QueryRowContext(ctx, userID).Scan(&ignoresData)
 	if err != nil {
 		return nil, err
 	}
@@ -76,12 +77,12 @@ func (s *ignoresStatements) SelectIgnores(
 }
 
 func (s *ignoresStatements) UpsertIgnores(
-	ctx context.Context, userID string, ignores *types.IgnoredUsers,
+	ctx context.Context, txn *sql.Tx, userID string, ignores *types.IgnoredUsers,
 ) error {
 	ignoresJSON, err := json.Marshal(ignores)
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertIgnoresStmt.ExecContext(ctx, userID, ignoresJSON)
+	_, err = sqlutil.TxStmt(txn, s.upsertIgnoresStmt).ExecContext(ctx, userID, ignoresJSON)
 	return err
 }

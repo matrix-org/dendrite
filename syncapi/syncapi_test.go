@@ -624,9 +624,7 @@ func testSendToDevice(t *testing.T, dbType test.DBType) {
 		// Send to-device messages of type "m.dendrite.test" with content `{"dummy":"message $counter"}`
 		for i := 0; i < tc.sendMessagesCount; i++ {
 			msgCounter++
-			msg := map[string]string{
-				"dummy": fmt.Sprintf("message %d", msgCounter),
-			}
+			msg := json.RawMessage(fmt.Sprintf(`{"dummy":"message %d"}`, msgCounter))
 			if err := producer.SendToDevice(ctx, user.ID, user.ID, alice.ID, "m.dendrite.test", msg); err != nil {
 				t.Fatalf("unable to send to device message: %v", err)
 			}
