@@ -95,22 +95,27 @@ func (s *OutputReadUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	log.Tracef("Received read update from sync API: %#v", read)
 
 	if read.Read > 0 {
-		updated, err := s.db.SetNotificationsRead(ctx, localpart, roomID, int64(read.Read), true)
+		/*updated*/ _, err := s.db.SetNotificationsRead(ctx, localpart, roomID, int64(read.Read), true)
 		if err != nil {
 			log.WithError(err).Error("userapi EDU consumer")
 			return false
 		}
 
-		if updated {
-			if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
-				log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
-				return false
-			}
-			if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
-				log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
-				return false
-			}
+		// zion hack - always send the notification data
+		// the notifications are stored in two different databases, and somehow the notification database
+		// prunes data, so trying to mark old notifications as read will fail, but the notification will still exist in the other db
+		// todo, revist when this refactor lands: https://github.com/matrix-org/dendrite/pull/2688/files
+
+		//if updated {
+		if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
+			log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
+			return false
 		}
+		if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
+			log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
+			return false
+		}
+		//}
 	}
 
 	if read.FullyRead > 0 {
