@@ -72,6 +72,8 @@ jobs:
           file: ./build/docker/Dockerfile.monolith
           platforms: ${{ env.PLATFORMS }}
           push: true
+          build-args: |
+            RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:latest
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ env.RELEASE_VERSION }}
