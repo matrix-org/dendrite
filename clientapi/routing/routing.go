@@ -42,6 +42,8 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
+var ReleaseVersion string
+
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
 //
@@ -103,7 +105,7 @@ func Setup(
 				JSON: struct {
 					Versions         []string        `json:"versions"`
 					UnstableFeatures map[string]bool `json:"unstable_features"`
-					BuildVersion     string          `json:"build_version"`
+					ReleaseVersion   string          `json:"release_version"`
 				}{Versions: []string{
 					"r0.0.1",
 					"r0.1.0",
@@ -115,7 +117,7 @@ func Setup(
 					"v1.0",
 					"v1.1",
 					"v1.2",
-				}, UnstableFeatures: unstableFeatures, BuildVersion: "TODO"},
+				}, UnstableFeatures: unstableFeatures, ReleaseVersion: ReleaseVersion},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
