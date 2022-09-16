@@ -222,6 +222,10 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	if int(result.Total) > nextBatch+len(results) {
 		nb := strconv.Itoa(len(results) + nextBatch)
 		nextBatchResult = &nb
+	} else if int(result.Total) == nextBatch+len(results) {
+		// Sytest expects a next_batch even if we don't actually have any more results
+		nb := ""
+		nextBatchResult = &nb
 	}
 
 	res := SearchResponse{
