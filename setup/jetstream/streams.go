@@ -95,11 +95,6 @@ var streams = []*nats.StreamConfig{
 		Storage:   nats.FileStorage,
 	},
 	{
-		Name:      OutputStreamEvent,
-		Retention: nats.InterestPolicy,
-		Storage:   nats.FileStorage,
-	},
-	{
 		Name:      OutputReadUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
