@@ -9,7 +9,7 @@ WORKDIR /build
 COPY . /build
 
 RUN mkdir -p bin
-RUN go build -trimpath -o bin/ -ldflags="-X routing.ReleaseVersion=$RELEASE_VERSION" ./cmd/dendrite-monolith-server
+RUN go build -trimpath -o bin/ -ldflags="-X 'github.com/matrix-org/dendrite/clientapi/routing.ReleaseVersion=$RELEASE_VERSION'" ./cmd/dendrite-monolith-server
 RUN go build -trimpath -o bin/ ./cmd/create-account
 RUN go build -trimpath -o bin/ ./cmd/generate-keys
 
