@@ -64,6 +64,11 @@ func Setup(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
+
+	logrus.WithFields(logrus.Fields{
+		"ReleaseVersion": ReleaseVersion,
+	}).Info("Started clientAPI router with ReleaseVersion")
+
 	prometheus.MustRegister(amtRegUsers, sendEventDuration)
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
