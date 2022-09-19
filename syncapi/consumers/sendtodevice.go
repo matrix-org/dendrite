@@ -115,7 +115,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		_, senderDomain, _ := gomatrixserverlib.SplitID('@', output.Sender)
 		if requestingDeviceID != "" && senderDomain != s.serverName {
 			// Mark the requesting device as stale, if we don't know about it.
-			if err := s.keyAPI.PerformMarkAsStaleIfNeeded(ctx, &keyapi.PerformMarkAsStaleRequest{
+			if err = s.keyAPI.PerformMarkAsStaleIfNeeded(ctx, &keyapi.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
 				logger.WithError(err).Errorf("failed to mark as stale if needed")
