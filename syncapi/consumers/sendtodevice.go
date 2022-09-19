@@ -109,14 +109,14 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	})
 	logger.Debugf("sync API received send-to-device event from the clientapi/federationsender")
 
-	// Check we actually got the requesting device in our store
+	// Check we actually got the requesting device in our store, if we receive a room key request
 	if output.Type == "m.room_key_request" {
 		requestingDeviceID := gjson.GetBytes(output.SendToDeviceEvent.Content, "requesting_device_id").Str
-		_, domain, _ := gomatrixserverlib.SplitID('@', output.Sender)
-		if requestingDeviceID != "" && domain != s.serverName {
+		_, senderDomain, _ := gomatrixserverlib.SplitID('@', output.Sender)
+		if requestingDeviceID != "" && senderDomain != s.serverName {
 			// Mark the requesting device as stale, if we don't know about it.
 			if err := s.keyAPI.PerformMarkAsStaleIfNeeded(ctx, &keyapi.PerformMarkAsStaleRequest{
-				UserID: output.Sender, DeviceID: requestingDeviceID,
+				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,
 			}, &struct{}{}); err != nil {
 				logger.WithError(err).Errorf("failed to mark as stale if needed")
 				return false

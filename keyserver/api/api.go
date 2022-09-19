@@ -340,5 +340,6 @@ type QuerySignaturesResponse struct {
 
 type PerformMarkAsStaleRequest struct {
 	UserID   string
+	Domain   gomatrixserverlib.ServerName
 	DeviceID string
 }

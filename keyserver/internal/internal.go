@@ -233,11 +233,7 @@ func (a *KeyInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *ap
 		return err
 	}
 	if len(knownDevices) == 0 {
-		_, remoteServer, err := gomatrixserverlib.SplitID('@', req.UserID)
-		if err != nil {
-			return err
-		}
-		return a.Updater.ManualUpdate(ctx, remoteServer, req.UserID)
+		return a.Updater.ManualUpdate(ctx, req.Domain, req.UserID)
 	}
 	return nil
 }
