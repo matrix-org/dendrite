@@ -23,7 +23,9 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 
+	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -39,6 +41,7 @@ type OutputSendToDeviceEventConsumer struct {
 	durable    string
 	topic      string
 	db         storage.Database
+	keyAPI     keyapi.SyncKeyAPI
 	serverName gomatrixserverlib.ServerName // our server name
 	stream     types.StreamProvider
 	notifier   *notifier.Notifier
@@ -51,6 +54,7 @@ func NewOutputSendToDeviceEventConsumer(
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
 	store storage.Database,
+	keyAPI keyapi.SyncKeyAPI,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
@@ -60,6 +64,7 @@ func NewOutputSendToDeviceEventConsumer(
 		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		durable:    cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
 		db:         store,
+		keyAPI:     keyAPI,
 		serverName: cfg.Matrix.ServerName,
 		notifier:   notifier,
 		stream:     stream,
@@ -96,12 +101,28 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		return true
 	}
 
-	util.GetLogger(context.TODO()).WithFields(log.Fields{
+	logger := util.GetLogger(context.TODO()).WithFields(log.Fields{
 		"sender":     output.Sender,
 		"user_id":    output.UserID,
 		"device_id":  output.DeviceID,
 		"event_type": output.Type,
-	}).Debugf("sync API received send-to-device event from the clientapi/federationsender")
+	})
+	logger.Debugf("sync API received send-to-device event from the clientapi/federationsender")
+
+	// Check we actually got the requesting device in our store
+	if output.Type == "m.room_key_request" {
+		requestingDeviceID := gjson.GetBytes(output.SendToDeviceEvent.Content, "requesting_device_id").Str
+		_, domain, _ := gomatrixserverlib.SplitID('@', output.Sender)
+		if requestingDeviceID != "" && domain != s.serverName {
+			// Mark the requesting device as stale, if we don't know about it.
+			if err := s.keyAPI.PerformMarkAsStaleIfNeeded(ctx, &keyapi.PerformMarkAsStaleRequest{
+				UserID: output.Sender, DeviceID: requestingDeviceID,
+			}, &struct{}{}); err != nil {
+				logger.WithError(err).Errorf("failed to mark as stale if needed")
+				return false
+			}
+		}
+	}
 
 	streamPos, err := s.db.StoreNewSendForDeviceMessage(
 		s.ctx, output.UserID, output.DeviceID, output.SendToDeviceEvent,

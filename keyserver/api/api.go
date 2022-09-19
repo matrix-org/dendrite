@@ -21,9 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/keyserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type KeyInternalAPI interface {
@@ -56,6 +57,7 @@ type UserKeyAPI interface {
 type SyncKeyAPI interface {
 	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse) error
 	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse) error
+	PerformMarkAsStaleIfNeeded(ctx context.Context, req *PerformMarkAsStaleRequest, res *struct{}) error
 }
 
 type FederationKeyAPI interface {
@@ -334,4 +336,9 @@ type QuerySignaturesResponse struct {
 	UserSigningKeys map[string]gomatrixserverlib.CrossSigningKey
 	// The request error, if any
 	Error *KeyError
+}
+
+type PerformMarkAsStaleRequest struct {
+	UserID   string
+	DeviceID string
 }
