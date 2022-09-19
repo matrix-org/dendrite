@@ -228,7 +228,7 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 // PerformMarkAsStaleIfNeeded marks the users device list as stale, if the given deviceID is not present
 // in our database.
 func (a *KeyInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *api.PerformMarkAsStaleRequest, res *struct{}) error {
-	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{}, true)
+	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{req.DeviceID}, true)
 	if err != nil {
 		return err
 	}
