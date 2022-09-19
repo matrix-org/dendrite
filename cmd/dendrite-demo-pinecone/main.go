@@ -98,6 +98,9 @@ func main() {
 				if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
 					panic("failed to load PEM key: " + err.Error())
 				}
+				if len(sk) != ed25519.PrivateKeySize {
+					panic("the private key is not long enough")
+				}
 			} else {
 				if sk, err = os.ReadFile(oldkeyfile); err != nil {
 					panic("failed to read the old private key: " + err.Error())
@@ -114,7 +117,13 @@ func main() {
 			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
 				panic("failed to load PEM key: " + err.Error())
 			}
+			if len(sk) != ed25519.PrivateKeySize {
+				panic("the private key is not long enough")
+			}
 		}
+
+		pk = sk.Public().(ed25519.PublicKey)
+
 		cfg.Defaults(config.DefaultOpts{
 			Generate:   true,
 			Monolithic: true,
@@ -136,14 +145,13 @@ func main() {
 		}
 	}
 
-	pk = sk.Public().(ed25519.PublicKey)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
-	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
 	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
 	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
