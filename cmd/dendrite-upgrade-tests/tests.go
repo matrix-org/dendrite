@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -82,11 +83,14 @@ func runTests(baseURL, branchName string) error {
 			client: users[1].client, text: "4: " + branchName,
 		},
 	}
+	wantEventIDs := make(map[string]struct{}, 8)
 	for _, msg := range msgs {
-		_, err = msg.client.SendText(dmRoomID, msg.text)
+		var resp *gomatrix.RespSendEvent
+		resp, err = msg.client.SendText(dmRoomID, msg.text)
 		if err != nil {
 			return fmt.Errorf("failed to send text in dm room: %s", err)
 		}
+		wantEventIDs[resp.EventID] = struct{}{}
 	}
 
 	// attempt to create/join the shared public room
@@ -114,11 +118,48 @@ func runTests(baseURL, branchName string) error {
 	}
 	// send messages
 	for _, msg := range msgs {
-		_, err = msg.client.SendText(publicRoomID, "public "+msg.text)
+		resp, err := msg.client.SendText(publicRoomID, "public "+msg.text)
 		if err != nil {
 			return fmt.Errorf("failed to send text in public room: %s", err)
 		}
+		wantEventIDs[resp.EventID] = struct{}{}
 	}
+
+	// Sync until we have all expected messages
+	doneCh := make(chan struct{})
+	go func() {
+		syncClient := users[0].client
+		since := ""
+		for len(wantEventIDs) > 0 {
+			select {
+			case <-doneCh:
+				return
+			default:
+			}
+			syncResp, err := syncClient.SyncRequest(1000, since, "1", false, "")
+			if err != nil {
+				continue
+			}
+			for _, room := range syncResp.Rooms.Join {
+				for _, ev := range room.Timeline.Events {
+					if ev.Type != "m.room.message" {
+						continue
+					}
+					delete(wantEventIDs, ev.ID)
+				}
+			}
+			since = syncResp.NextBatch
+		}
+		close(doneCh)
+	}()
+
+	select {
+	case <-time.After(time.Second * 10):
+		close(doneCh)
+		return fmt.Errorf("failed to receive all expected messages: %+v", wantEventIDs)
+	case <-doneCh:
+	}
+
 	log.Printf("OK! rooms(public=%s, dm=%s) users(%s, %s)\n", publicRoomID, dmRoomID, users[0].userID, users[1].userID)
 	return nil
 }

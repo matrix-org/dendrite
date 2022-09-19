@@ -154,25 +154,23 @@ func (s *OutputRoomEventConsumer) onMessage(
 
 	txnID := ""
 	// Try to get the message metadata, if we're able to, use the timestamp as the txnID
-	if len(msgs) > 0 {
-		metadata, err := msgs[0].Metadata()
-		if err == nil {
-			txnID = strconv.Itoa(int(metadata.Timestamp.UnixNano()))
-		}
+	metadata, err := msgs[0].Metadata()
+	if err == nil {
+		txnID = strconv.Itoa(int(metadata.Timestamp.UnixNano()))
 	}
 
 	// Send event to any relevant application services. If we hit
 	// an error here, return false, so that we negatively ack.
 	log.WithField("appservice", state.ID).Debugf("Appservice worker sending %d events(s) from roomserver", len(events))
-	return s.sendEvents(txnID, ctx, state, events) == nil
+	return s.sendEvents(ctx, state, events, txnID) == nil
 }
 
 // sendEvents passes events to the appservice by using the transactions
 // endpoint. It will block for the backoff period if necessary.
 func (s *OutputRoomEventConsumer) sendEvents(
-	txnID string,
 	ctx context.Context, state *appserviceState,
 	events []*gomatrixserverlib.HeaderedEvent,
+	txnID string,
 ) error {
 	// Create the transaction body.
 	transaction, err := json.Marshal(

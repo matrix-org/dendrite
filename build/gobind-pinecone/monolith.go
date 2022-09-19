@@ -218,6 +218,9 @@ func (m *DendriteMonolith) Start() {
 			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
 				panic("failed to load PEM key: " + err.Error())
 			}
+			if len(sk) != ed25519.PrivateKeySize {
+				panic("the private key is not long enough")
+			}
 		} else {
 			if sk, err = os.ReadFile(oldkeyfile); err != nil {
 				panic("failed to read the old private key: " + err.Error())
@@ -233,7 +236,12 @@ func (m *DendriteMonolith) Start() {
 		if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
 			panic("failed to load PEM key: " + err.Error())
 		}
+		if len(sk) != ed25519.PrivateKeySize {
+			panic("the private key is not long enough")
+		}
 	}
+
+	pk = sk.Public().(ed25519.PublicKey)
 
 	var err error
 	m.listener, err = net.Listen("tcp", "localhost:65432")
@@ -247,7 +255,7 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
-	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
 	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
 	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter, nil)
