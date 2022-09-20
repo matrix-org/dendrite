@@ -22,7 +22,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220916062000-d1c12e754be1
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220920132911-5fd1fa2e4297
 	github.com/matrix-org/pinecone v0.0.0-20220915154206-df85cb5026fc
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
@@ -80,7 +80,6 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/frankban/quicktest v1.14.3 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -93,11 +92,11 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.10 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lucas-clemente/quic-go v0.29.0 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
-	github.com/miekg/dns v1.1.49 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
