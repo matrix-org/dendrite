@@ -373,6 +373,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithTimeout(time.Minute * 5),
 		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationAPI.DisableTLSValidation),
+		gomatrixserverlib.WithKeepAlives(true),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
