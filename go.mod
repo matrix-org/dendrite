@@ -2,7 +2,7 @@ module github.com/matrix-org/dendrite
 
 require (
 	github.com/Arceliar/ironwood v0.0.0-20220903132624-ee60c16bcfcf
-	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
+	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
