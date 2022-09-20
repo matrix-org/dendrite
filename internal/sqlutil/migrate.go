@@ -155,5 +155,10 @@ func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) erro
 		time.Now().Format(time.RFC3339),
 		internal.VersionString(),
 	)
+	// If the migration was already executed, we'll get a unique constraint error,
+	// return nil instead, to avoid unnecessary logging.
+	if IsUniqueConstraintViolationErr(err) {
+		return nil
+	}
 	return err
 }
