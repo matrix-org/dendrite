@@ -130,5 +130,9 @@ func Test_insertMigration(t *testing.T) {
 		if err := sqlutil.InsertMigration(context.Background(), db, "testing"); err != nil {
 			t.Fatalf("unable to insert migration: %s", err)
 		}
+		// Second insert should not return an error, as it was already executed.
+		if err := sqlutil.InsertMigration(context.Background(), db, "testing"); err != nil {
+			t.Fatalf("unable to insert migration: %s", err)
+		}
 	})
 }
