@@ -10,8 +10,8 @@ const (
 
 var defaultUnderrideRules = []*Rule{
 	&mRuleCallDefinition,
-	&mRuleEncryptedRoomOneToOneDefinition,
 	&mRuleRoomOneToOneDefinition,
+	&mRuleEncryptedRoomOneToOneDefinition,
 	&mRuleMessageDefinition,
 	&mRuleEncryptedDefinition,
 }
@@ -61,6 +61,11 @@ var (
 			{Kind: NotifyAction},
 			{
 				Kind:  SetTweakAction,
+				Tweak: SoundTweak,
+				Value: "default",
+			},
+			{
+				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
 				Value: false,
 			},
@@ -88,6 +93,11 @@ var (
 				Tweak: HighlightTweak,
 				Value: false,
 			},
+			{
+				Kind:  SetTweakAction,
+				Tweak: HighlightTweak,
+				Value: false,
+			},
 		},
 	}
 	mRuleMessageDefinition = Rule{
@@ -101,7 +111,14 @@ var (
 				Pattern: "m.room.message",
 			},
 		},
-		Actions: []*Action{{Kind: NotifyAction}},
+		Actions: []*Action{
+			{Kind: NotifyAction},
+			{
+				Kind:  SetTweakAction,
+				Tweak: HighlightTweak,
+				Value: false,
+			},
+		},
 	}
 	mRuleEncryptedDefinition = Rule{
 		RuleID:  MRuleEncrypted,
@@ -114,6 +131,13 @@ var (
 				Pattern: "m.room.encrypted",
 			},
 		},
-		Actions: []*Action{{Kind: NotifyAction}},
+		Actions: []*Action{
+			{Kind: NotifyAction},
+			{
+				Kind:  SetTweakAction,
+				Tweak: HighlightTweak,
+				Value: false,
+			},
+		},
 	}
 )

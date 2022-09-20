@@ -303,7 +303,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	if stateFilter.LazyLoadMembers {
 		delta.StateEvents, err = p.lazyLoadMembers(
-			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
+			ctx, delta.RoomID, true, limited, stateFilter,
 			device, recentEvents, delta.StateEvents,
 		)
 		if err != nil && err != sql.ErrNoRows {
@@ -388,7 +388,7 @@ func applyHistoryVisibilityFilter(
 	if err != nil {
 		// Not a fatal error, we can continue without the stateEvents,
 		// they are only needed if there are state events in the timeline.
-		logrus.WithError(err).Warnf("failed to get current room state")
+		logrus.WithError(err).Warnf("Failed to get current room state for history visibility")
 	}
 	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
 	for _, ev := range stateEvents {
@@ -397,7 +397,6 @@ func applyHistoryVisibilityFilter(
 	startTime := time.Now()
 	events, err := internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
 	if err != nil {
-
 		return nil, err
 	}
 	logrus.WithFields(logrus.Fields{
@@ -405,7 +404,7 @@ func applyHistoryVisibilityFilter(
 		"room_id":  roomID,
 		"before":   len(recentEvents),
 		"after":    len(events),
-	}).Debug("applied history visibility (sync)")
+	}).Trace("Applied history visibility (sync)")
 	return events, nil
 }
 
@@ -532,7 +531,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			return nil, err
 		}
 		stateEvents, err = p.lazyLoadMembers(ctx, roomID,
-			false, limited, stateFilter.IncludeRedundantMembers,
+			false, limited, stateFilter,
 			device, recentEvents, stateEvents,
 		)
 		if err != nil && err != sql.ErrNoRows {
@@ -551,7 +550,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 
 func (p *PDUStreamProvider) lazyLoadMembers(
 	ctx context.Context, roomID string,
-	incremental, limited, includeRedundant bool,
+	incremental, limited bool, stateFilter *gomatrixserverlib.StateFilter,
 	device *userapi.Device,
 	timelineEvents, stateEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
@@ -581,7 +580,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			stateKey := *event.StateKey()
 			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
 				newStateEvents = append(newStateEvents, event)
-				if !includeRedundant {
+				if !stateFilter.IncludeRedundantMembers {
 					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
 				}
 				delete(timelineUsers, stateKey)
@@ -596,6 +595,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// Query missing membership events
 	filter := gomatrixserverlib.DefaultStateFilter()
+	filter.Limit = stateFilter.Limit
 	filter.Senders = &wantUsers
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := p.DB.GetStateEventsForRoom(ctx, roomID, &filter)

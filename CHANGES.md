@@ -1,5 +1,60 @@
 # Changelog
 
+## Dendrite 0.9.8 (2022-09-12)
+
+### Important
+
+* This is a **security release** to fix a vulnerability where missing events retrieved from other servers did not have their signatures verified in all cases, affecting all versions of Dendrite before 0.9.8. Upgrading to this version is highly recommended. For more information, [see here](https://github.com/matrix-org/dendrite/security/advisories/GHSA-pfw4-xjgm-267c).
+
+### Features
+
+* The built-in NATS Server has been updated to the final 2.9.0 release version
+
+### Fixes
+
+* Dendrite will now correctly verify the signatures of events retrieved using `/get_missing_events`
+
+## Dendrite 0.9.7 (2022-09-09)
+
+### Features
+
+* Initial supporting code to enable full-text search has been merged (although not ready for use yet)
+* Newly created rooms now have higher default power levels for enabling encryption, setting server ACLs or sending tombstone events
+* Incoming signing key updates over federation are now queued in JetStream for processing, so that they cannot be dropped accidentally
+
+### Fixes
+
+* A race condition between the roomserver output events being generated, forward extremities being updated and room info being updated has been fixed
+* Appservices will no longer receive invite events which they are not interested in, which caused heavy load in some cases or excessive request sizes in others
+* A bug in state resolution v2 where events could incorrectly be classified as control events has been fixed
+* A bug in state resolution v2 where some specific events with unexpected non-empty state keys are dropped has been fixed
+* A bug in state resolution v2 when fetching auth events vs partial state has been fixed
+* Stale device lists should now be handled correctly for all user IDs, which may help with E2EE reliability
+* A number of database writer issues have been fixed in the user API and sync API, which should help to reduce `database is locked` errors with SQLite databases
+* Database migrations should now be detected more reliably to prevent unexpected errors at startup
+* A number of minor database transaction issues have been fixed, particularly for assigning NIDs in the roomserver, cleaning up device keys and cleaning up notifications
+* The database query for finding shared users in the sync API has been optimised, using significantly less CPU time as a result
+
+## Dendrite 0.9.6 (2022-09-01)
+
+### Features
+
+* The appservice API has been refactored for improved performance and stability
+  * The appservice database has been deprecated, as the roomserver output stream is now used as the data source instead
+* The `generate-config` tool has been updated to support additional scenarios, i.e. for CI configuration generation and generating both monolith and polylith skeleton config files
+
+### Fixes
+
+* The username length check has been fixed on new account creation
+* The length of the `type`, `sender`, `state_key` and `room_id` fields in events are now verified by number of codepoints rather than bytes, fixing the "Cat Overflow" bug
+* UTF-16 surrogate handling in the canonical JSON implementation has been fixed
+* A race condition when starting the keyserver has been fixed
+* A race condition when configuring HTTP servers and routing at startup has been fixed
+* A bug where the incorrect limit was used for lazy-loading memberships has been fixed
+* The number of push notifications will now be sent to the push gateway
+* A missing index causing slow performance on the sync API send-to-device table has been added (contributed by [PiotrKozimor](https://github.com/PiotrKozimor))
+* Event auth will now correctly check for the existence of the `"creator"` field in create events
+
 ## Dendrite 0.9.5 (2022-08-25)
 
 ### Fixes

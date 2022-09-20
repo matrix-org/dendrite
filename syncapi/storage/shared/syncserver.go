@@ -108,7 +108,7 @@ func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.S
 }
 
 func (d *Database) MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error) {
-	id, err := d.NotificationData.SelectMaxID(ctx)
+	id, err := d.NotificationData.SelectMaxID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.NotificationData.SelectMaxID: %w", err)
 	}
@@ -1029,15 +1029,15 @@ func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, stream
 }
 
 func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, userID, roomID, notificationCount, highlightCount)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, txn, userID, roomID, notificationCount, highlightCount)
 		return err
 	})
 	return
 }
 
 func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	return d.NotificationData.SelectUserUnreadCounts(ctx, userID, from, to)
+	return d.NotificationData.SelectUserUnreadCounts(ctx, nil, userID, from, to)
 }
 
 func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
@@ -1052,15 +1052,23 @@ func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID s
 }
 
 func (d *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
-	return d.Ignores.SelectIgnores(ctx, userID)
+	return d.Ignores.SelectIgnores(ctx, nil, userID)
 }
 
 func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
-	return d.Ignores.UpsertIgnores(ctx, userID, ignores)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Ignores.UpsertIgnores(ctx, txn, userID, ignores)
+	})
 }
 
 func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
-	return d.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
+	var pos types.StreamPosition
+	var err error
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		pos, err = d.Presence.UpsertPresence(ctx, txn, userID, statusMsg, presence, lastActiveTS, fromSync)
+		return nil
+	})
+	return pos, err
 }
 
 func (d *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {

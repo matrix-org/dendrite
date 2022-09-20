@@ -439,6 +439,7 @@ type QueryMembershipAtEventRequest struct {
 
 // QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
 type QueryMembershipAtEventResponse struct {
-	// Memberships is a map from eventID to a list of events (if any).
+	// Memberships is a map from eventID to a list of events (if any). Events that
+	// do not have known state will return an empty array here.
 	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
 }

@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+//go:build wasm
+// +build wasm
 
-import (
-	"fmt"
+package sqlutil
 
-	"github.com/matrix-org/dendrite/appservice/storage/sqlite3"
-	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
-)
+import "github.com/mattn/go-sqlite3"
 
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (Database, error) {
-	switch {
-	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.NewDatabase(base, dbProperties)
-	case dbProperties.ConnectionString.IsPostgres():
-		return nil, fmt.Errorf("can't use Postgres implementation")
-	default:
-		return nil, fmt.Errorf("unexpected database type")
+// IsUniqueConstraintViolationErr returns true if the error is an unique_violation error
+func IsUniqueConstraintViolationErr(err error) bool {
+	switch e := err.(type) {
+	case *sqlite3.Error:
+		return e.Code == sqlite3.ErrConstraint
+	case sqlite3.Error:
+		return e.Code == sqlite3.ErrConstraint
 	}
+	return false
 }

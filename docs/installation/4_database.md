@@ -10,24 +10,6 @@ permalink: /installation/database
 Dendrite uses SQL databases to store data. Depending on the database engine being used, you
 may need to perform some manual steps outlined below.
 
-## SQLite
-
-SQLite deployments do not require manual database creation. Simply configure the database
-filenames in the Dendrite configuration file and start Dendrite. The databases will be created
-and populated automatically.
-
-Note that Dendrite **cannot share a single SQLite database across multiple components**. Each
-component must be configured with its own SQLite database filename. You will have to remove
-the `global.database` section from your Dendrite config and add it to each individual section
-instead in order to use SQLite.
-
-### Connection strings
-
-Connection strings for SQLite databases take the following forms:
-
-* Current working directory path: `file:dendrite_component.db`
-* Full specified path: `file:///path/to/dendrite_component.db`
-
 ## PostgreSQL
 
 Dendrite can automatically populate the database with the relevant tables and indexes, but
@@ -106,3 +88,25 @@ for i in appservice federationapi mediaapi mscs roomserver syncapi keyserver use
     sudo -u postgres createdb -O dendrite dendrite_$i
 done
 ```
+
+## SQLite
+
+**WARNING:** The Dendrite SQLite backend is slower, less reliable and not recommended for
+production usage. You should use PostgreSQL instead. We may not be able to provide support if
+you run into issues with your deployment while using the SQLite backend.
+
+SQLite deployments do not require manual database creation. Simply configure the database
+filenames in the Dendrite configuration file and start Dendrite. The databases will be created
+and populated automatically.
+
+Note that Dendrite **cannot share a single SQLite database across multiple components**. Each
+component must be configured with its own SQLite database filename. You will have to remove
+the `global.database` section from your Dendrite config and add it to each individual section
+instead in order to use SQLite.
+
+### Connection strings
+
+Connection strings for SQLite databases take the following forms:
+
+* Current working directory path: `file:dendrite_component.db`
+* Full specified path: `file:///path/to/dendrite_component.db`

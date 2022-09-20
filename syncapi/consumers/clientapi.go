@@ -75,15 +75,16 @@ func NewOutputClientDataConsumer(
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called when the sync server receives a new event from the client API server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Parse out the event JSON
 	userID := msg.Header.Get(jetstream.UserID)
 	var output eventutil.AccountData
