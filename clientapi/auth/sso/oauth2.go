@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -168,7 +168,7 @@ func (p *oauth2IdentityProvider) getUserInfo(ctx context.Context, accessToken st
 	}
 	defer hresp.Body.Close() // nolint:errcheck
 
-	body, err := ioutil.ReadAll(hresp.Body)
+	body, err := io.ReadAll(hresp.Body)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -205,7 +205,7 @@ func httpDo(ctx context.Context, hc *http.Client, req *http.Request) (*http.Resp
 		contentType := resp.Header.Get("Content-Type")
 		switch {
 		case strings.HasPrefix(contentType, "text/plain"):
-			bs, err := ioutil.ReadAll(resp.Body)
+			bs, err := io.ReadAll(resp.Body)
 			if err == nil {
 				if len(bs) > 80 {
 					bs = bs[:80]

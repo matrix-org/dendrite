@@ -65,26 +65,26 @@ func main() {
 		if *defaultsForCI {
 			cfg.AppServiceAPI.DisableTLSValidation = true
 			cfg.ClientAPI.RateLimiting.Enabled = false
-      cfg.ClientAPI.Login.SSO.Enabled = true
-		  cfg.ClientAPI.Login.SSO.Providers = []config.IdentityProvider{
-			  {
-				  Brand: "github",
-				  OAuth2: config.OAuth2{
-				  	ClientID:     "aclientid",
-				  	ClientSecret: "aclientsecret",
-				  },
-			  },
-			  {
-			  	Brand: "google",
-			  	OAuth2: config.OAuth2{
-			  		ClientID:     "aclientid",
-			  		ClientSecret: "aclientsecret",
-			  	},
-		  		OIDC: config.OIDC{
-		  			DiscoveryURL: "https://accounts.google.com/.well-known/openid-configuration",
-	  			},
-	  		},
-  		}
+			cfg.ClientAPI.Login.SSO.Enabled = true
+			cfg.ClientAPI.Login.SSO.Providers = []config.IdentityProvider{
+				{
+					Brand: "github",
+					OAuth2: config.OAuth2{
+						ClientID:     "aclientid",
+						ClientSecret: "aclientsecret",
+					},
+				},
+				{
+					Brand: "google",
+					OAuth2: config.OAuth2{
+						ClientID:     "aclientid",
+						ClientSecret: "aclientsecret",
+					},
+					OIDC: config.OIDC{
+						DiscoveryURL: "https://accounts.google.com/.well-known/openid-configuration",
+					},
+				},
+			}
 			cfg.FederationAPI.DisableTLSValidation = false
 			// don't hit matrix.org when running tests!!!
 			cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}

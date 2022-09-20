@@ -19,7 +19,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/opentracing/opentracing-go"
 )
 
 const (
@@ -28,26 +27,23 @@ const (
 	QueryLocalpartForSSOPath      = "/userapi/queryLocalpartForSSO"
 )
 
-func (h *httpUserInternalAPI) QueryLocalpartForSSO(ctx context.Context, req *api.QueryLocalpartForSSORequest, res *api.QueryLocalpartForSSOResponse) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, QueryLocalpartForSSOPath)
-	defer span.Finish()
-
-	apiURL := h.apiURL + QueryLocalpartForSSOPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+func (h *httpUserInternalAPI) QueryLocalpartForSSO(ctx context.Context, request *api.QueryLocalpartForSSORequest, response *api.QueryLocalpartForSSOResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"QuerytLocalpartForSSO", h.apiURL+QueryLocalpartForSSOPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
-func (h *httpUserInternalAPI) PerformForgetSSO(ctx context.Context, req *api.PerformForgetSSORequest, res *struct{}) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, PerformForgetSSOPath)
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformForgetSSOPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+func (h *httpUserInternalAPI) PerformForgetSSO(ctx context.Context, request *api.PerformForgetSSORequest, response *struct{}) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformForgetSSO", h.apiURL+PerformForgetSSOPath,
+		h.httpClient, ctx, request, response,
+	)
 }
 
-func (h *httpUserInternalAPI) PerformSaveSSOAssociation(ctx context.Context, req *api.PerformSaveSSOAssociationRequest, res *struct{}) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, PerformSaveSSOAssociationPath)
-	defer span.Finish()
-
-	apiURL := h.apiURL + PerformSaveSSOAssociationPath
-	return httputil.PostJSON(ctx, span, h.httpClient, apiURL, req, res)
+func (h *httpUserInternalAPI) PerformSaveSSOAssociation(ctx context.Context, request *api.PerformSaveSSOAssociationRequest, response *struct{}) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformSaveSSOAssociation", h.apiURL+PerformSaveSSOAssociationPath,
+		h.httpClient, ctx, request, response,
+	)
 }
