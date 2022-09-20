@@ -326,8 +326,10 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 		return respState, true, nil
 	}
 
+	logrus.WithContext(ctx).Warnf("State for event %s not available locally, falling back to federation (via %d servers)", eventID, len(t.servers))
 	respState, err := t.lookupStateBeforeEvent(ctx, roomVersion, roomID, eventID)
 	if err != nil {
+		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up state before event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupStateBeforeEvent: %w", err)
 	}
 
@@ -339,6 +341,7 @@ func (t *missingStateReq) lookupStateAfterEvent(ctx context.Context, roomVersion
 	case nil:
 		// do nothing
 	default:
+		logrus.WithContext(ctx).WithError(err).Errorf("Failed to look up event %s", eventID)
 		return nil, false, fmt.Errorf("t.lookupEvent: %w", err)
 	}
 	h = t.cacheAndReturn(h)
@@ -375,11 +378,7 @@ func (t *missingStateReq) lookupStateAfterEventLocally(ctx context.Context, room
 	defer span.Finish()
 
 	var res parsedRespState
-	roomInfo, err := t.db.RoomInfo(ctx, roomID)
-	if err != nil {
-		return nil
-	}
-	roomState := state.NewStateResolution(t.db, roomInfo)
+	roomState := state.NewStateResolution(t.db, t.roomInfo)
 	stateAtEvents, err := t.db.StateAtEventIDs(ctx, []string{eventID})
 	if err != nil {
 		util.GetLogger(ctx).WithField("room_id", roomID).WithError(err).Warnf("failed to get state after %s locally", eventID)
@@ -554,11 +553,14 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 
 	// Make sure events from the missingResp are using the cache - missing events
 	// will be added and duplicates will be removed.
-	logger.Debugf("get_missing_events returned %d events", len(missingResp.Events))
 	missingEvents := make([]*gomatrixserverlib.Event, 0, len(missingResp.Events))
 	for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
+		if err = ev.VerifyEventSignatures(ctx, t.keys); err != nil {
+			continue
+		}
 		missingEvents = append(missingEvents, t.cacheAndReturn(ev))
 	}
+	logger.Debugf("get_missing_events returned %d events (%d passed signature checks)", len(missingResp.Events), len(missingEvents))
 
 	// topologically sort and sanity check that we are making forward progress
 	newEvents = gomatrixserverlib.ReverseTopologicalOrdering(missingEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
@@ -666,9 +668,22 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 	util.GetLogger(ctx).WithField("room_id", roomID).Infof("lookupMissingStateViaStateIDs %s", eventID)
 	// fetch the state event IDs at the time of the event
-	stateIDs, err := t.federation.LookupStateIDs(ctx, t.origin, roomID, eventID)
+	var stateIDs gomatrixserverlib.RespStateIDs
+	var err error
+	count := 0
+	totalctx, totalcancel := context.WithTimeout(ctx, time.Minute*5)
+	for _, serverName := range t.servers {
+		reqctx, reqcancel := context.WithTimeout(totalctx, time.Second*20)
+		stateIDs, err = t.federation.LookupStateIDs(reqctx, serverName, roomID, eventID)
+		reqcancel()
+		if err == nil {
+			break
+		}
+		count++
+	}
+	totalcancel()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("t.federation.LookupStateIDs tried %d server(s), last error: %w", count, err)
 	}
 	// work out which auth/state IDs are missing
 	wantIDs := append(stateIDs.StateEventIDs, stateIDs.AuthEventIDs...)
@@ -754,9 +769,8 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 
 		// Define what we'll do in order to fetch the missing event ID.
 		fetch := func(missingEventID string) {
-			var h *gomatrixserverlib.Event
-			h, err = t.lookupEvent(ctx, roomVersion, roomID, missingEventID, false)
-			switch err.(type) {
+			h, herr := t.lookupEvent(ctx, roomVersion, roomID, missingEventID, false)
+			switch herr.(type) {
 			case verifySigError:
 				return
 			case nil:
@@ -765,7 +779,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 				util.GetLogger(ctx).WithFields(logrus.Fields{
 					"event_id": missingEventID,
 					"room_id":  roomID,
-				}).Warn("Failed to fetch missing event")
+				}).WithError(herr).Warn("Failed to fetch missing event")
 				return
 			}
 			haveEventsMutex.Lock()

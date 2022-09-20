@@ -15,6 +15,7 @@
 package test
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -22,7 +23,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"strings"
@@ -45,6 +45,10 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 	if err != nil {
 		return err
 	}
+	return SaveMatrixKey(matrixKeyPath, data[3:])
+}
+
+func SaveMatrixKey(matrixKeyPath string, data ed25519.PrivateKey) error {
 	keyOut, err := os.OpenFile(matrixKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
@@ -63,15 +67,15 @@ func NewMatrixKey(matrixKeyPath string) (err error) {
 		Headers: map[string]string{
 			"Key-ID": fmt.Sprintf("ed25519:%s", keyID[:6]),
 		},
-		Bytes: data[3:],
+		Bytes: data,
 	})
 	return err
 }
 
 const certificateDuration = time.Hour * 24 * 365 * 10
 
-func generateTLSTemplate(dnsNames []string) (*rsa.PrivateKey, *x509.Certificate, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+func generateTLSTemplate(dnsNames []string, bitSize int) (*rsa.PrivateKey, *x509.Certificate, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, bitSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -119,8 +123,8 @@ func writePrivateKey(tlsKeyPath string, priv *rsa.PrivateKey) error {
 }
 
 // NewTLSKey generates a new RSA TLS key and certificate and writes it to a file.
-func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
-	priv, template, err := generateTLSTemplate(nil)
+func NewTLSKey(tlsKeyPath, tlsCertPath string, keySize int) error {
+	priv, template, err := generateTLSTemplate(nil, keySize)
 	if err != nil {
 		return err
 	}
@@ -137,14 +141,14 @@ func NewTLSKey(tlsKeyPath, tlsCertPath string) error {
 	return writePrivateKey(tlsKeyPath, priv)
 }
 
-func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPath, authorityCertPath string) error {
-	priv, template, err := generateTLSTemplate([]string{serverName})
+func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPath, authorityCertPath string, keySize int) error {
+	priv, template, err := generateTLSTemplate([]string{serverName}, keySize)
 	if err != nil {
 		return err
 	}
 
 	// load the authority key
-	dat, err := ioutil.ReadFile(authorityKeyPath)
+	dat, err := os.ReadFile(authorityKeyPath)
 	if err != nil {
 		return err
 	}
@@ -158,7 +162,7 @@ func NewTLSKeyWithAuthority(serverName, tlsKeyPath, tlsCertPath, authorityKeyPat
 	}
 
 	// load the authority certificate
-	dat, err = ioutil.ReadFile(authorityCertPath)
+	dat, err = os.ReadFile(authorityCertPath)
 	if err != nil {
 		return err
 	}

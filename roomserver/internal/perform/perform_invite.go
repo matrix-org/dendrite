@@ -39,11 +39,13 @@ type Inviter struct {
 	Inputer *input.Inputer
 }
 
+// nolint:gocyclo
 func (r *Inviter) PerformInvite(
 	ctx context.Context,
 	req *api.PerformInviteRequest,
 	res *api.PerformInviteResponse,
 ) ([]api.OutputEvent, error) {
+	var outputUpdates []api.OutputEvent
 	event := req.Event
 	if event.StateKey() == nil {
 		return nil, fmt.Errorf("invite must be a state event")
@@ -56,9 +58,23 @@ func (r *Inviter) PerformInvite(
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 
-	_, domain, _ := gomatrixserverlib.SplitID('@', targetUserID)
+	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("The user ID %q is invalid!", targetUserID),
+		}
+		return nil, nil
+	}
 	isTargetLocal := domain == r.Cfg.Matrix.ServerName
 	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
+	if !isOriginLocal && !isTargetLocal {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  "The invite must be either from or to a local user",
+		}
+		return nil, nil
+	}
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
 		"inviter":  event.Sender(),
@@ -88,6 +104,34 @@ func (r *Inviter) PerformInvite(
 		if err = event.SetUnsignedField("invite_room_state", inviteState); err != nil {
 			return nil, fmt.Errorf("event.SetUnsignedField: %w", err)
 		}
+	}
+
+	updateMembershipTableManually := func() ([]api.OutputEvent, error) {
+		var updater *shared.MembershipUpdater
+		if updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion); err != nil {
+			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
+		}
+		outputUpdates, err = helpers.UpdateToInviteMembership(updater, &types.Event{
+			EventNID: 0,
+			Event:    event.Unwrap(),
+		}, outputUpdates, req.Event.RoomVersion)
+		if err != nil {
+			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
+		}
+		if err = updater.Commit(); err != nil {
+			return nil, fmt.Errorf("updater.Commit: %w", err)
+		}
+		logger.Debugf("updated membership to invite and sending invite OutputEvent")
+		return outputUpdates, nil
+	}
+
+	if (info == nil || info.IsStub()) && !isOriginLocal && isTargetLocal {
+		// The invite came in over federation for a room that we don't know about
+		// yet. We need to handle this a bit differently to most invites because
+		// we don't know the room state, therefore the roomserver can't process
+		// an input event. Instead we will update the membership table with the
+		// new invite and generate an output event.
+		return updateMembershipTableManually()
 	}
 
 	var isAlreadyJoined bool
@@ -133,31 +177,13 @@ func (r *Inviter) PerformInvite(
 		return nil, nil
 	}
 
+	// If the invite originated remotely then we can't send an
+	// InputRoomEvent for the invite as it will never pass auth checks
+	// due to lacking room state, but we still need to tell the client
+	// about the invite so we can accept it, hence we return an output
+	// event to send to the Sync API.
 	if !isOriginLocal {
-		// The invite originated over federation. Process the membership
-		// update, which will notify the sync API etc about the incoming
-		// invite. We do NOT send an InputRoomEvent for the invite as it
-		// will never pass auth checks due to lacking room state, but we
-		// still need to tell the client about the invite so we can accept
-		// it, hence we return an output event to send to the sync api.
-		var updater *shared.MembershipUpdater
-		updater, err = r.DB.MembershipUpdater(ctx, roomID, targetUserID, isTargetLocal, req.RoomVersion)
-		if err != nil {
-			return nil, fmt.Errorf("r.DB.MembershipUpdater: %w", err)
-		}
-
-		unwrapped := event.Unwrap()
-		var outputUpdates []api.OutputEvent
-		outputUpdates, err = helpers.UpdateToInviteMembership(updater, unwrapped, nil, req.Event.RoomVersion)
-		if err != nil {
-			return nil, fmt.Errorf("updateToInviteMembership: %w", err)
-		}
-
-		if err = updater.Commit(); err != nil {
-			return nil, fmt.Errorf("updater.Commit: %w", err)
-		}
-		logger.Debugf("updated membership to invite and sending invite OutputEvent")
-		return outputUpdates, nil
+		return updateMembershipTableManually()
 	}
 
 	// The invite originated locally. Therefore we have a responsibility to
@@ -215,19 +241,20 @@ func (r *Inviter) PerformInvite(
 		},
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes)
+	if err = r.Inputer.InputRoomEvents(context.Background(), inputReq, inputRes); err != nil {
+		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
+	}
 	if err = inputRes.Err(); err != nil {
 		res.Error = &api.PerformError{
 			Msg:  fmt.Sprintf("r.InputRoomEvents: %s", err.Error()),
 			Code: api.PerformErrorNotAllowed,
 		}
 		logger.WithError(err).WithField("event_id", event.EventID()).Error("r.InputRoomEvents failed")
-		return nil, nil
 	}
 
 	// Don't notify the sync api of this event in the same way as a federated invite so the invitee
 	// gets the invite, as the roomserver will do this when it processes the m.room.member invite.
-	return nil, nil
+	return outputUpdates, nil
 }
 
 func buildInviteStrippedState(
@@ -251,7 +278,7 @@ func buildInviteStrippedState(
 	}
 	roomState := state.NewStateResolution(db, info)
 	stateEntries, err := roomState.LoadStateAtSnapshotForStringTuples(
-		ctx, info.StateSnapshotNID, stateWanted,
+		ctx, info.StateSnapshotNID(), stateWanted,
 	)
 	if err != nil {
 		return nil, err

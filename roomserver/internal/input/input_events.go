@@ -17,8 +17,8 @@
 package input
 
 import (
-	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -107,28 +107,6 @@ func (r *Inputer) processRoomEvent(
 		})
 	}
 
-	// if we have already got this event then do not process it again, if the input kind is an outlier.
-	// Outliers contain no extra information which may warrant a re-processing.
-	if input.Kind == api.KindOutlier {
-		evs, err2 := r.DB.EventsFromIDs(ctx, []string{event.EventID()})
-		if err2 == nil && len(evs) == 1 {
-			// check hash matches if we're on early room versions where the event ID was a random string
-			idFormat, err2 := headered.RoomVersion.EventIDFormat()
-			if err2 == nil {
-				switch idFormat {
-				case gomatrixserverlib.EventIDFormatV1:
-					if bytes.Equal(event.EventReference().EventSHA256, evs[0].EventReference().EventSHA256) {
-						logger.Debugf("Already processed event; ignoring")
-						return nil
-					}
-				default:
-					logger.Debugf("Already processed event; ignoring")
-					return nil
-				}
-			}
-		}
-	}
-
 	// Don't waste time processing the event if the room doesn't exist.
 	// A room entry locally will only be created in response to a create
 	// event.
@@ -139,6 +117,29 @@ func (r *Inputer) processRoomEvent(
 	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
+	}
+
+	// If we already know about this outlier and it hasn't been rejected
+	// then we won't attempt to reprocess it. If it was rejected or has now
+	// arrived as a different kind of event, then we can attempt to reprocess,
+	// in case we have learned something new or need to weave the event into
+	// the DAG now.
+	if input.Kind == api.KindOutlier && roomInfo != nil {
+		wasRejected, werr := r.DB.IsEventRejected(ctx, roomInfo.RoomNID, event.EventID())
+		switch {
+		case werr == sql.ErrNoRows:
+			// We haven't seen this event before so continue.
+		case werr != nil:
+			// Something has gone wrong trying to find out if we rejected
+			// this event already.
+			logger.WithError(werr).Errorf("Failed to check if event %q is already seen", event.EventID())
+			return werr
+		case !wasRejected:
+			// We've seen this event before and it wasn't rejected so we
+			// should ignore it.
+			logger.Debugf("Already processed event %q, ignoring", event.EventID())
+			return nil
+		}
 	}
 
 	var missingAuth, missingPrev bool
@@ -295,19 +296,33 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// Get the state before the event so that we can work out if the event was
+	// allowed at the time, and also to get the history visibility. We won't
+	// bother doing this if the event was already rejected as it just ends up
+	// burning CPU time.
+	historyVisibility := gomatrixserverlib.HistoryVisibilityShared // Default to shared.
+	if input.Kind != api.KindOutlier && rejectionErr == nil && !isRejected {
+		var err error
+		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
+		if err != nil {
+			return fmt.Errorf("r.processStateBefore: %w", err)
+		}
+		if rejectionErr != nil {
+			isRejected = true
+		}
+	}
+
 	// Store the event.
-	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected || softfail)
+	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
 		return fmt.Errorf("updater.StoreEvent: %w", err)
 	}
 
 	// if storing this event results in it being redacted then do so.
 	if !isRejected && redactedEventID == event.EventID() {
-		r, rerr := eventutil.RedactEvent(redactionEvent, event)
-		if rerr != nil {
+		if err = eventutil.RedactEvent(redactionEvent, event); err != nil {
 			return fmt.Errorf("eventutil.RedactEvent: %w", rerr)
 		}
-		event = r
 	}
 
 	// For outliers we can stop after we've stored the event itself as it
@@ -338,12 +353,18 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
-	if isRejected || softfail {
-		logger.WithError(rejectionErr).WithFields(logrus.Fields{
-			"soft_fail":    softfail,
-			"missing_prev": missingPrev,
-		}).Warn("Stored rejected event")
+	// We stop here if the event is rejected: We've stored it but won't update
+	// forward extremities or notify downstream components about it.
+	switch {
+	case isRejected:
+		logger.WithError(rejectionErr).Warn("Stored rejected event")
+		if rejectionErr != nil {
+			return types.RejectedError(rejectionErr.Error())
+		}
+		return nil
+
+	case softfail:
+		logger.WithError(rejectionErr).Warn("Stored soft-failed event")
 		if rejectionErr != nil {
 			return types.RejectedError(rejectionErr.Error())
 		}
@@ -360,15 +381,17 @@ func (r *Inputer) processRoomEvent(
 			input.SendAsServer,  // send as server
 			input.TransactionID, // transaction ID
 			input.HasState,      // rewrites state?
+			historyVisibility,   // the history visibility before the event
 		); err != nil {
 			return fmt.Errorf("r.updateLatestEvents: %w", err)
 		}
 	case api.KindOld:
-		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+		err = r.OutputProducer.ProduceRoomEvents(event.RoomID(), []api.OutputEvent{
 			{
 				Type: api.OutputTypeOldRoomEvent,
 				OldRoomEvent: &api.OutputOldRoomEvent{
-					Event: headered,
+					Event:             headered,
+					HistoryVisibility: historyVisibility,
 				},
 			},
 		})
@@ -382,7 +405,7 @@ func (r *Inputer) processRoomEvent(
 	// so notify downstream components to redact this event - they should have it if they've
 	// been tracking our output log.
 	if redactedEventID != "" {
-		err = r.WriteOutputEvents(event.RoomID(), []api.OutputEvent{
+		err = r.OutputProducer.ProduceRoomEvents(event.RoomID(), []api.OutputEvent{
 			{
 				Type: api.OutputTypeRedactedEvent,
 				RedactedEvent: &api.OutputRedactedEvent{
@@ -400,6 +423,100 @@ func (r *Inputer) processRoomEvent(
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
 	return nil
+}
+
+// processStateBefore works out what the state is before the event and
+// then checks the event auths against the state at the time. It also
+// tries to determine what the history visibility was of the event at
+// the time, so that it can be sent in the output event to downstream
+// components.
+// nolint:nakedret
+func (r *Inputer) processStateBefore(
+	ctx context.Context,
+	input *api.InputRoomEvent,
+	missingPrev bool,
+) (historyVisibility gomatrixserverlib.HistoryVisibility, rejectionErr error, err error) {
+	historyVisibility = gomatrixserverlib.HistoryVisibilityShared // Default to shared.
+	event := input.Event.Unwrap()
+	isCreateEvent := event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("")
+	var stateBeforeEvent []*gomatrixserverlib.Event
+	switch {
+	case isCreateEvent:
+		// There's no state before a create event so there is nothing
+		// else to do.
+		return
+	case input.HasState:
+		// If we're overriding the state then we need to go and retrieve
+		// them from the database. It's a hard error if they are missing.
+		stateEvents, err := r.DB.EventsFromIDs(ctx, input.StateEventIDs)
+		if err != nil {
+			return "", nil, fmt.Errorf("r.DB.EventsFromIDs: %w", err)
+		}
+		stateBeforeEvent = make([]*gomatrixserverlib.Event, 0, len(stateEvents))
+		for _, entry := range stateEvents {
+			stateBeforeEvent = append(stateBeforeEvent, entry.Event)
+		}
+	case missingPrev:
+		// We don't know all of the prev events, so we can't work out
+		// the state before the event. Reject it in that case.
+		rejectionErr = fmt.Errorf("event %q has missing prev events", event.EventID())
+		return
+	case len(event.PrevEventIDs()) == 0:
+		// There should be prev events since it's not a create event.
+		// A non-create event that claims to have no prev events is
+		// invalid, so reject it.
+		rejectionErr = fmt.Errorf("event %q must have prev events", event.EventID())
+		return
+	default:
+		// For all non-create events, there must be prev events, so we'll
+		// ask the query API for the relevant tuples needed for auth. We
+		// will include the history visibility here even though we don't
+		// actually need it for auth, because we want to send it in the
+		// output events.
+		tuplesNeeded := gomatrixserverlib.StateNeededForAuth([]*gomatrixserverlib.Event{event}).Tuples()
+		tuplesNeeded = append(tuplesNeeded, gomatrixserverlib.StateKeyTuple{
+			EventType: gomatrixserverlib.MRoomHistoryVisibility,
+			StateKey:  "",
+		})
+		stateBeforeReq := &api.QueryStateAfterEventsRequest{
+			RoomID:       event.RoomID(),
+			PrevEventIDs: event.PrevEventIDs(),
+			StateToFetch: tuplesNeeded,
+		}
+		stateBeforeRes := &api.QueryStateAfterEventsResponse{}
+		if err := r.Queryer.QueryStateAfterEvents(ctx, stateBeforeReq, stateBeforeRes); err != nil {
+			return "", nil, fmt.Errorf("r.Queryer.QueryStateAfterEvents: %w", err)
+		}
+		switch {
+		case !stateBeforeRes.RoomExists:
+			rejectionErr = fmt.Errorf("room %q does not exist", event.RoomID())
+			return
+		case !stateBeforeRes.PrevEventsExist:
+			rejectionErr = fmt.Errorf("prev events of %q are not known", event.EventID())
+			return
+		default:
+			stateBeforeEvent = gomatrixserverlib.UnwrapEventHeaders(stateBeforeRes.StateEvents)
+		}
+	}
+	// At this point, stateBeforeEvent should be populated either by
+	// the supplied state in the input request, or from the prev events.
+	// Check whether the event is allowed or not.
+	stateBeforeAuth := gomatrixserverlib.NewAuthEvents(stateBeforeEvent)
+	if rejectionErr = gomatrixserverlib.Allowed(event, &stateBeforeAuth); rejectionErr != nil {
+		return
+	}
+	// Work out what the history visibility was at the time of the
+	// event.
+	for _, event := range stateBeforeEvent {
+		if event.Type() != gomatrixserverlib.MRoomHistoryVisibility || !event.StateKeyEquals("") {
+			continue
+		}
+		if hisVis, err := event.HistoryVisibility(); err == nil {
+			historyVisibility = hisVis
+			break
+		}
+	}
+	return
 }
 
 // fetchAuthEvents will check to see if any of the
@@ -550,7 +667,7 @@ func (r *Inputer) calculateAndSetState(
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs, true); err != nil {
 			return fmt.Errorf("updater.StateEntriesForEventIDs: %w", err)
 		}
 		entries = types.DeduplicateStateEntries(entries)

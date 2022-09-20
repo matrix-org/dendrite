@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     headered_event_json TEXT NOT NULL,
     membership TEXT,
     added_at BIGINT,
+    history_visibility SMALLINT NOT NULL DEFAULT 2, -- The history visibility before this event (1 - world_readable; 2 - shared; 3 - invited; 4 - joined)
     UNIQUE (room_id, type, state_key)
 );
 -- for event deletion
@@ -52,8 +54,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON sync
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" ON CONFLICT (room_id, type, state_key)" +
 	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
@@ -84,12 +86,17 @@ const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly six columns. We need to
+	// TODO: The session_id and transaction_id blanks are here because
+	// the rowsToStreamEvents expects there to be exactly seven columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, history_visibility" +
 	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
+
+const selectSharedUsersSQL = "" +
+	"SELECT state_key FROM syncapi_current_room_state WHERE room_id IN(" +
+	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
+	") AND type = 'm.room.member' AND state_key IN ($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
 	db                                 *sql.DB
@@ -100,8 +107,9 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithMembershipStmt    *sql.Stmt
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
-	//selectJoinedUsersInRoomStmt        *sql.Stmt - prepared at runtime due to variadic
+	//selectJoinedUsersInRoomStmt      *sql.Stmt - prepared at runtime due to variadic
 	selectStateEventStmt *sql.Stmt
+	//selectSharedUsersSQL             *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
@@ -113,6 +121,17 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: add history visibility column (current_room_state)",
+		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
 		return nil, err
 	}
@@ -322,6 +341,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		headeredJSON,
 		membership,
 		addedAt,
+		event.Visibility,
 	)
 	return err
 }
@@ -395,4 +415,33 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	return &ev, err
+}
+
+func (s *currentRoomStateStatements) SelectSharedUsers(
+	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
+) ([]string, error) {
+
+	params := make([]interface{}, len(otherUserIDs)+1)
+	params[0] = userID
+	for k, v := range otherUserIDs {
+		params[k+1] = v
+	}
+
+	result := make([]string, 0, len(otherUserIDs))
+	query := strings.Replace(selectSharedUsersSQL, "($2)", sqlutil.QueryVariadicOffset(len(otherUserIDs), 1), 1)
+	err := sqlutil.RunLimitedVariablesQuery(
+		ctx, query, s.db, params, sqlutil.SQLite3MaxVariables,
+		func(rows *sql.Rows) error {
+			var stateKey string
+			for rows.Next() {
+				if err := rows.Scan(&stateKey); err != nil {
+					return err
+				}
+				result = append(result, stateKey)
+			}
+			return nil
+		},
+	)
+
+	return result, err
 }

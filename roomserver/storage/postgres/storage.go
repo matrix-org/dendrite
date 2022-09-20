@@ -16,7 +16,9 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	// Import the postgres database driver.
@@ -45,26 +47,49 @@ func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache c
 	}
 
 	// Create the tables.
-	if err := d.create(db); err != nil {
+	if err = d.create(db); err != nil {
 		return nil, err
 	}
 
-	// Then execute the migrations. By this point the tables are created with the latest
-	// schemas.
-	m := sqlutil.NewMigrations()
-	deltas.LoadAddForgottenColumn(m)
-	deltas.LoadStateBlocksRefactor(m)
-	if err := m.RunDeltas(db, dbProperties); err != nil {
+	// Special case, since this migration uses several tables, so it needs to
+	// be sure that all tables are created first.
+	if err = executeMigration(base.Context(), db); err != nil {
 		return nil, err
 	}
 
 	// Then prepare the statements. Now that the migrations have run, any columns referred
 	// to in the database code should now exist.
-	if err := d.prepare(db, writer, cache); err != nil {
+	if err = d.prepare(db, writer, cache); err != nil {
 		return nil, err
 	}
 
 	return &d, nil
+}
+
+func executeMigration(ctx context.Context, db *sql.DB) error {
+	// TODO: Remove when we are sure we are not having goose artefacts in the db
+	// This forces an error, which indicates the migration is already applied, since the
+	// column event_nid was removed from the table
+	migrationName := "roomserver: state blocks refactor"
+
+	var cName string
+	err := db.QueryRowContext(ctx, "select column_name from information_schema.columns where table_name = 'roomserver_state_block' AND column_name = 'event_nid'").Scan(&cName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) { // migration was already executed, as the column was removed
+			if err = sqlutil.InsertMigration(ctx, db, migrationName); err != nil {
+				return fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+			}
+			return nil
+		}
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: migrationName,
+		Up:      deltas.UpStateBlocksRefactor,
+	})
+
+	return m.Up(ctx)
 }
 
 func (d *Database) create(db *sql.DB) error {

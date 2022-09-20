@@ -11,8 +11,8 @@ possible to get started.
 
 ## Sign off
 
-We ask that everyone who contributes to the project signs off their contributions
-in accordance with the [DCO](https://github.com/matrix-org/matrix-spec/blob/main/CONTRIBUTING.rst#sign-off).
+We require that everyone who contributes to the project signs off their contributions
+in accordance with the [Developer Certificate of Origin](https://github.com/matrix-org/matrix-spec/blob/main/CONTRIBUTING.rst#sign-off).
 In effect, this means adding a statement to your pull requests or commit messages
 along the lines of:
 
@@ -20,11 +20,22 @@ along the lines of:
 Signed-off-by: Full Name <email address>
 ```
 
-Unfortunately we can't accept contributions without it.
+Unfortunately we can't accept contributions without a sign-off.
+
+Please note that we can only accept contributions under a legally identifiable name,
+such as your name as it appears on government-issued documentation or common-law names
+(claimed by legitimate usage or repute). We cannot accept sign-offs from a pseudonym or
+alias and cannot accept anonymous contributions.
+
+If you would prefer to sign off privately instead (so as to not reveal your full
+name on a public pull request), you can do so by emailing a sign-off declaration
+and a link to your pull request directly to the [Matrix.org Foundation](https://matrix.org/foundation/)
+at `dco@matrix.org`. Once a private sign-off has been made, you will not be required
+to do so for future contributions.
 
 ## Getting up and running
 
-See the [Installation](INSTALL.md) section for information on how to build an
+See the [Installation](installation) section for information on how to build an
 instance of Dendrite. You will likely need this in order to test your changes.
 
 ## Code style
@@ -64,7 +75,7 @@ comment. Please avoid doing this if you can.
 We also have unit tests which we run via:
 
 ```bash
-go test ./...
+go test --race ./...
 ```
 
 In general, we like submissions that come with tests. Anything that proves that the

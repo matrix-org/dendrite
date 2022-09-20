@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -117,6 +118,15 @@ func NewPostgresDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName
 		serverName: serverName,
 	}
 	_, err := db.Exec(devicesSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: add last_seen_ts",
+		Up:      deltas.UpLastSeenTSIP,
+	})
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ on:
   pull_request:
   release:
     types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,13 +18,14 @@ jobs:
     name: WASM build test
     timeout-minutes: 5
     runs-on: ubuntu-latest
+    if: ${{ false }} # disable for now
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: 1.18
 
       - uses: actions/cache@v2
         with:
@@ -65,8 +67,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
 
   # run go test with different go versions
   test:
@@ -96,11 +102,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18", "1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
       - uses: actions/cache@v3
@@ -126,13 +132,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18", "1.19"]
         goos: ["linux"]
         goarch: ["amd64", "386"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
       - name: Install dependencies x86
@@ -150,6 +156,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 1
+          CGO_CFLAGS: -fno-stack-protector
         run: go build -trimpath -v -o "bin/" ./cmd/...
 
   # build for Windows 64-bit
@@ -159,13 +166,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.16", "1.17", "1.18"]
+        go: ["1.18", "1.19"]
         goos: ["windows"]
         goarch: ["amd64"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Go ${{ matrix.go }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
       - name: Install dependencies
@@ -206,9 +213,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: "1.16"
+          go-version: "1.18"
       - uses: actions/cache@v3
         with:
           path: |
@@ -221,6 +228,31 @@ jobs:
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade
         run: ./dendrite-upgrade-tests --head .
+
+  # run database upgrade tests, skipping over one version
+  upgrade_test_direct:
+    name: Upgrade tests from HEAD-2
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.18"
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-upgrade
+      - name: Build upgrade-tests
+        run: go build ./cmd/dendrite-upgrade-tests
+      - name: Test upgrade
+        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
 
   # run Sytest in different variations
   sytest:
@@ -344,6 +376,8 @@ jobs:
       # Build initial Dendrite image
       - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Run Complement
       - run: |
@@ -358,7 +392,14 @@ jobs:
 
   integration-tests-done:
     name: Integration tests passed
-    needs: [initial-tests-done, upgrade_test, sytest, complement]
+    needs:
+      [
+        initial-tests-done,
+        upgrade_test,
+        upgrade_test_direct,
+        sytest,
+        complement,
+      ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:

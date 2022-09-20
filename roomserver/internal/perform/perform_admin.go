@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -34,6 +35,7 @@ type Admin struct {
 	Cfg     *config.RoomServer
 	Queryer *query.Queryer
 	Inputer *input.Inputer
+	Leaver  *Leaver
 }
 
 // PerformEvacuateRoom will remove all local users from the given room.
@@ -41,21 +43,21 @@ func (r *Admin) PerformAdminEvacuateRoom(
 	ctx context.Context,
 	req *api.PerformAdminEvacuateRoomRequest,
 	res *api.PerformAdminEvacuateRoomResponse,
-) {
+) error {
 	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("r.DB.RoomInfo: %s", err),
 		}
-		return
+		return nil
 	}
-	if roomInfo == nil || roomInfo.IsStub {
+	if roomInfo == nil || roomInfo.IsStub() {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorNoRoom,
 			Msg:  fmt.Sprintf("Room %s not found", req.RoomID),
 		}
-		return
+		return nil
 	}
 
 	memberNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
@@ -64,7 +66,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("r.DB.GetMembershipEventNIDsForRoom: %s", err),
 		}
-		return
+		return nil
 	}
 
 	memberEvents, err := r.DB.Events(ctx, memberNIDs)
@@ -73,7 +75,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("r.DB.Events: %s", err),
 		}
-		return
+		return nil
 	}
 
 	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
@@ -87,7 +89,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("r.Queryer.QueryLatestEventsAndState: %s", err),
 		}
-		return
+		return nil
 	}
 
 	prevEvents := latestRes.LatestEvents
@@ -102,7 +104,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 				Code: api.PerformErrorBadRequest,
 				Msg:  fmt.Sprintf("json.Unmarshal: %s", err),
 			}
-			return
+			return nil
 		}
 		memberContent.Membership = gomatrixserverlib.Leave
 
@@ -120,7 +122,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 				Code: api.PerformErrorBadRequest,
 				Msg:  fmt.Sprintf("json.Marshal: %s", err),
 			}
-			return
+			return nil
 		}
 
 		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
@@ -129,7 +131,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 				Code: api.PerformErrorBadRequest,
 				Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
 			}
-			return
+			return nil
 		}
 
 		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, time.Now(), &eventsNeeded, latestRes)
@@ -138,7 +140,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 				Code: api.PerformErrorBadRequest,
 				Msg:  fmt.Sprintf("eventutil.BuildEvent: %s", err),
 			}
-			return
+			return nil
 		}
 
 		inputEvents = append(inputEvents, api.InputRoomEvent{
@@ -158,5 +160,74 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		Asynchronous:    true,
 	}
 	inputRes := &api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+	return r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
+}
+
+func (r *Admin) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *api.PerformAdminEvacuateUserRequest,
+	res *api.PerformAdminEvacuateUserResponse,
+) error {
+	_, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("Malformed user ID: %s", err),
+		}
+		return nil
+	}
+	if domain != r.Cfg.Matrix.ServerName {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  "Can only evacuate local users using this endpoint",
+		}
+		return nil
+	}
+
+	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Join)
+	if err != nil && err != sql.ErrNoRows {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
+		}
+		return nil
+	}
+
+	inviteRoomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, gomatrixserverlib.Invite)
+	if err != nil && err != sql.ErrNoRows {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.GetRoomsByMembership: %s", err),
+		}
+		return nil
+	}
+
+	for _, roomID := range append(roomIDs, inviteRoomIDs...) {
+		leaveReq := &api.PerformLeaveRequest{
+			RoomID: roomID,
+			UserID: req.UserID,
+		}
+		leaveRes := &api.PerformLeaveResponse{}
+		outputEvents, err := r.Leaver.PerformLeave(ctx, leaveReq, leaveRes)
+		if err != nil {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("r.Leaver.PerformLeave: %s", err),
+			}
+			return nil
+		}
+		if len(outputEvents) == 0 {
+			continue
+		}
+		if err := r.Inputer.OutputProducer.ProduceRoomEvents(roomID, outputEvents); err != nil {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("r.Inputer.WriteOutputEvents: %s", err),
+			}
+			return nil
+		}
+
+		res.Affected = append(res.Affected, roomID)
+	}
+	return nil
 }

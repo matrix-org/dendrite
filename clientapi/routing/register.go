@@ -19,7 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -29,9 +29,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
@@ -68,9 +69,10 @@ const (
 // It shouldn't be passed by value because it contains a mutex.
 type sessionsDict struct {
 	sync.RWMutex
-	sessions map[string][]authtypes.LoginType
-	params   map[string]registerRequest
-	timer    map[string]*time.Timer
+	sessions               map[string][]authtypes.LoginType
+	sessionCompletedResult map[string]registerResponse
+	params                 map[string]registerRequest
+	timer                  map[string]*time.Timer
 	// deleteSessionToDeviceID protects requests to DELETE /devices/{deviceID} from being abused.
 	// If a UIA session is started by trying to delete device1, and then UIA is completed by deleting device2,
 	// the delete request will fail for device2 since the UIA was initiated by trying to delete device1.
@@ -115,6 +117,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 	delete(d.params, sessionID)
 	delete(d.sessions, sessionID)
 	delete(d.deleteSessionToDeviceID, sessionID)
+	delete(d.sessionCompletedResult, sessionID)
 	// stop the timer, e.g. because the registration was completed
 	if t, ok := d.timer[sessionID]; ok {
 		if !t.Stop() {
@@ -130,6 +133,7 @@ func (d *sessionsDict) deleteSession(sessionID string) {
 func newSessionsDict() *sessionsDict {
 	return &sessionsDict{
 		sessions:                make(map[string][]authtypes.LoginType),
+		sessionCompletedResult:  make(map[string]registerResponse),
 		params:                  make(map[string]registerRequest),
 		timer:                   make(map[string]*time.Timer),
 		deleteSessionToDeviceID: make(map[string]string),
@@ -171,6 +175,19 @@ func (d *sessionsDict) addDeviceToDelete(sessionID, deviceID string) {
 	d.Lock()
 	defer d.Unlock()
 	d.deleteSessionToDeviceID[sessionID] = deviceID
+}
+
+func (d *sessionsDict) addCompletedRegistration(sessionID string, response registerResponse) {
+	d.Lock()
+	defer d.Unlock()
+	d.sessionCompletedResult[sessionID] = response
+}
+
+func (d *sessionsDict) getCompletedRegistration(sessionID string) (registerResponse, bool) {
+	d.RLock()
+	defer d.RUnlock()
+	result, ok := d.sessionCompletedResult[sessionID]
+	return result, ok
 }
 
 func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
@@ -259,19 +276,19 @@ type recaptchaResponse struct {
 }
 
 // validateUsername returns an error response if the username is invalid
-func validateUsername(username string) *util.JSONResponse {
+func validateUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(username) > maxUsernameLength {
+	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
+			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
 		}
-	} else if !validUsernameRegex.MatchString(username) {
+	} else if !validUsernameRegex.MatchString(localpart) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
 		}
-	} else if username[0] == '_' { // Regex checks its not a zero length string
+	} else if localpart[0] == '_' { // Regex checks its not a zero length string
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
@@ -281,13 +298,13 @@ func validateUsername(username string) *util.JSONResponse {
 }
 
 // validateApplicationServiceUsername returns an error response if the username is invalid for an application service
-func validateApplicationServiceUsername(username string) *util.JSONResponse {
-	if len(username) > maxUsernameLength {
+func validateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
+	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'username' >%d characters", maxUsernameLength)),
+			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
 		}
-	} else if !validUsernameRegex.MatchString(username) {
+	} else if !validUsernameRegex.MatchString(localpart) {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
@@ -354,7 +371,7 @@ func validateRecaptcha(
 
 	// Grab the body of the response from the captcha server
 	var r recaptchaResponse
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusGatewayTimeout,
@@ -506,7 +523,7 @@ func validateApplicationService(
 	}
 
 	// Check username application service is trying to register is valid
-	if err := validateApplicationServiceUsername(username); err != nil {
+	if err := validateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
 		return "", err
 	}
 
@@ -522,7 +539,7 @@ func Register(
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	defer req.Body.Close() // nolint: errcheck
-	reqBody, err := ioutil.ReadAll(req.Body)
+	reqBody, err := io.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -544,6 +561,14 @@ func Register(
 		r.DeviceID = data.DeviceID
 		r.InitialDisplayName = data.InitialDisplayName
 		r.InhibitLogin = data.InhibitLogin
+		// Check if the user already registered using this session, if so, return that result
+		if response, ok := sessions.getCompletedRegistration(sessionID); ok {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: response,
+			}
+		}
+
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
@@ -579,7 +604,7 @@ func Register(
 	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
 		// Spec-compliant case (the access_token is specified and the login type
 		// is correctly set, so it's an appservice registration)
-		if resErr := validateApplicationServiceUsername(r.Username); resErr != nil {
+		if resErr := validateApplicationServiceUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
 			return *resErr
 		}
 	case accessTokenErr == nil:
@@ -592,7 +617,7 @@ func Register(
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
-		if resErr := validateUsername(r.Username); resErr != nil {
+		if resErr := validateUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
 			return *resErr
 		}
 	}
@@ -839,13 +864,6 @@ func completeRegistration(
 	displayName, deviceID *string,
 	accType userapi.AccountType,
 ) util.JSONResponse {
-	var registrationOK bool
-	defer func() {
-		if registrationOK {
-			sessions.deleteSession(sessionID)
-		}
-	}()
-
 	if username == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -886,7 +904,6 @@ func completeRegistration(
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
 	if inhibitLogin {
-		registrationOK = true
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
@@ -920,15 +937,17 @@ func completeRegistration(
 		}
 	}
 
-	registrationOK = true
+	result := registerResponse{
+		UserID:      devRes.Device.UserID,
+		AccessToken: devRes.Device.AccessToken,
+		HomeServer:  accRes.Account.ServerName,
+		DeviceID:    devRes.Device.ID,
+	}
+	sessions.addCompletedRegistration(sessionID, result)
+
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: registerResponse{
-			UserID:      devRes.Device.UserID,
-			AccessToken: devRes.Device.AccessToken,
-			HomeServer:  accRes.Account.ServerName,
-			DeviceID:    devRes.Device.ID,
-		},
+		JSON: result,
 	}
 }
 
@@ -999,7 +1018,7 @@ func RegisterAvailable(
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
 
-	if err := validateUsername(username); err != nil {
+	if err := validateUsername(username, cfg.Matrix.ServerName); err != nil {
 		return *err
 	}
 
@@ -1040,7 +1059,7 @@ func RegisterAvailable(
 	}
 }
 
-func handleSharedSecretRegistration(userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
 	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
 	if err != nil {
 		return util.JSONResponse{
@@ -1061,7 +1080,7 @@ func handleSharedSecretRegistration(userAPI userapi.ClientUserAPI, sr *SharedSec
 	// downcase capitals
 	ssrr.User = strings.ToLower(ssrr.User)
 
-	if resErr := validateUsername(ssrr.User); resErr != nil {
+	if resErr := validateUsername(ssrr.User, cfg.Matrix.ServerName); resErr != nil {
 		return *resErr
 	}
 	if resErr := validatePassword(ssrr.Password); resErr != nil {

@@ -25,6 +25,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -35,10 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // RequestPool manages HTTP long-poll connections for /sync
@@ -61,7 +62,7 @@ type PresencePublisher interface {
 }
 
 type PresenceConsumer interface {
-	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts int, fromSync bool)
+	EmitPresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, ts gomatrixserverlib.Timestamp, fromSync bool)
 }
 
 // NewRequestPool makes a new RequestPool
@@ -171,7 +172,7 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	// the /sync response else we may not return presence: online immediately.
 	rp.consumer.EmitPresence(
 		context.Background(), userID, presenceID, newPresence.ClientFields.StatusMsg,
-		int(gomatrixserverlib.AsTimestamp(time.Now())), true,
+		gomatrixserverlib.AsTimestamp(time.Now()), true,
 	)
 }
 
@@ -251,6 +252,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 	waitingSyncRequests.Inc()
 	defer waitingSyncRequests.Dec()
 
+	// Clean up old send-to-device messages from before this stream position.
+	// This is needed to avoid sending the same message multiple times
+	if err = rp.db.CleanSendToDeviceUpdates(syncReq.Context, syncReq.Device.UserID, syncReq.Device.ID, syncReq.Since.SendToDevicePosition); err != nil {
+		syncReq.Log.WithError(err).Error("p.DB.CleanSendToDeviceUpdates failed")
+	}
+
 	// loop until we get some data
 	for {
 		startTime := time.Now()
@@ -291,8 +298,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				return giveup()
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
-				syncReq.Log.Debugln("Responding to sync after wake-up")
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+				syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync after wake-up")
 			}
 		} else {
 			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
@@ -429,7 +436,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 	}
 	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), syncReq, fromToken.PDUPosition, toToken.PDUPosition)
 	_, _, err = internal.DeviceListCatchup(
-		req.Context(), rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
+		req.Context(), rp.db, rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {

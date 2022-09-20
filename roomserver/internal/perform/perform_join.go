@@ -52,7 +52,7 @@ func (r *Joiner) PerformJoin(
 	ctx context.Context,
 	req *rsAPI.PerformJoinRequest,
 	res *rsAPI.PerformJoinResponse,
-) {
+) error {
 	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
 		"room_id": req.RoomIDOrAlias,
 		"user_id": req.UserID,
@@ -71,11 +71,12 @@ func (r *Joiner) PerformJoin(
 				Msg: err.Error(),
 			}
 		}
-		return
+		return nil
 	}
 	logger.Info("User joined room successfully")
 	res.RoomID = roomID
 	res.JoinedVia = joinedVia
+	return nil
 }
 
 func (r *Joiner) performJoin(
@@ -268,21 +269,19 @@ func (r *Joiner) performJoinRoomByID(
 	case nil:
 		// The room join is local. Send the new join event into the
 		// roomserver. First of all check that the user isn't already
-		// a member of the room.
-		alreadyJoined := false
-		for _, se := range buildRes.StateEvents {
-			if !se.StateKeyEquals(userID) {
-				continue
-			}
-			if membership, merr := se.Membership(); merr == nil {
-				alreadyJoined = (membership == gomatrixserverlib.Join)
-				break
-			}
+		// a member of the room. This is best-effort (as in we won't
+		// fail if we can't find the existing membership) because there
+		// is really no harm in just sending another membership event.
+		membershipReq := &api.QueryMembershipForUserRequest{
+			RoomID: req.RoomIDOrAlias,
+			UserID: userID,
 		}
+		membershipRes := &api.QueryMembershipForUserResponse{}
+		_ = r.Queryer.QueryMembershipForUser(ctx, membershipReq, membershipRes)
 
 		// If we haven't already joined the room then send an event
 		// into the room changing our membership status.
-		if !alreadyJoined {
+		if !membershipRes.RoomExists || !membershipRes.IsInRoom {
 			inputReq := rsAPI.InputRoomEventsRequest{
 				InputRoomEvents: []rsAPI.InputRoomEvent{
 					{
@@ -293,7 +292,12 @@ func (r *Joiner) performJoinRoomByID(
 				},
 			}
 			inputRes := rsAPI.InputRoomEventsResponse{}
-			r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+			if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+				return "", "", &rsAPI.PerformError{
+					Code: rsAPI.PerformErrorNoOperation,
+					Msg:  fmt.Sprintf("InputRoomEvents failed: %s", err),
+				}
+			}
 			if err = inputRes.Err(); err != nil {
 				return "", "", &rsAPI.PerformError{
 					Code: rsAPI.PerformErrorNotAllowed,

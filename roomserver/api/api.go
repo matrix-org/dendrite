@@ -40,7 +40,7 @@ type InputRoomEventsAPI interface {
 		ctx context.Context,
 		req *InputRoomEventsRequest,
 		res *InputRoomEventsResponse,
-	)
+	) error
 }
 
 // Query the latest events and state for a room from the room server.
@@ -97,6 +97,14 @@ type SyncRoomserverAPI interface {
 		req *PerformBackfillRequest,
 		res *PerformBackfillResponse,
 	) error
+
+	// QueryMembershipAtEvent queries the memberships at the given events.
+	// Returns a map from eventID to a slice of gomatrixserverlib.HeaderedEvent.
+	QueryMembershipAtEvent(
+		ctx context.Context,
+		request *QueryMembershipAtEventRequest,
+		response *QueryMembershipAtEventResponse,
+	) error
 }
 
 type AppserviceRoomserverAPI interface {
@@ -139,18 +147,15 @@ type ClientRoomserverAPI interface {
 	GetAliasesForRoomID(ctx context.Context, req *GetAliasesForRoomIDRequest, res *GetAliasesForRoomIDResponse) error
 
 	// PerformRoomUpgrade upgrades a room to a newer version
-	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse)
-	PerformAdminEvacuateRoom(
-		ctx context.Context,
-		req *PerformAdminEvacuateRoomRequest,
-		res *PerformAdminEvacuateRoomResponse,
-	)
-	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse)
-	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse)
+	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse) error
+	PerformAdminEvacuateRoom(ctx context.Context, req *PerformAdminEvacuateRoomRequest, res *PerformAdminEvacuateRoomResponse) error
+	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse) error
+	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse) error
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
-	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse)
+	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse) error
 	PerformLeave(ctx context.Context, req *PerformLeaveRequest, res *PerformLeaveResponse) error
-	PerformPublish(ctx context.Context, req *PerformPublishRequest, res *PerformPublishResponse)
+	PerformPublish(ctx context.Context, req *PerformPublishRequest, res *PerformPublishResponse) error
 	// PerformForget forgets a rooms history for a specific user
 	PerformForget(ctx context.Context, req *PerformForgetRequest, resp *PerformForgetResponse) error
 	SetRoomAlias(ctx context.Context, req *SetRoomAliasRequest, res *SetRoomAliasResponse) error
@@ -161,6 +166,7 @@ type UserRoomserverAPI interface {
 	QueryLatestEventsAndStateAPI
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
+	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
 }
 
 type FederationRoomserverAPI interface {

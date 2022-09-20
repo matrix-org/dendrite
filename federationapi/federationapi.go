@@ -15,7 +15,11 @@
 package federationapi
 
 import (
+	"time"
+
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
@@ -31,10 +35,10 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
@@ -63,6 +67,8 @@ func AddPublicRoutes(
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		ServerName:             cfg.Matrix.ServerName,
 		UserAPI:                userAPI,
 	}
@@ -166,5 +172,16 @@ func NewInternalAPI(
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")
 	}
+
+	var cleanExpiredEDUs func()
+	cleanExpiredEDUs = func() {
+		logrus.Infof("Cleaning expired EDUs")
+		if err := federationDB.DeleteExpiredEDUs(base.Context()); err != nil {
+			logrus.WithError(err).Error("Failed to clean expired EDUs")
+		}
+		time.AfterFunc(time.Hour, cleanExpiredEDUs)
+	}
+	time.AfterFunc(time.Minute, cleanExpiredEDUs)
+
 	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
 }

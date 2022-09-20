@@ -101,7 +101,7 @@ type ClientUserAPI interface {
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
-	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse)
+	QueryKeyBackup(ctx context.Context, req *QueryKeyBackupRequest, res *QueryKeyBackupResponse) error
 
 	QueryThreePIDsForLocalpart(ctx context.Context, req *QueryThreePIDsForLocalpartRequest, res *QueryThreePIDsForLocalpartResponse) error
 	QueryLocalpartForThreePID(ctx context.Context, req *QueryLocalpartForThreePIDRequest, res *QueryLocalpartForThreePIDResponse) error
@@ -335,8 +335,9 @@ type PerformAccountCreationResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformPasswordUpdateRequest struct {
-	Localpart string // Required: The localpart for this account.
-	Password  string // Required: The new password to set.
+	Localpart     string // Required: The localpart for this account.
+	Password      string // Required: The new password to set.
+	LogoutDevices bool   // Optional: Whether to log out all user devices.
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation

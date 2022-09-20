@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,11 +32,12 @@ type fedRoomserverAPI struct {
 }
 
 // PerformJoin will call this function
-func (f *fedRoomserverAPI) InputRoomEvents(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) {
+func (f *fedRoomserverAPI) InputRoomEvents(ctx context.Context, req *rsapi.InputRoomEventsRequest, res *rsapi.InputRoomEventsResponse) error {
 	if f.inputRoomEvents == nil {
-		return
+		return nil
 	}
 	f.inputRoomEvents(ctx, req, res)
+	return nil
 }
 
 // keychange consumer calls this
@@ -48,6 +50,7 @@ func (f *fedRoomserverAPI) QueryRoomsForUser(ctx context.Context, req *rsapi.Que
 
 // TODO: This struct isn't generic, only works for TestFederationAPIJoinThenKeyUpdate
 type fedClient struct {
+	fedClientMutex sync.Mutex
 	api.FederationClient
 	allowJoins []*test.Room
 	keys       map[gomatrixserverlib.ServerName]struct {
@@ -59,6 +62,8 @@ type fedClient struct {
 }
 
 func (f *fedClient) GetServerKeys(ctx context.Context, matrixServer gomatrixserverlib.ServerName) (gomatrixserverlib.ServerKeys, error) {
+	f.fedClientMutex.Lock()
+	defer f.fedClientMutex.Unlock()
 	fmt.Println("GetServerKeys:", matrixServer)
 	var keys gomatrixserverlib.ServerKeys
 	var keyID gomatrixserverlib.KeyID
@@ -122,6 +127,8 @@ func (f *fedClient) MakeJoin(ctx context.Context, s gomatrixserverlib.ServerName
 	return
 }
 func (f *fedClient) SendJoin(ctx context.Context, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res gomatrixserverlib.RespSendJoin, err error) {
+	f.fedClientMutex.Lock()
+	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
 		if r.ID == event.RoomID() {
 			r.InsertEvent(f.t, event.Headered(r.Version))
@@ -134,6 +141,8 @@ func (f *fedClient) SendJoin(ctx context.Context, s gomatrixserverlib.ServerName
 }
 
 func (f *fedClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error) {
+	f.fedClientMutex.Lock()
+	defer f.fedClientMutex.Unlock()
 	for _, edu := range t.EDUs {
 		if edu.Type == gomatrixserverlib.MDeviceListUpdate {
 			f.sentTxn = true
@@ -242,6 +251,8 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 
 	testrig.MustPublishMsgs(t, jsctx, msg)
 	time.Sleep(500 * time.Millisecond)
+	fc.fedClientMutex.Lock()
+	defer fc.fedClientMutex.Unlock()
 	if !fc.sentTxn {
 		t.Fatalf("did not send device list update")
 	}
@@ -252,7 +263,10 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	_, privKey, _ := ed25519.GenerateKey(nil)
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey

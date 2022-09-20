@@ -98,12 +98,20 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadFixSequences(m)
-	deltas.LoadRemoveSendToDeviceSentColumn(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+
+	// apply migrations which need multiple tables
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(
+		sqlutil.Migration{
+			Version: "syncapi: set history visibility for existing events",
+			Up:      deltas.UpSetHistoryVisibility, // Requires current_room_state and output_room_events to be created.
+		},
+	)
+	err = m.Up(base.Context())
+	if err != nil {
 		return nil, err
 	}
+
 	d.Database = shared.Database{
 		DB:                  d.db,
 		Writer:              d.writer,

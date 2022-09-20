@@ -1,0 +1,57 @@
+# Sample Caddyfile for using Caddy in front of Dendrite.
+#
+# Customize email address and domain names.
+# Optional settings commented out.
+#
+# BE SURE YOUR DOMAINS ARE POINTED AT YOUR SERVER FIRST.
+# Documentation: https://caddyserver.com/docs/
+#
+# Bonus tip: If your IP address changes, use Caddy's
+# dynamic DNS plugin to update your DNS records to
+# point to your new IP automatically:
+# https://github.com/mholt/caddy-dynamicdns
+#
+
+
+# Global options block
+{
+	# In case there is a problem with your certificates.
+	# email example@example.com
+
+	# Turn off the admin endpoint if you don't need graceful config
+	# changes and/or are running untrusted code on your machine.
+	# admin off
+
+	# Enable this if your clients don't send ServerName in TLS handshakes.
+	# default_sni example.com
+
+	# Enable debug mode for verbose logging.
+	# debug
+
+	# Use Let's Encrypt's staging endpoint for testing.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+
+	# If you're port-forwarding HTTP/HTTPS ports from 80/443 to something
+	# else, enable these and put the alternate port numbers here.
+	# http_port  8080
+	# https_port 8443
+}
+
+# The server name of your matrix homeserver. This example shows
+# "well-known delegation" from the registered domain to a subdomain,
+# which is only needed if your server_name doesn't match your Matrix
+# homeserver URL (i.e. you can show users a vanity domain that looks
+# nice and is easy to remember but still have your Matrix server on
+# its own subdomain or hosted service).
+example.com {
+	header /.well-known/matrix/* Content-Type application/json
+	header /.well-known/matrix/* Access-Control-Allow-Origin *
+	respond /.well-known/matrix/server `{"m.server": "matrix.example.com:443"}`
+	respond /.well-known/matrix/client `{"m.homeserver": {"base_url": "https://matrix.example.com"}}`
+}
+
+# The actual domain name whereby your Matrix server is accessed.
+matrix.example.com {
+	# Set localhost:8008 to the address of your Dendrite server, if different
+	reverse_proxy /_matrix/* localhost:8008
+}

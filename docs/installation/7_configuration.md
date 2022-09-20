@@ -1,13 +1,13 @@
 ---
-title: Populate the configuration
+title: Configuring Dendrite
 parent: Installation
 nav_order: 7
 permalink: /installation/configuration
 ---
 
-# Populate the configuration
+# Configuring Dendrite
 
-The configuration file is used to configure Dendrite. Sample configuration files are
+A YAML configuration file is used to configure Dendrite. Sample configuration files are
 present in the top level of the Dendrite repository:
 
 * [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml)
@@ -136,6 +136,19 @@ room_server:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
+```
+
+## Fulltext search
+
+Dendrite supports experimental fulltext indexing using [Bleve](https://github.com/blevesearch/bleve), it is configured in the `sync_api` section as follows. Depending on the language most likely to be used on the server, it might make sense to change the `language` used when indexing, to ensure the returned results match the expections. A full list of possible languages can be found [here](https://github.com/blevesearch/bleve/tree/master/analysis/lang).
+
+```yaml
+sync_api:
+  # ...
+  fulltext:
+    enabled: false
+    index_path: "./fulltextindex"
+    language: "en"
 ```
 
 ## Other sections

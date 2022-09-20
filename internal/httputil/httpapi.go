@@ -25,6 +25,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -59,6 +60,9 @@ func MakeAuthAPI(
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
+			hub.Scope().SetUser(sentry.User{
+				Username: device.UserID,
+			})
 			hub.Scope().SetTag("user_id", device.UserID)
 			hub.Scope().SetTag("device_id", device.ID)
 		}
@@ -81,6 +85,23 @@ func MakeAuthAPI(
 		return jsonRes
 	}
 	return MakeExternalAPI(metricsName, h)
+}
+
+// MakeAdminAPI is a wrapper around MakeAuthAPI which enforces that the request can only be
+// completed by a user that is a server administrator.
+func MakeAdminAPI(
+	metricsName string, userAPI userapi.QueryAcccessTokenAPI,
+	f func(*http.Request, *userapi.Device) util.JSONResponse,
+) http.Handler {
+	return MakeAuthAPI(metricsName, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		if device.AccountType != userapi.AccountTypeAdmin {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("This API can only be used by admin users."),
+			}
+		}
+		return f(req, device)
+	})
 }
 
 // MakeExternalAPI turns a util.JSONRequestHandler function into an http.Handler.

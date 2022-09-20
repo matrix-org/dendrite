@@ -20,32 +20,33 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
-	"github.com/sirupsen/logrus"
 )
 
 // updateLatestEvents updates the list of latest events for this room in the database and writes the
 // event to the output log.
 // The latest events are the events that aren't referenced by another event in the database:
 //
-//     Time goes down the page. 1 is the m.room.create event (root).
-//
-//        1                 After storing 1 the latest events are {1}
-//        |                 After storing 2 the latest events are {2}
-//        2                 After storing 3 the latest events are {3}
-//       / \                After storing 4 the latest events are {3,4}
-//      3   4               After storing 5 the latest events are {5,4}
-//      |   |               After storing 6 the latest events are {5,6}
-//      5   6 <--- latest   After storing 7 the latest events are {6,7}
-//      |
-//      7 <----- latest
+//	Time goes down the page. 1 is the m.room.create event (root).
+//	        1                 After storing 1 the latest events are {1}
+//	        |                 After storing 2 the latest events are {2}
+//	        2                 After storing 3 the latest events are {3}
+//	       / \                After storing 4 the latest events are {3,4}
+//	      3   4               After storing 5 the latest events are {5,4}
+//	      |   |               After storing 6 the latest events are {5,6}
+//	      5   6 <--- latest   After storing 7 the latest events are {6,7}
+//	      |
+//	      7 <----- latest
 //
 // Can only be called once at a time
 func (r *Inputer) updateLatestEvents(
@@ -56,6 +57,7 @@ func (r *Inputer) updateLatestEvents(
 	sendAsServer string,
 	transactionID *api.TransactionID,
 	rewritesState bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "updateLatestEvents")
 	defer span.Finish()
@@ -69,15 +71,16 @@ func (r *Inputer) updateLatestEvents(
 	defer sqlutil.EndTransactionWithCheck(updater, &succeeded, &err)
 
 	u := latestEventsUpdater{
-		ctx:           ctx,
-		api:           r,
-		updater:       updater,
-		roomInfo:      roomInfo,
-		stateAtEvent:  stateAtEvent,
-		event:         event,
-		sendAsServer:  sendAsServer,
-		transactionID: transactionID,
-		rewritesState: rewritesState,
+		ctx:               ctx,
+		api:               r,
+		updater:           updater,
+		roomInfo:          roomInfo,
+		stateAtEvent:      stateAtEvent,
+		event:             event,
+		sendAsServer:      sendAsServer,
+		transactionID:     transactionID,
+		rewritesState:     rewritesState,
+		historyVisibility: historyVisibility,
 	}
 
 	if err = u.doUpdateLatestEvents(); err != nil {
@@ -119,6 +122,8 @@ type latestEventsUpdater struct {
 	// The snapshots of current state before and after processing this event
 	oldStateNID types.StateSnapshotNID
 	newStateNID types.StateSnapshotNID
+	// The history visibility of the event itself (from the state before the event).
+	historyVisibility gomatrixserverlib.HistoryVisibility
 }
 
 func (u *latestEventsUpdater) doUpdateLatestEvents() error {
@@ -174,6 +179,10 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		u.newStateNID = u.oldStateNID
 	}
 
+	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
+	}
+
 	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
@@ -188,12 +197,8 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// send the event asynchronously but we would need to ensure that 1) the events are written to the log in
 	// the correct order, 2) that pending writes are resent across restarts. In order to avoid writing all the
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
-	if err = u.api.WriteOutputEvents(u.event.RoomID(), updates); err != nil {
+	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
-	}
-
-	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
-		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
 	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
@@ -259,19 +264,30 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
 	}
 
-	// Now that we have a new state snapshot based on the latest events,
-	// we can compare that new snapshot to the previous one and see what
-	// has changed. This gives us one list of removed state events and
-	// another list of added ones. Replacing a value for a state-key tuple
-	// will result one removed (the old event) and one added (the new event).
-	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
-		ctx, u.oldStateNID, u.newStateNID,
-	)
-	if err != nil {
-		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+	// Include information about what changed in the state transition. If the
+	// event rewrites the state (i.e. is a federated join) then we will simply
+	// include the entire state snapshot as added events, as the "RewritesState"
+	// flag in the output event signals downstream components to purge their
+	// room state first. If it doesn't rewrite the state then we will work out
+	// what the difference is between the state snapshots and send that. In all
+	// cases where a state event is being replaced, the old state event will
+	// appear in "removed" and the replacement will appear in "added".
+	if u.rewritesState {
+		u.removed = []types.StateEntry{}
+		u.added, err = roomState.LoadStateAtSnapshot(ctx, u.newStateNID)
+		if err != nil {
+			return fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
+		}
+	} else {
+		u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
+			ctx, u.oldStateNID, u.newStateNID,
+		)
+		if err != nil {
+			return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+		}
 	}
 
-	if removed := len(u.removed) - len(u.added); removed > 0 {
+	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
 			"event_id":      u.event.EventID(),
 			"room_id":       u.event.RoomID(),
@@ -279,7 +295,19 @@ func (u *latestEventsUpdater) latestState() error {
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),
 			"new_latest":    u.latest.EventIDs(),
-		}).Errorf("Unexpected state deletion (removing %d events)", removed)
+		}).Warnf("State reset detected (removing %d events)", removed)
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetLevel("warning")
+			scope.SetContext("State reset", map[string]interface{}{
+				"Event ID":      u.event.EventID(),
+				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
+				"New state NID": fmt.Sprintf("%d", u.newStateNID),
+				"Old latest":    u.oldLatest.EventIDs(),
+				"New latest":    u.latest.EventIDs(),
+				"State removed": removed,
+			})
+			sentry.CaptureMessage("State reset detected")
+		})
 	}
 
 	// Also work out the state before the event removes and the event
@@ -365,12 +393,13 @@ func (u *latestEventsUpdater) makeOutputNewRoomEvent() (*api.OutputEvent, error)
 	}
 
 	ore := api.OutputNewRoomEvent{
-		Event:           u.event.Headered(u.roomInfo.RoomVersion),
-		RewritesState:   u.rewritesState,
-		LastSentEventID: u.lastEventIDSent,
-		LatestEventIDs:  latestEventIDs,
-		TransactionID:   u.transactionID,
-		SendAsServer:    u.sendAsServer,
+		Event:             u.event.Headered(u.roomInfo.RoomVersion),
+		RewritesState:     u.rewritesState,
+		LastSentEventID:   u.lastEventIDSent,
+		LatestEventIDs:    latestEventIDs,
+		TransactionID:     u.transactionID,
+		SendAsServer:      u.sendAsServer,
+		HistoryVisibility: u.historyVisibility,
 	}
 
 	eventIDMap, err := u.stateEventMap()

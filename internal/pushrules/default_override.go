@@ -7,8 +7,9 @@ func defaultOverrideRules(userID string) []*Rule {
 		mRuleInviteForMeDefinition(userID),
 		&mRuleMemberEventDefinition,
 		&mRuleContainsDisplayNameDefinition,
-		&mRuleTombstoneDefinition,
 		&mRuleRoomNotifDefinition,
+		&mRuleTombstoneDefinition,
+		&mRuleReactionDefinition,
 	}
 }
 
@@ -20,6 +21,7 @@ const (
 	MRuleContainsDisplayName = ".m.rule.contains_display_name"
 	MRuleTombstone           = ".m.rule.tombstone"
 	MRuleRoomNotif           = ".m.rule.roomnotif"
+	MRuleReaction            = ".m.rule.reaction"
 )
 
 var (
@@ -96,7 +98,7 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: false,
+				Value: true,
 			},
 		},
 	}
@@ -120,8 +122,23 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: false,
+				Value: true,
 			},
+		},
+	}
+	mRuleReactionDefinition = Rule{
+		RuleID:  MRuleReaction,
+		Default: true,
+		Enabled: true,
+		Conditions: []*Condition{
+			{
+				Kind:    EventMatchCondition,
+				Key:     "type",
+				Pattern: "m.reaction",
+			},
+		},
+		Actions: []*Action{
+			{Kind: DontNotifyAction},
 		},
 	}
 )
