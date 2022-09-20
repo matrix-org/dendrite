@@ -7,9 +7,10 @@ import (
 	"reflect"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/test"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var dummyMigrations = []sqlutil.Migration{
@@ -81,11 +82,12 @@ func Test_migrations_Up(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-				conStr, close := test.PrepareDBConnectionString(t, dbType)
-				defer close()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		conStr, close := test.PrepareDBConnectionString(t, dbType)
+		defer close()
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
 				driverName := "sqlite3"
 				if dbType == test.DBTypePostgres {
 					driverName = "postgres"
@@ -107,6 +109,26 @@ func Test_migrations_Up(t *testing.T) {
 					t.Errorf("expected: %+v, got %v", tt.wantResult, result)
 				}
 			})
-		})
-	}
+		}
+	})
+}
+
+func Test_insertMigration(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		conStr, close := test.PrepareDBConnectionString(t, dbType)
+		defer close()
+		driverName := "sqlite3"
+		if dbType == test.DBTypePostgres {
+			driverName = "postgres"
+		}
+
+		db, err := sql.Open(driverName, conStr)
+		if err != nil {
+			t.Errorf("unable to open database: %v", err)
+		}
+
+		if err := sqlutil.InsertMigration(context.Background(), db, "testing"); err != nil {
+			t.Fatalf("unable to insert migration: %s", err)
+		}
+	})
 }
