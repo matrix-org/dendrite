@@ -162,7 +162,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 // requests to retry.
 func (oq *destinationQueue) wakeQueueIfNeeded() {
 	// If we are backing off then interrupt the backoff.
-	if oq.backingOff.CAS(true, false) {
+	if oq.backingOff.CompareAndSwap(true, false) {
 		oq.interruptBackoff <- true
 	}
 	// If we aren't running then wake up the queue.
@@ -242,7 +242,7 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 func (oq *destinationQueue) backgroundSend() {
 	// Check if a worker is already running, and if it isn't, then
 	// mark it as started.
-	if !oq.running.CAS(false, true) {
+	if !oq.running.CompareAndSwap(false, true) {
 		return
 	}
 	destinationQueueRunning.Inc()
