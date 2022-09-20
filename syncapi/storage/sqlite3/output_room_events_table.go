@@ -31,7 +31,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
 )
 
 const outputRoomEventsSchema = `
@@ -226,17 +225,6 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		addIDs, delIDs, err := unmarshalStateIDs(addIDsJSON, delIDsJSON)
 		if err != nil {
 			return nil, nil, err
-		}
-
-		// Sanity check for deleted state and whine if we see it. We don't need to do anything
-		// since it'll just mark the event as not being needed.
-		if len(addIDs) < len(delIDs) {
-			log.WithFields(log.Fields{
-				"since":   r.From,
-				"current": r.To,
-				"adds":    len(addIDsJSON),
-				"dels":    len(delIDsJSON),
-			}).Warn("StateBetween: ignoring deleted state")
 		}
 
 		// TODO: Handle redacted events

@@ -27,8 +27,6 @@ func IsUniqueConstraintViolationErr(err error) bool {
 	switch e := err.(type) {
 	case *pq.Error:
 		return e.Code == "23505"
-	case pq.Error:
-		return e.Code == "23505"
 	case *sqlite3.Error:
 		return e.Code == sqlite3.ErrConstraint
 	case sqlite3.Error:
