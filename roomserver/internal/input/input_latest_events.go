@@ -264,16 +264,27 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
 	}
 
-	// Now that we have a new state snapshot based on the latest events,
-	// we can compare that new snapshot to the previous one and see what
-	// has changed. This gives us one list of removed state events and
-	// another list of added ones. Replacing a value for a state-key tuple
-	// will result one removed (the old event) and one added (the new event).
-	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
-		ctx, u.oldStateNID, u.newStateNID,
-	)
-	if err != nil {
-		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+	// Include information about what changed in the state transition. If the
+	// event rewrites the state (i.e. is a federated join) then we will simply
+	// include the entire state snapshot as added events, as the "RewritesState"
+	// flag in the output event signals downstream components to purge their
+	// room state first. If it doesn't rewrite the state then we will work out
+	// what the difference is between the state snapshots and send that. In all
+	// cases where a state event is being replaced, the old state event will
+	// appear in "removed" and the replacement will appear in "added".
+	if u.rewritesState {
+		u.removed = []types.StateEntry{}
+		u.added, err = roomState.LoadStateAtSnapshot(ctx, u.newStateNID)
+		if err != nil {
+			return fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
+		}
+	} else {
+		u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
+			ctx, u.oldStateNID, u.newStateNID,
+		)
+		if err != nil {
+			return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+		}
 	}
 
 	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
