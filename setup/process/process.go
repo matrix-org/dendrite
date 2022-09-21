@@ -51,7 +51,7 @@ func (b *ProcessContext) WaitForComponentsToFinish() {
 }
 
 func (b *ProcessContext) Degraded() {
-	if b.degraded.CAS(false, true) {
+	if b.degraded.CompareAndSwap(false, true) {
 		logrus.Warn("Dendrite is running in a degraded state")
 		sentry.CaptureException(fmt.Errorf("Process is running in a degraded state"))
 	}

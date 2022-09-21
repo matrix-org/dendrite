@@ -16,6 +16,7 @@ package inthttp
 
 import (
 	"github.com/gorilla/mux"
+
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver/api"
 )
@@ -69,5 +70,10 @@ func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 	internalAPIMux.Handle(
 		QuerySignaturesPath,
 		httputil.MakeInternalRPCAPI("KeyserverQuerySignatures", s.QuerySignatures),
+	)
+
+	internalAPIMux.Handle(
+		PerformMarkAsStalePath,
+		httputil.MakeInternalRPCAPI("KeyserverMarkAsStale", s.PerformMarkAsStaleIfNeeded),
 	)
 }
