@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	// This is to silence the conflict about which chainhash is used
+	_ "github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/spruceid/siwe-go"

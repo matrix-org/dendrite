@@ -54,7 +54,10 @@ require (
 	nhooyr.io/websocket v1.8.7
 )
 
-require github.com/ethereum/go-ethereum v1.10.15
+require (
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1
+	github.com/ethereum/go-ethereum v1.10.25
+)
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
@@ -78,10 +81,11 @@ require (
 	github.com/blevesearch/zapx/v13 v13.3.5 // indirect
 	github.com/blevesearch/zapx/v14 v14.3.5 // indirect
 	github.com/blevesearch/zapx/v15 v15.3.5 // indirect
-	github.com/btcsuite/btcd v0.20.1-beta // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
