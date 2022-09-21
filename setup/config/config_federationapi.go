@@ -22,6 +22,11 @@ type FederationAPI struct {
 	// on remote federation endpoints. This is not recommended in production!
 	DisableTLSValidation bool `yaml:"disable_tls_validation"`
 
+	// DisableHTTPKeepalives prevents Dendrite from keeping HTTP connections
+	// open for reuse for future requests. Connections will be closed quicker
+	// but we may spend more time on TLS handshakes instead.
+	DisableHTTPKeepalives bool `yaml:"disable_http_keepalives"`
+
 	// Perspective keyservers, to use as a backup when direct key fetch
 	// requests don't succeed
 	KeyPerspectives KeyPerspectives `yaml:"key_perspectives"`
@@ -39,6 +44,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 	}
 	c.FederationMaxRetries = 16
 	c.DisableTLSValidation = false
+	c.DisableHTTPKeepalives = false
 	if opts.Generate {
 		c.KeyPerspectives = KeyPerspectives{
 			{
