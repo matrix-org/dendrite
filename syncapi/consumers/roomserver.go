@@ -493,7 +493,7 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, 
 	case gomatrixserverlib.MRoomTopic:
 		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
 	case gomatrixserverlib.MRoomRedaction:
-		log.Debugf("Redacting event: %s", ev.Redacts())
+		log.Tracef("Redacting event: %s", ev.Redacts())
 		if err := s.fts.Delete(ev.Redacts()); err != nil {
 			return fmt.Errorf("failed to delete entry from fulltext index: %w", err)
 		}
@@ -502,7 +502,7 @@ func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, 
 		return nil
 	}
 	if e.Content != "" {
-		log.Debugf("Indexing element: %+v", e)
+		log.Tracef("Indexing element: %+v", e)
 		if err := s.fts.Index(e); err != nil {
 			return err
 		}
