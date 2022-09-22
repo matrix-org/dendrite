@@ -114,7 +114,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	// a new backoff period. Increase the failure counter and
 	// start a goroutine which will wait out the backoff and
 	// unset the backoffStarted flag when done.
-	if s.backoffStarted.CAS(false, true) {
+	if s.backoffStarted.CompareAndSwap(false, true) {
 		if s.backoffCount.Inc() >= s.statistics.FailuresUntilBlacklist {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {

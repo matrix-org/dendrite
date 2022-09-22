@@ -17,8 +17,9 @@ package syncapi
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/internal/caching"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -127,7 +128,7 @@ func AddPublicRoutes(
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.SendToDeviceStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, keyAPI, notifier, streams.SendToDeviceStreamProvider,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
