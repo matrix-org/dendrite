@@ -163,10 +163,10 @@ func (p *SyncAPIProducer) SendPresence(
 }
 
 func (p *SyncAPIProducer) SendDeviceListUpdate(
-	ctx context.Context, deviceListUpdate gomatrixserverlib.RawJSON, origin string,
+	ctx context.Context, deviceListUpdate gomatrixserverlib.RawJSON, origin gomatrixserverlib.ServerName,
 ) (err error) {
 	m := nats.NewMsg(p.TopicDeviceListUpdate)
-	m.Header.Set("origin", origin)
+	m.Header.Set("origin", string(origin))
 	m.Data = deviceListUpdate
 	log.Debugf("Sending device list update: %+v", m.Header)
 	_, err = p.JetStream.PublishMsg(m, nats.Context(ctx))

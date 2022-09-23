@@ -37,6 +37,7 @@ const (
 	QueryOneTimeKeysPath              = "/keyserver/queryOneTimeKeys"
 	QueryDeviceMessagesPath           = "/keyserver/queryDeviceMessages"
 	QuerySignaturesPath               = "/keyserver/querySignatures"
+	PerformMarkAsStalePath            = "/keyserver/markAsStale"
 )
 
 // NewKeyServerClient creates a KeyInternalAPI implemented by talking to a HTTP POST API.
@@ -169,6 +170,17 @@ func (h *httpKeyInternalAPI) QuerySignatures(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QuerySignatures", h.apiURL+QuerySignaturesPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpKeyInternalAPI) PerformMarkAsStaleIfNeeded(
+	ctx context.Context,
+	request *api.PerformMarkAsStaleRequest,
+	response *struct{},
+) error {
+	return httputil.CallInternalRPCAPI(
+		"MarkAsStale", h.apiURL+PerformMarkAsStalePath,
 		h.httpClient, ctx, request, response,
 	)
 }
