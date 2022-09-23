@@ -57,7 +57,7 @@ func (w *ExclusiveWriter) Do(db *sql.DB, txn *sql.Tx, f func(txn *sql.Tx) error)
 // opened using the database object from the task and then this will
 // be passed as a parameter to the task function.
 func (w *ExclusiveWriter) run() {
-	if !w.running.CAS(false, true) {
+	if !w.running.CompareAndSwap(false, true) {
 		return
 	}
 	if tracingEnabled {

@@ -176,7 +176,8 @@ func (r *Inputer) Start() error {
 		},
 		nats.HeadersOnly(),
 		nats.DeliverAll(),
-		nats.AckAll(),
+		nats.AckExplicit(),
+		nats.ReplayInstant(),
 		nats.BindStream(r.InputRoomEventTopic),
 	)
 	return err

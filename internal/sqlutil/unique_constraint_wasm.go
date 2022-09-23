@@ -17,7 +17,15 @@
 
 package sqlutil
 
-// IsUniqueConstraintViolationErr no-ops for this architecture
+import "github.com/mattn/go-sqlite3"
+
+// IsUniqueConstraintViolationErr returns true if the error is an unique_violation error
 func IsUniqueConstraintViolationErr(err error) bool {
+	switch e := err.(type) {
+	case *sqlite3.Error:
+		return e.Code == sqlite3.ErrConstraint
+	case sqlite3.Error:
+		return e.Code == sqlite3.ErrConstraint
+	}
 	return false
 }

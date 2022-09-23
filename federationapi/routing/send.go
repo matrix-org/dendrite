@@ -359,7 +359,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
-			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, e.Origin); err != nil {
+			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, t.Origin); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
 			}
 		case gomatrixserverlib.MReceipt:
