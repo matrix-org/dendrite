@@ -11,21 +11,20 @@ It intends to provide an **efficient**, **reliable** and **scalable** alternativ
   a [brand new Go test suite](https://github.com/matrix-org/complement).
 - Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
 
-As of October 2020 (current [progress below](#progress)), Dendrite has now entered **beta** which means:
+Dendrite is **beta** software, which means:
 
 - Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
-- Dendrite has periodic semver releases. We intend to release new versions as we land significant features.
+- Dendrite has periodic releases. We intend to release new versions as we fix bugs and land significant features.
 - Dendrite supports database schema upgrades between releases. This means you should never lose your messages when upgrading Dendrite.
-- Breaking changes will not occur on minor releases. This means you can safely upgrade Dendrite without modifying your database or config file.
 
 This does not mean:
 
 - Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
 - Dendrite is feature-complete. There may be client or federation APIs that are not implemented.
-- Dendrite is ready for massive homeserver deployments. You cannot shard each microservice, only run each one on a different machine.
+- Dendrite is ready for massive homeserver deployments. There is no sharding of microservices (although it is possible to run them on separate machines) and there is no high-availability/clustering support.
 
 Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
-In the future, we will be able to scale up to gigantic servers (equivalent to matrix.org) via polylith mode.
+In the future, we will be able to scale up to gigantic servers (equivalent to `matrix.org`) via polylith mode.
 
 If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
 
