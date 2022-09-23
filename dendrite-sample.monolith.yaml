@@ -212,6 +212,13 @@ federation_api:
   # enable this option in production as it presents a security risk!
   disable_tls_validation: false
 
+  # Disable HTTP keepalives, which also prevents connection reuse. Dendrite will typically
+  # keep HTTP connections open to remote hosts for 5 minutes as they can be reused much
+  # more quickly than opening new connections each time. Disabling keepalives will close
+  # HTTP connections immediately after a successful request but may result in more CPU and
+  # memory being used on TLS handshakes for each new connection instead.
+  disable_http_keepalives: false
+
   # Perspective keyservers to use as a backup when direct key fetches fail. This may
   # be required to satisfy key requests for servers that are no longer online when
   # joining some rooms.
