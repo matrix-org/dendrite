@@ -122,7 +122,7 @@ func AddPublicRoutes(
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.SendToDeviceStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, keyAPI, notifier, streams.SendToDeviceStreamProvider,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
