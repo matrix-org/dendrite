@@ -96,7 +96,7 @@ func (s *pushersStatements) InsertPusher(
 	ctx context.Context, txn *sql.Tx, session_id int64,
 	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string,
 ) error {
-	_, err := s.insertPusherStmt.ExecContext(ctx, localpart, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
+	_, err := sqlutil.TxStmt(txn, s.insertPusherStmt).ExecContext(ctx, localpart, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
 	logrus.Debugf("Created pusher %d", session_id)
 	return err
 }
@@ -144,13 +144,13 @@ func (s *pushersStatements) SelectPushers(
 func (s *pushersStatements) DeletePusher(
 	ctx context.Context, txn *sql.Tx, appid, pushkey, localpart string,
 ) error {
-	_, err := s.deletePusherStmt.ExecContext(ctx, appid, pushkey, localpart)
+	_, err := sqlutil.TxStmt(txn, s.deletePusherStmt).ExecContext(ctx, appid, pushkey, localpart)
 	return err
 }
 
 func (s *pushersStatements) DeletePushers(
 	ctx context.Context, txn *sql.Tx, appid, pushkey string,
 ) error {
-	_, err := s.deletePushersByAppIdAndPushKeyStmt.ExecContext(ctx, appid, pushkey)
+	_, err := sqlutil.TxStmt(txn, s.deletePushersByAppIdAndPushKeyStmt).ExecContext(ctx, appid, pushkey)
 	return err
 }
