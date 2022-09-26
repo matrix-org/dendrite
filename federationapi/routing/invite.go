@@ -148,8 +148,15 @@ func processInvite(
 			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
 		}
 	}
+	_, serverName, err := gomatrixserverlib.SplitID('@', event.Sender())
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The event JSON contains an invalid sender"),
+		}
+	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             event.Origin(),
+		ServerName:             serverName,
 		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
