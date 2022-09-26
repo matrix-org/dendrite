@@ -21,6 +21,7 @@ import (
 
 	"github.com/gorilla/mux"
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	"github.com/matrix-org/dendrite/authorization"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
@@ -73,6 +74,8 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, userAPI, cfg)
+	authorization := authorization.NewClientApiAuthorization(cfg)
+	_ = authorization // todo: use this in httputil.MakeAuthAPI
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
