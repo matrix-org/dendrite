@@ -118,6 +118,7 @@ func MakeLeave(
 }
 
 // SendLeave implements the /send_leave API
+// nolint:gocyclo
 func SendLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -184,7 +185,7 @@ func SendLeave(
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
 	var serverName gomatrixserverlib.ServerName
-	if _, serverName, err := gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
