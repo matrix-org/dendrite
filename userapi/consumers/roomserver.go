@@ -92,7 +92,12 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		"event_type": event.Type(),
 	}).Tracef("Received message from roomserver: %#v", output)
 
-	if err := s.processMessage(ctx, event); err != nil {
+	metadata, err := msg.Metadata()
+	if err != nil {
+		return true
+	}
+
+	if err := s.processMessage(ctx, event, uint64(gomatrixserverlib.AsTimestamp(metadata.Timestamp))); err != nil {
 		log.WithFields(log.Fields{
 			"event_id": event.EventID(),
 		}).WithError(err).Errorf("userapi consumer: process room event failure")
@@ -101,7 +106,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	return true
 }
 
-func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, streamPos uint64) error {
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
@@ -141,7 +146,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 	// removing it means we can send all notifications to
 	// e.g. Element's Push gateway in one go.
 	for _, mem := range members {
-		if err := s.notifyLocal(ctx, event, mem, roomSize, roomName); err != nil {
+		if err := s.notifyLocal(ctx, event, mem, roomSize, roomName, streamPos); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": mem.Localpart,
 			}).WithError(err).Debugf("Unable to push to local user")
@@ -290,7 +295,7 @@ func unmarshalCanonicalAlias(event *gomatrixserverlib.HeaderedEvent) (string, er
 }
 
 // notifyLocal finds the right push actions for a local user, given an event.
-func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int, roomName string) error {
+func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int, roomName string, streamPos uint64) error {
 	actions, err := s.evaluatePushRules(ctx, event, mem, roomSize)
 	if err != nil {
 		return err
@@ -328,7 +333,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		RoomID:     event.RoomID(),
 		TS:         gomatrixserverlib.AsTimestamp(time.Now()),
 	}
-	if err = s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), tweaks, n); err != nil {
+	if err = s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), streamPos, tweaks, n); err != nil {
 		return err
 	}
 

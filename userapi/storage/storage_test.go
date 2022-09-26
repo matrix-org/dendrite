@@ -494,7 +494,6 @@ func Test_Notification(t *testing.T) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 		// generate some dummy notifications
-		eventIDs := make([]string, 0, 10)
 		for i := 0; i < 10; i++ {
 			eventID := util.RandomString(16)
 			roomID := room.ID
@@ -515,9 +514,8 @@ func Test_Notification(t *testing.T) {
 				RoomID: roomID,
 				TS:     gomatrixserverlib.AsTimestamp(ts),
 			}
-			err = db.InsertNotification(ctx, aliceLocalpart, eventID, nil, notification)
+			err = db.InsertNotification(ctx, aliceLocalpart, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")
-			eventIDs = append(eventIDs, eventID)
 		}
 
 		// get notifications
@@ -534,12 +532,12 @@ func Test_Notification(t *testing.T) {
 		assert.Equal(t, int64(4), total)
 
 		// mark notification as read
-		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, room2.ID, eventIDs[6], true)
+		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, room2.ID, 7, true)
 		assert.NoError(t, err, "unable to set notifications read")
 		assert.True(t, affected)
 
 		// this should delete 2 notifications
-		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, room2.ID, eventIDs[7])
+		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, room2.ID, 8)
 		assert.NoError(t, err, "unable to set notifications read")
 		assert.True(t, affected)
 

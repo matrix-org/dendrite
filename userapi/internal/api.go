@@ -107,7 +107,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 		return nil
 	}
 
-	deleted, err := a.DB.DeleteNotificationsUpTo(ctx, localpart, req.RoomID, output.FullyRead)
+	deleted, err := a.DB.DeleteNotificationsUpTo(ctx, localpart, req.RoomID, uint64(gomatrixserverlib.AsTimestamp(time.Now())))
 	if err != nil {
 		logrus.WithError(err).Errorf("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
 		return err
