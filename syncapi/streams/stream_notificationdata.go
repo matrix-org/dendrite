@@ -3,8 +3,6 @@ package streams
 import (
 	"context"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -41,17 +39,12 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		return from
 	}
 
-	// Add notification data based on the membership of the user
-	for roomID, counts := range countsByRoom {
-		if req.Rooms[roomID] != gomatrixserverlib.Join {
+	// We're merely decorating existing rooms.
+	for roomID, jr := range req.Response.Rooms.Join {
+		counts := countsByRoom[roomID]
+		if counts == nil {
 			continue
 		}
-		// If there's no join response, add a new one
-		jr, ok := req.Response.Rooms.Join[roomID]
-		if !ok {
-			jr = *types.NewJoinResponse()
-		}
-
 		jr.UnreadNotifications = &types.UnreadNotifications{
 			HighlightCount:    counts.UnreadHighlightCount,
 			NotificationCount: counts.UnreadNotificationCount,
