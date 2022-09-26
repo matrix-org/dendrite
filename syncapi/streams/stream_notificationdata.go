@@ -32,6 +32,8 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, _ types.StreamPosition,
 ) types.StreamPosition {
+	// Always get the latest data, as this might have advanced while waiting
+	// for other streams to prepare their responses and add/updated notifications.
 	to := p.LatestPosition(ctx)
 	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, from, to)
 	if err != nil {
