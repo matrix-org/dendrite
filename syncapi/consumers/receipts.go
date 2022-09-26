@@ -16,20 +16,17 @@ package consumers
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -44,7 +41,6 @@ type OutputReceiptEventConsumer struct {
 	stream     types.StreamProvider
 	notifier   *notifier.Notifier
 	serverName gomatrixserverlib.ServerName
-	producer   *producers.UserAPIReadProducer
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -56,7 +52,6 @@ func NewOutputReceiptEventConsumer(
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
-	producer *producers.UserAPIReadProducer,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
 		ctx:        process.Context(),
@@ -67,7 +62,6 @@ func NewOutputReceiptEventConsumer(
 		notifier:   notifier,
 		stream:     stream,
 		serverName: cfg.Matrix.ServerName,
-		producer:   producer,
 	}
 }
 
@@ -111,36 +105,8 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return true
 	}
 
-	if err = s.sendReadUpdate(output); err != nil {
-		log.WithError(err).WithFields(logrus.Fields{
-			"user_id": output.UserID,
-			"room_id": output.RoomID,
-		}).Errorf("Failed to generate read update")
-		sentry.CaptureException(err)
-		return false
-	}
-
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
 
 	return true
-}
-
-func (s *OutputReceiptEventConsumer) sendReadUpdate(output types.OutputReceiptEvent) error {
-	if output.Type != "m.read" {
-		return nil
-	}
-	_, serverName, err := gomatrixserverlib.SplitID('@', output.UserID)
-	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-	}
-	if serverName != s.serverName {
-		return nil
-	}
-	if output.EventID != "" {
-		if err := s.producer.SendReadUpdate(output.UserID, output.RoomID, output.EventID, ""); err != nil {
-			return fmt.Errorf("s.producer.SendReadUpdate: %w", err)
-		}
-	}
-	return nil
 }

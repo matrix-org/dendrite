@@ -17,7 +17,6 @@ package consumers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -30,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -45,7 +43,6 @@ type OutputClientDataConsumer struct {
 	stream     types.StreamProvider
 	notifier   *notifier.Notifier
 	serverName gomatrixserverlib.ServerName
-	producer   *producers.UserAPIReadProducer
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
@@ -56,7 +53,6 @@ func NewOutputClientDataConsumer(
 	store storage.Database,
 	notifier *notifier.Notifier,
 	stream types.StreamProvider,
-	producer *producers.UserAPIReadProducer,
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{
 		ctx:        process.Context(),
@@ -67,7 +63,6 @@ func NewOutputClientDataConsumer(
 		notifier:   notifier,
 		stream:     stream,
 		serverName: cfg.Matrix.ServerName,
-		producer:   producer,
 	}
 }
 
@@ -112,15 +107,6 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		return false
 	}
 
-	if err = s.sendReadUpdate(userID, output); err != nil {
-		log.WithError(err).WithFields(logrus.Fields{
-			"user_id": userID,
-			"room_id": output.RoomID,
-		}).Errorf("Failed to generate read update")
-		sentry.CaptureException(err)
-		return false
-	}
-
 	if output.IgnoredUsers != nil {
 		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
@@ -134,23 +120,4 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
 
 	return true
-}
-
-func (s *OutputClientDataConsumer) sendReadUpdate(userID string, output eventutil.AccountData) error {
-	if output.Type != "m.fully_read" || output.ReadMarker == nil {
-		return nil
-	}
-	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-	}
-	if serverName != s.serverName {
-		return nil
-	}
-	if output.ReadMarker.Read != "" || output.ReadMarker.FullyRead != "" {
-		if err := s.producer.SendReadUpdate(userID, output.RoomID, output.ReadMarker.Read, output.ReadMarker.FullyRead); err != nil {
-			return fmt.Errorf("s.producer.SendReadUpdate: %w", err)
-		}
-	}
-	return nil
 }

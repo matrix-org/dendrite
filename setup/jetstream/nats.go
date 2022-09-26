@@ -186,6 +186,7 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		OutputTypingEvent:       {"SyncAPIEDUServerTypingConsumer", "FederationAPIEDUServerConsumer"},
 		OutputRoomEvent:         {"AppserviceRoomserverConsumer"},
 		OutputStreamEvent:       {"UserAPISyncAPIStreamEventConsumer"},
+		OutputReadUpdate:        {"UserAPISyncAPIReadUpdateConsumer"},
 	} {
 		streamName := cfg.Matrix.JetStream.Prefixed(stream)
 		for _, consumer := range consumers {

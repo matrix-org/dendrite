@@ -77,11 +77,6 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	userAPIReadUpdateProducer := &producers.UserAPIReadProducer{
-		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
-	}
-
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		base.ProcessContext, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		js, rsAPI, syncDB, notifier,
@@ -101,7 +96,6 @@ func AddPublicRoutes(
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.AccountDataStreamProvider,
-		userAPIReadUpdateProducer,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -130,7 +124,6 @@ func AddPublicRoutes(
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.ReceiptStreamProvider,
-		userAPIReadUpdateProducer,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
