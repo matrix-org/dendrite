@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Runs SyTest either from Docker Hub, or from ../sytest. If it's run
 # locally, the Docker image is rebuilt first.
