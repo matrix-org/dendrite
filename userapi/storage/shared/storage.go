@@ -777,7 +777,7 @@ func (d *Database) GetPushers(
 func (d *Database) RemovePusher(
 	ctx context.Context, appid, pushkey, localpart string,
 ) error {
-	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart)
 		if err == sql.ErrNoRows {
 			return nil
@@ -792,7 +792,7 @@ func (d *Database) RemovePusher(
 func (d *Database) RemovePushers(
 	ctx context.Context, appid, pushkey string,
 ) error {
-	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.Pushers.DeletePushers(ctx, txn, appid, pushkey)
 	})
 }
