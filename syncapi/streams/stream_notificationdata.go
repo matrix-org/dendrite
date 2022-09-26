@@ -32,7 +32,6 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, _ types.StreamPosition,
 ) types.StreamPosition {
-	// We want counts for all possible rooms, so always start from zero.
 	to := p.LatestPosition(ctx)
 	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, from, to)
 	if err != nil {
@@ -40,8 +39,7 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		return from
 	}
 
-	// Add notification data to rooms.
-	// Create an empty JoinResponse if the room isn't in this response
+	// We're merely decorating existing rooms.
 	for roomID, jr := range req.Response.Rooms.Join {
 		counts := countsByRoom[roomID]
 		if counts == nil {
