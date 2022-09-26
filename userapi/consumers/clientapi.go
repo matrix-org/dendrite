@@ -105,13 +105,13 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return false
 	}
 
-	if !updated {
-		return true
-	}
-
 	if err = s.syncProducer.GetAndSendNotificationData(ctx, userID, roomID); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: GetAndSendNotificationData failed")
 		return false
+	}
+
+	if !updated {
+		return true
 	}
 	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")

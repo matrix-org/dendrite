@@ -112,15 +112,17 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 		logrus.WithError(err).Errorf("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
 		return err
 	}
-	// nothing changed, no need to send notification data/notify push gateway
-	if !deleted {
-		return nil
-	}
 
 	if err = a.SyncProducer.GetAndSendNotificationData(ctx, req.UserID, req.RoomID); err != nil {
 		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: GetAndSendNotificationData failed")
 		return err
 	}
+
+	// nothing changed, no need to notify the push gateway
+	if !deleted {
+		return nil
+	}
+
 	if err = userapiUtil.NotifyUserCountsAsync(ctx, a.PgClient, localpart, a.DB); err != nil {
 		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
 		return err
