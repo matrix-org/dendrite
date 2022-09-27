@@ -21,17 +21,19 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -46,7 +48,7 @@ type OutputRoomEventConsumer struct {
 	pduStream    types.StreamProvider
 	inviteStream types.StreamProvider
 	notifier     *notifier.Notifier
-	producer     *producers.UserAPIStreamEventProducer
+	fts          *fulltext.Search
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -59,7 +61,7 @@ func NewOutputRoomEventConsumer(
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
-	producer *producers.UserAPIStreamEventProducer,
+	fts *fulltext.Search,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
@@ -72,7 +74,7 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
-		producer:     producer,
+		fts:          fts,
 	}
 }
 
@@ -254,11 +256,11 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
 	}
-
-	if err = s.producer.SendStreamEvent(ev.RoomID(), ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to send stream output event for event %s", ev.EventID())
-		sentry.CaptureException(err)
-		return err
+	if err = s.writeFTS(ev, pduPos); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -302,6 +304,13 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
 		return nil
+	}
+
+	if err = s.writeFTS(ev, pduPos); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -459,4 +468,40 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 
 	event.Event, err = event.SetUnsigned(prev)
 	return event, err
+}
+
+func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, pduPosition types.StreamPosition) error {
+	if !s.cfg.Fulltext.Enabled {
+		return nil
+	}
+	e := fulltext.IndexElement{
+		EventID:        ev.EventID(),
+		RoomID:         ev.RoomID(),
+		StreamPosition: int64(pduPosition),
+	}
+	e.SetContentType(ev.Type())
+
+	switch ev.Type() {
+	case "m.room.message":
+		e.Content = gjson.GetBytes(ev.Content(), "body").String()
+	case gomatrixserverlib.MRoomName:
+		e.Content = gjson.GetBytes(ev.Content(), "name").String()
+	case gomatrixserverlib.MRoomTopic:
+		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
+	case gomatrixserverlib.MRoomRedaction:
+		log.Tracef("Redacting event: %s", ev.Redacts())
+		if err := s.fts.Delete(ev.Redacts()); err != nil {
+			return fmt.Errorf("failed to delete entry from fulltext index: %w", err)
+		}
+		return nil
+	default:
+		return nil
+	}
+	if e.Content != "" {
+		log.Tracef("Indexing element: %+v", e)
+		if err := s.fts.Index(e); err != nil {
+			return err
+		}
+	}
+	return nil
 }

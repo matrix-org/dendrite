@@ -40,7 +40,7 @@ func Test_evaluatePushRules(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
-		consumer := OutputStreamEventConsumer{db: db}
+		consumer := OutputRoomEventConsumer{db: db}
 
 		testCases := []struct {
 			name         string
