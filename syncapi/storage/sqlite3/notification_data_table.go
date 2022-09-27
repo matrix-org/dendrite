@@ -43,11 +43,11 @@ func NewSqliteNotificationDataTable(db *sql.DB, streamID *StreamIDStatements) (t
 }
 
 type notificationDataStatements struct {
-	db                             *sql.DB
-	streamIDStatements             *StreamIDStatements
-	upsertRoomUnreadCounts         *sql.Stmt
-	selectUserUnreadCountsForRooms *sql.Stmt
-	selectMaxID                    *sql.Stmt
+	db                     *sql.DB
+	streamIDStatements     *StreamIDStatements
+	upsertRoomUnreadCounts *sql.Stmt
+	selectMaxID            *sql.Stmt
+	//selectUserUnreadCountsForRooms *sql.Stmt
 }
 
 const notificationDataSchema = `
