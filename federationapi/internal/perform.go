@@ -217,7 +217,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		var remoteEvent *gomatrixserverlib.Event
 		remoteEvent, err = respSendJoin.Event.UntrustedEvent(respMakeJoin.RoomVersion)
 		if err == nil && isWellFormedMembershipEvent(
-			remoteEvent, roomID, userID, r.cfg.Matrix.ServerName,
+			remoteEvent, roomID, userID,
 		) {
 			event = remoteEvent
 		}
@@ -285,16 +285,13 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 
 // isWellFormedMembershipEvent returns true if the event looks like a legitimate
 // membership event.
-func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string, origin gomatrixserverlib.ServerName) bool {
+func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string) bool {
 	if membership, err := event.Membership(); err != nil {
 		return false
 	} else if membership != gomatrixserverlib.Join {
 		return false
 	}
 	if event.RoomID() != roomID {
-		return false
-	}
-	if event.Origin() != origin {
 		return false
 	}
 	if !event.StateKeyEquals(userID) {
