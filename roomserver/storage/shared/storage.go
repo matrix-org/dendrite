@@ -897,7 +897,7 @@ func (d *Database) handleRedactions(
 	switch {
 	case redactUser >= pl.Redact:
 		// The power level of the redaction event’s sender is greater than or equal to the redact level.
-	case redactedEvent.Origin() == redactionEvent.Origin() && redactedEvent.Sender() == redactionEvent.Sender():
+	case redactedEvent.Sender() == redactionEvent.Sender():
 		// The domain of the redaction event’s sender matches that of the original event’s sender.
 	default:
 		return nil, "", nil

@@ -21,18 +21,18 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -47,7 +47,6 @@ type OutputRoomEventConsumer struct {
 	pduStream    types.StreamProvider
 	inviteStream types.StreamProvider
 	notifier     *notifier.Notifier
-	producer     *producers.UserAPIStreamEventProducer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -60,7 +59,6 @@ func NewOutputRoomEventConsumer(
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
-	producer *producers.UserAPIStreamEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
@@ -73,7 +71,6 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
-		producer:     producer,
 	}
 }
 
@@ -256,12 +253,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			"del":        msg.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
-	}
-
-	if err = s.producer.SendStreamEvent(ev.RoomID(), ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to send stream output event for event %s", ev.EventID())
-		sentry.CaptureException(err)
-		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
