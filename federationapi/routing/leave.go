@@ -118,6 +118,7 @@ func MakeLeave(
 }
 
 // SendLeave implements the /send_leave API
+// nolint:gocyclo
 func SendLeave(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
@@ -167,14 +168,6 @@ func SendLeave(
 		}
 	}
 
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The leave must be sent by the server it originated on"),
-		}
-	}
-
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -185,6 +178,22 @@ func SendLeave(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("Event state key must match the event sender."),
+		}
+	}
+
+	// Check that the sender belongs to the server that is sending us
+	// the request. By this point we've already asserted that the sender
+	// and the state key are equal so we don't need to check both.
+	var serverName gomatrixserverlib.ServerName
+	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
+		}
+	} else if serverName != request.Origin() {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender does not match the server that originated the request"),
 		}
 	}
 
@@ -240,7 +249,7 @@ func SendLeave(
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             event.Origin(),
+		ServerName:             serverName,
 		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,

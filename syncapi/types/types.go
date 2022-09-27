@@ -398,6 +398,11 @@ func (r *Response) IsEmpty() bool {
 		len(r.ToDevice.Events) == 0
 }
 
+type UnreadNotifications struct {
+	HighlightCount    int `json:"highlight_count"`
+	NotificationCount int `json:"notification_count"`
+}
+
 // JoinResponse represents a /sync response for a room which is under the 'join' or 'peek' key.
 type JoinResponse struct {
 	Summary struct {
@@ -419,10 +424,7 @@ type JoinResponse struct {
 	AccountData struct {
 		Events []gomatrixserverlib.ClientEvent `json:"events"`
 	} `json:"account_data"`
-	UnreadNotifications struct {
-		HighlightCount    int `json:"highlight_count"`
-		NotificationCount int `json:"notification_count"`
-	} `json:"unread_notifications"`
+	*UnreadNotifications `json:"unread_notifications,omitempty"`
 }
 
 // NewJoinResponse creates an empty response with initialised arrays.
@@ -501,19 +503,6 @@ type Peek struct {
 	RoomID  string
 	New     bool
 	Deleted bool
-}
-
-type ReadUpdate struct {
-	UserID    string         `json:"user_id"`
-	RoomID    string         `json:"room_id"`
-	Read      StreamPosition `json:"read,omitempty"`
-	FullyRead StreamPosition `json:"fully_read,omitempty"`
-}
-
-// StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
-type StreamedEvent struct {
-	Event          *gomatrixserverlib.HeaderedEvent `json:"event"`
-	StreamPosition StreamPosition                   `json:"stream_position"`
 }
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
