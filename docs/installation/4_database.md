@@ -16,6 +16,9 @@ Dendrite can automatically populate the database with the relevant tables and in
 it is not capable of creating the databases themselves. You will need to create the databases
 manually.
 
+The databases **must** be created with UTF-8 encoding configured or you will likely run into problems
+with your Dendrite deployment.
+
 At this point, you can choose to either use a single database for all Dendrite components,
 or you can run each component with its own separate database:
 
@@ -65,7 +68,7 @@ sudo -u postgres createuser -P dendrite
 Create the database itself, using the `dendrite` role from above:
 
 ```bash
-sudo -u postgres createdb -O dendrite dendrite
+sudo -u postgres createdb -O dendrite -E UTF-8 dendrite
 ```
 
 ### Multiple database creation
@@ -85,7 +88,7 @@ The following eight components require a database. In this example they will be 
 
 ```bash
 for i in appservice federationapi mediaapi mscs roomserver syncapi keyserver userapi; do
-    sudo -u postgres createdb -O dendrite dendrite_$i
+    sudo -u postgres createdb -O dendrite -E UTF-8 dendrite_$i
 done
 ```
 
