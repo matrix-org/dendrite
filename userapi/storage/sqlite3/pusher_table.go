@@ -19,11 +19,12 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/sirupsen/logrus"
 )
 
 // See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-pushers
@@ -136,7 +137,7 @@ func (s *pushersStatements) SelectPushers(
 		pushers = append(pushers, pusher)
 	}
 
-	logrus.Debugf("Database returned %d pushers", len(pushers))
+	logrus.Tracef("Database returned %d pushers", len(pushers))
 	return pushers, rows.Err()
 }
 
