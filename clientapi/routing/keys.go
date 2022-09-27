@@ -31,7 +31,7 @@ type uploadKeysRequest struct {
 	OneTimeKeys map[string]json.RawMessage `json:"one_time_keys"`
 }
 
-func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
 	var r uploadKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
@@ -62,7 +62,9 @@ func UploadKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.De
 	}
 
 	var uploadRes api.PerformUploadKeysResponse
-	keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes)
+	if err := keyAPI.PerformUploadKeys(req.Context(), uploadReq, &uploadRes); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if uploadRes.Error != nil {
 		util.GetLogger(req.Context()).WithError(uploadRes.Error).Error("Failed to PerformUploadKeys")
 		return jsonerror.InternalServerError()
@@ -100,19 +102,21 @@ func (r *queryKeysRequest) GetTimeout() time.Duration {
 	return time.Duration(r.Timeout) * time.Millisecond
 }
 
-func QueryKeys(req *http.Request, keyAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+func QueryKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
 	var r queryKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
 	queryRes := api.QueryKeysResponse{}
-	keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
+	if err := keyAPI.QueryKeys(req.Context(), &api.QueryKeysRequest{
 		UserID:        device.UserID,
 		UserToDevices: r.DeviceKeys,
 		Timeout:       r.GetTimeout(),
 		// TODO: Token?
-	}, &queryRes)
+	}, &queryRes); err != nil {
+		return util.ErrorResponse(err)
+	}
 	return util.JSONResponse{
 		Code: 200,
 		JSON: map[string]interface{}{
@@ -138,17 +142,19 @@ func (r *claimKeysRequest) GetTimeout() time.Duration {
 	return time.Duration(r.TimeoutMS) * time.Millisecond
 }
 
-func ClaimKeys(req *http.Request, keyAPI api.KeyInternalAPI) util.JSONResponse {
+func ClaimKeys(req *http.Request, keyAPI api.ClientKeyAPI) util.JSONResponse {
 	var r claimKeysRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
 	}
 	claimRes := api.PerformClaimKeysResponse{}
-	keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
+	if err := keyAPI.PerformClaimKeys(req.Context(), &api.PerformClaimKeysRequest{
 		OneTimeKeys: r.OneTimeKeys,
 		Timeout:     r.GetTimeout(),
-	}, &claimRes)
+	}, &claimRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 	if claimRes.Error != nil {
 		util.GetLogger(req.Context()).WithError(claimRes.Error).Error("failed to PerformClaimKeys")
 		return jsonerror.InternalServerError()

@@ -23,6 +23,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -51,6 +52,7 @@ CREATE TABLE IF NOT EXISTS syncapi_current_room_state (
     -- The serial ID of the output_room_events table when this event became
     -- part of the current state of the room.
     added_at BIGINT,
+    history_visibility SMALLINT NOT NULL DEFAULT 2,
     -- Clobber based on 3-uple of room_id, type and state_key
     CONSTRAINT syncapi_room_state_unique UNIQUE (room_id, type, state_key)
 );
@@ -60,11 +62,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_s
 CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
 -- for querying state by event IDs
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON syncapi_current_room_state(event_id);
+-- for improving selectRoomIDsWithAnyMembershipSQL
+CREATE INDEX IF NOT EXISTS syncapi_current_room_state_type_state_key_idx ON syncapi_current_room_state(type, state_key);
 `
 
 const upsertRoomStateSQL = "" +
-	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
+	"INSERT INTO syncapi_current_room_state (room_id, event_id, type, sender, contains_url, state_key, headered_event_json, membership, added_at, history_visibility)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)" +
 	" ON CONFLICT ON CONSTRAINT syncapi_room_state_unique" +
 	" DO UPDATE SET event_id = $2, sender=$4, contains_url=$5, headered_event_json = $7, membership = $8, added_at = $9"
 
@@ -78,7 +82,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectRoomIDsWithAnyMembershipSQL = "" +
-	"SELECT DISTINCT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
+	"SELECT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1" +
@@ -93,16 +97,24 @@ const selectCurrentStateSQL = "" +
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
 
+const selectJoinedUsersInRoomSQL = "" +
+	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = ANY($1)"
+
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	// TODO: The session_id and transaction_id blanks are here because otherwise
-	// the rowsToStreamEvents expects there to be exactly six columns. We need to
+	// TODO: The session_id and transaction_id blanks are here because
+	// the rowsToStreamEvents expects there to be exactly seven columns. We need to
 	// figure out if these really need to be in the DB, and if so, we need a
 	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id" +
+	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, history_visibility" +
 	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
+
+const selectSharedUsersSQL = "" +
+	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
+	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
+	") AND type = 'm.room.member' AND state_key = ANY($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt                *sql.Stmt
@@ -112,8 +124,10 @@ type currentRoomStateStatements struct {
 	selectRoomIDsWithAnyMembershipStmt *sql.Stmt
 	selectCurrentStateStmt             *sql.Stmt
 	selectJoinedUsersStmt              *sql.Stmt
+	selectJoinedUsersInRoomStmt        *sql.Stmt
 	selectEventsWithEventIDsStmt       *sql.Stmt
 	selectStateEventStmt               *sql.Stmt
+	selectSharedUsersStmt              *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -122,6 +136,17 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if err != nil {
 		return nil, err
 	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: add history visibility column (current_room_state)",
+		Up:      deltas.UpAddHistoryVisibilityColumnCurrentRoomState,
+	})
+	err = m.Up(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
 		return nil, err
 	}
@@ -143,10 +168,16 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
 		return nil, err
 	}
+	if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
+		return nil, err
+	}
 	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
 		return nil, err
 	}
 	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
+		return nil, err
+	}
+	if s.selectSharedUsersStmt, err = db.Prepare(selectSharedUsersSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -163,9 +194,32 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
 
 	result := make(map[string][]string)
+	var roomID string
+	var userID string
 	for rows.Next() {
-		var roomID string
-		var userID string
+		if err := rows.Scan(&roomID, &userID); err != nil {
+			return nil, err
+		}
+		users := result[roomID]
+		users = append(users, userID)
+		result[roomID] = users
+	}
+	return result, rows.Err()
+}
+
+// SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
+func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
+	ctx context.Context, roomIDs []string,
+) (map[string][]string, error) {
+	rows, err := s.selectJoinedUsersInRoomStmt.QueryContext(ctx, pq.StringArray(roomIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsers: rows.close() failed")
+
+	result := make(map[string][]string)
+	var userID, roomID string
+	for rows.Next() {
 		if err := rows.Scan(&roomID, &userID); err != nil {
 			return nil, err
 		}
@@ -233,9 +287,10 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
+	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	rows, err := stmt.QueryContext(ctx, roomID,
-		pq.StringArray(stateFilter.Senders),
-		pq.StringArray(stateFilter.NotSenders),
+		pq.StringArray(senders),
+		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,
@@ -296,6 +351,7 @@ func (s *currentRoomStateStatements) UpsertRoomState(
 		headeredJSON,
 		membership,
 		addedAt,
+		event.Visibility,
 	)
 	return err
 }
@@ -347,4 +403,25 @@ func (s *currentRoomStateStatements) SelectStateEvent(
 		return nil, err
 	}
 	return &ev, err
+}
+
+func (s *currentRoomStateStatements) SelectSharedUsers(
+	ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string,
+) ([]string, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectSharedUsersStmt)
+	rows, err := stmt.QueryContext(ctx, userID, pq.Array(otherUserIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectSharedUsersStmt: rows.close() failed")
+
+	var stateKey string
+	result := make([]string, 0, len(otherUserIDs))
+	for rows.Next() {
+		if err := rows.Scan(&stateKey); err != nil {
+			return nil, err
+		}
+		result = append(result, stateKey)
+	}
+	return result, rows.Err()
 }

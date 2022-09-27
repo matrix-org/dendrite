@@ -21,10 +21,11 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -43,6 +44,7 @@ import (
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -61,6 +63,7 @@ var (
 	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
 	instancePeer   = flag.String("peer", "", "the static Pinecone peers to connect to, comma separated-list")
 	instanceListen = flag.String("listen", ":0", "the port Pinecone peers can connect to")
+	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
 )
 
 // nolint:gocyclo
@@ -71,31 +74,94 @@ func main() {
 	var pk ed25519.PublicKey
 	var sk ed25519.PrivateKey
 
-	keyfile := *instanceName + ".key"
-	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
-		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
-			panic(err)
+	// iterate through the cli args and check if the config flag was set
+	configFlagSet := false
+	for _, arg := range os.Args {
+		if arg == "--config" || arg == "-config" {
+			configFlagSet = true
+			break
 		}
-		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
-			panic(err)
-		}
-	} else if err == nil {
-		if sk, err = ioutil.ReadFile(keyfile); err != nil {
-			panic(err)
-		}
-		if len(sk) != ed25519.PrivateKeySize {
-			panic("the private key is not long enough")
-		}
-		pk = sk.Public().(ed25519.PublicKey)
 	}
 
-	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	cfg := &config.Dendrite{}
+
+	// use custom config if config flag is set
+	if configFlagSet {
+		cfg = setup.ParseFlags(true)
+		sk = cfg.Global.PrivateKey
+	} else {
+		keyfile := filepath.Join(*instanceDir, *instanceName) + ".pem"
+		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
+			oldkeyfile := *instanceName + ".key"
+			if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
+				if err = test.NewMatrixKey(keyfile); err != nil {
+					panic("failed to generate a new PEM key: " + err.Error())
+				}
+				if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+					panic("failed to load PEM key: " + err.Error())
+				}
+				if len(sk) != ed25519.PrivateKeySize {
+					panic("the private key is not long enough")
+				}
+			} else {
+				if sk, err = os.ReadFile(oldkeyfile); err != nil {
+					panic("failed to read the old private key: " + err.Error())
+				}
+				if len(sk) != ed25519.PrivateKeySize {
+					panic("the private key is not long enough")
+				}
+				if err := test.SaveMatrixKey(keyfile, sk); err != nil {
+					panic("failed to convert the private key to PEM format: " + err.Error())
+				}
+			}
+		} else {
+			var err error
+			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+				panic("failed to load PEM key: " + err.Error())
+			}
+			if len(sk) != ed25519.PrivateKeySize {
+				panic("the private key is not long enough")
+			}
+		}
+
+		pk = sk.Public().(ed25519.PublicKey)
+
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: true,
+		})
+		cfg.Global.PrivateKey = sk
+		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", filepath.Join(*instanceDir, *instanceName)))
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.ClientAPI.RegistrationDisabled = false
+		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+		if err := cfg.Derive(); err != nil {
+			panic(err)
+		}
+	}
+
+	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
+
+	base := base.NewBaseDendrite(cfg, "Monolith")
+	defer base.Close() // nolint: errcheck
+
+	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
 	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
-	pManager := pineconeConnections.NewConnectionManager(pRouter)
+	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
 	pMulticast.Start()
 	if instancePeer != nil && *instancePeer != "" {
-		pManager.AddPeer(*instancePeer)
+		for _, peer := range strings.Split(*instancePeer, ",") {
+			pManager.AddPeer(strings.Trim(peer, " \t\r\n"))
+		}
 	}
 
 	go func() {
@@ -126,28 +192,6 @@ func main() {
 		}
 	}()
 
-	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
-	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	cfg.Global.PrivateKey = sk
-	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
-	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-appservice.db", *instanceName))
-	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
-	if err := cfg.Derive(); err != nil {
-		panic(err)
-	}
-
-	base := base.NewBaseDendrite(cfg, "Monolith")
-	defer base.Close() // nolint: errcheck
-
-	accountDB := base.CreateAccountsDB()
 	federation := conn.CreateFederationClient(base, pQUIC)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
@@ -160,7 +204,7 @@ func main() {
 	)
 
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
-	userAPI := userapi.NewInternalAPI(base, accountDB, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
+	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
@@ -172,7 +216,6 @@ func main() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		AccountDB: accountDB,
 		Client:    conn.CreateClient(base, pQUIC),
 		FedClient: federation,
 		KeyRing:   keyRing,
@@ -185,15 +228,7 @@ func main() {
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
-	monolith.AddAllPublicRoutes(
-		base.ProcessContext,
-		base.PublicClientAPIMux,
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.PublicMediaAPIMux,
-		base.SynapseAdminMux,
-	)
+	monolith.AddAllPublicRoutes(base)
 
 	wsUpgrader := websocket.Upgrader{
 		CheckOrigin: func(_ *http.Request) bool {

@@ -37,8 +37,8 @@ import (
 type Leaver struct {
 	Cfg     *config.RoomServer
 	DB      storage.Database
-	FSAPI   fsAPI.FederationInternalAPI
-	UserAPI userapi.UserInternalAPI
+	FSAPI   fsAPI.RoomserverFederationAPI
+	UserAPI userapi.RoomserverUserAPI
 	Inputer *input.Inputer
 }
 
@@ -81,12 +81,11 @@ func (r *Leaver) performLeaveRoomByID(
 	// that.
 	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
-		var host gomatrixserverlib.ServerName
-		_, host, err = gomatrixserverlib.SplitID('@', senderUser)
-		if err != nil {
+		_, senderDomain, serr := gomatrixserverlib.SplitID('@', senderUser)
+		if serr != nil {
 			return nil, fmt.Errorf("sender %q is invalid", senderUser)
 		}
-		if host != r.Cfg.Matrix.ServerName {
+		if senderDomain != r.Cfg.Matrix.ServerName {
 			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
 		}
 		// check that this is not a "server notice room"
@@ -172,6 +171,12 @@ func (r *Leaver) performLeaveRoomByID(
 		return nil, fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}
 
+	// Get the sender domain.
+	_, senderDomain, serr := gomatrixserverlib.SplitID('@', event.Sender())
+	if serr != nil {
+		return nil, fmt.Errorf("sender %q is invalid", event.Sender())
+	}
+
 	// Give our leave event to the roomserver input stream. The
 	// roomserver will process the membership change and notify
 	// downstream automatically.
@@ -180,13 +185,15 @@ func (r *Leaver) performLeaveRoomByID(
 			{
 				Kind:         api.KindNew,
 				Event:        event.Headered(buildRes.RoomVersion),
-				Origin:       event.Origin(),
+				Origin:       senderDomain,
 				SendAsServer: string(r.Cfg.Matrix.ServerName),
 			},
 		},
 	}
 	inputRes := api.InputRoomEventsResponse{}
-	r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes)
+	if err = r.Inputer.InputRoomEvents(ctx, &inputReq, &inputRes); err != nil {
+		return nil, fmt.Errorf("r.Inputer.InputRoomEvents: %w", err)
+	}
 	if err = inputRes.Err(); err != nil {
 		return nil, fmt.Errorf("r.InputRoomEvents: %w", err)
 	}
@@ -228,14 +235,14 @@ func (r *Leaver) performFederatedRejectInvite(
 		util.GetLogger(ctx).WithError(err).Errorf("failed to get MembershipUpdater, still retiring invite event")
 	}
 	if updater != nil {
-		if _, err = updater.SetToLeave(req.UserID, eventID); err != nil {
-			util.GetLogger(ctx).WithError(err).Errorf("failed to set membership to leave, still retiring invite event")
+		if err = updater.Delete(); err != nil {
+			util.GetLogger(ctx).WithError(err).Errorf("failed to delete membership, still retiring invite event")
 			if err = updater.Rollback(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback membership leave, still retiring invite event")
+				util.GetLogger(ctx).WithError(err).Errorf("failed to rollback deleting membership, still retiring invite event")
 			}
 		} else {
 			if err = updater.Commit(); err != nil {
-				util.GetLogger(ctx).WithError(err).Errorf("failed to commit membership update, still retiring invite event")
+				util.GetLogger(ctx).WithError(err).Errorf("failed to commit deleting membership, still retiring invite event")
 			}
 		}
 	}

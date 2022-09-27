@@ -15,11 +15,13 @@
 package jsonerror
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // MatrixError represents the "standard error response" in Matrix.
@@ -154,6 +156,12 @@ func MissingParam(msg string) *MatrixError {
 	return &MatrixError{"M_MISSING_PARAM", msg}
 }
 
+// UnableToAuthoriseJoin is an error that is returned when a server can't
+// determine whether to allow a restricted join or not.
+func UnableToAuthoriseJoin(msg string) *MatrixError {
+	return &MatrixError{"M_UNABLE_TO_AUTHORISE_JOIN", msg}
+}
+
 // LeaveServerNoticeError is an error returned when trying to reject an invite
 // for a server notice room.
 func LeaveServerNoticeError() *MatrixError {
@@ -205,5 +213,17 @@ func NotTrusted(serverName string) *MatrixError {
 	return &MatrixError{
 		ErrCode: "M_SERVER_NOT_TRUSTED",
 		Err:     fmt.Sprintf("Untrusted server '%s'", serverName),
+	}
+}
+
+// InternalAPIError is returned when Dendrite failed to reach an internal API.
+func InternalAPIError(ctx context.Context, err error) util.JSONResponse {
+	logrus.WithContext(ctx).WithError(err).Error("Error reaching an internal API")
+	return util.JSONResponse{
+		Code: http.StatusInternalServerError,
+		JSON: &MatrixError{
+			ErrCode: "M_INTERNAL_SERVER_ERROR",
+			Err:     "Dendrite encountered an error reaching an internal API.",
+		},
 	}
 }

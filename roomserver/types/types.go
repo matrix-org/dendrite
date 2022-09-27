@@ -18,8 +18,11 @@ package types
 import (
 	"encoding/json"
 	"sort"
+	"strings"
+	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -96,6 +99,38 @@ func (a StateKeyTuple) LessThan(b StateKeyTuple) bool {
 	return a.EventStateKeyNID < b.EventStateKeyNID
 }
 
+type StateKeyTupleSorter []StateKeyTuple
+
+func (s StateKeyTupleSorter) Len() int           { return len(s) }
+func (s StateKeyTupleSorter) Less(i, j int) bool { return s[i].LessThan(s[j]) }
+func (s StateKeyTupleSorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+// Check whether a tuple is in the list. Assumes that the list is sorted.
+func (s StateKeyTupleSorter) contains(value StateKeyTuple) bool {
+	i := sort.Search(len(s), func(i int) bool { return !s[i].LessThan(value) })
+	return i < len(s) && s[i] == value
+}
+
+// List the unique eventTypeNIDs and eventStateKeyNIDs.
+// Assumes that the list is sorted.
+func (s StateKeyTupleSorter) TypesAndStateKeysAsArrays() (eventTypeNIDs []int64, eventStateKeyNIDs []int64) {
+	eventTypeNIDs = make([]int64, len(s))
+	eventStateKeyNIDs = make([]int64, len(s))
+	for i := range s {
+		eventTypeNIDs[i] = int64(s[i].EventTypeNID)
+		eventStateKeyNIDs[i] = int64(s[i].EventStateKeyNID)
+	}
+	eventTypeNIDs = eventTypeNIDs[:util.SortAndUnique(int64Sorter(eventTypeNIDs))]
+	eventStateKeyNIDs = eventStateKeyNIDs[:util.SortAndUnique(int64Sorter(eventStateKeyNIDs))]
+	return
+}
+
+type int64Sorter []int64
+
+func (s int64Sorter) Len() int           { return len(s) }
+func (s int64Sorter) Less(i, j int) bool { return s[i] < s[j] }
+func (s int64Sorter) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 // A StateEntry is an entry in the room state of a matrix room.
 type StateEntry struct {
 	StateKeyTuple
@@ -139,10 +174,6 @@ func DeduplicateStateEntries(a []StateEntry) []StateEntry {
 
 // StateAtEvent is the state before and after a matrix event.
 type StateAtEvent struct {
-	// Should this state overwrite the latest events and memberships of the room?
-	// This might be necessary when rejoining a federated room after a period of
-	// absence, as our state and latest events will be out of date.
-	Overwrite bool
 	// The state before the event.
 	BeforeStateSnapshotNID StateSnapshotNID
 	// True if this StateEntry is rejected. State resolution should then treat this
@@ -164,6 +195,28 @@ func (s StateAtEvent) IsStateEvent() bool {
 type StateAtEventAndReference struct {
 	StateAtEvent
 	gomatrixserverlib.EventReference
+}
+
+type StateAtEventAndReferences []StateAtEventAndReference
+
+func (s StateAtEventAndReferences) Less(a, b int) bool {
+	return strings.Compare(s[a].EventID, s[b].EventID) < 0
+}
+
+func (s StateAtEventAndReferences) Len() int {
+	return len(s)
+}
+
+func (s StateAtEventAndReferences) Swap(a, b int) {
+	s[a], s[b] = s[b], s[a]
+}
+
+func (s StateAtEventAndReferences) EventIDs() string {
+	strs := make([]string, 0, len(s))
+	for _, r := range s {
+		strs = append(strs, r.EventID)
+	}
+	return "[" + strings.Join(strs, " ") + "]"
 }
 
 // An Event is a gomatrixserverlib.Event with the numeric event ID attached.
@@ -227,8 +280,46 @@ func (e RejectedError) Error() string { return string(e) }
 
 // RoomInfo contains metadata about a room
 type RoomInfo struct {
+	mu               sync.RWMutex
 	RoomNID          RoomNID
 	RoomVersion      gomatrixserverlib.RoomVersion
-	StateSnapshotNID StateSnapshotNID
-	IsStub           bool
+	stateSnapshotNID StateSnapshotNID
+	isStub           bool
+}
+
+func (r *RoomInfo) StateSnapshotNID() StateSnapshotNID {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.stateSnapshotNID
+}
+
+func (r *RoomInfo) IsStub() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.isStub
+}
+
+func (r *RoomInfo) SetStateSnapshotNID(nid StateSnapshotNID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stateSnapshotNID = nid
+}
+
+func (r *RoomInfo) SetIsStub(isStub bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.isStub = isStub
+}
+
+func (r *RoomInfo) CopyFrom(r2 *RoomInfo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r2.mu.RLock()
+	defer r2.mu.RUnlock()
+
+	r.RoomNID = r2.RoomNID
+	r.RoomVersion = r2.RoomVersion
+	r.stateSnapshotNID = r2.stateSnapshotNID
+	r.isStub = r2.isStub
 }

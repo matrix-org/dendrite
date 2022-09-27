@@ -29,6 +29,8 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/matrix-org/dendrite/userapi/types"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -51,6 +53,7 @@ type Database struct {
 	LoginTokens           tables.LoginTokenTable
 	Notifications         tables.NotificationTable
 	Pushers               tables.PusherTable
+	Stats                 tables.StatsTable
 	LoginTokenLifetime    time.Duration
 	ServerName            gomatrixserverlib.ServerName
 	BcryptCost            int
@@ -173,6 +176,41 @@ func (d *Database) createAccount(
 		return nil, err
 	}
 	return account, nil
+}
+
+func (d *Database) QueryPushRules(
+	ctx context.Context,
+	localpart string,
+) (*pushrules.AccountRuleSets, error) {
+	data, err := d.AccountDatas.SelectAccountDataByType(ctx, localpart, "", "m.push_rules")
+	if err != nil {
+		return nil, err
+	}
+
+	// If we didn't find any default push rules then we should just generate some
+	// fresh ones.
+	if len(data) == 0 {
+		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.ServerName)
+		prbs, err := json.Marshal(pushRuleSets)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
+		}
+		err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", prbs); dbErr != nil {
+				return fmt.Errorf("failed to save default push rules: %w", dbErr)
+			}
+			return nil
+		})
+
+		return pushRuleSets, err
+	}
+
+	var pushRules pushrules.AccountRuleSets
+	if err := json.Unmarshal(data, &pushRules); err != nil {
+		return nil, err
+	}
+
+	return &pushRules, nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
@@ -577,21 +615,6 @@ func (d *Database) UpdateDevice(
 	})
 }
 
-// RemoveDevice revokes a device by deleting the entry in the database
-// matching with the given device ID and user ID localpart.
-// If the device doesn't exist, it will not return an error
-// If something went wrong during the deletion, it will return the SQL error.
-func (d *Database) RemoveDevice(
-	ctx context.Context, deviceID, localpart string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.Devices.DeleteDevice(ctx, txn, deviceID, localpart); err != sql.ErrNoRows {
-			return err
-		}
-		return nil
-	})
-}
-
 // RemoveDevices revokes one or more devices by deleting the entry in the database
 // matching with the given device IDs and user ID localpart.
 // If the devices don't exist, it will not return an error
@@ -626,10 +649,10 @@ func (d *Database) RemoveAllDevices(
 	return
 }
 
-// UpdateDeviceLastSeen updates a the last seen timestamp and the ip address
-func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr string) error {
+// UpdateDeviceLastSeen updates a last seen timestamp and the ip address.
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr)
+		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr, userAgent)
 	})
 }
 
@@ -712,7 +735,9 @@ func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roo
 }
 
 func (d *Database) DeleteOldNotifications(ctx context.Context) error {
-	return d.Notifications.Clean(ctx, nil)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Notifications.Clean(ctx, txn)
+	})
 }
 
 func (d *Database) UpsertPusher(
@@ -752,7 +777,7 @@ func (d *Database) GetPushers(
 func (d *Database) RemovePusher(
 	ctx context.Context, appid, pushkey, localpart string,
 ) error {
-	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart)
 		if err == sql.ErrNoRows {
 			return nil
@@ -767,7 +792,12 @@ func (d *Database) RemovePusher(
 func (d *Database) RemovePushers(
 	ctx context.Context, appid, pushkey string,
 ) error {
-	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.Pushers.DeletePushers(ctx, txn, appid, pushkey)
 	})
+}
+
+// UserStatistics populates types.UserStatistics, used in reports.
+func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error) {
+	return d.Stats.UserStatistics(ctx, nil)
 }

@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/lib/pq"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -61,9 +63,17 @@ const selectMembershipCountSQL = "" +
 	" SELECT DISTINCT ON (room_id, user_id) room_id, user_id, membership FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC" +
 	") t WHERE t.membership = $3"
 
+const selectHeroesSQL = "" +
+	"SELECT DISTINCT user_id FROM syncapi_memberships WHERE room_id = $1 AND user_id != $2 AND membership = ANY($3) LIMIT 5"
+
+const selectMembershipBeforeSQL = "" +
+	"SELECT membership, topological_pos FROM syncapi_memberships WHERE room_id = $1 and user_id = $2 AND topological_pos <= $3 ORDER BY topological_pos DESC LIMIT 1"
+
 type membershipsStatements struct {
-	upsertMembershipStmt      *sql.Stmt
-	selectMembershipCountStmt *sql.Stmt
+	upsertMembershipStmt        *sql.Stmt
+	selectMembershipCountStmt   *sql.Stmt
+	selectHeroesStmt            *sql.Stmt
+	selectMembershipForUserStmt *sql.Stmt
 }
 
 func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -72,13 +82,12 @@ func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.upsertMembershipStmt, err = db.Prepare(upsertMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCountSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertMembershipStmt, upsertMembershipSQL},
+		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
+		{&s.selectHeroesStmt, selectHeroesSQL},
+		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
+	}.Prepare(db)
 }
 
 func (s *membershipsStatements) UpsertMembership(
@@ -107,4 +116,41 @@ func (s *membershipsStatements) SelectMembershipCount(
 	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
 	err = stmt.QueryRowContext(ctx, roomID, pos, membership).Scan(&count)
 	return
+}
+
+func (s *membershipsStatements) SelectHeroes(
+	ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string,
+) (heroes []string, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectHeroesStmt)
+	var rows *sql.Rows
+	rows, err = stmt.QueryContext(ctx, roomID, userID, pq.StringArray(memberships))
+	if err != nil {
+		return
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectHeroes: rows.close() failed")
+	var hero string
+	for rows.Next() {
+		if err = rows.Scan(&hero); err != nil {
+			return
+		}
+		heroes = append(heroes, hero)
+	}
+	return heroes, rows.Err()
+}
+
+// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
+// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
+// string as the membership.
+func (s *membershipsStatements) SelectMembershipForUser(
+	ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64,
+) (membership string, topologyPos int, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipForUserStmt)
+	err = stmt.QueryRowContext(ctx, roomID, userID, pos).Scan(&membership, &topologyPos)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "leave", 0, nil
+		}
+		return "", 0, err
+	}
+	return membership, topologyPos, nil
 }

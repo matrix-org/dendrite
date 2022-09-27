@@ -15,15 +15,20 @@
 package routing
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/caching"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,9 +46,10 @@ type ContextRespsonse struct {
 
 func Context(
 	req *http.Request, device *userapi.Device,
-	rsAPI roomserver.RoomserverInternalAPI,
+	rsAPI roomserver.SyncRoomserverAPI,
 	syncDB storage.Database,
 	roomID, eventID string,
+	lazyLoadCache caching.LazyLoadCache,
 ) util.JSONResponse {
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -60,7 +66,9 @@ func Context(
 			Headers: nil,
 		}
 	}
-	filter.Rooms = append(filter.Rooms, roomID)
+	if filter.Rooms != nil {
+		*filter.Rooms = append(*filter.Rooms, roomID)
+	}
 
 	ctx := req.Context()
 	membershipRes := roomserver.QueryMembershipForUserResponse{}
@@ -68,6 +76,12 @@ func Context(
 	if err = rsAPI.QueryMembershipForUser(ctx, &membershipReq, &membershipRes); err != nil {
 		logrus.WithError(err).Error("unable to query membership")
 		return jsonerror.InternalServerError()
+	}
+	if !membershipRes.RoomExists {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("room does not exist"),
+		}
 	}
 
 	stateFilter := gomatrixserverlib.StateFilter{
@@ -83,24 +97,6 @@ func Context(
 		ContainsURL:             filter.ContainsURL,
 	}
 
-	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
-	state, _ := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
-	// verify the user is allowed to see the context for this room/event
-	for _, x := range state {
-		var hisVis string
-		hisVis, err = x.HistoryVisibility()
-		if err != nil {
-			continue
-		}
-		allowed := hisVis == gomatrixserverlib.WorldReadable || membershipRes.Membership == gomatrixserverlib.Join
-		if !allowed {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("User is not allowed to query context"),
-			}
-		}
-	}
-
 	id, requestedEvent, err := syncDB.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -111,6 +107,24 @@ func Context(
 		}
 		logrus.WithError(err).WithField("eventID", eventID).Error("unable to find requested event")
 		return jsonerror.InternalServerError()
+	}
+
+	// verify the user is allowed to see the context for this room/event
+	startTime := time.Now()
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
+	if err != nil {
+		logrus.WithError(err).Error("unable to apply history visibility filter")
+		return jsonerror.InternalServerError()
+	}
+	logrus.WithFields(logrus.Fields{
+		"duration": time.Since(startTime),
+		"room_id":  roomID,
+	}).Debug("applied history visibility (context)")
+	if len(filteredEvents) == 0 {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("User is not allowed to query context"),
+		}
 	}
 
 	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, roomID, filter)
@@ -125,9 +139,28 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatAll)
-	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatAll)
-	newState := applyLazyLoadMembers(filter, eventsAfterClient, eventsBeforeClient, state)
+	startTime = time.Now()
+	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, syncDB, rsAPI, eventsBefore, eventsAfter, device.UserID)
+	if err != nil {
+		logrus.WithError(err).Error("unable to apply history visibility filter")
+		return jsonerror.InternalServerError()
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"duration": time.Since(startTime),
+		"room_id":  roomID,
+	}).Debug("applied history visibility (context eventsBefore/eventsAfter)")
+
+	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
+	state, err := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
+	if err != nil {
+		logrus.WithError(err).Error("unable to fetch current room state")
+		return jsonerror.InternalServerError()
+	}
+
+	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBeforeFiltered, gomatrixserverlib.FormatAll)
+	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfterFiltered, gomatrixserverlib.FormatAll)
+	newState := applyLazyLoadMembers(device, filter, eventsAfterClient, eventsBeforeClient, state, lazyLoadCache)
 
 	response := ContextRespsonse{
 		Event:        gomatrixserverlib.HeaderedToClientEvent(&requestedEvent, gomatrixserverlib.FormatAll),
@@ -139,22 +172,87 @@ func Context(
 	if len(response.State) > filter.Limit {
 		response.State = response.State[len(response.State)-filter.Limit:]
 	}
-
+	start, end, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
+	if err == nil {
+		response.End = end.String()
+		response.Start = start.String()
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,
 	}
 }
 
-func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter, eventsBefore []gomatrixserverlib.ClientEvent, state []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
+// applyHistoryVisibilityOnContextEvents is a helper function to avoid roundtrips to the roomserver
+// by combining the events before and after the context event. Returns the filtered events,
+// and an error, if any.
+func applyHistoryVisibilityOnContextEvents(
+	ctx context.Context, syncDB storage.Database, rsAPI roomserver.SyncRoomserverAPI,
+	eventsBefore, eventsAfter []*gomatrixserverlib.HeaderedEvent,
+	userID string,
+) (filteredBefore, filteredAfter []*gomatrixserverlib.HeaderedEvent, err error) {
+	eventIDsBefore := make(map[string]struct{}, len(eventsBefore))
+	eventIDsAfter := make(map[string]struct{}, len(eventsAfter))
+
+	// Remember before/after eventIDs, so we can restore them
+	// after applying history visibility checks
+	for _, ev := range eventsBefore {
+		eventIDsBefore[ev.EventID()] = struct{}{}
+	}
+	for _, ev := range eventsAfter {
+		eventIDsAfter[ev.EventID()] = struct{}{}
+	}
+
+	allEvents := append(eventsBefore, eventsAfter...)
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, allEvents, nil, userID, "context")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// "Restore" events in the correct context
+	for _, ev := range filteredEvents {
+		if _, ok := eventIDsBefore[ev.EventID()]; ok {
+			filteredBefore = append(filteredBefore, ev)
+		}
+		if _, ok := eventIDsAfter[ev.EventID()]; ok {
+			filteredAfter = append(filteredAfter, ev)
+		}
+	}
+	return filteredBefore, filteredAfter, nil
+}
+
+func getStartEnd(ctx context.Context, syncDB storage.Database, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+	if len(startEvents) > 0 {
+		start, err = syncDB.EventPositionInTopology(ctx, startEvents[0].EventID())
+		if err != nil {
+			return
+		}
+	}
+	if len(endEvents) > 0 {
+		end, err = syncDB.EventPositionInTopology(ctx, endEvents[0].EventID())
+	}
+	return
+}
+
+func applyLazyLoadMembers(
+	device *userapi.Device,
+	filter *gomatrixserverlib.RoomEventFilter,
+	eventsAfter, eventsBefore []gomatrixserverlib.ClientEvent,
+	state []*gomatrixserverlib.HeaderedEvent,
+	lazyLoadCache caching.LazyLoadCache,
+) []*gomatrixserverlib.HeaderedEvent {
 	if filter == nil || !filter.LazyLoadMembers {
 		return state
 	}
 	allEvents := append(eventsBefore, eventsAfter...)
-	x := make(map[string]bool)
+	x := make(map[string]struct{})
 	// get members who actually send an event
 	for _, e := range allEvents {
-		x[e.Sender] = true
+		// Don't add membership events the client should already know about
+		if _, cached := lazyLoadCache.IsLazyLoadedUserCached(device, e.RoomID, e.Sender); cached {
+			continue
+		}
+		x[e.Sender] = struct{}{}
 	}
 
 	newState := []*gomatrixserverlib.HeaderedEvent{}
@@ -164,8 +262,9 @@ func applyLazyLoadMembers(filter *gomatrixserverlib.RoomEventFilter, eventsAfter
 			newState = append(newState, event)
 		} else {
 			// did the user send an event?
-			if x[event.Sender()] {
+			if _, ok := x[event.Sender()]; ok {
 				membershipEvents = append(membershipEvents, event)
+				lazyLoadCache.StoreLazyLoadedUser(device, event.RoomID(), event.Sender(), event.EventID())
 			}
 		}
 	}

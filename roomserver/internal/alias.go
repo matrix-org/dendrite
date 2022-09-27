@@ -41,9 +41,6 @@ type RoomserverInternalAPIDatabase interface {
 	// Look up all aliases referring to a given room ID.
 	// Returns an error if there was a problem talking to the database.
 	GetAliasesForRoomID(ctx context.Context, roomID string) ([]string, error)
-	// Get the user ID of the creator of an alias.
-	// Returns an error if there was a problem talking to the database.
-	GetCreatorIDForAlias(ctx context.Context, alias string) (string, error)
 	// Remove a given room alias.
 	// Returns an error if there was a problem talking to the database.
 	RemoveRoomAlias(ctx context.Context, alias string) error
@@ -134,22 +131,6 @@ func (r *RoomserverInternalAPI) GetAliasesForRoomID(
 	return nil
 }
 
-// GetCreatorIDForAlias implements alias.RoomserverInternalAPI
-func (r *RoomserverInternalAPI) GetCreatorIDForAlias(
-	ctx context.Context,
-	request *api.GetCreatorIDForAliasRequest,
-	response *api.GetCreatorIDForAliasResponse,
-) error {
-	// Look up the aliases in the database for the given RoomID
-	creatorID, err := r.DB.GetCreatorIDForAlias(ctx, request.Alias)
-	if err != nil {
-		return err
-	}
-
-	response.UserID = creatorID
-	return nil
-}
-
 // RemoveRoomAlias implements alias.RoomserverInternalAPI
 func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	ctx context.Context,
@@ -235,11 +216,10 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			err = api.SendEvents(ctx, r.RSAPI, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}
-
 		}
 	}
 

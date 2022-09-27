@@ -21,6 +21,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
 	"github.com/matrix-org/dendrite/keyserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -33,13 +34,15 @@ CREATE TABLE IF NOT EXISTS keyserver_cross_signing_sigs (
 	target_user_id TEXT NOT NULL,
 	target_key_id TEXT NOT NULL,
 	signature TEXT NOT NULL,
-	PRIMARY KEY (origin_user_id, target_user_id, target_key_id)
+	PRIMARY KEY (origin_user_id, origin_key_id, target_user_id, target_key_id)
 );
+
+CREATE INDEX IF NOT EXISTS keyserver_cross_signing_sigs_idx ON keyserver_cross_signing_sigs (origin_user_id, target_user_id, target_key_id);
 `
 
 const selectCrossSigningSigsForTargetSQL = "" +
 	"SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
-	" WHERE target_user_id = $1 AND target_key_id = $2"
+	" WHERE (origin_user_id = $1 OR origin_user_id = target_user_id) AND target_user_id = $2 AND target_key_id = $3"
 
 const upsertCrossSigningSigsForTargetSQL = "" +
 	"INSERT OR REPLACE INTO keyserver_cross_signing_sigs (origin_user_id, origin_key_id, target_user_id, target_key_id, signature)" +
@@ -63,6 +66,15 @@ func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error)
 	if err != nil {
 		return nil, err
 	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "keyserver: cross signing signature indexes",
+		Up:      deltas.UpFixCrossSigningSignatureIndexes,
+	})
+	if err = m.Up(context.Background()); err != nil {
+		return nil, err
+	}
+
 	return s, sqlutil.StatementList{
 		{&s.selectCrossSigningSigsForTargetStmt, selectCrossSigningSigsForTargetSQL},
 		{&s.upsertCrossSigningSigsForTargetStmt, upsertCrossSigningSigsForTargetSQL},
@@ -71,13 +83,13 @@ func NewSqliteCrossSigningSigsTable(db *sql.DB) (tables.CrossSigningSigs, error)
 }
 
 func (s *crossSigningSigsStatements) SelectCrossSigningSigsForTarget(
-	ctx context.Context, txn *sql.Tx, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
+	ctx context.Context, txn *sql.Tx, originUserID, targetUserID string, targetKeyID gomatrixserverlib.KeyID,
 ) (r types.CrossSigningSigMap, err error) {
-	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForTargetStmt).QueryContext(ctx, targetUserID, targetKeyID)
+	rows, err := sqlutil.TxStmt(txn, s.selectCrossSigningSigsForTargetStmt).QueryContext(ctx, originUserID, targetUserID, targetKeyID)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForTargetStmt: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectCrossSigningSigsForOriginTargetStmt: rows.close() failed")
 	r = types.CrossSigningSigMap{}
 	for rows.Next() {
 		var userID string

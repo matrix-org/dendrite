@@ -41,10 +41,10 @@ const insertAccountDataSQL = "" +
 	" ON CONFLICT (user_id, room_id, type) DO UPDATE" +
 	" SET id = $5"
 
+// further parameters are added by prepareWithFilters
 const selectAccountDataInRangeSQL = "" +
-	"SELECT room_id, type FROM syncapi_account_data_type" +
-	" WHERE user_id = $1 AND id > $2 AND id <= $3" +
-	" ORDER BY id ASC"
+	"SELECT id, room_id, type FROM syncapi_account_data_type" +
+	" WHERE user_id = $1 AND id > $2 AND id <= $3"
 
 const selectMaxAccountDataIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_account_data_type"
@@ -94,40 +94,31 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	ctx context.Context,
 	userID string,
 	r types.Range,
-	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (data map[string][]string, err error) {
+	filter *gomatrixserverlib.EventFilter,
+) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
+	stmt, params, err := prepareWithFilters(
+		s.db, nil, selectAccountDataInRangeSQL,
+		[]interface{}{
+			userID, r.Low(), r.High(),
+		},
+		filter.Senders, filter.NotSenders,
+		filter.Types, filter.NotTypes,
+		[]string{}, nil, filter.Limit, FilterOrderAsc)
 
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High())
+	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAccountDataInRange: rows.close() failed")
 
-	var entries int
+	var dataType string
+	var roomID string
+	var id types.StreamPosition
 
 	for rows.Next() {
-		var dataType string
-		var roomID string
-
-		if err = rows.Scan(&roomID, &dataType); err != nil {
+		if err = rows.Scan(&id, &roomID, &dataType); err != nil {
 			return
-		}
-
-		// check if we should add this by looking at the filter.
-		// It would be nice if we could do this in SQL-land, but the mix of variadic
-		// and positional parameters makes the query annoyingly hard to do, it's easier
-		// and clearer to do it in Go-land. If there are no filters for [not]types then
-		// this gets skipped.
-		for _, includeType := range accountDataFilterPart.Types {
-			if includeType != dataType { // TODO: wildcard support
-				continue
-			}
-		}
-		for _, excludeType := range accountDataFilterPart.NotTypes {
-			if excludeType == dataType { // TODO: wildcard support
-				continue
-			}
 		}
 
 		if len(data[roomID]) > 0 {
@@ -135,13 +126,14 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		} else {
 			data[roomID] = []string{dataType}
 		}
-		entries++
-		if entries >= accountDataFilterPart.Limit {
-			break
+		if id > pos {
+			pos = id
 		}
 	}
-
-	return data, nil
+	if pos == 0 {
+		pos = r.High()
+	}
+	return data, pos, nil
 }
 
 func (s *accountDataStatements) SelectMaxAccountDataID(

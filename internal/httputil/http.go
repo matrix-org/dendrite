@@ -19,19 +19,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/matrix-org/dendrite/userapi/api"
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
 
-// PostJSON performs a POST request with JSON on an internal HTTP API
-func PostJSON(
+// PostJSON performs a POST request with JSON on an internal HTTP API.
+// The error will match the errtype if returned from the remote API, or
+// will be a different type if there was a problem reaching the API.
+func PostJSON[reqtype, restype any, errtype error](
 	ctx context.Context, span opentracing.Span, httpClient *http.Client,
-	apiURL string, request, response interface{},
+	apiURL string, request *reqtype, response *restype,
 ) error {
 	jsonBytes, err := json.Marshal(request)
 	if err != nil {
@@ -69,17 +71,23 @@ func PostJSON(
 	if err != nil {
 		return err
 	}
-	if res.StatusCode != http.StatusOK {
-		var errorBody struct {
-			Message string `json:"message"`
-		}
-		if _, ok := response.(*api.PerformKeyBackupResponse); ok { // TODO: remove this, once cross-boundary errors are a thing
-			return nil
-		}
-		if msgerr := json.NewDecoder(res.Body).Decode(&errorBody); msgerr == nil {
-			return fmt.Errorf("internal API: %d from %s: %s", res.StatusCode, apiURL, errorBody.Message)
-		}
-		return fmt.Errorf("internal API: %d from %s", res.StatusCode, apiURL)
+	var body []byte
+	body, err = io.ReadAll(res.Body)
+	if err != nil {
+		return err
 	}
-	return json.NewDecoder(res.Body).Decode(response)
+	if res.StatusCode != http.StatusOK {
+		if len(body) == 0 {
+			return fmt.Errorf("HTTP %d from %s (no response body)", res.StatusCode, apiURL)
+		}
+		var reserr errtype
+		if err = json.Unmarshal(body, &reserr); err != nil {
+			return fmt.Errorf("HTTP %d from %s - %w", res.StatusCode, apiURL, err)
+		}
+		return reserr
+	}
+	if err = json.Unmarshal(body, response); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
+	return nil
 }

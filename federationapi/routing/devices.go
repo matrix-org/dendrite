@@ -20,18 +20,21 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 )
 
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	keyAPI keyapi.KeyInternalAPI,
+	keyAPI keyapi.FederationKeyAPI,
 	userID string,
 ) util.JSONResponse {
 	var res keyapi.QueryDeviceMessagesResponse
-	keyAPI.QueryDeviceMessages(req.Context(), &keyapi.QueryDeviceMessagesRequest{
+	if err := keyAPI.QueryDeviceMessages(req.Context(), &keyapi.QueryDeviceMessagesRequest{
 		UserID: userID,
-	}, &res)
+	}, &res); err != nil {
+		return util.ErrorResponse(err)
+	}
 	if res.Error != nil {
 		util.GetLogger(req.Context()).WithError(res.Error).Error("keyAPI.QueryDeviceMessages failed")
 		return jsonerror.InternalServerError()
@@ -43,7 +46,12 @@ func GetUserDevices(
 		},
 	}
 	sigRes := &keyapi.QuerySignaturesResponse{}
-	keyAPI.QuerySignatures(req.Context(), sigReq, sigRes)
+	for _, dev := range res.Devices {
+		sigReq.TargetIDs[userID] = append(sigReq.TargetIDs[userID], gomatrixserverlib.KeyID(dev.DeviceID))
+	}
+	if err := keyAPI.QuerySignatures(req.Context(), sigReq, sigRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	response := gomatrixserverlib.RespUserDevices{
 		UserID:   userID,
@@ -66,9 +74,14 @@ func GetUserDevices(
 			continue
 		}
 
+		displayName := dev.DisplayName
+		if displayName == "" {
+			displayName = gjson.GetBytes(dev.DeviceKeys.KeyJSON, "unsigned.device_display_name").Str
+		}
+
 		device := gomatrixserverlib.RespUserDevice{
 			DeviceID:    dev.DeviceID,
-			DisplayName: dev.DisplayName,
+			DisplayName: displayName,
 			Keys:        key,
 		}
 
@@ -76,6 +89,9 @@ func GetUserDevices(
 			if targetKey, ok := targetUser[gomatrixserverlib.KeyID(dev.DeviceID)]; ok {
 				for sourceUserID, forSourceUser := range targetKey {
 					for sourceKeyID, sourceKey := range forSourceUser {
+						if device.Keys.Signatures == nil {
+							device.Keys.Signatures = map[string]map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
+						}
 						if _, ok := device.Keys.Signatures[sourceUserID]; !ok {
 							device.Keys.Signatures[sourceUserID] = map[gomatrixserverlib.KeyID]gomatrixserverlib.Base64Bytes{}
 						}

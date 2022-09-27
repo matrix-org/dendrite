@@ -7,6 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -20,16 +24,12 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/util"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 type OutputStreamEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.UserAPI
-	userAPI      api.UserInternalAPI
-	rsAPI        rsapi.RoomserverInternalAPI
+	rsAPI        rsapi.UserRoomserverAPI
 	jetstream    nats.JetStreamContext
 	durable      string
 	db           storage.Database
@@ -44,8 +44,7 @@ func NewOutputStreamEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	pgClient pushgateway.Client,
-	userAPI api.UserInternalAPI,
-	rsAPI rsapi.RoomserverInternalAPI,
+	rsAPI rsapi.UserRoomserverAPI,
 	syncProducer *producers.SyncAPI,
 ) *OutputStreamEventConsumer {
 	return &OutputStreamEventConsumer{
@@ -56,7 +55,6 @@ func NewOutputStreamEventConsumer(
 		durable:      cfg.Matrix.JetStream.Durable("UserAPISyncAPIStreamEventConsumer"),
 		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputStreamEvent),
 		pgClient:     pgClient,
-		userAPI:      userAPI,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
 	}
@@ -64,15 +62,16 @@ func NewOutputStreamEventConsumer(
 
 func (s *OutputStreamEventConsumer) Start() error {
 	if err := jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *OutputStreamEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputStreamEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var output types.StreamedEvent
 	output.Event = &gomatrixserverlib.HeaderedEvent{}
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
@@ -303,7 +302,7 @@ func (s *OutputStreamEventConsumer) notifyLocal(ctx context.Context, event *goma
 			"event_id":  event.EventID(),
 			"room_id":   event.RoomID(),
 			"localpart": mem.Localpart,
-		}).Tracef("Push rule evaluation rejected the event")
+		}).Debugf("Push rule evaluation rejected the event")
 		return nil
 	}
 
@@ -346,7 +345,7 @@ func (s *OutputStreamEventConsumer) notifyLocal(ctx context.Context, event *goma
 		"localpart":  mem.Localpart,
 		"num_urls":   len(devicesByURLAndFormat),
 		"num_unread": userNumUnreadNotifs,
-	}).Tracef("Notifying single member")
+	}).Debugf("Notifying single member")
 
 	// Push gateways are out of our control, and we cannot risk
 	// looking up the server on a misbehaving push gateway. Each user
@@ -420,8 +419,8 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 			return nil, fmt.Errorf("user %s is ignored", sender)
 		}
 	}
-	var res api.QueryPushRulesResponse
-	if err = s.userAPI.QueryPushRules(ctx, &api.QueryPushRulesRequest{UserID: mem.UserID}, &res); err != nil {
+	ruleSets, err := s.db.QueryPushRules(ctx, mem.Localpart)
+	if err != nil {
 		return nil, err
 	}
 
@@ -432,7 +431,7 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 		roomID:   event.RoomID(),
 		roomSize: roomSize,
 	}
-	eval := pushrules.NewRuleSetEvaluator(ec, &res.RuleSets.Global)
+	eval := pushrules.NewRuleSetEvaluator(ec, &ruleSets.Global)
 	rule, err := eval.MatchEvent(event.Event)
 	if err != nil {
 		return nil, err
@@ -455,7 +454,7 @@ func (s *OutputStreamEventConsumer) evaluatePushRules(ctx context.Context, event
 
 type ruleSetEvalContext struct {
 	ctx      context.Context
-	rsAPI    rsapi.RoomserverInternalAPI
+	rsAPI    rsapi.UserRoomserverAPI
 	mem      *localMembership
 	roomID   string
 	roomSize int
@@ -529,7 +528,9 @@ func (s *OutputStreamEventConsumer) notifyHTTP(ctx context.Context, event *gomat
 	case "event_id_only":
 		req = pushgateway.NotifyRequest{
 			Notification: pushgateway.Notification{
-				Counts:  &pushgateway.Counts{},
+				Counts: &pushgateway.Counts{
+					Unread: userNumUnreadNotifs,
+				},
 				Devices: devices,
 				EventID: event.EventID(),
 				RoomID:  event.RoomID(),

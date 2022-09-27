@@ -20,15 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/tidwall/gjson"
+
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 // Database is a temporary struct until we have made syncserver.go the same for both pq/sqlite
@@ -105,7 +108,7 @@ func (d *Database) MaxStreamPositionForAccountData(ctx context.Context) (types.S
 }
 
 func (d *Database) MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error) {
-	id, err := d.NotificationData.SelectMaxID(ctx)
+	id, err := d.NotificationData.SelectMaxID(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("d.NotificationData.SelectMaxID: %w", err)
 	}
@@ -122,6 +125,10 @@ func (d *Database) RoomIDsWithMembership(ctx context.Context, userID string, mem
 
 func (d *Database) MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error) {
 	return d.Memberships.SelectMembershipCount(ctx, nil, roomID, membership, pos)
+}
+
+func (d *Database) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
+	return d.Memberships.SelectHeroes(ctx, nil, roomID, userID, memberships)
 }
 
 func (d *Database) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
@@ -150,7 +157,7 @@ func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, stre
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
 func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, false)
+	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +171,16 @@ func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]stri
 	return d.CurrentRoomState.SelectJoinedUsers(ctx)
 }
 
+func (d *Database) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
+	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, roomIDs)
+}
+
 func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
 	return d.Peeks.SelectPeekingDevices(ctx)
+}
+
+func (d *Database) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+	return d.CurrentRoomState.SelectSharedUsers(ctx, nil, userID, otherUserIDs)
 }
 
 func (d *Database) GetStateEvent(
@@ -219,7 +234,7 @@ func (d *Database) AddPeek(
 	return
 }
 
-// DeletePeeks tracks the fact that a user has stopped peeking from the specified
+// DeletePeek tracks the fact that a user has stopped peeking from the specified
 // device. If the peeks was successfully deleted this returns the stream ID it was
 // stored at. Returns an error if there was a problem communicating with the database.
 func (d *Database) DeletePeek(
@@ -261,7 +276,7 @@ func (d *Database) DeletePeeks(
 func (d *Database) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
-) (map[string][]string, error) {
+) (map[string][]string, types.StreamPosition, error) {
 	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
 }
 
@@ -312,7 +327,7 @@ func (d *Database) handleBackwardExtremities(ctx context.Context, txn *sql.Tx, e
 
 	// Check if we have all of the event's previous events. If an event is
 	// missing, add it to the room's backward extremities.
-	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs(), false)
+	prevEvents, err := d.OutputEvents.SelectEvents(ctx, txn, ev.PrevEventIDs(), nil, false)
 	if err != nil {
 		return err
 	}
@@ -356,11 +371,13 @@ func (d *Database) WriteEvent(
 	addStateEvents []*gomatrixserverlib.HeaderedEvent,
 	addStateEventIDs, removeStateEventIDs []string,
 	transactionID *api.TransactionID, excludeFromSync bool,
+	historyVisibility gomatrixserverlib.HistoryVisibility,
 ) (pduPosition types.StreamPosition, returnErr error) {
 	returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
+		ev.Visibility = historyVisibility
 		pos, err := d.OutputEvents.InsertEvent(
-			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync,
+			ctx, txn, ev, addStateEventIDs, removeStateEventIDs, transactionID, excludeFromSync, historyVisibility,
 		)
 		if err != nil {
 			return fmt.Errorf("d.OutputEvents.InsertEvent: %w", err)
@@ -379,7 +396,9 @@ func (d *Database) WriteEvent(
 			// Nothing to do, the event may have just been a message event.
 			return nil
 		}
-
+		for i := range addStateEvents {
+			addStateEvents[i].Visibility = historyVisibility
+		}
 		return d.updateRoomState(ctx, txn, removeStateEventIDs, addStateEvents, pduPosition, topoPosition)
 	})
 
@@ -429,7 +448,8 @@ func (d *Database) updateRoomState(
 func (d *Database) GetEventsInTopologicalRange(
 	ctx context.Context,
 	from, to *types.TopologyToken,
-	roomID string, limit int,
+	roomID string,
+	filter *gomatrixserverlib.RoomEventFilter,
 	backwardOrdering bool,
 ) (events []types.StreamEvent, err error) {
 	var minDepth, maxDepth, maxStreamPosForMaxDepth types.StreamPosition
@@ -450,14 +470,14 @@ func (d *Database) GetEventsInTopologicalRange(
 	// Select the event IDs from the defined range.
 	var eIDs []string
 	eIDs, err = d.Topology.SelectEventIDsInRange(
-		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, limit, !backwardOrdering,
+		ctx, nil, roomID, minDepth, maxDepth, maxStreamPosForMaxDepth, filter.Limit, !backwardOrdering,
 	)
 	if err != nil {
 		return
 	}
 
 	// Retrieve the events' contents using their IDs.
-	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs, true)
+	events, err = d.OutputEvents.SelectEvents(ctx, nil, eIDs, filter, true)
 	return
 }
 
@@ -508,9 +528,9 @@ func (d *Database) StreamToTopologicalPosition(
 }
 
 func (d *Database) GetFilter(
-	ctx context.Context, localpart string, filterID string,
-) (*gomatrixserverlib.Filter, error) {
-	return d.Filter.SelectFilter(ctx, localpart, filterID)
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
@@ -536,19 +556,18 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 	eventToRedact := redactedEvents[0].Unwrap()
 	redactionEvent := redactedBecause.Unwrap()
-	ev, err := eventutil.RedactEvent(redactionEvent, eventToRedact)
-	if err != nil {
+	if err = eventutil.RedactEvent(redactionEvent, eventToRedact); err != nil {
 		return err
 	}
 
-	newEvent := ev.Headered(redactedBecause.RoomVersion)
+	newEvent := eventToRedact.Headered(redactedBecause.RoomVersion)
 	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
 		return d.OutputEvents.UpdateEventJSON(ctx, newEvent)
 	})
 	return err
 }
 
-// Retrieve the backward topology position, i.e. the position of the
+// GetBackwardTopologyPos retrieves the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
 func (d *Database) GetBackwardTopologyPos(
 	ctx context.Context,
@@ -619,7 +638,7 @@ func (d *Database) fetchMissingStateEvents(
 ) ([]types.StreamEvent, error) {
 	// Fetch from the events table first so we pick up the stream ID for the
 	// event.
-	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs, false)
+	events, err := d.OutputEvents.SelectEvents(ctx, txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -659,7 +678,7 @@ func (d *Database) fetchMissingStateEvents(
 	return events, nil
 }
 
-// getStateDeltas returns the state deltas between fromPos and toPos,
+// GetStateDeltas returns the state deltas between fromPos and toPos,
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
@@ -667,7 +686,7 @@ func (d *Database) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
-) ([]types.StateDelta, []string, error) {
+) (deltas []types.StateDelta, joinedRoomsIDs []string, err error) {
 	// Implement membership change algorithm: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L821
 	// - Get membership list changes for this user in this sync response
 	// - For each room which has membership list changes:
@@ -687,6 +706,9 @@ func (d *Database) GetStateDeltas(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -699,22 +721,26 @@ func (d *Database) GetStateDeltas(
 		}
 	}
 
-	var deltas []types.StateDelta
-
 	// get all the state events ever (i.e. for all available rooms) between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
 	// find out which rooms this user is peeking, if any.
 	// We do this before joins so any peeks get overwritten
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, nil, err
 	}
 
@@ -725,6 +751,9 @@ func (d *Database) GetStateDeltas(
 			var s []types.StreamEvent
 			s, err = d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 			if err != nil {
+				if err == sql.ErrNoRows {
+					continue
+				}
 				return nil, nil, err
 			}
 			state[peek.RoomID] = s
@@ -739,22 +768,22 @@ func (d *Database) GetStateDeltas(
 	}
 
 	// handle newly joined rooms and non-joined rooms
+	newlyJoinedRooms := make(map[string]bool, len(state))
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			// TODO: Currently this will incorrectly add rooms which were ALREADY joined but they sent another no-op join event.
-			//       We should be checking if the user was already joined at fromPos and not proceed if so. As a result of this,
-			//       dupe join events will result in the entire room state coming down to the client again. This is added in
-			//       the 'state' part of the response though, so is transparent modulo bandwidth concerns as it is not added to
-			//       the timeline.
-			if membership := getMembershipFromEvent(ev.Event, userID); membership != "" {
-				if membership == gomatrixserverlib.Join {
+			if membership, prevMembership := getMembershipFromEvent(ev.Event, userID); membership != "" {
+				if membership == gomatrixserverlib.Join && prevMembership != membership {
 					// send full room state down instead of a delta
 					var s []types.StreamEvent
 					s, err = d.currentStateStreamEventsForRoom(ctx, txn, roomID, stateFilter)
 					if err != nil {
+						if err == sql.ErrNoRows {
+							continue
+						}
 						return nil, nil, err
 					}
 					state[roomID] = s
+					newlyJoinedRooms[roomID] = true
 					continue // we'll add this room in when we do joined rooms
 				}
 
@@ -775,6 +804,7 @@ func (d *Database) GetStateDeltas(
 			Membership:  gomatrixserverlib.Join,
 			StateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
 			RoomID:      joinedRoomID,
+			NewlyJoined: newlyJoinedRooms[joinedRoomID],
 		})
 	}
 
@@ -782,7 +812,7 @@ func (d *Database) GetStateDeltas(
 	return deltas, joinedRoomIDs, nil
 }
 
-// getStateDeltasForFullStateSync is a variant of getStateDeltas used for /sync
+// GetStateDeltasForFullStateSync is a variant of getStateDeltas used for /sync
 // requests with full_state=true.
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
@@ -802,6 +832,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	// user has ever interacted with — joined to, kicked/banned from, left.
 	memberships, err := d.CurrentRoomState.SelectRoomIDsWithAnyMembership(ctx, txn, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -818,7 +851,7 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	deltas := make(map[string]types.StateDelta)
 
 	peeks, err := d.Peeks.SelectPeeksInRange(ctx, txn, userID, device.ID, r)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, nil, err
 	}
 
@@ -827,6 +860,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 		if !peek.Deleted {
 			s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, peek.RoomID, stateFilter)
 			if stateErr != nil {
+				if stateErr == sql.ErrNoRows {
+					continue
+				}
 				return nil, nil, stateErr
 			}
 			deltas[peek.RoomID] = types.StateDelta{
@@ -840,16 +876,22 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	// Get all the state events ever between these two positions
 	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, txn, r, stateFilter, allRoomIDs)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, txn, stateNeeded, eventMap)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
 		return nil, nil, err
 	}
 
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership := getMembershipFromEvent(ev.Event, userID); membership != "" {
+			if membership, _ := getMembershipFromEvent(ev.Event, userID); membership != "" {
 				if membership != gomatrixserverlib.Join { // We've already added full state for all joined rooms above.
 					deltas[roomID] = types.StateDelta{
 						Membership:    membership,
@@ -868,6 +910,9 @@ func (d *Database) GetStateDeltasForFullStateSync(
 	for _, joinedRoomID := range joinedRoomIDs {
 		s, stateErr := d.currentStateStreamEventsForRoom(ctx, txn, joinedRoomID, stateFilter)
 		if stateErr != nil {
+			if stateErr == sql.ErrNoRows {
+				continue
+			}
 			return nil, nil, stateErr
 		}
 		deltas[joinedRoomID] = types.StateDelta{
@@ -957,15 +1002,16 @@ func (d *Database) CleanSendToDeviceUpdates(
 
 // getMembershipFromEvent returns the value of content.membership iff the event is a state event
 // with type 'm.room.member' and state_key of userID. Otherwise, an empty string is returned.
-func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) string {
+func getMembershipFromEvent(ev *gomatrixserverlib.Event, userID string) (string, string) {
 	if ev.Type() != "m.room.member" || !ev.StateKeyEquals(userID) {
-		return ""
+		return "", ""
 	}
 	membership, err := ev.Membership()
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	return membership
+	prevMembership := gjson.GetBytes(ev.Unsigned(), "prev_content.membership").Str
+	return membership, prevMembership
 }
 
 // StoreReceipt stores user receipts
@@ -983,48 +1029,60 @@ func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, stream
 }
 
 func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = d.Writer.Do(nil, nil, func(_ *sql.Tx) error {
-		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, userID, roomID, notificationCount, highlightCount)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		pos, err = d.NotificationData.UpsertRoomUnreadCounts(ctx, txn, userID, roomID, notificationCount, highlightCount)
 		return err
 	})
 	return
 }
 
 func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	return d.NotificationData.SelectUserUnreadCounts(ctx, userID, from, to)
+	return d.NotificationData.SelectUserUnreadCounts(ctx, nil, userID, from, to)
 }
 
-func (s *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
+func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.SelectContextEvent(ctx, nil, roomID, eventID)
 }
 
-func (s *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
+func (d *Database) SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.SelectContextBeforeEvent(ctx, nil, id, roomID, filter)
 }
-func (s *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
-}
-
-func (s *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
-	return s.Ignores.SelectIgnores(ctx, userID)
+func (d *Database) SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.SelectContextAfterEvent(ctx, nil, id, roomID, filter)
 }
 
-func (s *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
-	return s.Ignores.UpsertIgnores(ctx, userID, ignores)
+func (d *Database) IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error) {
+	return d.Ignores.SelectIgnores(ctx, nil, userID)
 }
 
-func (s *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
-	return s.Presence.UpsertPresence(ctx, nil, userID, statusMsg, presence, lastActiveTS, fromSync)
+func (d *Database) UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Ignores.UpsertIgnores(ctx, txn, userID, ignores)
+	})
 }
 
-func (s *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceForUser(ctx, nil, userID)
+func (d *Database) UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error) {
+	var pos types.StreamPosition
+	var err error
+	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		pos, err = d.Presence.UpsertPresence(ctx, txn, userID, statusMsg, presence, lastActiveTS, fromSync)
+		return nil
+	})
+	return pos, err
 }
 
-func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition) (map[string]*types.PresenceInternal, error) {
-	return s.Presence.GetPresenceAfter(ctx, nil, after)
+func (d *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
-	return s.Presence.GetMaxPresenceID(ctx, nil)
+func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceAfter(ctx, nil, after, filter)
+}
+
+func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return d.Presence.GetMaxPresenceID(ctx, nil)
+}
+
+func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
+	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }

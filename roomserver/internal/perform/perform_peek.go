@@ -33,7 +33,7 @@ import (
 type Peeker struct {
 	ServerName gomatrixserverlib.ServerName
 	Cfg        *config.RoomServer
-	FSAPI      fsAPI.FederationInternalAPI
+	FSAPI      fsAPI.RoomserverFederationAPI
 	DB         storage.Database
 
 	Inputer *input.Inputer
@@ -44,7 +44,7 @@ func (r *Peeker) PerformPeek(
 	ctx context.Context,
 	req *api.PerformPeekRequest,
 	res *api.PerformPeekResponse,
-) {
+) error {
 	roomID, err := r.performPeek(ctx, req)
 	if err != nil {
 		perr, ok := err.(*api.PerformError)
@@ -57,6 +57,7 @@ func (r *Peeker) PerformPeek(
 		}
 	}
 	res.RoomID = roomID
+	return nil
 }
 
 func (r *Peeker) performPeek(
@@ -207,7 +208,7 @@ func (r *Peeker) performPeekRoomByID(
 
 	// TODO: handle federated peeks
 
-	err = r.Inputer.WriteOutputEvents(roomID, []api.OutputEvent{
+	err = r.Inputer.OutputProducer.ProduceRoomEvents(roomID, []api.OutputEvent{
 		{
 			Type: api.OutputTypeNewPeek,
 			NewPeek: &api.OutputNewPeek{

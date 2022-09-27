@@ -21,8 +21,10 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/sirupsen/logrus"
 )
 
 const sendToDeviceSchema = `
@@ -39,6 +41,8 @@ CREATE TABLE IF NOT EXISTS syncapi_send_to_device (
 	-- The event content JSON.
 	content TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS syncapi_send_to_device_user_id_device_id_idx ON syncapi_send_to_device(user_id, device_id);
 `
 
 const insertSendToDeviceMessageSQL = `
@@ -51,12 +55,12 @@ const selectSendToDeviceMessagesSQL = `
 	SELECT id, user_id, device_id, content
 	  FROM syncapi_send_to_device
 	  WHERE user_id = $1 AND device_id = $2 AND id > $3 AND id <= $4
-	  ORDER BY id DESC
+	  ORDER BY id ASC
 `
 
 const deleteSendToDeviceMessagesSQL = `
 	DELETE FROM syncapi_send_to_device
-	  WHERE user_id = $1 AND device_id = $2 AND id < $3
+	  WHERE user_id = $1 AND device_id = $2 AND id <= $3
 `
 
 const selectMaxSendToDeviceIDSQL = "" +
@@ -72,6 +76,15 @@ type sendToDeviceStatements struct {
 func NewPostgresSendToDeviceTable(db *sql.DB) (tables.SendToDevice, error) {
 	s := &sendToDeviceStatements{}
 	_, err := db.Exec(sendToDeviceSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "syncapi: drop sent_by_token",
+		Up:      deltas.UpRemoveSendToDeviceSentColumn,
+	})
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -112,16 +125,17 @@ func (s *sendToDeviceStatements) SelectSendToDeviceMessages(
 		if err = rows.Scan(&id, &userID, &deviceID, &content); err != nil {
 			return
 		}
-		if id > lastPos {
-			lastPos = id
-		}
 		event := types.SendToDeviceEvent{
 			ID:       id,
 			UserID:   userID,
 			DeviceID: deviceID,
 		}
 		if err = json.Unmarshal([]byte(content), &event.SendToDeviceEvent); err != nil {
+			logrus.WithError(err).Errorf("Failed to unmarshal send-to-device message")
 			continue
+		}
+		if id > lastPos {
+			lastPos = id
 		}
 		events = append(events, event)
 	}

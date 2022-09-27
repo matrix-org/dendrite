@@ -21,27 +21,51 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/keyserver/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type KeyInternalAPI interface {
+	SyncKeyAPI
+	ClientKeyAPI
+	FederationKeyAPI
+	UserKeyAPI
+
 	// SetUserAPI assigns a user API to query when extracting device names.
-	SetUserAPI(i userapi.UserInternalAPI)
-	// InputDeviceListUpdate from a federated server EDU
-	InputDeviceListUpdate(ctx context.Context, req *InputDeviceListUpdateRequest, res *InputDeviceListUpdateResponse)
-	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse)
+	SetUserAPI(i userapi.KeyserverUserAPI)
+}
+
+// API functions required by the clientapi
+type ClientKeyAPI interface {
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
+	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse) error
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse) error
+	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse) error
 	// PerformClaimKeys claims one-time keys for use in pre-key messages
-	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse)
-	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse)
-	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse)
-	PerformUploadDeviceSignatures(ctx context.Context, req *PerformUploadDeviceSignaturesRequest, res *PerformUploadDeviceSignaturesResponse)
-	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse)
-	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse)
-	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse)
-	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse)
-	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse)
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
+}
+
+// API functions required by the userapi
+type UserKeyAPI interface {
+	PerformUploadKeys(ctx context.Context, req *PerformUploadKeysRequest, res *PerformUploadKeysResponse) error
+	PerformDeleteKeys(ctx context.Context, req *PerformDeleteKeysRequest, res *PerformDeleteKeysResponse) error
+}
+
+// API functions required by the syncapi
+type SyncKeyAPI interface {
+	QueryKeyChanges(ctx context.Context, req *QueryKeyChangesRequest, res *QueryKeyChangesResponse) error
+	QueryOneTimeKeys(ctx context.Context, req *QueryOneTimeKeysRequest, res *QueryOneTimeKeysResponse) error
+	PerformMarkAsStaleIfNeeded(ctx context.Context, req *PerformMarkAsStaleRequest, res *struct{}) error
+}
+
+type FederationKeyAPI interface {
+	QueryKeys(ctx context.Context, req *QueryKeysRequest, res *QueryKeysResponse) error
+	QuerySignatures(ctx context.Context, req *QuerySignaturesRequest, res *QuerySignaturesResponse) error
+	QueryDeviceMessages(ctx context.Context, req *QueryDeviceMessagesRequest, res *QueryDeviceMessagesResponse) error
+	PerformUploadDeviceKeys(ctx context.Context, req *PerformUploadDeviceKeysRequest, res *PerformUploadDeviceKeysResponse) error
+	PerformClaimKeys(ctx context.Context, req *PerformClaimKeysRequest, res *PerformClaimKeysResponse) error
 }
 
 // KeyError is returned if there was a problem performing/querying the server
@@ -314,10 +338,8 @@ type QuerySignaturesResponse struct {
 	Error *KeyError
 }
 
-type InputDeviceListUpdateRequest struct {
-	Event gomatrixserverlib.DeviceListUpdateEvent
-}
-
-type InputDeviceListUpdateResponse struct {
-	Error *KeyError
+type PerformMarkAsStaleRequest struct {
+	UserID   string
+	Domain   gomatrixserverlib.ServerName
+	DeviceID string
 }

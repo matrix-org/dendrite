@@ -69,14 +69,15 @@ func (t *OutputPresenceConsumer) Start() error {
 		return nil
 	}
 	return jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
+		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
 
 // onMessage is called in response to a message received on the presence
 // events topic from the client api.
-func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// only send presence events which originated from us
 	userID := msg.Header.Get(jetstream.UserID)
 	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
@@ -133,7 +134,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) b
 		return true
 	}
 
-	log.Debugf("sending presence EDU to %d servers", len(joined))
+	log.Tracef("sending presence EDU to %d servers", len(joined))
 	if err = t.queues.SendEDU(edu, t.ServerName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false

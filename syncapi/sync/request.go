@@ -15,18 +15,21 @@
 package sync
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/storage"
-	"github.com/matrix-org/dendrite/syncapi/types"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 const defaultSyncTimeout = time.Duration(0)
@@ -44,7 +47,8 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 			return nil, err
 		}
 	}
-	// TODO: read from stored filters too
+
+	// Create a default filter and apply a stored filter on top of it (if specified)
 	filter := gomatrixserverlib.DefaultFilter()
 	filterQuery := req.URL.Query().Get("filter")
 	if filterQuery != "" {
@@ -60,13 +64,22 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			if f, err := syncDB.GetFilter(req.Context(), localpart, filterQuery); err != nil {
+			if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && err != sql.ErrNoRows {
 				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
-			} else {
-				filter = *f
 			}
 		}
+	}
+
+	// A loaded filter might have overwritten these values,
+	// so set them after loading the filter.
+	if since.IsEmpty() {
+		// Send as much account data down for complete syncs as possible
+		// by default, otherwise clients do weird things while waiting
+		// for the rest of the data to trickle down.
+		filter.AccountData.Limit = math.MaxInt32
+		filter.Room.AccountData.Limit = math.MaxInt32
+		filter.Room.State.Limit = math.MaxInt32
 	}
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{

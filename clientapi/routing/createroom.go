@@ -49,6 +49,7 @@ type createRoomRequest struct {
 	GuestCanJoin              bool                          `json:"guest_can_join"`
 	RoomVersion               gomatrixserverlib.RoomVersion `json:"room_version"`
 	PowerLevelContentOverride json.RawMessage               `json:"power_level_content_override"`
+	IsDirect                  bool                          `json:"is_direct"`
 }
 
 const (
@@ -137,8 +138,8 @@ type fledglingEvent struct {
 func CreateRoom(
 	req *http.Request, device *api.Device,
 	cfg *config.ClientAPI,
-	profileAPI api.UserProfileAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 ) util.JSONResponse {
 	var r createRoomRequest
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
@@ -164,8 +165,8 @@ func createRoom(
 	ctx context.Context,
 	r createRoomRequest, device *api.Device,
 	cfg *config.ClientAPI,
-	profileAPI api.UserProfileAPI, rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	profileAPI api.ClientUserAPI, rsAPI roomserverAPI.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 	evTime time.Time,
 ) util.JSONResponse {
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
@@ -245,7 +246,9 @@ func createRoom(
 	case presetTrustedPrivateChat:
 		joinRuleContent.JoinRule = gomatrixserverlib.Invite
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
-		// TODO If trusted_private_chat, all invitees are given the same power level as the room creator.
+		for _, invitee := range r.Invite {
+			powerLevelContent.Users[invitee] = 100
+		}
 	case presetPublicChat:
 		joinRuleContent.JoinRule = gomatrixserverlib.Public
 		historyVisibilityContent.HistoryVisibility = historyVisibilityShared
@@ -497,8 +500,16 @@ func createRoom(
 		// Build some stripped state for the invite.
 		var globalStrippedState []gomatrixserverlib.InviteV2StrippedState
 		for _, event := range builtEvents {
+			// Chosen events from the spec:
+			// https://spec.matrix.org/v1.3/client-server-api/#stripped-state
 			switch event.Type() {
+			case gomatrixserverlib.MRoomCreate:
+				fallthrough
 			case gomatrixserverlib.MRoomName:
+				fallthrough
+			case gomatrixserverlib.MRoomAvatar:
+				fallthrough
+			case gomatrixserverlib.MRoomTopic:
 				fallthrough
 			case gomatrixserverlib.MRoomCanonicalAlias:
 				fallthrough
@@ -520,7 +531,7 @@ func createRoom(
 			// Build the invite event.
 			inviteEvent, err := buildMembershipEvent(
 				ctx, invitee, "", profileAPI, device, gomatrixserverlib.Invite,
-				roomID, true, cfg, evTime, rsAPI, asAPI,
+				roomID, r.IsDirect, cfg, evTime, rsAPI, asAPI,
 			)
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).Error("buildMembershipEvent failed")
@@ -531,24 +542,22 @@ func createRoom(
 				gomatrixserverlib.NewInviteV2StrippedState(inviteEvent.Event),
 			)
 			// Send the invite event to the roomserver.
-			err = roomserverAPI.SendInvite(
-				ctx,
-				rsAPI,
-				inviteEvent.Headered(roomVersion),
-				inviteStrippedState,   // invite room state
-				cfg.Matrix.ServerName, // send as server
-				nil,                   // transaction ID
-			)
-			switch e := err.(type) {
-			case *roomserverAPI.PerformError:
-				return e.JSONResponse()
-			case nil:
-			default:
-				util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInvite failed")
+			var inviteRes roomserverAPI.PerformInviteResponse
+			event := inviteEvent.Headered(roomVersion)
+			if err := rsAPI.PerformInvite(ctx, &roomserverAPI.PerformInviteRequest{
+				Event:           event,
+				InviteRoomState: inviteStrippedState,
+				RoomVersion:     event.RoomVersion,
+				SendAsServer:    string(cfg.Matrix.ServerName),
+			}, &inviteRes); err != nil {
+				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 				return util.JSONResponse{
 					Code: http.StatusInternalServerError,
 					JSON: jsonerror.InternalServerError(),
 				}
+			}
+			if inviteRes.Error != nil {
+				return inviteRes.Error.JSONResponse()
 			}
 		}
 	}
@@ -556,10 +565,12 @@ func createRoom(
 	if r.Visibility == "public" {
 		// expose this room in the published room list
 		var pubRes roomserverAPI.PerformPublishResponse
-		rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
+		if err := rsAPI.PerformPublish(ctx, &roomserverAPI.PerformPublishRequest{
 			RoomID:     roomID,
 			Visibility: "public",
-		}, &pubRes)
+		}, &pubRes); err != nil {
+			return jsonerror.InternalAPIError(ctx, err)
+		}
 		if pubRes.Error != nil {
 			// treat as non-fatal since the room is already made by this point
 			util.GetLogger(ctx).WithError(pubRes.Error).Error("failed to visibility:public")

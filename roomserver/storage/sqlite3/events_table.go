@@ -50,7 +50,7 @@ const insertEventSQL = `
 	INSERT INTO roomserver_events (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	  ON CONFLICT DO UPDATE
-	  SET is_rejected = $8 WHERE is_rejected = 0
+	  SET is_rejected = $8 WHERE is_rejected = 1
 	  RETURNING event_nid, state_snapshot_nid;
 `
 
@@ -65,10 +65,19 @@ const bulkSelectStateEventByIDSQL = "" +
 	" WHERE event_id IN ($1)" +
 	" ORDER BY event_type_nid, event_state_key_nid ASC"
 
+// Bulk lookup of events by string ID that aren't rejected.
+// Sort by the numeric IDs for event type and state key.
+// This means we can use binary search to lookup entries by type and state key.
+const bulkSelectStateEventByIDExcludingRejectedSQL = "" +
+	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
+	" WHERE event_id IN ($1) AND is_rejected = 0" +
+	" ORDER BY event_type_nid, event_state_key_nid ASC"
+
 const bulkSelectStateEventByNIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid FROM roomserver_events" +
 	" WHERE event_nid IN ($1)"
-	// Rest of query is built by BulkSelectStateEventByNID
+
+// Rest of query is built by BulkSelectStateEventByNID
 
 const bulkSelectStateAtEventByIDSQL = "" +
 	"SELECT event_type_nid, event_state_key_nid, event_nid, state_snapshot_nid, is_rejected FROM roomserver_events" +
@@ -108,30 +117,35 @@ const selectMaxEventDepthSQL = "" +
 const selectRoomNIDsForEventNIDsSQL = "" +
 	"SELECT event_nid, room_nid FROM roomserver_events WHERE event_nid IN ($1)"
 
+const selectEventRejectedSQL = "" +
+	"SELECT is_rejected FROM roomserver_events WHERE room_nid = $1 AND event_id = $2"
+
 type eventStatements struct {
-	db                                     *sql.DB
-	insertEventStmt                        *sql.Stmt
-	selectEventStmt                        *sql.Stmt
-	bulkSelectStateEventByIDStmt           *sql.Stmt
-	bulkSelectStateAtEventByIDStmt         *sql.Stmt
-	updateEventStateStmt                   *sql.Stmt
-	selectEventSentToOutputStmt            *sql.Stmt
-	updateEventSentToOutputStmt            *sql.Stmt
-	selectEventIDStmt                      *sql.Stmt
-	bulkSelectStateAtEventAndReferenceStmt *sql.Stmt
-	bulkSelectEventReferenceStmt           *sql.Stmt
-	bulkSelectEventIDStmt                  *sql.Stmt
+	db                                            *sql.DB
+	insertEventStmt                               *sql.Stmt
+	selectEventStmt                               *sql.Stmt
+	bulkSelectStateEventByIDStmt                  *sql.Stmt
+	bulkSelectStateEventByIDExcludingRejectedStmt *sql.Stmt
+	bulkSelectStateAtEventByIDStmt                *sql.Stmt
+	updateEventStateStmt                          *sql.Stmt
+	selectEventSentToOutputStmt                   *sql.Stmt
+	updateEventSentToOutputStmt                   *sql.Stmt
+	selectEventIDStmt                             *sql.Stmt
+	bulkSelectStateAtEventAndReferenceStmt        *sql.Stmt
+	bulkSelectEventReferenceStmt                  *sql.Stmt
+	bulkSelectEventIDStmt                         *sql.Stmt
+	selectEventRejectedStmt                       *sql.Stmt
 	//bulkSelectEventNIDStmt               *sql.Stmt
 	//bulkSelectUnsentEventNIDStmt         *sql.Stmt
 	//selectRoomNIDsForEventNIDsStmt       *sql.Stmt
 }
 
-func createEventsTable(db *sql.DB) error {
+func CreateEventsTable(db *sql.DB) error {
 	_, err := db.Exec(eventsSchema)
 	return err
 }
 
-func prepareEventsTable(db *sql.DB) (tables.Events, error) {
+func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 	s := &eventStatements{
 		db: db,
 	}
@@ -140,6 +154,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
+		{&s.bulkSelectStateEventByIDExcludingRejectedStmt, bulkSelectStateEventByIDExcludingRejectedSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
 		{&s.updateEventStateStmt, updateEventStateSQL},
 		{&s.updateEventSentToOutputStmt, updateEventSentToOutputSQL},
@@ -151,6 +166,7 @@ func prepareEventsTable(db *sql.DB) (tables.Events, error) {
 		//{&s.bulkSelectEventNIDStmt, bulkSelectEventNIDSQL},
 		//{&s.bulkSelectUnsentEventNIDStmt, bulkSelectUnsentEventNIDSQL},
 		//{&s.selectRoomNIDForEventNIDStmt, selectRoomNIDForEventNIDSQL},
+		{&s.selectEventRejectedStmt, selectEventRejectedSQL},
 	}.Prepare(db)
 }
 
@@ -188,16 +204,24 @@ func (s *eventStatements) SelectEvent(
 }
 
 // bulkSelectStateEventByID lookups a list of state events by event ID.
-// If any of the requested events are missing from the database it returns a types.MissingEventError
+// If not excluding rejected events, and any of the requested events are missing from
+// the database it returns a types.MissingEventError. If excluding rejected events,
+// the events will be silently omitted without error.
 func (s *eventStatements) BulkSelectStateEventByID(
-	ctx context.Context, txn *sql.Tx, eventIDs []string,
+	ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
 	///////////////
+	var sql string
+	if excludeRejected {
+		sql = bulkSelectStateEventByIDExcludingRejectedSQL
+	} else {
+		sql = bulkSelectStateEventByIDSQL
+	}
 	iEventIDs := make([]interface{}, len(eventIDs))
 	for k, v := range eventIDs {
 		iEventIDs[k] = v
 	}
-	selectOrig := strings.Replace(bulkSelectStateEventByIDSQL, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
+	selectOrig := strings.Replace(sql, "($1)", sqlutil.QueryVariadic(len(iEventIDs)), 1)
 	selectPrep, err := s.db.Prepare(selectOrig)
 	if err != nil {
 		return nil, err
@@ -215,10 +239,10 @@ func (s *eventStatements) BulkSelectStateEventByID(
 	// because of the unique constraint on event IDs.
 	// So we can allocate an array of the correct size now.
 	// We might get fewer results than IDs so we adjust the length of the slice before returning it.
-	results := make([]types.StateEntry, len(eventIDs))
+	results := make([]types.StateEntry, 0, len(eventIDs))
 	i := 0
 	for ; rows.Next(); i++ {
-		result := &results[i]
+		var result types.StateEntry
 		if err = rows.Scan(
 			&result.EventTypeNID,
 			&result.EventStateKeyNID,
@@ -226,8 +250,9 @@ func (s *eventStatements) BulkSelectStateEventByID(
 		); err != nil {
 			return nil, err
 		}
+		results = append(results, result)
 	}
-	if i != len(eventIDs) {
+	if !excludeRejected && i != len(eventIDs) {
 		// If there are fewer rows returned than IDs then we were asked to lookup event IDs we don't have.
 		// We don't know which ones were missing because we don't return the string IDs in the query.
 		// However it should be possible debug this by replaying queries or entries from the input kafka logs.
@@ -246,9 +271,9 @@ func (s *eventStatements) BulkSelectStateEventByNID(
 	ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID,
 	stateKeyTuples []types.StateKeyTuple,
 ) ([]types.StateEntry, error) {
-	tuples := stateKeyTupleSorter(stateKeyTuples)
+	tuples := types.StateKeyTupleSorter(stateKeyTuples)
 	sort.Sort(tuples)
-	eventTypeNIDArray, eventStateKeyNIDArray := tuples.typesAndStateKeysAsArrays()
+	eventTypeNIDArray, eventStateKeyNIDArray := tuples.TypesAndStateKeysAsArrays()
 	params := make([]interface{}, 0, len(eventNIDs)+len(eventTypeNIDArray)+len(eventStateKeyNIDArray))
 	selectOrig := strings.Replace(bulkSelectStateEventByNIDSQL, "($1)", sqlutil.QueryVariadic(len(eventNIDs)), 1)
 	for _, v := range eventNIDs {
@@ -337,7 +362,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		// Genuine create events are the only case where it's OK to have no previous state.
 		isCreate := result.EventTypeNID == types.MRoomCreateNID && result.EventStateKeyNID == 1
 		if result.BeforeStateSnapshotNID == 0 && !isCreate {
-			return nil, types.MissingEventError(
+			return nil, types.MissingStateError(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
 		}
@@ -404,15 +429,15 @@ func (s *eventStatements) BulkSelectStateAtEventAndReference(
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateAtEventAndReference: rows.close() failed")
 	results := make([]types.StateAtEventAndReference, len(eventNIDs))
 	i := 0
+	var (
+		eventTypeNID     int64
+		eventStateKeyNID int64
+		eventNID         int64
+		stateSnapshotNID int64
+		eventID          string
+		eventSHA256      []byte
+	)
 	for ; rows.Next(); i++ {
-		var (
-			eventTypeNID     int64
-			eventStateKeyNID int64
-			eventNID         int64
-			stateSnapshotNID int64
-			eventID          string
-			eventSHA256      []byte
-		)
 		if err = rows.Scan(
 			&eventTypeNID, &eventStateKeyNID, &eventNID, &stateSnapshotNID, &eventID, &eventSHA256,
 		); err != nil {
@@ -491,9 +516,9 @@ func (s *eventStatements) BulkSelectEventID(ctx context.Context, txn *sql.Tx, ev
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventID: rows.close() failed")
 	results := make(map[types.EventNID]string, len(eventNIDs))
 	i := 0
+	var eventNID int64
+	var eventID string
 	for ; rows.Next(); i++ {
-		var eventNID int64
-		var eventID string
 		if err = rows.Scan(&eventNID, &eventID); err != nil {
 			return nil, err
 		}
@@ -545,9 +570,9 @@ func (s *eventStatements) bulkSelectEventNID(ctx context.Context, txn *sql.Tx, e
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectEventNID: rows.close() failed")
 	results := make(map[string]types.EventNID, len(eventIDs))
+	var eventID string
+	var eventNID int64
 	for rows.Next() {
-		var eventID string
-		var eventNID int64
 		if err = rows.Scan(&eventID, &eventNID); err != nil {
 			return nil, err
 		}
@@ -595,9 +620,9 @@ func (s *eventStatements) SelectRoomNIDsForEventNIDs(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomNIDsForEventNIDsStmt: rows.close() failed")
 	result := make(map[types.EventNID]types.RoomNID)
+	var eventNID types.EventNID
+	var roomNID types.RoomNID
 	for rows.Next() {
-		var eventNID types.EventNID
-		var roomNID types.RoomNID
 		if err = rows.Scan(&eventNID, &roomNID); err != nil {
 			return nil, err
 		}
@@ -612,4 +637,12 @@ func eventNIDsAsArray(eventNIDs []types.EventNID) string {
 	}
 	b, _ := json.Marshal(eventNIDs)
 	return string(b)
+}
+
+func (s *eventStatements) SelectEventRejected(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string,
+) (rejected bool, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectEventRejectedStmt)
+	err = stmt.QueryRowContext(ctx, roomNID, eventID).Scan(&rejected)
+	return
 }

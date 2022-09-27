@@ -44,7 +44,7 @@ type connectionInfo struct {
 
 // GetAdminWhois implements GET /admin/whois/{userId}
 func GetAdminWhois(
-	req *http.Request, userAPI api.UserInternalAPI, device *api.Device,
+	req *http.Request, userAPI api.ClientUserAPI, device *api.Device,
 	userID string,
 ) util.JSONResponse {
 	allowed := device.AccountType == api.AccountTypeAdmin || userID == device.UserID

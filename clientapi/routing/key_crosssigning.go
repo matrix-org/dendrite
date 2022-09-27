@@ -34,8 +34,8 @@ type crossSigningRequest struct {
 
 func UploadCrossSigningDeviceKeys(
 	req *http.Request, userInteractiveAuth *auth.UserInteractive,
-	keyserverAPI api.KeyInternalAPI, device *userapi.Device,
-	accountAPI userapi.UserAccountAPI, cfg *config.ClientAPI,
+	keyserverAPI api.ClientKeyAPI, device *userapi.Device,
+	accountAPI userapi.ClientUserAPI, cfg *config.ClientAPI,
 ) util.JSONResponse {
 	uploadReq := &crossSigningRequest{}
 	uploadRes := &api.PerformUploadDeviceKeysResponse{}
@@ -72,7 +72,9 @@ func UploadCrossSigningDeviceKeys(
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	uploadReq.UserID = device.UserID
-	keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes)
+	if err := keyserverAPI.PerformUploadDeviceKeys(req.Context(), &uploadReq.PerformUploadDeviceKeysRequest, uploadRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	if err := uploadRes.Error; err != nil {
 		switch {
@@ -105,7 +107,7 @@ func UploadCrossSigningDeviceKeys(
 	}
 }
 
-func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.KeyInternalAPI, device *userapi.Device) util.JSONResponse {
+func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
 	uploadReq := &api.PerformUploadDeviceSignaturesRequest{}
 	uploadRes := &api.PerformUploadDeviceSignaturesResponse{}
 
@@ -114,7 +116,9 @@ func UploadCrossSigningDeviceSignatures(req *http.Request, keyserverAPI api.KeyI
 	}
 
 	uploadReq.UserID = device.UserID
-	keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes)
+	if err := keyserverAPI.PerformUploadDeviceSignatures(req.Context(), uploadReq, uploadRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	if err := uploadRes.Error; err != nil {
 		switch {

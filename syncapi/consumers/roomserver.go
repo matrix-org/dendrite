@@ -38,7 +38,7 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx          context.Context
 	cfg          *config.SyncAPI
-	rsAPI        api.RoomserverInternalAPI
+	rsAPI        api.SyncRoomserverAPI
 	jetstream    nats.JetStreamContext
 	durable      string
 	topic        string
@@ -58,7 +58,7 @@ func NewOutputRoomEventConsumer(
 	notifier *notifier.Notifier,
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.SyncRoomserverAPI,
 	producer *producers.UserAPIStreamEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
@@ -79,15 +79,16 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
@@ -154,41 +155,61 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	ctx context.Context, msg api.OutputNewRoomEvent,
 ) error {
 	ev := msg.Event
+	addsStateEvents, missingEventIDs := msg.NeededStateEventIDs()
 
-	addsStateEvents := []*gomatrixserverlib.HeaderedEvent{}
-	foundEventIDs := map[string]bool{}
-	if len(msg.AddsStateEventIDs) > 0 {
-		for _, eventID := range msg.AddsStateEventIDs {
-			foundEventIDs[eventID] = false
-		}
-		foundEvents, err := s.db.Events(ctx, msg.AddsStateEventIDs)
+	// Work out the list of events we need to find out about. Either
+	// they will be the event supplied in the request, we will find it
+	// in the sync API database or we'll need to ask the roomserver.
+	knownEventIDs := make(map[string]bool, len(msg.AddsStateEventIDs))
+	for _, eventID := range missingEventIDs {
+		knownEventIDs[eventID] = false
+	}
+
+	// Look the events up in the database. If we know them, add them into
+	// the set of adds state events.
+	if len(missingEventIDs) > 0 {
+		alreadyKnown, err := s.db.Events(ctx, missingEventIDs)
 		if err != nil {
 			return fmt.Errorf("s.db.Events: %w", err)
 		}
-		for _, event := range foundEvents {
-			foundEventIDs[event.EventID()] = true
+		for _, knownEvent := range alreadyKnown {
+			knownEventIDs[knownEvent.EventID()] = true
+			addsStateEvents = append(addsStateEvents, knownEvent)
 		}
-		eventsReq := &api.QueryEventsByIDRequest{}
+	}
+
+	// Now work out if there are any remaining events we don't know. For
+	// these we will need to ask the roomserver for help.
+	missingEventIDs = missingEventIDs[:0]
+	for eventID, known := range knownEventIDs {
+		if !known {
+			missingEventIDs = append(missingEventIDs, eventID)
+		}
+	}
+
+	// Ask the roomserver and add in the rest of the results into the set.
+	// Finally, work out if there are any more events missing.
+	if len(missingEventIDs) > 0 {
+		eventsReq := &api.QueryEventsByIDRequest{
+			EventIDs: missingEventIDs,
+		}
 		eventsRes := &api.QueryEventsByIDResponse{}
-		for eventID, found := range foundEventIDs {
-			if !found {
-				eventsReq.EventIDs = append(eventsReq.EventIDs, eventID)
-			}
-		}
-		if err = s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
+		if err := s.rsAPI.QueryEventsByID(ctx, eventsReq, eventsRes); err != nil {
 			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
 		}
 		for _, event := range eventsRes.Events {
-			eventID := event.EventID()
-			foundEvents = append(foundEvents, event)
-			foundEventIDs[eventID] = true
+			addsStateEvents = append(addsStateEvents, event)
+			knownEventIDs[event.EventID()] = true
 		}
-		for eventID, found := range foundEventIDs {
+
+		// This should never happen because this would imply that the
+		// roomserver has sent us adds_state_event_ids for events that it
+		// also doesn't know about, but let's just be sure.
+		for eventID, found := range knownEventIDs {
 			if !found {
 				return fmt.Errorf("event %s is missing", eventID)
 			}
 		}
-		addsStateEvents = foundEvents
 	}
 
 	ev, err := s.updateStateEvent(ev)
@@ -220,6 +241,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		msg.RemovesStateEventIDs,
 		msg.TransactionID,
 		false,
+		msg.HistoryVisibility,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -269,7 +291,8 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		[]string{},           // adds no state
 		[]string{},           // removes no state
 		nil,                  // no transaction
-		ev.StateKey() != nil, // exclude from sync?
+		ev.StateKey() != nil, // exclude from sync?,
+		msg.HistoryVisibility,
 	)
 	if err != nil {
 		// panic rather than continue with an inconsistent database
@@ -327,9 +350,11 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	ctx context.Context, msg api.OutputNewInviteEvent,
 ) {
 	if msg.Event.StateKey() == nil {
-		log.WithFields(log.Fields{
-			"event": string(msg.Event.JSON()),
-		}).Panicf("roomserver output log: invite has no state key")
+		return
+	}
+	if _, serverName, err := gomatrixserverlib.SplitID('@', *msg.Event.StateKey()); err != nil {
+		return
+	} else if serverName != s.cfg.Matrix.ServerName {
 		return
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
@@ -341,7 +366,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 			"event":      string(msg.Event.JSON()),
 			"pdupos":     pduPos,
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write invite failure")
+		}).Errorf("roomserver output log: write invite failure")
 		return
 	}
 
@@ -361,7 +386,7 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		log.WithFields(log.Fields{
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: remove invite failure")
+		}).Errorf("roomserver output log: remove invite failure")
 		return
 	}
 
@@ -379,7 +404,7 @@ func (s *OutputRoomEventConsumer) onNewPeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write peek failure")
+		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
 
@@ -398,7 +423,7 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 		// panic rather than continue with an inconsistent database
 		log.WithFields(log.Fields{
 			log.ErrorKey: err,
-		}).Panicf("roomserver output log: write peek failure")
+		}).Errorf("roomserver output log: write peek failure")
 		return
 	}
 

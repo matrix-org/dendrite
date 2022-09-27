@@ -10,13 +10,17 @@ type MSCs struct {
 	// 'msc2946': Spaces Summary - https://github.com/matrix-org/matrix-doc/pull/2946
 	MSCs []string `yaml:"mscs"`
 
-	Database DatabaseOptions `yaml:"database"`
+	Database DatabaseOptions `yaml:"database,omitempty"`
 }
 
-func (c *MSCs) Defaults(generate bool) {
-	c.Database.Defaults(5)
-	if generate {
-		c.Database.ConnectionString = "file:mscs.db"
+func (c *MSCs) Defaults(opts DefaultOpts) {
+	if !opts.Monolithic {
+		c.Database.Defaults(5)
+	}
+	if opts.Generate {
+		if !opts.Monolithic {
+			c.Database.ConnectionString = "file:mscs.db"
+		}
 	}
 }
 
@@ -31,5 +35,10 @@ func (c *MSCs) Enabled(msc string) bool {
 }
 
 func (c *MSCs) Verify(configErrs *ConfigErrors, isMonolith bool) {
-	checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
+	if isMonolith { // polylith required configs below
+		return
+	}
+	if c.Matrix.DatabaseOptions.ConnectionString == "" {
+		checkNotEmpty(configErrs, "mscs.database.connection_string", string(c.Database.ConnectionString))
+	}
 }

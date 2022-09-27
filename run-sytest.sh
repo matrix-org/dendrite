@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Runs SyTest either from Docker Hub, or from ../sytest. If it's run
 # locally, the Docker image is rebuilt first.
@@ -17,7 +17,7 @@ main() {
 
     if [ -d ../sytest ]; then
         local tmpdir
-        tmpdir="$(mktemp -d --tmpdir run-systest.XXXXXXXXXX)"
+        tmpdir="$(mktemp -d -t run-systest.XXXXXXXXXX)"
         trap "rm -r '$tmpdir'" EXIT
 
         if [ -z "$DISABLE_BUILDING_SYTEST" ]; then

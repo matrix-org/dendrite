@@ -3,16 +3,19 @@ package tables
 import (
 	"context"
 	"database/sql"
+	"errors"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
+var OptimisationNotSupportedError = errors.New("optimisation not supported")
+
 type EventJSONPair struct {
-	EventNID    types.EventNID
-	RoomVersion gomatrixserverlib.RoomVersion
-	EventJSON   []byte
+	EventNID  types.EventNID
+	EventJSON []byte
 }
 
 type EventJSON interface {
@@ -36,13 +39,14 @@ type EventStateKeys interface {
 
 type Events interface {
 	InsertEvent(
-		ctx context.Context, txn *sql.Tx, i types.RoomNID, j types.EventTypeNID, k types.EventStateKeyNID, eventID string,
+		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventTypeNID types.EventTypeNID,
+		eventStateKeyNID types.EventStateKeyNID, eventID string,
 		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
 	// bulkSelectStateEventByID lookups a list of state events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError
-	BulkSelectStateEventByID(ctx context.Context, txn *sql.Tx, eventIDs []string) ([]types.StateEntry, error)
+	BulkSelectStateEventByID(ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool) ([]types.StateEntry, error)
 	BulkSelectStateEventByNID(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntry, error)
 	// BulkSelectStateAtEventByID lookups the state at a list of events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError.
@@ -62,6 +66,7 @@ type Events interface {
 	BulkSelectUnsentEventNID(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[string]types.EventNID, error)
 	SelectMaxEventDepth(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (int64, error)
 	SelectRoomNIDsForEventNIDs(ctx context.Context, txn *sql.Tx, eventNIDs []types.EventNID) (roomNIDs map[types.EventNID]types.RoomNID, err error)
+	SelectEventRejected(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventID string) (rejected bool, err error)
 }
 
 type Rooms interface {
@@ -72,7 +77,7 @@ type Rooms interface {
 	UpdateLatestEventNIDs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, eventNIDs []types.EventNID, lastEventSentNID types.EventNID, stateSnapshotNID types.StateSnapshotNID) error
 	SelectRoomVersionsForRoomNIDs(ctx context.Context, txn *sql.Tx, roomNID []types.RoomNID) (map[types.RoomNID]gomatrixserverlib.RoomVersion, error)
 	SelectRoomInfo(ctx context.Context, txn *sql.Tx, roomID string) (*types.RoomInfo, error)
-	SelectRoomIDs(ctx context.Context, txn *sql.Tx) ([]string, error)
+	SelectRoomIDsWithEvents(ctx context.Context, txn *sql.Tx) ([]string, error)
 	BulkSelectRoomIDs(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID) ([]string, error)
 	BulkSelectRoomNIDs(ctx context.Context, txn *sql.Tx, roomIDs []string) ([]types.RoomNID, error)
 }
@@ -80,6 +85,10 @@ type Rooms interface {
 type StateSnapshot interface {
 	InsertState(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs) (stateNID types.StateSnapshotNID, err error)
 	BulkSelectStateBlockNIDs(ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
+	// BulkSelectStateForHistoryVisibility is a PostgreSQL-only optimisation for finding
+	// which users are in a room faster than having to load the entire room state. In the
+	// case of SQLite, this will return tables.OptimisationNotSupportedError.
+	BulkSelectStateForHistoryVisibility(ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string) ([]types.EventNID, error)
 }
 
 type StateBlock interface {
@@ -133,6 +142,7 @@ type Membership interface {
 	UpdateForgetMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID, forget bool) error
 	SelectLocalServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) (bool, error)
 	SelectServerInRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, serverName gomatrixserverlib.ServerName) (bool, error)
+	DeleteMembership(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) error
 }
 
 type Published interface {
@@ -170,7 +180,7 @@ type StrippedEvent struct {
 }
 
 // ExtractContentValue from the given state event. For example, given an m.room.name event with:
-//    content: { name: "Foo" }
+// content: { name: "Foo" }
 // this returns "Foo".
 func ExtractContentValue(ev *gomatrixserverlib.HeaderedEvent) string {
 	content := ev.Content()

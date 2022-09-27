@@ -40,9 +40,9 @@ type upgradeRoomResponse struct {
 func UpgradeRoom(
 	req *http.Request, device *userapi.Device,
 	cfg *config.ClientAPI,
-	roomID string, profileAPI userapi.UserProfileAPI,
-	rsAPI roomserverAPI.RoomserverInternalAPI,
-	asAPI appserviceAPI.AppServiceQueryAPI,
+	roomID string, profileAPI userapi.ClientUserAPI,
+	rsAPI roomserverAPI.ClientRoomserverAPI,
+	asAPI appserviceAPI.AppServiceInternalAPI,
 ) util.JSONResponse {
 	var r upgradeRoomRequest
 	if rErr := httputil.UnmarshalJSONRequest(req, &r); rErr != nil {
@@ -64,7 +64,9 @@ func UpgradeRoom(
 	}
 	upgradeResp := roomserverAPI.PerformRoomUpgradeResponse{}
 
-	rsAPI.PerformRoomUpgrade(req.Context(), &upgradeReq, &upgradeResp)
+	if err := rsAPI.PerformRoomUpgrade(req.Context(), &upgradeReq, &upgradeResp); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
 
 	if upgradeResp.Error != nil {
 		if upgradeResp.Error.Code == roomserverAPI.PerformErrorNoRoom {

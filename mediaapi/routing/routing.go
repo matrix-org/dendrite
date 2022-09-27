@@ -35,7 +35,7 @@ import (
 // configResponse is the response to GET /_matrix/media/r0/config
 // https://matrix.org/docs/spec/client_server/latest#get-matrix-media-r0-config
 type configResponse struct {
-	UploadSize config.FileSizeBytes `json:"m.upload.size"`
+	UploadSize *config.FileSizeBytes `json:"m.upload.size"`
 }
 
 // Setup registers the media API HTTP handlers
@@ -48,7 +48,7 @@ func Setup(
 	cfg *config.MediaAPI,
 	rateLimit *config.RateLimiting,
 	db storage.Database,
-	userAPI userapi.UserInternalAPI,
+	userAPI userapi.MediaUserAPI,
 	client *gomatrixserverlib.Client,
 ) {
 	rateLimits := httputil.NewRateLimits(rateLimit)
@@ -62,7 +62,7 @@ func Setup(
 	uploadHandler := httputil.MakeAuthAPI(
 		"upload", userAPI,
 		func(req *http.Request, dev *userapi.Device) util.JSONResponse {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, dev); r != nil {
 				return *r
 			}
 			return Upload(req, cfg, dev, db, activeThumbnailGeneration)
@@ -70,12 +70,16 @@ func Setup(
 	)
 
 	configHandler := httputil.MakeAuthAPI("config", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-		if r := rateLimits.Limit(req); r != nil {
+		if r := rateLimits.Limit(req, device); r != nil {
 			return *r
+		}
+		respondSize := &cfg.MaxFileSizeBytes
+		if cfg.MaxFileSizeBytes == 0 {
+			respondSize = nil
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: configResponse{UploadSize: *cfg.MaxFileSizeBytes},
+			JSON: configResponse{UploadSize: respondSize},
 		}
 	})
 
@@ -122,7 +126,7 @@ func makeDownloadAPI(
 		// Ratelimit requests
 		// NOTSPEC: The spec says everything at /media/ should be rate limited, but this causes issues with thumbnails (#2243)
 		if name != "thumbnail" {
-			if r := rateLimits.Limit(req); r != nil {
+			if r := rateLimits.Limit(req, nil); r != nil {
 				if err := json.NewEncoder(w).Encode(r); err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
@@ -144,6 +148,9 @@ func makeDownloadAPI(
 				return
 			}
 		}
+
+		// Cache media for at least one day.
+		w.Header().Set("Cache-Control", "public,max-age=86400,s-maxage=86400")
 
 		Download(
 			w,

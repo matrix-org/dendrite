@@ -122,6 +122,7 @@ type QueryMembershipForUserResponse struct {
 	Membership string `json:"membership"`
 	// True if the user asked to forget this room.
 	IsRoomForgotten bool `json:"is_room_forgotten"`
+	RoomExists      bool `json:"room_exists"`
 }
 
 // QueryMembershipsForRoomRequest is a request to QueryMembershipsForRoom
@@ -226,10 +227,13 @@ type QueryStateAndAuthChainResponse struct {
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
+	StateKnown      bool `json:"state_known"`
 	// The state and auth chain events that were requested.
 	// The lists will be in an arbitrary order.
 	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
 	AuthChainEvents []*gomatrixserverlib.HeaderedEvent `json:"auth_chain_events"`
+	// True if the queried event was rejected earlier.
+	IsRejected bool `json:"is_rejected"`
 }
 
 // QueryRoomVersionCapabilitiesRequest asks for the default room version
@@ -345,6 +349,26 @@ type QueryServerBannedFromRoomResponse struct {
 	Banned bool `json:"banned"`
 }
 
+type QueryRestrictedJoinAllowedRequest struct {
+	UserID string `json:"user_id"`
+	RoomID string `json:"room_id"`
+}
+
+type QueryRestrictedJoinAllowedResponse struct {
+	// True if the room membership is restricted by the join rule being set to "restricted"
+	Restricted bool `json:"restricted"`
+	// True if our local server is joined to all of the allowed rooms specified in the "allow"
+	// key of the join rule, false if we are missing from some of them and therefore can't
+	// reliably decide whether or not we can satisfy the join
+	Resident bool `json:"resident"`
+	// True if the restricted join is allowed because we found the membership in one of the
+	// allowed rooms from the join rule, false if not
+	Allowed bool `json:"allowed"`
+	// Contains the user ID of the selected user ID that has power to issue invites, this will
+	// get populated into the "join_authorised_via_users_server" content in the membership
+	AuthorisedVia string `json:"authorised_via,omitempty"`
+}
+
 // MarshalJSON stringifies the room ID and StateKeyTuple keys so they can be sent over the wire in HTTP API mode.
 func (r *QueryBulkStateContentResponse) MarshalJSON() ([]byte, error) {
 	se := make(map[string]string)
@@ -403,4 +427,19 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 		}] = v
 	}
 	return nil
+}
+
+// QueryMembershipAtEventRequest requests the membership events for a user
+// for a list of eventIDs.
+type QueryMembershipAtEventRequest struct {
+	RoomID   string
+	EventIDs []string
+	UserID   string
+}
+
+// QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
+type QueryMembershipAtEventResponse struct {
+	// Memberships is a map from eventID to a list of events (if any). Events that
+	// do not have known state will return an empty array here.
+	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
 }

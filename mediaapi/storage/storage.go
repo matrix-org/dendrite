@@ -22,16 +22,17 @@ import (
 
 	"github.com/matrix-org/dendrite/mediaapi/storage/postgres"
 	"github.com/matrix-org/dendrite/mediaapi/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-// Open opens a postgres database.
-func Open(dbProperties *config.DatabaseOptions) (Database, error) {
+// NewMediaAPIDatasource opens a database connection.
+func NewMediaAPIDatasource(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		return sqlite3.Open(dbProperties)
+		return sqlite3.NewDatabase(base, dbProperties)
 	case dbProperties.ConnectionString.IsPostgres():
-		return postgres.Open(dbProperties)
+		return postgres.NewDatabase(base, dbProperties)
 	default:
 		return nil, fmt.Errorf("unexpected database type")
 	}

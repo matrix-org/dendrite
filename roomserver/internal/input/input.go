@@ -25,27 +25,23 @@ import (
 
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
-	fedapi "github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/roomserver/acls"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/query"
-	"github.com/matrix-org/dendrite/roomserver/storage"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-)
 
-var keyContentFields = map[string]string{
-	"m.room.join_rules":         "join_rule",
-	"m.room.history_visibility": "history_visibility",
-	"m.room.member":             "membership",
-}
+	fedapi "github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/roomserver/acls"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/internal/query"
+	"github.com/matrix-org/dendrite/roomserver/producers"
+	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
+)
 
 // Inputer is responsible for consuming from the roomserver input
 // streams and processing the events. All input events are queued
@@ -66,28 +62,29 @@ var keyContentFields = map[string]string{
 // per-room durable consumers will only progress through the stream
 // as events are processed.
 //
-//       A BC *  -> positions of each consumer (* = ephemeral)
-//       ⌄ ⌄⌄ ⌄
-// ABAABCAABCAA  -> newest (letter = subject for each message)
+//	      A BC *  -> positions of each consumer (* = ephemeral)
+//	      ⌄ ⌄⌄ ⌄
+//	ABAABCAABCAA  -> newest (letter = subject for each message)
 //
 // In this example, A is still processing an event but has two
 // pending events to process afterwards. Both B and C are caught
 // up, so they will do nothing until a new event comes in for B
 // or C.
 type Inputer struct {
-	Cfg                  *config.RoomServer
-	ProcessContext       *process.ProcessContext
-	DB                   storage.Database
-	NATSClient           *nats.Conn
-	JetStream            nats.JetStreamContext
-	Durable              nats.SubOpt
-	ServerName           gomatrixserverlib.ServerName
-	FSAPI                fedapi.FederationInternalAPI
-	KeyRing              gomatrixserverlib.JSONVerifier
-	ACLs                 *acls.ServerACLs
-	InputRoomEventTopic  string
-	OutputRoomEventTopic string
-	workers              sync.Map // room ID -> *worker
+	Cfg                 *config.RoomServer
+	Base                *base.BaseDendrite
+	ProcessContext      *process.ProcessContext
+	DB                  storage.Database
+	NATSClient          *nats.Conn
+	JetStream           nats.JetStreamContext
+	Durable             nats.SubOpt
+	ServerName          gomatrixserverlib.ServerName
+	FSAPI               fedapi.RoomserverFederationAPI
+	KeyRing             gomatrixserverlib.JSONVerifier
+	ACLs                *acls.ServerACLs
+	InputRoomEventTopic string
+	OutputProducer      *producers.RoomEventProducer
+	workers             sync.Map // room ID -> *worker
 
 	Queryer *query.Queryer
 }
@@ -167,7 +164,9 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 // will look to see if we have a worker for that room which has its
 // own consumer. If we don't, we'll start one.
 func (r *Inputer) Start() error {
-	prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
+	if r.Base.EnableMetrics {
+		prometheus.MustRegister(roomserverInputBackpressure, processRoomEventDuration)
+	}
 	_, err := r.JetStream.Subscribe(
 		"", // This is blank because we specified it in BindStream.
 		func(m *nats.Msg) {
@@ -177,7 +176,8 @@ func (r *Inputer) Start() error {
 		},
 		nats.HeadersOnly(),
 		nats.DeliverAll(),
-		nats.AckAll(),
+		nats.AckExplicit(),
+		nats.ReplayInstant(),
 		nats.BindStream(r.InputRoomEventTopic),
 	)
 	return err
@@ -189,6 +189,9 @@ func (w *worker) _next() {
 	// Look up what the next event is that's waiting to be processed.
 	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
 	defer cancel()
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("room_id", w.roomID)
+	}
 	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
 	switch err {
 	case nil:
@@ -202,7 +205,7 @@ func (w *worker) _next() {
 			return
 		}
 
-	case context.DeadlineExceeded:
+	case context.DeadlineExceeded, context.Canceled:
 		// The context exceeded, so we've been waiting for more than a
 		// minute for activity in this room. At this point we will shut
 		// down the subscriber to free up resources. It'll get started
@@ -240,6 +243,9 @@ func (w *worker) _next() {
 		return
 	}
 
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("event_id", inputRoomEvent.Event.EventID())
+	}
 	roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Inc()
 	defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Dec()
 
@@ -249,14 +255,24 @@ func (w *worker) _next() {
 	// it was a synchronous request.
 	var errString string
 	if err = w.r.processRoomEvent(w.r.ProcessContext.Context(), &inputRoomEvent); err != nil {
-		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-			sentry.CaptureException(err)
+		switch err.(type) {
+		case types.RejectedError:
+			// Don't send events that were rejected to Sentry
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver rejected event")
+		default:
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				sentry.CaptureException(err)
+			}
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver failed to process event")
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"room_id":  w.roomID,
-			"event_id": inputRoomEvent.Event.EventID(),
-			"type":     inputRoomEvent.Event.Type(),
-		}).Warn("Roomserver failed to process async event")
 		_ = msg.Term()
 		errString = err.Error()
 	} else {
@@ -339,18 +355,18 @@ func (r *Inputer) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) {
+) error {
 	// Queue up the event into the roomserver.
 	replySub, err := r.queueInputRoomEvents(ctx, request)
 	if err != nil {
 		response.ErrMsg = err.Error()
-		return
+		return nil
 	}
 
 	// If we aren't waiting for synchronous responses then we can
 	// give up here, there is nothing further to do.
 	if replySub == nil {
-		return
+		return nil
 	}
 
 	// Otherwise, we'll want to sit and wait for the responses
@@ -362,63 +378,13 @@ func (r *Inputer) InputRoomEvents(
 		msg, err := replySub.NextMsgWithContext(ctx)
 		if err != nil {
 			response.ErrMsg = err.Error()
-			return
+			return nil
 		}
 		if len(msg.Data) > 0 {
 			response.ErrMsg = string(msg.Data)
 		}
 	}
-}
 
-// WriteOutputEvents implements OutputRoomEventWriter
-func (r *Inputer) WriteOutputEvents(roomID string, updates []api.OutputEvent) error {
-	var err error
-	for _, update := range updates {
-		msg := &nats.Msg{
-			Subject: r.OutputRoomEventTopic,
-			Header:  nats.Header{},
-		}
-		msg.Header.Set(jetstream.RoomID, roomID)
-		msg.Data, err = json.Marshal(update)
-		if err != nil {
-			return err
-		}
-		logger := log.WithFields(log.Fields{
-			"room_id": roomID,
-			"type":    update.Type,
-		})
-		if update.NewRoomEvent != nil {
-			eventType := update.NewRoomEvent.Event.Type()
-			logger = logger.WithFields(log.Fields{
-				"event_type":     eventType,
-				"event_id":       update.NewRoomEvent.Event.EventID(),
-				"adds_state":     len(update.NewRoomEvent.AddsStateEventIDs),
-				"removes_state":  len(update.NewRoomEvent.RemovesStateEventIDs),
-				"send_as_server": update.NewRoomEvent.SendAsServer,
-				"sender":         update.NewRoomEvent.Event.Sender(),
-			})
-			if update.NewRoomEvent.Event.StateKey() != nil {
-				logger = logger.WithField("state_key", *update.NewRoomEvent.Event.StateKey())
-			}
-			contentKey := keyContentFields[eventType]
-			if contentKey != "" {
-				value := gjson.GetBytes(update.NewRoomEvent.Event.Content(), contentKey)
-				if value.Exists() {
-					logger = logger.WithField("content_value", value.String())
-				}
-			}
-
-			if eventType == "m.room.server_acl" && update.NewRoomEvent.Event.StateKeyEquals("") {
-				ev := update.NewRoomEvent.Event.Unwrap()
-				defer r.ACLs.OnServerACLUpdate(ev)
-			}
-		}
-		logger.Tracef("Producing to topic '%s'", r.OutputRoomEventTopic)
-		if _, err := r.JetStream.PublishMsg(msg); err != nil {
-			logger.WithError(err).Errorf("Failed to produce to topic '%s': %s", r.OutputRoomEventTopic, err)
-			return err
-		}
-	}
 	return nil
 }
 

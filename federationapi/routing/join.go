@@ -15,18 +15,20 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/sirupsen/logrus"
 )
 
 // MakeJoin implements the /make_join API
@@ -34,7 +36,7 @@ func MakeJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	roomID, userID string,
 	remoteVersions []gomatrixserverlib.RoomVersion,
 ) util.JSONResponse {
@@ -103,6 +105,16 @@ func MakeJoin(
 		}
 	}
 
+	// Check if the restricted join is allowed. If the room doesn't
+	// support restricted joins then this is effectively a no-op.
+	res, authorisedVia, err := checkRestrictedJoin(httpReq, rsAPI, verRes.RoomVersion, roomID, userID)
+	if err != nil {
+		util.GetLogger(httpReq.Context()).WithError(err).Error("checkRestrictedJoin failed")
+		return jsonerror.InternalServerError()
+	} else if res != nil {
+		return *res
+	}
+
 	// Try building an event for the server
 	builder := gomatrixserverlib.EventBuilder{
 		Sender:   userID,
@@ -110,8 +122,11 @@ func MakeJoin(
 		Type:     "m.room.member",
 		StateKey: &userID,
 	}
-	err = builder.SetContent(map[string]interface{}{"membership": gomatrixserverlib.Join})
-	if err != nil {
+	content := gomatrixserverlib.MemberContent{
+		Membership:    gomatrixserverlib.Join,
+		AuthorisedVia: authorisedVia,
+	}
+	if err = builder.SetContent(content); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("builder.SetContent failed")
 		return jsonerror.InternalServerError()
 	}
@@ -161,11 +176,12 @@ func MakeJoin(
 // SendJoin implements the /send_join API
 // The make-join send-join dance makes much more sense as a single
 // flow so the cyclomatic complexity is high:
+// nolint:gocyclo
 func SendJoin(
 	httpReq *http.Request,
 	request *gomatrixserverlib.FederationRequest,
 	cfg *config.FederationAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	roomID, eventID string,
 ) util.JSONResponse {
@@ -201,6 +217,22 @@ func SendJoin(
 		}
 	}
 
+	// Check that the sender belongs to the server that is sending us
+	// the request. By this point we've already asserted that the sender
+	// and the state key are equal so we don't need to check both.
+	var serverName gomatrixserverlib.ServerName
+	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
+		}
+	} else if serverName != request.Origin() {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("The sender does not match the server that originated the request"),
+		}
+	}
+
 	// Check that the room ID is correct.
 	if event.RoomID() != roomID {
 		return util.JSONResponse{
@@ -227,14 +259,6 @@ func SendJoin(
 		}
 	}
 
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
-		}
-	}
-
 	// Check that this is in fact a join event
 	membership, err := event.Membership()
 	if err != nil {
@@ -251,10 +275,17 @@ func SendJoin(
 	}
 
 	// Check that the event is signed by the server sending the request.
-	redacted := event.Redact()
+	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
+	if err != nil {
+		logrus.WithError(err).Errorf("XXX: join.go")
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("The event JSON could not be redacted"),
+		}
+	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             event.Origin(),
-		Message:                redacted.JSON(),
+		ServerName:             serverName,
+		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
 	}}
@@ -290,6 +321,12 @@ func SendJoin(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	}
+	if !stateAndAuthChainResponse.StateKnown {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("State not known"),
+		}
+	}
 
 	// Check if the user is already in the room. If they're already in then
 	// there isn't much point in sending another join event into the room.
@@ -314,21 +351,57 @@ func SendJoin(
 		}
 	}
 
+	// If the membership content contains a user ID for a server that is not
+	// ours then we should kick it back.
+	var memberContent gomatrixserverlib.MemberContent
+	if err := json.Unmarshal(event.Content(), &memberContent); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(err.Error()),
+		}
+	}
+	if memberContent.AuthorisedVia != "" {
+		_, domain, err := gomatrixserverlib.SplitID('@', memberContent.AuthorisedVia)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(fmt.Sprintf("The authorising username %q is invalid.", memberContent.AuthorisedVia)),
+			}
+		}
+		if domain != cfg.Matrix.ServerName {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(fmt.Sprintf("The authorising username %q does not belong to this server.", memberContent.AuthorisedVia)),
+			}
+		}
+	}
+
+	// Sign the membership event. This is required for restricted joins to work
+	// in the case that the authorised via user is one of our own users. It also
+	// doesn't hurt to do it even if it isn't a restricted join.
+	signed := event.Sign(
+		string(cfg.Matrix.ServerName),
+		cfg.Matrix.KeyID,
+		cfg.Matrix.PrivateKey,
+	)
+
 	// Send the events to the room server.
 	// We are responsible for notifying other servers that the user has joined
 	// the room, so set SendAsServer to cfg.Matrix.ServerName
 	if !alreadyJoined {
 		var response api.InputRoomEventsResponse
-		rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
+		if err := rsAPI.InputRoomEvents(httpReq.Context(), &api.InputRoomEventsRequest{
 			InputRoomEvents: []api.InputRoomEvent{
 				{
 					Kind:          api.KindNew,
-					Event:         event.Headered(stateAndAuthChainResponse.RoomVersion),
+					Event:         signed.Headered(stateAndAuthChainResponse.RoomVersion),
 					SendAsServer:  string(cfg.Matrix.ServerName),
 					TransactionID: nil,
 				},
 			},
-		}, &response)
+		}, &response); err != nil {
+			return jsonerror.InternalAPIError(httpReq.Context(), err)
+		}
 		if response.ErrMsg != "" {
 			util.GetLogger(httpReq.Context()).WithField(logrus.ErrorKey, response.ErrMsg).Error("SendEvents failed")
 			if response.NotAllowed {
@@ -354,7 +427,74 @@ func SendJoin(
 			StateEvents: gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.StateEvents),
 			AuthEvents:  gomatrixserverlib.NewEventJSONsFromHeaderedEvents(stateAndAuthChainResponse.AuthChainEvents),
 			Origin:      cfg.Matrix.ServerName,
+			Event:       signed.JSON(),
 		},
+	}
+}
+
+// checkRestrictedJoin finds out whether or not we can assist in processing
+// a restricted room join. If the room version does not support restricted
+// joins then this function returns with no side effects. This returns three
+// values:
+//   - an optional JSON response body (i.e. M_UNABLE_TO_AUTHORISE_JOIN) which
+//     should always be sent back to the client if one is specified
+//   - a user ID of an authorising user, typically a user that has power to
+//     issue invites in the room, if one has been found
+//   - an error if there was a problem finding out if this was allowable,
+//     like if the room version isn't known or a problem happened talking to
+//     the roomserver
+func checkRestrictedJoin(
+	httpReq *http.Request,
+	rsAPI api.FederationRoomserverAPI,
+	roomVersion gomatrixserverlib.RoomVersion,
+	roomID, userID string,
+) (*util.JSONResponse, string, error) {
+	if allowRestricted, err := roomVersion.MayAllowRestrictedJoinsInEventAuth(); err != nil {
+		return nil, "", err
+	} else if !allowRestricted {
+		return nil, "", nil
+	}
+	req := &api.QueryRestrictedJoinAllowedRequest{
+		RoomID: roomID,
+		UserID: userID,
+	}
+	res := &api.QueryRestrictedJoinAllowedResponse{}
+	if err := rsAPI.QueryRestrictedJoinAllowed(httpReq.Context(), req, res); err != nil {
+		return nil, "", err
+	}
+
+	switch {
+	case !res.Restricted:
+		// The join rules for the room don't restrict membership.
+		return nil, "", nil
+
+	case !res.Resident:
+		// The join rules restrict membership but our server isn't currently
+		// joined to all of the allowed rooms, so we can't actually decide
+		// whether or not to allow the user to join. This error code should
+		// tell the joining server to try joining via another resident server
+		// instead.
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.UnableToAuthoriseJoin("This server cannot authorise the join."),
+		}, "", nil
+
+	case !res.Allowed:
+		// The join rules restrict membership, our server is in the relevant
+		// rooms and the user wasn't joined to join any of the allowed rooms
+		// and therefore can't join this room.
+		return &util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You are not joined to any matching rooms."),
+		}, "", nil
+
+	default:
+		// The join rules restrict membership, our server is in the relevant
+		// rooms and the user was allowed to join because they belong to one
+		// of the allowed rooms. We now need to pick one of our own local users
+		// from within the room to use as the authorising user ID, so that it
+		// can be referred to from within the membership content.
+		return nil, res.AuthorisedVia, nil
 	}
 }
 

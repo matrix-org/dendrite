@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, *sql.DB, func()) {
@@ -20,7 +21,7 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
-	})
+	}, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		t.Fatalf("failed to open db: %s", err)
 	}
@@ -44,7 +45,7 @@ func newOutputRoomEventsTable(t *testing.T, dbType test.DBType) (tables.Events, 
 
 func TestOutputRoomEventsTable(t *testing.T) {
 	ctx := context.Background()
-	alice := test.NewUser()
+	alice := test.NewUser(t)
 	room := test.NewRoom(t, alice)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		tab, db, close := newOutputRoomEventsTable(t, dbType)
@@ -52,7 +53,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 		events := room.Events()
 		err := sqlutil.WithTransaction(db, func(txn *sql.Tx) error {
 			for _, ev := range events {
-				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false)
+				_, err := tab.InsertEvent(ctx, txn, ev, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared)
 				if err != nil {
 					return fmt.Errorf("failed to InsertEvent: %s", err)
 				}
@@ -61,7 +62,7 @@ func TestOutputRoomEventsTable(t *testing.T) {
 			wantEventIDs := []string{
 				events[2].EventID(), events[0].EventID(), events[3].EventID(), events[1].EventID(),
 			}
-			gotEvents, err := tab.SelectEvents(ctx, txn, wantEventIDs, true)
+			gotEvents, err := tab.SelectEvents(ctx, txn, wantEventIDs, nil, true)
 			if err != nil {
 				return fmt.Errorf("failed to SelectEvents: %s", err)
 			}
@@ -71,6 +72,28 @@ func TestOutputRoomEventsTable(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotEventIDs, wantEventIDs) {
 				return fmt.Errorf("SelectEvents\ngot  %v\n want %v", gotEventIDs, wantEventIDs)
+			}
+
+			// Test that contains_url is correctly populated
+			urlEv := room.CreateEvent(t, alice, "m.text", map[string]interface{}{
+				"body": "test.txt",
+				"url":  "mxc://test.txt",
+			})
+			if _, err = tab.InsertEvent(ctx, txn, urlEv, nil, nil, nil, false, gomatrixserverlib.HistoryVisibilityShared); err != nil {
+				return fmt.Errorf("failed to InsertEvent: %s", err)
+			}
+			wantEventID := []string{urlEv.EventID()}
+			t := true
+			gotEvents, err = tab.SelectEvents(ctx, txn, wantEventID, &gomatrixserverlib.RoomEventFilter{Limit: 1, ContainsURL: &t}, true)
+			if err != nil {
+				return fmt.Errorf("failed to SelectEvents: %s", err)
+			}
+			gotEventIDs = make([]string, len(gotEvents))
+			for i := range gotEvents {
+				gotEventIDs[i] = gotEvents[i].EventID()
+			}
+			if !reflect.DeepEqual(gotEventIDs, wantEventID) {
+				return fmt.Errorf("SelectEvents\ngot  %v\n want %v", gotEventIDs, wantEventID)
 			}
 
 			return nil

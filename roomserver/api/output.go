@@ -161,6 +161,21 @@ type OutputNewRoomEvent struct {
 	// The transaction ID of the send request if sent by a local user and one
 	// was specified
 	TransactionID *TransactionID `json:"transaction_id,omitempty"`
+	// The history visibility of the event.
+	HistoryVisibility gomatrixserverlib.HistoryVisibility `json:"history_visibility"`
+}
+
+func (o *OutputNewRoomEvent) NeededStateEventIDs() ([]*gomatrixserverlib.HeaderedEvent, []string) {
+	addsStateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, 1)
+	missingEventIDs := make([]string, 0, len(o.AddsStateEventIDs))
+	for _, eventID := range o.AddsStateEventIDs {
+		if eventID != o.Event.EventID() {
+			missingEventIDs = append(missingEventIDs, eventID)
+		} else {
+			addsStateEvents = append(addsStateEvents, o.Event)
+		}
+	}
+	return addsStateEvents, missingEventIDs
 }
 
 // An OutputOldRoomEvent is written when the roomserver receives an old event.
@@ -174,7 +189,8 @@ type OutputNewRoomEvent struct {
 // should build their current room state up from OutputNewRoomEvents only.
 type OutputOldRoomEvent struct {
 	// The Event.
-	Event *gomatrixserverlib.HeaderedEvent `json:"event"`
+	Event             *gomatrixserverlib.HeaderedEvent    `json:"event"`
+	HistoryVisibility gomatrixserverlib.HistoryVisibility `json:"history_visibility"`
 }
 
 // An OutputNewInviteEvent is written whenever an invite becomes active.

@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/mediaapi/storage/tables"
 	"github.com/matrix-org/dendrite/mediaapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -63,7 +65,7 @@ SELECT content_type, file_size_bytes, creation_ts FROM mediaapi_thumbnail WHERE 
 
 // Note: this selects all thumbnails for a media_origin and media_id
 const selectThumbnailsSQL = `
-SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2
+SELECT content_type, file_size_bytes, creation_ts, width, height, resize_method FROM mediaapi_thumbnail WHERE media_id = $1 AND media_origin = $2 ORDER BY creation_ts ASC
 `
 
 type thumbnailStatements struct {
@@ -72,24 +74,25 @@ type thumbnailStatements struct {
 	selectThumbnailsStmt *sql.Stmt
 }
 
-func (s *thumbnailStatements) prepare(db *sql.DB) (err error) {
-	_, err = db.Exec(thumbnailSchema)
+func NewPostgresThumbnailsTable(db *sql.DB) (tables.Thumbnails, error) {
+	s := &thumbnailStatements{}
+	_, err := db.Exec(thumbnailSchema)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return statementList{
+	return s, sqlutil.StatementList{
 		{&s.insertThumbnailStmt, insertThumbnailSQL},
 		{&s.selectThumbnailStmt, selectThumbnailSQL},
 		{&s.selectThumbnailsStmt, selectThumbnailsSQL},
-	}.prepare(db)
+	}.Prepare(db)
 }
 
-func (s *thumbnailStatements) insertThumbnail(
-	ctx context.Context, thumbnailMetadata *types.ThumbnailMetadata,
+func (s *thumbnailStatements) InsertThumbnail(
+	ctx context.Context, txn *sql.Tx, thumbnailMetadata *types.ThumbnailMetadata,
 ) error {
-	thumbnailMetadata.MediaMetadata.CreationTimestamp = types.UnixMs(time.Now().UnixNano() / 1000000)
-	_, err := s.insertThumbnailStmt.ExecContext(
+	thumbnailMetadata.MediaMetadata.CreationTimestamp = gomatrixserverlib.AsTimestamp(time.Now())
+	_, err := sqlutil.TxStmtContext(ctx, txn, s.insertThumbnailStmt).ExecContext(
 		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
@@ -103,8 +106,9 @@ func (s *thumbnailStatements) insertThumbnail(
 	return err
 }
 
-func (s *thumbnailStatements) selectThumbnail(
+func (s *thumbnailStatements) SelectThumbnail(
 	ctx context.Context,
+	txn *sql.Tx,
 	mediaID types.MediaID,
 	mediaOrigin gomatrixserverlib.ServerName,
 	width, height int,
@@ -121,7 +125,7 @@ func (s *thumbnailStatements) selectThumbnail(
 			ResizeMethod: resizeMethod,
 		},
 	}
-	err := s.selectThumbnailStmt.QueryRowContext(
+	err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailStmt).QueryRowContext(
 		ctx,
 		thumbnailMetadata.MediaMetadata.MediaID,
 		thumbnailMetadata.MediaMetadata.Origin,
@@ -136,10 +140,10 @@ func (s *thumbnailStatements) selectThumbnail(
 	return &thumbnailMetadata, err
 }
 
-func (s *thumbnailStatements) selectThumbnails(
-	ctx context.Context, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName,
+func (s *thumbnailStatements) SelectThumbnails(
+	ctx context.Context, txn *sql.Tx, mediaID types.MediaID, mediaOrigin gomatrixserverlib.ServerName,
 ) ([]*types.ThumbnailMetadata, error) {
-	rows, err := s.selectThumbnailsStmt.QueryContext(
+	rows, err := sqlutil.TxStmtContext(ctx, txn, s.selectThumbnailsStmt).QueryContext(
 		ctx, mediaID, mediaOrigin,
 	)
 	if err != nil {

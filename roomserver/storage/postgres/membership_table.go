@@ -23,6 +23,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -65,9 +66,15 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 );
 `
 
-var selectJoinedUsersSetForRoomsSQL = "" +
+var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
 	" WHERE room_nid = ANY($1) AND target_nid = ANY($2) AND" +
+	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" GROUP BY target_nid"
+
+var selectJoinedUsersSetForRoomsSQL = "" +
+	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
+	" WHERE room_nid = ANY($1) AND" +
 	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
 	" GROUP BY target_nid"
 
@@ -80,24 +87,24 @@ const insertMembershipSQL = "" +
 
 const selectMembershipFromRoomAndTargetSQL = "" +
 	"SELECT membership_nid, event_nid, forgotten FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND target_nid = $2"
+	" WHERE room_nid = $1 AND event_nid != 0 AND target_nid = $2"
 
 const selectMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2 and forgotten = false"
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2 and forgotten = false"
 
 const selectLocalMembershipsFromRoomAndMembershipSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 AND membership_nid = $2" +
+	" WHERE room_nid = $1 AND event_nid != 0 AND membership_nid = $2" +
 	" AND target_local = true and forgotten = false"
 
 const selectMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1 and forgotten = false"
+	" WHERE room_nid = $1 AND event_nid != 0 and forgotten = false"
 
 const selectLocalMembershipsFromRoomSQL = "" +
 	"SELECT event_nid FROM roomserver_membership" +
-	" WHERE room_nid = $1" +
+	" WHERE room_nid = $1 AND event_nid != 0" +
 	" AND target_local = true and forgotten = false"
 
 const selectMembershipForUpdateSQL = "" +
@@ -111,6 +118,9 @@ const updateMembershipSQL = "" +
 const updateMembershipForgetRoom = "" +
 	"UPDATE roomserver_membership SET forgotten = $3" +
 	" WHERE room_nid = $1 AND target_nid = $2"
+
+const deleteMembershipSQL = "" +
+	"DELETE FROM roomserver_membership WHERE room_nid = $1 AND target_nid = $2"
 
 const selectRoomsWithMembershipSQL = "" +
 	"SELECT room_nid FROM roomserver_membership WHERE membership_nid = $1 AND target_nid = $2 and forgotten = false"
@@ -153,19 +163,29 @@ type membershipStatements struct {
 	selectLocalMembershipsFromRoomStmt              *sql.Stmt
 	updateMembershipStmt                            *sql.Stmt
 	selectRoomsWithMembershipStmt                   *sql.Stmt
+	selectJoinedUsersSetForRoomsAndUserStmt         *sql.Stmt
 	selectJoinedUsersSetForRoomsStmt                *sql.Stmt
 	selectKnownUsersStmt                            *sql.Stmt
 	updateMembershipForgetRoomStmt                  *sql.Stmt
 	selectLocalServerInRoomStmt                     *sql.Stmt
 	selectServerInRoomStmt                          *sql.Stmt
+	deleteMembershipStmt                            *sql.Stmt
 }
 
-func createMembershipTable(db *sql.DB) error {
+func CreateMembershipTable(db *sql.DB) error {
 	_, err := db.Exec(membershipSchema)
-	return err
+	if err != nil {
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "roomserver: add forgotten column",
+		Up:      deltas.UpAddForgottenColumn,
+	})
+	return m.Up(context.Background())
 }
 
-func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
+func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 	s := &membershipStatements{}
 
 	return s, sqlutil.StatementList{
@@ -178,11 +198,13 @@ func prepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectLocalMembershipsFromRoomStmt, selectLocalMembershipsFromRoomSQL},
 		{&s.updateMembershipStmt, updateMembershipSQL},
 		{&s.selectRoomsWithMembershipStmt, selectRoomsWithMembershipSQL},
+		{&s.selectJoinedUsersSetForRoomsAndUserStmt, selectJoinedUsersSetForRoomsAndUserSQL},
 		{&s.selectJoinedUsersSetForRoomsStmt, selectJoinedUsersSetForRoomsSQL},
 		{&s.selectKnownUsersStmt, selectKnownUsersSQL},
 		{&s.updateMembershipForgetRoomStmt, updateMembershipForgetRoom},
 		{&s.selectLocalServerInRoomStmt, selectLocalServerInRoomSQL},
 		{&s.selectServerInRoomStmt, selectServerInRoomSQL},
+		{&s.deleteMembershipStmt, deleteMembershipSQL},
 	}.Prepare(db)
 }
 
@@ -234,8 +256,8 @@ func (s *membershipStatements) SelectMembershipsFromRoom(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoom: rows.close() failed")
 
+	var eNID types.EventNID
 	for rows.Next() {
-		var eNID types.EventNID
 		if err = rows.Scan(&eNID); err != nil {
 			return
 		}
@@ -262,8 +284,8 @@ func (s *membershipStatements) SelectMembershipsFromRoomAndMembership(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectMembershipsFromRoomAndMembership: rows.close() failed")
 
+	var eNID types.EventNID
 	for rows.Next() {
-		var eNID types.EventNID
 		if err = rows.Scan(&eNID); err != nil {
 			return
 		}
@@ -298,8 +320,8 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectRoomsWithMembership: rows.close() failed")
 	var roomNIDs []types.RoomNID
+	var roomNID types.RoomNID
 	for rows.Next() {
-		var roomNID types.RoomNID
 		if err := rows.Scan(&roomNID); err != nil {
 			return nil, err
 		}
@@ -313,16 +335,26 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(
 	roomNIDs []types.RoomNID,
 	userNIDs []types.EventStateKeyNID,
 ) (map[types.EventStateKeyNID]int, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
 	stmt := sqlutil.TxStmt(txn, s.selectJoinedUsersSetForRoomsStmt)
-	rows, err := stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(userNIDs))
+	if len(userNIDs) > 0 {
+		stmt = sqlutil.TxStmt(txn, s.selectJoinedUsersSetForRoomsAndUserStmt)
+		rows, err = stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(userNIDs))
+	} else {
+		rows, err = stmt.QueryContext(ctx, pq.Array(roomNIDs))
+	}
+
 	if err != nil {
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectJoinedUsersSetForRooms: rows.close() failed")
 	result := make(map[types.EventStateKeyNID]int)
+	var userID types.EventStateKeyNID
+	var count int
 	for rows.Next() {
-		var userID types.EventStateKeyNID
-		var count int
 		if err := rows.Scan(&userID, &count); err != nil {
 			return nil, err
 		}
@@ -342,12 +374,12 @@ func (s *membershipStatements) SelectKnownUsers(
 	}
 	result := []string{}
 	defer internal.CloseAndLogIfError(ctx, rows, "SelectKnownUsers: rows.close() failed")
+	var resUserID string
 	for rows.Next() {
-		var userID string
-		if err := rows.Scan(&userID); err != nil {
+		if err := rows.Scan(&resUserID); err != nil {
 			return nil, err
 		}
-		result = append(result, userID)
+		result = append(result, resUserID)
 	}
 	return result, rows.Err()
 }
@@ -393,4 +425,14 @@ func (s *membershipStatements) SelectServerInRoom(
 		return false, err
 	}
 	return roomNID == nid, nil
+}
+
+func (s *membershipStatements) DeleteMembership(
+	ctx context.Context, txn *sql.Tx,
+	roomNID types.RoomNID, targetUserNID types.EventStateKeyNID,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.deleteMembershipStmt).ExecContext(
+		ctx, roomNID, targetUserNID,
+	)
+	return err
 }

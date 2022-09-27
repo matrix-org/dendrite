@@ -19,15 +19,15 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
-func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }
 
-func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (t *RoomserverInternalAPITrace) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 	t.Impl.SetAppserviceAPI(asAPI)
 }
 
-func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (t *RoomserverInternalAPITrace) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	t.Impl.SetUserAPI(userAPI)
 }
 
@@ -35,9 +35,10 @@ func (t *RoomserverInternalAPITrace) InputRoomEvents(
 	ctx context.Context,
 	req *InputRoomEventsRequest,
 	res *InputRoomEventsResponse,
-) {
-	t.Impl.InputRoomEvents(ctx, req, res)
-	util.GetLogger(ctx).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
+) error {
+	err := t.Impl.InputRoomEvents(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("InputRoomEvents req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformInvite(
@@ -45,44 +46,49 @@ func (t *RoomserverInternalAPITrace) PerformInvite(
 	req *PerformInviteRequest,
 	res *PerformInviteResponse,
 ) error {
-	util.GetLogger(ctx).Infof("PerformInvite req=%+v res=%+v", js(req), js(res))
-	return t.Impl.PerformInvite(ctx, req, res)
+	err := t.Impl.PerformInvite(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformInvite req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformPeek(
 	ctx context.Context,
 	req *PerformPeekRequest,
 	res *PerformPeekResponse,
-) {
-	t.Impl.PerformPeek(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformPeek req=%+v res=%+v", js(req), js(res))
+) error {
+	err := t.Impl.PerformPeek(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformPeek req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformUnpeek(
 	ctx context.Context,
 	req *PerformUnpeekRequest,
 	res *PerformUnpeekResponse,
-) {
-	t.Impl.PerformUnpeek(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformUnpeek req=%+v res=%+v", js(req), js(res))
+) error {
+	err := t.Impl.PerformUnpeek(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformUnpeek req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformRoomUpgrade(
 	ctx context.Context,
 	req *PerformRoomUpgradeRequest,
 	res *PerformRoomUpgradeResponse,
-) {
-	t.Impl.PerformRoomUpgrade(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformRoomUpgrade req=%+v res=%+v", js(req), js(res))
+) error {
+	err := t.Impl.PerformRoomUpgrade(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformRoomUpgrade req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformJoin(
 	ctx context.Context,
 	req *PerformJoinRequest,
 	res *PerformJoinResponse,
-) {
-	t.Impl.PerformJoin(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformJoin req=%+v res=%+v", js(req), js(res))
+) error {
+	err := t.Impl.PerformJoin(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformJoin req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformLeave(
@@ -99,9 +105,30 @@ func (t *RoomserverInternalAPITrace) PerformPublish(
 	ctx context.Context,
 	req *PerformPublishRequest,
 	res *PerformPublishResponse,
-) {
-	t.Impl.PerformPublish(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
+) error {
+	err := t.Impl.PerformPublish(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformPublish req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) PerformAdminEvacuateRoom(
+	ctx context.Context,
+	req *PerformAdminEvacuateRoomRequest,
+	res *PerformAdminEvacuateRoomResponse,
+) error {
+	err := t.Impl.PerformAdminEvacuateRoom(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformAdminEvacuateRoom req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) PerformAdminEvacuateUser(
+	ctx context.Context,
+	req *PerformAdminEvacuateUserRequest,
+	res *PerformAdminEvacuateUserResponse,
+) error {
+	err := t.Impl.PerformAdminEvacuateUser(ctx, req, res)
+	util.GetLogger(ctx).WithError(err).Infof("PerformAdminEvacuateUser req=%+v res=%+v", js(req), js(res))
+	return err
 }
 
 func (t *RoomserverInternalAPITrace) PerformInboundPeek(
@@ -110,7 +137,7 @@ func (t *RoomserverInternalAPITrace) PerformInboundPeek(
 	res *PerformInboundPeekResponse,
 ) error {
 	err := t.Impl.PerformInboundPeek(ctx, req, res)
-	util.GetLogger(ctx).Infof("PerformInboundPeek req=%+v res=%+v", js(req), js(res))
+	util.GetLogger(ctx).WithError(err).Infof("PerformInboundPeek req=%+v res=%+v", js(req), js(res))
 	return err
 }
 
@@ -284,16 +311,6 @@ func (t *RoomserverInternalAPITrace) GetAliasesForRoomID(
 	return err
 }
 
-func (t *RoomserverInternalAPITrace) GetCreatorIDForAlias(
-	ctx context.Context,
-	req *GetCreatorIDForAliasRequest,
-	res *GetCreatorIDForAliasResponse,
-) error {
-	err := t.Impl.GetCreatorIDForAlias(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("GetCreatorIDForAlias req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
 func (t *RoomserverInternalAPITrace) RemoveRoomAlias(
 	ctx context.Context,
 	req *RemoveRoomAliasRequest,
@@ -352,6 +369,26 @@ func (t *RoomserverInternalAPITrace) QueryAuthChain(
 ) error {
 	err := t.Impl.QueryAuthChain(ctx, request, response)
 	util.GetLogger(ctx).WithError(err).Infof("QueryAuthChain req=%+v res=%+v", js(request), js(response))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) QueryRestrictedJoinAllowed(
+	ctx context.Context,
+	request *QueryRestrictedJoinAllowedRequest,
+	response *QueryRestrictedJoinAllowedResponse,
+) error {
+	err := t.Impl.QueryRestrictedJoinAllowed(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryRestrictedJoinAllowed req=%+v res=%+v", js(request), js(response))
+	return err
+}
+
+func (t *RoomserverInternalAPITrace) QueryMembershipAtEvent(
+	ctx context.Context,
+	request *QueryMembershipAtEventRequest,
+	response *QueryMembershipAtEventResponse,
+) error {
+	err := t.Impl.QueryMembershipAtEvent(ctx, request, response)
+	util.GetLogger(ctx).WithError(err).Infof("QueryMembershipAtEvent req=%+v res=%+v", js(request), js(response))
 	return err
 }
 

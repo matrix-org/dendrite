@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"crypto/tls"
 	"fmt"
 	"reflect"
 	"strings"
@@ -13,58 +14,60 @@ import (
 	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
-	"github.com/nats-io/nats.go"
 	natsclient "github.com/nats-io/nats.go"
 )
 
-var natsServer *natsserver.Server
-var natsServerMutex sync.Mutex
-
-func PrepareForTests() (*process.ProcessContext, nats.JetStreamContext, *nats.Conn) {
-	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
-	cfg.Global.JetStream.InMemory = true
-	pc := process.NewProcessContext()
-	js, jc := Prepare(pc, &cfg.Global.JetStream)
-	return pc, js, jc
+type NATSInstance struct {
+	*natsserver.Server
 }
 
-func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
+var natsLock sync.Mutex
+
+func DeleteAllStreams(js natsclient.JetStreamContext, cfg *config.JetStream) {
+	for _, stream := range streams { // streams are defined in streams.go
+		name := cfg.Prefixed(stream.Name)
+		_ = js.DeleteStream(name)
+	}
+}
+
+func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient.JetStreamContext, *natsclient.Conn) {
+	natsLock.Lock()
+	defer natsLock.Unlock()
 	// check if we need an in-process NATS Server
 	if len(cfg.Addresses) != 0 {
 		return setupNATS(process, cfg, nil)
 	}
-	natsServerMutex.Lock()
-	if natsServer == nil {
+	if s.Server == nil {
 		var err error
-		natsServer, err = natsserver.NewServer(&natsserver.Options{
+		s.Server, err = natsserver.NewServer(&natsserver.Options{
 			ServerName:      "monolith",
 			DontListen:      true,
 			JetStream:       true,
 			StoreDir:        string(cfg.StoragePath),
 			NoSystemAccount: true,
 			MaxPayload:      16 * 1024 * 1024,
+			NoSigs:          true,
+			NoLog:           cfg.NoLog,
 		})
 		if err != nil {
 			panic(err)
 		}
-		natsServer.ConfigureLogger()
+		s.ConfigureLogger()
 		go func() {
 			process.ComponentStarted()
-			natsServer.Start()
+			s.Start()
 		}()
 		go func() {
 			<-process.WaitForShutdown()
-			natsServer.Shutdown()
-			natsServer.WaitForShutdown()
+			s.Shutdown()
+			s.WaitForShutdown()
 			process.ComponentFinished()
 		}()
 	}
-	natsServerMutex.Unlock()
-	if !natsServer.ReadyForConnections(time.Second * 10) {
+	if !s.ReadyForConnections(time.Second * 10) {
 		logrus.Fatalln("NATS did not start in time")
 	}
-	nc, err := natsclient.Connect("", natsclient.InProcessServer(natsServer))
+	nc, err := natsclient.Connect("", natsclient.InProcessServer(s))
 	if err != nil {
 		logrus.Fatalln("Failed to create NATS client")
 	}
@@ -74,7 +77,13 @@ func Prepare(process *process.ProcessContext, cfg *config.JetStream) (natsclient
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	if nc == nil {
 		var err error
-		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","))
+		opts := []natsclient.Option{}
+		if cfg.DisableTLSValidation {
+			opts = append(opts, natsclient.Secure(&tls.Config{
+				InsecureSkipVerify: true,
+			}))
+		}
+		nc, err = natsclient.Connect(strings.Join(cfg.Addresses, ","), opts...)
 		if err != nil {
 			logrus.WithError(err).Panic("Unable to connect to NATS")
 			return nil, nil
@@ -174,6 +183,7 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		OutputReceiptEvent:      {"SyncAPIEDUServerReceiptConsumer", "FederationAPIEDUServerConsumer"},
 		OutputSendToDeviceEvent: {"SyncAPIEDUServerSendToDeviceConsumer", "FederationAPIEDUServerConsumer"},
 		OutputTypingEvent:       {"SyncAPIEDUServerTypingConsumer", "FederationAPIEDUServerConsumer"},
+		OutputRoomEvent:         {"AppserviceRoomserverConsumer"},
 	} {
 		streamName := cfg.Matrix.JetStream.Prefixed(stream)
 		for _, consumer := range consumers {

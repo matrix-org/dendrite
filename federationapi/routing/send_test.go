@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/internal/test"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -64,11 +64,12 @@ func (t *testRoomserverAPI) InputRoomEvents(
 	ctx context.Context,
 	request *api.InputRoomEventsRequest,
 	response *api.InputRoomEventsResponse,
-) {
+) error {
 	t.inputRoomEvents = append(t.inputRoomEvents, request.InputRoomEvents...)
 	for _, ire := range request.InputRoomEvents {
 		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
 	}
+	return nil
 }
 
 // Query the latest events and state for a room from the room server.
@@ -183,7 +184,7 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserver
 	return c.getMissingEvents(missing)
 }
 
-func mustCreateTransaction(rsAPI api.RoomserverInternalAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
+func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
 	t := &txnReq{
 		rsAPI:      rsAPI,
 		keys:       &test.NopJSONVerifier{},

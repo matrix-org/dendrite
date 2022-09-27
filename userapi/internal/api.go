@@ -28,12 +28,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
-	"github.com/matrix-org/dendrite/internal/pushrules"
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	synctypes "github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
@@ -48,7 +49,8 @@ type UserInternalAPI struct {
 	ServerName           gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
-	KeyAPI      keyapi.KeyInternalAPI
+	KeyAPI      keyapi.UserKeyAPI
+	RSAPI       rsapi.UserRoomserverAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -62,7 +64,24 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
-	return a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData)
+	if err := a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
+		return fmt.Errorf("failed to save account data: %w", err)
+	}
+	var ignoredUsers *synctypes.IgnoredUsers
+	if req.DataType == "m.ignored_user_list" {
+		ignoredUsers = &synctypes.IgnoredUsers{}
+		_ = json.Unmarshal(req.AccountData, ignoredUsers)
+	}
+	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+		RoomID:       req.RoomID,
+		Type:         req.DataType,
+		IgnoredUsers: ignoredUsers,
+	}); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
+		return fmt.Errorf("failed to send account data to output: %w", err)
+	}
+	return nil
 }
 
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
@@ -90,6 +109,15 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
+	// Inform the SyncAPI about the newly created push_rules
+	if err = a.SyncProducer.SendAccountData(acc.UserID, eventutil.AccountData{
+		Type: "m.push_rules",
+	}); err != nil {
+		util.GetLogger(ctx).WithFields(logrus.Fields{
+			"user_id": acc.UserID,
+		}).WithError(err).Warn("failed to send account data to the SyncAPI")
+	}
+
 	if req.AccountType == api.AccountTypeGuest {
 		res.AccountCreated = true
 		res.Account = acc
@@ -108,6 +136,11 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
 	if err := a.DB.SetPassword(ctx, req.Localpart, req.Password); err != nil {
 		return err
+	}
+	if req.LogoutDevices {
+		if _, err := a.DB.RemoveAllDevices(context.Background(), req.Localpart, ""); err != nil {
+			return err
+		}
 	}
 	res.PasswordUpdated = true
 	return nil
@@ -162,7 +195,9 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 		deleteReq.KeyIDs = append(deleteReq.KeyIDs, gomatrixserverlib.KeyID(keyID))
 	}
 	deleteRes := &keyapi.PerformDeleteKeysResponse{}
-	a.KeyAPI.PerformDeleteKeys(ctx, deleteReq, deleteRes)
+	if err := a.KeyAPI.PerformDeleteKeys(ctx, deleteReq, deleteRes); err != nil {
+		return err
+	}
 	if err := deleteRes.Error; err != nil {
 		return fmt.Errorf("a.KeyAPI.PerformDeleteKeys: %w", err)
 	}
@@ -181,10 +216,12 @@ func (a *UserInternalAPI) deviceListUpdate(userID string, deviceIDs []string) er
 	}
 
 	var uploadRes keyapi.PerformUploadKeysResponse
-	a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+	if err := a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
 		UserID:     userID,
 		DeviceKeys: deviceKeys,
-	}, &uploadRes)
+	}, &uploadRes); err != nil {
+		return err
+	}
 	if uploadRes.Error != nil {
 		return fmt.Errorf("failed to delete device keys: %v", uploadRes.Error)
 	}
@@ -203,7 +240,7 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
-	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr); err != nil {
+	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
 		return fmt.Errorf("a.DeviceDB.UpdateDeviceLastSeen: %w", err)
 	}
 	return nil
@@ -238,7 +275,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	if req.DisplayName != nil && dev.DisplayName != *req.DisplayName {
 		// display name has changed: update the device key
 		var uploadRes keyapi.PerformUploadKeysResponse
-		a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
+		if err := a.KeyAPI.PerformUploadKeys(context.Background(), &keyapi.PerformUploadKeysRequest{
 			UserID: req.RequestingUserID,
 			DeviceKeys: []keyapi.DeviceKeys{
 				{
@@ -249,7 +286,9 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 				},
 			},
 			OnlyDisplayNameUpdates: true,
-		}, &uploadRes)
+		}, &uploadRes); err != nil {
+			return err
+		}
 		if uploadRes.Error != nil {
 			return fmt.Errorf("failed to update device key display name: %v", uploadRes.Error)
 		}
@@ -413,7 +452,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	// Create a dummy device for AS user
 	dev := api.Device{
 		// Use AS dummy device ID
-		ID: types.AppServiceDeviceID,
+		ID: "AS_Device",
 		// AS dummy device has AS's token.
 		AccessToken:  token,
 		AppserviceID: appService.ID,
@@ -445,6 +484,32 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 
 // PerformAccountDeactivation deactivates the user's account, removing all ability for the user to login again.
 func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
+	if err := a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes); err != nil {
+		return err
+	}
+	if err := evacuateRes.Error; err != nil {
+		logrus.WithError(err).Errorf("Failed to evacuate user after account deactivation")
+	}
+
+	deviceReq := &api.PerformDeviceDeletionRequest{
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+	}
+	deviceRes := &api.PerformDeviceDeletionResponse{}
+	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
+		return err
+	}
+
+	pusherReq := &api.PerformPusherDeletionRequest{
+		Localpart: req.Localpart,
+	}
+	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+		return err
+	}
+
 	err := a.DB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err
@@ -484,9 +549,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		if req.Version == "" {
 			res.BadInput = true
 			res.Error = "must specify a version to delete"
-			if res.Error != "" {
-				return fmt.Errorf(res.Error)
-			}
 			return nil
 		}
 		exists, err := a.DB.DeleteKeyBackup(ctx, req.UserID, req.Version)
@@ -495,9 +557,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = exists
 		res.Version = req.Version
-		if res.Error != "" {
-			return fmt.Errorf(res.Error)
-		}
 		return nil
 	}
 	// Create metadata
@@ -508,9 +567,6 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = err == nil
 		res.Version = version
-		if res.Error != "" {
-			return fmt.Errorf(res.Error)
-		}
 		return nil
 	}
 	// Update metadata
@@ -521,16 +577,10 @@ func (a *UserInternalAPI) PerformKeyBackup(ctx context.Context, req *api.Perform
 		}
 		res.Exists = err == nil
 		res.Version = req.Version
-		if res.Error != "" {
-			return fmt.Errorf(res.Error)
-		}
 		return nil
 	}
 	// Upload Keys for a specific version metadata
 	a.uploadBackupKeys(ctx, req, res)
-	if res.Error != "" {
-		return fmt.Errorf(res.Error)
-	}
 	return nil
 }
 
@@ -573,16 +623,16 @@ func (a *UserInternalAPI) uploadBackupKeys(ctx context.Context, req *api.Perform
 	res.KeyETag = etag
 }
 
-func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) {
+func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyBackupRequest, res *api.QueryKeyBackupResponse) error {
 	version, algorithm, authData, etag, deleted, err := a.DB.GetKeyBackup(ctx, req.UserID, req.Version)
 	res.Version = version
 	if err != nil {
 		if err == sql.ErrNoRows {
 			res.Exists = false
-			return
+			return nil
 		}
 		res.Error = fmt.Sprintf("failed to query key backup: %s", err)
-		return
+		return nil
 	}
 	res.Algorithm = algorithm
 	res.AuthData = authData
@@ -594,15 +644,16 @@ func (a *UserInternalAPI) QueryKeyBackup(ctx context.Context, req *api.QueryKeyB
 		if err != nil {
 			res.Error = fmt.Sprintf("failed to count keys: %s", err)
 		}
-		return
+		return nil
 	}
 
 	result, err := a.DB.GetBackupKeys(ctx, version, req.UserID, req.KeysForRoomID, req.KeysForSessionID)
 	if err != nil {
 		res.Error = fmt.Sprintf("failed to query keys: %s", err)
-		return
+		return nil
 	}
 	res.Keys = result
+	return nil
 }
 
 func (a *UserInternalAPI) QueryNotifications(ctx context.Context, req *api.QueryNotificationsRequest, res *api.QueryNotificationsResponse) error {
@@ -653,7 +704,7 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart)
 	}
 	if req.Pusher.PushKeyTS == 0 {
-		req.Pusher.PushKeyTS = gomatrixserverlib.AsTimestamp(time.Now())
+		req.Pusher.PushKeyTS = int64(time.Now().Unix())
 	}
 	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart)
 }
@@ -699,66 +750,24 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-
-	if err := a.SyncProducer.SendAccountData(req.UserID, "" /* roomID */, pushRulesAccountDataType); err != nil {
+	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
+		Type: pushRulesAccountDataType,
+	}); err != nil {
 		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
 	}
-
 	return nil
 }
 
 func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
-	userReq := api.QueryAccountDataRequest{
-		UserID:   req.UserID,
-		DataType: pushRulesAccountDataType,
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
 	}
-	var userRes api.QueryAccountDataResponse
-	if err := a.QueryAccountData(ctx, &userReq, &userRes); err != nil {
-		return err
+	pushRules, err := a.DB.QueryPushRules(ctx, localpart)
+	if err != nil {
+		return fmt.Errorf("failed to query push rules: %w", err)
 	}
-	bs, ok := userRes.GlobalAccountData[pushRulesAccountDataType]
-	if ok {
-		// Legacy Dendrite users will have completely empty push rules, so we should
-		// detect that situation and set some defaults.
-		var rules struct {
-			G struct {
-				Content   []json.RawMessage `json:"content"`
-				Override  []json.RawMessage `json:"override"`
-				Room      []json.RawMessage `json:"room"`
-				Sender    []json.RawMessage `json:"sender"`
-				Underride []json.RawMessage `json:"underride"`
-			} `json:"global"`
-		}
-		if err := json.Unmarshal([]byte(bs), &rules); err == nil {
-			count := len(rules.G.Content) + len(rules.G.Override) +
-				len(rules.G.Room) + len(rules.G.Sender) + len(rules.G.Underride)
-			ok = count > 0
-		}
-	}
-	if !ok {
-		// If we didn't find any default push rules then we should just generate some
-		// fresh ones.
-		localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
-		if err != nil {
-			return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
-		}
-		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, a.ServerName)
-		prbs, err := json.Marshal(pushRuleSets)
-		if err != nil {
-			return fmt.Errorf("failed to marshal default push rules: %w", err)
-		}
-		if err := a.DB.SaveAccountData(ctx, localpart, "", pushRulesAccountDataType, json.RawMessage(prbs)); err != nil {
-			return fmt.Errorf("failed to save default push rules: %w", err)
-		}
-		res.RuleSets = pushRuleSets
-		return nil
-	}
-	var data pushrules.AccountRuleSets
-	if err := json.Unmarshal([]byte(bs), &data); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("json.Unmarshal of push rules failed")
-		return err
-	}
-	res.RuleSets = &data
+	res.RuleSets = pushRules
 	return nil
 }
 

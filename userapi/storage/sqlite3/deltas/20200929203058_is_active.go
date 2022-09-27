@@ -1,25 +1,13 @@
 package deltas
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/pressly/goose"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-func LoadFromGoose() {
-	goose.AddMigration(UpIsActive, DownIsActive)
-	goose.AddMigration(UpAddAccountType, DownAddAccountType)
-}
-
-func LoadIsActive(m *sqlutil.Migrations) {
-	m.AddMigration(UpIsActive, DownIsActive)
-}
-
-func UpIsActive(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func UpIsActive(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
@@ -42,8 +30,8 @@ DROP TABLE account_accounts_tmp;`)
 	return nil
 }
 
-func DownIsActive(tx *sql.Tx) error {
-	_, err := tx.Exec(`
+func DownIsActive(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `
 	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
 CREATE TABLE account_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,

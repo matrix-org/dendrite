@@ -24,9 +24,7 @@ var (
 	}
 )
 
-type fakeAccountDatabase struct {
-	api.UserAccountAPI
-}
+type fakeAccountDatabase struct{}
 
 func (d *fakeAccountDatabase) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
 	return nil
@@ -187,5 +185,40 @@ func TestUserInteractivePasswordBadLogin(t *testing.T) {
 		if errRes.Code != tc.wantRes.Code {
 			t.Errorf("got code %d want code %d for request: %s", errRes.Code, tc.wantRes.Code, string(tc.body))
 		}
+	}
+}
+
+func TestUserInteractive_AddCompletedStage(t *testing.T) {
+	tests := []struct {
+		name      string
+		sessionID string
+	}{
+		{
+			name:      "first user",
+			sessionID: util.RandomString(8),
+		},
+		{
+			name:      "second user",
+			sessionID: util.RandomString(8),
+		},
+		{
+			name:      "third user",
+			sessionID: util.RandomString(8),
+		},
+	}
+	u := setup()
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, resp := u.Verify(ctx, []byte("{}"), nil)
+			challenge, ok := resp.JSON.(Challenge)
+			if !ok {
+				t.Fatalf("expected a Challenge, got %T", resp.JSON)
+			}
+			if len(challenge.Completed) > 0 {
+				t.Fatalf("expected 0 completed stages, got %d", len(challenge.Completed))
+			}
+			u.AddCompletedStage(tt.sessionID, "")
+		})
 	}
 }

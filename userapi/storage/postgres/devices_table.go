@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -75,10 +76,10 @@ const selectDeviceByTokenSQL = "" +
 	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
-	"SELECT display_name FROM device_devices WHERE localpart = $1 and device_id = $2"
+	"SELECT display_name, last_seen_ts, ip FROM device_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2 ORDER BY last_seen_ts DESC"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
@@ -93,10 +94,10 @@ const deleteDevicesSQL = "" +
 	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
 
 const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, display_name FROM device_devices WHERE device_id = ANY($1)"
+	"SELECT device_id, localpart, display_name, last_seen_ts FROM device_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
 
 const updateDeviceLastSeen = "" +
-	"UPDATE device_devices SET last_seen_ts = $1, ip = $2 WHERE localpart = $3 AND device_id = $4"
+	"UPDATE device_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND device_id = $5"
 
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
@@ -117,6 +118,15 @@ func NewPostgresDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName
 		serverName: serverName,
 	}
 	_, err := db.Exec(devicesSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: add last_seen_ts",
+		Up:      deltas.UpLastSeenTSIP,
+	})
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -215,14 +225,21 @@ func (s *devicesStatements) SelectDeviceByID(
 	ctx context.Context, localpart, deviceID string,
 ) (*api.Device, error) {
 	var dev api.Device
-	var displayName sql.NullString
+	var displayName, ip sql.NullString
+	var lastseenTS sql.NullInt64
 	stmt := s.selectDeviceByIDStmt
-	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&displayName)
+	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&displayName, &lastseenTS, &ip)
 	if err == nil {
 		dev.ID = deviceID
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		if displayName.Valid {
 			dev.DisplayName = displayName.String
+		}
+		if lastseenTS.Valid {
+			dev.LastSeenTS = lastseenTS.Int64
+		}
+		if ip.Valid {
+			dev.LastSeenIP = ip.String
 		}
 	}
 	return &dev, err
@@ -235,15 +252,19 @@ func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []s
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByID: rows.close() failed")
 	var devices []api.Device
+	var dev api.Device
+	var localpart string
+	var lastseents sql.NullInt64
+	var displayName sql.NullString
 	for rows.Next() {
-		var dev api.Device
-		var localpart string
-		var displayName sql.NullString
-		if err := rows.Scan(&dev.ID, &localpart, &displayName); err != nil {
+		if err := rows.Scan(&dev.ID, &localpart, &displayName, &lastseents); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {
 			dev.DisplayName = displayName.String
+		}
+		if lastseents.Valid {
+			dev.LastSeenTS = lastseents.Int64
 		}
 		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
 		devices = append(devices, dev)
@@ -262,10 +283,10 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectDevicesByLocalpart: rows.close() failed")
 
+	var dev api.Device
+	var lastseents sql.NullInt64
+	var id, displayname, ip, useragent sql.NullString
 	for rows.Next() {
-		var dev api.Device
-		var lastseents sql.NullInt64
-		var id, displayname, ip, useragent sql.NullString
 		err = rows.Scan(&id, &displayname, &lastseents, &ip, &useragent)
 		if err != nil {
 			return devices, err
@@ -293,9 +314,9 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 	return devices, rows.Err()
 }
 
-func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr string) error {
+func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr, userAgent string) error {
 	lastSeenTs := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
-	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, localpart, deviceID)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, userAgent, localpart, deviceID)
 	return err
 }

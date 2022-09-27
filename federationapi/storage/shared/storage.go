@@ -63,11 +63,21 @@ func (r *Receipt) String() string {
 // this isn't a duplicate message.
 func (d *Database) UpdateRoom(
 	ctx context.Context,
-	roomID, oldEventID, newEventID string,
+	roomID string,
 	addHosts []types.JoinedHost,
 	removeHosts []string,
+	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		if purgeRoomFirst {
+			// If the event is a create event then we'll delete all of the existing
+			// data for the room. The only reason that a create event would be replayed
+			// to us in this way is if we're about to receive the entire room state.
+			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
+				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
+			}
+		}
+
 		joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID)
 		if err != nil {
 			return err
@@ -136,20 +146,6 @@ func (d *Database) StoreJSON(
 	return &Receipt{
 		nid: nid,
 	}, nil
-}
-
-func (d *Database) PurgeRoomState(
-	ctx context.Context, roomID string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		// If the event is a create event then we'll delete all of the existing
-		// data for the room. The only reason that a create event would be replayed
-		// to us in this way is if we're about to receive the entire room state.
-		if err := d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
-		}
-		return nil
-	})
 }
 
 func (d *Database) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {

@@ -53,6 +53,9 @@ func InitialPowerLevelsContent(roomCreator string) (c gomatrixserverlib.PowerLev
 		"m.room.history_visibility": 100,
 		"m.room.canonical_alias":    50,
 		"m.room.avatar":             50,
+		"m.room.tombstone":          100,
+		"m.room.encryption":         100,
+		"m.room.server_acl":         100,
 	}
 	c.Users = map[string]int64{roomCreator: 100}
 	return c

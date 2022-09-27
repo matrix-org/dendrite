@@ -36,7 +36,7 @@ import (
 type OutputRoomEventConsumer struct {
 	ctx       context.Context
 	cfg       *config.FederationAPI
-	rsAPI     api.RoomserverInternalAPI
+	rsAPI     api.FederationRoomserverAPI
 	jetstream nats.JetStreamContext
 	durable   string
 	db        storage.Database
@@ -51,7 +51,7 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.FederationRoomserverAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:       process.Context(),
@@ -68,8 +68,8 @@ func NewOutputRoomEventConsumer(
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
@@ -77,7 +77,8 @@ func (s *OutputRoomEventConsumer) Start() error {
 // It is unsafe to call this with messages for the same room in multiple gorountines
 // because updates it will likely fail with a types.EventIDMismatchError when it
 // realises that it cannot update the room state using the deltas.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
@@ -89,15 +90,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) 
 	switch output.Type {
 	case api.OutputTypeNewRoomEvent:
 		ev := output.NewRoomEvent.Event
-
-		if output.NewRoomEvent.RewritesState {
-			if err := s.db.PurgeRoomState(s.ctx, ev.RoomID()); err != nil {
-				log.WithError(err).Errorf("roomserver output log: purge room state failure")
-				return false
-			}
-		}
-
-		if err := s.processMessage(*output.NewRoomEvent); err != nil {
+		if err := s.processMessage(*output.NewRoomEvent, output.NewRoomEvent.RewritesState); err != nil {
 			// panic rather than continue with an inconsistent database
 			log.WithFields(log.Fields{
 				"event_id":   ev.EventID(),
@@ -145,29 +138,26 @@ func (s *OutputRoomEventConsumer) processInboundPeek(orp api.OutputNewInboundPee
 
 // processMessage updates the list of currently joined hosts in the room
 // and then sends the event to the hosts that were joined before the event.
-func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) error {
-	eventsRes := &api.QueryEventsByIDResponse{}
-	if len(ore.AddsStateEventIDs) > 0 {
+func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rewritesState bool) error {
+	addsStateEvents, missingEventIDs := ore.NeededStateEventIDs()
+
+	// Ask the roomserver and add in the rest of the results into the set.
+	// Finally, work out if there are any more events missing.
+	if len(missingEventIDs) > 0 {
 		eventsReq := &api.QueryEventsByIDRequest{
-			EventIDs: ore.AddsStateEventIDs,
+			EventIDs: missingEventIDs,
 		}
+		eventsRes := &api.QueryEventsByIDResponse{}
 		if err := s.rsAPI.QueryEventsByID(s.ctx, eventsReq, eventsRes); err != nil {
 			return fmt.Errorf("s.rsAPI.QueryEventsByID: %w", err)
 		}
-
-		found := false
-		for _, event := range eventsRes.Events {
-			if event.EventID() == ore.Event.EventID() {
-				found = true
-				break
-			}
+		if len(eventsRes.Events) != len(missingEventIDs) {
+			return fmt.Errorf("missing state events")
 		}
-		if !found {
-			eventsRes.Events = append(eventsRes.Events, ore.Event)
-		}
+		addsStateEvents = append(addsStateEvents, eventsRes.Events...)
 	}
 
-	addsJoinedHosts, err := joinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(eventsRes.Events))
+	addsJoinedHosts, err := JoinedHostsFromEvents(gomatrixserverlib.UnwrapEventHeaders(addsStateEvents))
 	if err != nil {
 		return err
 	}
@@ -179,10 +169,9 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 	oldJoinedHosts, err := s.db.UpdateRoom(
 		s.ctx,
 		ore.Event.RoomID(),
-		ore.LastSentEventID,
-		ore.Event.EventID(),
 		addsJoinedHosts,
 		ore.RemovesStateEventIDs,
+		rewritesState, // if we're re-writing state, nuke all joined hosts before adding
 	)
 	if err != nil {
 		return err
@@ -220,9 +209,11 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent) err
 // joinedHostsAtEvent works out a list of matrix servers that were joined to
 // the room at the event (including peeking ones)
 // It is important to use the state at the event for sending messages because:
-//   1) We shouldn't send messages to servers that weren't in the room.
-//   2) If a server is kicked from the rooms it should still be told about the
-//      kick event,
+//
+//  1. We shouldn't send messages to servers that weren't in the room.
+//  2. If a server is kicked from the rooms it should still be told about the
+//     kick event.
+//
 // Usually the list can be calculated locally, but sometimes it will need fetch
 // events from the room server.
 // Returns an error if there was a problem talking to the room server.
@@ -241,7 +232,7 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 		return nil, err
 	}
 
-	combinedAddsJoinedHosts, err := joinedHostsFromEvents(combinedAddsEvents)
+	combinedAddsJoinedHosts, err := JoinedHostsFromEvents(combinedAddsEvents)
 	if err != nil {
 		return nil, err
 	}
@@ -287,10 +278,10 @@ func (s *OutputRoomEventConsumer) joinedHostsAtEvent(
 	return result, nil
 }
 
-// joinedHostsFromEvents turns a list of state events into a list of joined hosts.
+// JoinedHostsFromEvents turns a list of state events into a list of joined hosts.
 // This errors if one of the events was invalid.
 // It should be impossible for an invalid event to get this far in the pipeline.
-func joinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, error) {
+func JoinedHostsFromEvents(evs []*gomatrixserverlib.Event) ([]types.JoinedHost, error) {
 	var joinedHosts []types.JoinedHost
 	for _, ev := range evs {
 		if ev.Type() != "m.room.member" || ev.StateKey() == nil {

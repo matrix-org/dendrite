@@ -21,32 +21,16 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
-	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
-
-	// Import the postgres database driver.
-	_ "github.com/lib/pq"
 )
 
 // NewDatabase creates a new accounts and profiles database
-func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
-	db, err := sqlutil.Open(dbProperties)
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
 	if err != nil {
-		return nil, err
-	}
-
-	m := sqlutil.NewMigrations()
-	if _, err = db.Exec(accountsSchema); err != nil {
-		// do this so that the migration can and we don't fail on
-		// preparing statements for columns that don't exist yet
-		return nil, err
-	}
-	deltas.LoadIsActive(m)
-	//deltas.LoadLastSeenTSIP(m)
-	deltas.LoadAddAccountType(m)
-	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
 
@@ -94,6 +78,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresNotificationTable: %w", err)
 	}
+	statsTable, err := NewSQLiteStatsTable(db, serverName)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
+	}
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
 		Accounts:              accountsTable,
@@ -106,9 +94,10 @@ func NewDatabase(dbProperties *config.DatabaseOptions, serverName gomatrixserver
 		ThreePIDs:             threePIDTable,
 		Pushers:               pusherTable,
 		Notifications:         notificationsTable,
+		Stats:                 statsTable,
 		ServerName:            serverName,
 		DB:                    db,
-		Writer:                sqlutil.NewExclusiveWriter(),
+		Writer:                writer,
 		LoginTokenLifetime:    loginTokenLifetime,
 		BcryptCost:            bcryptCost,
 		OpenIDTokenLifetimeMS: openIDTokenLifetimeMS,

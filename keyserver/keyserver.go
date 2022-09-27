@@ -16,8 +16,11 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/consumers"
 	"github.com/matrix-org/dendrite/keyserver/internal"
 	"github.com/matrix-org/dendrite/keyserver/inthttp"
 	"github.com/matrix-org/dendrite/keyserver/producers"
@@ -25,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
@@ -37,11 +39,11 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
-	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.FederationClient,
+	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.KeyserverFederationAPI,
 ) api.KeyInternalAPI {
-	js, _ := jetstream.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	db, err := storage.NewDatabase(&cfg.Database)
+	db, err := storage.NewDatabase(base, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
@@ -63,6 +65,20 @@ func NewInternalAPI(
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
+
+	dlConsumer := consumers.NewDeviceListUpdateConsumer(
+		base.ProcessContext, cfg, js, updater,
+	)
+	if err := dlConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start device list consumer")
+	}
+
+	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
+		base.ProcessContext, cfg, js, ap,
+	)
+	if err := sigConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start signing key consumer")
+	}
 
 	return ap
 }

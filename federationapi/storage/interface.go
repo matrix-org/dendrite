@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -25,13 +26,12 @@ import (
 type Database interface {
 	gomatrixserverlib.KeyDatabase
 
-	UpdateRoom(ctx context.Context, roomID, oldEventID, newEventID string, addHosts []types.JoinedHost, removeHosts []string) (joinedHosts []types.JoinedHost, err error)
+	UpdateRoom(ctx context.Context, roomID string, addHosts []types.JoinedHost, removeHosts []string, purgeRoomFirst bool) (joinedHosts []types.JoinedHost, err error)
 
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	// GetJoinedHostsForRooms returns the complete set of servers in the rooms given.
 	GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf bool) ([]gomatrixserverlib.ServerName, error)
-	PurgeRoomState(ctx context.Context, roomID string) error
 
 	StoreJSON(ctx context.Context, js string) (*shared.Receipt, error)
 
@@ -39,7 +39,7 @@ type Database interface {
 	GetPendingEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (edus map[*shared.Receipt]*gomatrixserverlib.EDU, err error)
 
 	AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
-	AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error
+	AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt, eduType string, expireEDUTypes map[string]time.Duration) error
 
 	CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error
 	CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error
@@ -71,4 +71,6 @@ type Database interface {
 	// Query the notary for the server keys for the given server. If `optKeyIDs` is not empty, multiple server keys may be returned (between 1 - len(optKeyIDs))
 	// such that the combination of all server keys will include all the `optKeyIDs`.
 	GetNotaryKeys(ctx context.Context, serverName gomatrixserverlib.ServerName, optKeyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error)
+	// DeleteExpiredEDUs cleans up expired EDUs
+	DeleteExpiredEDUs(ctx context.Context) error
 }

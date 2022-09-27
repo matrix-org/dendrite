@@ -16,6 +16,8 @@ const (
 
 var (
 	InputRoomEvent          = "InputRoomEvent"
+	InputDeviceListUpdate   = "InputDeviceListUpdate"
+	InputSigningKeyUpdate   = "InputSigningKeyUpdate"
 	OutputRoomEvent         = "OutputRoomEvent"
 	OutputSendToDeviceEvent = "OutputSendToDeviceEvent"
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
@@ -27,6 +29,7 @@ var (
 	OutputReadUpdate        = "OutputReadUpdate"
 	RequestPresence         = "GetPresence"
 	OutputPresenceEvent     = "OutputPresenceEvent"
+	InputFulltextReindex    = "InputFulltextReindex"
 )
 
 var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
@@ -42,6 +45,16 @@ func InputRoomEventSubj(roomID string) string {
 var streams = []*nats.StreamConfig{
 	{
 		Name:      InputRoomEvent,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      InputDeviceListUpdate,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      InputSigningKeyUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

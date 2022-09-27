@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -34,13 +35,12 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationCache, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.FederationCache, serverName gomatrixserverlib.ServerName) (*Database, error) {
 	var d Database
 	var err error
-	if d.db, err = sqlutil.Open(dbProperties); err != nil {
+	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
-	d.writer = sqlutil.NewExclusiveWriter()
 	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -81,9 +81,16 @@ func NewDatabase(dbProperties *config.DatabaseOptions, cache caching.FederationC
 	if err != nil {
 		return nil, err
 	}
-	m := sqlutil.NewMigrations()
-	deltas.LoadRemoveRoomsTable(m)
-	if err = m.RunDeltas(d.db, dbProperties); err != nil {
+	m := sqlutil.NewMigrator(d.db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "federationsender: drop federationsender_rooms",
+		Up:      deltas.UpRemoveRoomsTable,
+	})
+	err = m.Up(base.Context())
+	if err != nil {
+		return nil, err
+	}
+	if err = queueEDUs.Prepare(); err != nil {
 		return nil, err
 	}
 	d.Database = shared.Database{

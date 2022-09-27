@@ -1,7 +1,7 @@
 package routing
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -15,12 +15,12 @@ import (
 func Deactivate(
 	req *http.Request,
 	userInteractiveAuth *auth.UserInteractive,
-	accountAPI api.UserAccountAPI,
+	accountAPI api.ClientUserAPI,
 	deviceAPI *api.Device,
 ) util.JSONResponse {
 	ctx := req.Context()
 	defer req.Body.Close() // nolint:errcheck
-	bodyBytes, err := ioutil.ReadAll(req.Body)
+	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,

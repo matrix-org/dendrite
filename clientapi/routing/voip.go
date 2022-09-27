@@ -22,15 +22,17 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/util"
 )
 
 // RequestTurnServer implements:
-//     GET /voip/turnServer
+//
+//	GET /voip/turnServer
 func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.ClientAPI) util.JSONResponse {
 	turnConfig := cfg.TURN
 
@@ -52,6 +54,7 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 
 	if turnConfig.SharedSecret != "" {
 		expiry := time.Now().Add(duration).Unix()
+		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
 		mac := hmac.New(sha1.New, []byte(turnConfig.SharedSecret))
 		_, err := mac.Write([]byte(resp.Username))
 
@@ -60,7 +63,6 @@ func RequestTurnServer(req *http.Request, device *api.Device, cfg *config.Client
 			return jsonerror.InternalServerError()
 		}
 
-		resp.Username = fmt.Sprintf("%d:%s", expiry, device.UserID)
 		resp.Password = base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	} else if turnConfig.Username != "" && turnConfig.Password != "" {
 		resp.Username = turnConfig.Username

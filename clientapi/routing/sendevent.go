@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 	"time"
 
@@ -62,15 +63,16 @@ var sendEventDuration = prometheus.NewHistogramVec(
 )
 
 // SendEvent implements:
-//   /rooms/{roomID}/send/{eventType}
-//   /rooms/{roomID}/send/{eventType}/{txnID}
-//   /rooms/{roomID}/state/{eventType}/{stateKey}
+//
+//	/rooms/{roomID}/send/{eventType}
+//	/rooms/{roomID}/send/{eventType}/{txnID}
+//	/rooms/{roomID}/state/{eventType}/{stateKey}
 func SendEvent(
 	req *http.Request,
 	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
@@ -96,12 +98,26 @@ func SendEvent(
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
-	startedGeneratingEvent := time.Now()
-
 	var r map[string]interface{} // must be a JSON object
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
+	}
+
+	if stateKey != nil {
+		// If the existing/new state content are equal, return the existing event_id, making the request idempotent.
+		if resp := stateEqual(req.Context(), rsAPI, eventType, *stateKey, roomID, r); resp != nil {
+			return *resp
+		}
+	}
+
+	startedGeneratingEvent := time.Now()
+
+	// If we're sending a membership update, make sure to strip the authorised
+	// via key if it is present, otherwise other servers won't be able to auth
+	// the event if the room is set to the "restricted" join rule.
+	if eventType == gomatrixserverlib.MRoomMember {
+		delete(r, "join_authorised_via_users_server")
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -201,13 +217,44 @@ func SendEvent(
 	return res
 }
 
+// stateEqual compares the new and the existing state event content. If they are equal, returns a *util.JSONResponse
+// with the existing event_id, making this an idempotent request.
+func stateEqual(ctx context.Context, rsAPI api.ClientRoomserverAPI, eventType, stateKey, roomID string, newContent map[string]interface{}) *util.JSONResponse {
+	stateRes := api.QueryCurrentStateResponse{}
+	tuple := gomatrixserverlib.StateKeyTuple{
+		EventType: eventType,
+		StateKey:  stateKey,
+	}
+	err := rsAPI.QueryCurrentState(ctx, &api.QueryCurrentStateRequest{
+		RoomID:      roomID,
+		StateTuples: []gomatrixserverlib.StateKeyTuple{tuple},
+	}, &stateRes)
+	if err != nil {
+		return nil
+	}
+	if existingEvent, ok := stateRes.StateEvents[tuple]; ok {
+		var existingContent map[string]interface{}
+		if err = json.Unmarshal(existingEvent.Content(), &existingContent); err != nil {
+			return nil
+		}
+		if reflect.DeepEqual(existingContent, newContent) {
+			return &util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: sendEventResponse{existingEvent.EventID()},
+			}
+		}
+
+	}
+	return nil
+}
+
 func generateSendEvent(
 	ctx context.Context,
 	r map[string]interface{},
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request

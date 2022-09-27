@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 
 	log "github.com/sirupsen/logrus"
@@ -65,7 +66,7 @@ const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
 
 const selectNewNumericLocalpartSQL = "" +
-	"SELECT COUNT(localpart) FROM account_accounts"
+	"SELECT COALESCE(MAX(CAST(localpart AS INT)), 0) FROM account_accounts WHERE CAST(localpart AS INT) <> 0"
 
 type accountsStatements struct {
 	db                            *sql.DB
@@ -84,6 +85,23 @@ func NewSQLiteAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 		serverName: serverName,
 	}
 	_, err := db.Exec(accountsSchema)
+	if err != nil {
+		return nil, err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations([]sqlutil.Migration{
+		{
+			Version: "userapi: add is active",
+			Up:      deltas.UpIsActive,
+			Down:    deltas.DownIsActive,
+		},
+		{
+			Version: "userapi: add account type",
+			Up:      deltas.UpAddAccountType,
+			Down:    deltas.DownAddAccountType,
+		},
+	}...)
+	err = m.Up(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +139,7 @@ func (s *accountsStatements) InsertAccount(
 		UserID:       userutil.MakeUserID(localpart, s.serverName),
 		ServerName:   s.serverName,
 		AppServiceID: appserviceID,
+		AccountType:  accountType,
 	}, nil
 }
 
@@ -177,5 +196,8 @@ func (s *accountsStatements) SelectNewNumericLocalpart(
 		stmt = sqlutil.TxStmt(txn, stmt)
 	}
 	err = stmt.QueryRowContext(ctx).Scan(&id)
-	return
+	if err == sql.ErrNoRows {
+		return 1, nil
+	}
+	return id + 1, err
 }

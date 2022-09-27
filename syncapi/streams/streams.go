@@ -25,14 +25,16 @@ type Streams struct {
 }
 
 func NewSyncStreamProviders(
-	d storage.Database, userAPI userapi.UserInternalAPI,
-	rsAPI rsapi.RoomserverInternalAPI, keyAPI keyapi.KeyInternalAPI,
-	eduCache *caching.EDUCache, notifier *notifier.Notifier,
+	d storage.Database, userAPI userapi.SyncUserAPI,
+	rsAPI rsapi.SyncRoomserverAPI, keyAPI keyapi.SyncKeyAPI,
+	eduCache *caching.EDUCache, lazyLoadCache caching.LazyLoadCache, notifier *notifier.Notifier,
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
-			userAPI:        userAPI,
+			lazyLoadCache:  lazyLoadCache,
+			rsAPI:          rsAPI,
+			notifier:       notifier,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
 			StreamProvider: StreamProvider{DB: d},
