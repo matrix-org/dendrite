@@ -137,7 +137,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 		"room_id":     event.RoomID(),
 		"num_members": len(members),
 		"room_size":   roomSize,
-	}).Debugf("Notifying members")
+	}).Tracef("Notifying members")
 
 	// Notification.UserIsTarget is a per-member field, so we
 	// cannot group all users in a single request.
@@ -149,7 +149,7 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 		if err := s.notifyLocal(ctx, event, mem, roomSize, roomName, streamPos); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": mem.Localpart,
-			}).WithError(err).Debugf("Unable to push to local user")
+			}).WithError(err).Error("Unable to push to local user")
 			continue
 		}
 	}
@@ -310,7 +310,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 			"event_id":  event.EventID(),
 			"room_id":   event.RoomID(),
 			"localpart": mem.Localpart,
-		}).Debugf("Push rule evaluation rejected the event")
+		}).Tracef("Push rule evaluation rejected the event")
 		return nil
 	}
 
@@ -353,7 +353,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		"localpart":  mem.Localpart,
 		"num_urls":   len(devicesByURLAndFormat),
 		"num_unread": userNumUnreadNotifs,
-	}).Debugf("Notifying single member")
+	}).Trace("Notifying single member")
 
 	// Push gateways are out of our control, and we cannot risk
 	// looking up the server on a misbehaving push gateway. Each user
@@ -455,7 +455,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 		"room_id":   event.RoomID(),
 		"localpart": mem.Localpart,
 		"rule_id":   rule.RuleID,
-	}).Debugf("Matched a push rule")
+	}).Trace("Matched a push rule")
 
 	return rule.Actions, nil
 }
@@ -569,13 +569,13 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatri
 		}
 	}
 
-	logger.Debugf("Notifying push gateway %s", url)
+	logger.Tracef("Notifying push gateway %s", url)
 	var res pushgateway.NotifyResponse
 	if err := s.pgClient.Notify(ctx, url, &req, &res); err != nil {
 		logger.WithError(err).Errorf("Failed to notify push gateway %s", url)
 		return nil, err
 	}
-	logger.WithField("num_rejected", len(res.Rejected)).Debugf("Push gateway result")
+	logger.WithField("num_rejected", len(res.Rejected)).Trace("Push gateway result")
 
 	if len(res.Rejected) == 0 {
 		return nil, nil
