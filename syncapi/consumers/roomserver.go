@@ -32,7 +32,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -49,7 +48,6 @@ type OutputRoomEventConsumer struct {
 	pduStream    types.StreamProvider
 	inviteStream types.StreamProvider
 	notifier     *notifier.Notifier
-	producer     *producers.UserAPIStreamEventProducer
 	fts          *fulltext.Search
 }
 
@@ -63,7 +61,6 @@ func NewOutputRoomEventConsumer(
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
-	producer *producers.UserAPIStreamEventProducer,
 	fts *fulltext.Search,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
@@ -77,7 +74,6 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
-		producer:     producer,
 		fts:          fts,
 	}
 }
@@ -262,12 +258,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 	}
 	if err = s.writeFTS(ev, pduPos); err != nil {
 		log.WithError(err).Warn("failed to write fulltext")
-	}
-
-	if err = s.producer.SendStreamEvent(ev.RoomID(), ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to send stream output event for event %s", ev.EventID())
-		sentry.CaptureException(err)
-		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
