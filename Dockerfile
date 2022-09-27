@@ -3,7 +3,7 @@
 #
 # base installs required dependencies and runs go mod download to cache dependencies
 #
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.18-alpine AS base
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.19-alpine AS base
 RUN apk --update --no-cache add bash build-base
 
 WORKDIR /src
@@ -23,7 +23,7 @@ RUN --mount=target=. \
 #
 # The dendrite base image; mainly creates a user and switches to it
 #
-FROM alpine:3.16 AS dendrite-base
+FROM alpine:latest AS dendrite-base
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
@@ -56,6 +56,23 @@ ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
 EXPOSE 8008 8448
 
 #
+# Builds the P2P demo image and contains all required binaries
+#
+FROM dendrite-base AS demo-pinecone
+LABEL org.opencontainers.image.title="Dendrite (P2P Demo)"
+
+COPY --from=build /out/create-account /usr/bin/create-account
+COPY --from=build /out/generate-config /usr/bin/generate-config
+COPY --from=build /out/generate-keys /usr/bin/generate-keys
+COPY --from=build /out/dendrite-demo-pinecone /usr/bin/dendrite-demo-pinecone
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["/usr/bin/dendrite-demo-pinecone"]
+EXPOSE 8008 8448
+
+#
 # Builds the Complement image, used for integration tests
 #
 FROM base AS complement
@@ -76,6 +93,6 @@ EXPOSE 8008 8448
 # At runtime, generate TLS cert based on the CA now mounted at /ca
 # At runtime, replace the SERVER_NAME with what we are told
 CMD /usr/bin/generate-keys --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /ca/ca.crt --tls-authority-key /ca/ca.key && \
- /usr/bin/generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
- cp /ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
- /usr/bin/dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+    /usr/bin/generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
+    cp /ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
+    /usr/bin/dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
