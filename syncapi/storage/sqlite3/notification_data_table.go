@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -32,19 +33,21 @@ func NewSqliteNotificationDataTable(db *sql.DB, streamID *StreamIDStatements) (t
 	}
 	r := &notificationDataStatements{
 		streamIDStatements: streamID,
+		db:                 db,
 	}
 	return r, sqlutil.StatementList{
 		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
-		{&r.selectUserUnreadCounts, selectUserUnreadNotificationCountsSQL},
 		{&r.selectMaxID, selectMaxNotificationIDSQL},
+		// {&r.selectUserUnreadCountsForRooms, selectUserUnreadNotificationsForRooms}, // used at runtime
 	}.Prepare(db)
 }
 
 type notificationDataStatements struct {
+	db                     *sql.DB
 	streamIDStatements     *StreamIDStatements
 	upsertRoomUnreadCounts *sql.Stmt
-	selectUserUnreadCounts *sql.Stmt
 	selectMaxID            *sql.Stmt
+	//selectUserUnreadCountsForRooms *sql.Stmt
 }
 
 const notificationDataSchema = `
@@ -63,12 +66,10 @@ const upsertRoomUnreadNotificationCountsSQL = `INSERT INTO syncapi_notification_
   ON CONFLICT (user_id, room_id)
   DO UPDATE SET id = $5, notification_count = $6, highlight_count = $7`
 
-const selectUserUnreadNotificationCountsSQL = `SELECT
-  id, room_id, notification_count, highlight_count
-  FROM syncapi_notification_data
-  WHERE
-    user_id = $1 AND
-    id BETWEEN $2 + 1 AND $3`
+const selectUserUnreadNotificationsForRooms = `SELECT room_id, notification_count, highlight_count
+	FROM syncapi_notification_data
+	WHERE user_id = $1 AND
+	      room_id IN ($2)`
 
 const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(id) END FROM syncapi_notification_data`
 
@@ -81,20 +82,26 @@ func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context,
 	return
 }
 
-func (r *notificationDataStatements) SelectUserUnreadCounts(ctx context.Context, txn *sql.Tx, userID string, fromExcl, toIncl types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	rows, err := sqlutil.TxStmt(txn, r.selectUserUnreadCounts).QueryContext(ctx, userID, fromExcl, toIncl)
+func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
+	ctx context.Context, txn *sql.Tx, userID string, roomIDs []string,
+) (map[string]*eventutil.NotificationData, error) {
+	params := make([]interface{}, len(roomIDs)+1)
+	params[0] = userID
+	for i := range roomIDs {
+		params[i+1] = roomIDs[i]
+	}
+	sql := strings.Replace(selectUserUnreadNotificationsForRooms, "($1)", sqlutil.QueryVariadic(len(params)), 1)
+	rows, err := r.db.QueryContext(ctx, sql, params)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectUserUnreadCounts: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectUserUnreadCountsForRooms: rows.close() failed")
 
 	roomCounts := map[string]*eventutil.NotificationData{}
+	var roomID string
+	var notificationCount, highlightCount int
 	for rows.Next() {
-		var id types.StreamPosition
-		var roomID string
-		var notificationCount, highlightCount int
-
-		if err = rows.Scan(&id, &roomID, &notificationCount, &highlightCount); err != nil {
+		if err = rows.Scan(&roomID, &notificationCount, &highlightCount); err != nil {
 			return nil, err
 		}
 
