@@ -1093,3 +1093,11 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
+
+func (s *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
+		gomatrixserverlib.MRoomName,
+		gomatrixserverlib.MRoomTopic,
+		"m.room.message",
+	})
+}

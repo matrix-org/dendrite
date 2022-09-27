@@ -57,6 +57,11 @@ Request body format:
 Reset the password of a local user. The `localpart` is the username only, i.e. if
 the full user ID is `@alice:domain.com` then the local part is `alice`.
 
+## GET `/_dendrite/admin/fulltext/reindex`
+
+This endpoint instructs Dendrite to reindex all searchable events (`m.room.message`, `m.room.topic` and `m.room.name`). An empty JSON body will be returned immediately.
+Indexing is done in the background, the server logs every 1000 events (or below) when they are being indexed. Once reindexing is done, you'll see something along the lines `Indexed 69586 events in 53.68223182s` in your debug logs.
+
 ## POST `/_synapse/admin/v1/send_server_notice`
 
 Request body format:

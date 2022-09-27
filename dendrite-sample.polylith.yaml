@@ -326,10 +326,15 @@ sync_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
-  fulltext:
+
+  # Configuration for the fulltext search
+  search:
     enabled: false
+    # The path where the fulltext index will be created in.
     index_path: "./fulltextindex"
-    language: "en" # more possible languages can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    # The language most likely to be used on the server - used when indexing, to ensure the returned results match the expectations.
+    # A full list of possible languages can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    language: "en"
 
   # This option controls which HTTP header to inspect to find the real remote IP
   # address of the client. This is likely required if Dendrite is running behind
