@@ -1044,7 +1044,7 @@ func (d *Database) GetUserUnreadNotificationCountsForRooms(ctx context.Context, 
 		}
 		roomIDs = append(roomIDs, roomID)
 	}
-	return d.NotificationData.SelectUnserUnreadCountsForRooms(ctx, nil, userID, roomIDs)
+	return d.NotificationData.SelectUserUnreadCountsForRooms(ctx, nil, userID, roomIDs)
 }
 
 func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {

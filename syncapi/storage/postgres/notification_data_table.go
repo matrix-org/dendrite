@@ -75,14 +75,14 @@ func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context,
 	return
 }
 
-func (r *notificationDataStatements) SelectUnserUnreadCountsForRooms(
+func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
 	ctx context.Context, txn *sql.Tx, userID string, roomIDs []string,
 ) (map[string]*eventutil.NotificationData, error) {
 	rows, err := sqlutil.TxStmt(txn, r.selectUserUnreadCountsForRooms).QueryContext(ctx, userID, pq.Array(roomIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectUnserUnreadCountsForRooms: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectUserUnreadCountsForRooms: rows.close() failed")
 
 	roomCounts := map[string]*eventutil.NotificationData{}
 	var roomID string
