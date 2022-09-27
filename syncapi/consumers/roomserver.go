@@ -257,7 +257,10 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return nil
 	}
 	if err = s.writeFTS(ev, pduPos); err != nil {
-		log.WithError(err).Warn("failed to write fulltext")
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -304,7 +307,10 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 	}
 
 	if err = s.writeFTS(ev, pduPos); err != nil {
-		log.WithError(err).Warn("failed to write fulltext")
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
