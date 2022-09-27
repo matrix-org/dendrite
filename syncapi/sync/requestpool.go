@@ -298,8 +298,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				return giveup()
 
 			case <-userStreamListener.GetNotifyChannel(syncReq.Since):
-				syncReq.Log.Debugln("Responding to sync after wake-up")
 				currentPos.ApplyUpdates(userStreamListener.GetSyncPosition())
+				syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync after wake-up")
 			}
 		} else {
 			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
@@ -308,6 +308,12 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 		if syncReq.Since.IsEmpty() {
 			// Complete sync
 			syncReq.Response.NextBatch = types.StreamingToken{
+				// Get the current DeviceListPosition first, as the currentPosition
+				// might advance while processing other streams, resulting in flakey
+				// tests.
+				DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
+					syncReq.Context, syncReq,
+				),
 				PDUPosition: rp.streams.PDUStreamProvider.CompleteSync(
 					syncReq.Context, syncReq,
 				),
@@ -327,9 +333,6 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					syncReq.Context, syncReq,
 				),
 				NotificationDataPosition: rp.streams.NotificationDataStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
-				),
-				DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
 					syncReq.Context, syncReq,
 				),
 				PresencePosition: rp.streams.PresenceStreamProvider.CompleteSync(

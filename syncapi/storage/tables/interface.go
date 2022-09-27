@@ -75,6 +75,7 @@ type Events interface {
 	SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
 	SelectContextBeforeEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
 	SelectContextAfterEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
+	ReIndex(ctx context.Context, txn *sql.Tx, limit, offset int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error)
 }
 
 // Topology keeps track of the depths and stream positions for all events.
@@ -189,14 +190,14 @@ type Memberships interface {
 }
 
 type NotificationData interface {
-	UpsertRoomUnreadCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (types.StreamPosition, error)
-	SelectUserUnreadCounts(ctx context.Context, userID string, fromExcl, toIncl types.StreamPosition) (map[string]*eventutil.NotificationData, error)
-	SelectMaxID(ctx context.Context) (int64, error)
+	UpsertRoomUnreadCounts(ctx context.Context, txn *sql.Tx, userID, roomID string, notificationCount, highlightCount int) (types.StreamPosition, error)
+	SelectUserUnreadCountsForRooms(ctx context.Context, txn *sql.Tx, userID string, roomIDs []string) (map[string]*eventutil.NotificationData, error)
+	SelectMaxID(ctx context.Context, txn *sql.Tx) (int64, error)
 }
 
 type Ignores interface {
-	SelectIgnores(ctx context.Context, userID string) (*types.IgnoredUsers, error)
-	UpsertIgnores(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
+	SelectIgnores(ctx context.Context, txn *sql.Tx, userID string) (*types.IgnoredUsers, error)
+	UpsertIgnores(ctx context.Context, txn *sql.Tx, userID string, ignores *types.IgnoredUsers) error
 }
 
 type Presence interface {

@@ -10,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/internal"
@@ -20,9 +24,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
 )
 
 type fedRoomserverAPI struct {
@@ -263,12 +264,14 @@ func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	_, privKey, _ := ed25519.GenerateKey(nil)
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.JetStream.InMemory = true
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	keyRing := &test.NopJSONVerifier{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.

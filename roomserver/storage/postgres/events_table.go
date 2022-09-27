@@ -74,7 +74,7 @@ const insertEventSQL = "" +
 	"INSERT INTO roomserver_events AS e (room_nid, event_type_nid, event_state_key_nid, event_id, reference_sha256, auth_event_nids, depth, is_rejected)" +
 	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
 	" ON CONFLICT ON CONSTRAINT roomserver_event_id_unique DO UPDATE" +
-	" SET is_rejected = $8 WHERE e.event_id = $4 AND e.is_rejected = FALSE" +
+	" SET is_rejected = $8 WHERE e.event_id = $4 AND e.is_rejected = TRUE" +
 	" RETURNING event_nid, state_snapshot_nid"
 
 const selectEventSQL = "" +
@@ -346,7 +346,7 @@ func (s *eventStatements) BulkSelectStateAtEventByID(
 		// Genuine create events are the only case where it's OK to have no previous state.
 		isCreate := result.EventTypeNID == types.MRoomCreateNID && result.EventStateKeyNID == 1
 		if result.BeforeStateSnapshotNID == 0 && !isCreate {
-			return nil, types.MissingEventError(
+			return nil, types.MissingStateError(
 				fmt.Sprintf("storage: missing state for event NID %d", result.EventNID),
 			)
 		}

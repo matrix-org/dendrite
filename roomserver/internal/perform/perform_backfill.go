@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -320,7 +319,6 @@ FederationHit:
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = res
 		return res, nil
 	}
-	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
@@ -398,7 +396,6 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 		}
 		return result, nil
 	}
-	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
@@ -471,7 +468,9 @@ FindSuccessor:
 	// Store the server names in a temporary map to avoid duplicates.
 	serverSet := make(map[gomatrixserverlib.ServerName]bool)
 	for _, event := range memberEvents {
-		serverSet[event.Origin()] = true
+		if _, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender()); err == nil {
+			serverSet[senderDomain] = true
+		}
 	}
 	var servers []gomatrixserverlib.ServerName
 	for server := range serverSet {

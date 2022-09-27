@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -175,7 +176,8 @@ func (r *Inputer) Start() error {
 		},
 		nats.HeadersOnly(),
 		nats.DeliverAll(),
-		nats.AckAll(),
+		nats.AckExplicit(),
+		nats.ReplayInstant(),
 		nats.BindStream(r.InputRoomEventTopic),
 	)
 	return err
@@ -187,6 +189,9 @@ func (w *worker) _next() {
 	// Look up what the next event is that's waiting to be processed.
 	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
 	defer cancel()
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("room_id", w.roomID)
+	}
 	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
 	switch err {
 	case nil:
@@ -238,6 +243,9 @@ func (w *worker) _next() {
 		return
 	}
 
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("event_id", inputRoomEvent.Event.EventID())
+	}
 	roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Inc()
 	defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Dec()
 
@@ -247,14 +255,24 @@ func (w *worker) _next() {
 	// it was a synchronous request.
 	var errString string
 	if err = w.r.processRoomEvent(w.r.ProcessContext.Context(), &inputRoomEvent); err != nil {
-		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-			sentry.CaptureException(err)
+		switch err.(type) {
+		case types.RejectedError:
+			// Don't send events that were rejected to Sentry
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver rejected event")
+		default:
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				sentry.CaptureException(err)
+			}
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver failed to process event")
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"room_id":  w.roomID,
-			"event_id": inputRoomEvent.Event.EventID(),
-			"type":     inputRoomEvent.Event.Type(),
-		}).Warn("Roomserver failed to process async event")
 		_ = msg.Term()
 		errString = err.Error()
 	} else {

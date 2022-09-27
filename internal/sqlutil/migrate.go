@@ -21,8 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/internal"
 )
 
 const createDBMigrationsSQL = "" +
@@ -48,12 +49,13 @@ type Migration struct {
 	Down func(ctx context.Context, txn *sql.Tx) error
 }
 
-// Migrator
+// Migrator contains fields required to run migrations.
 type Migrator struct {
 	db              *sql.DB
 	migrations      []Migration
 	knownMigrations map[string]struct{}
 	mutex           *sync.Mutex
+	insertStmt      *sql.Stmt
 }
 
 // NewMigrator creates a new DB migrator.
@@ -81,40 +83,48 @@ func (m *Migrator) AddMigrations(migrations ...Migration) {
 
 // Up executes all migrations in order they were added.
 func (m *Migrator) Up(ctx context.Context) error {
-	var (
-		err             error
-		dendriteVersion = internal.VersionString()
-	)
 	// ensure there is a table for known migrations
 	executedMigrations, err := m.ExecutedMigrations(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to create/get migrations: %w", err)
 	}
-
+	// ensure we close the insert statement, as it's not needed anymore
+	defer m.close()
 	return WithTransaction(m.db, func(txn *sql.Tx) error {
 		for i := range m.migrations {
-			now := time.Now().UTC().Format(time.RFC3339)
 			migration := m.migrations[i]
-			logrus.Debugf("Executing database migration '%s'", migration.Version)
 			// Skip migration if it was already executed
 			if _, ok := executedMigrations[migration.Version]; ok {
 				continue
 			}
-			err = migration.Up(ctx, txn)
-			if err != nil {
+			logrus.Debugf("Executing database migration '%s'", migration.Version)
+
+			if err = migration.Up(ctx, txn); err != nil {
 				return fmt.Errorf("unable to execute migration '%s': %w", migration.Version, err)
 			}
-			_, err = txn.ExecContext(ctx, insertVersionSQL,
-				migration.Version,
-				now,
-				dendriteVersion,
-			)
-			if err != nil {
+			if err = m.insertMigration(ctx, txn, migration.Version); err != nil {
 				return fmt.Errorf("unable to insert executed migrations: %w", err)
 			}
 		}
 		return nil
 	})
+}
+
+func (m *Migrator) insertMigration(ctx context.Context, txn *sql.Tx, migrationName string) error {
+	if m.insertStmt == nil {
+		stmt, err := m.db.Prepare(insertVersionSQL)
+		if err != nil {
+			return fmt.Errorf("unable to prepare insert statement: %w", err)
+		}
+		m.insertStmt = stmt
+	}
+	stmt := TxStmtContext(ctx, txn, m.insertStmt)
+	_, err := stmt.ExecContext(ctx,
+		migrationName,
+		time.Now().Format(time.RFC3339),
+		internal.VersionString(),
+	)
+	return err
 }
 
 // ExecutedMigrations returns a map with already executed migrations in addition to creating the
@@ -139,4 +149,26 @@ func (m *Migrator) ExecutedMigrations(ctx context.Context) (map[string]struct{},
 	}
 
 	return result, rows.Err()
+}
+
+// InsertMigration creates the migrations table if it doesn't exist and
+// inserts a migration given their name to the database.
+// This should only be used when manually inserting migrations.
+func InsertMigration(ctx context.Context, db *sql.DB, migrationName string) error {
+	m := NewMigrator(db)
+	defer m.close()
+	existingMigrations, err := m.ExecutedMigrations(ctx)
+	if err != nil {
+		return err
+	}
+	if _, ok := existingMigrations[migrationName]; ok {
+		return nil
+	}
+	return m.insertMigration(ctx, nil, migrationName)
+}
+
+func (m *Migrator) close() {
+	if m.insertStmt != nil {
+		internal.CloseAndLogIfError(context.Background(), m.insertStmt, "unable to close insert statement")
+	}
 }

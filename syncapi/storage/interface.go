@@ -19,15 +19,17 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
 	Presence
 	SharedUsers
+	Notifications
 
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
@@ -147,12 +149,6 @@ type Database interface {
 	// GetRoomReceipts gets all receipts for a given roomID
 	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error)
 
-	// UpsertRoomUnreadNotificationCounts updates the notification statistics about a (user, room) key.
-	UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (types.StreamPosition, error)
-
-	// GetUserUnreadNotificationCounts returns statistics per room a user is interested in.
-	GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error)
-
 	SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
 	SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
 	SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
@@ -165,6 +161,7 @@ type Database interface {
 	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 	// string as the membership.
 	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
+	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
 }
 
 type Presence interface {
@@ -177,4 +174,12 @@ type Presence interface {
 type SharedUsers interface {
 	// SharedUsers returns a subset of otherUserIDs that share a room with userID.
 	SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error)
+}
+
+type Notifications interface {
+	// UpsertRoomUnreadNotificationCounts updates the notification statistics about a (user, room) key.
+	UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (types.StreamPosition, error)
+
+	// getUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
+	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 }

@@ -62,14 +62,15 @@ func NewOutputTypingConsumer(
 // Start consuming from the clientapi
 func (t *OutputTypingConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		t.ctx, t.jetstream, t.topic, t.durable, t.onMessage,
+		t.ctx, t.jetstream, t.topic, t.durable, 1, t.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
 
 // onMessage is called in response to a message received on the typing
 // events topic from the client api.
-func (t *OutputTypingConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Extract the typing event from msg.
 	roomID := msg.Header.Get(jetstream.RoomID)
 	userID := msg.Header.Get(jetstream.UserID)

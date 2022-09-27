@@ -30,7 +30,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
 )
 
 const outputRoomEventsSchema = `
@@ -167,6 +166,8 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
+
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
 	selectEventsStmt              *sql.Stmt
@@ -181,6 +182,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
+	selectSearchStmt              *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -216,6 +218,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.selectSearchStmt, selectSearchSQL},
 	}.Prepare(db)
 }
 
@@ -272,16 +275,6 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		)
 		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs, &historyVisibility); err != nil {
 			return nil, nil, err
-		}
-		// Sanity check for deleted state and whine if we see it. We don't need to do anything
-		// since it'll just mark the event as not being needed.
-		if len(addIDs) < len(delIDs) {
-			log.WithFields(log.Fields{
-				"since":   r.From,
-				"current": r.To,
-				"adds":    len(addIDs),
-				"dels":    len(delIDs),
-			}).Warn("StateBetween: ignoring deleted state")
 		}
 
 		// TODO: Handle redacted events
@@ -640,6 +633,30 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			TransactionID:   transactionID,
 			ExcludeFromSync: excludeFromSync,
 		})
+	}
+	return result, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, afterID, pq.StringArray(types), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var eventID string
+	var id int64
+	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result[id] = ev
 	}
 	return result, rows.Err()
 }
