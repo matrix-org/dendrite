@@ -391,17 +391,26 @@ func (b *BaseDendrite) configureHTTPErrors() {
 		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
 	}
 
+	clientNotFoundHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+	}
+
 	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
 	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
 
 	for _, router := range []*mux.Router{
-		b.PublicClientAPIMux, b.PublicMediaAPIMux,
-		b.DendriteAdminMux, b.SynapseAdminMux,
-		b.PublicWellKnownAPIMux,
+		b.PublicMediaAPIMux, b.DendriteAdminMux,
+		b.SynapseAdminMux, b.PublicWellKnownAPIMux,
 	} {
 		router.NotFoundHandler = notFoundCORSHandler
 		router.MethodNotAllowedHandler = notAllowedCORSHandler
 	}
+
+	// Special case so that we don't upset clients on the CS API.
+	b.PublicClientAPIMux.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
+	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
