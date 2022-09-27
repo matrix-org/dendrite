@@ -50,7 +50,7 @@ type Fulltext struct {
 
 func (f *Fulltext) Defaults(opts DefaultOpts) {
 	f.Enabled = false
-	f.IndexPath = "./fulltextindex"
+	f.IndexPath = "./searchindex"
 	f.Language = "en"
 }
 

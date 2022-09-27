@@ -138,16 +138,18 @@ room_server:
     conn_max_lifetime: -1
 ```
 
-## Fulltext search
+## Full-text search
 
-Dendrite supports experimental fulltext indexing using [Bleve](https://github.com/blevesearch/bleve), it is configured in the `sync_api` section as follows. Depending on the language most likely to be used on the server, it might make sense to change the `language` used when indexing, to ensure the returned results match the expectations. A full list of possible languages can be found [here](https://github.com/blevesearch/bleve/tree/master/analysis/lang).
+Dendrite supports experimental full-text indexing using [Bleve](https://github.com/blevesearch/bleve). It is configured in the `sync_api` section as follows.
+
+Depending on the language most likely to be used on the server, it might make sense to change the `language` used when indexing, to ensure the returned results match the expectations. A full list of possible languages can be found [here](https://github.com/blevesearch/bleve/tree/master/analysis/lang).
 
 ```yaml
 sync_api:
   # ...
   search:
     enabled: false
-    index_path: "./fulltextindex"
+    index_path: "./searchindex"
     language: "en"
 ```
 

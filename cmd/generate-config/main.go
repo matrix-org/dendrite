@@ -85,7 +85,7 @@ func main() {
 			}
 			cfg.SyncAPI.Fulltext = config.Fulltext{
 				Enabled:   true,
-				IndexPath: config.Path(filepath.Join(*dirPath, "fulltextindex")),
+				IndexPath: config.Path(filepath.Join(*dirPath, "searchindex")),
 				InMemory:  true,
 				Language:  "en",
 			}
