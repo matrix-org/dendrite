@@ -1036,8 +1036,15 @@ func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userI
 	return
 }
 
-func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	return d.NotificationData.SelectUserUnreadCounts(ctx, nil, userID, from, to)
+func (d *Database) GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, rooms map[string]string) (map[string]*eventutil.NotificationData, error) {
+	roomIDs := make([]string, 0, len(rooms))
+	for roomID, membership := range rooms {
+		if membership != gomatrixserverlib.Join {
+			continue
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return d.NotificationData.SelectUnserUnreadCountsForRooms(ctx, nil, userID, roomIDs)
 }
 
 func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {

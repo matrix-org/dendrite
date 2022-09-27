@@ -32,12 +32,12 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	req *types.SyncRequest,
 	from, _ types.StreamPosition,
 ) types.StreamPosition {
-	// Always get the latest data, as this might have advanced while waiting
-	// for other streams to prepare their responses and add/updated notifications.
-	to := p.LatestPosition(ctx)
-	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, from, to)
+	// Get the unread notifications for rooms in our join response.
+	// This is to ensure clients always have an unread notification section
+	// and can display the correct numbers.
+	countsByRoom, err := p.DB.GetUserUnreadNotificationCountsForRooms(ctx, req.Device.UserID, req.Rooms)
 	if err != nil {
-		req.Log.WithError(err).Error("GetUserUnreadNotificationCounts failed")
+		req.Log.WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
 		return from
 	}
 
@@ -53,5 +53,6 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		}
 		req.Response.Rooms.Join[roomID] = jr
 	}
-	return to
+
+	return p.LatestPosition(ctx)
 }
