@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/routing"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type server struct {
@@ -75,7 +76,10 @@ func TestMain(m *testing.M) {
 			// Draw up just enough Dendrite config for the server key
 			// API to work.
 			cfg := &config.Dendrite{}
-			cfg.Defaults(true)
+			cfg.Defaults(config.DefaultOpts{
+				Generate:   true,
+				Monolithic: true,
+			})
 			cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 			cfg.Global.PrivateKey = testPriv
 			cfg.Global.JetStream.InMemory = true
@@ -83,7 +87,12 @@ func TestMain(m *testing.M) {
 			cfg.Global.JetStream.StoragePath = config.Path(d)
 			cfg.Global.KeyID = serverKeyID
 			cfg.Global.KeyValidityPeriod = s.validity
-			cfg.FederationAPI.Database.ConnectionString = config.DataSource("file::memory:")
+			f, err := os.CreateTemp(d, "federation_keys_test*.db")
+			if err != nil {
+				return -1
+			}
+			defer f.Close()
+			cfg.FederationAPI.Database.ConnectionString = config.DataSource("file:" + f.Name())
 			s.config = &cfg.FederationAPI
 
 			// Create a transport which redirects federation requests to

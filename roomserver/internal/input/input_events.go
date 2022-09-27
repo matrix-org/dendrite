@@ -118,6 +118,10 @@ func (r *Inputer) processRoomEvent(
 	if roomInfo == nil && !isCreateEvent {
 		return fmt.Errorf("room %s does not exist for event %s", event.RoomID(), event.EventID())
 	}
+	_, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender())
+	if err != nil {
+		return fmt.Errorf("event has invalid sender %q", input.Event.Sender())
+	}
 
 	// If we already know about this outlier and it hasn't been rejected
 	// then we won't attempt to reprocess it. If it was rejected or has now
@@ -145,7 +149,8 @@ func (r *Inputer) processRoomEvent(
 	var missingAuth, missingPrev bool
 	serverRes := &fedapi.QueryJoinedHostServerNamesInRoomResponse{}
 	if !isCreateEvent {
-		missingAuthIDs, missingPrevIDs, err := r.DB.MissingAuthPrevEvents(ctx, event)
+		var missingAuthIDs, missingPrevIDs []string
+		missingAuthIDs, missingPrevIDs, err = r.DB.MissingAuthPrevEvents(ctx, event)
 		if err != nil {
 			return fmt.Errorf("updater.MissingAuthPrevEvents: %w", err)
 		}
@@ -158,7 +163,7 @@ func (r *Inputer) processRoomEvent(
 			RoomID:      event.RoomID(),
 			ExcludeSelf: true,
 		}
-		if err := r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
+		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
 		}
 		// Sort all of the servers into a map so that we can randomise
@@ -173,9 +178,9 @@ func (r *Inputer) processRoomEvent(
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if origin := event.Origin(); origin != input.Origin {
-			serverRes.ServerNames = append(serverRes.ServerNames, origin)
-			delete(servers, origin)
+		if senderDomain != input.Origin {
+			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
+			delete(servers, senderDomain)
 		}
 		for server := range servers {
 			serverRes.ServerNames = append(serverRes.ServerNames, server)
@@ -188,7 +193,7 @@ func (r *Inputer) processRoomEvent(
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	if err := r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+	if err = r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
@@ -231,7 +236,6 @@ func (r *Inputer) processRoomEvent(
 	if input.Kind == api.KindNew {
 		// Check that the event passes authentication checks based on the
 		// current room state.
-		var err error
 		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
 		if err != nil {
 			logger.WithError(err).Warn("Error authing soft-failed event")
@@ -265,7 +269,8 @@ func (r *Inputer) processRoomEvent(
 				hadEvents:  map[string]bool{},
 				haveEvents: map[string]*gomatrixserverlib.Event{},
 			}
-			if stateSnapshot, err := missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
+			var stateSnapshot *parsedRespState
+			if stateSnapshot, err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
 				// Something went wrong with retrieving the missing state, so we can't
 				// really do anything with the event other than reject it at this point.
 				isRejected = true
@@ -301,8 +306,7 @@ func (r *Inputer) processRoomEvent(
 	// bother doing this if the event was already rejected as it just ends up
 	// burning CPU time.
 	historyVisibility := gomatrixserverlib.HistoryVisibilityShared // Default to shared.
-	if rejectionErr == nil && !isRejected && !softfail {
-		var err error
+	if input.Kind != api.KindOutlier && rejectionErr == nil && !isRejected {
 		historyVisibility, rejectionErr, err = r.processStateBefore(ctx, input, missingPrev)
 		if err != nil {
 			return fmt.Errorf("r.processStateBefore: %w", err)
@@ -313,7 +317,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// Store the event.
-	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected || softfail)
+	_, _, stateAtEvent, redactionEvent, redactedEventID, err := r.DB.StoreEvent(ctx, event, authEventNIDs, isRejected)
 	if err != nil {
 		return fmt.Errorf("updater.StoreEvent: %w", err)
 	}
@@ -353,12 +357,18 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// We stop here if the event is rejected: We've stored it but won't update forward extremities or notify anyone about it.
-	if isRejected || softfail {
-		logger.WithError(rejectionErr).WithFields(logrus.Fields{
-			"soft_fail":    softfail,
-			"missing_prev": missingPrev,
-		}).Warn("Stored rejected event")
+	// We stop here if the event is rejected: We've stored it but won't update
+	// forward extremities or notify downstream components about it.
+	switch {
+	case isRejected:
+		logger.WithError(rejectionErr).Warn("Stored rejected event")
+		if rejectionErr != nil {
+			return types.RejectedError(rejectionErr.Error())
+		}
+		return nil
+
+	case softfail:
+		logger.WithError(rejectionErr).Warn("Stored soft-failed event")
 		if rejectionErr != nil {
 			return types.RejectedError(rejectionErr.Error())
 		}
@@ -661,7 +671,7 @@ func (r *Inputer) calculateAndSetState(
 		// We've been told what the state at the event is so we don't need to calculate it.
 		// Check that those state events are in the database and store the state.
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs); err != nil {
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, input.StateEventIDs, true); err != nil {
 			return fmt.Errorf("updater.StateEntriesForEventIDs: %w", err)
 		}
 		entries = types.DeduplicateStateEntries(entries)

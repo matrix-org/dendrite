@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/matrix-org/dendrite/userapi/types"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
@@ -175,6 +176,41 @@ func (d *Database) createAccount(
 		return nil, err
 	}
 	return account, nil
+}
+
+func (d *Database) QueryPushRules(
+	ctx context.Context,
+	localpart string,
+) (*pushrules.AccountRuleSets, error) {
+	data, err := d.AccountDatas.SelectAccountDataByType(ctx, localpart, "", "m.push_rules")
+	if err != nil {
+		return nil, err
+	}
+
+	// If we didn't find any default push rules then we should just generate some
+	// fresh ones.
+	if len(data) == 0 {
+		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.ServerName)
+		prbs, err := json.Marshal(pushRuleSets)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
+		}
+		err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", prbs); dbErr != nil {
+				return fmt.Errorf("failed to save default push rules: %w", dbErr)
+			}
+			return nil
+		})
+
+		return pushRuleSets, err
+	}
+
+	var pushRules pushrules.AccountRuleSets
+	if err := json.Unmarshal(data, &pushRules); err != nil {
+		return nil, err
+	}
+
+	return &pushRules, nil
 }
 
 // SaveAccountData saves new account data for a given user and a given room.
@@ -664,13 +700,13 @@ func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (
 	return d.LoginTokens.SelectLoginToken(ctx, token)
 }
 
-func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, pos int64, tweaks map[string]interface{}, n *api.Notification) error {
+func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, pos uint64, tweaks map[string]interface{}, n *api.Notification) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.Notifications.Insert(ctx, txn, localpart, eventID, pos, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
 	})
 }
 
-func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID string, pos int64) (affected bool, err error) {
+func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID string, pos uint64) (affected bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		affected, err = d.Notifications.DeleteUpTo(ctx, txn, localpart, roomID, pos)
 		return err
@@ -678,7 +714,7 @@ func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomI
 	return
 }
 
-func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID string, pos int64, b bool) (affected bool, err error) {
+func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID string, pos uint64, b bool) (affected bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		affected, err = d.Notifications.UpdateRead(ctx, txn, localpart, roomID, pos, b)
 		return err
@@ -699,7 +735,9 @@ func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roo
 }
 
 func (d *Database) DeleteOldNotifications(ctx context.Context) error {
-	return d.Notifications.Clean(ctx, nil)
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Notifications.Clean(ctx, txn)
+	})
 }
 
 func (d *Database) UpsertPusher(
@@ -739,7 +777,7 @@ func (d *Database) GetPushers(
 func (d *Database) RemovePusher(
 	ctx context.Context, appid, pushkey, localpart string,
 ) error {
-	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart)
 		if err == sql.ErrNoRows {
 			return nil
@@ -754,7 +792,7 @@ func (d *Database) RemovePusher(
 func (d *Database) RemovePushers(
 	ctx context.Context, appid, pushkey string,
 ) error {
-	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.Pushers.DeletePushers(ctx, txn, appid, pushkey)
 	})
 }

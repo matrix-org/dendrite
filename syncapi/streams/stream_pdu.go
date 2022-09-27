@@ -178,24 +178,24 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	var err error
 	var stateDeltas []types.StateDelta
-	var joinedRooms []string
+	var syncJoinedRooms []string
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
 
 	if req.WantFullState {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
 			return
 		}
 	} else {
-		if stateDeltas, joinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
+		if stateDeltas, syncJoinedRooms, err = p.DB.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
 			return
 		}
 	}
 
-	for _, roomID := range joinedRooms {
+	for _, roomID := range syncJoinedRooms {
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
 
@@ -209,10 +209,26 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	newPos = from
 	for _, delta := range stateDeltas {
+		newRange := r
+		// If this room was joined in this sync, try to fetch
+		// as much timeline events as allowed by the filter.
+		if delta.NewlyJoined {
+			// Reverse the range, so we get the most recent first.
+			// This will be limited by the eventFilter.
+			newRange = types.Range{
+				From:      r.To,
+				To:        0,
+				Backwards: true,
+			}
+		}
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, r, delta, &eventFilter, &stateFilter, req.Response); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, req.Device, newRange, delta, &eventFilter, &stateFilter, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			return to
+		}
+		// Reset the position, as it is only for the special case of newly joined rooms
+		if delta.NewlyJoined {
+			pos = newRange.From
 		}
 		switch {
 		case r.Backwards && pos < newPos:
@@ -287,7 +303,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 
 	if stateFilter.LazyLoadMembers {
 		delta.StateEvents, err = p.lazyLoadMembers(
-			ctx, delta.RoomID, true, limited, stateFilter.IncludeRedundantMembers,
+			ctx, delta.RoomID, true, limited, stateFilter,
 			device, recentEvents, delta.StateEvents,
 		)
 		if err != nil && err != sql.ErrNoRows {
@@ -309,11 +325,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 	}
 
-	if len(events) > 0 {
-		updateLatestPosition(events[len(events)-1].EventID())
-	}
 	if len(delta.StateEvents) > 0 {
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
+	}
+	if len(events) > 0 {
+		updateLatestPosition(events[len(events)-1].EventID())
 	}
 
 	switch delta.Membership {
@@ -372,7 +388,7 @@ func applyHistoryVisibilityFilter(
 	if err != nil {
 		// Not a fatal error, we can continue without the stateEvents,
 		// they are only needed if there are state events in the timeline.
-		logrus.WithError(err).Warnf("failed to get current room state")
+		logrus.WithError(err).Warnf("Failed to get current room state for history visibility")
 	}
 	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
 	for _, ev := range stateEvents {
@@ -381,13 +397,14 @@ func applyHistoryVisibilityFilter(
 	startTime := time.Now()
 	events, err := internal.ApplyHistoryVisibilityFilter(ctx, db, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
 	if err != nil {
-
 		return nil, err
 	}
 	logrus.WithFields(logrus.Fields{
 		"duration": time.Since(startTime),
 		"room_id":  roomID,
-	}).Debug("applied history visibility (sync)")
+		"before":   len(recentEvents),
+		"after":    len(events),
+	}).Trace("Applied history visibility (sync)")
 	return events, nil
 }
 
@@ -514,7 +531,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 			return nil, err
 		}
 		stateEvents, err = p.lazyLoadMembers(ctx, roomID,
-			false, limited, stateFilter.IncludeRedundantMembers,
+			false, limited, stateFilter,
 			device, recentEvents, stateEvents,
 		)
 		if err != nil && err != sql.ErrNoRows {
@@ -533,7 +550,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 
 func (p *PDUStreamProvider) lazyLoadMembers(
 	ctx context.Context, roomID string,
-	incremental, limited, includeRedundant bool,
+	incremental, limited bool, stateFilter *gomatrixserverlib.StateFilter,
 	device *userapi.Device,
 	timelineEvents, stateEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
@@ -563,7 +580,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			stateKey := *event.StateKey()
 			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
 				newStateEvents = append(newStateEvents, event)
-				if !includeRedundant {
+				if !stateFilter.IncludeRedundantMembers {
 					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
 				}
 				delete(timelineUsers, stateKey)
@@ -578,6 +595,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// Query missing membership events
 	filter := gomatrixserverlib.DefaultStateFilter()
+	filter.Limit = stateFilter.Limit
 	filter.Senders = &wantUsers
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := p.DB.GetStateEventsForRoom(ctx, roomID, &filter)

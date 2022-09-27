@@ -51,6 +51,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_s
 -- CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
 -- for querying state by event IDs
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON syncapi_current_room_state(event_id);
+-- for improving selectRoomIDsWithAnyMembershipSQL
+CREATE INDEX IF NOT EXISTS syncapi_current_room_state_type_state_key_idx ON syncapi_current_room_state(type, state_key);
 `
 
 const upsertRoomStateSQL = "" +
@@ -69,7 +71,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectRoomIDsWithAnyMembershipSQL = "" +
-	"SELECT DISTINCT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
+	"SELECT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1"
@@ -95,8 +97,8 @@ const selectEventsWithEventIDsSQL = "" +
 
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id IN(" +
-	"	SELECT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
-	") AND state_key IN ($2) AND membership IN ('join', 'invite');"
+	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
+	") AND type = 'm.room.member' AND state_key IN ($2) AND membership IN ('join', 'invite');"
 
 type currentRoomStateStatements struct {
 	db                                 *sql.DB

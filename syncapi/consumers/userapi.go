@@ -19,6 +19,9 @@ import (
 	"encoding/json"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -26,8 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputNotificationDataConsumer consumes events that originated in
@@ -67,8 +68,8 @@ func NewOutputNotificationDataConsumer(
 // Start starts consumption.
 func (s *OutputNotificationDataConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
@@ -76,7 +77,8 @@ func (s *OutputNotificationDataConsumer) Start() error {
 // the push server. It is not safe for this function to be called from
 // multiple goroutines, or else the sync stream position may race and
 // be incorrectly calculated.
-func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputNotificationDataConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	userID := string(msg.Header.Get(jetstream.UserID))
 
 	// Parse out the event JSON

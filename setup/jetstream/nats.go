@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
 	natsclient "github.com/nats-io/nats.go"
@@ -183,6 +184,9 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		OutputReceiptEvent:      {"SyncAPIEDUServerReceiptConsumer", "FederationAPIEDUServerConsumer"},
 		OutputSendToDeviceEvent: {"SyncAPIEDUServerSendToDeviceConsumer", "FederationAPIEDUServerConsumer"},
 		OutputTypingEvent:       {"SyncAPIEDUServerTypingConsumer", "FederationAPIEDUServerConsumer"},
+		OutputRoomEvent:         {"AppserviceRoomserverConsumer"},
+		OutputStreamEvent:       {"UserAPISyncAPIStreamEventConsumer"},
+		OutputReadUpdate:        {"UserAPISyncAPIReadUpdateConsumer"},
 	} {
 		streamName := cfg.Matrix.JetStream.Prefixed(stream)
 		for _, consumer := range consumers {

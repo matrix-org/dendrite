@@ -5,10 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
+
+	"github.com/matrix-org/dendrite/federationapi/storage"
 )
 
 // Statistics contains information about all of the remote federated
@@ -113,7 +114,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	// a new backoff period. Increase the failure counter and
 	// start a goroutine which will wait out the backoff and
 	// unset the backoffStarted flag when done.
-	if s.backoffStarted.CAS(false, true) {
+	if s.backoffStarted.CompareAndSwap(false, true) {
 		if s.backoffCount.Inc() >= s.statistics.FailuresUntilBlacklist {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {
@@ -126,13 +127,13 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 
 		go func() {
 			until, ok := s.backoffUntil.Load().(time.Time)
-			if ok {
+			if ok && !until.IsZero() {
 				select {
 				case <-time.After(time.Until(until)):
 				case <-s.interrupt:
 				}
+				s.backoffStarted.Store(false)
 			}
-			s.backoffStarted.Store(false)
 		}()
 	}
 

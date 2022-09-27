@@ -18,6 +18,7 @@ package state
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"sync"
@@ -134,11 +135,14 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	for i := range eventIDs {
 		eventID := eventIDs[i]
 		snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
 		}
 		if snapshotNID == 0 {
-			return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID(%s) returned 0 NID, was this event stored?", eventID)
+			// If we don't know a state snapshot for this event then we can't calculate
+			// memberships at the time of the event, so skip over it. This means that
+			// it isn't guaranteed that the response map will contain every single event.
+			continue
 		}
 		snapshotNIDMap[snapshotNID] = append(snapshotNIDMap[snapshotNID], eventID)
 	}

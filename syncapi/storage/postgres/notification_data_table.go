@@ -18,6 +18,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -33,15 +35,15 @@ func NewPostgresNotificationDataTable(db *sql.DB) (tables.NotificationData, erro
 	r := &notificationDataStatements{}
 	return r, sqlutil.StatementList{
 		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
-		{&r.selectUserUnreadCounts, selectUserUnreadNotificationCountsSQL},
+		{&r.selectUserUnreadCountsForRooms, selectUserUnreadNotificationsForRooms},
 		{&r.selectMaxID, selectMaxNotificationIDSQL},
 	}.Prepare(db)
 }
 
 type notificationDataStatements struct {
-	upsertRoomUnreadCounts *sql.Stmt
-	selectUserUnreadCounts *sql.Stmt
-	selectMaxID            *sql.Stmt
+	upsertRoomUnreadCounts         *sql.Stmt
+	selectUserUnreadCountsForRooms *sql.Stmt
+	selectMaxID                    *sql.Stmt
 }
 
 const notificationDataSchema = `
@@ -61,34 +63,32 @@ const upsertRoomUnreadNotificationCountsSQL = `INSERT INTO syncapi_notification_
   DO UPDATE SET id = nextval('syncapi_notification_data_id_seq'), notification_count = $3, highlight_count = $4
   RETURNING id`
 
-const selectUserUnreadNotificationCountsSQL = `SELECT
-  id, room_id, notification_count, highlight_count
-  FROM syncapi_notification_data
-  WHERE
-    user_id = $1 AND
-    id BETWEEN $2 + 1 AND $3`
+const selectUserUnreadNotificationsForRooms = `SELECT room_id, notification_count, highlight_count
+	FROM syncapi_notification_data
+	WHERE user_id = $1 AND
+	      room_id = ANY($2)`
 
 const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(id) END FROM syncapi_notification_data`
 
-func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
-	err = r.upsertRoomUnreadCounts.QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
+func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, txn *sql.Tx, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
+	err = sqlutil.TxStmt(txn, r.upsertRoomUnreadCounts).QueryRowContext(ctx, userID, roomID, notificationCount, highlightCount).Scan(&pos)
 	return
 }
 
-func (r *notificationDataStatements) SelectUserUnreadCounts(ctx context.Context, userID string, fromExcl, toIncl types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	rows, err := r.selectUserUnreadCounts.QueryContext(ctx, userID, fromExcl, toIncl)
+func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
+	ctx context.Context, txn *sql.Tx, userID string, roomIDs []string,
+) (map[string]*eventutil.NotificationData, error) {
+	rows, err := sqlutil.TxStmt(txn, r.selectUserUnreadCountsForRooms).QueryContext(ctx, userID, pq.Array(roomIDs))
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectUserUnreadCounts: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectUserUnreadCountsForRooms: rows.close() failed")
 
 	roomCounts := map[string]*eventutil.NotificationData{}
+	var roomID string
+	var notificationCount, highlightCount int
 	for rows.Next() {
-		var id types.StreamPosition
-		var roomID string
-		var notificationCount, highlightCount int
-
-		if err = rows.Scan(&id, &roomID, &notificationCount, &highlightCount); err != nil {
+		if err = rows.Scan(&roomID, &notificationCount, &highlightCount); err != nil {
 			return nil, err
 		}
 
@@ -101,8 +101,8 @@ func (r *notificationDataStatements) SelectUserUnreadCounts(ctx context.Context,
 	return roomCounts, rows.Err()
 }
 
-func (r *notificationDataStatements) SelectMaxID(ctx context.Context) (int64, error) {
+func (r *notificationDataStatements) SelectMaxID(ctx context.Context, txn *sql.Tx) (int64, error) {
 	var id int64
-	err := r.selectMaxID.QueryRowContext(ctx).Scan(&id)
+	err := sqlutil.TxStmt(txn, r.selectMaxID).QueryRowContext(ctx).Scan(&id)
 	return id, err
 }

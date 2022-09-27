@@ -102,7 +102,7 @@ func Test_EventsTable(t *testing.T) {
 			})
 		}
 
-		stateEvents, err := tab.BulkSelectStateEventByID(ctx, nil, eventIDs)
+		stateEvents, err := tab.BulkSelectStateEventByID(ctx, nil, eventIDs, false)
 		assert.NoError(t, err)
 		assert.Equal(t, len(stateEvents), len(eventIDs))
 		nids := make([]types.EventNID, 0, len(stateEvents))

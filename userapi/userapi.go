@@ -81,17 +81,18 @@ func NewInternalAPI(
 		KeyAPI:               keyAPI,
 		RSAPI:                rsAPI,
 		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
+		PgClient:             pgClient,
 	}
 
-	readConsumer := consumers.NewOutputReadUpdateConsumer(
-		base.ProcessContext, cfg, js, db, pgClient, userAPI, syncProducer,
+	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
+		base.ProcessContext, cfg, js, db, syncProducer, pgClient,
 	)
-	if err := readConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start user API read update consumer")
+	if err := receiptConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start user API receipt consumer")
 	}
 
-	eventConsumer := consumers.NewOutputStreamEventConsumer(
-		base.ProcessContext, cfg, js, db, pgClient, userAPI, rsAPI, syncProducer,
+	eventConsumer := consumers.NewOutputRoomEventConsumer(
+		base.ProcessContext, cfg, js, db, pgClient, rsAPI, syncProducer,
 	)
 	if err := eventConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")

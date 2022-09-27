@@ -113,9 +113,9 @@ func (d *Database) eventStateKeyNIDs(
 }
 
 func (d *Database) StateEntriesForEventIDs(
-	ctx context.Context, eventIDs []string,
+	ctx context.Context, eventIDs []string, excludeRejected bool,
 ) ([]types.StateEntry, error) {
-	return d.EventsTable.BulkSelectStateEventByID(ctx, nil, eventIDs)
+	return d.EventsTable.BulkSelectStateEventByID(ctx, nil, eventIDs, excludeRejected)
 }
 
 func (d *Database) StateEntriesForTuples(
@@ -402,7 +402,7 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		requestSenderUserNID, err = d.assignStateKeyNID(ctx, requestSenderUserID)
+		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
 		return err
 	})
 	if err != nil {
@@ -596,7 +596,9 @@ func (d *Database) storeEvent(
 	if updater != nil && updater.txn != nil {
 		txn = updater.txn
 	}
-	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+	// First writer is with a database-provided transaction, so that NIDs are assigned
+	// globally outside of the updater context, to help avoid races.
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// TODO: Here we should aim to have two different code paths for new rooms
 		// vs existing ones.
 
@@ -611,11 +613,11 @@ func (d *Database) storeEvent(
 			return fmt.Errorf("extractRoomVersionFromCreateEvent: %w", err)
 		}
 
-		if roomNID, err = d.assignRoomNID(ctx, event.RoomID(), roomVersion); err != nil {
+		if roomNID, err = d.assignRoomNID(ctx, txn, event.RoomID(), roomVersion); err != nil {
 			return fmt.Errorf("d.assignRoomNID: %w", err)
 		}
 
-		if eventTypeNID, err = d.assignEventTypeNID(ctx, event.Type()); err != nil {
+		if eventTypeNID, err = d.assignEventTypeNID(ctx, txn, event.Type()); err != nil {
 			return fmt.Errorf("d.assignEventTypeNID: %w", err)
 		}
 
@@ -623,11 +625,19 @@ func (d *Database) storeEvent(
 		// Assigned a numeric ID for the state_key if there is one present.
 		// Otherwise set the numeric ID for the state_key to 0.
 		if eventStateKey != nil {
-			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, *eventStateKey); err != nil {
+			if eventStateKeyNID, err = d.assignStateKeyNID(ctx, txn, *eventStateKey); err != nil {
 				return fmt.Errorf("d.assignStateKeyNID: %w", err)
 			}
 		}
 
+		return nil
+	})
+	if err != nil {
+		return 0, 0, types.StateAtEvent{}, nil, "", fmt.Errorf("d.Writer.Do: %w", err)
+	}
+	// Second writer is using the database-provided transaction, probably from the
+	// room updater, for easy roll-back if required.
+	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
 		if eventNID, stateNID, err = d.EventsTable.InsertEvent(
 			ctx,
 			txn,
@@ -749,48 +759,48 @@ func (d *Database) MissingAuthPrevEvents(
 }
 
 func (d *Database) assignRoomNID(
-	ctx context.Context, roomID string, roomVersion gomatrixserverlib.RoomVersion,
+	ctx context.Context, txn *sql.Tx, roomID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (types.RoomNID, error) {
 	// Check if we already have a numeric ID in the database.
-	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
+	roomNID, err := d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, nil, roomID, roomVersion)
+		roomNID, err = d.RoomsTable.InsertRoomNID(ctx, txn, roomID, roomVersion)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, nil, roomID)
+			roomNID, err = d.RoomsTable.SelectRoomNID(ctx, txn, roomID)
 		}
 	}
 	return roomNID, err
 }
 
 func (d *Database) assignEventTypeNID(
-	ctx context.Context, eventType string,
+	ctx context.Context, txn *sql.Tx, eventType string,
 ) (types.EventTypeNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, nil, eventType)
+	eventTypeNID, err := d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, nil, eventType)
+		eventTypeNID, err = d.EventTypesTable.InsertEventTypeNID(ctx, txn, eventType)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, nil, eventType)
+			eventTypeNID, err = d.EventTypesTable.SelectEventTypeNID(ctx, txn, eventType)
 		}
 	}
 	return eventTypeNID, err
 }
 
 func (d *Database) assignStateKeyNID(
-	ctx context.Context, eventStateKey string,
+	ctx context.Context, txn *sql.Tx, eventStateKey string,
 ) (types.EventStateKeyNID, error) {
 	// Check if we already have a numeric ID in the database.
-	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, eventStateKey)
+	eventStateKeyNID, err := d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 	if err == sql.ErrNoRows {
 		// We don't have a numeric ID so insert one into the database.
-		eventStateKeyNID, err = d.EventStateKeysTable.InsertEventStateKeyNID(ctx, nil, eventStateKey)
+		eventStateKeyNID, err = d.EventStateKeysTable.InsertEventStateKeyNID(ctx, txn, eventStateKey)
 		if err == sql.ErrNoRows {
 			// We raced with another insert so run the select again.
-			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, nil, eventStateKey)
+			eventStateKeyNID, err = d.EventStateKeysTable.SelectEventStateKeyNID(ctx, txn, eventStateKey)
 		}
 	}
 	return eventStateKeyNID, err
@@ -886,7 +896,7 @@ func (d *Database) handleRedactions(
 	switch {
 	case redactUser >= pl.Redact:
 		// The power level of the redaction event’s sender is greater than or equal to the redact level.
-	case redactedEvent.Origin() == redactionEvent.Origin() && redactedEvent.Sender() == redactionEvent.Sender():
+	case redactedEvent.Sender() == redactionEvent.Sender():
 		// The domain of the redaction event’s sender matches that of the original event’s sender.
 	default:
 		return nil, "", nil

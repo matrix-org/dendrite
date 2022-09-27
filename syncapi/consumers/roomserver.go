@@ -21,17 +21,17 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputRoomEventConsumer consumes events that originated in the room server.
@@ -46,7 +46,6 @@ type OutputRoomEventConsumer struct {
 	pduStream    types.StreamProvider
 	inviteStream types.StreamProvider
 	notifier     *notifier.Notifier
-	producer     *producers.UserAPIStreamEventProducer
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -59,7 +58,6 @@ func NewOutputRoomEventConsumer(
 	pduStream types.StreamProvider,
 	inviteStream types.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
-	producer *producers.UserAPIStreamEventProducer,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
@@ -72,22 +70,22 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
-		producer:     producer,
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputRoomEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
 // onMessage is called when the sync server receives a new event from the room server output log.
 // It is not safe for this function to be called from multiple goroutines, or else the
 // sync stream position may race and be incorrectly calculated.
-func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
@@ -252,12 +250,6 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			"del":        msg.RemovesStateEventIDs,
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
-	}
-
-	if err = s.producer.SendStreamEvent(ev.RoomID(), ev, pduPos); err != nil {
-		log.WithError(err).Errorf("Failed to send stream output event for event %s", ev.EventID())
-		sentry.CaptureException(err)
-		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {

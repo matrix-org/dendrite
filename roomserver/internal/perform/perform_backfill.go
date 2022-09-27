@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -140,11 +139,11 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 			continue
 		}
 		var entries []types.StateEntry
-		if entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs); err != nil {
+		if entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true); err != nil {
 			// attempt to fetch the missing events
 			r.fetchAndStoreMissingEvents(ctx, info.RoomVersion, requester, stateIDs)
 			// try again
-			entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs)
+			entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true)
 			if err != nil {
 				logrus.WithError(err).WithField("event_id", ev.EventID()).Error("backfillViaFederation: failed to get state entries for event")
 				return err
@@ -164,6 +163,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	// TODO: update backwards extremities, as that should be moved from syncapi to roomserver at some point.
 
 	res.Events = events
+	res.HistoryVisibility = requester.historyVisiblity
 	return nil
 }
 
@@ -248,6 +248,7 @@ type backfillRequester struct {
 	servers                 []gomatrixserverlib.ServerName
 	eventIDToBeforeStateIDs map[string][]string
 	eventIDMap              map[string]*gomatrixserverlib.Event
+	historyVisiblity        gomatrixserverlib.HistoryVisibility
 }
 
 func newBackfillRequester(
@@ -266,6 +267,7 @@ func newBackfillRequester(
 		eventIDMap:              make(map[string]*gomatrixserverlib.Event),
 		bwExtrems:               bwExtrems,
 		preferServer:            preferServer,
+		historyVisiblity:        gomatrixserverlib.HistoryVisibilityShared,
 	}
 }
 
@@ -317,7 +319,6 @@ FederationHit:
 		b.eventIDToBeforeStateIDs[targetEvent.EventID()] = res
 		return res, nil
 	}
-	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
@@ -395,7 +396,6 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 		}
 		return result, nil
 	}
-	sentry.CaptureException(lastErr) // temporary to see if we might need to raise the server limit
 	return nil, lastErr
 }
 
@@ -447,7 +447,8 @@ FindSuccessor:
 	}
 
 	// possibly return all joined servers depending on history visiblity
-	memberEventsFromVis, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries, b.thisServer)
+	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries, b.thisServer)
+	b.historyVisiblity = visibility
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
 		return nil
@@ -467,7 +468,9 @@ FindSuccessor:
 	// Store the server names in a temporary map to avoid duplicates.
 	serverSet := make(map[gomatrixserverlib.ServerName]bool)
 	for _, event := range memberEvents {
-		serverSet[event.Origin()] = true
+		if _, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender()); err == nil {
+			serverSet[senderDomain] = true
+		}
 	}
 	var servers []gomatrixserverlib.ServerName
 	for server := range serverSet {
@@ -528,7 +531,7 @@ func (b *backfillRequester) ProvideEvents(roomVer gomatrixserverlib.RoomVersion,
 // pull all events and then filter by that table.
 func joinEventsFromHistoryVisibility(
 	ctx context.Context, db storage.Database, roomID string, stateEntries []types.StateEntry,
-	thisServer gomatrixserverlib.ServerName) ([]types.Event, error) {
+	thisServer gomatrixserverlib.ServerName) ([]types.Event, gomatrixserverlib.HistoryVisibility, error) {
 
 	var eventNIDs []types.EventNID
 	for _, entry := range stateEntries {
@@ -542,7 +545,9 @@ func joinEventsFromHistoryVisibility(
 	// Get all of the events in this state
 	stateEvents, err := db.Events(ctx, eventNIDs)
 	if err != nil {
-		return nil, err
+		// even though the default should be shared, restricting the visibility to joined
+		// feels more secure here.
+		return nil, gomatrixserverlib.HistoryVisibilityJoined, err
 	}
 	events := make([]*gomatrixserverlib.Event, len(stateEvents))
 	for i := range stateEvents {
@@ -551,20 +556,22 @@ func joinEventsFromHistoryVisibility(
 
 	// Can we see events in the room?
 	canSeeEvents := auth.IsServerAllowed(thisServer, true, events)
+	visibility := gomatrixserverlib.HistoryVisibility(auth.HistoryVisibilityForRoom(events))
 	if !canSeeEvents {
-		logrus.Infof("ServersAtEvent history not visible to us: %s", auth.HistoryVisibilityForRoom(events))
-		return nil, nil
+		logrus.Infof("ServersAtEvent history not visible to us: %s", visibility)
+		return nil, visibility, nil
 	}
 	// get joined members
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
-		return nil, err
+		return nil, visibility, nil
 	}
 	joinEventNIDs, err := db.GetMembershipEventNIDsForRoom(ctx, info.RoomNID, true, false)
 	if err != nil {
-		return nil, err
+		return nil, visibility, err
 	}
-	return db.Events(ctx, joinEventNIDs)
+	evs, err := db.Events(ctx, joinEventNIDs)
+	return evs, visibility, err
 }
 
 func persistEvents(ctx context.Context, db storage.Database, events []*gomatrixserverlib.HeaderedEvent) (types.RoomNID, map[string]types.Event) {

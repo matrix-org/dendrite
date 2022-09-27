@@ -7,6 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -14,10 +19,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
 )
 
 const loginTokenLifetime = time.Minute
@@ -516,7 +517,7 @@ func Test_Notification(t *testing.T) {
 				RoomID: roomID,
 				TS:     gomatrixserverlib.AsTimestamp(ts),
 			}
-			err = db.InsertNotification(ctx, aliceLocalpart, eventID, int64(i+1), nil, notification)
+			err = db.InsertNotification(ctx, aliceLocalpart, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")
 		}
 

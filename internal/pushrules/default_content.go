@@ -16,6 +16,12 @@ func mRuleContainsUserNameDefinition(localpart string) *Rule {
 		Default: true,
 		Enabled: true,
 		Pattern: localpart,
+		Conditions: []*Condition{
+			{
+				Kind: EventMatchCondition,
+				Key:  "content.body",
+			},
+		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
 			{
