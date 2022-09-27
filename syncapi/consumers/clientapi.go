@@ -91,7 +91,7 @@ func (s *OutputClientDataConsumer) Start() error {
 			return
 		}
 		ctx := context.Background()
-		logrus.Debugf("Starting to index events")
+		logrus.Infof("Starting to index events")
 		var offset int
 		start := time.Now()
 		count := 0
@@ -140,7 +140,7 @@ func (s *OutputClientDataConsumer) Start() error {
 			offset += len(evs)
 			count += len(elements)
 		}
-		logrus.Debugf("Indexed %d events in %v", count, time.Since(start))
+		logrus.Infof("Indexed %d events in %v", count, time.Since(start))
 	})
 	if err != nil {
 		return err
