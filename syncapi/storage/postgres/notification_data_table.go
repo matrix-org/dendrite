@@ -37,6 +37,7 @@ func NewPostgresNotificationDataTable(db *sql.DB) (tables.NotificationData, erro
 		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
 		{&r.selectUserUnreadCountsForRooms, selectUserUnreadNotificationsForRooms},
 		{&r.selectMaxID, selectMaxNotificationIDSQL},
+		{&r.purgeNotificationData, purgeNotificationDataSQL},
 	}.Prepare(db)
 }
 
@@ -44,6 +45,7 @@ type notificationDataStatements struct {
 	upsertRoomUnreadCounts         *sql.Stmt
 	selectUserUnreadCountsForRooms *sql.Stmt
 	selectMaxID                    *sql.Stmt
+	purgeNotificationData          *sql.Stmt
 }
 
 const notificationDataSchema = `
