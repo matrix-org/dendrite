@@ -99,14 +99,15 @@ func (s *accountDataStatements) InsertAccountData(
 }
 
 func (s *accountDataStatements) SelectAccountDataInRange(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 	userID string,
 	r types.Range,
 	accountDataEventFilter *gomatrixserverlib.EventFilter,
 ) (data map[string][]string, pos types.StreamPosition, err error) {
 	data = make(map[string][]string)
 
-	rows, err := s.selectAccountDataInRangeStmt.QueryContext(ctx, userID, r.Low(), r.High(),
+	rows, err := sqlutil.TxStmt(txn, s.selectAccountDataInRangeStmt).QueryContext(
+		ctx, userID, r.Low(), r.High(),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.Types)),
 		pq.StringArray(filterConvertTypeWildcardToSQL(accountDataEventFilter.NotTypes)),
 		accountDataEventFilter.Limit,
