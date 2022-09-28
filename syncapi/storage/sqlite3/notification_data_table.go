@@ -90,8 +90,13 @@ func (r *notificationDataStatements) SelectUserUnreadCountsForRooms(
 	for i := range roomIDs {
 		params[i+1] = roomIDs[i]
 	}
-	sql := strings.Replace(selectUserUnreadNotificationsForRooms, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
-	rows, err := r.db.QueryContext(ctx, sql, params...)
+	sql := strings.Replace(selectUserUnreadNotificationsForRooms, "($1)", sqlutil.QueryVariadic(len(params)), 1)
+	prep, err := r.db.PrepareContext(ctx, sql)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, prep, "SelectUserUnreadCountsForRooms: prep.close() failed")
+	rows, err := sqlutil.TxStmt(txn, prep).QueryContext(ctx, sql, params)
 	if err != nil {
 		return nil, err
 	}
