@@ -19,6 +19,9 @@ import (
 	"encoding/json"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -26,8 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputNotificationDataConsumer consumes events that originated in

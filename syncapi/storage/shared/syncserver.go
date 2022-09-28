@@ -148,7 +148,7 @@ func (d *Database) PeeksInRange(ctx context.Context, userID, deviceID string, r 
 }
 
 func (d *Database) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
-	return d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
+	return d.Receipts.SelectRoomReceiptsAfter(ctx, nil, roomIDs, streamPos)
 }
 
 // Events lookups a list of event by their event ID.
@@ -168,15 +168,15 @@ func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixse
 }
 
 func (d *Database) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
-	return d.CurrentRoomState.SelectJoinedUsers(ctx)
+	return d.CurrentRoomState.SelectJoinedUsers(ctx, nil)
 }
 
 func (d *Database) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
-	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, roomIDs)
+	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, nil, roomIDs)
 }
 
 func (d *Database) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
-	return d.Peeks.SelectPeekingDevices(ctx)
+	return d.Peeks.SelectPeekingDevices(ctx, nil)
 }
 
 func (d *Database) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
@@ -186,7 +186,7 @@ func (d *Database) SharedUsers(ctx context.Context, userID string, otherUserIDs 
 func (d *Database) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
-	return d.CurrentRoomState.SelectStateEvent(ctx, roomID, evType, stateKey)
+	return d.CurrentRoomState.SelectStateEvent(ctx, nil, roomID, evType, stateKey)
 }
 
 func (d *Database) GetStateEventsForRoom(
@@ -277,7 +277,7 @@ func (d *Database) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
 ) (map[string][]string, types.StreamPosition, error) {
-	return d.AccountData.SelectAccountDataInRange(ctx, userID, r, accountDataFilterPart)
+	return d.AccountData.SelectAccountDataInRange(ctx, nil, userID, r, accountDataFilterPart)
 }
 
 // UpsertAccountData keeps track of new or updated account data, by saving the type
@@ -484,7 +484,7 @@ func (d *Database) GetEventsInTopologicalRange(
 func (d *Database) BackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
 ) (backwardExtremities map[string][]string, err error) {
-	return d.BackwardExtremities.SelectBackwardExtremitiesForRoom(ctx, roomID)
+	return d.BackwardExtremities.SelectBackwardExtremitiesForRoom(ctx, nil, roomID)
 }
 
 func (d *Database) MaxTopologicalPosition(
@@ -530,7 +530,7 @@ func (d *Database) StreamToTopologicalPosition(
 func (d *Database) GetFilter(
 	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
 ) error {
-	return d.Filter.SelectFilter(ctx, target, localpart, filterID)
+	return d.Filter.SelectFilter(ctx, nil, target, localpart, filterID)
 }
 
 func (d *Database) PutFilter(
@@ -538,8 +538,8 @@ func (d *Database) PutFilter(
 ) (string, error) {
 	var filterID string
 	var err error
-	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
-		filterID, err = d.Filter.InsertFilter(ctx, filter, localpart)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		filterID, err = d.Filter.InsertFilter(ctx, txn, filter, localpart)
 		return err
 	})
 	return filterID, err
@@ -561,8 +561,8 @@ func (d *Database) RedactEvent(ctx context.Context, redactedEventID string, reda
 	}
 
 	newEvent := eventToRedact.Headered(redactedBecause.RoomVersion)
-	err = d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
-		return d.OutputEvents.UpdateEventJSON(ctx, newEvent)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.OutputEvents.UpdateEventJSON(ctx, txn, newEvent)
 	})
 	return err
 }
@@ -1024,7 +1024,7 @@ func (d *Database) StoreReceipt(ctx context.Context, roomId, receiptType, userId
 }
 
 func (d *Database) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error) {
-	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, roomIDs, streamPos)
+	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, nil, roomIDs, streamPos)
 	return receipts, err
 }
 
@@ -1036,8 +1036,15 @@ func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userI
 	return
 }
 
-func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	return d.NotificationData.SelectUserUnreadCounts(ctx, nil, userID, from, to)
+func (d *Database) GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, rooms map[string]string) (map[string]*eventutil.NotificationData, error) {
+	roomIDs := make([]string, 0, len(rooms))
+	for roomID, membership := range rooms {
+		if membership != gomatrixserverlib.Join {
+			continue
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return d.NotificationData.SelectUserUnreadCountsForRooms(ctx, nil, userID, roomIDs)
 }
 
 func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
@@ -1085,4 +1092,12 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
+}
+
+func (s *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
+		gomatrixserverlib.MRoomName,
+		gomatrixserverlib.MRoomTopic,
+		"m.room.message",
+	})
 }

@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 #
 # Parses a results.tap file from SyTest output and a file containing test names (a test whitelist)
 # and checks whether a test name that exists in the whitelist (that should pass), failed or not.

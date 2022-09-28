@@ -51,6 +51,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS syncapi_event_id_idx ON syncapi_current_room_s
 -- CREATE INDEX IF NOT EXISTS syncapi_membership_idx ON syncapi_current_room_state(type, state_key, membership) WHERE membership IS NOT NULL AND membership != 'leave';
 -- for querying state by event IDs
 CREATE UNIQUE INDEX IF NOT EXISTS syncapi_current_room_state_eventid_idx ON syncapi_current_room_state(event_id);
+-- for improving selectRoomIDsWithAnyMembershipSQL
+CREATE INDEX IF NOT EXISTS syncapi_current_room_state_type_state_key_idx ON syncapi_current_room_state(type, state_key);
 `
 
 const upsertRoomStateSQL = "" +
@@ -69,7 +71,7 @@ const selectRoomIDsWithMembershipSQL = "" +
 	"SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1 AND membership = $2"
 
 const selectRoomIDsWithAnyMembershipSQL = "" +
-	"SELECT DISTINCT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
+	"SELECT room_id, membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND state_key = $1"
 
 const selectCurrentStateSQL = "" +
 	"SELECT event_id, headered_event_json FROM syncapi_current_room_state WHERE room_id = $1"
@@ -161,9 +163,9 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 
 // SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
 func (s *currentRoomStateStatements) SelectJoinedUsers(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 ) (map[string][]string, error) {
-	rows, err := s.selectJoinedUsersStmt.QueryContext(ctx)
+	rows, err := sqlutil.TxStmt(txn, s.selectJoinedUsersStmt).QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +187,7 @@ func (s *currentRoomStateStatements) SelectJoinedUsers(
 
 // SelectJoinedUsersInRoom returns a map of room ID to a list of joined user IDs for a given room.
 func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
-	ctx context.Context, roomIDs []string,
+	ctx context.Context, txn *sql.Tx, roomIDs []string,
 ) (map[string][]string, error) {
 	query := strings.Replace(selectJoinedUsersInRoomSQL, "($1)", sqlutil.QueryVariadic(len(roomIDs)), 1)
 	params := make([]interface{}, 0, len(roomIDs))
@@ -198,7 +200,7 @@ func (s *currentRoomStateStatements) SelectJoinedUsersInRoom(
 	}
 	defer internal.CloseAndLogIfError(ctx, stmt, "SelectJoinedUsersInRoom: stmt.close() failed")
 
-	rows, err := stmt.QueryContext(ctx, params...)
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -399,9 +401,9 @@ func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
 }
 
 func (s *currentRoomStateStatements) SelectStateEvent(
-	ctx context.Context, roomID, evType, stateKey string,
+	ctx context.Context, txn *sql.Tx, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
-	stmt := s.selectStateEventStmt
+	stmt := sqlutil.TxStmt(txn, s.selectStateEventStmt)
 	var res []byte
 	err := stmt.QueryRowContext(ctx, roomID, evType, stateKey).Scan(&res)
 	if err == sql.ErrNoRows {
@@ -427,10 +429,17 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 		params[k+1] = v
 	}
 
+	var provider sqlutil.QueryProvider
+	if txn == nil {
+		provider = s.db
+	} else {
+		provider = txn
+	}
+
 	result := make([]string, 0, len(otherUserIDs))
 	query := strings.Replace(selectSharedUsersSQL, "($2)", sqlutil.QueryVariadicOffset(len(otherUserIDs), 1), 1)
 	err := sqlutil.RunLimitedVariablesQuery(
-		ctx, query, s.db, params, sqlutil.SQLite3MaxVariables,
+		ctx, query, provider, params, sqlutil.SQLite3MaxVariables,
 		func(rows *sql.Rows) error {
 			var stateKey string
 			for rows.Next() {
