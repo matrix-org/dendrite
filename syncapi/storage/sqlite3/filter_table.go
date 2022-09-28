@@ -116,14 +116,9 @@ func (s *filterStatements) InsertFilter(
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-<<<<<<< Updated upstream
-	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(ctx,
-		localpart, filterJSON).Scan(&existingFilterID)
-=======
 	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(
 		ctx, localpart, filterJSON,
 	).Scan(&existingFilterID)
->>>>>>> Stashed changes
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
