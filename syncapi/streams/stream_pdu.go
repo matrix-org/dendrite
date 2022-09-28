@@ -101,7 +101,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
-			return from
+			continue // return from
 		}
 		req.Response.Rooms.Join[roomID] = *jr
 		req.Rooms[roomID] = gomatrixserverlib.Join
@@ -121,7 +121,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
-				return from
+				continue // return from
 			}
 			req.Response.Rooms.Peek[peek.RoomID] = *jr
 		}
