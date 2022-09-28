@@ -71,7 +71,7 @@ func OnIncomingMessagesRequest(
 ) util.JSONResponse {
 	var err error
 
-	snapshot, err := db.NewDatabaseSnapshot(req.Context())
+	snapshot, err := db.NewDatabaseWritable(req.Context())
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}

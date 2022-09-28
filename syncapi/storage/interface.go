@@ -116,6 +116,7 @@ type Database interface {
 	Notifications
 
 	NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseSnapshot, error)
+	NewDatabaseWritable(ctx context.Context) (*shared.DatabaseSnapshot, error)
 
 	// Events lookups a list of event by their event ID.
 	// Returns a list of events matching the requested IDs found in the database.
