@@ -323,7 +323,7 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	if err != nil {
 		return err
 	}
-	defer snapshot.Rollback() // nolint:err
+	defer snapshot.Rollback() // nolint:errcheck
 
 	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
 	if err != nil {
@@ -349,7 +349,7 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	if err != nil {
 		return err
 	}
-	defer snapshot.Rollback() // nolint:err
+	defer snapshot.Rollback() // nolint:errcheck
 
 	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {

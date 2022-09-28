@@ -55,7 +55,7 @@ func Context(
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:err
+	defer snapshot.Rollback() // nolint:errcheck
 
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {

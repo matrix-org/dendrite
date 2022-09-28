@@ -49,7 +49,7 @@ func GetFilter(
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:err
+	defer snapshot.Rollback() // nolint:errcheck
 
 	filter := gomatrixserverlib.DefaultFilter()
 	if err := snapshot.GetFilter(req.Context(), &filter, localpart, filterID); err != nil {

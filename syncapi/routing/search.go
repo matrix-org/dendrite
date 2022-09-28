@@ -65,7 +65,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:err
+	defer snapshot.Rollback() // nolint:errcheck
 
 	// only search rooms the user is actually joined to
 	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")

@@ -454,7 +454,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	if err != nil {
 		return nil, err
 	}
-	defer snapshot.Rollback() // nolint:err
+	defer snapshot.Rollback() // nolint:errcheck
 
 	prevEvent, err := snapshot.GetStateEvent(
 		s.ctx, event.RoomID(), event.Type(), stateKey,
