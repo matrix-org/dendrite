@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -38,7 +39,7 @@ type OutputReceiptEventConsumer struct {
 	durable    string
 	topic      string
 	db         storage.Database
-	stream     types.StreamProvider
+	stream     streams.StreamProvider
 	notifier   *notifier.Notifier
 	serverName gomatrixserverlib.ServerName
 }
@@ -51,7 +52,7 @@ func NewOutputReceiptEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
 		ctx:        process.Context(),

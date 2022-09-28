@@ -23,20 +23,23 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type PresenceStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 	// cache contains previously sent presence updates to avoid unneeded updates
 	cache    sync.Map
 	notifier *notifier.Notifier
 }
 
-func (p *PresenceStreamProvider) Setup() {
-	p.StreamProvider.Setup()
+func (p *PresenceStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseSnapshot,
+) {
+	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := p.DB.MaxStreamPositionForPresence(context.Background())
+	id, err := snapshot.MaxStreamPositionForPresence(context.Background())
 	if err != nil {
 		panic(err)
 	}
@@ -45,13 +48,15 @@ func (p *PresenceStreamProvider) Setup() {
 
 func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

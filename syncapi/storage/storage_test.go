@@ -79,7 +79,13 @@ func TestRecentEventsPDU(t *testing.T) {
 		// dummy room to make sure SQL queries are filtering on room ID
 		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
 
-		latest, err := db.MaxStreamPositionForPDUs(ctx)
+		snapshot, err := db.NewDatabaseSnapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer snapshot.Rollback() // nolint:errcheck
+
+		latest, err := snapshot.MaxStreamPositionForPDUs(ctx)
 		if err != nil {
 			t.Fatalf("failed to get MaxStreamPositionForPDUs: %s", err)
 		}
@@ -141,7 +147,7 @@ func TestRecentEventsPDU(t *testing.T) {
 			t.Run(tc.Name, func(st *testing.T) {
 				var filter gomatrixserverlib.RoomEventFilter
 				filter.Limit = tc.Limit
-				gotEvents, limited, err := db.RecentEvents(ctx, r.ID, types.Range{
+				gotEvents, limited, err := snapshot.RecentEvents(ctx, r.ID, types.Range{
 					From: tc.From,
 					To:   tc.To,
 				}, &filter, !tc.ReverseOrder, true)
@@ -178,7 +184,13 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 		events := r.Events()
 		_ = MustWriteEvents(t, db, events)
 
-		from, err := db.MaxTopologicalPosition(ctx, r.ID)
+		snapshot, err := db.NewDatabaseSnapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer snapshot.Rollback() // nolint:errcheck
+
+		from, err := snapshot.MaxTopologicalPosition(ctx, r.ID)
 		if err != nil {
 			t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
 		}
@@ -188,11 +200,11 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 
 		// backpaginate 5 messages starting at the latest position.
 		filter := &gomatrixserverlib.RoomEventFilter{Limit: 5}
-		paginatedEvents, err := db.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
+		paginatedEvents, err := snapshot.GetEventsInTopologicalRange(ctx, &from, &to, r.ID, filter, true)
 		if err != nil {
 			t.Fatalf("GetEventsInTopologicalRange returned an error: %s", err)
 		}
-		gots := db.StreamEventsToEvents(nil, paginatedEvents)
+		gots := snapshot.StreamEventsToEvents(nil, paginatedEvents)
 		test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
 	})
 }
@@ -414,7 +426,12 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		defer closeBase()
 		// At this point there should be no messages. We haven't sent anything
 		// yet.
-		_, events, err := db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
+		snapshot, err := db.NewDatabaseSnapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer snapshot.Rollback() // nolint:errcheck
+		_, events, err := snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -435,7 +452,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		// At this point we should get exactly one message. We're sending the sync position
 		// that we were given from the update and the send-to-device update will be updated
 		// in the database to reflect that this was the sync position we sent the message at.
-		streamPos, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
+		streamPos, events, err = snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -446,7 +463,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		// At this point we should still have one message because we haven't progressed the
 		// sync position yet. This is equivalent to the client failing to /sync and retrying
 		// with the same position.
-		streamPos, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
+		streamPos, events, err = snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, streamPos)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -460,7 +477,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 		// At this point we should now have no updates, because we've progressed the sync
 		// position. Therefore the update from before will not be sent again.
-		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
+		_, events, err = snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -470,7 +487,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 
 		// At this point we should still have no updates, because no new updates have been
 		// sent.
-		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
+		_, events, err = snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, streamPos, streamPos+10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -492,7 +509,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			lastPos = streamPos
 		}
 
-		_, events, err = db.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, lastPos)
+		_, events, err = snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, lastPos)
 		if err != nil {
 			t.Fatalf("unable to get events: %v", err)
 		}

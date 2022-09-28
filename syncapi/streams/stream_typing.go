@@ -5,24 +5,27 @@ import (
 	"encoding/json"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type TypingStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 	EDUCache *caching.EDUCache
 }
 
 func (p *TypingStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *TypingStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
