@@ -62,6 +62,11 @@ the full user ID is `@alice:domain.com` then the local part is `alice`.
 This endpoint instructs Dendrite to reindex all searchable events (`m.room.message`, `m.room.topic` and `m.room.name`). An empty JSON body will be returned immediately.
 Indexing is done in the background, the server logs every 1000 events (or below) when they are being indexed. Once reindexing is done, you'll see something along the lines `Indexed 69586 events in 53.68223182s` in your debug logs.
 
+## POST `/_dendrite/admin/markAsStale/{userID}`
+
+This endpoint instructs Dendrite to immediately query `/devices/{userID}` on a federated server. An empty JSON body will be returned on success, updating all locally stored user devices/keys. This can be used to possibly resolve E2EE issues, where the remote user can't decrypt messages.
+
+
 ## POST `/_synapse/admin/v1/send_server_notice`
 
 Request body format:
