@@ -1104,8 +1104,12 @@ func (d *Database) GetPresence(ctx context.Context, userID string) (*types.Prese
 	return d.Presence.GetPresenceForUser(ctx, nil, userID)
 }
 
-func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
-	return d.Presence.GetPresenceAfter(ctx, nil, after, filter)
+func (d *DatabaseSnapshot) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUser(ctx, d.txn, userID)
+}
+
+func (d *DatabaseSnapshot) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceAfter(ctx, d.txn, after, filter)
 }
 
 func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {

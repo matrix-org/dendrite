@@ -61,7 +61,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	// We pull out a larger number than the filter asks for, since we're filtering out events later
-	presences, err := p.DB.PresenceAfter(ctx, from, gomatrixserverlib.EventFilter{Limit: 1000})
+	presences, err := snapshot.PresenceAfter(ctx, from, gomatrixserverlib.EventFilter{Limit: 1000})
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
 		return from
@@ -89,7 +89,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				}
 				// Bear in mind that this might return nil, but at least populating
 				// a nil means that there's a map entry so we won't repeat this call.
-				presences[roomUsers[i]], err = p.DB.GetPresence(ctx, roomUsers[i])
+				presences[roomUsers[i]], err = snapshot.GetPresence(ctx, roomUsers[i])
 				if err != nil {
 					req.Log.WithError(err).Error("unable to query presence for user")
 					return from
