@@ -1036,8 +1036,15 @@ func (d *Database) UpsertRoomUnreadNotificationCounts(ctx context.Context, userI
 	return
 }
 
-func (d *Database) GetUserUnreadNotificationCounts(ctx context.Context, userID string, from, to types.StreamPosition) (map[string]*eventutil.NotificationData, error) {
-	return d.NotificationData.SelectUserUnreadCounts(ctx, nil, userID, from, to)
+func (d *Database) GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, rooms map[string]string) (map[string]*eventutil.NotificationData, error) {
+	roomIDs := make([]string, 0, len(rooms))
+	for roomID, membership := range rooms {
+		if membership != gomatrixserverlib.Join {
+			continue
+		}
+		roomIDs = append(roomIDs, roomID)
+	}
+	return d.NotificationData.SelectUserUnreadCountsForRooms(ctx, nil, userID, roomIDs)
 }
 
 func (d *Database) SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error) {
@@ -1085,4 +1092,12 @@ func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.Stre
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
+}
+
+func (s *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
+		gomatrixserverlib.MRoomName,
+		gomatrixserverlib.MRoomTopic,
+		"m.room.message",
+	})
 }

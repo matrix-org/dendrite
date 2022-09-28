@@ -30,27 +30,29 @@ func (p *NotificationDataStreamProvider) CompleteSync(
 func (p *NotificationDataStreamProvider) IncrementalSync(
 	ctx context.Context,
 	req *types.SyncRequest,
-	from, to types.StreamPosition,
+	from, _ types.StreamPosition,
 ) types.StreamPosition {
-	// We want counts for all possible rooms, so always start from zero.
-	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, from, to)
+	// Get the unread notifications for rooms in our join response.
+	// This is to ensure clients always have an unread notification section
+	// and can display the correct numbers.
+	countsByRoom, err := p.DB.GetUserUnreadNotificationCountsForRooms(ctx, req.Device.UserID, req.Rooms)
 	if err != nil {
-		req.Log.WithError(err).Error("GetUserUnreadNotificationCounts failed")
+		req.Log.WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
 		return from
 	}
 
-	// We're merely decorating existing rooms. Note that the Join map
-	// values are not pointers.
+	// We're merely decorating existing rooms.
 	for roomID, jr := range req.Response.Rooms.Join {
 		counts := countsByRoom[roomID]
 		if counts == nil {
 			continue
 		}
-		jr.UnreadNotifications.HighlightCount = counts.UnreadHighlightCount
-		jr.UnreadNotifications.NotificationCount = counts.UnreadNotificationCount
+		jr.UnreadNotifications = &types.UnreadNotifications{
+			HighlightCount:    counts.UnreadHighlightCount,
+			NotificationCount: counts.UnreadNotificationCount,
+		}
 		req.Response.Rooms.Join[roomID] = jr
 	}
-
 	// BEGIN ZION CODE but return all notifications regardless of whether they're in a room we're in.
 	for roomID, counts := range countsByRoom {
 		unreadNotificationsData := *types.NewUnreadNotificationsResponse()
@@ -60,5 +62,5 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		req.Response.Rooms.UnreadNotifications[roomID] = unreadNotificationsData
 	}
 	// END ZION CODE
-	return to
+	return p.LatestPosition(ctx)
 }
