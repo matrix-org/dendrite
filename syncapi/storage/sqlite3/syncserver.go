@@ -56,6 +56,13 @@ func (d *SyncServerDatasource) NewDatabaseSnapshot(ctx context.Context) (*shared
 	}, nil
 }
 
+func (d *SyncServerDatasource) NewDatabaseWritable(ctx context.Context) (*shared.DatabaseSnapshot, error) {
+	return &shared.DatabaseSnapshot{
+		Database: &d.Database,
+		// not setting a transaction because SQLite doesn't support it
+	}, nil
+}
+
 func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
