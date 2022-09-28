@@ -94,6 +94,20 @@ func (m *DendriteMonolith) SessionCount() int {
 	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
 }
 
+func (m *DendriteMonolith) RegisterNetworkInterface(name string, index int, mtu int, up bool, broadcast bool, loopback bool, pointToPoint bool, multicast bool, addrs string) {
+	m.PineconeMulticast.RegisterInterface(pineconeMulticast.InterfaceInfo{
+		Name: name,
+		Index: index,
+		Mtu: mtu,
+		Up: up,
+		Broadcast: broadcast,
+		Loopback: loopback,
+		PointToPoint: pointToPoint,
+		Multicast: multicast,
+		Addrs: addrs,
+	})
+}
+
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 	if enabled {
 		m.PineconeMulticast.Start()
