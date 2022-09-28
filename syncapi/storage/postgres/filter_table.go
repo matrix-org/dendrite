@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 )
@@ -73,11 +74,11 @@ func NewPostgresFilterTable(db *sql.DB) (tables.Filter, error) {
 }
 
 func (s *filterStatements) SelectFilter(
-	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+	ctx context.Context, txn *sql.Tx, target *gomatrixserverlib.Filter, localpart string, filterID string,
 ) error {
 	// Retrieve filter from database (stored as canonical JSON)
 	var filterData []byte
-	err := s.selectFilterStmt.QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
+	err := sqlutil.TxStmt(txn, s.selectFilterStmt).QueryRowContext(ctx, localpart, filterID).Scan(&filterData)
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,7 @@ func (s *filterStatements) SelectFilter(
 }
 
 func (s *filterStatements) InsertFilter(
-	ctx context.Context, filter *gomatrixserverlib.Filter, localpart string,
+	ctx context.Context, txn *sql.Tx, filter *gomatrixserverlib.Filter, localpart string,
 ) (filterID string, err error) {
 	var existingFilterID string
 
@@ -111,8 +112,9 @@ func (s *filterStatements) InsertFilter(
 	// This can result in a race condition when two clients try to insert the
 	// same filter and localpart at the same time, however this is not a
 	// problem as both calls will result in the same filterID
-	err = s.selectFilterIDByContentStmt.QueryRowContext(ctx,
-		localpart, filterJSON).Scan(&existingFilterID)
+	err = sqlutil.TxStmt(txn, s.selectFilterIDByContentStmt).QueryRowContext(
+		ctx, localpart, filterJSON,
+	).Scan(&existingFilterID)
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
@@ -122,7 +124,7 @@ func (s *filterStatements) InsertFilter(
 	}
 
 	// Otherwise insert the filter and return the new ID
-	err = s.insertFilterStmt.QueryRowContext(ctx, filterJSON, localpart).
+	err = sqlutil.TxStmt(txn, s.insertFilterStmt).QueryRowContext(ctx, filterJSON, localpart).
 		Scan(&filterID)
 	return
 }
