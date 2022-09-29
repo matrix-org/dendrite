@@ -47,7 +47,7 @@ var (
 	)
 )
 
-const defaultWaitTime = time.Second * 30
+const defaultWaitTime = time.Minute
 const requestTimeout = time.Second * 30
 
 func init() {
@@ -443,6 +443,9 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			return time.Minute * 10, err
 		}
 		switch e := err.(type) {
+		case *json.UnmarshalTypeError, *json.SyntaxError:
+			logger.WithError(err).Debugf("Device list update for %q contained invalid JSON", userID)
+			return defaultWaitTime, nil
 		case *fedsenderapi.FederationClientError:
 			if e.RetryAfter > 0 {
 				return e.RetryAfter, err
