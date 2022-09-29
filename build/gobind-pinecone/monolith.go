@@ -28,8 +28,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
