@@ -147,7 +147,7 @@ func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventTy
 		}
 		// Clear stats if we successfully stored it
 		if err == nil {
-			stats.MessagesE2EE = 0
+			stats.Messages = 0
 			stats.SentMessages = 0
 			stats.MessagesE2EE = 0
 			stats.SentMessagesE2EE = 0
