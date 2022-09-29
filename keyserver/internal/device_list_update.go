@@ -468,9 +468,13 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			}
 		default:
 			// Something else failed
-			logger.WithError(err).WithField("user_id", userID).Debugf("GetUserDevices returned unknown error type: %T", err)
+			logger.WithError(err).Debugf("GetUserDevices returned unknown error type: %T", err)
 			return time.Minute * 10, err
 		}
+	}
+	if res.UserID != userID {
+		logger.WithError(err).Warnf("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
+		return defaultWaitTime, nil
 	}
 	if res.MasterKey != nil || res.SelfSigningKey != nil {
 		uploadReq := &api.PerformUploadDeviceKeysRequest{
@@ -491,7 +495,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 	}
 	err = u.updateDeviceList(&res)
 	if err != nil {
-		logger.WithError(err).WithField("user_id", userID).Error("Fetched device list but failed to store/emit it")
+		logger.WithError(err).Error("Fetched device list but failed to store/emit it")
 		return defaultWaitTime, err
 	}
 	return defaultWaitTime, nil
