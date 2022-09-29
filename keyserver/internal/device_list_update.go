@@ -242,7 +242,7 @@ func (u *DeviceListUpdater) update(ctx context.Context, event gomatrixserverlib.
 		"prev_ids":       event.PrevID,
 		"display_name":   event.DeviceDisplayName,
 		"deleted":        event.Deleted,
-	}).Info("DeviceListUpdater.Update")
+	}).Trace("DeviceListUpdater.Update")
 
 	// if we haven't missed anything update the database and notify users
 	if exists || event.Deleted {
