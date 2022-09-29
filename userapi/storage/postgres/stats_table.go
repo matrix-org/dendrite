@@ -64,7 +64,7 @@ const upsertDailyMessagesSQL = `
 	DO UPDATE SET
 	    messages=u.messages+excluded.messages, sent_messages=u.sent_messages+excluded.sent_messages,
 	    e2ee_messages=u.e2ee_messages+excluded.e2ee_messages, sent_e2ee_messages=u.sent_e2ee_messages+excluded.sent_e2ee_messages,
-		active_rooms=$7, active_e2ee_rooms=$8
+		active_rooms=GREATEST($7, u.active_rooms), active_e2ee_rooms=GREATEST($8, u.active_e2ee_rooms)
 `
 
 const selectDailyMessagesSQL = `
