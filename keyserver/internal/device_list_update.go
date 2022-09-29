@@ -31,6 +31,7 @@ import (
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/setup/process"
 )
 
 var (
@@ -44,6 +45,9 @@ var (
 		[]string{"server"},
 	)
 )
+
+const defaultWaitTime = time.Second * 2
+const requestTimeout = time.Second * 30
 
 func init() {
 	prometheus.MustRegister(
@@ -80,6 +84,7 @@ func init() {
 // In the event that the query fails, a lock is acquired and the server name along with the time to wait before retrying is
 // set in a map. A restarter goroutine periodically probes this map and injects servers which are ready to be retried.
 type DeviceListUpdater struct {
+	process *process.ProcessContext
 	// A map from user_id to a mutex. Used when we are missing prev IDs so we don't make more than 1
 	// request to the remote server and race.
 	// TODO: Put in an LRU cache to bound growth
@@ -131,10 +136,12 @@ type KeyChangeProducer interface {
 
 // NewDeviceListUpdater creates a new updater which fetches fresh device lists when they go stale.
 func NewDeviceListUpdater(
-	db DeviceListUpdaterDatabase, api DeviceListUpdaterAPI, producer KeyChangeProducer,
+	process *process.ProcessContext, db DeviceListUpdaterDatabase,
+	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
+		process:        process,
 		userIDToMutex:  make(map[string]*sync.Mutex),
 		mu:             &sync.Mutex{},
 		db:             db,
@@ -378,111 +385,116 @@ func (u *DeviceListUpdater) worker(ch chan gomatrixserverlib.ServerName) {
 }
 
 func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerName) (time.Duration, bool) {
-	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
-	requestTimeout := time.Second * 30 // max amount of time we want to spend on each request
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer cancel()
+	ctx := u.process.Context()
 	logger := util.GetLogger(ctx).WithField("server_name", serverName)
-	waitTime := 2 * time.Second
-	// fetch stale device lists
+	deviceListUpdateCount.WithLabelValues(string(serverName)).Inc()
+
+	waitTime := defaultWaitTime // How long should we wait to try again?
+	successCount := 0           // How many user requests failed?
+
 	userIDs, err := u.db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{serverName})
 	if err != nil {
 		logger.WithError(err).Error("Failed to load stale device lists")
 		return waitTime, true
 	}
-	failCount := 0
 
-userLoop:
+	defer func() {
+		for _, userID := range userIDs {
+			// always clear the channel to unblock Update calls regardless of success/failure
+			u.clearChannel(userID)
+		}
+	}()
+
 	for _, userID := range userIDs {
-		if ctx.Err() != nil {
-			// we've timed out, give up and go to the back of the queue to let another server be processed.
-			failCount += 1
-			waitTime = time.Minute * 10
+		userWait, err := u.processServerUser(ctx, serverName, userID)
+		if err != nil {
+			if userWait > waitTime {
+				waitTime = userWait
+			}
 			break
 		}
-		res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
-		if err != nil {
-			failCount += 1
-			select {
-			case <-ctx.Done():
-				// we've timed out, give up and go to the back of the queue to let another server be processed.
-				waitTime = time.Minute * 10
-				break userLoop
-			default:
-			}
-			switch e := err.(type) {
-			case *fedsenderapi.FederationClientError:
-				if e.RetryAfter > 0 {
-					waitTime = e.RetryAfter
-				} else if e.Blacklisted {
-					waitTime = time.Hour * 8
-					break userLoop
-				} else if e.Code >= 300 {
-					// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
-					// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
-					waitTime = time.Hour
-					break userLoop
-				}
-			case net.Error:
-				// Use the default waitTime, if it's a timeout.
-				// It probably doesn't make sense to try further users.
-				if !e.Timeout() {
-					waitTime = time.Minute * 10
-					logger.WithError(e).Error("GetUserDevices returned net.Error")
-					break userLoop
-				}
-			case gomatrix.HTTPError:
-				// The remote server returned an error, give it some time to recover.
-				// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
-				if e.Code >= 300 {
-					waitTime = time.Hour
-					logger.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
-					break userLoop
-				}
-			default:
-				// Something else failed
-				waitTime = time.Minute * 10
-				logger.WithError(err).WithField("user_id", userID).Debugf("GetUserDevices returned unknown error type: %T", err)
-				break userLoop
-			}
-			continue
-		}
-		if res.MasterKey != nil || res.SelfSigningKey != nil {
-			uploadReq := &api.PerformUploadDeviceKeysRequest{
-				UserID: userID,
-			}
-			uploadRes := &api.PerformUploadDeviceKeysResponse{}
-			if res.MasterKey != nil {
-				if err = sanityCheckKey(*res.MasterKey, userID, gomatrixserverlib.CrossSigningKeyPurposeMaster); err == nil {
-					uploadReq.MasterKey = *res.MasterKey
-				}
-			}
-			if res.SelfSigningKey != nil {
-				if err = sanityCheckKey(*res.SelfSigningKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
-					uploadReq.SelfSigningKey = *res.SelfSigningKey
-				}
-			}
-			_ = u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
-		}
-		err = u.updateDeviceList(&res)
-		if err != nil {
-			logger.WithError(err).WithField("user_id", userID).Error("Fetched device list but failed to store/emit it")
-			failCount += 1
-		}
+		successCount++
 	}
-	if failCount > 0 {
+
+	allUsersSucceeded := successCount == len(userIDs)
+	if !allUsersSucceeded {
 		logger.WithFields(logrus.Fields{
-			"total":    len(userIDs),
-			"failed":   failCount,
-			"skipped":  len(userIDs) - failCount,
-			"waittime": waitTime,
-		}).Warn("Failed to query device keys for some users")
+			"total":     len(userIDs),
+			"succeeded": successCount,
+			"failed":    len(userIDs) - successCount,
+			"wait_time": waitTime,
+		}).Debug("Failed to query device keys for some users")
 	}
-	for _, userID := range userIDs {
-		// always clear the channel to unblock Update calls regardless of success/failure
-		u.clearChannel(userID)
+	return waitTime, !allUsersSucceeded
+}
+
+func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName gomatrixserverlib.ServerName, userID string) (time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	logger := util.GetLogger(ctx).WithFields(logrus.Fields{
+		"server_name": serverName,
+		"user_id":     userID,
+	})
+
+	res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
+	if err != nil {
+		if err == context.DeadlineExceeded {
+			return time.Minute * 10, err
+		}
+		switch e := err.(type) {
+		case *fedsenderapi.FederationClientError:
+			if e.RetryAfter > 0 {
+				return e.RetryAfter, err
+			} else if e.Blacklisted {
+				return time.Hour * 8, err
+			} else if e.Code >= 300 {
+				// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
+				// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
+				return time.Hour, err
+			}
+		case net.Error:
+			// Use the default waitTime, if it's a timeout.
+			// It probably doesn't make sense to try further users.
+			if !e.Timeout() {
+				logger.WithError(e).Error("GetUserDevices returned net.Error")
+				return time.Minute * 10, err
+			}
+		case gomatrix.HTTPError:
+			// The remote server returned an error, give it some time to recover.
+			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
+			if e.Code >= 300 {
+				logger.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
+				return time.Hour, err
+			}
+		default:
+			// Something else failed
+			logger.WithError(err).WithField("user_id", userID).Debugf("GetUserDevices returned unknown error type: %T", err)
+			return time.Minute * 10, err
+		}
 	}
-	return waitTime, failCount > 0
+	if res.MasterKey != nil || res.SelfSigningKey != nil {
+		uploadReq := &api.PerformUploadDeviceKeysRequest{
+			UserID: userID,
+		}
+		uploadRes := &api.PerformUploadDeviceKeysResponse{}
+		if res.MasterKey != nil {
+			if err = sanityCheckKey(*res.MasterKey, userID, gomatrixserverlib.CrossSigningKeyPurposeMaster); err == nil {
+				uploadReq.MasterKey = *res.MasterKey
+			}
+		}
+		if res.SelfSigningKey != nil {
+			if err = sanityCheckKey(*res.SelfSigningKey, userID, gomatrixserverlib.CrossSigningKeyPurposeSelfSigning); err == nil {
+				uploadReq.SelfSigningKey = *res.SelfSigningKey
+			}
+		}
+		_ = u.api.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes)
+	}
+	err = u.updateDeviceList(&res)
+	if err != nil {
+		logger.WithError(err).WithField("user_id", userID).Error("Fetched device list but failed to store/emit it")
+		return defaultWaitTime, err
+	}
+	return defaultWaitTime, nil
 }
 
 func (u *DeviceListUpdater) updateDeviceList(res *gomatrixserverlib.RespUserDevices) error {
