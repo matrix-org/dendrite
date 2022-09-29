@@ -48,27 +48,27 @@ const messagesDailySchema = `
 CREATE TABLE IF NOT EXISTS userapi_daily_stats (
 	timestamp BIGINT NOT NULL,
 	server_name TEXT NOT NULL,
-	daily_messages BIGINT NOT NULL,
-	daily_sent_messages BIGINT NOT NULL,
-	daily_e2ee_messages BIGINT NOT NULL,
-	daily_sent_e2ee_messages BIGINT NOT NULL,
-	daily_active_rooms BIGINT NOT NULL,
-	daily_active_e2ee_rooms BIGINT NOT NULL,
+	messages BIGINT NOT NULL,
+	sent_messages BIGINT NOT NULL,
+	e2ee_messages BIGINT NOT NULL,
+	sent_e2ee_messages BIGINT NOT NULL,
+	active_rooms BIGINT NOT NULL,
+	active_e2ee_rooms BIGINT NOT NULL,
 	CONSTRAINT daily_stats_unique UNIQUE (timestamp, server_name)
 );
 `
 
 const upsertDailyMessagesSQL = `
-	INSERT INTO userapi_daily_stats (timestamp, server_name, daily_messages, daily_sent_messages, daily_e2ee_messages, daily_sent_e2ee_messages, daily_active_rooms, daily_active_e2ee_rooms)
+	INSERT INTO userapi_daily_stats (timestamp, server_name, messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (timestamp, server_name)
 	DO UPDATE SET
-	    daily_messages=daily_messages+excluded.daily_messages, daily_sent_messages=daily_sent_messages+excluded.daily_sent_messages,
-	    daily_e2ee_messages=daily_e2ee_messages+excluded.daily_e2ee_messages, daily_sent_e2ee_messages=daily_sent_e2ee_messages+excluded.daily_sent_e2ee_messages,
-	    daily_active_rooms=$7, daily_active_e2ee_rooms=$8
+	    messages=messages+excluded.messages, sent_messages=sent_messages+excluded.sent_messages,
+	    e2ee_messages=e2ee_messages+excluded.e2ee_messages, sent_e2ee_messages=sent_e2ee_messages+excluded.sent_e2ee_messages,
+	    active_rooms=$7, active_e2ee_rooms=$8
 `
 
 const selectDailyMessagesSQL = `
-	SELECT daily_messages, daily_sent_messages, daily_e2ee_messages, daily_sent_e2ee_messages, daily_active_rooms, daily_active_e2ee_rooms
+	SELECT messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms
 	FROM userapi_daily_stats
 	WHERE server_name = $1 AND timestamp = $2;
 `
