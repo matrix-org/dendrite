@@ -24,11 +24,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 type phoneHomeStats struct {
@@ -109,12 +110,17 @@ func (p *phoneHomeStats) collect() {
 	}
 
 	// message and room stats
-	// TODO: Find a solution to actually set these values
+	// TODO: Find a solution to actually set this value
 	p.stats["total_room_count"] = 0
-	p.stats["daily_messages"] = 0
-	p.stats["daily_sent_messages"] = 0
-	p.stats["daily_e2ee_messages"] = 0
-	p.stats["daily_sent_e2ee_messages"] = 0
+
+	messageStats, err := p.db.DailyMessages(ctx, p.serverName)
+	if err != nil {
+		logrus.WithError(err).Warn("unable to query message stats, using default values")
+	}
+	p.stats["daily_messages"] = messageStats.Messages
+	p.stats["daily_sent_messages"] = messageStats.SentMessages
+	p.stats["daily_e2ee_messages"] = messageStats.MessagesE2EE
+	p.stats["daily_sent_e2ee_messages"] = messageStats.SentMessagesE2EE
 
 	// user stats and DB engine
 	userStats, db, err := p.db.UserStatistics(ctx)

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/types"
@@ -115,7 +117,9 @@ type NotificationTable interface {
 
 type StatsTable interface {
 	UserStatistics(ctx context.Context, txn *sql.Tx) (*types.UserStatistics, *types.DatabaseEngine, error)
+	DailyMessages(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (types.MessageStats, error)
 	UpdateUserDailyVisits(ctx context.Context, txn *sql.Tx, startTime, lastUpdate time.Time) error
+	UpsertDailyMessages(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, stats types.MessageStats) error
 }
 
 type NotificationFilter uint32

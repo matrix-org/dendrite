@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -23,19 +24,23 @@ import (
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/dendrite/userapi/util"
 )
 
 type OutputRoomEventConsumer struct {
-	ctx          context.Context
-	cfg          *config.UserAPI
-	rsAPI        rsapi.UserRoomserverAPI
-	jetstream    nats.JetStreamContext
-	durable      string
-	db           storage.Database
-	topic        string
-	pgClient     pushgateway.Client
-	syncProducer *producers.SyncAPI
+	ctx           context.Context
+	cfg           *config.UserAPI
+	rsAPI         rsapi.UserRoomserverAPI
+	jetstream     nats.JetStreamContext
+	durable       string
+	db            storage.Database
+	topic         string
+	pgClient      pushgateway.Client
+	syncProducer  *producers.SyncAPI
+	msgCounts     map[gomatrixserverlib.ServerName]userAPITypes.MessageStats
+	msgCountsLock sync.Mutex
+	serverName    gomatrixserverlib.ServerName
 }
 
 func NewOutputRoomEventConsumer(
@@ -48,15 +53,18 @@ func NewOutputRoomEventConsumer(
 	syncProducer *producers.SyncAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:          process.Context(),
-		cfg:          cfg,
-		jetstream:    js,
-		db:           store,
-		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
-		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		pgClient:     pgClient,
-		rsAPI:        rsAPI,
-		syncProducer: syncProducer,
+		ctx:           process.Context(),
+		cfg:           cfg,
+		jetstream:     js,
+		db:            store,
+		durable:       cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
+		topic:         cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		pgClient:      pgClient,
+		rsAPI:         rsAPI,
+		syncProducer:  syncProducer,
+		msgCounts:     map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+		msgCountsLock: sync.Mutex{},
+		serverName:    cfg.Matrix.ServerName,
 	}
 }
 
@@ -87,6 +95,31 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		return true
 	}
 
+	_, sender, _ := gomatrixserverlib.SplitID('@', event.Sender())
+
+	switch event.Type() {
+	case "m.room.message":
+		s.msgCountsLock.Lock()
+		msgCount := s.msgCounts[s.serverName]
+		msgCount.Messages++
+		if sender == s.serverName {
+			msgCount.SentMessages++
+		}
+		s.msgCounts[s.serverName] = msgCount
+		s.msgCountsLock.Unlock()
+	case "m.room.encrypted":
+		s.msgCountsLock.Lock()
+		msgCount := s.msgCounts[s.serverName]
+		msgCount.MessagesE2EE++
+		if sender == s.serverName {
+			msgCount.SentMessagesE2EE++
+		}
+		s.msgCounts[s.serverName] = msgCount
+		s.msgCountsLock.Unlock()
+	}
+
+	s.storeMessageStats(ctx)
+
 	log.WithFields(log.Fields{
 		"event_id":   event.EventID(),
 		"event_type": event.Type(),
@@ -104,6 +137,33 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	}
 
 	return true
+}
+
+func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context) {
+	s.msgCountsLock.Lock()
+	defer s.msgCountsLock.Unlock()
+	var sumStats int64 = 0
+	for _, stats := range s.msgCounts {
+		sumStats += stats.Messages + stats.SentMessages + stats.MessagesE2EE + stats.SentMessagesE2EE
+	}
+	// Nothing to do
+	if sumStats == 0 {
+		return
+	}
+	for serverName, stats := range s.msgCounts {
+		err := s.db.UpsertDailyMessages(ctx, serverName, stats)
+		if err != nil {
+			log.WithError(err).Errorf("failed to upsert daily messages")
+		}
+		// Clear stats if we successfully stored it
+		if err == nil {
+			stats.MessagesE2EE = 0
+			stats.SentMessages = 0
+			stats.MessagesE2EE = 0
+			stats.SentMessagesE2EE = 0
+			s.msgCounts[serverName] = stats
+		}
+	}
 }
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, streamPos uint64) error {
