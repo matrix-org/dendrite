@@ -99,7 +99,9 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		return true
 	}
 
-	go s.storeMessageStats(ctx, event.Type(), event.Sender(), event.RoomID())
+	if s.cfg.Matrix.ReportStats.Enabled {
+		go s.storeMessageStats(ctx, event.Type(), event.Sender(), event.RoomID())
+	}
 
 	log.WithFields(log.Fields{
 		"event_id":   event.EventID(),
