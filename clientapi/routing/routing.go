@@ -168,8 +168,8 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
-	dendriteAdminRouter.Handle("/admin/markAsStale/{userID}",
-		httputil.MakeAdminAPI("admin_mark_as_stale", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+	dendriteAdminRouter.Handle("/admin/refreshDevices/{userID}",
+		httputil.MakeAdminAPI("admin_refresh_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			return AdminMarkAsStale(req, cfg, keyAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
