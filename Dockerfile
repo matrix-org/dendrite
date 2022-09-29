@@ -6,19 +6,17 @@
 FROM --platform=${BUILDPLATFORM} docker.io/golang:1.19-alpine AS base
 RUN apk --update --no-cache add bash build-base
 
-WORKDIR /src
-COPY go.* .
-RUN go mod download
-
 #
 # build creates all needed binaries
 #
 FROM base AS build
+WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
+ARG FLAGS
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -o /out/ ./cmd/...
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
 
 #
 # The dendrite base image; mainly creates a user and switches to it
