@@ -457,14 +457,14 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			// Use the default waitTime, if it's a timeout.
 			// It probably doesn't make sense to try further users.
 			if !e.Timeout() {
-				logger.WithError(e).Error("GetUserDevices returned net.Error")
+				logger.WithError(e).Debug("GetUserDevices returned net.Error")
 				return time.Minute * 10, err
 			}
 		case gomatrix.HTTPError:
 			// The remote server returned an error, give it some time to recover.
 			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 			if e.Code >= 300 {
-				logger.WithError(e).Error("GetUserDevices returned gomatrix.HTTPError")
+				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
 				return time.Hour, err
 			}
 		default:
@@ -474,7 +474,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		}
 	}
 	if res.UserID != userID {
-		logger.WithError(err).Warnf("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
+		logger.WithError(err).Debugf("User ID %q in device list update response doesn't match expected %q", res.UserID, userID)
 		return defaultWaitTime, nil
 	}
 	if res.MasterKey != nil || res.SelfSigningKey != nil {
