@@ -423,7 +423,7 @@ func (u *DeviceListUpdater) processServer(serverName gomatrixserverlib.ServerNam
 			"succeeded": successCount,
 			"failed":    len(userIDs) - successCount,
 			"wait_time": waitTime,
-		}).Debug("Failed to query device keys for some users")
+		}).Warn("Failed to query device keys for some users")
 	}
 	return waitTime, !allUsersSucceeded
 }
