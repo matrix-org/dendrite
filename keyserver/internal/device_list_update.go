@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net"
@@ -438,7 +439,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 
 	res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
 	if err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return time.Minute * 10, err
 		}
 		switch e := err.(type) {
