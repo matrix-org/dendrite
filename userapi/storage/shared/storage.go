@@ -801,14 +801,14 @@ func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *
 	return d.Stats.UserStatistics(ctx, nil)
 }
 
-func (d *Database) UpsertDailyMessages(ctx context.Context, serverName gomatrixserverlib.ServerName, stats types.MessageStats) error {
+func (d *Database) UpsertDailyRoomsMessages(ctx context.Context, serverName gomatrixserverlib.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Stats.UpsertDailyMessages(ctx, txn, serverName, stats)
+		return d.Stats.UpsertDailyStats(ctx, txn, serverName, stats, activeRooms, activeE2EERooms)
 	})
 }
 
-func (d *Database) DailyMessages(
+func (d *Database) DailyRoomsMessages(
 	ctx context.Context, serverName gomatrixserverlib.ServerName,
-) (types.MessageStats, error) {
-	return d.Stats.DailyMessages(ctx, nil, serverName)
+) (stats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
+	return d.Stats.DailyRoomsMessages(ctx, nil, serverName)
 }

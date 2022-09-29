@@ -45,28 +45,31 @@ CREATE INDEX IF NOT EXISTS userapi_daily_visits_localpart_timestamp_idx ON usera
 `
 
 const messagesDailySchema = `
-CREATE TABLE IF NOT EXISTS userapi_daily_messages (
+CREATE TABLE IF NOT EXISTS userapi_daily_stats (
 	timestamp BIGINT NOT NULL,
 	server_name TEXT NOT NULL,
 	daily_messages BIGINT NOT NULL,
 	daily_sent_messages BIGINT NOT NULL,
 	daily_e2ee_messages BIGINT NOT NULL,
 	daily_sent_e2ee_messages BIGINT NOT NULL,
-	CONSTRAINT daily_messages_unique UNIQUE (timestamp, server_name)
+	daily_active_rooms BIGINT NOT NULL,
+	daily_active_e2ee_rooms BIGINT NOT NULL,
+	CONSTRAINT daily_stats_unique UNIQUE (timestamp, server_name)
 );
 `
 
 const upsertDailyMessagesSQL = `
-	INSERT INTO userapi_daily_messages AS u (timestamp, server_name, daily_messages, daily_sent_messages, daily_e2ee_messages, daily_sent_e2ee_messages)
-	VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT ON CONSTRAINT daily_messages_unique
+	INSERT INTO userapi_daily_stats AS u (timestamp, server_name, daily_messages, daily_sent_messages, daily_e2ee_messages, daily_sent_e2ee_messages, daily_active_rooms, daily_active_e2ee_rooms)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT ON CONSTRAINT daily_stats_unique
 	DO UPDATE SET
 	    daily_messages=u.daily_messages+excluded.daily_messages, daily_sent_messages=u.daily_sent_messages+excluded.daily_sent_messages,
-	    daily_e2ee_messages=u.daily_e2ee_messages+excluded.daily_e2ee_messages, daily_sent_e2ee_messages=u.daily_sent_e2ee_messages+excluded.daily_sent_e2ee_messages
+	    daily_e2ee_messages=u.daily_e2ee_messages+excluded.daily_e2ee_messages, daily_sent_e2ee_messages=u.daily_sent_e2ee_messages+excluded.daily_sent_e2ee_messages,
+		daily_active_rooms=$7, daily_active_e2ee_rooms=$8
 `
 
 const selectDailyMessagesSQL = `
-	SELECT daily_messages, daily_sent_messages, daily_e2ee_messages, daily_sent_e2ee_messages
-	FROM userapi_daily_messages
+	SELECT daily_messages, daily_sent_messages, daily_e2ee_messages, daily_sent_e2ee_messages, daily_active_rooms, daily_active_e2ee_rooms
+	FROM userapi_daily_stats
 	WHERE server_name = $1 AND timestamp = $2;
 `
 
@@ -471,9 +474,10 @@ func (s *statsStatements) UpdateUserDailyVisits(
 	return err
 }
 
-func (s *statsStatements) UpsertDailyMessages(
+func (s *statsStatements) UpsertDailyStats(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName, stats types.MessageStats,
+	activeRooms, activeE2EERooms int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.upsertMessagesStmt)
 	timestamp := time.Now().Truncate(time.Hour * 24)
@@ -481,22 +485,22 @@ func (s *statsStatements) UpsertDailyMessages(
 		gomatrixserverlib.AsTimestamp(timestamp),
 		serverName,
 		stats.Messages, stats.SentMessages, stats.MessagesE2EE, stats.SentMessagesE2EE,
+		activeRooms, activeE2EERooms,
 	)
 	return err
 }
 
-func (s *statsStatements) DailyMessages(
+func (s *statsStatements) DailyRoomsMessages(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
-) (types.MessageStats, error) {
+) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
 	stmt := sqlutil.TxStmt(txn, s.selectDailyMessagesStmt)
 	timestamp := time.Now().Truncate(time.Hour * 24)
 
-	res := types.MessageStats{}
-	err := stmt.QueryRowContext(ctx, serverName, gomatrixserverlib.AsTimestamp(timestamp)).
-		Scan(&res.Messages, &res.SentMessages, &res.MessagesE2EE, &res.SentMessagesE2EE)
+	err = stmt.QueryRowContext(ctx, serverName, gomatrixserverlib.AsTimestamp(timestamp)).
+		Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
 	if err != nil && err != sql.ErrNoRows {
-		return res, err
+		return msgStats, 0, 0, err
 	}
-	return res, nil
+	return msgStats, activeRooms, activeE2EERooms, nil
 }

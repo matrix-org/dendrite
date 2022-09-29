@@ -29,18 +29,20 @@ import (
 )
 
 type OutputRoomEventConsumer struct {
-	ctx           context.Context
-	cfg           *config.UserAPI
-	rsAPI         rsapi.UserRoomserverAPI
-	jetstream     nats.JetStreamContext
-	durable       string
-	db            storage.Database
-	topic         string
-	pgClient      pushgateway.Client
-	syncProducer  *producers.SyncAPI
-	msgCounts     map[gomatrixserverlib.ServerName]userAPITypes.MessageStats
-	msgCountsLock sync.Mutex
-	serverName    gomatrixserverlib.ServerName
+	ctx          context.Context
+	cfg          *config.UserAPI
+	rsAPI        rsapi.UserRoomserverAPI
+	jetstream    nats.JetStreamContext
+	durable      string
+	db           storage.Database
+	topic        string
+	pgClient     pushgateway.Client
+	syncProducer *producers.SyncAPI
+	msgCounts    map[gomatrixserverlib.ServerName]userAPITypes.MessageStats
+	roomCounts   map[gomatrixserverlib.ServerName]map[string]bool // map from serverName to map from rommID to "isEncrypted"
+	lastUpdate   time.Time
+	countsLock   sync.Mutex
+	serverName   gomatrixserverlib.ServerName
 }
 
 func NewOutputRoomEventConsumer(
@@ -53,18 +55,20 @@ func NewOutputRoomEventConsumer(
 	syncProducer *producers.SyncAPI,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
-		ctx:           process.Context(),
-		cfg:           cfg,
-		jetstream:     js,
-		db:            store,
-		durable:       cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
-		topic:         cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
-		pgClient:      pgClient,
-		rsAPI:         rsAPI,
-		syncProducer:  syncProducer,
-		msgCounts:     map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
-		msgCountsLock: sync.Mutex{},
-		serverName:    cfg.Matrix.ServerName,
+		ctx:          process.Context(),
+		cfg:          cfg,
+		jetstream:    js,
+		db:           store,
+		durable:      cfg.Matrix.JetStream.Durable("UserAPIRoomServerConsumer"),
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputRoomEvent),
+		pgClient:     pgClient,
+		rsAPI:        rsAPI,
+		syncProducer: syncProducer,
+		msgCounts:    map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+		roomCounts:   map[gomatrixserverlib.ServerName]map[string]bool{},
+		lastUpdate:   time.Now(),
+		countsLock:   sync.Mutex{},
+		serverName:   cfg.Matrix.ServerName,
 	}
 }
 
@@ -95,7 +99,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		return true
 	}
 
-	s.storeMessageStats(ctx, event.Type(), event.Sender())
+	go s.storeMessageStats(ctx, event.Type(), event.Sender(), event.RoomID())
 
 	log.WithFields(log.Fields{
 		"event_id":   event.EventID(),
@@ -116,22 +120,33 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	return true
 }
 
-func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventType, eventSender string) {
-	s.msgCountsLock.Lock()
-	defer s.msgCountsLock.Unlock()
+func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventType, eventSender, roomID string) {
+	s.countsLock.Lock()
+	defer s.countsLock.Unlock()
+
+	// reset the roomCounts on a day change
+	if s.lastUpdate.Day() != time.Now().Day() {
+		s.roomCounts[s.serverName] = make(map[string]bool)
+	}
 
 	_, sender, err := gomatrixserverlib.SplitID('@', eventSender)
 	if err != nil {
 		return
 	}
 	msgCount := s.msgCounts[s.serverName]
+	roomCount := s.roomCounts[s.serverName]
+	if roomCount == nil {
+		roomCount = make(map[string]bool)
+	}
 	switch eventType {
 	case "m.room.message":
+		roomCount[roomID] = false
 		msgCount.Messages++
 		if sender == s.serverName {
 			msgCount.SentMessages++
 		}
 	case "m.room.encrypted":
+		roomCount[roomID] = true
 		msgCount.MessagesE2EE++
 		if sender == s.serverName {
 			msgCount.SentMessagesE2EE++
@@ -140,8 +155,18 @@ func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventTy
 		return
 	}
 	s.msgCounts[s.serverName] = msgCount
+	s.roomCounts[s.serverName] = roomCount
+
 	for serverName, stats := range s.msgCounts {
-		err := s.db.UpsertDailyMessages(ctx, serverName, stats)
+		var normalRooms, encryptedRooms int64 = 0, 0
+		for _, isEncrypted := range s.roomCounts[s.serverName] {
+			if isEncrypted {
+				encryptedRooms++
+			} else {
+				normalRooms++
+			}
+		}
+		err := s.db.UpsertDailyRoomsMessages(ctx, serverName, stats, normalRooms, encryptedRooms)
 		if err != nil {
 			log.WithError(err).Errorf("failed to upsert daily messages")
 		}

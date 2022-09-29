@@ -146,8 +146,8 @@ type Database interface {
 
 type Statistics interface {
 	UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error)
-	DailyMessages(ctx context.Context, serverName gomatrixserverlib.ServerName) (types.MessageStats, error)
-	UpsertDailyMessages(ctx context.Context, serverName gomatrixserverlib.ServerName, stats types.MessageStats) error
+	DailyRoomsMessages(ctx context.Context, serverName gomatrixserverlib.ServerName) (stats types.MessageStats, activeRooms, activeE2EERooms int64, err error)
+	UpsertDailyRoomsMessages(ctx context.Context, serverName gomatrixserverlib.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

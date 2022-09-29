@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
@@ -135,12 +136,15 @@ func TestMessageStats(t *testing.T) {
 	type args struct {
 		eventType   string
 		eventSender string
+		roomID      string
 	}
 	tests := []struct {
-		name      string
-		args      args
-		ourServer gomatrixserverlib.ServerName
-		wantStats userAPITypes.MessageStats
+		name           string
+		args           args
+		ourServer      gomatrixserverlib.ServerName
+		lastUpdate     time.Time
+		initRoomCounts map[gomatrixserverlib.ServerName]map[string]bool
+		wantStats      userAPITypes.MessageStats
 	}{
 		{
 			name:      "m.room.create does not count as a message",
@@ -156,6 +160,7 @@ func TestMessageStats(t *testing.T) {
 			args: args{
 				eventType:   "m.room.message",
 				eventSender: "@alice:localhost",
+				roomID:      "normalRoom",
 			},
 			wantStats: userAPITypes.MessageStats{Messages: 1, SentMessages: 1},
 		},
@@ -165,6 +170,7 @@ func TestMessageStats(t *testing.T) {
 			args: args{
 				eventType:   "m.room.encrypted",
 				eventSender: "@alice:localhost",
+				roomID:      "encryptedRoom",
 			},
 			wantStats: userAPITypes.MessageStats{Messages: 1, SentMessages: 1, MessagesE2EE: 1, SentMessagesE2EE: 1},
 		},
@@ -175,6 +181,7 @@ func TestMessageStats(t *testing.T) {
 			args: args{
 				eventType:   "m.room.message",
 				eventSender: "@alice:remote",
+				roomID:      "normalRoom",
 			},
 			wantStats: userAPITypes.MessageStats{Messages: 2, SentMessages: 1, MessagesE2EE: 1, SentMessagesE2EE: 1},
 		},
@@ -184,8 +191,23 @@ func TestMessageStats(t *testing.T) {
 			args: args{
 				eventType:   "m.room.encrypted",
 				eventSender: "@alice:remote",
+				roomID:      "encryptedRoom",
 			},
 			wantStats: userAPITypes.MessageStats{Messages: 2, SentMessages: 1, MessagesE2EE: 2, SentMessagesE2EE: 1},
+		},
+		{
+			name:       "day change creates a new room map",
+			ourServer:  "localhost",
+			lastUpdate: time.Now().Add(-time.Hour * 24),
+			initRoomCounts: map[gomatrixserverlib.ServerName]map[string]bool{
+				"localhost": {"encryptedRoom": true},
+			},
+			args: args{
+				eventType:   "m.room.encrypted",
+				eventSender: "@alice:remote",
+				roomID:      "someOtherRoom",
+			},
+			wantStats: userAPITypes.MessageStats{Messages: 2, SentMessages: 1, MessagesE2EE: 3, SentMessagesE2EE: 1},
 		},
 	}
 
@@ -195,20 +217,34 @@ func TestMessageStats(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				s := &OutputRoomEventConsumer{
-					db:            db,
-					msgCounts:     map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
-					msgCountsLock: sync.Mutex{},
-					serverName:    tt.ourServer,
+				if tt.lastUpdate.IsZero() {
+					tt.lastUpdate = time.Now()
 				}
-				s.storeMessageStats(context.Background(), tt.args.eventType, tt.args.eventSender)
-
-				gotStats, err := db.DailyMessages(context.Background(), tt.ourServer)
+				if tt.initRoomCounts == nil {
+					tt.initRoomCounts = map[gomatrixserverlib.ServerName]map[string]bool{}
+				}
+				s := &OutputRoomEventConsumer{
+					db:         db,
+					msgCounts:  map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+					roomCounts: tt.initRoomCounts,
+					countsLock: sync.Mutex{},
+					lastUpdate: tt.lastUpdate,
+					serverName: tt.ourServer,
+				}
+				s.storeMessageStats(context.Background(), tt.args.eventType, tt.args.eventSender, tt.args.roomID)
+				t.Logf("%+v", s.roomCounts)
+				gotStats, activeRooms, activeE2EERooms, err := db.DailyRoomsMessages(context.Background(), tt.ourServer)
 				if err != nil {
 					t.Fatalf("unexpected error: %s", err)
 				}
 				if !reflect.DeepEqual(gotStats, tt.wantStats) {
 					t.Fatalf("expected %+v, got %+v", tt.wantStats, gotStats)
+				}
+				if tt.args.eventType == "m.room.encrypted" && activeE2EERooms != 1 {
+					t.Fatalf("expected room to be activeE2EE")
+				}
+				if tt.args.eventType == "m.room.message" && activeRooms != 1 {
+					t.Fatalf("expected room to be active")
 				}
 			})
 		}
