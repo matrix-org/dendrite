@@ -47,7 +47,7 @@ var (
 	)
 )
 
-const defaultWaitTime = time.Second * 2
+const defaultWaitTime = time.Second * 30
 const requestTimeout = time.Second * 30
 
 func init() {
