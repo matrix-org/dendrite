@@ -13,6 +13,7 @@ import (
 
 type DatabaseTransaction struct {
 	*Database
+	ctx context.Context
 	txn *sql.Tx
 }
 
@@ -28,6 +29,19 @@ func (d *DatabaseTransaction) Rollback() error {
 		return nil
 	}
 	return d.txn.Rollback()
+}
+
+func (d *DatabaseTransaction) Reset() (err error) {
+	if d.txn == nil {
+		return nil
+	}
+	if err = d.txn.Rollback(); err != nil {
+		return err
+	}
+	if d.txn, err = d.DB.BeginTx(d.ctx, nil); err != nil {
+		return err
+	}
+	return
 }
 
 func (d *DatabaseTransaction) MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error) {

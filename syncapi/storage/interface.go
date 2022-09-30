@@ -29,6 +29,7 @@ import (
 
 type DatabaseTransaction interface {
 	sqlutil.Transaction
+	Reset() (err error)
 	SharedUsers
 
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)

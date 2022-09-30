@@ -67,7 +67,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	presences, err := snapshot.PresenceAfter(ctx, from, gomatrixserverlib.EventFilter{Limit: 1000})
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
-		_ = snapshot.Rollback()
+		_ = snapshot.Reset()
 		return from
 	}
 
