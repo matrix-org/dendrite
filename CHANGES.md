@@ -6,6 +6,7 @@
 
 * High performance full-text searching has been added to Dendrite
   * Search must be enabled in the [`search` section of the `sync_api` config](https://github.com/matrix-org/dendrite/blob/6348486a1365c7469a498101f5035a9b6bd16d22/dendrite-sample.monolith.yaml#L279-L290) before it can be used
+  * The search index is stored on the filesystem rather than the sync API database, so a path to a suitable storage location on disk must be configured
 * Sync requests should now complete faster and use considerably less database connections as a result of better transactional isolation
 * The notifications code has been refactored to hopefully make notifications more reliable
 * A new `/_dendrite/admin/refreshDevices/{userID}` admin endpoint has been added for forcing a refresh of a remote user's device lists without having to modify the database by hand
