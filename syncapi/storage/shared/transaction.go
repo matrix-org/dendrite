@@ -102,7 +102,7 @@ func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID st
 	return d.Topology.SelectPositionInTopology(ctx, d.txn, eventID)
 }
 
-func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
 	return d.Invites.SelectInviteEventsInRange(ctx, d.txn, targetUserID, r)
 }
 

@@ -51,7 +51,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		To:   to,
 	}
 
-	invites, retiredInvites, err := snapshot.InviteEventsInRange(
+	invites, retiredInvites, maxID, err := snapshot.InviteEventsInRange(
 		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
@@ -91,5 +91,5 @@ func (p *InviteStreamProvider) IncrementalSync(
 		}
 	}
 
-	return to
+	return maxID
 }
