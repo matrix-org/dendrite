@@ -77,7 +77,7 @@ func OnIncomingMessagesRequest(
 		return jsonerror.InternalServerError()
 	}
 	var succeeded bool
-	defer sqlutil.EndTransaction(snapshot, &succeeded)
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// check if the user has already forgotten about this room
 	isForgotten, roomExists, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
