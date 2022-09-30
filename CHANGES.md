@@ -1,5 +1,26 @@
 # Changelog
 
+## Dendrite 0.10.0 (2022-09-30)
+
+### Features
+
+* High performance full-text searching has been added to Dendrite
+  * Search must be enabled in the [`search` section of the `sync_api` config](https://github.com/matrix-org/dendrite/blob/6348486a1365c7469a498101f5035a9b6bd16d22/dendrite-sample.monolith.yaml#L279-L290) before it can be used
+* Sync requests should now complete faster and use considerably less database connections as a result of better transactional isolation
+* The notifications code has been refactored to hopefully make notifications more reliable
+* A new `/_dendrite/admin/refreshDevices/{userID}` admin endpoint has been added for forcing a refresh of a remote user's device lists without having to modify the database by hand
+* A new `/_dendrite/admin/fulltext/reindex` admin endpoint has been added for rebuilding the search index (although this may take some time)
+
+### Fixes
+
+* A number of bugs in the device list updater have been fixed, which should help considerably with federated device list synchronisation and E2EE reliability
+* A state resolution bug has been fixed which should help to prevent unexpected state resets
+* The deprecated `"origin"` field in events will now be correctly ignored in all cases
+* Room versions 8 and 9 will now correctly evaluate `"knock"` join rules and membership states
+* A database index has been added to speed up finding room memberships in the sync API (contributed by [PiotrKozimor](https://github.com/PiotrKozimor))
+* The client API will now return an `M_UNRECOGNIZED` error for unknown endpoints/methods, which should help with client error handling
+* A bug has been fixed when updating push rules which could result in `database is locked` on SQLite
+
 ## Dendrite 0.9.9 (2022-09-22)
 
 ### Features
