@@ -46,6 +46,7 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	countsByRoom, err := snapshot.GetUserUnreadNotificationCountsForRooms(ctx, req.Device.UserID, req.Rooms)
 	if err != nil {
 		req.Log.WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
+		_ = snapshot.Rollback()
 		return from
 	}
 

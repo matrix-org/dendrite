@@ -20,6 +20,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -27,6 +28,7 @@ import (
 )
 
 type DatabaseTransaction interface {
+	sqlutil.Transaction
 	SharedUsers
 
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)

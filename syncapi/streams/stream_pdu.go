@@ -75,6 +75,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	joinedRoomIDs, err := snapshot.RoomIDsWithMembership(ctx, req.Device.UserID, gomatrixserverlib.Join)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
+		_ = snapshot.Rollback()
 		return from
 	}
 
@@ -101,6 +102,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
+			_ = snapshot.Rollback()
 			continue // return from
 		}
 		req.Response.Rooms.Join[roomID] = *jr
@@ -111,6 +113,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
+		_ = snapshot.Rollback()
 		return from
 	}
 	for _, peek := range peeks {
@@ -121,6 +124,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
+				_ = snapshot.Rollback()
 				continue // return from
 			}
 			req.Response.Rooms.Peek[peek.RoomID] = *jr

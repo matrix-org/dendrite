@@ -310,7 +310,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
 			return jsonerror.InternalServerError()
 		}
-		defer snapshot.Rollback() // nolint:errcheck
+		defer snapshot.Commit() // nolint:errcheck
 
 		if syncReq.Since.IsEmpty() {
 			// Complete sync
