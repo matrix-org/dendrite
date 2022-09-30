@@ -30,6 +30,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/setup/process"
 )
 
 var (
@@ -146,7 +147,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(db, ap, producer, nil, 1)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -218,7 +219,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(db, ap, producer, fedClient, 2)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -287,7 +288,7 @@ func TestDebounce(t *testing.T) {
 		close(incomingFedReq)
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(db, ap, producer, fedClient, 1)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
