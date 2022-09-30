@@ -72,6 +72,9 @@ func OnIncomingMessagesRequest(
 ) util.JSONResponse {
 	var err error
 
+	// NewDatabaseTransaction is used here instead of NewDatabaseSnapshot as we
+	// expect to be able to write to the database in response to a /messages
+	// request that requires backfilling from the roomserver or federation.
 	snapshot, err := db.NewDatabaseTransaction(req.Context())
 	if err != nil {
 		return jsonerror.InternalServerError()
