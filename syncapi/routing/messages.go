@@ -27,6 +27,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/internal"
@@ -75,7 +76,8 @@ func OnIncomingMessagesRequest(
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransaction(snapshot, &succeeded)
 
 	// check if the user has already forgotten about this room
 	isForgotten, roomExists, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
@@ -237,6 +239,7 @@ func OnIncomingMessagesRequest(
 	}
 
 	// Respond with the events.
+	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
