@@ -16,7 +16,10 @@ func (p *NotificationDataStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := snapshot.MaxStreamPositionForNotificationData(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForNotificationData(ctx)
 	if err != nil {
 		panic(err)
 	}

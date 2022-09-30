@@ -18,7 +18,10 @@ func (p *ReceiptStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := snapshot.MaxStreamPositionForReceipts(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForReceipts(ctx)
 	if err != nil {
 		panic(err)
 	}

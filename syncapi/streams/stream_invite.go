@@ -25,7 +25,7 @@ func (p *InviteStreamProvider) Setup(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForInvites(context.Background())
+	id, err := snapshot.MaxStreamPositionForInvites(ctx)
 	if err != nil {
 		panic(err)
 	}

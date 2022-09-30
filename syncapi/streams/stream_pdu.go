@@ -47,7 +47,7 @@ func (p *PDUStreamProvider) Setup(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForPDUs(context.Background())
+	id, err := snapshot.MaxStreamPositionForPDUs(ctx)
 	if err != nil {
 		panic(err)
 	}

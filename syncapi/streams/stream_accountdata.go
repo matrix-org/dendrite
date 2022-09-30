@@ -23,7 +23,7 @@ func (p *AccountDataStreamProvider) Setup(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForAccountData(context.Background())
+	id, err := snapshot.MaxStreamPositionForAccountData(ctx)
 	if err != nil {
 		panic(err)
 	}

@@ -16,7 +16,10 @@ func (p *SendToDeviceStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := snapshot.MaxStreamPositionForSendToDeviceMessages(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForSendToDeviceMessages(ctx)
 	if err != nil {
 		panic(err)
 	}

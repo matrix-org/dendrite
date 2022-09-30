@@ -39,7 +39,10 @@ func (p *PresenceStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := snapshot.MaxStreamPositionForPresence(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForPresence(ctx)
 	if err != nil {
 		panic(err)
 	}
