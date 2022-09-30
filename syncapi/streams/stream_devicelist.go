@@ -18,7 +18,7 @@ type DeviceListStreamProvider struct {
 
 func (p *DeviceListStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.LatestPosition(ctx)
@@ -26,7 +26,7 @@ func (p *DeviceListStreamProvider) CompleteSync(
 
 func (p *DeviceListStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

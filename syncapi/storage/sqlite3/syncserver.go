@@ -49,15 +49,15 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	return &d, nil
 }
 
-func (d *SyncServerDatasource) NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseSnapshot, error) {
-	return &shared.DatabaseSnapshot{
+func (d *SyncServerDatasource) NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseTransaction, error) {
+	return &shared.DatabaseTransaction{
 		Database: &d.Database,
 		// not setting a transaction because SQLite doesn't support it
 	}, nil
 }
 
-func (d *SyncServerDatasource) NewDatabaseWritable(ctx context.Context) (*shared.DatabaseSnapshot, error) {
-	return &shared.DatabaseSnapshot{
+func (d *SyncServerDatasource) NewDatabaseTransaction(ctx context.Context) (*shared.DatabaseTransaction, error) {
+	return &shared.DatabaseTransaction{
 		Database: &d.Database,
 		// not setting a transaction because SQLite doesn't support it
 	}, nil

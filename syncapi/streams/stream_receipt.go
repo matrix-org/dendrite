@@ -14,7 +14,7 @@ type ReceiptStreamProvider struct {
 }
 
 func (p *ReceiptStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
@@ -30,7 +30,7 @@ func (p *ReceiptStreamProvider) Setup(
 
 func (p *ReceiptStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
@@ -38,7 +38,7 @@ func (p *ReceiptStreamProvider) CompleteSync(
 
 func (p *ReceiptStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

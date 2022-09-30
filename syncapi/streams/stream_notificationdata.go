@@ -12,7 +12,7 @@ type NotificationDataStreamProvider struct {
 }
 
 func (p *NotificationDataStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
@@ -28,7 +28,7 @@ func (p *NotificationDataStreamProvider) Setup(
 
 func (p *NotificationDataStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
@@ -36,7 +36,7 @@ func (p *NotificationDataStreamProvider) CompleteSync(
 
 func (p *NotificationDataStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, _ types.StreamPosition,
 ) types.StreamPosition {

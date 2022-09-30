@@ -55,31 +55,34 @@ type Database struct {
 	Presence            tables.Presence
 }
 
-func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseSnapshot, error) {
-	txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
-		// Set the isolation level so that we see a snapshot of the database.
-		// In PostgreSQL repeatable read transactions will see a snapshot taken
-		// at the first query, and since the transaction is read-only it can't
-		// run into any serialisation errors.
-		// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
-		Isolation: sql.LevelRepeatableRead,
-		ReadOnly:  true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &DatabaseSnapshot{
-		Database: d,
-		txn:      txn,
-	}, nil
+func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
+	return d.NewDatabaseTransaction(ctx) // TODO: revert
+	/*
+		txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
+			// Set the isolation level so that we see a snapshot of the database.
+			// In PostgreSQL repeatable read transactions will see a snapshot taken
+			// at the first query, and since the transaction is read-only it can't
+			// run into any serialisation errors.
+			// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
+			Isolation: sql.LevelRepeatableRead,
+			ReadOnly:  true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &DatabaseTransaction{
+			Database: d,
+			txn:      txn,
+		}, nil
+	*/
 }
 
-func (d *Database) NewDatabaseWritable(ctx context.Context) (*DatabaseSnapshot, error) {
+func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransaction, error) {
 	txn, err := d.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &DatabaseSnapshot{
+	return &DatabaseTransaction{
 		Database: d,
 		txn:      txn,
 	}, nil

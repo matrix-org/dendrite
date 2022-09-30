@@ -15,7 +15,7 @@ type DefaultStreamProvider struct {
 }
 
 func (p *DefaultStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 }
 

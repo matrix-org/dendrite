@@ -60,7 +60,7 @@ func TestWriteEvents(t *testing.T) {
 	})
 }
 
-func WithSnapshot(t *testing.T, db storage.Database, f func(snapshot storage.DatabaseSnapshot)) {
+func WithSnapshot(t *testing.T, db storage.Database, f func(snapshot storage.DatabaseTransaction)) {
 	snapshot, err := db.NewDatabaseSnapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestRecentEventsPDU(t *testing.T) {
 		MustWriteEvents(t, db, test.NewRoom(t, alice).Events())
 
 		var latest types.StreamPosition
-		WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 			var err error
 			if latest, err = snapshot.MaxStreamPositionForPDUs(ctx); err != nil {
 				t.Fatal("failed to get MaxStreamPositionForPDUs: %w", err)
@@ -157,7 +157,7 @@ func TestRecentEventsPDU(t *testing.T) {
 				var gotEvents []types.StreamEvent
 				var limited bool
 				filter.Limit = tc.Limit
-				WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+				WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 					var err error
 					gotEvents, limited, err = snapshot.RecentEvents(ctx, r.ID, types.Range{
 						From: tc.From,
@@ -197,7 +197,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 		events := r.Events()
 		_ = MustWriteEvents(t, db, events)
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 			from, err := snapshot.MaxTopologicalPosition(ctx, r.ID)
 			if err != nil {
 				t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
@@ -436,7 +436,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 		// At this point there should be no messages. We haven't sent anything
 		// yet.
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 			_, events, err := snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, 100)
 			if err != nil {
 				t.Fatal(err)
@@ -456,7 +456,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 			// At this point we should get exactly one message. We're sending the sync position
 			// that we were given from the update and the send-to-device update will be updated
 			// in the database to reflect that this was the sync position we sent the message at.
@@ -486,7 +486,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			return
 		}
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 			// At this point we should now have no updates, because we've progressed the sync
 			// position. Therefore the update from before will not be sent again.
 			var events []types.SendToDeviceEvent
@@ -523,7 +523,7 @@ func TestSendToDeviceBehaviour(t *testing.T) {
 			lastPos = streamPos
 		}
 
-		WithSnapshot(t, db, func(snapshot storage.DatabaseSnapshot) {
+		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 			_, events, err := snapshot.SendToDeviceUpdatesForSync(ctx, alice.ID, deviceID, 0, lastPos)
 			if err != nil {
 				t.Fatalf("unable to get events: %v", err)

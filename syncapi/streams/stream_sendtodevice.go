@@ -12,7 +12,7 @@ type SendToDeviceStreamProvider struct {
 }
 
 func (p *SendToDeviceStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
@@ -28,7 +28,7 @@ func (p *SendToDeviceStreamProvider) Setup(
 
 func (p *SendToDeviceStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
@@ -36,7 +36,7 @@ func (p *SendToDeviceStreamProvider) CompleteSync(
 
 func (p *SendToDeviceStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

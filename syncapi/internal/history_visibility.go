@@ -100,7 +100,7 @@ func (ev eventVisibility) allowed() (allowed bool) {
 // Returns the filtered events and an error, if any.
 func ApplyHistoryVisibilityFilter(
 	ctx context.Context,
-	syncDB storage.DatabaseSnapshot,
+	syncDB storage.DatabaseTransaction,
 	rsAPI api.SyncRoomserverAPI,
 	events []*gomatrixserverlib.HeaderedEvent,
 	alwaysIncludeEventIDs map[string]struct{},

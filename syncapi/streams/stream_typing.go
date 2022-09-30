@@ -17,7 +17,7 @@ type TypingStreamProvider struct {
 
 func (p *TypingStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
@@ -25,7 +25,7 @@ func (p *TypingStreamProvider) CompleteSync(
 
 func (p *TypingStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

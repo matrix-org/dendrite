@@ -258,7 +258,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 // contextEvents returns the events around a given eventID
 func contextEvents(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	event *gomatrixserverlib.HeaderedEvent,
 	roomFilter *gomatrixserverlib.RoomEventFilter,
 	searchReq SearchRequest,

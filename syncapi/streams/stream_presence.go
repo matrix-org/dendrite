@@ -35,7 +35,7 @@ type PresenceStreamProvider struct {
 }
 
 func (p *PresenceStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
@@ -51,7 +51,7 @@ func (p *PresenceStreamProvider) Setup(
 
 func (p *PresenceStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
@@ -59,7 +59,7 @@ func (p *PresenceStreamProvider) CompleteSync(
 
 func (p *PresenceStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

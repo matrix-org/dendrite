@@ -39,7 +39,7 @@ import (
 type messagesReq struct {
 	ctx              context.Context
 	db               storage.Database
-	snapshot         storage.DatabaseSnapshot
+	snapshot         storage.DatabaseTransaction
 	rsAPI            api.SyncRoomserverAPI
 	cfg              *config.SyncAPI
 	roomID           string
@@ -71,7 +71,7 @@ func OnIncomingMessagesRequest(
 ) util.JSONResponse {
 	var err error
 
-	snapshot, err := db.NewDatabaseWritable(req.Context())
+	snapshot, err := db.NewDatabaseTransaction(req.Context())
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
@@ -247,7 +247,7 @@ func OnIncomingMessagesRequest(
 // LazyLoadMembers enabled.
 func (m *messagesResp) applyLazyLoadMembers(
 	ctx context.Context,
-	db storage.DatabaseSnapshot,
+	db storage.DatabaseTransaction,
 	roomID string,
 	device *userapi.Device,
 	lazyLoad bool,
@@ -561,7 +561,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 // Returns an error if there was an issue with retrieving the latest position
 // from the database
 func setToDefault(
-	ctx context.Context, snapshot storage.DatabaseSnapshot, backwardOrdering bool,
+	ctx context.Context, snapshot storage.DatabaseTransaction, backwardOrdering bool,
 	roomID string,
 ) (to types.TopologyToken, err error) {
 	if backwardOrdering {

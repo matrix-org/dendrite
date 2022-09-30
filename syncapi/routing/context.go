@@ -194,7 +194,7 @@ func Context(
 // by combining the events before and after the context event. Returns the filtered events,
 // and an error, if any.
 func applyHistoryVisibilityOnContextEvents(
-	ctx context.Context, snapshot storage.DatabaseSnapshot, rsAPI roomserver.SyncRoomserverAPI,
+	ctx context.Context, snapshot storage.DatabaseTransaction, rsAPI roomserver.SyncRoomserverAPI,
 	eventsBefore, eventsAfter []*gomatrixserverlib.HeaderedEvent,
 	userID string,
 ) (filteredBefore, filteredAfter []*gomatrixserverlib.HeaderedEvent, err error) {
@@ -228,7 +228,7 @@ func applyHistoryVisibilityOnContextEvents(
 	return filteredBefore, filteredAfter, nil
 }
 
-func getStartEnd(ctx context.Context, snapshot storage.DatabaseSnapshot, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if len(startEvents) > 0 {
 		start, err = snapshot.EventPositionInTopology(ctx, startEvents[0].EventID())
 		if err != nil {

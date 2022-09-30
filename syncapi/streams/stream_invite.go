@@ -18,7 +18,7 @@ type InviteStreamProvider struct {
 }
 
 func (p *InviteStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
@@ -34,7 +34,7 @@ func (p *InviteStreamProvider) Setup(
 
 func (p *InviteStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
@@ -42,7 +42,7 @@ func (p *InviteStreamProvider) CompleteSync(
 
 func (p *InviteStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {

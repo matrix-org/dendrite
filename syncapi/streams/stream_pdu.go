@@ -40,7 +40,7 @@ type PDUStreamProvider struct {
 }
 
 func (p *PDUStreamProvider) Setup(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context, snapshot storage.DatabaseTransaction,
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
@@ -56,7 +56,7 @@ func (p *PDUStreamProvider) Setup(
 
 func (p *PDUStreamProvider) CompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	from := types.StreamPosition(0)
@@ -132,7 +132,7 @@ func (p *PDUStreamProvider) CompleteSync(
 
 func (p *PDUStreamProvider) IncrementalSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) (newPos types.StreamPosition) {
@@ -210,7 +210,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 // nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	device *userapi.Device,
 	r types.Range,
 	delta types.StateDelta,
@@ -343,7 +343,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 // sure we always return the required events in the timeline.
 func applyHistoryVisibilityFilter(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	roomID, userID string,
 	limit int,
@@ -375,7 +375,7 @@ func applyHistoryVisibilityFilter(
 	return events, nil
 }
 
-func (p *PDUStreamProvider) addRoomSummary(ctx context.Context, snapshot storage.DatabaseSnapshot, jr *types.JoinResponse, roomID, userID string, latestPosition types.StreamPosition) {
+func (p *PDUStreamProvider) addRoomSummary(ctx context.Context, snapshot storage.DatabaseTransaction, jr *types.JoinResponse, roomID, userID string, latestPosition types.StreamPosition) {
 	// Work out how many members are in the room.
 	joinedCount, _ := snapshot.MembershipCount(ctx, roomID, gomatrixserverlib.Join, latestPosition)
 	invitedCount, _ := snapshot.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, latestPosition)
@@ -416,7 +416,7 @@ func (p *PDUStreamProvider) addRoomSummary(ctx context.Context, snapshot storage
 
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
-	snapshot storage.DatabaseSnapshot,
+	snapshot storage.DatabaseTransaction,
 	roomID string,
 	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
@@ -518,7 +518,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 }
 
 func (p *PDUStreamProvider) lazyLoadMembers(
-	ctx context.Context, snapshot storage.DatabaseSnapshot, roomID string,
+	ctx context.Context, snapshot storage.DatabaseTransaction, roomID string,
 	incremental, limited bool, stateFilter *gomatrixserverlib.StateFilter,
 	device *userapi.Device,
 	timelineEvents, stateEvents []*gomatrixserverlib.HeaderedEvent,
@@ -581,7 +581,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 
 // addIgnoredUsersToFilter adds ignored users to the eventfilter and
 // the syncreq itself for further use in streams.
-func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, snapshot storage.DatabaseSnapshot, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
+func (p *PDUStreamProvider) addIgnoredUsersToFilter(ctx context.Context, snapshot storage.DatabaseTransaction, req *types.SyncRequest, eventFilter *gomatrixserverlib.RoomEventFilter) error {
 	ignores, err := snapshot.IgnoresForUser(ctx, req.Device.UserID)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -11,26 +11,26 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type DatabaseSnapshot struct {
+type DatabaseTransaction struct {
 	*Database
 	txn *sql.Tx
 }
 
-func (d *DatabaseSnapshot) Commit() error {
+func (d *DatabaseTransaction) Commit() error {
 	if d.txn == nil {
 		return nil
 	}
 	return d.txn.Commit()
 }
 
-func (d *DatabaseSnapshot) Rollback() error {
+func (d *DatabaseTransaction) Rollback() error {
 	if d.txn == nil {
 		return nil
 	}
 	return d.txn.Rollback()
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.OutputEvents.SelectMaxEventID(ctx, d.txn)
 	if err != nil {
 		return 0, fmt.Errorf("d.OutputEvents.SelectMaxEventID: %w", err)
@@ -38,7 +38,7 @@ func (d *DatabaseSnapshot) MaxStreamPositionForPDUs(ctx context.Context) (types.
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Receipts.SelectMaxReceiptID(ctx, d.txn)
 	if err != nil {
 		return 0, fmt.Errorf("d.Receipts.SelectMaxReceiptID: %w", err)
@@ -46,7 +46,7 @@ func (d *DatabaseSnapshot) MaxStreamPositionForReceipts(ctx context.Context) (ty
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForInvites(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Invites.SelectMaxInviteID(ctx, d.txn)
 	if err != nil {
 		return 0, fmt.Errorf("d.Invites.SelectMaxInviteID: %w", err)
@@ -54,7 +54,7 @@ func (d *DatabaseSnapshot) MaxStreamPositionForInvites(ctx context.Context) (typ
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.SendToDevice.SelectMaxSendToDeviceMessageID(ctx, d.txn)
 	if err != nil {
 		return 0, fmt.Errorf("d.SendToDevice.SelectMaxSendToDeviceMessageID: %w", err)
@@ -62,7 +62,7 @@ func (d *DatabaseSnapshot) MaxStreamPositionForSendToDeviceMessages(ctx context.
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.AccountData.SelectMaxAccountDataID(ctx, d.txn)
 	if err != nil {
 		return 0, fmt.Errorf("d.Invites.SelectMaxAccountDataID: %w", err)
@@ -70,7 +70,7 @@ func (d *DatabaseSnapshot) MaxStreamPositionForAccountData(ctx context.Context) 
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.NotificationData.SelectMaxID(ctx, d.txn)
 	if err != nil {
 		return 0, fmt.Errorf("d.NotificationData.SelectMaxID: %w", err)
@@ -78,39 +78,39 @@ func (d *DatabaseSnapshot) MaxStreamPositionForNotificationData(ctx context.Cont
 	return types.StreamPosition(id), nil
 }
 
-func (d *DatabaseSnapshot) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilterPart, excludeEventIDs)
 }
 
-func (d *DatabaseSnapshot) RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error) {
+func (d *DatabaseTransaction) RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error) {
 	return d.CurrentRoomState.SelectRoomIDsWithMembership(ctx, d.txn, userID, membership)
 }
 
-func (d *DatabaseSnapshot) MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error) {
+func (d *DatabaseTransaction) MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error) {
 	return d.Memberships.SelectMembershipCount(ctx, d.txn, roomID, membership, pos)
 }
 
-func (d *DatabaseSnapshot) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
+func (d *DatabaseTransaction) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
 	return d.Memberships.SelectHeroes(ctx, d.txn, roomID, userID, memberships)
 }
 
-func (d *DatabaseSnapshot) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
+func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
 	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
-func (d *DatabaseSnapshot) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
+func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {
 	return d.Topology.SelectPositionInTopology(ctx, d.txn, eventID)
 }
 
-func (d *DatabaseSnapshot) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
 	return d.Invites.SelectInviteEventsInRange(ctx, d.txn, targetUserID, r)
 }
 
-func (d *DatabaseSnapshot) PeeksInRange(ctx context.Context, userID, deviceID string, r types.Range) (peeks []types.Peek, err error) {
+func (d *DatabaseTransaction) PeeksInRange(ctx context.Context, userID, deviceID string, r types.Range) (peeks []types.Peek, err error) {
 	return d.Peeks.SelectPeeksInRange(ctx, d.txn, userID, deviceID, r)
 }
 
-func (d *DatabaseSnapshot) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
+func (d *DatabaseTransaction) RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
 	return d.Receipts.SelectRoomReceiptsAfter(ctx, d.txn, roomIDs, streamPos)
 }
 
@@ -119,7 +119,7 @@ func (d *DatabaseSnapshot) RoomReceiptsAfter(ctx context.Context, roomIDs []stri
 // If an event is not found in the database then it will be omitted from the list.
 // Returns an error if there was a problem talking with the database.
 // Does not include any transaction IDs in the returned events.
-func (d *DatabaseSnapshot) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
+func (d *DatabaseTransaction) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	streamEvents, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, false)
 	if err != nil {
 		return nil, err
@@ -130,29 +130,29 @@ func (d *DatabaseSnapshot) Events(ctx context.Context, eventIDs []string) ([]*go
 	return d.StreamEventsToEvents(nil, streamEvents), nil
 }
 
-func (d *DatabaseSnapshot) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
+func (d *DatabaseTransaction) AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsers(ctx, d.txn)
 }
 
-func (d *DatabaseSnapshot) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
+func (d *DatabaseTransaction) AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error) {
 	return d.CurrentRoomState.SelectJoinedUsersInRoom(ctx, d.txn, roomIDs)
 }
 
-func (d *DatabaseSnapshot) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
+func (d *DatabaseTransaction) AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error) {
 	return d.Peeks.SelectPeekingDevices(ctx, d.txn)
 }
 
-func (d *DatabaseSnapshot) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
+func (d *DatabaseTransaction) SharedUsers(ctx context.Context, userID string, otherUserIDs []string) ([]string, error) {
 	return d.CurrentRoomState.SelectSharedUsers(ctx, d.txn, userID, otherUserIDs)
 }
 
-func (d *DatabaseSnapshot) GetStateEvent(
+func (d *DatabaseTransaction) GetStateEvent(
 	ctx context.Context, roomID, evType, stateKey string,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	return d.CurrentRoomState.SelectStateEvent(ctx, d.txn, roomID, evType, stateKey)
 }
 
-func (d *DatabaseSnapshot) GetStateEventsForRoom(
+func (d *DatabaseTransaction) GetStateEventsForRoom(
 	ctx context.Context, roomID string, stateFilter *gomatrixserverlib.StateFilter,
 ) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error) {
 	stateEvents, err = d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, stateFilter, nil)
@@ -164,14 +164,14 @@ func (d *DatabaseSnapshot) GetStateEventsForRoom(
 // Returns a map following the format data[roomID] = []dataTypes
 // If no data is retrieved, returns an empty map
 // If there was an issue with the retrieval, returns an error
-func (d *DatabaseSnapshot) GetAccountDataInRange(
+func (d *DatabaseTransaction) GetAccountDataInRange(
 	ctx context.Context, userID string, r types.Range,
 	accountDataFilterPart *gomatrixserverlib.EventFilter,
 ) (map[string][]string, types.StreamPosition, error) {
 	return d.AccountData.SelectAccountDataInRange(ctx, d.txn, userID, r, accountDataFilterPart)
 }
 
-func (d *DatabaseSnapshot) GetEventsInTopologicalRange(
+func (d *DatabaseTransaction) GetEventsInTopologicalRange(
 	ctx context.Context,
 	from, to *types.TopologyToken,
 	roomID string,
@@ -207,13 +207,13 @@ func (d *DatabaseSnapshot) GetEventsInTopologicalRange(
 	return
 }
 
-func (d *DatabaseSnapshot) BackwardExtremitiesForRoom(
+func (d *DatabaseTransaction) BackwardExtremitiesForRoom(
 	ctx context.Context, roomID string,
 ) (backwardExtremities map[string][]string, err error) {
 	return d.BackwardExtremities.SelectBackwardExtremitiesForRoom(ctx, d.txn, roomID)
 }
 
-func (d *DatabaseSnapshot) MaxTopologicalPosition(
+func (d *DatabaseTransaction) MaxTopologicalPosition(
 	ctx context.Context, roomID string,
 ) (types.TopologyToken, error) {
 	depth, streamPos, err := d.Topology.SelectMaxPositionInTopology(ctx, d.txn, roomID)
@@ -223,7 +223,7 @@ func (d *DatabaseSnapshot) MaxTopologicalPosition(
 	return types.TopologyToken{Depth: depth, PDUPosition: streamPos}, nil
 }
 
-func (d *DatabaseSnapshot) EventPositionInTopology(
+func (d *DatabaseTransaction) EventPositionInTopology(
 	ctx context.Context, eventID string,
 ) (types.TopologyToken, error) {
 	depth, stream, err := d.Topology.SelectPositionInTopology(ctx, d.txn, eventID)
@@ -233,7 +233,7 @@ func (d *DatabaseSnapshot) EventPositionInTopology(
 	return types.TopologyToken{Depth: depth, PDUPosition: stream}, nil
 }
 
-func (d *DatabaseSnapshot) StreamToTopologicalPosition(
+func (d *DatabaseTransaction) StreamToTopologicalPosition(
 	ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
 ) (types.TopologyToken, error) {
 	topoPos, err := d.Topology.SelectStreamToTopologicalPosition(ctx, d.txn, roomID, streamPos, backwardOrdering)
@@ -255,7 +255,7 @@ func (d *DatabaseSnapshot) StreamToTopologicalPosition(
 
 // GetBackwardTopologyPos retrieves the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
-func (d *DatabaseSnapshot) GetBackwardTopologyPos(
+func (d *DatabaseTransaction) GetBackwardTopologyPos(
 	ctx context.Context,
 	events []types.StreamEvent,
 ) (types.TopologyToken, error) {
@@ -276,7 +276,7 @@ func (d *DatabaseSnapshot) GetBackwardTopologyPos(
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
-func (d *DatabaseSnapshot) GetStateDeltas(
+func (d *DatabaseTransaction) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
@@ -403,7 +403,7 @@ func (d *DatabaseSnapshot) GetStateDeltas(
 // requests with full_state=true.
 // Fetches full state for all joined rooms and uses selectStateInRange to get
 // updates for other rooms.
-func (d *DatabaseSnapshot) GetStateDeltasForFullStateSync(
+func (d *DatabaseTransaction) GetStateDeltasForFullStateSync(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
 	stateFilter *gomatrixserverlib.StateFilter,
@@ -513,7 +513,7 @@ func (d *DatabaseSnapshot) GetStateDeltasForFullStateSync(
 	return result, joinedRoomIDs, nil
 }
 
-func (d *DatabaseSnapshot) currentStateStreamEventsForRoom(
+func (d *DatabaseTransaction) currentStateStreamEventsForRoom(
 	ctx context.Context, roomID string,
 	stateFilter *gomatrixserverlib.StateFilter,
 ) ([]types.StreamEvent, error) {
@@ -528,7 +528,7 @@ func (d *DatabaseSnapshot) currentStateStreamEventsForRoom(
 	return s, nil
 }
 
-func (d *DatabaseSnapshot) SendToDeviceUpdatesForSync(
+func (d *DatabaseTransaction) SendToDeviceUpdatesForSync(
 	ctx context.Context,
 	userID, deviceID string,
 	from, to types.StreamPosition,
@@ -545,12 +545,12 @@ func (d *DatabaseSnapshot) SendToDeviceUpdatesForSync(
 	return lastPos, events, nil
 }
 
-func (d *DatabaseSnapshot) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error) {
+func (d *DatabaseTransaction) GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error) {
 	_, receipts, err := d.Receipts.SelectRoomReceiptsAfter(ctx, d.txn, roomIDs, streamPos)
 	return receipts, err
 }
 
-func (d *DatabaseSnapshot) GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, rooms map[string]string) (map[string]*eventutil.NotificationData, error) {
+func (d *DatabaseTransaction) GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, rooms map[string]string) (map[string]*eventutil.NotificationData, error) {
 	roomIDs := make([]string, 0, len(rooms))
 	for roomID, membership := range rooms {
 		if membership != gomatrixserverlib.Join {
@@ -561,14 +561,14 @@ func (d *DatabaseSnapshot) GetUserUnreadNotificationCountsForRooms(ctx context.C
 	return d.NotificationData.SelectUserUnreadCountsForRooms(ctx, d.txn, userID, roomIDs)
 }
 
-func (d *DatabaseSnapshot) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+func (d *DatabaseTransaction) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
 	return d.Presence.GetPresenceForUser(ctx, d.txn, userID)
 }
 
-func (d *DatabaseSnapshot) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+func (d *DatabaseTransaction) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
 	return d.Presence.GetPresenceAfter(ctx, d.txn, after, filter)
 }
 
-func (d *DatabaseSnapshot) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return d.Presence.GetMaxPresenceID(ctx, d.txn)
 }

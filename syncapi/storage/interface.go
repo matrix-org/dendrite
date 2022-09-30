@@ -26,7 +26,7 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-type DatabaseSnapshot interface {
+type DatabaseTransaction interface {
 	SharedUsers
 
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
@@ -111,8 +111,8 @@ type Database interface {
 	Presence
 	Notifications
 
-	NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseSnapshot, error)
-	NewDatabaseWritable(ctx context.Context) (*shared.DatabaseSnapshot, error)
+	NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseTransaction, error)
+	NewDatabaseTransaction(ctx context.Context) (*shared.DatabaseTransaction, error)
 
 	// Events lookups a list of event by their event ID.
 	// Returns a list of events matching the requested IDs found in the database.
