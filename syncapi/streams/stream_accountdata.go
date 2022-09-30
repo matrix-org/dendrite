@@ -23,11 +23,17 @@ func (p *AccountDataStreamProvider) Setup(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
+	p.latest = p.latestPosition(ctx, snapshot)
+}
+
+func (p *AccountDataStreamProvider) latestPosition(
+	ctx context.Context, snapshot storage.DatabaseSnapshot,
+) types.StreamPosition {
 	id, err := snapshot.MaxStreamPositionForAccountData(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	p.latest = id
+	return id
 }
 
 func (p *AccountDataStreamProvider) CompleteSync(
@@ -35,7 +41,7 @@ func (p *AccountDataStreamProvider) CompleteSync(
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.latestPosition(ctx, snapshot))
 }
 
 func (p *AccountDataStreamProvider) IncrementalSync(

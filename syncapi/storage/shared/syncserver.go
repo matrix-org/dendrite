@@ -85,6 +85,12 @@ func (d *Database) NewDatabaseWritable(ctx context.Context) (*DatabaseSnapshot, 
 	}, nil
 }
 
+func (d *Database) GetFilter(
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, nil, target, localpart, filterID)
+}
+
 func (d *Database) Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	streamEvents, err := d.OutputEvents.SelectEvents(ctx, nil, eventIDs, nil, false)
 	if err != nil {

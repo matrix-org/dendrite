@@ -56,7 +56,16 @@ func AddPublicRoutes(
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
 	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, base.Caches, notifier)
-	notifier.SetCurrentPosition(streams.Latest(context.Background()))
+
+	snapshot, err := syncDB.NewDatabaseSnapshot(base.ProcessContext.Context())
+	if err != nil {
+		logrus.WithError(err).Fatalf("Failed to acquire database snapshot for sync startup")
+	}
+	notifier.SetCurrentPosition(streams.Latest(context.Background(), snapshot))
+	if err = snapshot.Rollback(); err != nil {
+		logrus.WithError(err).Fatalf("Failed to roll back snapshot for sync startup")
+	}
+
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
 	}

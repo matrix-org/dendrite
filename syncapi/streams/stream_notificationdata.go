@@ -16,11 +16,20 @@ func (p *NotificationDataStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	p.latest = p.latestPosition(ctx, snapshot)
+}
+
+func (p *NotificationDataStreamProvider) latestPosition(
+	ctx context.Context, snapshot storage.DatabaseSnapshot,
+) types.StreamPosition {
 	id, err := snapshot.MaxStreamPositionForNotificationData(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	p.latest = id
+	return id
 }
 
 func (p *NotificationDataStreamProvider) CompleteSync(
@@ -28,7 +37,7 @@ func (p *NotificationDataStreamProvider) CompleteSync(
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.latestPosition(ctx, snapshot))
 }
 
 func (p *NotificationDataStreamProvider) IncrementalSync(
@@ -59,5 +68,5 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		req.Response.Rooms.Join[roomID] = jr
 	}
 
-	return p.LatestPosition(ctx)
+	return p.latestPosition(ctx, snapshot)
 }

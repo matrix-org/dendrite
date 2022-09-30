@@ -47,11 +47,17 @@ func (p *PDUStreamProvider) Setup(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
+	p.latest = p.latestPosition(ctx, snapshot)
+}
+
+func (p *PDUStreamProvider) latestPosition(
+	ctx context.Context, snapshot storage.DatabaseSnapshot,
+) types.StreamPosition {
 	id, err := snapshot.MaxStreamPositionForPDUs(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	p.latest = id
+	return id
 }
 
 func (p *PDUStreamProvider) CompleteSync(
@@ -60,7 +66,7 @@ func (p *PDUStreamProvider) CompleteSync(
 	req *types.SyncRequest,
 ) types.StreamPosition {
 	from := types.StreamPosition(0)
-	to := p.LatestPosition(ctx)
+	to := p.latestPosition(ctx, snapshot)
 
 	// Get the current sync position which we will base the sync response on.
 	// For complete syncs, we want to start at the most recent events and work

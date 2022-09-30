@@ -25,11 +25,17 @@ func (p *InviteStreamProvider) Setup(
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := snapshot.MaxStreamPositionForInvites(context.Background())
+	p.latest = p.latestPosition(ctx, snapshot)
+}
+
+func (p *InviteStreamProvider) latestPosition(
+	ctx context.Context, snapshot storage.DatabaseSnapshot,
+) types.StreamPosition {
+	id, err := snapshot.MaxStreamPositionForAccountData(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	p.latest = id
+	return id
 }
 
 func (p *InviteStreamProvider) CompleteSync(
@@ -37,7 +43,7 @@ func (p *InviteStreamProvider) CompleteSync(
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.latestPosition(ctx, snapshot))
 }
 
 func (p *InviteStreamProvider) IncrementalSync(
