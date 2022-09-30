@@ -27,6 +27,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -454,7 +455,8 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	if err != nil {
 		return nil, err
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	prevEvent, err := snapshot.GetStateEvent(
 		s.ctx, event.RoomID(), event.Type(), stateKey,
@@ -474,6 +476,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	}
 
 	event.Event, err = event.SetUnsigned(prev)
+	succeeded = true
 	return event, err
 }
 

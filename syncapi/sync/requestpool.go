@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -310,7 +311,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
 			return jsonerror.InternalServerError()
 		}
-		defer snapshot.Commit() // nolint:errcheck
+		var succeeded bool
+		defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 		if syncReq.Since.IsEmpty() {
 			// Complete sync
@@ -409,6 +411,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			}
 		}
 
+		succeeded = true
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: syncReq.Response,

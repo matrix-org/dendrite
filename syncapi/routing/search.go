@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
@@ -65,7 +66,8 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// only search rooms the user is actually joined to
 	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")
@@ -249,6 +251,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	logrus.Debugf("Full search request took %v", time.Since(start))
 
+	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
