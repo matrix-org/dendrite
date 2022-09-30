@@ -25,6 +25,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -55,7 +56,8 @@ func Context(
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
@@ -184,6 +186,7 @@ func Context(
 		response.End = end.String()
 		response.Start = start.String()
 	}
+	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: response,

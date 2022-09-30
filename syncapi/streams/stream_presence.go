@@ -67,6 +67,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	presences, err := snapshot.PresenceAfter(ctx, from, gomatrixserverlib.EventFilter{Limit: 1000})
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PresenceAfter failed")
+		_ = snapshot.Rollback()
 		return from
 	}
 
@@ -95,6 +96,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				presences[roomUsers[i]], err = snapshot.GetPresence(ctx, roomUsers[i])
 				if err != nil {
 					req.Log.WithError(err).Error("unable to query presence for user")
+					_ = snapshot.Rollback()
 					return from
 				}
 				if len(presences) > req.Filter.Presence.Limit {
