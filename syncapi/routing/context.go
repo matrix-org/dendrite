@@ -51,6 +51,12 @@ func Context(
 	roomID, eventID string,
 	lazyLoadCache caching.LazyLoadCache,
 ) util.JSONResponse {
+	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+	defer snapshot.Rollback() // nolint:errcheck
+
 	filter, err := parseRoomEventFilter(req)
 	if err != nil {
 		errMsg := ""
@@ -97,7 +103,7 @@ func Context(
 		ContainsURL:             filter.ContainsURL,
 	}
 
-	id, requestedEvent, err := syncDB.SelectContextEvent(ctx, roomID, eventID)
+	id, requestedEvent, err := snapshot.SelectContextEvent(ctx, roomID, eventID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return util.JSONResponse{
@@ -111,7 +117,7 @@ func Context(
 
 	// verify the user is allowed to see the context for this room/event
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, []*gomatrixserverlib.HeaderedEvent{&requestedEvent}, nil, device.UserID, "context")
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
@@ -127,20 +133,20 @@ func Context(
 		}
 	}
 
-	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, roomID, filter)
+	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch before events")
 		return jsonerror.InternalServerError()
 	}
 
-	_, eventsAfter, err := syncDB.SelectContextAfterEvent(ctx, id, roomID, filter)
+	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, roomID, filter)
 	if err != nil && err != sql.ErrNoRows {
 		logrus.WithError(err).Error("unable to fetch after events")
 		return jsonerror.InternalServerError()
 	}
 
 	startTime = time.Now()
-	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, syncDB, rsAPI, eventsBefore, eventsAfter, device.UserID)
+	eventsBeforeFiltered, eventsAfterFiltered, err := applyHistoryVisibilityOnContextEvents(ctx, snapshot, rsAPI, eventsBefore, eventsAfter, device.UserID)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 		return jsonerror.InternalServerError()
@@ -152,7 +158,7 @@ func Context(
 	}).Debug("applied history visibility (context eventsBefore/eventsAfter)")
 
 	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
-	state, err := syncDB.CurrentState(ctx, roomID, &stateFilter, nil)
+	state, err := snapshot.CurrentState(ctx, roomID, &stateFilter, nil)
 	if err != nil {
 		logrus.WithError(err).Error("unable to fetch current room state")
 		return jsonerror.InternalServerError()
@@ -173,7 +179,7 @@ func Context(
 	if len(response.State) > filter.Limit {
 		response.State = response.State[len(response.State)-filter.Limit:]
 	}
-	start, end, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
+	start, end, err := getStartEnd(ctx, snapshot, eventsBefore, eventsAfter)
 	if err == nil {
 		response.End = end.String()
 		response.Start = start.String()
@@ -188,7 +194,7 @@ func Context(
 // by combining the events before and after the context event. Returns the filtered events,
 // and an error, if any.
 func applyHistoryVisibilityOnContextEvents(
-	ctx context.Context, syncDB storage.Database, rsAPI roomserver.SyncRoomserverAPI,
+	ctx context.Context, snapshot storage.DatabaseTransaction, rsAPI roomserver.SyncRoomserverAPI,
 	eventsBefore, eventsAfter []*gomatrixserverlib.HeaderedEvent,
 	userID string,
 ) (filteredBefore, filteredAfter []*gomatrixserverlib.HeaderedEvent, err error) {
@@ -205,7 +211,7 @@ func applyHistoryVisibilityOnContextEvents(
 	}
 
 	allEvents := append(eventsBefore, eventsAfter...)
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, syncDB, rsAPI, allEvents, nil, userID, "context")
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, allEvents, nil, userID, "context")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -222,15 +228,15 @@ func applyHistoryVisibilityOnContextEvents(
 	return filteredBefore, filteredAfter, nil
 }
 
-func getStartEnd(ctx context.Context, syncDB storage.Database, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
+func getStartEnd(ctx context.Context, snapshot storage.DatabaseTransaction, startEvents, endEvents []*gomatrixserverlib.HeaderedEvent) (start, end types.TopologyToken, err error) {
 	if len(startEvents) > 0 {
-		start, err = syncDB.EventPositionInTopology(ctx, startEvents[0].EventID())
+		start, err = snapshot.EventPositionInTopology(ctx, startEvents[0].EventID())
 		if err != nil {
 			return
 		}
 	}
 	if len(endEvents) > 0 {
-		end, err = syncDB.EventPositionInTopology(ctx, endEvents[0].EventID())
+		end, err = snapshot.EventPositionInTopology(ctx, endEvents[0].EventID())
 	}
 	return
 }

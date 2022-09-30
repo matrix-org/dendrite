@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -45,8 +46,8 @@ type OutputRoomEventConsumer struct {
 	durable      string
 	topic        string
 	db           storage.Database
-	pduStream    types.StreamProvider
-	inviteStream types.StreamProvider
+	pduStream    streams.StreamProvider
+	inviteStream streams.StreamProvider
 	notifier     *notifier.Notifier
 	fts          *fulltext.Search
 }
@@ -58,8 +59,8 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	pduStream types.StreamProvider,
-	inviteStream types.StreamProvider,
+	pduStream streams.StreamProvider,
+	inviteStream streams.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
 	fts *fulltext.Search,
 ) *OutputRoomEventConsumer {
@@ -449,8 +450,14 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	}
 	stateKey := *event.StateKey()
 
-	prevEvent, err := s.db.GetStateEvent(
-		context.TODO(), event.RoomID(), event.Type(), stateKey,
+	snapshot, err := s.db.NewDatabaseSnapshot(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer snapshot.Rollback() // nolint:errcheck
+
+	prevEvent, err := snapshot.GetStateEvent(
+		s.ctx, event.RoomID(), event.Type(), stateKey,
 	)
 	if err != nil {
 		return event, err
