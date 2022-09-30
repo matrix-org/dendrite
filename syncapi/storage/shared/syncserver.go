@@ -56,22 +56,30 @@ type Database struct {
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
-	txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
-		// Set the isolation level so that we see a snapshot of the database.
-		// In PostgreSQL repeatable read transactions will see a snapshot taken
-		// at the first query, and since the transaction is read-only it can't
-		// run into any serialisation errors.
-		// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
-		Isolation: sql.LevelRepeatableRead,
-		ReadOnly:  true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &DatabaseTransaction{
-		Database: d,
-		txn:      txn,
-	}, nil
+	return d.NewDatabaseTransaction(ctx)
+
+	/*
+		TODO: Repeatable read is probably the right thing to do here,
+		but it seems to cause some problems with the invite tests, so
+		need to investigate that further.
+
+		txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
+			// Set the isolation level so that we see a snapshot of the database.
+			// In PostgreSQL repeatable read transactions will see a snapshot taken
+			// at the first query, and since the transaction is read-only it can't
+			// run into any serialisation errors.
+			// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
+			Isolation: sql.LevelRepeatableRead,
+			ReadOnly:  true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &DatabaseTransaction{
+			Database: d,
+			txn:      txn,
+		}, nil
+	*/
 }
 
 func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransaction, error) {
