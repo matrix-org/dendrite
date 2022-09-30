@@ -8,16 +8,18 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
-type StreamProvider struct {
+type DefaultStreamProvider struct {
 	DB          storage.Database
 	latest      types.StreamPosition
 	latestMutex sync.RWMutex
 }
 
-func (p *StreamProvider) Setup() {
+func (p *DefaultStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseTransaction,
+) {
 }
 
-func (p *StreamProvider) Advance(
+func (p *DefaultStreamProvider) Advance(
 	latest types.StreamPosition,
 ) {
 	p.latestMutex.Lock()
@@ -28,7 +30,7 @@ func (p *StreamProvider) Advance(
 	}
 }
 
-func (p *StreamProvider) LatestPosition(
+func (p *DefaultStreamProvider) LatestPosition(
 	ctx context.Context,
 ) types.StreamPosition {
 	p.latestMutex.RLock()

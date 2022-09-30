@@ -367,7 +367,13 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	for start < len(eventIDs) {
 		n := minOfInts(len(eventIDs)-start, 999)
 		query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", sqlutil.QueryVariadic(n), 1)
-		rows, err := txn.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		var rows *sql.Rows
+		var err error
+		if txn == nil {
+			rows, err = s.db.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		} else {
+			rows, err = txn.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		}
 		if err != nil {
 			return nil, err
 		}
