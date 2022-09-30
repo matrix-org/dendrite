@@ -176,7 +176,7 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 		}
 	}
 	if lastPos == 0 {
-		lastPos = r.To
+		lastPos = r.From
 	}
 	return result, retired, lastPos, nil
 }
