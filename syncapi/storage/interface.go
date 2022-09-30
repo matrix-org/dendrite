@@ -90,10 +90,6 @@ type DatabaseSnapshot interface {
 	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns the
 	// relevant events within the given ranges for the supplied user ID and device ID.
 	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (pos types.StreamPosition, events []types.SendToDeviceEvent, err error)
-	// GetFilter looks up the filter associated with a given local user and filter ID
-	// and populates the target filter. Otherwise returns an error if no such filter exists
-	// or if there was an error talking to the database.
-	GetFilter(ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string) error
 	// GetRoomReceipts gets all receipts for a given roomID
 	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error)
 	SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
@@ -162,6 +158,10 @@ type Database interface {
 	// CleanSendToDeviceUpdates removes all send-to-device messages BEFORE the specified
 	// from position, preventing the send-to-device table from growing indefinitely.
 	CleanSendToDeviceUpdates(ctx context.Context, userID, deviceID string, before types.StreamPosition) (err error)
+	// GetFilter looks up the filter associated with a given local user and filter ID
+	// and populates the target filter. Otherwise returns an error if no such filter exists
+	// or if there was an error talking to the database.
+	GetFilter(ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string) error
 	// PutFilter puts the passed filter into the database.
 	// Returns the filterID as a string. Otherwise returns an error if something
 	// goes wrong.

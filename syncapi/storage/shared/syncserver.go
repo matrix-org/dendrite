@@ -333,6 +333,12 @@ func (d *Database) updateRoomState(
 	return nil
 }
 
+func (d *Database) GetFilter(
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, nil, target, localpart, filterID)
+}
+
 func (d *Database) PutFilter(
 	ctx context.Context, localpart string, filter *gomatrixserverlib.Filter,
 ) (string, error) {
