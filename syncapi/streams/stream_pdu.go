@@ -301,6 +301,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
+		_ = snapshot.Rollback()
 	}
 
 	if len(delta.StateEvents) > 0 {
