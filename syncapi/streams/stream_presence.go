@@ -39,20 +39,11 @@ func (p *PresenceStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	p.latestMutex.Lock()
-	defer p.latestMutex.Unlock()
-
-	p.latest = p.latestPosition(ctx, snapshot)
-}
-
-func (p *PresenceStreamProvider) latestPosition(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
-) types.StreamPosition {
 	id, err := snapshot.MaxStreamPositionForPresence(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	return id
+	p.latest = id
 }
 
 func (p *PresenceStreamProvider) CompleteSync(
@@ -60,7 +51,7 @@ func (p *PresenceStreamProvider) CompleteSync(
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.latestPosition(ctx, snapshot))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *PresenceStreamProvider) IncrementalSync(

@@ -16,20 +16,11 @@ func (p *SendToDeviceStreamProvider) Setup(
 ) {
 	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	p.latestMutex.Lock()
-	defer p.latestMutex.Unlock()
-
-	p.latest = p.latestPosition(ctx, snapshot)
-}
-
-func (p *SendToDeviceStreamProvider) latestPosition(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
-) types.StreamPosition {
 	id, err := snapshot.MaxStreamPositionForSendToDeviceMessages(context.Background())
 	if err != nil {
 		panic(err)
 	}
-	return id
+	p.latest = id
 }
 
 func (p *SendToDeviceStreamProvider) CompleteSync(
@@ -37,7 +28,7 @@ func (p *SendToDeviceStreamProvider) CompleteSync(
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.latestPosition(ctx, snapshot))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *SendToDeviceStreamProvider) IncrementalSync(

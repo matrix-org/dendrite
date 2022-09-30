@@ -31,7 +31,7 @@ func (p *DefaultStreamProvider) Advance(
 }
 
 func (p *DefaultStreamProvider) LatestPosition(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
+	ctx context.Context,
 ) types.StreamPosition {
 	p.latestMutex.RLock()
 	defer p.latestMutex.RUnlock()

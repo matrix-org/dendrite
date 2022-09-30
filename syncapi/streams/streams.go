@@ -87,16 +87,16 @@ func NewSyncStreamProviders(
 	return streams
 }
 
-func (s *Streams) Latest(ctx context.Context, snapshot storage.DatabaseSnapshot) types.StreamingToken {
+func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 	return types.StreamingToken{
-		PDUPosition:              s.PDUStreamProvider.LatestPosition(ctx, snapshot),
-		TypingPosition:           s.TypingStreamProvider.LatestPosition(ctx, snapshot),
-		ReceiptPosition:          s.ReceiptStreamProvider.LatestPosition(ctx, snapshot),
-		InvitePosition:           s.InviteStreamProvider.LatestPosition(ctx, snapshot),
-		SendToDevicePosition:     s.SendToDeviceStreamProvider.LatestPosition(ctx, snapshot),
-		AccountDataPosition:      s.AccountDataStreamProvider.LatestPosition(ctx, snapshot),
-		NotificationDataPosition: s.NotificationDataStreamProvider.LatestPosition(ctx, snapshot),
-		DeviceListPosition:       s.DeviceListStreamProvider.LatestPosition(ctx, snapshot),
-		PresencePosition:         s.PresenceStreamProvider.LatestPosition(ctx, snapshot),
+		PDUPosition:              s.PDUStreamProvider.LatestPosition(ctx),
+		TypingPosition:           s.TypingStreamProvider.LatestPosition(ctx),
+		ReceiptPosition:          s.ReceiptStreamProvider.LatestPosition(ctx),
+		InvitePosition:           s.InviteStreamProvider.LatestPosition(ctx),
+		SendToDevicePosition:     s.SendToDeviceStreamProvider.LatestPosition(ctx),
+		AccountDataPosition:      s.AccountDataStreamProvider.LatestPosition(ctx),
+		NotificationDataPosition: s.NotificationDataStreamProvider.LatestPosition(ctx),
+		DeviceListPosition:       s.DeviceListStreamProvider.LatestPosition(ctx),
+		PresencePosition:         s.PresenceStreamProvider.LatestPosition(ctx),
 	}
 }

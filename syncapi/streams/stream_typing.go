@@ -15,18 +15,12 @@ type TypingStreamProvider struct {
 	EDUCache *caching.EDUCache
 }
 
-func (p *TypingStreamProvider) latestPosition(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
-) types.StreamPosition {
-	return types.StreamPosition(p.EDUCache.GetLatestSyncPosition())
-}
-
 func (p *TypingStreamProvider) CompleteSync(
 	ctx context.Context,
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, snapshot, req, 0, p.latestPosition(ctx, snapshot))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *TypingStreamProvider) IncrementalSync(

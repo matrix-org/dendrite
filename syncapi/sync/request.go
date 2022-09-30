@@ -48,6 +48,13 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		}
 	}
 
+	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
+	if err != nil {
+		logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
+		return nil, err
+	}
+	defer snapshot.Rollback() // nolint:errcheck
+
 	// Create a default filter and apply a stored filter on top of it (if specified)
 	filter := gomatrixserverlib.DefaultFilter()
 	filterQuery := req.URL.Query().Get("filter")
@@ -64,7 +71,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 				util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 				return nil, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 			}
-			if err := syncDB.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && err != sql.ErrNoRows {
+			if err := snapshot.GetFilter(req.Context(), &filter, localpart, filterQuery); err != nil && err != sql.ErrNoRows {
 				util.GetLogger(req.Context()).WithError(err).Error("syncDB.GetFilter failed")
 				return nil, fmt.Errorf("syncDB.GetFilter: %w", err)
 			}

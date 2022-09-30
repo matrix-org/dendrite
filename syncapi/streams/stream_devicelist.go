@@ -16,18 +16,12 @@ type DeviceListStreamProvider struct {
 	keyAPI keyapi.SyncKeyAPI
 }
 
-func (p *DeviceListStreamProvider) latestPosition(
-	ctx context.Context, snapshot storage.DatabaseSnapshot,
-) types.StreamPosition {
-	return 0 // TODO: is this the right thing to do?
-}
-
 func (p *DeviceListStreamProvider) CompleteSync(
 	ctx context.Context,
 	snapshot storage.DatabaseSnapshot,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.latestPosition(ctx, snapshot)
+	return p.LatestPosition(ctx)
 }
 
 func (p *DeviceListStreamProvider) IncrementalSync(

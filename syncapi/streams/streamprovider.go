@@ -24,8 +24,5 @@ type StreamProvider interface {
 	IncrementalSync(ctx context.Context, snapshot storage.DatabaseSnapshot, req *types.SyncRequest, from, to types.StreamPosition) types.StreamPosition
 
 	// LatestPosition returns the latest stream position for this stream.
-	LatestPosition(ctx context.Context, snapshot storage.DatabaseSnapshot) types.StreamPosition
-
-	// latestPosition gets the latest stream position from the database for this stream.
-	latestPosition(ctx context.Context, snapshot storage.DatabaseSnapshot) types.StreamPosition
+	LatestPosition(ctx context.Context) types.StreamPosition
 }

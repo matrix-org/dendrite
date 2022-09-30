@@ -253,6 +253,12 @@ func (d *DatabaseSnapshot) StreamToTopologicalPosition(
 	}
 }
 
+func (d *DatabaseSnapshot) GetFilter(
+	ctx context.Context, target *gomatrixserverlib.Filter, localpart string, filterID string,
+) error {
+	return d.Filter.SelectFilter(ctx, d.txn, target, localpart, filterID)
+}
+
 // GetBackwardTopologyPos retrieves the backward topology position, i.e. the position of the
 // oldest event in the room's topology.
 func (d *DatabaseSnapshot) GetBackwardTopologyPos(
