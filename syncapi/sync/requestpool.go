@@ -452,7 +452,8 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
 		return jsonerror.InternalServerError()
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), snapshot, syncReq, fromToken.PDUPosition, toToken.PDUPosition)
 	_, _, err = internal.DeviceListCatchup(
 		req.Context(), snapshot, rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
@@ -462,6 +463,7 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
 		return jsonerror.InternalServerError()
 	}
+	succeeded = true
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct {
