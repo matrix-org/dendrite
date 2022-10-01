@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -323,7 +324,8 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	if err != nil {
 		return err
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
 	if err != nil {
@@ -337,6 +339,7 @@ func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	}
 	n.setPeekingDevices(roomToPeekingDevices)
 
+	succeeded = true
 	return nil
 }
 
@@ -349,7 +352,8 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	if err != nil {
 		return err
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {
@@ -357,6 +361,7 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
+	succeeded = true
 	return nil
 }
 

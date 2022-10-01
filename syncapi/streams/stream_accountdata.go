@@ -54,6 +54,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 	)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.GetAccountDataInRange failed")
+		_ = snapshot.Reset()
 		return from
 	}
 

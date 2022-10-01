@@ -77,6 +77,7 @@ func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransactio
 		}
 		return &DatabaseTransaction{
 			Database: d,
+			ctx:      ctx,
 			txn:      txn,
 		}, nil
 	*/
@@ -89,6 +90,7 @@ func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransac
 	}
 	return &DatabaseTransaction{
 		Database: d,
+		ctx:      ctx,
 		txn:      txn,
 	}, nil
 }

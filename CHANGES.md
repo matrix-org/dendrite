@@ -1,5 +1,16 @@
 # Changelog
 
+## Dendrite 0.10.1 (2022-09-30)
+
+### Features
+
+* The built-in NATS Server has been updated to version 2.9.2
+
+### Fixes
+
+* A regression introduced in 0.10.0 in `/sync` as a result of transaction errors has been fixed
+* Account data updates will no longer send duplicate output events
+
 ## Dendrite 0.10.0 (2022-09-30)
 
 ### Features

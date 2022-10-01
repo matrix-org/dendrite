@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -72,7 +73,8 @@ func NewSyncStreamProviders(
 	if err != nil {
 		panic(err)
 	}
-	defer snapshot.Rollback() // nolint:errcheck
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	streams.PDUStreamProvider.Setup(ctx, snapshot)
 	streams.TypingStreamProvider.Setup(ctx, snapshot)
@@ -84,6 +86,7 @@ func NewSyncStreamProviders(
 	streams.DeviceListStreamProvider.Setup(ctx, snapshot)
 	streams.PresenceStreamProvider.Setup(ctx, snapshot)
 
+	succeeded = true
 	return streams
 }
 
