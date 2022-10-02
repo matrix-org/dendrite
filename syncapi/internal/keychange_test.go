@@ -193,8 +193,7 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 		}
 
 		lr := syncResponse.Rooms.Leave[roomID]
-		lr.Timeline = &types.Timeline{}
-		lr.State = &types.ClientEvents{Events: roomEvents}
+		lr.Timeline = &types.Timeline{Events: roomEvents}
 		syncResponse.Rooms.Leave[roomID] = lr
 	}
 	return syncResponse
