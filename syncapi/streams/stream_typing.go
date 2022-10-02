@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type TypingStreamProvider struct {
@@ -35,9 +36,9 @@ func (p *TypingStreamProvider) IncrementalSync(
 			continue
 		}
 
-		jr := *types.NewJoinResponse()
-		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
-			jr = existing
+		jr, ok := req.Response.Rooms.Join[roomID]
+		if !ok {
+			jr = *types.NewJoinResponse()
 		}
 
 		if users, updated := p.EDUCache.GetTypingUsersIfUpdatedAfter(
