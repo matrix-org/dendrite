@@ -475,8 +475,14 @@ func (jr JoinResponse) MarshalJSON() ([]byte, error) {
 	if jr.Timeline != nil && len(jr.Timeline.Events) == 0 {
 		a.Timeline = nil
 	}
-	if jr.Summary != nil && len(jr.Summary.Heroes) == 0 {
-		a.Summary = nil
+	if jr.Summary != nil {
+		var nilPtr int
+		joinedEmpty := jr.Summary.JoinedMemberCount == nil || jr.Summary.JoinedMemberCount == &nilPtr
+		invitedEmpty := jr.Summary.InvitedMemberCount == nil || jr.Summary.InvitedMemberCount == &nilPtr
+		if joinedEmpty && invitedEmpty && len(jr.Summary.Heroes) == 0 {
+			a.Summary = nil
+		}
+
 	}
 	if jr.UnreadNotifications != nil &&
 		jr.UnreadNotifications.NotificationCount == 0 && jr.UnreadNotifications.HighlightCount == 0 {
