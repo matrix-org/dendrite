@@ -172,7 +172,8 @@ func joinResponseWithRooms(syncResponse *types.Response, userID string, roomIDs 
 		}
 
 		jr := syncResponse.Rooms.Join[roomID]
-		jr.State.Events = roomEvents
+		jr.Timeline = &types.Timeline{}
+		jr.State = &types.ClientEvents{Events: roomEvents}
 		syncResponse.Rooms.Join[roomID] = jr
 	}
 	return syncResponse
@@ -192,7 +193,8 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 		}
 
 		lr := syncResponse.Rooms.Leave[roomID]
-		lr.Timeline.Events = roomEvents
+		lr.Timeline = &types.Timeline{}
+		lr.State = &types.ClientEvents{Events: roomEvents}
 		syncResponse.Rooms.Leave[roomID] = lr
 	}
 	return syncResponse
@@ -329,8 +331,8 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 	}
 
 	jr := syncResponse.Rooms.Join[roomID]
-	jr.State.Events = roomStateEvents
-	jr.Timeline.Events = roomTimelineEvents
+	jr.State = &types.ClientEvents{Events: roomStateEvents}
+	jr.Timeline = &types.Timeline{Events: roomTimelineEvents}
 	syncResponse.Rooms.Join[roomID] = jr
 
 	rsAPI := &mockRoomserverAPI{
@@ -443,7 +445,7 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 	}
 
 	lr := syncResponse.Rooms.Leave[roomID]
-	lr.Timeline.Events = roomEvents
+	lr.Timeline = &types.Timeline{Events: roomEvents}
 	syncResponse.Rooms.Leave[roomID] = lr
 
 	rsAPI := &mockRoomserverAPI{
