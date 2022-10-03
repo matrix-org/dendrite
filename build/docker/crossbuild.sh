@@ -12,7 +12,7 @@ case $GOARCH in
     export CC=x86_64-linux-musl-gcc
     ;;
 
-  i386)
+  386)
     curl -s https://musl.cc/i686-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
     export CC=i686-linux-musl-gcc
     ;;
