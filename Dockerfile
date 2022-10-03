@@ -4,7 +4,7 @@
 # base installs required dependencies and runs go mod download to cache dependencies
 #
 FROM --platform=${BUILDPLATFORM} docker.io/golang:1.19-alpine AS base
-RUN apk --update --no-cache add bash build-base
+RUN apk --update --no-cache add bash build-base curl
 
 #
 # build creates all needed binaries
@@ -14,9 +14,11 @@ WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
 ARG FLAGS
+ENV GOOS $TARGETOS
+ENV GOARCH $TARGETARCH
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
+    sh ./build/docker/crossbuild.sh
 
 #
 # The dendrite base image; mainly creates a user and switches to it
