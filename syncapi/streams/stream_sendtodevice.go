@@ -44,7 +44,6 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 	lastPos, events, err := snapshot.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.SendToDeviceUpdatesForSync failed")
-		_ = snapshot.Reset()
 		return from
 	}
 

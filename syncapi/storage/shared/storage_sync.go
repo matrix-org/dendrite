@@ -31,19 +31,6 @@ func (d *DatabaseTransaction) Rollback() error {
 	return d.txn.Rollback()
 }
 
-func (d *DatabaseTransaction) Reset() (err error) {
-	if d.txn == nil {
-		return nil
-	}
-	if err = d.txn.Rollback(); err != nil {
-		return err
-	}
-	if d.txn, err = d.DB.BeginTx(d.ctx, nil); err != nil {
-		return err
-	}
-	return
-}
-
 func (d *DatabaseTransaction) MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.OutputEvents.SelectMaxEventID(ctx, d.txn)
 	if err != nil {
