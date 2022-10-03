@@ -126,7 +126,9 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.PineconeManager.RemovePeers()
-	m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	for _, uri := range strings.Split(uri, ",") {
+		m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	}
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
