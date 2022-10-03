@@ -233,7 +233,7 @@ func (a *KeyInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *ap
 		return err
 	}
 	if len(knownDevices) == 0 {
-		return fmt.Errorf("unknown user %s", req.UserID)
+		return nil // fmt.Errorf("unknown user %s", req.UserID)
 	}
 
 	for i := range knownDevices {
