@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
@@ -13,15 +14,15 @@ import (
 )
 
 type Streams struct {
-	PDUStreamProvider              types.StreamProvider
-	TypingStreamProvider           types.StreamProvider
-	ReceiptStreamProvider          types.StreamProvider
-	InviteStreamProvider           types.StreamProvider
-	SendToDeviceStreamProvider     types.StreamProvider
-	AccountDataStreamProvider      types.StreamProvider
-	DeviceListStreamProvider       types.StreamProvider
-	NotificationDataStreamProvider types.StreamProvider
-	PresenceStreamProvider         types.StreamProvider
+	PDUStreamProvider              StreamProvider
+	TypingStreamProvider           StreamProvider
+	ReceiptStreamProvider          StreamProvider
+	InviteStreamProvider           StreamProvider
+	SendToDeviceStreamProvider     StreamProvider
+	AccountDataStreamProvider      StreamProvider
+	DeviceListStreamProvider       StreamProvider
+	NotificationDataStreamProvider StreamProvider
+	PresenceStreamProvider         StreamProvider
 }
 
 func NewSyncStreamProviders(
@@ -31,52 +32,61 @@ func NewSyncStreamProviders(
 ) *Streams {
 	streams := &Streams{
 		PDUStreamProvider: &PDUStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
-			lazyLoadCache:  lazyLoadCache,
-			rsAPI:          rsAPI,
-			notifier:       notifier,
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			lazyLoadCache:         lazyLoadCache,
+			rsAPI:                 rsAPI,
+			notifier:              notifier,
 		},
 		TypingStreamProvider: &TypingStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
-			EDUCache:       eduCache,
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			EDUCache:              eduCache,
 		},
 		ReceiptStreamProvider: &ReceiptStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 		},
 		InviteStreamProvider: &InviteStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 		},
 		SendToDeviceStreamProvider: &SendToDeviceStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 		},
 		AccountDataStreamProvider: &AccountDataStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
-			userAPI:        userAPI,
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			userAPI:               userAPI,
 		},
 		NotificationDataStreamProvider: &NotificationDataStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
 		},
 		DeviceListStreamProvider: &DeviceListStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
-			rsAPI:          rsAPI,
-			keyAPI:         keyAPI,
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			rsAPI:                 rsAPI,
+			keyAPI:                keyAPI,
 		},
 		PresenceStreamProvider: &PresenceStreamProvider{
-			StreamProvider: StreamProvider{DB: d},
-			notifier:       notifier,
+			DefaultStreamProvider: DefaultStreamProvider{DB: d},
+			notifier:              notifier,
 		},
 	}
 
-	streams.PDUStreamProvider.Setup()
-	streams.TypingStreamProvider.Setup()
-	streams.ReceiptStreamProvider.Setup()
-	streams.InviteStreamProvider.Setup()
-	streams.SendToDeviceStreamProvider.Setup()
-	streams.AccountDataStreamProvider.Setup()
-	streams.NotificationDataStreamProvider.Setup()
-	streams.DeviceListStreamProvider.Setup()
-	streams.PresenceStreamProvider.Setup()
+	ctx := context.TODO()
+	snapshot, err := d.NewDatabaseSnapshot(ctx)
+	if err != nil {
+		panic(err)
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
+	streams.PDUStreamProvider.Setup(ctx, snapshot)
+	streams.TypingStreamProvider.Setup(ctx, snapshot)
+	streams.ReceiptStreamProvider.Setup(ctx, snapshot)
+	streams.InviteStreamProvider.Setup(ctx, snapshot)
+	streams.SendToDeviceStreamProvider.Setup(ctx, snapshot)
+	streams.AccountDataStreamProvider.Setup(ctx, snapshot)
+	streams.NotificationDataStreamProvider.Setup(ctx, snapshot)
+	streams.DeviceListStreamProvider.Setup(ctx, snapshot)
+	streams.PresenceStreamProvider.Setup(ctx, snapshot)
+
+	succeeded = true
 	return streams
 }
 

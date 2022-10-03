@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -43,7 +44,7 @@ type OutputSendToDeviceEventConsumer struct {
 	db         storage.Database
 	keyAPI     keyapi.SyncKeyAPI
 	serverName gomatrixserverlib.ServerName // our server name
-	stream     types.StreamProvider
+	stream     streams.StreamProvider
 	notifier   *notifier.Notifier
 }
 
@@ -56,7 +57,7 @@ func NewOutputSendToDeviceEventConsumer(
 	store storage.Database,
 	keyAPI keyapi.SyncKeyAPI,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
 	return &OutputSendToDeviceEventConsumer{
 		ctx:        process.Context(),
