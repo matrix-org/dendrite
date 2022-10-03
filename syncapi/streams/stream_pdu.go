@@ -101,7 +101,10 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
-			return from
+			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
+				return from
+			}
+			continue
 		}
 		req.Response.Rooms.Join[roomID] = *jr
 		req.Rooms[roomID] = gomatrixserverlib.Join
