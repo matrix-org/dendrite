@@ -89,6 +89,7 @@ func main() {
 	if configFlagSet {
 		cfg = setup.ParseFlags(true)
 		sk = cfg.Global.PrivateKey
+		pk = sk.Public().(ed25519.PublicKey)
 	} else {
 		keyfile := filepath.Join(*instanceDir, *instanceName) + ".pem"
 		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
