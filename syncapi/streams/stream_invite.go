@@ -56,7 +56,6 @@ func (p *InviteStreamProvider) IncrementalSync(
 	)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.InviteEventsInRange failed")
-		_ = snapshot.Reset()
 		return from
 	}
 
