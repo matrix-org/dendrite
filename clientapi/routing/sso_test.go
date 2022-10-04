@@ -37,7 +37,30 @@ func TestSSORedirect(t *testing.T) {
 					}.Encode(),
 				},
 			},
-			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fprovider%3D&nonce=.+&providerID=`,
+			Config: config.SSO{
+				DefaultProviderID: "adefault",
+			},
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fprovider%3Dadefault&nonce=.+&providerID=adefault`,
+			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
+		},
+		{
+			Name: "redirectFirstProvider",
+			Req: http.Request{
+				Host: "matrix.example.com",
+				URL: &url.URL{
+					Path: "/_matrix/v4/login/sso/redirect",
+					RawQuery: url.Values{
+						"redirectUrl": []string{"http://example.com/continue"},
+					}.Encode(),
+				},
+			},
+			Config: config.SSO{
+				Providers: []config.IdentityProvider{
+					{ID: "firstprovider"},
+					{ID: "secondprovider"},
+				},
+			},
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http%3A%2F%2Fmatrix.example.com%2F_matrix%2Fv4%2Flogin%2Fsso%2Fcallback%3Fprovider%3Dfirstprovider&nonce=.+&providerID=firstprovider`,
 			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
 		},
 		{
@@ -468,6 +491,10 @@ type fakeSSOAuthenticator struct {
 }
 
 func (auth *fakeSSOAuthenticator) AuthorizationURL(ctx context.Context, providerID, callbackURL, nonce string) (string, error) {
+	if providerID == "" {
+		return "", errors.New("empty providerID")
+	}
+
 	return (&url.URL{
 		Scheme: "http",
 		Host:   "auth.example.com",

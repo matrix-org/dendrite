@@ -70,6 +70,13 @@ func SSORedirect(
 		}
 	}
 
+	if idpID == "" {
+		idpID = cfg.DefaultProviderID
+		if idpID == "" && len(cfg.Providers) > 0 {
+			idpID = cfg.Providers[0].ID
+		}
+	}
+
 	callbackURL, err := buildCallbackURLFromOther(cfg, req, "/login/sso/redirect")
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed to build callback URL")
