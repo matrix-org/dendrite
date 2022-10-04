@@ -284,7 +284,7 @@ jobs:
         API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Run Sytest
         run: /bootstrap.sh dendrite
         working-directory: /src
@@ -344,8 +344,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
           go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
 
-      - name: Run actions/checkout@v3 for dendrite
-        uses: actions/checkout@v3
+      - name: Run actions/checkout@v2 for dendrite
+        uses: actions/checkout@v2
         with:
           path: dendrite
 
