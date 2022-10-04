@@ -35,6 +35,7 @@ jobs:
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "FLAGS=\"-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}\"" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -59,7 +60,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS="-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}"
           target: monolith
           platforms: ${{ env.PLATFORMS }}
           push: true
@@ -114,6 +114,7 @@ jobs:
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "FLAGS=\"-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}\"" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -138,7 +139,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS="-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}"
           target: polylith
           platforms: ${{ env.PLATFORMS }}
           push: true
@@ -192,6 +192,7 @@ jobs:
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "FLAGS=\"-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}\"" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -231,7 +232,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          build-args: FLAGS="-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}"
           target: demo-pinecone
           platforms: ${{ env.PLATFORMS }}
           push: true

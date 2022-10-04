@@ -12,6 +12,7 @@ GOOS="linux"
 
 echo "Target arch: $TARGETARCH"
 echo "User arch:   $USERARCH"
+echo "Link flags:  $FLAGS"
 
 if [ "$TARGETARCH" != "$USERARCH" ]; then
     if [ "$USERARCH" != "amd64" ]; then
