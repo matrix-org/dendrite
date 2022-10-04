@@ -237,7 +237,7 @@ func (r *Joiner) performJoinRoomByID(
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
 	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
-	if err == nil && isInvitePending {
+	if err == nil && !serverInRoom && isInvitePending {
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
 		if ierr != nil {
 			return "", "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
