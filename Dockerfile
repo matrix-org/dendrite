@@ -27,6 +27,8 @@ FROM alpine:latest AS dendrite-base
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.documentation="https://matrix-org.github.io/dendrite/"
+LABEL org.opencontainers.image.vendor="The Matrix.org Foundation C.I.C."
 RUN addgroup dendrite && adduser dendrite -G dendrite -u 1337 -D
 USER dendrite
 WORKDIR /home/dendrite
@@ -76,6 +78,7 @@ EXPOSE 8008 8448
 # Builds the Complement image, used for integration tests
 #
 FROM base AS complement
+LABEL org.opencontainers.image.title="Dendrite (Complement)"
 RUN apk add --no-cache sqlite openssl ca-certificates
 COPY --from=build /out/* /usr/bin/
 RUN rm /usr/bin/dendrite-polylith-multi /usr/bin/dendrite-demo* /usr/bin/dendritejs-pinecone
