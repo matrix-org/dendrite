@@ -37,15 +37,31 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 		return nil, err
 	}
 	if driverName != "sqlite3" {
-		logrus.WithFields(logrus.Fields{
-			"MaxOpenConns":    dbProperties.MaxOpenConns(),
-			"MaxIdleConns":    dbProperties.MaxIdleConns(),
-			"ConnMaxLifetime": dbProperties.ConnMaxLifetime(),
-			"dataSourceName":  regexp.MustCompile(`://[^@]*@`).ReplaceAllLiteralString(dsn, "://"),
-		}).Debug("Setting DB connection limits")
+		logger := logrus.WithFields(logrus.Fields{
+			"max_open_conns":    dbProperties.MaxOpenConns(),
+			"max_idle_conns":    dbProperties.MaxIdleConns(),
+			"conn_max_lifetime": dbProperties.ConnMaxLifetime(),
+			"data_source_name":  regexp.MustCompile(`://[^@]*@`).ReplaceAllLiteralString(dsn, "://"),
+		})
+		logger.Debug("Setting DB connection limits")
 		db.SetMaxOpenConns(dbProperties.MaxOpenConns())
 		db.SetMaxIdleConns(dbProperties.MaxIdleConns())
 		db.SetConnMaxLifetime(dbProperties.ConnMaxLifetime())
+
+		if driverName == "postgres" {
+			// Perform a quick sanity check if possible that we aren't trying to use more database
+			// connections than PostgreSQL is willing to give us.
+			var max, reserved int
+			if err := db.QueryRow("SELECT setting::integer FROM pg_settings WHERE name='max_connections';").Scan(&max); err != nil {
+				return nil, fmt.Errorf("failed to find maximum connections: %w", err)
+			}
+			if err := db.QueryRow("SELECT setting::integer FROM pg_settings WHERE name='superuser_reserved_connections';").Scan(&reserved); err != nil {
+				return nil, fmt.Errorf("failed to find reserved connections: %w", err)
+			}
+			if configured, allowed := dbProperties.MaxOpenConns(), max-reserved; configured > allowed {
+				return nil, fmt.Errorf("the max_open_conns is greater than the %d non-superuser connections that PostgreSQL is configured to allow", allowed)
+			}
+		}
 	}
 	return db, nil
 }
