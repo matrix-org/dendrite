@@ -14,35 +14,40 @@ echo "Target arch: $TARGETARCH"
 echo "User arch:   $USERARCH"
 
 if [ "$TARGETARCH" != "$USERARCH" ]; then
+    if [ "$USERARCH" != "amd64" ]; then
+      echo "Cross-compiling only supported on amd64"
+      exit 1
+    fi
+
     echo "Cross compile"
     case $GOARCH in
     arm64)
-        curl -s https://musl.cc/aarch64-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
+        curl -s https://more.musl.cc/x86_64-linux-musl/aarch64-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
         export CC=aarch64-linux-musl-gcc
         ;;
 
     amd64)
-        curl -s https://musl.cc/x86_64-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
+        curl -s https://more.musl.cc/x86_64-linux-musl/x86_64-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
         export CC=x86_64-linux-musl-gcc
         ;;
 
     386)
-        curl -s https://musl.cc/i686-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
+        curl -s https://more.musl.cc/x86_64-linux-musl/i686-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
         export CC=i686-linux-musl-gcc
         ;;
 
     arm)
-        curl -s https://musl.cc/armv7l-linux-musleabihf-cross.tgz | tar xz --strip-components=1 -C /usr
+        curl -s https://more.musl.cc/x86_64-linux-musl/armv7l-linux-musleabihf-cross.tgz | tar xz --strip-components=1 -C /usr
         export CC=armv7l-linux-musleabihf-gcc
         ;;
 
     s390x)
-        curl -s https://musl.cc/s390x-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
+        curl -s https://more.musl.cc/x86_64-linux-musl/s390x-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
         export CC=s390x-linux-musl-gcc
         ;;
 
     ppc64le)
-        curl -s https://musl.cc/powerpc64le-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
+        curl -s https://more.musl.cc/x86_64-linux-musl/powerpc64le-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
         export CC=powerpc64le-linux-musl-gcc
         ;;
 
