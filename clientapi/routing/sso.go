@@ -63,7 +63,7 @@ func SSORedirect(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidArgumentValue("Invalid redirectURL: " + err.Error()),
 		}
-	} else if ru.Scheme == "" || ru.Host == "" || ru.Path == "" {
+	} else if ru.Scheme == "" || ru.Host == "" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidArgumentValue("Invalid redirectURL: " + redirectURL),

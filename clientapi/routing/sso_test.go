@@ -78,6 +78,21 @@ func TestSSORedirect(t *testing.T) {
 			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http.*%3Fprovider%3Dsomeprovider&nonce=.+&providerID=someprovider`,
 			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
 		},
+		{
+			Name: "redirectEmptyredirectPath",
+			Req: http.Request{
+				Host: "matrix.example.com",
+				URL: &url.URL{
+					Path: "/_matrix/v4/login/sso/redirect",
+					RawQuery: url.Values{
+						"redirectUrl": []string{"http://example.com"},
+					}.Encode(),
+				},
+			},
+			IDPID:           "someprovider",
+			WantLocationRE:  `http://auth.example.com/authorize\?callbackURL=http.*%3Fprovider%3Dsomeprovider&nonce=.+&providerID=someprovider`,
+			WantSetCookieRE: "sso_nonce=[^;].*Path=/_matrix/v4/login/sso",
+		},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
