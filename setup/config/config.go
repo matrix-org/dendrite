@@ -415,8 +415,8 @@ func checkURL(configErrs *ConfigErrors, key, value string) {
 		return
 	}
 	switch url.Scheme {
-	case "http":
-	case "https":
+	case "http": // nolint:goconst
+	case "https": // nolint:goconst
 	default:
 		configErrs.Add(fmt.Sprintf("config key %q URL should be http:// or https://", key))
 		return
@@ -435,8 +435,8 @@ func checkIconURL(configErrs *ConfigErrors, key, value string) {
 		return
 	}
 	switch url.Scheme {
-	case "http":
-	case "https":
+	case "http": // nolint:goconst
+	case "https": // nolint:goconst
 	case "mxc":
 	default:
 		configErrs.Add(fmt.Sprintf("invalid URL scheme for config key %q: %s", key, value))
