@@ -27,6 +27,7 @@ func (c *UserAPI) Defaults(opts DefaultOpts) {
 	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7781"
 		c.InternalAPI.Connect = "http://localhost:7781"
+		c.AccountDatabase.Name = "user_api"
 		c.AccountDatabase.Defaults(10)
 	}
 	c.BCryptCost = bcrypt.DefaultCost

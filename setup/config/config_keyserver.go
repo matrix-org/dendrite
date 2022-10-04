@@ -12,6 +12,7 @@ func (c *KeyServer) Defaults(opts DefaultOpts) {
 	if !opts.Monolithic {
 		c.InternalAPI.Listen = "http://localhost:7779"
 		c.InternalAPI.Connect = "http://localhost:7779"
+		c.Database.Name = "keyserver"
 		c.Database.Defaults(10)
 	}
 	if opts.Generate {

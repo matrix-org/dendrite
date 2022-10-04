@@ -40,6 +40,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 		c.InternalAPI.Listen = "http://localhost:7772"
 		c.InternalAPI.Connect = "http://localhost:7772"
 		c.ExternalAPI.Listen = "http://[::]:8072"
+		c.Database.Name = "federation_api"
 		c.Database.Defaults(10)
 	}
 	c.FederationMaxRetries = 16

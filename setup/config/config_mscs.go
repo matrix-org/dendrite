@@ -15,6 +15,7 @@ type MSCs struct {
 
 func (c *MSCs) Defaults(opts DefaultOpts) {
 	if !opts.Monolithic {
+		c.Database.Name = "mscs"
 		c.Database.Defaults(5)
 	}
 	if opts.Generate {

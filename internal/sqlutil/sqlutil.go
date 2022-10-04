@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -47,5 +48,6 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 		db.SetMaxIdleConns(dbProperties.MaxIdleConns())
 		db.SetConnMaxLifetime(dbProperties.ConnMaxLifetime())
 	}
+	collectors.NewDBStatsCollector(db, fmt.Sprintf("dendrite_%s", dbProperties.Name))
 	return db, nil
 }

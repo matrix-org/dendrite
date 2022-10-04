@@ -96,6 +96,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	}
 	c.KeyValidityPeriod = time.Hour * 24 * 7
 	if opts.Monolithic {
+		c.DatabaseOptions.Name = "global"
 		c.DatabaseOptions.Defaults(90)
 	}
 	c.JetStream.Defaults(opts)
@@ -237,6 +238,8 @@ func (c *Sentry) Verify(configErrs *ConfigErrors, isMonolith bool) {
 }
 
 type DatabaseOptions struct {
+	// Which database is this? For use in prometheus collectors.
+	Name string `json:"-"`
 	// The connection string, file:filename.db or postgres://server....
 	ConnectionString DataSource `yaml:"connection_string"`
 	// Maximum open connections to the DB (0 = use default, negative means unlimited)
