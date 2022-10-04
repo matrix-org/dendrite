@@ -371,6 +371,14 @@ func (errs *ConfigErrors) Add(str string) {
 	*errs = append(*errs, str)
 }
 
+// checkNotEmpty verifies the given value is empty in the configuration.
+// If it is, adds an error to the list.
+func checkEmpty(configErrs *ConfigErrors, key, value string) {
+	if value != "" {
+		configErrs.Add(fmt.Sprintf("expected empty key %q: %s", key, value))
+	}
+}
+
 // checkNotEmpty verifies the given value is not empty in the configuration.
 // If it is, adds an error to the list.
 func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
@@ -412,6 +420,26 @@ func checkURL(configErrs *ConfigErrors, key, value string) {
 	default:
 		configErrs.Add(fmt.Sprintf("config key %q URL should be http:// or https://", key))
 		return
+	}
+}
+
+// checkIconURL verifies that the parameter is a valid icon URL.
+func checkIconURL(configErrs *ConfigErrors, key, value string) {
+	if value == "" {
+		configErrs.Add(fmt.Sprintf("missing config key %q", key))
+		return
+	}
+	url, err := url.Parse(value)
+	if err != nil {
+		configErrs.Add(fmt.Sprintf("config key %q contains invalid URL (%s)", key, err.Error()))
+		return
+	}
+	switch url.Scheme {
+	case "http":
+	case "https":
+	case "mxc":
+	default:
+		configErrs.Add(fmt.Sprintf("invalid URL scheme for config key %q: %s", key, value))
 	}
 }
 

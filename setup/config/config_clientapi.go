@@ -162,6 +162,12 @@ func (sso *SSO) Verify(configErrs *ConfigErrors) {
 }
 
 type IdentityProvider struct {
+	// OAuth2 contains settings for IdPs based on OAuth2 (but not OpenID Connect).
+	OAuth2 OAuth2 `yaml:"oauth2"`
+
+	// OIDC contains settings for IdPs based on OpenID Connect.
+	OIDC OIDC `yaml:"oidc"`
+
 	// ID is the unique identifier of this IdP. If empty, the brand will be used.
 	ID string `yaml:"id"`
 
@@ -178,14 +184,8 @@ type IdentityProvider struct {
 	Icon string `yaml:"icon"`
 
 	// Type describes how this IdP is implemented. If this is empty, a default is chosen
-	// based on brand.
+	// based on brand or which subkeys exist.
 	Type IdentityProviderType `yaml:"type"`
-
-	// OAuth2 contains settings for IdPs based on OpenID Connect and OAuth2.
-	OAuth2 OAuth2 `yaml:"oauth2"`
-
-	// OIDC contains settings for IdPs based on OpenID Connect.
-	OIDC OIDC `yaml:"oidc"`
 }
 
 func (idp *IdentityProvider) WithDefaults() IdentityProvider {
@@ -216,6 +216,7 @@ type OAuth2 struct {
 }
 
 type OIDC struct {
+	OAuth2       `yaml:",inline"`
 	DiscoveryURL string `yaml:"discovery_url"`
 }
 
@@ -231,18 +232,21 @@ func (idp *IdentityProvider) verifyNormalized(configErrs *ConfigErrors) {
 		configErrs.Add(fmt.Sprintf("unrecognised brand in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", idp.Brand))
 	}
 	if idp.Icon != "" {
-		checkURL(configErrs, "client_api.sso.providers.icon", idp.Icon)
+		checkIconURL(configErrs, "client_api.sso.providers.icon", idp.Icon)
 	}
 
 	switch idp.Type {
 	case SSOTypeOIDC:
-		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_id", idp.OAuth2.ClientID)
-		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OAuth2.ClientSecret)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_id", idp.OIDC.ClientID)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OIDC.ClientSecret)
 		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.discovery_url", idp.OIDC.DiscoveryURL)
 
+		checkEmpty(configErrs, "client_api.sso.providers.oauth2.client_id", idp.OAuth2.ClientID)
+		checkEmpty(configErrs, "client_api.sso.providers.oauth2.client_secret", idp.OAuth2.ClientSecret)
+
 	case SSOTypeGitHub:
-		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_id", idp.OAuth2.ClientID)
-		checkNotEmpty(configErrs, "client_api.sso.providers.oidc.client_secret", idp.OAuth2.ClientSecret)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oauth2.client_id", idp.OAuth2.ClientID)
+		checkNotEmpty(configErrs, "client_api.sso.providers.oauth2.client_secret", idp.OAuth2.ClientSecret)
 
 	default:
 		configErrs.Add(fmt.Sprintf("unrecognised type in identity provider %q for config key %q: %s", idp.ID, "client_api.sso.providers", idp.Type))
