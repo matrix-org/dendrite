@@ -75,7 +75,6 @@ func (p *PDUStreamProvider) CompleteSync(
 	joinedRoomIDs, err := snapshot.RoomIDsWithMembership(ctx, req.Device.UserID, gomatrixserverlib.Join)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
-		_ = snapshot.Reset()
 		return from
 	}
 
@@ -102,10 +101,10 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
-			if err = snapshot.Reset(); err != nil {
+			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 				return from
 			}
-			continue // return from
+			continue
 		}
 		req.Response.Rooms.Join[roomID] = *jr
 		req.Rooms[roomID] = gomatrixserverlib.Join
@@ -115,7 +114,6 @@ func (p *PDUStreamProvider) CompleteSync(
 	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
-		_ = snapshot.Reset()
 		return from
 	}
 	for _, peek := range peeks {
@@ -126,10 +124,10 @@ func (p *PDUStreamProvider) CompleteSync(
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
-				if err = snapshot.Reset(); err != nil {
+				if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 					return from
 				}
-				continue // return from
+				continue
 			}
 			req.Response.Rooms.Peek[peek.RoomID] = *jr
 		}
@@ -160,14 +158,12 @@ func (p *PDUStreamProvider) IncrementalSync(
 	if req.WantFullState {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltasForFullStateSync(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltasForFullStateSync failed")
-			_ = snapshot.Reset()
-			return
+			return from
 		}
 	} else {
 		if stateDeltas, syncJoinedRooms, err = snapshot.GetStateDeltas(ctx, req.Device, r, req.Device.UserID, &stateFilter); err != nil {
 			req.Log.WithError(err).Error("p.DB.GetStateDeltas failed")
-			_ = snapshot.Reset()
-			return
+			return from
 		}
 	}
 
@@ -181,7 +177,6 @@ func (p *PDUStreamProvider) IncrementalSync(
 
 	if err = p.addIgnoredUsersToFilter(ctx, snapshot, req, &eventFilter); err != nil {
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
-		_ = snapshot.Reset()
 	}
 
 	newPos = from
@@ -201,13 +196,10 @@ func (p *PDUStreamProvider) IncrementalSync(
 		var pos types.StreamPosition
 		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req.Response); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
-			if err == context.DeadlineExceeded || err == context.Canceled {
+			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 				return newPos
 			}
-			if err = snapshot.Reset(); err != nil {
-				return from
-			}
-			continue // return to
+			continue
 		}
 		// Reset the position, as it is only for the special case of newly joined rooms
 		if delta.NewlyJoined {
@@ -307,7 +299,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
-		_ = snapshot.Reset()
 	}
 
 	if len(delta.StateEvents) > 0 {

@@ -14,7 +14,7 @@ User accounts can be created on a Dendrite instance in a number of ways.
 The `create-account` tool is built in the `bin` folder when building Dendrite with
 the `build.sh` script.
 
-It uses the `dendrite.yaml` configuration file to connect to a running Dendrite instance and requires 
+It uses the `dendrite.yaml` configuration file to connect to a running Dendrite instance and requires
 shared secret registration to be enabled as explained below.
 
 An example of using `create-account` to create a **normal account**:
@@ -31,11 +31,11 @@ To create a new **admin account**, add the `-admin` flag:
 ./bin/create-account -config /path/to/dendrite.yaml -username USERNAME -admin
 ```
 
-By default `create-account` uses `https://localhost:8448` to connect to Dendrite, this can be overwritten using 
+By default `create-account` uses `http://localhost:8008` to connect to Dendrite, this can be overwritten using
 the `-url` flag:
 
 ```bash
-./bin/create-account -config /path/to/dendrite.yaml -username USERNAME -url http://localhost:8008
+./bin/create-account -config /path/to/dendrite.yaml -username USERNAME -url https://localhost:8448
 ```
 
 An example of using `create-account` when running in **Docker**, having found the `CONTAINERNAME` from `docker ps`:
@@ -43,6 +43,7 @@ An example of using `create-account` when running in **Docker**, having found th
 ```bash
 docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME
 ```
+
 ```bash
 docker exec -it CONTAINERNAME /usr/bin/create-account -config /path/to/dendrite.yaml -username USERNAME -admin
 ```
