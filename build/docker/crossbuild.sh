@@ -46,11 +46,6 @@ if [ "$TARGETARCH" != "$USERARCH" ]; then
         export CC=powerpc64le-linux-musl-gcc
         ;;
 
-    riscv64)
-        curl -s https://musl.cc/riscv64-linux-musl-cross.tgz | tar xz --strip-components=1 -C /usr
-        export CC=riscv64-linux-musl-gcc
-        ;;
-
     *)
         echo "Unsupported GOARCH=${GOARCH}"
         exit 1
