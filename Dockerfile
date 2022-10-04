@@ -14,8 +14,6 @@ WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
 ARG FLAGS
-ENV GOOS $TARGETOS
-ENV GOARCH $TARGETARCH
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     sh ./build/docker/crossbuild.sh
