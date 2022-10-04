@@ -18,6 +18,7 @@ func main() {
 	dbURI := flag.String("db", "", "The DB URI to use for all components (PostgreSQL only)")
 	dirPath := flag.String("dir", "./", "The folder to use for paths (like SQLite databases, media storage)")
 	normalise := flag.String("normalise", "", "Normalise an existing configuration file by adding new/missing options and defaults")
+	schemaPath := flag.String("schema", "", "Path to the schema file")
 	polylith := flag.Bool("polylith", false, "Generate a config that makes sense for polylith deployments")
 	flag.Parse()
 
@@ -103,4 +104,7 @@ func main() {
 	}
 
 	fmt.Println(string(j))
+	if *schemaPath != "" {
+		fmt.Printf("# yaml-language-server: $schema=%s\n", *schemaPath)
+	}
 }

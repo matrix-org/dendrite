@@ -17,6 +17,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/invopop/jsonschema v0.4.0
 	github.com/kardianos/minwinsvc v1.0.0
 	github.com/lib/pq v1.10.7
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
@@ -89,6 +90,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
+	github.com/iancoleman/orderedmap v0.0.0-20190318233801-ac98e3ecb4b0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
