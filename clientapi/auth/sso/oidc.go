@@ -123,7 +123,6 @@ type oidcDiscovery struct {
 	TokenEndpoint         string   `json:"token_endpoint"`
 	UserinfoEndpoint      string   `json:"userinfo_endpoint"`
 	ScopesSupported       []string `json:"scopes_supported"`
-	ClaimsSupported       []string `json:"claims_supported"`
 }
 
 func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
@@ -164,14 +163,6 @@ func oidcDiscover(ctx context.Context, url string) (*oidcDiscovery, error) {
 	if disc.ScopesSupported != nil {
 		if !stringSliceContains(disc.ScopesSupported, "openid") {
 			return nil, fmt.Errorf("scope 'openid' is missing in %q", url)
-		}
-	}
-
-	if disc.ClaimsSupported != nil {
-		for _, claim := range []string{"iss", "sub"} {
-			if !stringSliceContains(disc.ClaimsSupported, claim) {
-				return nil, fmt.Errorf("claim %q is not supported in %q", claim, url)
-			}
 		}
 	}
 
