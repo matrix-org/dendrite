@@ -540,6 +540,18 @@ type LeaveResponse struct {
 	Timeline *Timeline     `json:"timeline,omitempty"`
 }
 
+func (lr LeaveResponse) MarshalJSON() ([]byte, error) {
+	type alias LeaveResponse
+	a := alias(lr)
+	if lr.State != nil && len(lr.State.Events) == 0 {
+		a.State = nil
+	}
+	if lr.Timeline != nil && len(lr.Timeline.Events) == 0 {
+		a.Timeline = nil
+	}
+	return json.Marshal(a)
+}
+
 // NewLeaveResponse creates an empty response with initialised arrays.
 func NewLeaveResponse() *LeaveResponse {
 	res := LeaveResponse{
