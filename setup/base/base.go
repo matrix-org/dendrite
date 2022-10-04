@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -467,8 +468,13 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		w.WriteHeader(200)
 	})
 	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
-		if b.ProcessContext.IsDegraded() {
+		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
 			w.WriteHeader(503)
+			_ = json.NewEncoder(w).Encode(struct {
+				Warnings []string `json:"warnings"`
+			}{
+				Warnings: reasons,
+			})
 			return
 		}
 		w.WriteHeader(200)
