@@ -76,11 +76,11 @@ func main() {
 				},
 				{
 					Brand: "google",
-					OAuth2: config.OAuth2{
-						ClientID:     "aclientid",
-						ClientSecret: "aclientsecret",
-					},
 					OIDC: config.OIDC{
+						OAuth2: config.OAuth2{
+							ClientID:     "aclientid",
+							ClientSecret: "aclientsecret",
+						},
 						DiscoveryURL: "https://accounts.google.com/.well-known/openid-configuration",
 					},
 				},
