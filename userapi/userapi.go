@@ -98,13 +98,6 @@ func NewInternalAPI(
 		logrus.WithError(err).Panic("failed to start user API streamed event consumer")
 	}
 
-	roomserverConsumer := consumers.NewOutputRoomEventConsumer(
-		base, js, db,
-	)
-	if err := roomserverConsumer.Start(); err != nil {
-		logrus.WithError(err).Panic("failed to start user API roomserver event consumer")
-	}
-
 	var cleanOldNotifs func()
 	cleanOldNotifs = func() {
 		logrus.Infof("Cleaning old notifications")

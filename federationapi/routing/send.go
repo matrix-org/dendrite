@@ -85,7 +85,6 @@ func Send(
 	cfg *config.FederationAPI,
 	rsAPI api.FederationRoomserverAPI,
 	keyAPI keyapi.FederationKeyAPI,
-	userAPI userapi.FederationUserAPI,
 	keys gomatrixserverlib.JSONVerifier,
 	federation federationAPI.FederationClient,
 	mu *internal.MutexByRoom,
@@ -133,7 +132,6 @@ func Send(
 		roomsMu:                mu,
 		producer:               producer,
 		inboundPresenceEnabled: cfg.Matrix.Presence.EnableInbound,
-		userAPI:                userAPI,
 	}
 
 	var txnEvents struct {
@@ -187,7 +185,6 @@ type txnReq struct {
 	gomatrixserverlib.Transaction
 	rsAPI                  api.FederationRoomserverAPI
 	keyAPI                 keyapi.FederationKeyAPI
-	userAPI                userapi.FederationUserAPI
 	ourServerName          gomatrixserverlib.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
 	federation             txnFederationClient
