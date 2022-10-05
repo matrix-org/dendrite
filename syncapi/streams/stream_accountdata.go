@@ -92,7 +92,7 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
 					joinData, ok := req.Response.Rooms.Join[roomID]
 					if !ok {
-						joinData = *types.NewJoinResponse()
+						joinData = types.NewJoinResponse()
 					}
 					joinData.AccountData.Events = append(
 						joinData.AccountData.Events,

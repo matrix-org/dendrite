@@ -65,7 +65,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 			continue
 		}
 		ir := types.NewInviteResponse(inviteEvent)
-		req.Response.Rooms.Invite[roomID] = *ir
+		req.Response.Rooms.Invite[roomID] = ir
 	}
 
 	// When doing an initial sync, we don't want to add retired invites, as this
@@ -87,7 +87,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 				Type:           "m.room.member",
 				Content:        gomatrixserverlib.RawJSON(`{"membership":"leave"}`),
 			})
-			req.Response.Rooms.Leave[roomID] = *lr
+			req.Response.Rooms.Leave[roomID] = lr
 		}
 	}
 

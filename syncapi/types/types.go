@@ -333,10 +333,10 @@ type DeviceLists struct {
 }
 
 type RoomsResponse struct {
-	Join   map[string]JoinResponse   `json:"join,omitempty"`
-	Peek   map[string]JoinResponse   `json:"peek,omitempty"`
-	Invite map[string]InviteResponse `json:"invite,omitempty"`
-	Leave  map[string]LeaveResponse  `json:"leave,omitempty"`
+	Join   map[string]*JoinResponse   `json:"join,omitempty"`
+	Peek   map[string]*JoinResponse   `json:"peek,omitempty"`
+	Invite map[string]*InviteResponse `json:"invite,omitempty"`
+	Leave  map[string]*LeaveResponse  `json:"leave,omitempty"`
 }
 
 type ToDeviceResponse struct {
@@ -399,10 +399,10 @@ func NewResponse() *Response {
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
 	res.Rooms = &RoomsResponse{
-		Join:   map[string]JoinResponse{},
-		Peek:   map[string]JoinResponse{},
-		Invite: map[string]InviteResponse{},
-		Leave:  map[string]LeaveResponse{},
+		Join:   map[string]*JoinResponse{},
+		Peek:   map[string]*JoinResponse{},
+		Invite: map[string]*InviteResponse{},
+		Leave:  map[string]*LeaveResponse{},
 	}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
@@ -493,7 +493,7 @@ func (jr JoinResponse) MarshalJSON() ([]byte, error) {
 
 // NewJoinResponse creates an empty response with initialised arrays.
 func NewJoinResponse() *JoinResponse {
-	res := JoinResponse{
+	return &JoinResponse{
 		Summary:             &Summary{},
 		State:               &ClientEvents{},
 		Timeline:            &Timeline{},
@@ -501,7 +501,6 @@ func NewJoinResponse() *JoinResponse {
 		AccountData:         &ClientEvents{},
 		UnreadNotifications: &UnreadNotifications{},
 	}
-	return &res
 }
 
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.

@@ -38,7 +38,7 @@ func (p *TypingStreamProvider) IncrementalSync(
 
 		jr, ok := req.Response.Rooms.Join[roomID]
 		if !ok {
-			jr = *types.NewJoinResponse()
+			jr = types.NewJoinResponse()
 		}
 
 		if users, updated := p.EDUCache.GetTypingUsersIfUpdatedAfter(
