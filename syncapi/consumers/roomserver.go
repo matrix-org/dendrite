@@ -93,6 +93,23 @@ func (s *OutputRoomEventConsumer) Start() error {
 // sync stream position may race and be incorrectly calculated.
 func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
+
+	receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
+	ok := false
+	// Only handle events we care about
+	for _, eventType := range api.OutputTypes {
+		if receivedType == eventType {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		log.WithField("type", receivedType).Debug(
+			"roomserver output log: ignoring unknown output type",
+		)
+		return true
+	}
+
 	// Parse out the event JSON
 	var err error
 	var output api.OutputEvent
@@ -102,7 +119,7 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		return true
 	}
 
-	switch output.Type {
+	switch receivedType {
 	case api.OutputTypeNewRoomEvent:
 		// Ignore redaction events. We will add them to the database when they are
 		// validated (when we receive OutputTypeRedactedEvent)

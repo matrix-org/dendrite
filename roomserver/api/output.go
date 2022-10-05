@@ -21,6 +21,18 @@ import (
 // An OutputType is a type of roomserver output.
 type OutputType string
 
+// OutputTypes contains all possible output types from below
+var OutputTypes = []OutputType{
+	OutputTypeNewRoomEvent,
+	OutputTypeOldRoomEvent,
+	OutputTypeNewInviteEvent,
+	OutputTypeRetireInviteEvent,
+	OutputTypeRedactedEvent,
+	OutputTypeNewPeek,
+	OutputTypeNewInboundPeek,
+	OutputTypeRetirePeek,
+}
+
 const (
 	// OutputTypeNewRoomEvent indicates that the event is an OutputNewRoomEvent
 	OutputTypeNewRoomEvent OutputType = "new_room_event"
