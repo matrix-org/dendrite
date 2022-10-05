@@ -362,13 +362,16 @@ func (r *messagesReq) retrieveEvents() (
 
 	// Apply room history visibility filter
 	startTime := time.Now()
-	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.device.UserID, "messages")
-	logrus.WithFields(logrus.Fields{
-		"duration":      time.Since(startTime),
-		"room_id":       r.roomID,
-		"events_before": len(events),
-		"events_after":  len(filteredEvents),
-	}).Debug("applied history visibility (messages)")
+	filteredEvents := events
+	if filtered, ferr := internal.ApplyHistoryVisibilityFilter(r.ctx, r.snapshot, r.rsAPI, events, nil, r.device.UserID, "messages"); ferr == nil {
+		filteredEvents = filtered
+		logrus.WithFields(logrus.Fields{
+			"duration":      time.Since(startTime),
+			"room_id":       r.roomID,
+			"events_before": len(events),
+			"events_after":  len(filteredEvents),
+		}).Debug("applied history visibility (messages)")
+	}
 	return gomatrixserverlib.HeaderedToClientEvents(filteredEvents, gomatrixserverlib.FormatAll), start, end, err
 }
 
