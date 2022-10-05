@@ -22,11 +22,11 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20220926161602-759a8ee7c4d5
-	github.com/matrix-org/pinecone v0.0.0-20220927101513-d0beb180f44d
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20220929190355-91d455cd3621
+	github.com/matrix-org/pinecone v0.0.0-20220929155234-2ce51dd4a42c
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
-	github.com/nats-io/nats-server/v2 v2.9.1-0.20220920152220-52d7b481c4b5
+	github.com/nats-io/nats-server/v2 v2.9.2
 	github.com/nats-io/nats.go v1.17.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -43,7 +43,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.5-0.20220901155642-4f2abece817c
 	go.uber.org/atomic v1.10.0
-	golang.org/x/crypto v0.0.0-20220919173607-35f4265a4bc0
+	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69
 	golang.org/x/mobile v0.0.0-20220722155234-aaac322e2105
 	golang.org/x/net v0.0.0-20220919232410-f2f64ebce3c1
@@ -91,7 +91,7 @@ require (
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/errors v1.0.0 // indirect
-	github.com/klauspost/compress v1.15.10 // indirect
+	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lucas-clemente/quic-go v0.29.0 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
@@ -120,9 +120,9 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	golang.org/x/exp v0.0.0-20220916125017-b168a2c6b86b // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8 // indirect
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
-	golang.org/x/time v0.0.0-20220920022843-2ce7c2934d45 // indirect
+	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect

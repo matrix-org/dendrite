@@ -17,19 +17,19 @@ package storage
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
-
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage/shared"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
-type Database interface {
-	Presence
+type DatabaseTransaction interface {
+	sqlutil.Transaction
 	SharedUsers
-	Notifications
 
 	MaxStreamPositionForPDUs(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForReceipts(ctx context.Context) (types.StreamPosition, error)
@@ -37,6 +37,7 @@ type Database interface {
 	MaxStreamPositionForAccountData(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
 
 	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
@@ -44,23 +45,77 @@ type Database interface {
 	RoomIDsWithMembership(ctx context.Context, userID string, membership string) ([]string, error)
 	MembershipCount(ctx context.Context, roomID, membership string, pos types.StreamPosition) (int, error)
 	GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error)
-
 	RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error)
-
 	GetBackwardTopologyPos(ctx context.Context, events []types.StreamEvent) (types.TopologyToken, error)
 	PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error)
-
-	InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error)
+	InviteEventsInRange(ctx context.Context, targetUserID string, r types.Range) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error)
 	PeeksInRange(ctx context.Context, userID, deviceID string, r types.Range) (peeks []types.Peek, err error)
 	RoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error)
-
 	// AllJoinedUsersInRooms returns a map of room ID to a list of all joined user IDs.
 	AllJoinedUsersInRooms(ctx context.Context) (map[string][]string, error)
 	// AllJoinedUsersInRoom returns a map of room ID to a list of all joined user IDs for a given room.
 	AllJoinedUsersInRoom(ctx context.Context, roomIDs []string) (map[string][]string, error)
-
 	// AllPeekingDevicesInRooms returns a map of room ID to a list of all peeking devices.
 	AllPeekingDevicesInRooms(ctx context.Context) (map[string][]types.PeekingDevice, error)
+	// Events lookups a list of event by their event ID.
+	// Returns a list of events matching the requested IDs found in the database.
+	// If an event is not found in the database then it will be omitted from the list.
+	// Returns an error if there was a problem talking with the database.
+	// Does not include any transaction IDs in the returned events.
+	Events(ctx context.Context, eventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
+	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
+	// If no event could be found, returns nil
+	// If there was an issue during the retrieval, returns an error
+	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
+	// GetStateEventsForRoom fetches the state events for a given room.
+	// Returns an empty slice if no state events could be found for this room.
+	// Returns an error if there was an issue with the retrieval.
+	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error)
+	// GetAccountDataInRange returns all account data for a given user inserted or
+	// updated between two given positions
+	// Returns a map following the format data[roomID] = []dataTypes
+	// If no data is retrieved, returns an empty map
+	// If there was an issue with the retrieval, returns an error
+	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *gomatrixserverlib.EventFilter) (map[string][]string, types.StreamPosition, error)
+	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit. If backwardsOrdering is true, the most recent event must be first, else last.
+	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *gomatrixserverlib.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
+	// EventPositionInTopology returns the depth and stream position of the given event.
+	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
+	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
+	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities map[string][]string, err error)
+	// MaxTopologicalPosition returns the highest topological position for a given room.
+	MaxTopologicalPosition(ctx context.Context, roomID string) (types.TopologyToken, error)
+	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
+	// matches the streamevent.transactionID device then the transaction ID gets
+	// added to the unsigned section of the output event.
+	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent
+	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns the
+	// relevant events within the given ranges for the supplied user ID and device ID.
+	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (pos types.StreamPosition, events []types.SendToDeviceEvent, err error)
+	// GetRoomReceipts gets all receipts for a given roomID
+	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error)
+	SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
+	SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
+	SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
+	StreamToTopologicalPosition(ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool) (types.TopologyToken, error)
+	IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error)
+	// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
+	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
+	// string as the membership.
+	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
+	// getUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
+	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
+	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
+	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
+}
+
+type Database interface {
+	Presence
+	Notifications
+
+	NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseTransaction, error)
+	NewDatabaseTransaction(ctx context.Context) (*shared.DatabaseTransaction, error)
+
 	// Events lookups a list of event by their event ID.
 	// Returns a list of events matching the requested IDs found in the database.
 	// If an event is not found in the database then it will be omitted from the list.
@@ -77,20 +132,6 @@ type Database interface {
 	// PurgeRoomState completely purges room state from the sync API. This is done when
 	// receiving an output event that completely resets the state.
 	PurgeRoomState(ctx context.Context, roomID string) error
-	// GetStateEvent returns the Matrix state event of a given type for a given room with a given state key
-	// If no event could be found, returns nil
-	// If there was an issue during the retrieval, returns an error
-	GetStateEvent(ctx context.Context, roomID, evType, stateKey string) (*gomatrixserverlib.HeaderedEvent, error)
-	// GetStateEventsForRoom fetches the state events for a given room.
-	// Returns an empty slice if no state events could be found for this room.
-	// Returns an error if there was an issue with the retrieval.
-	GetStateEventsForRoom(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter) (stateEvents []*gomatrixserverlib.HeaderedEvent, err error)
-	// GetAccountDataInRange returns all account data for a given user inserted or
-	// updated between two given positions
-	// Returns a map following the format data[roomID] = []dataTypes
-	// If no data is retrieved, returns an empty map
-	// If there was an issue with the retrieval, returns an error
-	GetAccountDataInRange(ctx context.Context, userID string, r types.Range, accountDataFilterPart *gomatrixserverlib.EventFilter) (map[string][]string, types.StreamPosition, error)
 	// UpsertAccountData keeps track of new or updated account data, by saving the type
 	// of the new/updated data, and the user ID and room ID the data is related to (empty)
 	// room ID means the data isn't specific to any room)
@@ -114,21 +155,6 @@ type Database interface {
 	// DeletePeek deletes all peeks for a given room by a given user
 	// Returns an error if there was a problem communicating with the database.
 	DeletePeeks(ctx context.Context, RoomID, UserID string) (types.StreamPosition, error)
-	// GetEventsInTopologicalRange retrieves all of the events on a given ordering using the given extremities and limit. If backwardsOrdering is true, the most recent event must be first, else last.
-	GetEventsInTopologicalRange(ctx context.Context, from, to *types.TopologyToken, roomID string, filter *gomatrixserverlib.RoomEventFilter, backwardOrdering bool) (events []types.StreamEvent, err error)
-	// EventPositionInTopology returns the depth and stream position of the given event.
-	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
-	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
-	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities map[string][]string, err error)
-	// MaxTopologicalPosition returns the highest topological position for a given room.
-	MaxTopologicalPosition(ctx context.Context, roomID string) (types.TopologyToken, error)
-	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
-	// matches the streamevent.transactionID device then the transaction ID gets
-	// added to the unsigned section of the output event.
-	StreamEventsToEvents(device *userapi.Device, in []types.StreamEvent) []*gomatrixserverlib.HeaderedEvent
-	// SendToDeviceUpdatesForSync returns a list of send-to-device updates. It returns the
-	// relevant events within the given ranges for the supplied user ID and device ID.
-	SendToDeviceUpdatesForSync(ctx context.Context, userID, deviceID string, from, to types.StreamPosition) (pos types.StreamPosition, events []types.SendToDeviceEvent, err error)
 	// StoreNewSendForDeviceMessage stores a new send-to-device event for a user's device.
 	StoreNewSendForDeviceMessage(ctx context.Context, userID, deviceID string, event gomatrixserverlib.SendToDeviceEvent) (types.StreamPosition, error)
 	// CleanSendToDeviceUpdates removes all send-to-device messages BEFORE the specified
@@ -146,28 +172,13 @@ type Database interface {
 	RedactEvent(ctx context.Context, redactedEventID string, redactedBecause *gomatrixserverlib.HeaderedEvent) error
 	// StoreReceipt stores new receipt events
 	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
-	// GetRoomReceipts gets all receipts for a given roomID
-	GetRoomReceipts(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) ([]types.OutputReceiptEvent, error)
-
-	SelectContextEvent(ctx context.Context, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
-	SelectContextBeforeEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
-	SelectContextAfterEvent(ctx context.Context, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
-
-	StreamToTopologicalPosition(ctx context.Context, roomID string, streamPos types.StreamPosition, backwardOrdering bool) (types.TopologyToken, error)
-
-	IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
-	// SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
-	// returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
-	// string as the membership.
-	SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
+	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
 }
 
 type Presence interface {
-	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
-	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
-	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
+	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
 }
 
 type SharedUsers interface {
@@ -178,7 +189,4 @@ type SharedUsers interface {
 type Notifications interface {
 	// UpsertRoomUnreadNotificationCounts updates the notification statistics about a (user, room) key.
 	UpsertRoomUnreadNotificationCounts(ctx context.Context, userID, roomID string, notificationCount, highlightCount int) (types.StreamPosition, error)
-
-	// getUserUnreadNotificationCountsForRooms returns the unread notifications for the given rooms
-	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 }

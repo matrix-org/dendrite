@@ -88,14 +88,15 @@ func AddPublicRoutes(
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI,
+		streams.InviteStreamProvider, rsAPI, base.Fulltext,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.AccountDataStreamProvider,
+		base.ProcessContext, cfg, js, natsClient, syncDB, notifier,
+		streams.AccountDataStreamProvider, base.Fulltext,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -131,6 +132,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches,
+		rsAPI, cfg, base.Caches, base.Fulltext,
 	)
 }

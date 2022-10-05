@@ -796,11 +796,6 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
-		Type: pushRulesAccountDataType,
-	}); err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
-	}
 	return nil
 }
 

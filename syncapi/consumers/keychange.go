@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -40,7 +41,7 @@ type OutputKeyChangeEventConsumer struct {
 	topic      string
 	db         storage.Database
 	notifier   *notifier.Notifier
-	stream     types.StreamProvider
+	stream     streams.StreamProvider
 	serverName gomatrixserverlib.ServerName // our server name
 	rsAPI      roomserverAPI.SyncRoomserverAPI
 }
@@ -55,7 +56,7 @@ func NewOutputKeyChangeEventConsumer(
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputKeyChangeEventConsumer {
 	s := &OutputKeyChangeEventConsumer{
 		ctx:        process.Context(),

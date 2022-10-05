@@ -80,7 +80,6 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 		return true
 	}
 	if originServerName != t.ServerName {
-		log.WithField("other_server", originServerName).Info("Suppressing send-to-device: originated elsewhere")
 		return true
 	}
 	// Extract the send-to-device event from msg.

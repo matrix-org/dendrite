@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -318,18 +319,27 @@ func (n *Notifier) GetListener(req types.SyncRequest) UserDeviceStreamListener {
 func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	roomToUsers, err := db.AllJoinedUsersInRooms(ctx)
+
+	snapshot, err := db.NewDatabaseSnapshot(ctx)
+	if err != nil {
+		return err
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
+	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	roomToPeekingDevices, err := db.AllPeekingDevicesInRooms(ctx)
+	roomToPeekingDevices, err := snapshot.AllPeekingDevicesInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setPeekingDevices(roomToPeekingDevices)
 
+	succeeded = true
 	return nil
 }
 
@@ -338,12 +348,20 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	roomToUsers, err := db.AllJoinedUsersInRoom(ctx, roomIDs)
+	snapshot, err := db.NewDatabaseSnapshot(ctx)
+	if err != nil {
+		return err
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
+	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
+	succeeded = true
 	return nil
 }
 
