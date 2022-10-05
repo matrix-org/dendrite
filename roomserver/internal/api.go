@@ -211,7 +211,7 @@ func (r *RoomserverInternalAPI) PerformInvite(
 		sentry.CaptureException(err)
 		return err
 	}
-	if len(outputEvents) == 0 {
+	if res.Error != nil || len(outputEvents) == 0 {
 		return nil
 	}
 	return r.OutputProducer.ProduceRoomEvents(req.Event.RoomID(), outputEvents)
