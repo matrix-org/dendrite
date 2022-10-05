@@ -17,12 +17,13 @@ package producers
 import (
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/roomserver/acls"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/roomserver/acls"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 )
 
 var keyContentFields = map[string]string{
@@ -40,10 +41,8 @@ type RoomEventProducer struct {
 func (r *RoomEventProducer) ProduceRoomEvents(roomID string, updates []api.OutputEvent) error {
 	var err error
 	for _, update := range updates {
-		msg := &nats.Msg{
-			Subject: r.Topic,
-			Header:  nats.Header{},
-		}
+		msg := nats.NewMsg(r.Topic)
+		msg.Header.Set(jetstream.RoomEventType, string(update.Type))
 		msg.Header.Set(jetstream.RoomID, roomID)
 		msg.Data, err = json.Marshal(update)
 		if err != nil {
