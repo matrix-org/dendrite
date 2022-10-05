@@ -103,7 +103,29 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		}).WithError(err).Errorf("userapi consumer: process room event failure")
 	}
 
+	if err := s.deleteProfile(ctx, event); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": event.EventID(),
+		}).WithError(err).WithField("user_id", *event.StateKey()).Warn("userapi consumer: failed to delete user profile")
+	}
+
 	return true
+}
+
+func (s *OutputRoomEventConsumer) deleteProfile(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+	if event.Type() != gomatrixserverlib.MRoomMember || event.StateKey() == nil {
+		return nil
+	}
+	localPart, domain, err := gomatrixserverlib.SplitID('@', *event.StateKey())
+	if err != nil {
+		return nil
+	}
+	// Profiles from ourselves are updated by API calls, don't delete them.
+	if domain == s.cfg.Matrix.ServerName {
+		return nil
+	}
+	log.WithField("user_id", *event.StateKey()).Debug("Deleting remote user profile")
+	return s.db.DeleteProfile(ctx, localPart, domain)
 }
 
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, streamPos uint64) error {
