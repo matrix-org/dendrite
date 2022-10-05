@@ -45,7 +45,7 @@ const membershipSchema = `
 var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
 	" WHERE (target_local OR $1 = false)" +
-	" AND room_nid = IN ($2) AND target_nid IN ($3)" +
+	" AND room_nid IN ($2) AND target_nid IN ($3)" +
 	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
 	" AND forgotten = false" +
 	" GROUP BY target_nid"
@@ -53,7 +53,7 @@ var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 var selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
 	" WHERE (target_local OR $1 = false)" +
-	" AND room_nid = IN ($2)" +
+	" AND room_nid IN ($2)" +
 	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
 	" AND forgotten = false" +
 	" GROUP BY target_nid"
