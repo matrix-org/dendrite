@@ -129,6 +129,7 @@ func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventTy
 	// reset the roomCounts on a day change
 	if s.lastUpdate.Day() != time.Now().Day() {
 		s.roomCounts[s.serverName] = make(map[string]bool)
+		s.lastUpdate = time.Now()
 	}
 
 	_, sender, err := gomatrixserverlib.SplitID('@', eventSender)
