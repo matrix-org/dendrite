@@ -44,14 +44,18 @@ const membershipSchema = `
 
 var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
-	" WHERE room_nid IN ($1) AND target_nid IN ($2) AND" +
-	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" WHERE (target_local OR $1 = false)" +
+	" AND room_nid = ANY($2) AND target_nid = ANY($3)" +
+	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" AND forgotten = false" +
 	" GROUP BY target_nid"
 
 var selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
-	" WHERE room_nid IN ($1) AND " +
-	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" WHERE (target_local OR $1 = false)" +
+	" AND room_nid = ANY($2)" +
+	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" AND forgotten = false" +
 	" GROUP BY target_nid"
 
 // Insert a row in to membership table so that it can be locked by the
@@ -305,8 +309,9 @@ func (s *membershipStatements) SelectRoomsWithMembership(
 	return roomNIDs, nil
 }
 
-func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID, userNIDs []types.EventStateKeyNID) (map[types.EventStateKeyNID]int, error) {
-	params := make([]interface{}, 0, len(roomNIDs)+len(userNIDs))
+func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context, txn *sql.Tx, roomNIDs []types.RoomNID, userNIDs []types.EventStateKeyNID, localOnly bool) (map[types.EventStateKeyNID]int, error) {
+	params := make([]interface{}, 0, 1+len(roomNIDs)+len(userNIDs))
+	params = append(params, localOnly)
 	for _, v := range roomNIDs {
 		params = append(params, v)
 	}
@@ -314,10 +319,10 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(ctx context.Context,
 		params = append(params, v)
 	}
 
-	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
+	query := strings.Replace(selectJoinedUsersSetForRoomsSQL, "($2)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
 	if len(userNIDs) > 0 {
-		query = strings.Replace(selectJoinedUsersSetForRoomsAndUserSQL, "($1)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
-		query = strings.Replace(query, "($2)", sqlutil.QueryVariadicOffset(len(userNIDs), len(roomNIDs)), 1)
+		query = strings.Replace(selectJoinedUsersSetForRoomsAndUserSQL, "($2)", sqlutil.QueryVariadic(len(roomNIDs)), 1)
+		query = strings.Replace(query, "($3)", sqlutil.QueryVariadicOffset(len(userNIDs), len(roomNIDs)), 1)
 	}
 	var rows *sql.Rows
 	var err error
