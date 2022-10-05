@@ -193,6 +193,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 }
 
 func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
+	r.Inviter.UserAPI = userAPI
 	r.Leaver.UserAPI = userAPI
 }
 

@@ -50,6 +50,7 @@ type KeyserverUserAPI interface {
 
 type RoomserverUserAPI interface {
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryAccountAvailability(ctx context.Context, req *QueryAccountAvailabilityRequest, res *QueryAccountAvailabilityResponse) error
 }
 
 // api functions required by the media api

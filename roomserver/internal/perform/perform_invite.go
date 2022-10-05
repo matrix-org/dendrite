@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	log "github.com/sirupsen/logrus"
@@ -36,6 +37,7 @@ type Inviter struct {
 	DB      storage.Database
 	Cfg     *config.RoomServer
 	FSAPI   federationAPI.RoomserverFederationAPI
+	UserAPI userAPI.RoomserverUserAPI
 	Inputer *input.Inputer
 }
 
@@ -62,7 +64,7 @@ func (r *Inviter) PerformInvite(
 		return nil, fmt.Errorf("failed to load RoomInfo: %w", err)
 	}
 
-	_, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', targetUserID)
 	if err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -78,6 +80,23 @@ func (r *Inviter) PerformInvite(
 			Msg:  "The invite must be either from or to a local user",
 		}
 		return nil, nil
+	}
+
+	if isTargetLocal {
+		userReq := &userAPI.QueryAccountAvailabilityRequest{
+			Localpart: localpart,
+		}
+		userRes := &userAPI.QueryAccountAvailabilityResponse{}
+		if err = r.UserAPI.QueryAccountAvailability(ctx, userReq, userRes); err != nil {
+			return nil, fmt.Errorf("r.UserAPI.QueryAccountAvailability: %w", err)
+		}
+		if userRes.Available {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("The user ID %q does not exist!", targetUserID),
+			}
+			return nil, nil
+		}
 	}
 
 	logger := util.GetLogger(ctx).WithFields(map[string]interface{}{
