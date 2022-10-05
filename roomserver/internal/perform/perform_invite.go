@@ -92,7 +92,7 @@ func (r *Inviter) PerformInvite(
 		}
 		if userRes.Available {
 			res.Error = &api.PerformError{
-				Code: api.PerformErrorBadRequest,
+				Code: api.PerformErrorNotFound,
 				Msg:  fmt.Sprintf("The user ID %q does not exist!", targetUserID),
 			}
 			return nil, nil

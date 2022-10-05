@@ -57,6 +57,11 @@ func (p *PerformError) JSONResponse() util.JSONResponse {
 			// TODO: Should we assert this is in fact JSON? E.g gjson parse?
 			JSON: json.RawMessage(p.Msg),
 		}
+	case PerformErrorNotFound:
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(p.Msg),
+		}
 	default:
 		return util.ErrorResponse(p)
 	}
@@ -73,6 +78,8 @@ const (
 	PerformErrorNoOperation PerformErrorCode = 4
 	// PerformErrRemote means that the request failed and the PerformError.Msg is the raw remote JSON error response
 	PerformErrRemote PerformErrorCode = 5
+	// PerformErrorNotFound means the thing they were trying to do was not found.
+	PerformErrorNotFound PerformErrorCode = 6
 )
 
 type PerformJoinRequest struct {
