@@ -22,6 +22,10 @@ var (
 
 type mockKeyAPI struct{}
 
+func (k *mockKeyAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *keyapi.PerformMarkAsStaleRequest, res *struct{}) error {
+	return nil
+}
+
 func (k *mockKeyAPI) PerformUploadKeys(ctx context.Context, req *keyapi.PerformUploadKeysRequest, res *keyapi.PerformUploadKeysResponse) error {
 	return nil
 }
@@ -166,9 +170,12 @@ func joinResponseWithRooms(syncResponse *types.Response, userID string, roomIDs 
 				Content:  []byte(`{"membership":"join"}`),
 			},
 		}
-
-		jr := syncResponse.Rooms.Join[roomID]
-		jr.State.Events = roomEvents
+		jr, ok := syncResponse.Rooms.Join[roomID]
+		if !ok {
+			jr = types.NewJoinResponse()
+		}
+		jr.Timeline = &types.Timeline{}
+		jr.State = &types.ClientEvents{Events: roomEvents}
 		syncResponse.Rooms.Join[roomID] = jr
 	}
 	return syncResponse
@@ -187,8 +194,11 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 			},
 		}
 
-		lr := syncResponse.Rooms.Leave[roomID]
-		lr.Timeline.Events = roomEvents
+		lr, ok := syncResponse.Rooms.Leave[roomID]
+		if !ok {
+			lr = types.NewLeaveResponse()
+		}
+		lr.Timeline = &types.Timeline{Events: roomEvents}
 		syncResponse.Rooms.Leave[roomID] = lr
 	}
 	return syncResponse
@@ -324,9 +334,13 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 		},
 	}
 
-	jr := syncResponse.Rooms.Join[roomID]
-	jr.State.Events = roomStateEvents
-	jr.Timeline.Events = roomTimelineEvents
+	jr, ok := syncResponse.Rooms.Join[roomID]
+	if !ok {
+		jr = types.NewJoinResponse()
+	}
+
+	jr.State = &types.ClientEvents{Events: roomStateEvents}
+	jr.Timeline = &types.Timeline{Events: roomTimelineEvents}
 	syncResponse.Rooms.Join[roomID] = jr
 
 	rsAPI := &mockRoomserverAPI{
@@ -438,8 +452,11 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 		},
 	}
 
-	lr := syncResponse.Rooms.Leave[roomID]
-	lr.Timeline.Events = roomEvents
+	lr, ok := syncResponse.Rooms.Leave[roomID]
+	if !ok {
+		lr = types.NewLeaveResponse()
+	}
+	lr.Timeline = &types.Timeline{Events: roomEvents}
 	syncResponse.Rooms.Leave[roomID] = lr
 
 	rsAPI := &mockRoomserverAPI{

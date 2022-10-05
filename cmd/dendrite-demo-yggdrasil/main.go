@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -56,6 +57,7 @@ var (
 	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
 	instancePeer   = flag.String("peer", "", "the static Yggdrasil peers to connect to, comma separated-list")
 	instanceListen = flag.String("listen", "tcp://:0", "the port Yggdrasil peers can connect to")
+	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
 )
 
 func main() {
@@ -76,7 +78,7 @@ func main() {
 
 	cfg := &config.Dendrite{}
 
-	keyfile := *instanceName + ".pem"
+	keyfile := filepath.Join(*instanceDir, *instanceName) + ".pem"
 	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
 		oldkeyfile := *instanceName + ".key"
 		if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
@@ -121,17 +123,20 @@ func main() {
 			Monolithic: true,
 		})
 		cfg.Global.PrivateKey = sk
-		cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/", *instanceName))
-		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", *instanceName))
-		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", *instanceName))
-		cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", *instanceName))
-		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", *instanceName))
-		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", *instanceName))
-		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", *instanceName))
-		cfg.MSCs.MSCs = []string{"msc2836"}
-		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", *instanceName))
+		cfg.Global.JetStream.StoragePath = config.Path(filepath.Join(*instanceDir, *instanceName))
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
+		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+		cfg.MediaAPI.BasePath = config.Path(*instanceDir)
+		cfg.SyncAPI.Fulltext.Enabled = true
+		cfg.SyncAPI.Fulltext.IndexPath = config.Path(*instanceDir)
 		if err := cfg.Derive(); err != nil {
 			panic(err)
 		}

@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/sirupsen/logrus"
 
 	natsserver "github.com/nats-io/nats-server/v2/server"
 	natsclient "github.com/nats-io/nats.go"
@@ -168,9 +169,9 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 					// We've managed to add the stream in memory.  What's on the
 					// disk will be left alone, but our ability to recover from a
 					// future crash will be limited. Yell about it.
-					sentry.CaptureException(fmt.Errorf("Stream %q is running in-memory; this may be due to data corruption in the JetStream storage directory, investigate as soon as possible", namespaced.Name))
-					logrus.Warn("Stream is running in-memory; this may be due to data corruption in the JetStream storage directory, investigate as soon as possible")
-					process.Degraded()
+					err := fmt.Errorf("Stream %q is running in-memory; this may be due to data corruption in the JetStream storage directory", namespaced.Name)
+					sentry.CaptureException(err)
+					process.Degraded(err)
 				}
 			}
 		}
@@ -184,6 +185,8 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 		OutputSendToDeviceEvent: {"SyncAPIEDUServerSendToDeviceConsumer", "FederationAPIEDUServerConsumer"},
 		OutputTypingEvent:       {"SyncAPIEDUServerTypingConsumer", "FederationAPIEDUServerConsumer"},
 		OutputRoomEvent:         {"AppserviceRoomserverConsumer"},
+		OutputStreamEvent:       {"UserAPISyncAPIStreamEventConsumer"},
+		OutputReadUpdate:        {"UserAPISyncAPIReadUpdateConsumer"},
 	} {
 		streamName := cfg.Matrix.JetStream.Prefixed(stream)
 		for _, consumer := range consumers {

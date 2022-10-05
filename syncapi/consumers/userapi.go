@@ -19,15 +19,17 @@ import (
 	"encoding/json"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputNotificationDataConsumer consumes events that originated in
@@ -39,7 +41,7 @@ type OutputNotificationDataConsumer struct {
 	topic     string
 	db        storage.Database
 	notifier  *notifier.Notifier
-	stream    types.StreamProvider
+	stream    streams.StreamProvider
 }
 
 // NewOutputNotificationDataConsumer creates a new consumer. Call
@@ -50,7 +52,7 @@ func NewOutputNotificationDataConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputNotificationDataConsumer {
 	s := &OutputNotificationDataConsumer{
 		ctx:       process.Context(),

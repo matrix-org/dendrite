@@ -342,9 +342,8 @@ func (r *Admin) PerformAdminDownloadState(
 
 	for _, authEvent := range append(authEvents, stateEvents...) {
 		inputReq.InputRoomEvents = append(inputReq.InputRoomEvents, api.InputRoomEvent{
-			Kind:   api.KindOutlier,
-			Event:  authEvent,
-			Origin: authEvent.Origin(),
+			Kind:  api.KindOutlier,
+			Event: authEvent,
 		})
 	}
 

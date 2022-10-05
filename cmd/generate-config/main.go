@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v2"
+
+	"github.com/matrix-org/dendrite/setup/config"
 )
 
 func main() {
@@ -81,6 +82,12 @@ func main() {
 			cfg.Global.Presence = config.PresenceOptions{
 				EnableInbound:  true,
 				EnableOutbound: true,
+			}
+			cfg.SyncAPI.Fulltext = config.Fulltext{
+				Enabled:   true,
+				IndexPath: config.Path(filepath.Join(*dirPath, "searchindex")),
+				InMemory:  true,
+				Language:  "en",
 			}
 		}
 	} else {

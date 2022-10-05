@@ -17,8 +17,9 @@ package syncapi
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/internal/caching"
 
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -76,16 +77,6 @@ func AddPublicRoutes(
 		logrus.WithError(err).Panicf("failed to start presence consumer")
 	}
 
-	userAPIStreamEventProducer := &producers.UserAPIStreamEventProducer{
-		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputStreamEvent),
-	}
-
-	userAPIReadUpdateProducer := &producers.UserAPIReadProducer{
-		JetStream: js,
-		Topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReadUpdate),
-	}
-
 	keyChangeConsumer := consumers.NewOutputKeyChangeEventConsumer(
 		base.ProcessContext, cfg, cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
 		js, rsAPI, syncDB, notifier,
@@ -97,15 +88,15 @@ func AddPublicRoutes(
 
 	roomConsumer := consumers.NewOutputRoomEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.PDUStreamProvider,
-		streams.InviteStreamProvider, rsAPI, userAPIStreamEventProducer,
+		streams.InviteStreamProvider, rsAPI, base.Fulltext,
 	)
 	if err = roomConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start room server consumer")
 	}
 
 	clientConsumer := consumers.NewOutputClientDataConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.AccountDataStreamProvider,
-		userAPIReadUpdateProducer,
+		base.ProcessContext, cfg, js, natsClient, syncDB, notifier,
+		streams.AccountDataStreamProvider, base.Fulltext,
 	)
 	if err = clientConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start client data consumer")
@@ -126,7 +117,7 @@ func AddPublicRoutes(
 	}
 
 	sendToDeviceConsumer := consumers.NewOutputSendToDeviceEventConsumer(
-		base.ProcessContext, cfg, js, syncDB, notifier, streams.SendToDeviceStreamProvider,
+		base.ProcessContext, cfg, js, syncDB, keyAPI, notifier, streams.SendToDeviceStreamProvider,
 	)
 	if err = sendToDeviceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start send-to-device consumer")
@@ -134,7 +125,6 @@ func AddPublicRoutes(
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
 		base.ProcessContext, cfg, js, syncDB, notifier, streams.ReceiptStreamProvider,
-		userAPIReadUpdateProducer,
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
@@ -142,6 +132,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches,
+		rsAPI, cfg, base.Caches, base.Fulltext,
 	)
 }

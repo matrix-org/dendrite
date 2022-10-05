@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -305,75 +306,182 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 			syncReq.Log.WithField("currentPos", currentPos).Debugln("Responding to sync immediately")
 		}
 
+		withTransaction := func(from types.StreamPosition, f func(snapshot storage.DatabaseTransaction) types.StreamPosition) types.StreamPosition {
+			var succeeded bool
+			snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
+			if err != nil {
+				logrus.WithError(err).Error("Failed to acquire database snapshot for sync request")
+				return from
+			}
+			defer func() {
+				succeeded = err == nil
+				sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+			}()
+			return f(snapshot)
+		}
+
 		if syncReq.Since.IsEmpty() {
 			// Complete sync
 			syncReq.Response.NextBatch = types.StreamingToken{
-				PDUPosition: rp.streams.PDUStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				// Get the current DeviceListPosition first, as the currentPosition
+				// might advance while processing other streams, resulting in flakey
+				// tests.
+				DeviceListPosition: withTransaction(
+					syncReq.Since.DeviceListPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.DeviceListStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				TypingPosition: rp.streams.TypingStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				PDUPosition: withTransaction(
+					syncReq.Since.PDUPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.PDUStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				ReceiptPosition: rp.streams.ReceiptStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				TypingPosition: withTransaction(
+					syncReq.Since.TypingPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.TypingStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				InvitePosition: rp.streams.InviteStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				ReceiptPosition: withTransaction(
+					syncReq.Since.ReceiptPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.ReceiptStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				InvitePosition: withTransaction(
+					syncReq.Since.InvitePosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.InviteStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				AccountDataPosition: rp.streams.AccountDataStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				SendToDevicePosition: withTransaction(
+					syncReq.Since.SendToDevicePosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.SendToDeviceStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				NotificationDataPosition: rp.streams.NotificationDataStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				AccountDataPosition: withTransaction(
+					syncReq.Since.AccountDataPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.AccountDataStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				DeviceListPosition: rp.streams.DeviceListStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				NotificationDataPosition: withTransaction(
+					syncReq.Since.NotificationDataPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.NotificationDataStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
-				PresencePosition: rp.streams.PresenceStreamProvider.CompleteSync(
-					syncReq.Context, syncReq,
+				PresencePosition: withTransaction(
+					syncReq.Since.PresencePosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.PresenceStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
 				),
 			}
 		} else {
 			// Incremental sync
 			syncReq.Response.NextBatch = types.StreamingToken{
-				PDUPosition: rp.streams.PDUStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.PDUPosition, currentPos.PDUPosition,
+				PDUPosition: withTransaction(
+					syncReq.Since.PDUPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.PDUStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.PDUPosition, currentPos.PDUPosition,
+						)
+					},
 				),
-				TypingPosition: rp.streams.TypingStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.TypingPosition, currentPos.TypingPosition,
+				TypingPosition: withTransaction(
+					syncReq.Since.TypingPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.TypingStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.TypingPosition, currentPos.TypingPosition,
+						)
+					},
 				),
-				ReceiptPosition: rp.streams.ReceiptStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
+				ReceiptPosition: withTransaction(
+					syncReq.Since.ReceiptPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.ReceiptStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.ReceiptPosition, currentPos.ReceiptPosition,
+						)
+					},
 				),
-				InvitePosition: rp.streams.InviteStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.InvitePosition, currentPos.InvitePosition,
+				InvitePosition: withTransaction(
+					syncReq.Since.InvitePosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.InviteStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.InvitePosition, currentPos.InvitePosition,
+						)
+					},
 				),
-				SendToDevicePosition: rp.streams.SendToDeviceStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
+				SendToDevicePosition: withTransaction(
+					syncReq.Since.SendToDevicePosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.SendToDeviceStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.SendToDevicePosition, currentPos.SendToDevicePosition,
+						)
+					},
 				),
-				AccountDataPosition: rp.streams.AccountDataStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
+				AccountDataPosition: withTransaction(
+					syncReq.Since.AccountDataPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.AccountDataStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.AccountDataPosition, currentPos.AccountDataPosition,
+						)
+					},
 				),
-				NotificationDataPosition: rp.streams.NotificationDataStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
+				NotificationDataPosition: withTransaction(
+					syncReq.Since.NotificationDataPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.NotificationDataStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.NotificationDataPosition, currentPos.NotificationDataPosition,
+						)
+					},
 				),
-				DeviceListPosition: rp.streams.DeviceListStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
+				DeviceListPosition: withTransaction(
+					syncReq.Since.DeviceListPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.DeviceListStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.DeviceListPosition, currentPos.DeviceListPosition,
+						)
+					},
 				),
-				PresencePosition: rp.streams.PresenceStreamProvider.IncrementalSync(
-					syncReq.Context, syncReq,
-					syncReq.Since.PresencePosition, currentPos.PresencePosition,
+				PresencePosition: withTransaction(
+					syncReq.Since.PresencePosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.PresenceStreamProvider.IncrementalSync(
+							syncReq.Context, txn, syncReq,
+							syncReq.Since.PresencePosition, currentPos.PresencePosition,
+						)
+					},
 				),
 			}
 			// it's possible for there to be no updates for this user even though since < current pos,
@@ -434,15 +542,23 @@ func (rp *RequestPool) OnIncomingKeyChangeRequest(req *http.Request, device *use
 		util.GetLogger(req.Context()).WithError(err).Error("newSyncRequest failed")
 		return jsonerror.InternalServerError()
 	}
-	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), syncReq, fromToken.PDUPosition, toToken.PDUPosition)
+	snapshot, err := rp.db.NewDatabaseSnapshot(req.Context())
+	if err != nil {
+		logrus.WithError(err).Error("Failed to acquire database snapshot for key change")
+		return jsonerror.InternalServerError()
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+	rp.streams.PDUStreamProvider.IncrementalSync(req.Context(), snapshot, syncReq, fromToken.PDUPosition, toToken.PDUPosition)
 	_, _, err = internal.DeviceListCatchup(
-		req.Context(), rp.db, rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
+		req.Context(), snapshot, rp.keyAPI, rp.rsAPI, syncReq.Device.UserID,
 		syncReq.Response, fromToken.DeviceListPosition, toToken.DeviceListPosition,
 	)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("Failed to DeviceListCatchup info")
 		return jsonerror.InternalServerError()
 	}
+	succeeded = true
 	return util.JSONResponse{
 		Code: 200,
 		JSON: struct {
