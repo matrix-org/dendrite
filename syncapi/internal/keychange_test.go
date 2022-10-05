@@ -170,8 +170,10 @@ func joinResponseWithRooms(syncResponse *types.Response, userID string, roomIDs 
 				Content:  []byte(`{"membership":"join"}`),
 			},
 		}
-
-		jr := syncResponse.Rooms.Join[roomID]
+		jr, ok := syncResponse.Rooms.Join[roomID]
+		if !ok {
+			jr = types.NewJoinResponse()
+		}
 		jr.Timeline = &types.Timeline{}
 		jr.State = &types.ClientEvents{Events: roomEvents}
 		syncResponse.Rooms.Join[roomID] = jr
@@ -192,7 +194,10 @@ func leaveResponseWithRooms(syncResponse *types.Response, userID string, roomIDs
 			},
 		}
 
-		lr := syncResponse.Rooms.Leave[roomID]
+		lr, ok := syncResponse.Rooms.Leave[roomID]
+		if !ok {
+			lr = types.NewLeaveResponse()
+		}
 		lr.Timeline = &types.Timeline{Events: roomEvents}
 		syncResponse.Rooms.Leave[roomID] = lr
 	}
@@ -329,7 +334,11 @@ func TestKeyChangeCatchupNoNewJoinsButMessages(t *testing.T) {
 		},
 	}
 
-	jr := syncResponse.Rooms.Join[roomID]
+	jr, ok := syncResponse.Rooms.Join[roomID]
+	if !ok {
+		jr = types.NewJoinResponse()
+	}
+
 	jr.State = &types.ClientEvents{Events: roomStateEvents}
 	jr.Timeline = &types.Timeline{Events: roomTimelineEvents}
 	syncResponse.Rooms.Join[roomID] = jr
@@ -443,7 +452,10 @@ func TestKeyChangeCatchupChangeAndLeftSameRoom(t *testing.T) {
 		},
 	}
 
-	lr := syncResponse.Rooms.Leave[roomID]
+	lr, ok := syncResponse.Rooms.Leave[roomID]
+	if !ok {
+		lr = types.NewLeaveResponse()
+	}
 	lr.Timeline = &types.Timeline{Events: roomEvents}
 	syncResponse.Rooms.Leave[roomID] = lr
 
