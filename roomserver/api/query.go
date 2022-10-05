@@ -278,6 +278,7 @@ type QuerySharedUsersRequest struct {
 	OtherUserIDs   []string
 	ExcludeRoomIDs []string
 	IncludeRoomIDs []string
+	LocalOnly      bool
 }
 
 type QuerySharedUsersResponse struct {
