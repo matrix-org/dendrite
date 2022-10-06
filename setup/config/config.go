@@ -251,7 +251,7 @@ func loadConfig(
 
 			key.KeyID = keyID
 			key.PrivateKey = privateKey
-			key.PublicKey = privateKey.Public().(gomatrixserverlib.Base64Bytes)
+			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
 
 		case len(key.PublicKey) == ed25519.PublicKeySize:
 			continue
