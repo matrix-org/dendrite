@@ -131,7 +131,7 @@ type OldVerifyKeys struct {
 	PublicKey gomatrixserverlib.Base64Bytes `yaml:"public_key"`
 
 	// The key ID of the private key.
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 
 	// When the private key was designed as "expired", as a UNIX timestamp
 	// in millisecond precision.

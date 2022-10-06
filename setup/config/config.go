@@ -234,7 +234,7 @@ func loadConfig(
 	for _, key := range c.Global.OldVerifyKeys {
 		switch {
 		case key.KeyID == "":
-			return nil, fmt.Errorf("key ID must be specified for old_verify_keys")
+			return nil, fmt.Errorf("key ID must be specified if public_key is specified")
 
 		case len(key.PublicKey) == ed25519.PublicKeySize:
 			continue
