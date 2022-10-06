@@ -233,19 +233,7 @@ func loadConfig(
 
 	for _, key := range c.Global.OldVerifyKeys {
 		switch {
-		case key.KeyID == "":
-			return nil, fmt.Errorf("key ID must be specified if public_key is specified")
-
-		case len(key.PublicKey) == ed25519.PublicKeySize:
-			continue
-
-		case len(key.PublicKey) > 0:
-			return nil, fmt.Errorf("the public_key is the wrong length")
-
-		case key.PrivateKeyPath == "":
-			return nil, fmt.Errorf("a private_key path must be specified if public_key isn't")
-
-		default:
+		case key.PrivateKeyPath != "":
 			var oldPrivateKeyData []byte
 			oldPrivateKeyPath := absPath(basePath, key.PrivateKeyPath)
 			oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
@@ -264,6 +252,18 @@ func loadConfig(
 			key.KeyID = keyID
 			key.PrivateKey = privateKey
 			key.PublicKey = privateKey.Public().(gomatrixserverlib.Base64Bytes)
+
+		case len(key.PublicKey) == ed25519.PublicKeySize:
+			continue
+
+		case len(key.PublicKey) > 0:
+			return nil, fmt.Errorf("the supplied 'public_key' is the wrong length")
+
+		case key.KeyID == "":
+			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
+
+		default:
+			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
 		}
 	}
 
