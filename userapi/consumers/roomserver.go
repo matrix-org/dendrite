@@ -84,13 +84,14 @@ func (s *OutputRoomEventConsumer) Start() error {
 
 func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
+	// Only handle events we care about
+	if rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) != rsapi.OutputTypeNewRoomEvent {
+		return true
+	}
 	var output rsapi.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
-		return true
-	}
-	if output.Type != rsapi.OutputTypeNewRoomEvent {
 		return true
 	}
 	event := output.NewRoomEvent.Event

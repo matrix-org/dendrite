@@ -79,7 +79,7 @@ func TestMembershipTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, inRoom)
 
-		userJoinedToRooms, err := tab.SelectJoinedUsersSetForRooms(ctx, nil, []types.RoomNID{1}, userNIDs)
+		userJoinedToRooms, err := tab.SelectJoinedUsersSetForRooms(ctx, nil, []types.RoomNID{1}, userNIDs, false)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(userJoinedToRooms))
 
