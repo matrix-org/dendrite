@@ -263,7 +263,7 @@ func loadConfig(
 
 			key.KeyID = keyID
 			key.PrivateKey = privateKey
-			key.PublicKey = privateKey.Public().(ed25519.PublicKey)
+			key.PublicKey = privateKey.Public().(gomatrixserverlib.Base64Bytes)
 		}
 	}
 

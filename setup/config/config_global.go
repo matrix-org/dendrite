@@ -128,7 +128,7 @@ type OldVerifyKeys struct {
 	PrivateKey ed25519.PrivateKey `yaml:"-"`
 
 	// The public key, in case only that part is known.
-	PublicKey ed25519.PublicKey `yaml:"public_key"`
+	PublicKey gomatrixserverlib.Base64Bytes `yaml:"public_key"`
 
 	// The key ID of the private key.
 	KeyID gomatrixserverlib.KeyID `yaml:"-"`
