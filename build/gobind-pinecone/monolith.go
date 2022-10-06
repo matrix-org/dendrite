@@ -103,15 +103,15 @@ func (m *DendriteMonolith) SessionCount() int {
 
 func (m *DendriteMonolith) RegisterNetworkInterface(name string, index int, mtu int, up bool, broadcast bool, loopback bool, pointToPoint bool, multicast bool, addrs string) {
 	m.PineconeMulticast.RegisterInterface(pineconeMulticast.InterfaceInfo{
-		Name: name,
-		Index: index,
-		Mtu: mtu,
-		Up: up,
-		Broadcast: broadcast,
-		Loopback: loopback,
+		Name:         name,
+		Index:        index,
+		Mtu:          mtu,
+		Up:           up,
+		Broadcast:    broadcast,
+		Loopback:     loopback,
 		PointToPoint: pointToPoint,
-		Multicast: multicast,
-		Addrs: addrs,
+		Multicast:    multicast,
+		Addrs:        addrs,
 	})
 }
 

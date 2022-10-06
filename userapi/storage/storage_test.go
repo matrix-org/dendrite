@@ -521,7 +521,7 @@ func Test_Notification(t *testing.T) {
 		// get notifications
 		count, err := db.GetNotificationCount(ctx, aliceLocalpart, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notification count")
-		assert.Equal(t, int64(10), count)
+		assert.Equal(t, int64(2), count)
 		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, 0, 15, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notifications")
 		assert.Equal(t, int64(10), count)

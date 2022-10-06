@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -33,12 +34,18 @@ type GetAccountByPassword func(ctx context.Context, req *api.QueryAccountByPassw
 type PasswordRequest struct {
 	Login
 	Password string `json:"password"`
+	Address  string `json:"address"`
+	Medium   string `json:"medium"`
 }
+
+const email = "email"
 
 // LoginTypePassword implements https://matrix.org/docs/spec/client_server/r0.6.1#password-based
 type LoginTypePassword struct {
-	GetAccountByPassword GetAccountByPassword
-	Config               *config.ClientAPI
+	UserApi       api.ClientUserAPI
+	Config        *config.ClientAPI
+	Rt            *ratelimit.RtFailedLogin
+	InhibitDevice bool
 }
 
 func (t *LoginTypePassword) Name() string {
@@ -55,13 +62,42 @@ func (t *LoginTypePassword) LoginFromJSON(ctx context.Context, reqBytes []byte) 
 	if err != nil {
 		return nil, nil, err
 	}
+	login.InhibitDevice = t.InhibitDevice
 
 	return login, func(context.Context, *util.JSONResponse) {}, nil
 }
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	username := strings.ToLower(r.Username())
+	if r.Identifier.Address != "" {
+		r.Address = r.Identifier.Address
+	}
+	if r.Identifier.Medium != "" {
+		r.Medium = r.Identifier.Medium
+	}
+	var username string
+	if r.Medium == email && r.Address != "" {
+		r.Address = strings.ToLower(r.Address)
+		res := api.QueryLocalpartForThreePIDResponse{}
+		err := t.UserApi.QueryLocalpartForThreePID(ctx, &api.QueryLocalpartForThreePIDRequest{
+			ThreePID: r.Address,
+			Medium:   email,
+		}, &res)
+		if err != nil {
+			util.GetLogger(ctx).WithError(err).Error("userApi.QueryLocalpartForThreePID failed")
+			resp := jsonerror.InternalServerError()
+			return nil, &resp
+		}
+		username = res.Localpart
+		if username == "" {
+			return nil, &util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.Forbidden("Invalid username or password"),
+			}
+		}
+	} else {
+		username = strings.ToLower(r.Username())
+	}
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -77,7 +113,17 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	}
 	// Squash username to all lowercase letters
 	res := &api.QueryAccountByPasswordResponse{}
-	err = t.GetAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{Localpart: strings.ToLower(localpart), PlaintextPassword: r.Password}, res)
+	localpart = strings.ToLower(localpart)
+	if t.Rt != nil {
+		ok, retryIn := t.Rt.CanAct(localpart)
+		if !ok {
+			return nil, &util.JSONResponse{
+				Code: http.StatusTooManyRequests,
+				JSON: jsonerror.LimitExceeded("Too Many Requests", retryIn.Milliseconds()),
+			}
+		}
+	}
+	err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{Localpart: localpart, PlaintextPassword: r.Password}, res)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -86,7 +132,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	}
 
 	if !res.Exists {
-		err = t.GetAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+		err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
 			PlaintextPassword: r.Password,
 		}, res)
@@ -99,11 +145,15 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows
 		// but that would leak the existence of the user.
 		if !res.Exists {
+			if t.Rt != nil {
+				t.Rt.Act(localpart)
+			}
 			return nil, &util.JSONResponse{
 				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
+				JSON: jsonerror.Forbidden("Invalid username or password"),
 			}
 		}
 	}
+	r.Login.User = username
 	return &r.Login, nil
 }

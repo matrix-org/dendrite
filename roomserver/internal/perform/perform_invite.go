@@ -140,7 +140,7 @@ func (r *Inviter) PerformInvite(
 
 	var isAlreadyJoined bool
 	if info != nil {
-		_, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *event.StateKey())
+		_, _, isAlreadyJoined, _, err = r.DB.GetMembership(ctx, info.RoomNID, *event.StateKey())
 		if err != nil {
 			return nil, fmt.Errorf("r.DB.GetMembership: %w", err)
 		}

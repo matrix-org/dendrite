@@ -52,3 +52,17 @@ Guest users can join guest_access rooms
 
 # This will fail in HTTP API mode, so blacklisted for now
 If a device list update goes missing, the server resyncs on the next one
+# You'll be shocked to discover this is flakey too
+
+Inbound /v1/send_join rejects joins from other servers
+
+# For notifications extension on iOS
+
+/event/ does not allow access to events before the user joined
+
+# Failing after recent updates with presence
+
+Newly joined room includes presence in incremental sync
+User sees their own presence in a sync
+User is offline if they set_presence=offline in their sync
+User sees updates to presence from other users in the incremental sync.

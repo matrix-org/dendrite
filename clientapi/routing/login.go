@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -55,6 +56,7 @@ func passwordLogin() flows {
 func Login(
 	req *http.Request, userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
+	rt *ratelimit.RtFailedLogin,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
 		// TODO: support other forms of login other than password, depending on config options
@@ -63,9 +65,20 @@ func Login(
 			JSON: passwordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, userAPI, userAPI, cfg)
+		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, userAPI, cfg, rt)
 		if authErr != nil {
 			return *authErr
+		}
+		if login.InhibitDevice {
+			return util.JSONResponse{
+				Code: http.StatusOK,
+				JSON: loginResponse{
+					UserID:      login.Username(),
+					AccessToken: "",
+					HomeServer:  cfg.Matrix.ServerName,
+					DeviceID:    "",
+				},
+			}
 		}
 		// make a device/access token
 		authErr2 := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())

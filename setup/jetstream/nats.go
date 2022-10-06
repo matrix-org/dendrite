@@ -78,7 +78,17 @@ func (s *NATSInstance) Prepare(process *process.ProcessContext, cfg *config.JetS
 func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsclient.Conn) (natsclient.JetStreamContext, *natsclient.Conn) {
 	if nc == nil {
 		var err error
-		opts := []natsclient.Option{}
+		opts := []natsclient.Option{
+			natsclient.DisconnectErrHandler(func(c *natsclient.Conn, err error) {
+				logrus.WithError(err).Error("nats connection: disconnected")
+			}),
+			natsclient.ReconnectHandler(func(_ *natsclient.Conn) {
+				logrus.Info("nats connection: client reconnected")
+			}),
+			natsclient.ClosedHandler(func(_ *natsclient.Conn) {
+				logrus.Info("nats connection: client closed")
+			}),
+		}
 		if cfg.DisableTLSValidation {
 			opts = append(opts, natsclient.Secure(&tls.Config{
 				InsecureSkipVerify: true,
