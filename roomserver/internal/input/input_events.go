@@ -173,12 +173,15 @@ func (r *Inputer) processRoomEvent(
 		for _, server := range serverRes.ServerNames {
 			servers[server] = struct{}{}
 		}
+		// Don't try to talk to ourselves.
+		delete(servers, r.Cfg.Matrix.ServerName)
+		// Now build up the list of servers.
 		serverRes.ServerNames = serverRes.ServerNames[:0]
-		if input.Origin != "" {
+		if input.Origin != "" && input.Origin != r.Cfg.Matrix.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if senderDomain != input.Origin {
+		if senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
 			delete(servers, senderDomain)
 		}

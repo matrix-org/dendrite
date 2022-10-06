@@ -18,11 +18,16 @@ global:
   private_key: matrix_key.pem
 
   # The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
-  # to old signing private keys that were formerly in use on this domain. These
+  # to old signing keys that were formerly in use on this domain name. These
   # keys will not be used for federation request or event signing, but will be
   # provided to any other homeserver that asks when trying to verify old events.
   old_private_keys:
+  #  If the old private key file is available:
   #  - private_key: old_matrix_key.pem
+  #    expired_at: 1601024554498
+  #  If only the public key (in base64 format) and key ID are known:
+  #  - public_key: mn59Kxfdq9VziYHSBzI7+EDPDcBS2Xl7jeUdiiQcOnM=
+  #    key_id: ed25519:mykeyid
   #    expired_at: 1601024554498
 
   # How long a remote server can cache our server signing key before requesting it
