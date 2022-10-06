@@ -253,14 +253,14 @@ func loadConfig(
 			key.PrivateKey = privateKey
 			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
 
+		case key.KeyID == "":
+			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
+
 		case len(key.PublicKey) == ed25519.PublicKeySize:
 			continue
 
 		case len(key.PublicKey) > 0:
 			return nil, fmt.Errorf("the supplied 'public_key' is the wrong length")
-
-		case key.KeyID == "":
-			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
 
 		default:
 			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
