@@ -219,6 +219,13 @@ federation_api:
   # enable this option in production as it presents a security risk!
   disable_tls_validation: false
 
+  # Disable HTTP keepalives, which also prevents connection reuse. Dendrite will typically
+  # keep HTTP connections open to remote hosts for 5 minutes as they can be reused much
+  # more quickly than opening new connections each time. Disabling keepalives will close
+  # HTTP connections immediately after a successful request but may result in more CPU and
+  # memory being used on TLS handshakes for each new connection instead.
+  disable_http_keepalives: false
+
   # Perspective keyservers to use as a backup when direct key fetches fail. This may
   # be required to satisfy key requests for servers that are no longer online when
   # joining some rooms.
@@ -319,6 +326,19 @@ sync_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
+
+  # Configuration for the full-text search engine.
+  search:
+    # Whether or not search is enabled.
+    enabled: false
+
+    # The path where the search index will be created in.
+    index_path: "./searchindex"
+
+    # The language most likely to be used on the server - used when indexing, to
+    # ensure the returned results match expectations. A full list of possible languages
+    # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    language: "en"
 
   # This option controls which HTTP header to inspect to find the real remote IP
   # address of the client. This is likely required if Dendrite is running behind

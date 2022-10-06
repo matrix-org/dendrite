@@ -16,37 +16,42 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"fmt"
+	"strings"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // OutputClientDataConsumer consumes events that originated in the client API server.
 type OutputClientDataConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	topic      string
-	db         storage.Database
-	stream     types.StreamProvider
-	notifier   *notifier.Notifier
-	serverName gomatrixserverlib.ServerName
-	producer   *producers.UserAPIReadProducer
+	ctx          context.Context
+	jetstream    nats.JetStreamContext
+	nats         *nats.Conn
+	durable      string
+	topic        string
+	topicReIndex string
+	db           storage.Database
+	stream       streams.StreamProvider
+	notifier     *notifier.Notifier
+	serverName   gomatrixserverlib.ServerName
+	fts          *fulltext.Search
+	cfg          *config.SyncAPI
 }
 
 // NewOutputClientDataConsumer creates a new OutputClientData consumer. Call Start() to begin consuming from room servers.
@@ -54,26 +59,93 @@ func NewOutputClientDataConsumer(
 	process *process.ProcessContext,
 	cfg *config.SyncAPI,
 	js nats.JetStreamContext,
+	nats *nats.Conn,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
-	producer *producers.UserAPIReadProducer,
+	stream streams.StreamProvider,
+	fts *fulltext.Search,
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
-		db:         store,
-		notifier:   notifier,
-		stream:     stream,
-		serverName: cfg.Matrix.ServerName,
-		producer:   producer,
+		ctx:          process.Context(),
+		jetstream:    js,
+		topic:        cfg.Matrix.JetStream.Prefixed(jetstream.OutputClientData),
+		topicReIndex: cfg.Matrix.JetStream.Prefixed(jetstream.InputFulltextReindex),
+		durable:      cfg.Matrix.JetStream.Durable("SyncAPIAccountDataConsumer"),
+		nats:         nats,
+		db:           store,
+		notifier:     notifier,
+		stream:       stream,
+		serverName:   cfg.Matrix.ServerName,
+		fts:          fts,
+		cfg:          cfg,
 	}
 }
 
 // Start consuming from room servers
 func (s *OutputClientDataConsumer) Start() error {
+	_, err := s.nats.Subscribe(s.topicReIndex, func(msg *nats.Msg) {
+		if err := msg.Ack(); err != nil {
+			return
+		}
+		if !s.cfg.Fulltext.Enabled {
+			logrus.Warn("Fulltext indexing is disabled")
+			return
+		}
+		ctx := context.Background()
+		logrus.Infof("Starting to index events")
+		var offset int
+		start := time.Now()
+		count := 0
+		var id int64 = 0
+		for {
+			evs, err := s.db.ReIndex(ctx, 1000, id)
+			if err != nil {
+				logrus.WithError(err).Errorf("unable to get events to index")
+				return
+			}
+			if len(evs) == 0 {
+				break
+			}
+			logrus.Debugf("Indexing %d events", len(evs))
+			elements := make([]fulltext.IndexElement, 0, len(evs))
+
+			for streamPos, ev := range evs {
+				id = streamPos
+				e := fulltext.IndexElement{
+					EventID:        ev.EventID(),
+					RoomID:         ev.RoomID(),
+					StreamPosition: streamPos,
+				}
+				e.SetContentType(ev.Type())
+
+				switch ev.Type() {
+				case "m.room.message":
+					e.Content = gjson.GetBytes(ev.Content(), "body").String()
+				case gomatrixserverlib.MRoomName:
+					e.Content = gjson.GetBytes(ev.Content(), "name").String()
+				case gomatrixserverlib.MRoomTopic:
+					e.Content = gjson.GetBytes(ev.Content(), "topic").String()
+				default:
+					continue
+				}
+
+				if strings.TrimSpace(e.Content) == "" {
+					continue
+				}
+				elements = append(elements, e)
+			}
+			if err = s.fts.Index(elements...); err != nil {
+				logrus.WithError(err).Error("unable to index events")
+				continue
+			}
+			offset += len(evs)
+			count += len(elements)
+		}
+		logrus.Infof("Indexed %d events in %v", count, time.Since(start))
+	})
+	if err != nil {
+		return err
+	}
 	return jetstream.JetStreamConsumer(
 		s.ctx, s.jetstream, s.topic, s.durable, 1,
 		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
@@ -113,15 +185,6 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 		return false
 	}
 
-	if err = s.sendReadUpdate(ctx, userID, output); err != nil {
-		log.WithError(err).WithFields(logrus.Fields{
-			"user_id": userID,
-			"room_id": output.RoomID,
-		}).Errorf("Failed to generate read update")
-		sentry.CaptureException(err)
-		return false
-	}
-
 	if output.IgnoredUsers != nil {
 		if err := s.db.UpdateIgnoresForUser(ctx, userID, output.IgnoredUsers); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
@@ -135,35 +198,4 @@ func (s *OutputClientDataConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	s.notifier.OnNewAccountData(userID, types.StreamingToken{AccountDataPosition: streamPos})
 
 	return true
-}
-
-func (s *OutputClientDataConsumer) sendReadUpdate(ctx context.Context, userID string, output eventutil.AccountData) error {
-	if output.Type != "m.fully_read" || output.ReadMarker == nil {
-		return nil
-	}
-	_, serverName, err := gomatrixserverlib.SplitID('@', userID)
-	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-	}
-	if serverName != s.serverName {
-		return nil
-	}
-	var readPos types.StreamPosition
-	var fullyReadPos types.StreamPosition
-	if output.ReadMarker.Read != "" {
-		if _, readPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.Read); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("s.db.PositionInTopology (Read): %w", err)
-		}
-	}
-	if output.ReadMarker.FullyRead != "" {
-		if _, fullyReadPos, err = s.db.PositionInTopology(ctx, output.ReadMarker.FullyRead); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("s.db.PositionInTopology (FullyRead): %w", err)
-		}
-	}
-	if readPos > 0 || fullyReadPos > 0 {
-		if err := s.producer.SendReadUpdate(userID, output.RoomID, readPos, fullyReadPos); err != nil {
-			return fmt.Errorf("s.producer.SendReadUpdate: %w", err)
-		}
-	}
-	return nil
 }

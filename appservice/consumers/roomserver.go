@@ -22,6 +22,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -134,7 +135,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 			}
 
 		case api.OutputTypeNewInviteEvent:
-			if output.NewInviteEvent == nil {
+			if output.NewInviteEvent == nil || !s.appserviceIsInterestedInEvent(ctx, output.NewInviteEvent.Event, state.ApplicationService) {
 				continue
 			}
 			events = append(events, output.NewInviteEvent.Event)
@@ -151,10 +152,17 @@ func (s *OutputRoomEventConsumer) onMessage(
 		return true
 	}
 
+	txnID := ""
+	// Try to get the message metadata, if we're able to, use the timestamp as the txnID
+	metadata, err := msgs[0].Metadata()
+	if err == nil {
+		txnID = strconv.Itoa(int(metadata.Timestamp.UnixNano()))
+	}
+
 	// Send event to any relevant application services. If we hit
 	// an error here, return false, so that we negatively ack.
 	log.WithField("appservice", state.ID).Debugf("Appservice worker sending %d events(s) from roomserver", len(events))
-	return s.sendEvents(ctx, state, events) == nil
+	return s.sendEvents(ctx, state, events, txnID) == nil
 }
 
 // sendEvents passes events to the appservice by using the transactions
@@ -162,6 +170,7 @@ func (s *OutputRoomEventConsumer) onMessage(
 func (s *OutputRoomEventConsumer) sendEvents(
 	ctx context.Context, state *appserviceState,
 	events []*gomatrixserverlib.HeaderedEvent,
+	txnID string,
 ) error {
 	// Create the transaction body.
 	transaction, err := json.Marshal(
@@ -173,13 +182,14 @@ func (s *OutputRoomEventConsumer) sendEvents(
 		return err
 	}
 
-	// TODO: We should probably be more intelligent and pick something not
-	// in the control of the event. A NATS timestamp header or something maybe.
-	txnID := events[0].Event.OriginServerTS()
+	// If txnID is not defined, generate one from the events.
+	if txnID == "" {
+		txnID = fmt.Sprintf("%d_%d", events[0].Event.OriginServerTS(), len(transaction))
+	}
 
 	// Send the transaction to the appservice.
 	// https://matrix.org/docs/spec/application_service/r0.1.2#put-matrix-app-v1-transactions-txnid
-	address := fmt.Sprintf("%s/transactions/%d?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
+	address := fmt.Sprintf("%s/transactions/%s?access_token=%s", state.URL, txnID, url.QueryEscape(state.HSToken))
 	req, err := http.NewRequestWithContext(ctx, "PUT", address, bytes.NewBuffer(transaction))
 	if err != nil {
 		return err
@@ -281,7 +291,9 @@ func (s *OutputRoomEventConsumer) appserviceJoinedAtEvent(ctx context.Context, e
 			case err != nil:
 				continue
 			case membership.Membership == gomatrixserverlib.Join:
-				return true
+				if appservice.IsInterestedInUserID(*ev.StateKey) {
+					return true
+				}
 			}
 		}
 	} else {

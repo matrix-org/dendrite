@@ -3,17 +3,23 @@ package streams
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type SendToDeviceStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 }
 
-func (p *SendToDeviceStreamProvider) Setup() {
-	p.StreamProvider.Setup()
+func (p *SendToDeviceStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseTransaction,
+) {
+	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := p.DB.MaxStreamPositionForSendToDeviceMessages(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForSendToDeviceMessages(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -22,20 +28,23 @@ func (p *SendToDeviceStreamProvider) Setup() {
 
 func (p *SendToDeviceStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *SendToDeviceStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
 	// See if we have any new tasks to do for the send-to-device messaging.
-	lastPos, events, err := p.DB.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
+	lastPos, events, err := snapshot.SendToDeviceUpdatesForSync(req.Context, req.Device.UserID, req.Device.ID, from, to)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.SendToDeviceUpdatesForSync failed")
+		_ = snapshot.Reset()
 		return from
 	}
 

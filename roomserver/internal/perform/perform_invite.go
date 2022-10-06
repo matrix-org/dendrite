@@ -50,6 +50,10 @@ func (r *Inviter) PerformInvite(
 	if event.StateKey() == nil {
 		return nil, fmt.Errorf("invite must be a state event")
 	}
+	_, senderDomain, err := gomatrixserverlib.SplitID('@', event.Sender())
+	if err != nil {
+		return nil, fmt.Errorf("sender %q is invalid", event.Sender())
+	}
 
 	roomID := event.RoomID()
 	targetUserID := *event.StateKey()
@@ -67,7 +71,7 @@ func (r *Inviter) PerformInvite(
 		return nil, nil
 	}
 	isTargetLocal := domain == r.Cfg.Matrix.ServerName
-	isOriginLocal := event.Origin() == r.Cfg.Matrix.ServerName
+	isOriginLocal := senderDomain == r.Cfg.Matrix.ServerName
 	if !isOriginLocal && !isTargetLocal {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
@@ -235,7 +239,7 @@ func (r *Inviter) PerformInvite(
 			{
 				Kind:         api.KindNew,
 				Event:        event,
-				Origin:       event.Origin(),
+				Origin:       senderDomain,
 				SendAsServer: req.SendAsServer,
 			},
 		},

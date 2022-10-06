@@ -9,20 +9,23 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type InviteStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 }
 
-func (p *InviteStreamProvider) Setup() {
-	p.StreamProvider.Setup()
+func (p *InviteStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseTransaction,
+) {
+	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := p.DB.MaxStreamPositionForInvites(context.Background())
+	id, err := snapshot.MaxStreamPositionForInvites(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -31,13 +34,15 @@ func (p *InviteStreamProvider) Setup() {
 
 func (p *InviteStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *InviteStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
@@ -46,11 +51,12 @@ func (p *InviteStreamProvider) IncrementalSync(
 		To:   to,
 	}
 
-	invites, retiredInvites, err := p.DB.InviteEventsInRange(
+	invites, retiredInvites, maxID, err := snapshot.InviteEventsInRange(
 		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.InviteEventsInRange failed")
+		_ = snapshot.Reset()
 		return from
 	}
 
@@ -86,5 +92,5 @@ func (p *InviteStreamProvider) IncrementalSync(
 		}
 	}
 
-	return to
+	return maxID
 }

@@ -37,14 +37,12 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-
-	"github.com/matrix-org/dendrite/internal"
-	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 
 	"github.com/gorilla/mux"
 	"github.com/kardianos/minwinsvc"
@@ -60,6 +58,8 @@ import (
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	rsinthttp "github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 )
@@ -90,6 +90,7 @@ type BaseDendrite struct {
 	Database               *sql.DB
 	DatabaseWriter         sqlutil.Writer
 	EnableMetrics          bool
+	Fulltext               *fulltext.Search
 	startupLock            sync.Mutex
 }
 
@@ -147,6 +148,15 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 	closer, err := cfg.SetupTracing("Dendrite" + componentName)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
+	}
+
+	var fts *fulltext.Search
+	isSyncOrMonolith := componentName == "syncapi" || isMonolith
+	if cfg.SyncAPI.Fulltext.Enabled && isSyncOrMonolith {
+		fts, err = fulltext.New(cfg.SyncAPI.Fulltext)
+		if err != nil {
+			logrus.WithError(err).Panicf("failed to create full text")
+		}
 	}
 
 	if cfg.Global.Sentry.Enabled {
@@ -246,6 +256,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		Database:               db,     // set if monolith with global connection pool only
 		DatabaseWriter:         writer, // set if monolith with global connection pool only
 		EnableMetrics:          enableMetrics,
+		Fulltext:               fts,
 	}
 }
 
@@ -360,6 +371,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 	opts := []gomatrixserverlib.ClientOption{
 		gomatrixserverlib.WithTimeout(time.Minute * 5),
 		gomatrixserverlib.WithSkipVerify(b.Cfg.FederationAPI.DisableTLSValidation),
+		gomatrixserverlib.WithKeepAlives(!b.Cfg.FederationAPI.DisableHTTPKeepalives),
 	}
 	if b.Cfg.Global.DNSCache.Enabled {
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
@@ -378,17 +390,26 @@ func (b *BaseDendrite) configureHTTPErrors() {
 		_, _ = w.Write([]byte(fmt.Sprintf("405 %s not allowed on this endpoint", r.Method)))
 	}
 
+	clientNotFoundHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}`)) // nolint:misspell
+	}
+
 	notFoundCORSHandler := httputil.WrapHandlerInCORS(http.NotFoundHandler())
 	notAllowedCORSHandler := httputil.WrapHandlerInCORS(http.HandlerFunc(notAllowedHandler))
 
 	for _, router := range []*mux.Router{
-		b.PublicClientAPIMux, b.PublicMediaAPIMux,
-		b.DendriteAdminMux, b.SynapseAdminMux,
-		b.PublicWellKnownAPIMux,
+		b.PublicMediaAPIMux, b.DendriteAdminMux,
+		b.SynapseAdminMux, b.PublicWellKnownAPIMux,
 	} {
 		router.NotFoundHandler = notFoundCORSHandler
 		router.MethodNotAllowedHandler = notAllowedCORSHandler
 	}
+
+	// Special case so that we don't upset clients on the CS API.
+	b.PublicClientAPIMux.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
+	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
@@ -485,7 +506,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			logrus.Infof("Starting internal %s listener on %s", b.componentName, internalServ.Addr)
 			b.ProcessContext.ComponentStarted()
 			internalServ.RegisterOnShutdown(func() {
-				if internalShutdown.CAS(false, true) {
+				if internalShutdown.CompareAndSwap(false, true) {
 					b.ProcessContext.ComponentFinished()
 					logrus.Infof("Stopped internal HTTP listener")
 				}
@@ -513,7 +534,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 			logrus.Infof("Starting external %s listener on %s", b.componentName, externalServ.Addr)
 			b.ProcessContext.ComponentStarted()
 			externalServ.RegisterOnShutdown(func() {
-				if externalShutdown.CAS(false, true) {
+				if externalShutdown.CompareAndSwap(false, true) {
 					b.ProcessContext.ComponentFinished()
 					logrus.Infof("Stopped external HTTP listener")
 				}

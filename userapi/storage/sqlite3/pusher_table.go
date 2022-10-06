@@ -19,11 +19,12 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/sirupsen/logrus"
 )
 
 // See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-pushers
@@ -96,7 +97,7 @@ func (s *pushersStatements) InsertPusher(
 	ctx context.Context, txn *sql.Tx, session_id int64,
 	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string,
 ) error {
-	_, err := s.insertPusherStmt.ExecContext(ctx, localpart, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
+	_, err := sqlutil.TxStmt(txn, s.insertPusherStmt).ExecContext(ctx, localpart, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
 	logrus.Debugf("Created pusher %d", session_id)
 	return err
 }
@@ -136,7 +137,7 @@ func (s *pushersStatements) SelectPushers(
 		pushers = append(pushers, pusher)
 	}
 
-	logrus.Debugf("Database returned %d pushers", len(pushers))
+	logrus.Tracef("Database returned %d pushers", len(pushers))
 	return pushers, rows.Err()
 }
 
@@ -144,13 +145,13 @@ func (s *pushersStatements) SelectPushers(
 func (s *pushersStatements) DeletePusher(
 	ctx context.Context, txn *sql.Tx, appid, pushkey, localpart string,
 ) error {
-	_, err := s.deletePusherStmt.ExecContext(ctx, appid, pushkey, localpart)
+	_, err := sqlutil.TxStmt(txn, s.deletePusherStmt).ExecContext(ctx, appid, pushkey, localpart)
 	return err
 }
 
 func (s *pushersStatements) DeletePushers(
 	ctx context.Context, txn *sql.Tx, appid, pushkey string,
 ) error {
-	_, err := s.deletePushersByAppIdAndPushKeyStmt.ExecContext(ctx, appid, pushkey)
+	_, err := sqlutil.TxStmt(txn, s.deletePushersByAppIdAndPushKeyStmt).ExecContext(ctx, appid, pushkey)
 	return err
 }

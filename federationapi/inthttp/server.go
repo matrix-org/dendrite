@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/internal/httputil"
 )
 
 // AddRoutes adds the FederationInternalAPI handlers to the http.ServeMux.
@@ -229,9 +232,21 @@ func federationClientError(err error) error {
 		return &ferr
 	case *api.FederationClientError:
 		return ferr
-	default:
+	case gomatrix.HTTPError:
 		return &api.FederationClientError{
-			Err: err.Error(),
+			Code: ferr.Code,
+		}
+	case *url.Error: // e.g. certificate error, unable to connect
+		return &api.FederationClientError{
+			Err:  ferr.Error(),
+			Code: 400,
+		}
+	default:
+		// We don't know what exactly failed, but we probably don't
+		// want to retry the request immediately in the device list updater
+		return &api.FederationClientError{
+			Err:  err.Error(),
+			Code: 400,
 		}
 	}
 }

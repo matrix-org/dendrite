@@ -176,7 +176,8 @@ func (r *Inputer) Start() error {
 		},
 		nats.HeadersOnly(),
 		nats.DeliverAll(),
-		nats.AckAll(),
+		nats.AckExplicit(),
+		nats.ReplayInstant(),
 		nats.BindStream(r.InputRoomEventTopic),
 	)
 	return err
@@ -188,6 +189,9 @@ func (w *worker) _next() {
 	// Look up what the next event is that's waiting to be processed.
 	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
 	defer cancel()
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("room_id", w.roomID)
+	}
 	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
 	switch err {
 	case nil:
@@ -239,6 +243,9 @@ func (w *worker) _next() {
 		return
 	}
 
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("event_id", inputRoomEvent.Event.EventID())
+	}
 	roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Inc()
 	defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Dec()
 
