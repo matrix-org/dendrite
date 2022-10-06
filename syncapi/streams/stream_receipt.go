@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type ReceiptStreamProvider struct {
@@ -76,9 +77,9 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 			continue
 		}
 
-		jr := *types.NewJoinResponse()
-		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
-			jr = existing
+		jr, ok := req.Response.Rooms.Join[roomID]
+		if !ok {
+			jr = types.NewJoinResponse()
 		}
 
 		ev := gomatrixserverlib.ClientEvent{

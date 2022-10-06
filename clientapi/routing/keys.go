@@ -19,11 +19,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/util"
 )
 
 type uploadKeysRequest struct {
@@ -77,7 +78,6 @@ func UploadKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Devi
 		}
 	}
 	keyCount := make(map[string]int)
-	// we only return key counts when the client uploads OTKs
 	if len(uploadRes.OneTimeKeyCounts) > 0 {
 		keyCount = uploadRes.OneTimeKeyCounts[0].KeyCount
 	}
