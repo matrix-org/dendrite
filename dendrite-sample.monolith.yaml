@@ -25,7 +25,7 @@ global:
   #  If the old private key file is available:
   #  - private_key: old_matrix_key.pem
   #    expired_at: 1601024554498
-  #  If only the public key (in base64 format) and key ID is known:
+  #  If only the public key (in base64 format) and key ID are known:
   #  - public_key: mn59Kxfdq9VziYHSBzI7+EDPDcBS2Xl7jeUdiiQcOnM=
   #    key_id: ed25519:mykeyid
   #    expired_at: 1601024554498
