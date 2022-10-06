@@ -231,24 +231,40 @@ func loadConfig(
 		return nil, err
 	}
 
-	for i, oldPrivateKey := range c.Global.OldVerifyKeys {
-		var oldPrivateKeyData []byte
+	for _, key := range c.Global.OldVerifyKeys {
+		switch {
+		case key.KeyID == "":
+			return nil, fmt.Errorf("key ID must be specified for old_verify_keys")
 
-		oldPrivateKeyPath := absPath(basePath, oldPrivateKey.PrivateKeyPath)
-		oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
-		if err != nil {
-			return nil, err
+		case len(key.PublicKey) == ed25519.PublicKeySize:
+			continue
+
+		case len(key.PublicKey) > 0:
+			return nil, fmt.Errorf("the public_key is the wrong length")
+
+		case key.PrivateKeyPath == "":
+			return nil, fmt.Errorf("a private_key path must be specified if public_key isn't")
+
+		default:
+			var oldPrivateKeyData []byte
+			oldPrivateKeyPath := absPath(basePath, key.PrivateKeyPath)
+			oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read %q: %w", oldPrivateKeyPath, err)
+			}
+
+			// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
+			// a number of private keys out there with non-compatible symbols in them due
+			// to lack of validation in Synapse, we won't enforce that for old verify keys.
+			keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
+			if perr != nil {
+				return nil, fmt.Errorf("failed to parse %q: %w", oldPrivateKeyPath, perr)
+			}
+
+			key.KeyID = keyID
+			key.PrivateKey = privateKey
+			key.PublicKey = privateKey.Public().(ed25519.PublicKey)
 		}
-
-		// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
-		// a number of private keys out there with non-compatible symbols in them due
-		// to lack of validation in Synapse, we won't enforce that for old verify keys.
-		keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
-		if perr != nil {
-			return nil, perr
-		}
-
-		c.Global.OldVerifyKeys[i].KeyID, c.Global.OldVerifyKeys[i].PrivateKey = keyID, privateKey
 	}
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))

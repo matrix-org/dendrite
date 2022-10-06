@@ -27,7 +27,7 @@ type Global struct {
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
 	// servers that ask for them to help verify old events.
-	OldVerifyKeys []OldVerifyKeys `yaml:"old_private_keys"`
+	OldVerifyKeys []*OldVerifyKeys `yaml:"old_private_keys"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
@@ -126,6 +126,9 @@ type OldVerifyKeys struct {
 
 	// The private key itself.
 	PrivateKey ed25519.PrivateKey `yaml:"-"`
+
+	// The public key, in case only that part is known.
+	PublicKey ed25519.PublicKey `yaml:"public_key"`
 
 	// The key ID of the private key.
 	KeyID gomatrixserverlib.KeyID `yaml:"-"`

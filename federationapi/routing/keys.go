@@ -160,7 +160,7 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 	for _, oldVerifyKey := range cfg.Matrix.OldVerifyKeys {
 		keys.OldVerifyKeys[oldVerifyKey.KeyID] = gomatrixserverlib.OldVerifyKey{
 			VerifyKey: gomatrixserverlib.VerifyKey{
-				Key: gomatrixserverlib.Base64Bytes(oldVerifyKey.PrivateKey.Public().(ed25519.PublicKey)),
+				Key: gomatrixserverlib.Base64Bytes(oldVerifyKey.PublicKey),
 			},
 			ExpiredTS: oldVerifyKey.ExpiredAt,
 		}
