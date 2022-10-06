@@ -90,6 +90,7 @@ func (r *Inviter) PerformInvite(
 		if err = r.UserAPI.QueryAccountAvailability(ctx, userReq, userRes); err != nil {
 			return nil, fmt.Errorf("r.UserAPI.QueryAccountAvailability: %w", err)
 		}
+		// If the user ID is "available" then that user doesn't exist.
 		if userRes.Available {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorNotFound,
