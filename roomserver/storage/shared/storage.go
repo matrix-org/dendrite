@@ -598,7 +598,7 @@ func (d *Database) storeEvent(
 	}
 	// First writer is with a database-provided transaction, so that NIDs are assigned
 	// globally outside of the updater context, to help avoid races.
-	err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// TODO: Here we should aim to have two different code paths for new rooms
 		// vs existing ones.
 
@@ -964,9 +964,9 @@ func (d *Database) loadRedactionPair(
 	}
 
 	if isRedactionEvent {
-		redactedEvent = d.loadEvent(ctx, txn, info.RedactsEventID)
+		redactedEvent = d.loadEvent(ctx, info.RedactsEventID)
 	} else {
-		redactionEvent = d.loadEvent(ctx, txn, info.RedactionEventID)
+		redactionEvent = d.loadEvent(ctx, info.RedactionEventID)
 	}
 
 	return redactionEvent, redactedEvent, info.Validated, nil
@@ -982,15 +982,15 @@ func (d *Database) applyRedactions(events []types.Event) {
 }
 
 // loadEvent loads a single event or returns nil on any problems/missing event
-func (d *Database) loadEvent(ctx context.Context, txn *sql.Tx, eventID string) *types.Event {
-	nids, err := d.eventNIDs(ctx, txn, []string{eventID}, NoFilter)
+func (d *Database) loadEvent(ctx context.Context, eventID string) *types.Event {
+	nids, err := d.EventNIDs(ctx, []string{eventID})
 	if err != nil {
 		return nil
 	}
 	if len(nids) == 0 {
 		return nil
 	}
-	evs, err := d.events(ctx, txn, []types.EventNID{nids[eventID]})
+	evs, err := d.Events(ctx, []types.EventNID{nids[eventID]})
 	if err != nil {
 		return nil
 	}
@@ -1358,7 +1358,7 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 	}
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.MembershipTable.UpdateForgetMembership(ctx, txn, roomNIDs[0], stateKeyNID, forget)
+		return d.MembershipTable.UpdateForgetMembership(ctx, nil, roomNIDs[0], stateKeyNID, forget)
 	})
 }
 
