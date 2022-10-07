@@ -13,6 +13,7 @@
 ### Fixes
 
 * The sync transaction behaviour has been modified further so that errors in one stream should not propagate to other streams unnecessarily
+* Rooms should now be classified as DM rooms correctly by passing through `is_direct` and unsigned hints
 * A bug which caused marking device lists as stale to consume lots of CPU has been fixed
 * Users accepting invites should no longer cause unnecessary federated joins if there are already other local users in the room
 * The sync API state range queries have been optimised by adding missing indexes
