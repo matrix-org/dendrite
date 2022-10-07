@@ -17,7 +17,7 @@
 * A bug which caused marking device lists as stale to consume lots of CPU has been fixed
 * Users accepting invites should no longer cause unnecessary federated joins if there are already other local users in the room
 * The sync API state range queries have been optimised by adding missing indexes
-* It should now be possible to configure non-English languages for full-text search in `search.languages`
+* It should now be possible to configure non-English languages for full-text search in `search.language`
 * The roomserver will no longer attempt to perform federated requests to the local server when trying to fetch missing events
 * The `/keys/upload` endpoint will now always return the `one_time_keys_counts`, which may help with E2EE reliability
 * The sync API will now retrieve the latest stream position before processing each stream rather than at the beginning of the request, to hopefully reduce the number of round-trips to `/sync`
