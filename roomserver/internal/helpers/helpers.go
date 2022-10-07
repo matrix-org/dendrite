@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -14,8 +17,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // TODO: temporary package which has helper functions used by both internal/perform packages.
@@ -97,35 +98,35 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 func IsInvitePending(
 	ctx context.Context, db storage.Database,
 	roomID, userID string,
-) (bool, string, string, error) {
+) (bool, string, string, *gomatrixserverlib.Event, error) {
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
 	if info == nil {
-		return false, "", "", fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
+		return false, "", "", nil, fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
 	}
 
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{userID})
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
 	targetUserNID, targetUserFound := targetUserNIDs[userID]
 	if !targetUserFound {
-		return false, "", "", fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
+		return false, "", "", nil, fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
 	// we do then it will contain a server name that we can direct the
 	// send_leave to.
-	senderUserNIDs, eventIDs, err := db.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
+	senderUserNIDs, eventIDs, eventJSON, err := db.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
 	}
 	if len(senderUserNIDs) == 0 {
-		return false, "", "", nil
+		return false, "", "", nil, nil
 	}
 	userNIDToEventID := make(map[types.EventStateKeyNID]string)
 	for i, nid := range senderUserNIDs {
@@ -135,18 +136,20 @@ func IsInvitePending(
 	// Look up the user ID from the NID.
 	senderUsers, err := db.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeys: %w", err)
 	}
 	if len(senderUsers) == 0 {
-		return false, "", "", fmt.Errorf("no senderUsers")
+		return false, "", "", nil, fmt.Errorf("no senderUsers")
 	}
 
 	senderUser, senderUserFound := senderUsers[senderUserNIDs[0]]
 	if !senderUserFound {
-		return false, "", "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
+		return false, "", "", nil, fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], nil
+	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, info.RoomVersion)
+
+	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
 }
 
 // GetMembershipsAtState filters the state events to
