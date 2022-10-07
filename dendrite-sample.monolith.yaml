@@ -9,6 +9,12 @@ version: 2
 
 # Global Matrix configuration. This configuration applies to all components.
 global:
+  # Monolith specific configuration
+  monolith:
+    # HTTP and HTTPS bind address
+    http_bind_address: http://:8008
+    https_bind_address: https://:8448
+
   # The domain name of this homeserver.
   server_name: localhost
 

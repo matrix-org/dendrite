@@ -33,8 +33,8 @@ import (
 )
 
 var (
-	httpBindAddr   = flag.String("http-bind-address", ":8008", "The HTTP listening port for the server")
-	httpsBindAddr  = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
+	httpBindAddr   = flag.String("http-bind-address", "", "The HTTP listening port for the server")
+	httpsBindAddr  = flag.String("https-bind-address", "", "The HTTPS listening port for the server")
 	apiBindAddr    = flag.String("api-bind-address", "localhost:18008", "The HTTP listening port for the internal HTTP APIs (if -api is enabled)")
 	certFile       = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile        = flag.String("tls-key", "", "The PEM private key to use for TLS")
@@ -44,8 +44,14 @@ var (
 
 func main() {
 	cfg := setup.ParseFlags(true)
-	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
-	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
+	httpAddr := cfg.Global.Monolith.HTTPBindAddr
+	httpsAddr := cfg.Global.Monolith.HTTPBindAddr
+	if *httpBindAddr != "" {
+		httpAddr = config.HTTPAddress("http://" + *httpBindAddr)
+	}
+	if *httpsBindAddr != "" {
+		httpsAddr = config.HTTPAddress("https://" + *httpsBindAddr)
+	}
 	httpAPIAddr := httpAddr
 	options := []basepkg.BaseDendriteOptions{}
 	if *enableHTTPAPIs {

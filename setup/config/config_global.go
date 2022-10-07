@@ -12,6 +12,9 @@ import (
 )
 
 type Global struct {
+	// Monolith specific configuration options, like bind address.
+	Monolith Monolith `yaml:"monolith,omitempty"`
+
 	// Signing identity contains the server name, private key and key ID of
 	// the deployment.
 	gomatrixserverlib.SigningIdentity `yaml:",inline"`
@@ -96,6 +99,7 @@ func (c *Global) Defaults(opts DefaultOpts) {
 	if opts.Monolithic {
 		c.DatabaseOptions.Defaults(90)
 	}
+	c.Monolith.Defaults(opts)
 	c.JetStream.Defaults(opts)
 	c.Metrics.Defaults(opts)
 	c.DNSCache.Defaults()
@@ -113,6 +117,7 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		v.Verify(configErrs)
 	}
 
+	c.Monolith.Verify(configErrs, isMonolith)
 	c.JetStream.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
 	c.Sentry.Verify(configErrs, isMonolith)
