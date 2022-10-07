@@ -117,7 +117,7 @@ func Test_insertMigration(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		conStr, close := test.PrepareDBConnectionString(t, dbType)
 		defer close()
-		driverName := "sqlite3"
+		driverName := "sqlite"
 		if dbType == test.DBTypePostgres {
 			driverName = "postgres"
 		}
