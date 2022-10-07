@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 )
 
 // Ideally, when we have both events we should redact the event JSON and forget about the redaction, but we currently
@@ -445,7 +446,7 @@ func (d *Database) GetInvitesForUser(
 	ctx context.Context,
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
-) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, err error) {
+) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, inviteEventJSON []byte, err error) {
 	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 }
 

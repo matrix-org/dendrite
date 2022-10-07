@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/consumers"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/consumers"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
 // PerformLeaveRequest implements api.FederationInternalAPI
@@ -95,6 +96,7 @@ func (r *FederationInternalAPI) PerformJoin(
 			request.Content,
 			serverName,
 			supportedVersions,
+			request.Unsigned,
 		); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"server_name": serverName,
@@ -139,6 +141,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	content map[string]interface{},
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
+	unsigned map[string]interface{},
 ) error {
 	// Try to perform a make_join using the information supplied in the
 	// request.
@@ -267,6 +270,12 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
+	event, err = event.SetUnsigned(unsigned)
+	if err != nil {
+		// non-fatal, log and continue
+		logrus.WithError(err).Errorf("Failed to set prev content")
+	}
+
 	if err = roomserverAPI.SendEventWithState(
 		context.Background(),
 		r.rsAPI,
