@@ -212,15 +212,13 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 		return nil
 	}
 	maxStreamID := int64(0)
+	// remove deleted devices
+	var result []api.DeviceMessage
 	for _, m := range msgs {
 		if m.StreamID > maxStreamID {
 			maxStreamID = m.StreamID
 		}
-	}
-	// remove deleted devices
-	var result []api.DeviceMessage
-	for _, m := range msgs {
-		if m.KeyJSON == nil {
+		if m.KeyJSON == nil || len(m.KeyJSON) == 0 {
 			continue
 		}
 		result = append(result, m)
