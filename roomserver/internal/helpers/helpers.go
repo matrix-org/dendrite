@@ -147,7 +147,7 @@ func IsInvitePending(
 		return false, "", "", nil, fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, true, info.RoomVersion)
+	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, info.RoomVersion)
 
 	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
 }
