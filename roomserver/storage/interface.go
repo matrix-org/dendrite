@@ -17,10 +17,11 @@ package storage
 import (
 	"context"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
@@ -104,7 +105,7 @@ type Database interface {
 	// Look up the active invites targeting a user in a room and return the
 	// numeric state key IDs for the user IDs who sent them along with the event IDs for the invites.
 	// Returns an error if there was a problem talking to the database.
-	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, err error)
+	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, inviteEventJSON []byte, err error)
 	// Save a given room alias with the room ID it refers to.
 	// Returns an error if there was a problem talking to the database.
 	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
