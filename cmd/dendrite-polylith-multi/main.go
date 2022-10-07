@@ -25,7 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type entrypoint func(base *base.BaseDendrite, cfg *config.Dendrite)

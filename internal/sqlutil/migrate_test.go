@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/test"
@@ -88,7 +88,7 @@ func Test_migrations_Up(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				driverName := "sqlite3"
+				driverName := "sqlite"
 				if dbType == test.DBTypePostgres {
 					driverName = "postgres"
 				}
