@@ -361,7 +361,7 @@ func (r *Joiner) performFederatedJoinRoomByID(
 		UserID:      req.UserID,        // the user ID joining the room
 		ServerNames: req.ServerNames,   // the server to try joining with
 		Content:     req.Content,       // the membership event content
-		Unsigned:    req.Unsigned,
+		Unsigned:    req.Unsigned,      // the unsigned event content, if any
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
 	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)

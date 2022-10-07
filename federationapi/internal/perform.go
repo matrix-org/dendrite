@@ -270,10 +270,12 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
-	event, err = event.SetUnsigned(unsigned)
-	if err != nil {
-		// non-fatal, log and continue
-		logrus.WithError(err).Errorf("Failed to set prev content")
+	if unsigned != nil {
+		event, err = event.SetUnsigned(unsigned)
+		if err != nil {
+			// non-fatal, log and continue
+			logrus.WithError(err).Errorf("Failed to set unsigned content")
+		}
 	}
 
 	if err = roomserverAPI.SendEventWithState(
