@@ -1,5 +1,26 @@
 # Changelog
 
+## Dendrite 0.10.2 (2022-10-07)
+
+### Features
+
+* Dendrite will now fail to start if there is an obvious problem with the configured `max_open_conns` when using PostgreSQL database backends, since this can lead to instability and performance issues
+  * More information on this is available [in the documentation](https://matrix-org.github.io/dendrite/installation/start/optimisation#postgresql-connection-limit)
+* Unnecessary/empty fields will no longer be sent in `/sync` responses
+* It is now possible to configure `old_private_keys` from previous Matrix installations on the same domain if only public key is known, to make it easier to expire old keys correctly
+  * You can configure either just the `private_key` path, or you can supply both the `public_key` and `key_id`
+
+### Fixes
+
+* The sync transaction behaviour has been modified further so that errors in one stream should not propagate to other streams unnecessarily
+* A bug which caused marking device lists as stale to consume lots of CPU has been fixed
+* Users accepting invites should no longer cause unnecessary federated joins if there are already other local users in the room
+* The sync API state range queries have been optimised by adding missing indexes
+* It should now be possible to configure non-English languages for full-text search in `search.languages`
+* The roomserver will no longer attempt to perform federated requests to the local server when trying to fetch missing events
+* The `/keys/upload` endpoint will now always return the `one_time_keys_counts`, which may help with E2EE reliability
+* The sync API will now retrieve the latest stream position before processing each stream rather than at the beginning of the request, to hopefully reduce the number of round-trips to `/sync`
+
 ## Dendrite 0.10.1 (2022-09-30)
 
 ### Features
