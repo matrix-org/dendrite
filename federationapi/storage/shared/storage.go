@@ -68,6 +68,7 @@ func (d *Database) UpdateRoom(
 	removeHosts []string,
 	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
+	returnHosts := map[string]types.JoinedHost{}
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if purgeRoomFirst {
 			// If the event is a create event then we'll delete all of the existing
@@ -80,19 +81,30 @@ func (d *Database) UpdateRoom(
 			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
 				return err
 			}
-		}
-		if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
-			return err
+			for _, add := range joinedHosts {
+				returnHosts[string(add.ServerName)] = add
+			}
+			if len(removeHosts) > 0 {
+				if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
+					return err
+				}
+				for _, remove := range removeHosts {
+					delete(returnHosts, remove)
+				}
+			}
 		}
 		for _, add := range addHosts {
 			err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
 			if err != nil {
 				return err
 			}
-			joinedHosts = append(joinedHosts, add)
+			returnHosts[string(add.ServerName)] = add
 		}
 		return nil
 	})
+	for _, host := range returnHosts {
+		joinedHosts = append(joinedHosts, host)
+	}
 	return
 }
 
