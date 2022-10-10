@@ -88,6 +88,7 @@ func (d *Database) UpdateRoom(
 			if err != nil {
 				return err
 			}
+			joinedHosts = append(joinedHosts, add)
 		}
 		if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 			return err
