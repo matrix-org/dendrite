@@ -71,27 +71,27 @@ func (d *Database) UpdateRoom(
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var joinedHosts []types.JoinedHost
 		if purgeRoomFirst {
-			// If the event is a create event then we'll delete all of the existing
-			// data for the room. The only reason that a create event would be replayed
-			// to us in this way is if we're about to receive the entire room state.
 			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
+			}
+			for _, add := range addHosts {
+				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
+					return err
+				}
+				joinedHosts = append(joinedHosts, add)
 			}
 		} else {
 			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
 				return err
 			}
-		}
-
-		for _, add := range addHosts {
-			err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
-			if err != nil {
+			for _, add := range addHosts {
+				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
+					return err
+				}
+			}
+			if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 				return err
 			}
-			joinedHosts = append(joinedHosts, add)
-		}
-		if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
-			return err
 		}
 		return nil
 	})
