@@ -68,7 +68,6 @@ func (d *Database) UpdateRoom(
 	removeHosts []string,
 	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
-	returnHosts := map[string]types.JoinedHost{}
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if purgeRoomFirst {
 			// If the event is a create event then we'll delete all of the existing
@@ -77,34 +76,21 @@ func (d *Database) UpdateRoom(
 			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
 			}
-		} else {
-			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
+		} else if len(removeHosts) > 0 {
+			if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
 				return err
-			}
-			for _, add := range joinedHosts {
-				returnHosts[string(add.ServerName)] = add
-			}
-			if len(removeHosts) > 0 {
-				if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
-					return err
-				}
-				for _, remove := range removeHosts {
-					delete(returnHosts, remove)
-				}
 			}
 		}
 		for _, add := range addHosts {
-			err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
-			if err != nil {
+			if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
 				return err
 			}
-			returnHosts[string(add.ServerName)] = add
+		}
+		if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
+			return err
 		}
 		return nil
 	})
-	for _, host := range returnHosts {
-		joinedHosts = append(joinedHosts, host)
-	}
 	return
 }
 
