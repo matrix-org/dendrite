@@ -1,8 +1,8 @@
 ### Pull Request Checklist
 
-<!-- Please read docs/CONTRIBUTING.md before submitting your pull request -->
+<!-- Please read https://matrix-org.github.io/dendrite/development/contributing before submitting your pull request -->
 
 * [ ] I have added tests for PR _or_ I have justified why this PR doesn't need tests.
-* [ ] Pull request includes a [sign off](https://github.com/matrix-org/dendrite/blob/main/docs/CONTRIBUTING.md#sign-off)
+* [ ] Pull request includes a [sign off below using a legally identifiable name](https://matrix-org.github.io/dendrite/development/contributing#sign-off) _or_ I have already signed off privately
 
 Signed-off-by: `Your Name <your@email.example.org>`

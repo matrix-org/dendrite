@@ -77,9 +77,9 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 			continue
 		}
 
-		jr := types.NewJoinResponse()
-		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
-			jr = existing
+		jr, ok := req.Response.Rooms.Join[roomID]
+		if !ok {
+			jr = types.NewJoinResponse()
 		}
 
 		ev := gomatrixserverlib.ClientEvent{

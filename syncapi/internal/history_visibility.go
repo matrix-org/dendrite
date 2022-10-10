@@ -19,11 +19,13 @@ import (
 	"math"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 )
 
 func init() {
@@ -189,7 +191,7 @@ func visibilityForEvents(
 		UserID:   userID,
 	}, membershipResp)
 	if err != nil {
-		return result, err
+		logrus.WithError(err).Error("visibilityForEvents: failed to fetch membership at event, defaulting to 'leave'")
 	}
 
 	// Create a map from eventID -> eventVisibility
