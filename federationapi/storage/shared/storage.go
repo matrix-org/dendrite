@@ -69,6 +69,7 @@ func (d *Database) UpdateRoom(
 	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		var joinedHosts []types.JoinedHost
 		if purgeRoomFirst {
 			// If the event is a create event then we'll delete all of the existing
 			// data for the room. The only reason that a create event would be replayed
@@ -76,11 +77,10 @@ func (d *Database) UpdateRoom(
 			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
 			}
-		}
-
-		joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID)
-		if err != nil {
-			return err
+		} else {
+			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
+				return err
+			}
 		}
 
 		for _, add := range addHosts {
