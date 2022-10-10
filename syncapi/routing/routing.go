@@ -60,6 +60,16 @@ func Setup(
 		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], device, rsAPI, cfg, srp, lazyLoadCache)
 	})).Methods(http.MethodGet, http.MethodOptions)
 
+	v3mux.Handle("/rooms/{roomID}/event/{eventID}",
+		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, syncDB, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	v3mux.Handle("/user/{userId}/filter",
 		httputil.MakeAuthAPI("put_filter", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
