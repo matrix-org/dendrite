@@ -69,7 +69,6 @@ func (d *Database) UpdateRoom(
 	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var joinedHosts []types.JoinedHost
 		if purgeRoomFirst {
 			// If the event is a create event then we'll delete all of the existing
 			// data for the room. The only reason that a create event would be replayed
