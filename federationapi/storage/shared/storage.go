@@ -69,7 +69,6 @@ func (d *Database) UpdateRoom(
 	purgeRoomFirst bool,
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var joinedHosts []types.JoinedHost
 		if purgeRoomFirst {
 			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
