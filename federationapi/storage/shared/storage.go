@@ -82,16 +82,15 @@ func (d *Database) UpdateRoom(
 				return err
 			}
 		}
-
+		if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
+			return err
+		}
 		for _, add := range addHosts {
 			err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
 			if err != nil {
 				return err
 			}
 			joinedHosts = append(joinedHosts, add)
-		}
-		if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
-			return err
 		}
 		return nil
 	})
