@@ -7,24 +7,27 @@ about: Create a report to help us improve
 <!--
 All bug reports must provide the following background information
 Text between <!-- and --​> marks will be invisible in the report.
+
+IF YOUR ISSUE IS CONSIDERED A SECURITY VULNERABILITY THEN PLEASE STOP AND
+DO NOT POST IT AS A GITHUB ISSUE! Please report the issue responsibly by
+disclosing in private by email to security@matrix.org instead.
 -->
 
 ### Background information
 <!-- Please include versions of all software when known e.g database versions, docker versions, client versions -->
-- **Dendrite version or git SHA**: 
-- **Monolith or Polylith?**: 
-- **SQLite3 or Postgres?**: 
-- **Running in Docker?**: 
+- **Dendrite version or git SHA**:
+- **Monolith or Polylith?**:
+- **SQLite3 or Postgres?**:
+- **Running in Docker?**:
 - **`go version`**:
 - **Client used (if applicable)**:
 
-
 ### Description
 
- - **What** is the problem:
- - **Who** is affected:
- - **How** is this bug manifesting:
- - **When** did this first appear:
+- **What** is the problem:
+- **Who** is affected:
+- **How** is this bug manifesting:
+- **When** did this first appear:
 
 <!--
 Examples of good descriptions:
@@ -37,7 +40,6 @@ Examples of good descriptions:
 - Who: "Server admin"
 - How: "Lots of logs about device change updates"
 - When: "After my server joined Matrix HQ"
-
 
 Examples of bad descriptions:
 - What: "Can't send messages"  - This is bad because it isn't specfic enough. Which endpoint isn't working and what is the response code? Does the message send but encryption fail?
