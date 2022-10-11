@@ -108,7 +108,7 @@ type DatabaseTransaction interface {
 	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
-	RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, limit int) (clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error)
+	RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error)
 }
 
 type Database interface {

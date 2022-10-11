@@ -75,15 +75,9 @@ func Relations(req *http.Request, device *api.Device, syncDB storage.Database, r
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
-	if to == 0 {
-		if to, err = snapshot.MaxStreamPositionForRelations(req.Context()); err != nil {
-			return util.ErrorResponse(err)
-		}
-	}
-
 	res := &RelationsResponse{}
 	res.Chunk, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
-		req.Context(), roomID, eventID, relType, eventType, from, to, limit,
+		req.Context(), roomID, eventID, relType, eventType, from, to, dir == "b", limit,
 	)
 	if err != nil {
 		return util.ErrorResponse(err)

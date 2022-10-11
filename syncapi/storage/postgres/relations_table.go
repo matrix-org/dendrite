@@ -50,12 +50,12 @@ const deleteRelationSQL = "" +
 
 const selectRelationsInRangeSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
-	" WHERE room_id = $1 AND event_id = $2 AND id > $3 AND id <= $4" +
+	" WHERE room_id = $1 AND event_id = $2 AND id >= $3 AND id <= $4" +
 	" ORDER BY id DESC LIMIT $5"
 
 const selectRelationsByTypeInRangeSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
-	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id > $4 AND id <= $5" +
+	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id >= $4 AND id <= $5" +
 	" ORDER BY id DESC LIMIT $6"
 
 const selectMaxRelationIDSQL = "" +

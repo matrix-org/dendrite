@@ -595,7 +595,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context)
 	return types.StreamPosition(id), err
 }
 
-func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, limit int) (
+func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (
 	clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error,
 ) {
 	clientEvents = []gomatrixserverlib.ClientEvent{}
@@ -603,7 +603,16 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	r := types.Range{
 		From:      from,
 		To:        to,
-		Backwards: from > to,
+		Backwards: backwards,
+	}
+	if r.To == 0 && !backwards {
+		if r.To, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+		}
+	} else if r.From == 0 && backwards {
+		if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+		}
 	}
 
 	// First up look up any relations from the database. We add one to the limit here
@@ -633,7 +642,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
 	// could be.
 	if from > 0 {
-		prevBatch = fmt.Sprintf("%d", entries[0].Position-1)
+		prevBatch = fmt.Sprintf("%d", r.Low()-1)
 	}
 	if len(entries) > limit {
 		nextBatch = fmt.Sprintf("%d", entries[len(entries)-1].Position)
