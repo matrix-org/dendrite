@@ -453,7 +453,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -470,7 +470,9 @@ func (r *Queryer) QueryMissingEvents(
 			if verr != nil {
 				return verr
 			}
-
+			if _, ok := redactEventIDs[event.EventID()]; ok {
+				event.Redact()
+			}
 			response.Events = append(response.Events, event.Headered(roomVersion))
 		}
 	}
