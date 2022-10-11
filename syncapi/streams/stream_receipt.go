@@ -67,6 +67,10 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		if _, ok := req.IgnoredUsers.List[receipt.UserID]; ok {
 			continue
 		}
+		// Don't send private read receipts to other users
+		if receipt.Type == "m.read.private" && req.Device.UserID != receipt.UserID {
+			continue
+		}
 		receiptsByRoom[receipt.RoomID] = append(receiptsByRoom[receipt.RoomID], receipt)
 	}
 
