@@ -84,7 +84,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 	switch receipt.Type {
 	case "m.read":
 		// These are allowed to be sent over federation
-	case "m.read.private":
+	case "m.read.private", "m.fully_read":
 		// These must not be sent over federation
 		return true
 	}

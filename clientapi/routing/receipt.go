@@ -40,6 +40,7 @@ func SetReceipt(req *http.Request, syncProducer *producers.SyncAPIProducer, devi
 	switch receiptType {
 	case "m.read":
 	case "m.read.private":
+	case "m.fully_read":
 	default:
 		return util.MessageResponse(400, fmt.Sprintf("receipt type '%s' not known", receiptType))
 	}
