@@ -168,12 +168,10 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
-<<<<<<< HEAD
 const purgeEventsSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
-=======
+
 const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
->>>>>>> main
 
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
@@ -189,11 +187,8 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
-<<<<<<< HEAD
 	purgeEventsStmt               *sql.Stmt
-=======
 	selectSearchStmt              *sql.Stmt
->>>>>>> main
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -229,11 +224,8 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
-<<<<<<< HEAD
 		{&s.purgeEventsStmt, purgeEventsSQL},
-=======
 		{&s.selectSearchStmt, selectSearchSQL},
->>>>>>> main
 	}.Prepare(db)
 }
 
@@ -652,13 +644,13 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	return result, rows.Err()
 }
 
-<<<<<<< HEAD
 func (s *outputRoomEventsStatements) PurgeEvents(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomID)
 	return err
-=======
+}
+
 func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
 	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, afterID, pq.StringArray(types), limit)
 	if err != nil {
@@ -681,5 +673,4 @@ func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, l
 		result[id] = ev
 	}
 	return result, rows.Err()
->>>>>>> main
 }
