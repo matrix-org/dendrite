@@ -601,9 +601,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 	case content.Relations.RelationType == "":
 		return nil
 	case event.Type() == gomatrixserverlib.MRoomRedaction:
-		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-			return d.Relations.DeleteRelation(ctx, txn, event.RoomID(), event.Redacts())
-		})
+		return nil
 	default:
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 			var err error
@@ -617,4 +615,10 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 			return err
 		})
 	}
+}
+
+func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Relations.DeleteRelation(ctx, txn, roomID, redactedEventID)
+	})
 }
