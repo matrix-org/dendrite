@@ -109,6 +109,9 @@ func (s *relationsStatements) DeleteRelation(
 	_, err := stmt.ExecContext(
 		ctx, roomID, childEventID,
 	)
+	if err == sql.ErrNoRows {
+		return nil
+	}
 	return err
 }
 
