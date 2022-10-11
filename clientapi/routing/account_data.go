@@ -175,10 +175,10 @@ func SaveReadMarker(
 
 	// Handle the read receipts that may be included in the read marker.
 	if r.Read != "" {
-		return SetReceipt(req, syncProducer, device, roomID, "m.read", r.Read)
+		return SetReceipt(req, userAPI, syncProducer, device, roomID, "m.read", r.Read)
 	}
 	if r.ReadPrivate != "" {
-		return SetReceipt(req, syncProducer, device, roomID, "m.read.private", r.ReadPrivate)
+		return SetReceipt(req, userAPI, syncProducer, device, roomID, "m.read.private", r.ReadPrivate)
 	}
 
 	return util.JSONResponse{
