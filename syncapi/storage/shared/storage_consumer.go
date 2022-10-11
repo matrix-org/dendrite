@@ -608,6 +608,9 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 				event.EventID(), content.Relations.RelationType,
 			)
 		}
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to update relations for room %s when processing event %s", event.RoomID(), event.EventID())
+		}
 		return err
 	})
 }
