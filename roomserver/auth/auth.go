@@ -59,7 +59,7 @@ func HistoryVisibilityForRoom(authEvents []*gomatrixserverlib.Event) gomatrixser
 			continue
 		}
 		if vis, err := ev.HistoryVisibility(); err == nil {
-			return vis
+			visibility = vis
 		}
 	}
 	return visibility
