@@ -597,10 +597,18 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 		return nil
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		_, err := d.Relations.InsertRelation(
-			ctx, txn, event.RoomID(), content.Relations.EventID,
-			event.EventID(), content.Relations.RelationType,
-		)
+		var err error
+		if event.Redacted() {
+			err = d.Relations.DeleteRelation(
+				ctx, txn, event.RoomID(), content.Relations.EventID,
+				event.EventID(), content.Relations.RelationType,
+			)
+		} else {
+			_, err = d.Relations.InsertRelation(
+				ctx, txn, event.RoomID(), content.Relations.EventID,
+				event.EventID(), content.Relations.RelationType,
+			)
+		}
 		return err
 	})
 }
