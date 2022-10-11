@@ -119,7 +119,7 @@ func (s *relationsStatements) DeleteRelation(
 func (s *relationsStatements) SelectRelationsInRange(
 	ctx context.Context, txn *sql.Tx, roomID, eventID, relType string,
 	r types.Range, limit int,
-) (map[string][]string, types.StreamPosition, error) {
+) (map[string][]types.RelationEntry, types.StreamPosition, error) {
 	var lastPos types.StreamPosition
 	var rows *sql.Rows
 	var err error
@@ -134,7 +134,7 @@ func (s *relationsStatements) SelectRelationsInRange(
 		return nil, lastPos, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRelationsInRange: rows.close() failed")
-	result := map[string][]string{}
+	result := map[string][]types.RelationEntry{}
 	for rows.Next() {
 		var (
 			id           types.StreamPosition
@@ -148,7 +148,10 @@ func (s *relationsStatements) SelectRelationsInRange(
 		if id > lastPos {
 			lastPos = id
 		}
-		result[relType] = append(result[relType], childEventID)
+		result[relType] = append(result[relType], types.RelationEntry{
+			Position: id,
+			EventID:  childEventID,
+		})
 	}
 	if lastPos == 0 {
 		lastPos = r.To

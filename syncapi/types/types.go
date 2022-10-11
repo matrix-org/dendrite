@@ -607,3 +607,8 @@ type OutputSendToDeviceEvent struct {
 type IgnoredUsers struct {
 	List map[string]interface{} `json:"ignored_users"`
 }
+
+type RelationEntry struct {
+	Position StreamPosition
+	EventID  string
+}

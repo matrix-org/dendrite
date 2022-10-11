@@ -598,28 +598,47 @@ func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context)
 func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, limit int) (
 	clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error,
 ) {
-	// TODO: Nothing here is limited or setting prev_batch or next_batch
 	var eventIDs []string
 	r := types.Range{
 		From:      from,
 		To:        to,
 		Backwards: from > to,
 	}
-	rels, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, r, limit+1)
+	relations, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, r, limit+1)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("d.Relations.SelectRelationsInRange: %w", err)
 	}
+
+	entries := []types.RelationEntry{}
 	if relType != "" {
-		eventIDs = rels[relType]
+		entries = relations[relType]
 	} else {
-		for _, ids := range rels {
-			eventIDs = append(eventIDs, ids...)
+		for _, e := range relations {
+			entries = append(entries, e...)
 		}
 	}
+
+	if len(entries) == 0 {
+		return nil, "", "", nil
+	}
+
+	if from > 0 {
+		prevBatch = fmt.Sprintf("%d", entries[0].Position-1)
+	}
+	if len(entries) > limit {
+		nextBatch = fmt.Sprintf("%d", entries[len(entries)-1].Position)
+		entries = entries[:len(entries)-1]
+	}
+
+	for _, entry := range entries {
+		eventIDs = append(eventIDs, entry.EventID)
+	}
+
 	events, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, true)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("d.OutputEvents.SelectEvents: %w", err)
 	}
+
 	for _, event := range events {
 		if eventType != "" && event.Type() != eventType {
 			continue
@@ -629,5 +648,6 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
 		)
 	}
+
 	return clientEvents, prevBatch, nextBatch, nil
 }

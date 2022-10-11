@@ -68,8 +68,6 @@ func Relations(req *http.Request, device *api.Device, syncDB storage.Database, r
 		}
 	}
 
-	res := &RelationsResponse{}
-
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		return jsonerror.InternalServerError()
@@ -83,6 +81,7 @@ func Relations(req *http.Request, device *api.Device, syncDB storage.Database, r
 		}
 	}
 
+	res := &RelationsResponse{}
 	res.Chunk, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
 		req.Context(), roomID, eventID, relType, eventType, from, to, limit,
 	)
