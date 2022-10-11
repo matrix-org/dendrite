@@ -80,6 +80,13 @@ func (s *OutputRoomEventConsumer) Start() error {
 // realises that it cannot update the room state using the deltas.
 func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
+	receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
+
+	// Only handle events we care about
+	if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInboundPeek {
+		return true
+	}
+
 	// Parse out the event JSON
 	var output api.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {

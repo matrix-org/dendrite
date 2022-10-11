@@ -80,6 +80,7 @@ type PerformJoinRequest struct {
 	UserID        string                         `json:"user_id"`
 	Content       map[string]interface{}         `json:"content"`
 	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
+	Unsigned      map[string]interface{}         `json:"unsigned"`
 }
 
 type PerformJoinResponse struct {

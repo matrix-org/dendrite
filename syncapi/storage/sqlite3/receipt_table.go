@@ -108,7 +108,7 @@ func (r *receiptStatements) UpsertReceipt(ctx context.Context, txn *sql.Tx, room
 }
 
 // SelectRoomReceiptsAfter select all receipts for a given room after a specific timestamp
-func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
+func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, txn *sql.Tx, roomIDs []string, streamPos types.StreamPosition) (types.StreamPosition, []types.OutputReceiptEvent, error) {
 	selectSQL := strings.Replace(selectRoomReceipts, "($2)", sqlutil.QueryVariadicOffset(len(roomIDs), 1), 1)
 	var lastPos types.StreamPosition
 	params := make([]interface{}, len(roomIDs)+1)
@@ -116,7 +116,12 @@ func (r *receiptStatements) SelectRoomReceiptsAfter(ctx context.Context, roomIDs
 	for k, v := range roomIDs {
 		params[k+1] = v
 	}
-	rows, err := r.db.QueryContext(ctx, selectSQL, params...)
+	prep, err := r.db.Prepare(selectSQL)
+	if err != nil {
+		return 0, nil, fmt.Errorf("unable to prepare statement: %w", err)
+	}
+	defer internal.CloseAndLogIfError(ctx, prep, "SelectRoomReceiptsAfter: prep.close() failed")
+	rows, err := sqlutil.TxStmt(txn, prep).QueryContext(ctx, params...)
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to query room receipts: %w", err)
 	}

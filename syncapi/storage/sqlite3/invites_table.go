@@ -51,7 +51,7 @@ const deleteInviteEventSQL = "" +
 	"UPDATE syncapi_invite_events SET deleted=true, id=$1 WHERE event_id = $2 AND deleted=false"
 
 const selectInviteEventsInRangeSQL = "" +
-	"SELECT room_id, headered_event_json, deleted FROM syncapi_invite_events" +
+	"SELECT id, room_id, headered_event_json, deleted FROM syncapi_invite_events" +
 	" WHERE target_user_id = $1 AND id > $2 AND id <= $3" +
 	" ORDER BY id DESC"
 
@@ -133,23 +133,28 @@ func (s *inviteEventsStatements) DeleteInviteEvent(
 // active invites for the target user ID in the supplied range.
 func (s *inviteEventsStatements) SelectInviteEventsInRange(
 	ctx context.Context, txn *sql.Tx, targetUserID string, r types.Range,
-) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, error) {
+) (map[string]*gomatrixserverlib.HeaderedEvent, map[string]*gomatrixserverlib.HeaderedEvent, types.StreamPosition, error) {
+	var lastPos types.StreamPosition
 	stmt := sqlutil.TxStmt(txn, s.selectInviteEventsInRangeStmt)
 	rows, err := stmt.QueryContext(ctx, targetUserID, r.Low(), r.High())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, lastPos, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteEventsInRange: rows.close() failed")
 	result := map[string]*gomatrixserverlib.HeaderedEvent{}
 	retired := map[string]*gomatrixserverlib.HeaderedEvent{}
 	for rows.Next() {
 		var (
+			id        types.StreamPosition
 			roomID    string
 			eventJSON []byte
 			deleted   bool
 		)
-		if err = rows.Scan(&roomID, &eventJSON, &deleted); err != nil {
-			return nil, nil, err
+		if err = rows.Scan(&id, &roomID, &eventJSON, &deleted); err != nil {
+			return nil, nil, lastPos, err
+		}
+		if id > lastPos {
+			lastPos = id
 		}
 
 		// if we have seen this room before, it has a higher stream position and hence takes priority
@@ -162,15 +167,19 @@ func (s *inviteEventsStatements) SelectInviteEventsInRange(
 
 		var event *gomatrixserverlib.HeaderedEvent
 		if err := json.Unmarshal(eventJSON, &event); err != nil {
-			return nil, nil, err
+			return nil, nil, lastPos, err
 		}
+
 		if deleted {
 			retired[roomID] = event
 		} else {
 			result[roomID] = event
 		}
 	}
-	return result, retired, nil
+	if lastPos == 0 {
+		lastPos = r.To
+	}
+	return result, retired, lastPos, nil
 }
 
 func (s *inviteEventsStatements) SelectMaxInviteID(

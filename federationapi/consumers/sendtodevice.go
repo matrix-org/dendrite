@@ -18,16 +18,18 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputSendToDeviceConsumer consumes events that originate in the clientapi.
@@ -76,22 +78,24 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	sender := msg.Header.Get("sender")
 	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).WithField("user_id", sender).Error("Failed to extract domain from send-to-device sender")
 		return true
 	}
 	if originServerName != t.ServerName {
-		log.WithField("other_server", originServerName).Info("Suppressing send-to-device: originated elsewhere")
 		return true
 	}
 	// Extract the send-to-device event from msg.
 	var ote syncTypes.OutputSendToDeviceEvent
 	if err = json.Unmarshal(msg.Data, &ote); err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
 		return true
 	}
 
 	_, destServerName, err := gomatrixserverlib.SplitID('@', ote.UserID)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).WithField("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
 		return true
 	}
@@ -117,6 +121,7 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 		},
 	}
 	if edu.Content, err = json.Marshal(tdm); err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}

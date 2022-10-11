@@ -1,5 +1,60 @@
 # Changelog
 
+## Dendrite 0.10.2 (2022-10-07)
+
+### Features
+
+* Dendrite will now fail to start if there is an obvious problem with the configured `max_open_conns` when using PostgreSQL database backends, since this can lead to instability and performance issues
+  * More information on this is available [in the documentation](https://matrix-org.github.io/dendrite/installation/start/optimisation#postgresql-connection-limit)
+* Unnecessary/empty fields will no longer be sent in `/sync` responses
+* It is now possible to configure `old_private_keys` from previous Matrix installations on the same domain if only public key is known, to make it easier to expire old keys correctly
+  * You can configure either just the `private_key` path, or you can supply both the `public_key` and `key_id`
+
+### Fixes
+
+* The sync transaction behaviour has been modified further so that errors in one stream should not propagate to other streams unnecessarily
+* Rooms should now be classified as DM rooms correctly by passing through `is_direct` and unsigned hints
+* A bug which caused marking device lists as stale to consume lots of CPU has been fixed
+* Users accepting invites should no longer cause unnecessary federated joins if there are already other local users in the room
+* The sync API state range queries have been optimised by adding missing indexes
+* It should now be possible to configure non-English languages for full-text search in `search.language`
+* The roomserver will no longer attempt to perform federated requests to the local server when trying to fetch missing events
+* The `/keys/upload` endpoint will now always return the `one_time_keys_counts`, which may help with E2EE reliability
+* The sync API will now retrieve the latest stream position before processing each stream rather than at the beginning of the request, to hopefully reduce the number of round-trips to `/sync`
+
+## Dendrite 0.10.1 (2022-09-30)
+
+### Features
+
+* The built-in NATS Server has been updated to version 2.9.2
+
+### Fixes
+
+* A regression introduced in 0.10.0 in `/sync` as a result of transaction errors has been fixed
+* Account data updates will no longer send duplicate output events
+
+## Dendrite 0.10.0 (2022-09-30)
+
+### Features
+
+* High performance full-text searching has been added to Dendrite
+  * Search must be enabled in the [`search` section of the `sync_api` config](https://github.com/matrix-org/dendrite/blob/6348486a1365c7469a498101f5035a9b6bd16d22/dendrite-sample.monolith.yaml#L279-L290) before it can be used
+  * The search index is stored on the filesystem rather than the sync API database, so a path to a suitable storage location on disk must be configured
+* Sync requests should now complete faster and use considerably less database connections as a result of better transactional isolation
+* The notifications code has been refactored to hopefully make notifications more reliable
+* A new `/_dendrite/admin/refreshDevices/{userID}` admin endpoint has been added for forcing a refresh of a remote user's device lists without having to modify the database by hand
+* A new `/_dendrite/admin/fulltext/reindex` admin endpoint has been added for rebuilding the search index (although this may take some time)
+
+### Fixes
+
+* A number of bugs in the device list updater have been fixed, which should help considerably with federated device list synchronisation and E2EE reliability
+* A state resolution bug has been fixed which should help to prevent unexpected state resets
+* The deprecated `"origin"` field in events will now be correctly ignored in all cases
+* Room versions 8 and 9 will now correctly evaluate `"knock"` join rules and membership states
+* A database index has been added to speed up finding room memberships in the sync API (contributed by [PiotrKozimor](https://github.com/PiotrKozimor))
+* The client API will now return an `M_UNRECOGNIZED` error for unknown endpoints/methods, which should help with client error handling
+* A bug has been fixed when updating push rules which could result in `database is locked` on SQLite
+
 ## Dendrite 0.9.9 (2022-09-22)
 
 ### Features

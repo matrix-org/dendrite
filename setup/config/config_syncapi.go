@@ -10,7 +10,7 @@ type SyncAPI struct {
 
 	RealIPHeader string `yaml:"real_ip_header"`
 
-	Fulltext Fulltext `yaml:"fulltext"`
+	Fulltext Fulltext `yaml:"search"`
 }
 
 func (c *SyncAPI) Defaults(opts DefaultOpts) {
@@ -50,18 +50,14 @@ type Fulltext struct {
 
 func (f *Fulltext) Defaults(opts DefaultOpts) {
 	f.Enabled = false
-	f.IndexPath = "./fulltextindex"
+	f.IndexPath = "./searchindex"
 	f.Language = "en"
-	if opts.Generate {
-		f.Enabled = true
-		f.InMemory = true
-	}
 }
 
 func (f *Fulltext) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	if !f.Enabled {
 		return
 	}
-	checkNotEmpty(configErrs, "syncapi.fulltext.index_path", string(f.IndexPath))
-	checkNotEmpty(configErrs, "syncapi.fulltext.language", f.Language)
+	checkNotEmpty(configErrs, "syncapi.search.index_path", string(f.IndexPath))
+	checkNotEmpty(configErrs, "syncapi.search.language", f.Language)
 }

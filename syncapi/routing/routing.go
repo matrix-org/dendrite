@@ -18,15 +18,18 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
+	"github.com/matrix-org/dendrite/internal/fulltext"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // Setup configures the given mux with sync-server listeners
@@ -40,6 +43,7 @@ func Setup(
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
 	lazyLoadCache caching.LazyLoadCache,
+	fts *fulltext.Search,
 ) {
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
@@ -55,6 +59,16 @@ func Setup(
 		}
 		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], device, rsAPI, cfg, srp, lazyLoadCache)
 	})).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/event/{eventID}",
+		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, syncDB, rsAPI)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/user/{userId}/filter",
 		httputil.MakeAuthAPI("put_filter", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -95,4 +109,24 @@ func Setup(
 			)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/search",
+		httputil.MakeAuthAPI("search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			if !cfg.Fulltext.Enabled {
+				return util.JSONResponse{
+					Code: http.StatusNotImplemented,
+					JSON: jsonerror.Unknown("Search has been disabled by the server administrator."),
+				}
+			}
+			var nextBatch *string
+			if err := req.ParseForm(); err != nil {
+				return jsonerror.InternalServerError()
+			}
+			if req.Form.Has("next_batch") {
+				nb := req.FormValue("next_batch")
+				nextBatch = &nb
+			}
+			return Search(req, device, syncDB, fts, nextBatch)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
 }

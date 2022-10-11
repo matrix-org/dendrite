@@ -18,11 +18,16 @@ global:
   private_key: matrix_key.pem
 
   # The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
-  # to old signing private keys that were formerly in use on this domain. These
+  # to old signing keys that were formerly in use on this domain name. These
   # keys will not be used for federation request or event signing, but will be
   # provided to any other homeserver that asks when trying to verify old events.
   old_private_keys:
+  #  If the old private key file is available:
   #  - private_key: old_matrix_key.pem
+  #    expired_at: 1601024554498
+  #  If only the public key (in base64 format) and key ID are known:
+  #  - public_key: mn59Kxfdq9VziYHSBzI7+EDPDcBS2Xl7jeUdiiQcOnM=
+  #    key_id: ed25519:mykeyid
   #    expired_at: 1601024554498
 
   # How long a remote server can cache our server signing key before requesting it
@@ -37,7 +42,7 @@ global:
   # you must configure the "database" block for each component instead.
   database:
     connection_string: postgresql://username:password@hostname/dendrite?sslmode=disable
-    max_open_conns: 100
+    max_open_conns: 90
     max_idle_conns: 5
     conn_max_lifetime: -1
 
@@ -275,10 +280,19 @@ sync_api:
   # address of the client. This is likely required if Dendrite is running behind
   # a reverse proxy server.
   # real_ip_header: X-Real-IP
-  fulltext:
+
+  # Configuration for the full-text search engine.
+  search:
+    # Whether or not search is enabled.
     enabled: false
-    index_path: "./fulltextindex"
-    language: "en" # more possible languages can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+
+    # The path where the search index will be created in.
+    index_path: "./searchindex"
+
+    # The language most likely to be used on the server - used when indexing, to
+    # ensure the returned results match expectations. A full list of possible languages
+    # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    language: "en"
 
 # Configuration for the User API.
 user_api:

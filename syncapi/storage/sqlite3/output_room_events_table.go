@@ -55,6 +55,8 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_sender_idx ON syncapi_output_room_events (sender);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events (room_id);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON syncapi_output_room_events (exclude_from_sync);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON syncapi_output_room_events ((add_state_ids IS NOT NULL));
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
 `
 
 const insertEventSQL = "" +
@@ -115,6 +117,8 @@ const selectContextAfterEventSQL = "" +
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
+const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE type IN ($1) AND id > $2 LIMIT $3 ORDER BY id ASC"
+
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
 	streamIDStatements           *StreamIDStatements
@@ -125,6 +129,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt       *sql.Stmt
 	selectContextBeforeEventStmt *sql.Stmt
 	selectContextAfterEventStmt  *sql.Stmt
+	//selectSearchStmt             *sql.Stmt - prepared at runtime
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Events, error) {
@@ -157,15 +162,16 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		//{&s.selectSearchStmt, selectSearchSQL}, - prepared at runtime
 	}.Prepare(db)
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	_, err = sqlutil.TxStmt(txn, s.updateEventJSONStmt).ExecContext(ctx, headeredJSON, event.EventID())
 	return err
 }
 
@@ -633,4 +639,41 @@ func (s *outputRoomEventsStatements) PurgeEvents(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
 	return fmt.Errorf("not implemented on SQLite")
+}
+
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	params := make([]interface{}, len(types))
+	for i := range types {
+		params[i] = types[i]
+	}
+	params = append(params, afterID)
+	params = append(params, limit)
+	selectSQL := strings.Replace(selectSearchSQL, "($1)", sqlutil.QueryVariadic(len(types)), 1)
+
+	stmt, err := s.db.Prepare(selectSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectEvents: stmt.close() failed")
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var eventID string
+	var id int64
+	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result[id] = ev
+	}
+	return result, rows.Err()
 }

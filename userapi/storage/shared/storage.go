@@ -75,6 +75,9 @@ func (d *Database) GetAccountByPassword(
 	if err != nil {
 		return nil, err
 	}
+	if len(hash) == 0 && len(plaintextPassword) > 0 {
+		return nil, bcrypt.ErrHashTooShort
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plaintextPassword)); err != nil {
 		return nil, err
 	}

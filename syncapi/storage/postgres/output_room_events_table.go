@@ -76,6 +76,8 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_sender_idx ON syncapi_output_room_events (sender);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events (room_id);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON syncapi_output_room_events (exclude_from_sync);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON syncapi_output_room_events ((add_state_ids IS NOT NULL));
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
 `
 
 const insertEventSQL = "" +
@@ -166,8 +168,12 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+<<<<<<< HEAD
 const purgeEventsSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
+=======
+const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
+>>>>>>> main
 
 type outputRoomEventsStatements struct {
 	insertEventStmt               *sql.Stmt
@@ -183,7 +189,11 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt        *sql.Stmt
 	selectContextBeforeEventStmt  *sql.Stmt
 	selectContextAfterEventStmt   *sql.Stmt
+<<<<<<< HEAD
 	purgeEventsStmt               *sql.Stmt
+=======
+	selectSearchStmt              *sql.Stmt
+>>>>>>> main
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -219,16 +229,20 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+<<<<<<< HEAD
 		{&s.purgeEventsStmt, purgeEventsSQL},
+=======
+		{&s.selectSearchStmt, selectSearchSQL},
+>>>>>>> main
 	}.Prepare(db)
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	_, err = sqlutil.TxStmt(txn, s.updateEventJSONStmt).ExecContext(ctx, headeredJSON, event.EventID())
 	return err
 }
 
@@ -638,9 +652,34 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 	return result, rows.Err()
 }
 
+<<<<<<< HEAD
 func (s *outputRoomEventsStatements) PurgeEvents(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomID)
 	return err
+=======
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, afterID, pq.StringArray(types), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var eventID string
+	var id int64
+	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result[id] = ev
+	}
+	return result, rows.Err()
+>>>>>>> main
 }

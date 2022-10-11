@@ -4,18 +4,25 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type ReceiptStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 }
 
-func (p *ReceiptStreamProvider) Setup() {
-	p.StreamProvider.Setup()
+func (p *ReceiptStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseTransaction,
+) {
+	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := p.DB.MaxStreamPositionForReceipts(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForReceipts(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -24,13 +31,15 @@ func (p *ReceiptStreamProvider) Setup() {
 
 func (p *ReceiptStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *ReceiptStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
@@ -41,7 +50,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 	}
 
-	lastPos, receipts, err := p.DB.RoomReceiptsAfter(ctx, joinedRooms, from)
+	lastPos, receipts, err := snapshot.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RoomReceiptsAfter failed")
 		return from
@@ -68,9 +77,9 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 			continue
 		}
 
-		jr := *types.NewJoinResponse()
-		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
-			jr = existing
+		jr, ok := req.Response.Rooms.Join[roomID]
+		if !ok {
+			jr = types.NewJoinResponse()
 		}
 
 		ev := gomatrixserverlib.ClientEvent{

@@ -86,9 +86,9 @@ func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
 }
 
 func (s *backwardExtremitiesStatements) SelectBackwardExtremitiesForRoom(
-	ctx context.Context, roomID string,
+	ctx context.Context, txn *sql.Tx, roomID string,
 ) (bwExtrems map[string][]string, err error) {
-	rows, err := s.selectBackwardExtremitiesForRoomStmt.QueryContext(ctx, roomID)
+	rows, err := sqlutil.TxStmt(txn, s.selectBackwardExtremitiesForRoomStmt).QueryContext(ctx, roomID)
 	if err != nil {
 		return
 	}

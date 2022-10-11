@@ -79,7 +79,7 @@ func (r *Leaver) performLeaveRoomByID(
 ) ([]api.OutputEvent, error) {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
+	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
 		_, senderDomain, serr := gomatrixserverlib.SplitID('@', senderUser)
 		if serr != nil {

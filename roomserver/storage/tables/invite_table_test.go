@@ -4,6 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3"
@@ -11,8 +14,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/util"
-	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateInviteTable(t *testing.T, dbType test.DBType) (tables.Invites, func()) {
@@ -67,7 +68,7 @@ func TestInviteTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, newInvite)
 
-		stateKeyNIDs, eventIDs, err := tab.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
+		stateKeyNIDs, eventIDs, _, err := tab.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{eventID1, eventID2}, eventIDs)
 		assert.Equal(t, []types.EventStateKeyNID{2, 2}, stateKeyNIDs)
@@ -78,13 +79,13 @@ func TestInviteTable(t *testing.T) {
 		assert.Equal(t, []string{eventID1, eventID2}, retiredEventIDs)
 
 		// This should now be empty
-		stateKeyNIDs, eventIDs, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
+		stateKeyNIDs, eventIDs, _, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 		assert.NoError(t, err)
 		assert.Empty(t, eventIDs)
 		assert.Empty(t, stateKeyNIDs)
 
 		// Non-existent targetUserNID
-		stateKeyNIDs, eventIDs, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, types.EventStateKeyNID(10), roomNID)
+		stateKeyNIDs, eventIDs, _, err = tab.SelectInviteActiveForUserInRoom(ctx, nil, types.EventStateKeyNID(10), roomNID)
 		assert.NoError(t, err)
 		assert.Empty(t, stateKeyNIDs)
 		assert.Empty(t, eventIDs)

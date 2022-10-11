@@ -180,7 +180,7 @@ func (s *outputRoomEventsTopologyStatements) SelectEventIDsInRange(
 func (s *outputRoomEventsTopologyStatements) SelectPositionInTopology(
 	ctx context.Context, txn *sql.Tx, eventID string,
 ) (pos, spos types.StreamPosition, err error) {
-	err = s.selectPositionInTopologyStmt.QueryRowContext(ctx, eventID).Scan(&pos, &spos)
+	err = sqlutil.TxStmt(txn, s.selectPositionInTopologyStmt).QueryRowContext(ctx, eventID).Scan(&pos, &spos)
 	return
 }
 
@@ -190,9 +190,9 @@ func (s *outputRoomEventsTopologyStatements) SelectStreamToTopologicalPosition(
 	ctx context.Context, txn *sql.Tx, roomID string, streamPos types.StreamPosition, backwardOrdering bool,
 ) (topoPos types.StreamPosition, err error) {
 	if backwardOrdering {
-		err = s.selectStreamToTopologicalPositionDescStmt.QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
+		err = sqlutil.TxStmt(txn, s.selectStreamToTopologicalPositionDescStmt).QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
 	} else {
-		err = s.selectStreamToTopologicalPositionAscStmt.QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
+		err = sqlutil.TxStmt(txn, s.selectStreamToTopologicalPositionAscStmt).QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
 	}
 	return
 }
@@ -200,7 +200,7 @@ func (s *outputRoomEventsTopologyStatements) SelectStreamToTopologicalPosition(
 func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) (pos types.StreamPosition, spos types.StreamPosition, err error) {
-	err = s.selectMaxPositionInTopologyStmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
+	err = sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt).QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
 }
 

@@ -796,11 +796,6 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
-		Type: pushRulesAccountDataType,
-	}); err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
-	}
 	return nil
 }
 
@@ -842,6 +837,8 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 	case sql.ErrNoRows: // user does not exist
 		return nil
 	case bcrypt.ErrMismatchedHashAndPassword: // user exists, but password doesn't match
+		return nil
+	case bcrypt.ErrHashTooShort: // user exists, but probably a passwordless account
 		return nil
 	default:
 		res.Exists = true

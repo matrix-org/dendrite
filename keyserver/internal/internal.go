@@ -70,6 +70,11 @@ func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perform
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
+	otks, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	if err != nil {
+		return err
+	}
+	res.OneTimeKeyCounts = []api.OneTimeKeysCount{*otks}
 	return nil
 }
 
@@ -207,15 +212,13 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 		return nil
 	}
 	maxStreamID := int64(0)
+	// remove deleted devices
+	var result []api.DeviceMessage
 	for _, m := range msgs {
 		if m.StreamID > maxStreamID {
 			maxStreamID = m.StreamID
 		}
-	}
-	// remove deleted devices
-	var result []api.DeviceMessage
-	for _, m := range msgs {
-		if m.KeyJSON == nil {
+		if m.KeyJSON == nil || len(m.KeyJSON) == 0 {
 			continue
 		}
 		result = append(result, m)
@@ -228,14 +231,21 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 // PerformMarkAsStaleIfNeeded marks the users device list as stale, if the given deviceID is not present
 // in our database.
 func (a *KeyInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *api.PerformMarkAsStaleRequest, res *struct{}) error {
-	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{req.DeviceID}, true)
+	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{}, true)
 	if err != nil {
 		return err
 	}
 	if len(knownDevices) == 0 {
-		return a.Updater.ManualUpdate(ctx, req.Domain, req.UserID)
+		return nil // fmt.Errorf("unknown user %s", req.UserID)
 	}
-	return nil
+
+	for i := range knownDevices {
+		if knownDevices[i].DeviceID == req.DeviceID {
+			return nil // we already know about this device
+		}
+	}
+
+	return a.Updater.ManualUpdate(ctx, req.Domain, req.UserID)
 }
 
 // nolint:gocyclo
