@@ -589,3 +589,40 @@ func (d *DatabaseTransaction) PresenceAfter(ctx context.Context, after types.Str
 func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return d.Presence.GetMaxPresenceID(ctx, d.txn)
 }
+
+func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, limit int) (
+	clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error,
+) {
+	// TODO: Nothing here is limited or setting prev_batch or next_batch
+	var eventIDs []string
+	r := types.Range{
+		From:      from,
+		To:        to,
+		Backwards: from > to,
+	}
+	rels, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, r, limit+1)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("d.Relations.SelectRelationsInRange: %w", err)
+	}
+	if relType != "" {
+		eventIDs = rels[relType]
+	} else {
+		for _, ids := range rels {
+			eventIDs = append(eventIDs, ids...)
+		}
+	}
+	events, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, true)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("d.OutputEvents.SelectEvents: %w", err)
+	}
+	for _, event := range events {
+		if eventType != "" && event.Type() != eventType {
+			continue
+		}
+		clientEvents = append(
+			clientEvents,
+			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
+		)
+	}
+	return clientEvents, prevBatch, nextBatch, nil
+}

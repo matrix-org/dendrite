@@ -51,12 +51,12 @@ const deleteRelationSQL = "" +
 const selectRelationsInRangeSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND id > $3 AND id <= $4" +
-	" ORDER BY id DESC"
+	" ORDER BY id DESC LIMIT $5"
 
 const selectRelationsByTypeInRangeSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id > $4 AND id <= $5" +
-	" ORDER BY id DESC"
+	" ORDER BY id DESC LIMIT $6"
 
 const selectMaxRelationIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_relations"
@@ -117,17 +117,18 @@ func (s *relationsStatements) DeleteRelation(
 
 // SelectRelationsInRange returns a map rel_type -> []child_event_id
 func (s *relationsStatements) SelectRelationsInRange(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, relType string, r types.Range,
+	ctx context.Context, txn *sql.Tx, roomID, eventID, relType string,
+	r types.Range, limit int,
 ) (map[string][]string, types.StreamPosition, error) {
 	var lastPos types.StreamPosition
 	var rows *sql.Rows
 	var err error
 	if relType != "" {
 		stmt := sqlutil.TxStmt(txn, s.selectRelationsByTypeInRangeStmt)
-		rows, err = stmt.QueryContext(ctx, roomID, eventID, relType, r.Low(), r.High())
+		rows, err = stmt.QueryContext(ctx, roomID, eventID, relType, r.Low(), r.High(), limit)
 	} else {
 		stmt := sqlutil.TxStmt(txn, s.selectRelationsInRangeStmt)
-		rows, err = stmt.QueryContext(ctx, roomID, eventID, r.Low(), r.High())
+		rows, err = stmt.QueryContext(ctx, roomID, eventID, r.Low(), r.High(), limit)
 	}
 	if err != nil {
 		return nil, lastPos, err

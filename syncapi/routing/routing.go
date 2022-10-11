@@ -110,6 +110,48 @@ func Setup(
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
+	v3mux.Handle("/rooms/{roomId}/relations/{eventId}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Relations(
+				req, device, syncDB,
+				vars["roomId"], vars["eventId"], "", "",
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Relations(
+				req, device, syncDB,
+				vars["roomId"], vars["eventId"], vars["relType"], "",
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}/{eventType}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Relations(
+				req, device, syncDB,
+				vars["roomId"], vars["eventId"], vars["relType"], vars["eventType"],
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
 	v3mux.Handle("/search",
 		httputil.MakeAuthAPI("search", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if !cfg.Fulltext.Enabled {
