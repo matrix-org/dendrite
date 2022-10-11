@@ -26,6 +26,8 @@ import (
 )
 
 const relationsSchema = `
+CREATE SEQUENCE IF NOT EXISTS syncapi_relation_id;
+
 CREATE TABLE IF NOT EXISTS syncapi_relations (
 	id BIGINT PRIMARY KEY DEFAULT nextval('syncapi_relation_id'),
 	room_id TEXT NOT NULL,
