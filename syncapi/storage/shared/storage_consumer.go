@@ -598,10 +598,9 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
-		if event.Redacted() {
+		if event.Type() == gomatrixserverlib.MRoomRedaction {
 			err = d.Relations.DeleteRelation(
-				ctx, txn, event.RoomID(), content.Relations.EventID,
-				event.EventID(), content.Relations.RelationType,
+				ctx, txn, event.RoomID(), event.Redacts(),
 			)
 		} else {
 			_, err = d.Relations.InsertRelation(

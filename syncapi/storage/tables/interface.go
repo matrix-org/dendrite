@@ -209,7 +209,7 @@ type Presence interface {
 
 type Relations interface {
 	InsertRelation(ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string) (streamPos types.StreamPosition, err error)
-	DeleteRelation(ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string) error
+	DeleteRelation(ctx context.Context, txn *sql.Tx, roomID, childEventID string) error
 	SelectRelationsInRange(ctx context.Context, txn *sql.Tx, roomID, eventID, relType string, r types.Range) (map[string][]string, types.StreamPosition, error)
 	SelectMaxRelationID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }

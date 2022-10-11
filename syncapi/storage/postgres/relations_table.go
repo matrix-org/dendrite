@@ -46,7 +46,7 @@ const insertRelationSQL = "" +
 	" RETURNING id"
 
 const deleteRelationSQL = "" +
-	"DELETE FROM syncapi_relations WHERE event_id = $1"
+	"DELETE FROM syncapi_relations WHERE room_id = $1 AND child_event_id = $2"
 
 const selectRelationsInRangeSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
@@ -103,11 +103,11 @@ func (s *relationsStatements) InsertRelation(
 }
 
 func (s *relationsStatements) DeleteRelation(
-	ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string,
+	ctx context.Context, txn *sql.Tx, roomID, childEventID string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteRelationStmt)
 	_, err := stmt.ExecContext(
-		ctx, roomID, eventID, childEventID, relType,
+		ctx, roomID, childEventID,
 	)
 	return err
 }
