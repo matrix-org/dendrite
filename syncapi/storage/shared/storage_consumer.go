@@ -604,14 +604,10 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 		return nil
 	default:
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-			var err error
-			_, err = d.Relations.InsertRelation(
+			_, err := d.Relations.InsertRelation(
 				ctx, txn, event.RoomID(), content.Relations.EventID,
 				event.EventID(), content.Relations.RelationType,
 			)
-			if err != nil {
-				logrus.WithError(err).Errorf("Failed to update relations for room %s when processing event %s", event.RoomID(), event.EventID())
-			}
 			return err
 		})
 	}

@@ -155,6 +155,7 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 			"event_id":          msg.RedactedBecause.EventID(),
 			"redacted_event_id": msg.RedactedEventID,
 		}).WithError(err).Warn("Failed to redact relations")
+		return err
 	}
 
 	// fake a room event so we notify clients about the redaction, as if it were
@@ -285,6 +286,7 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("Failed to update relations")
+		return err
 	}
 
 	s.pduStream.Advance(pduPos)
@@ -337,6 +339,7 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("Failed to update relations")
+		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {

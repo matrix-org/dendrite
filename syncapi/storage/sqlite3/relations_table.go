@@ -97,14 +97,13 @@ func NewSqliteRelationsTable(db *sql.DB, streamID *StreamIDStatements) (tables.R
 func (s *relationsStatements) InsertRelation(
 	ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string,
 ) (streamPos types.StreamPosition, err error) {
-	pos, err := s.streamIDStatements.nextRelationID(ctx, txn)
-	if err != nil {
+	if streamPos, err = s.streamIDStatements.nextRelationID(ctx, txn); err != nil {
 		return
 	}
-	_, err = sqlutil.TxStmt(txn, s.insertRelationStmt).ExecContext(
-		ctx, pos, roomID, eventID, childEventID, relType,
-	)
-	return pos, err
+	err = sqlutil.TxStmt(txn, s.insertRelationStmt).QueryRowContext(
+		ctx, streamPos, roomID, eventID, childEventID, relType,
+	).Scan(&streamPos)
+	return
 }
 
 func (s *relationsStatements) DeleteRelation(
