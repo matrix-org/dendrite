@@ -81,6 +81,14 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 		Type:    msg.Header.Get("type"),
 	}
 
+	switch receipt.Type {
+	case "m.read":
+		// These are allowed to be sent over federation
+	case "m.read.private":
+		// These must not be sent over federation
+		return true
+	}
+
 	// only send receipt events which originated from us
 	_, receiptServerName, err := gomatrixserverlib.SplitID('@', receipt.UserID)
 	if err != nil {

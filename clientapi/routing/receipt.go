@@ -37,9 +37,11 @@ func SetReceipt(req *http.Request, syncProducer *producers.SyncAPIProducer, devi
 		"timestamp":   timestamp,
 	}).Debug("Setting receipt")
 
-	// currently only m.read is accepted
-	if receiptType != "m.read" {
-		return util.MessageResponse(400, fmt.Sprintf("receipt type must be m.read not '%s'", receiptType))
+	switch receiptType {
+	case "m.read":
+	case "m.read.private":
+	default:
+		return util.MessageResponse(400, fmt.Sprintf("receipt type '%s' not known", receiptType))
 	}
 
 	if err := syncProducer.SendReceipt(req.Context(), device.UserID, roomID, eventID, receiptType, timestamp); err != nil {
