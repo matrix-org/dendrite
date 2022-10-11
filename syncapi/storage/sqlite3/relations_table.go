@@ -68,8 +68,10 @@ type relationsStatements struct {
 	selectMaxRelationIDStmt          *sql.Stmt
 }
 
-func NewSqliteRelationsTable(db *sql.DB) (tables.Relations, error) {
-	s := &relationsStatements{}
+func NewSqliteRelationsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Relations, error) {
+	s := &relationsStatements{
+		streamIDStatements: streamID,
+	}
 	_, err := db.Exec(relationsSchema)
 	if err != nil {
 		return nil, err

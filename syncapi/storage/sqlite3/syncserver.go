@@ -123,7 +123,7 @@ func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	relations, err := NewSqliteRelationsTable(d.db)
+	relations, err := NewSqliteRelationsTable(d.db, &d.streamID)
 	if err != nil {
 		return err
 	}
