@@ -360,34 +360,50 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	newlyJoinedRooms := make(map[string]bool, len(state))
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership, prevMembership := getMembershipFromEvent(ev.Event, userID); membership != "" {
-				if membership == gomatrixserverlib.Join && prevMembership != membership {
-					// send full room state down instead of a delta
+			// Look for our membership in the state events and skip over any
+			// membership events that are not related to us.
+			membership, prevMembership := getMembershipFromEvent(ev.Event, userID)
+			if membership == "" {
+				continue
+			}
+
+			if membership == gomatrixserverlib.Join {
+				// If our membership is now join but the previous membership wasn't
+				// then this is a "join transition", so we'll insert this room.
+				if prevMembership != membership {
+					// Get the full room state, as we'll send that down for a newly
+					// joined room instead of a delta.
 					var s []types.StreamEvent
-					s, err = d.currentStateStreamEventsForRoom(ctx, roomID, stateFilter)
-					if err != nil {
+					if s, err = d.currentStateStreamEventsForRoom(ctx, roomID, stateFilter); err != nil {
 						if err == sql.ErrNoRows {
 							continue
 						}
 						return nil, nil, err
 					}
+
+					// Add the information for this room into the state so that
+					// it will get added with all of the rest of the joined rooms.
 					state[roomID] = s
 					newlyJoinedRooms[roomID] = true
-					continue // we'll add this room in when we do joined rooms
 				}
 
-				deltas = append(deltas, types.StateDelta{
-					Membership:    membership,
-					MembershipPos: ev.StreamPosition,
-					StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
-					RoomID:        roomID,
-				})
-				break
+				// We won't add joined rooms into the delta at this point as they
+				// are added later on.
+				continue
 			}
+
+			deltas = append(deltas, types.StateDelta{
+				Membership:    membership,
+				MembershipPos: ev.StreamPosition,
+				StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
+				RoomID:        roomID,
+			})
+			break
 		}
 	}
 
-	// Add in currently joined rooms
+	// Finally, add in currently joined rooms, including those from the
+	// join transitions above.
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  gomatrixserverlib.Join,
