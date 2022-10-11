@@ -42,7 +42,7 @@ const insertRelationSQL = "" +
 	"INSERT INTO syncapi_relations (" +
 	"  room_id, event_id, child_event_id, rel_type" +
 	") VALUES ($1, $2, $3, $4) " +
-	" ON CONFLICT syncapi_relations_unique DO UPDATE SET event_id=EXCLUDED.event_id" +
+	" ON CONFLICT ON CONSTRAINT syncapi_relations_unique DO UPDATE SET event_id=EXCLUDED.event_id" +
 	" RETURNING id"
 
 const deleteRelationSQL = "" +
