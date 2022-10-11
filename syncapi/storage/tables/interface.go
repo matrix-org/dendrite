@@ -206,3 +206,10 @@ type Presence interface {
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
 	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (presences map[string]*types.PresenceInternal, err error)
 }
+
+type Relations interface {
+	InsertRelation(ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string) (streamPos types.StreamPosition, err error)
+	DeleteRelation(ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string) error
+	SelectRelationsInRange(ctx context.Context, txn *sql.Tx, roomID, eventID, relType string, r types.Range) (map[string][]string, types.StreamPosition, error)
+	SelectMaxRelationID(ctx context.Context, txn *sql.Tx) (id int64, err error)
+}
