@@ -174,6 +174,7 @@ type Database interface {
 	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
 	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
+	UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
 }
 
 type Presence interface {

@@ -271,6 +271,13 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+	}
+
 	s.pduStream.Advance(pduPos)
 	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 

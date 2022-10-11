@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS syncapi_relations (
 const insertRelationSQL = "" +
 	"INSERT INTO syncapi_relations (" +
 	"  room_id, event_id, child_event_id, rel_type" +
-	") VALUES ($1, $2, $3, $4) RETURNING id"
+	") VALUES ($1, $2, $3, $4) " +
+	" ON CONFLICT syncapi_relations_unique DO UPDATE SET event_id=EXCLUDED.event_id" +
+	" RETURNING id"
 
 const deleteRelationSQL = "" +
 	"DELETE FROM syncapi_relations WHERE event_id = $1"
