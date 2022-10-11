@@ -593,24 +593,28 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 	if err := json.Unmarshal(event.Content(), &content); err != nil {
 		return fmt.Errorf("json.Unmarshal: %w", err)
 	}
-	if content.Relations == nil {
+	switch {
+	case content.Relations == nil:
 		return nil
-	}
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		var err error
-		if event.Type() == gomatrixserverlib.MRoomRedaction {
-			err = d.Relations.DeleteRelation(
-				ctx, txn, event.RoomID(), event.Redacts(),
-			)
-		} else {
+	case content.Relations.EventID == "":
+		return nil
+	case content.Relations.RelationType == "":
+		return nil
+	case event.Type() == gomatrixserverlib.MRoomRedaction:
+		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			return d.Relations.DeleteRelation(ctx, txn, event.RoomID(), event.Redacts())
+		})
+	default:
+		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			var err error
 			_, err = d.Relations.InsertRelation(
 				ctx, txn, event.RoomID(), content.Relations.EventID,
 				event.EventID(), content.Relations.RelationType,
 			)
-		}
-		if err != nil {
-			logrus.WithError(err).Errorf("Failed to update relations for room %s when processing event %s", event.RoomID(), event.EventID())
-		}
-		return err
-	})
+			if err != nil {
+				logrus.WithError(err).Errorf("Failed to update relations for room %s when processing event %s", event.RoomID(), event.EventID())
+			}
+			return err
+		})
+	}
 }
