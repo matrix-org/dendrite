@@ -123,6 +123,10 @@ func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	relations, err := NewSqliteRelationsTable(d.db)
+	if err != nil {
+		return err
+	}
 
 	// apply migrations which need multiple tables
 	m := sqlutil.NewMigrator(d.db)
@@ -153,6 +157,7 @@ func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 		NotificationData:    notificationData,
 		Ignores:             ignores,
 		Presence:            presence,
+		Relations:           relations,
 	}
 	return nil
 }
