@@ -47,6 +47,14 @@ type StateDelta struct {
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
 
+func NewStreamPositionFromString(s string) (StreamPosition, error) {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	return StreamPosition(n), nil
+}
+
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
 	*gomatrixserverlib.HeaderedEvent

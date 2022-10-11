@@ -16,6 +16,7 @@ package routing
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -23,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
@@ -34,19 +36,36 @@ type RelationsResponse struct {
 
 // nolint:gocyclo
 func Relations(req *http.Request, device *api.Device, syncDB storage.Database, roomID, eventID, relType, eventType string) util.JSONResponse {
+	var err error
+	var from, to types.StreamPosition
+	var limit int
 	dir := req.URL.Query().Get("dir")
-	from := req.URL.Query().Get("from")
-	to := req.URL.Query().Get("to")
-	limit := req.URL.Query().Get("limit")
-
+	if f := req.URL.Query().Get("from"); f != "" {
+		if from, err = types.NewStreamPositionFromString(f); err != nil {
+			return util.ErrorResponse(err)
+		}
+	}
+	if t := req.URL.Query().Get("to"); t != "" {
+		if to, err = types.NewStreamPositionFromString(t); err != nil {
+			return util.ErrorResponse(err)
+		}
+	}
+	if l := req.URL.Query().Get("limit"); l != "" {
+		if limit, err = strconv.Atoi(l); err != nil {
+			return util.ErrorResponse(err)
+		}
+	}
+	if limit == 0 || limit > 50 {
+		limit = 50
+	}
+	if dir == "" {
+		dir = "b"
+	}
 	if dir != "b" && dir != "f" {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("Bad or missing dir query parameter (should be either 'b' or 'f')"),
 		}
-	}
-	if dir == "" {
-		dir = "b"
 	}
 
 	res := &RelationsResponse{}
@@ -58,7 +77,18 @@ func Relations(req *http.Request, device *api.Device, syncDB storage.Database, r
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
-	_, _, _, _ = from, to, limit, dir
+	if to == 0 {
+		if to, err = snapshot.MaxStreamPositionForRelations(req.Context()); err != nil {
+			return util.ErrorResponse(err)
+		}
+	}
+
+	res.Chunk, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
+		req.Context(), roomID, eventID, relType, eventType, from, to, limit,
+	)
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
 
 	succeeded = true
 	return util.JSONResponse{

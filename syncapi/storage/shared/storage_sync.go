@@ -590,6 +590,11 @@ func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) 
 	return d.Presence.GetMaxPresenceID(ctx, d.txn)
 }
 
+func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.Relations.SelectMaxRelationID(ctx, d.txn)
+	return types.StreamPosition(id), err
+}
+
 func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, limit int) (
 	clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error,
 ) {
