@@ -605,13 +605,18 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 		To:        to,
 		Backwards: backwards,
 	}
-	if r.To == 0 && !backwards {
-		if r.To, err = d.MaxStreamPositionForRelations(ctx); err != nil {
-			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+	if r.Backwards {
+		if r.From == 0 {
+			if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+				return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+			}
+			r.From++
 		}
-	} else if r.From == 0 && backwards {
-		if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
-			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+	} else {
+		if r.To == 0 {
+			if r.To, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+				return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+			}
 		}
 	}
 
@@ -641,13 +646,11 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
 	// could be.
-	if from > 0 {
-		prevBatch = fmt.Sprintf("%d", r.Low()-1)
-	}
 	if len(entries) > limit {
-		nextBatch = fmt.Sprintf("%d", entries[len(entries)-1].Position)
 		entries = entries[:len(entries)-1]
+		nextBatch = fmt.Sprintf("%d", entries[len(entries)-1].Position)
 	}
+	// TODO: set prevBatch? doesn't seem to affect the tests...
 
 	// Extract all of the event IDs from the relation entries so that we can pull the
 	// events out of the database.

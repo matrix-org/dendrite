@@ -48,25 +48,37 @@ const insertRelationSQL = "" +
 const deleteRelationSQL = "" +
 	"DELETE FROM syncapi_relations WHERE room_id = $1 AND child_event_id = $2"
 
-const selectRelationsInRangeSQL = "" +
+const selectRelationsInRangeAscSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND id > $3 AND id <= $4" +
+	" ORDER BY id ASC LIMIT $5"
+
+const selectRelationsInRangeDescSQL = "" +
+	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
+	" WHERE room_id = $1 AND event_id = $2 AND id >= $3 AND id < $4" +
 	" ORDER BY id DESC LIMIT $5"
 
-const selectRelationsByTypeInRangeSQL = "" +
+const selectRelationsByTypeInRangeAscSQL = "" +
 	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id > $4 AND id <= $5" +
+	" ORDER BY id ASC LIMIT $6"
+
+const selectRelationsByTypeInRangeDescSQL = "" +
+	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
+	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id >= $4 AND id < $5" +
 	" ORDER BY id DESC LIMIT $6"
 
 const selectMaxRelationIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_relations"
 
 type relationsStatements struct {
-	insertRelationStmt               *sql.Stmt
-	selectRelationsInRangeStmt       *sql.Stmt
-	selectRelationsByTypeInRangeStmt *sql.Stmt
-	deleteRelationStmt               *sql.Stmt
-	selectMaxRelationIDStmt          *sql.Stmt
+	insertRelationStmt                   *sql.Stmt
+	selectRelationsInRangeAscStmt        *sql.Stmt
+	selectRelationsInRangeDescStmt       *sql.Stmt
+	selectRelationsByTypeInRangeAscStmt  *sql.Stmt
+	selectRelationsByTypeInRangeDescStmt *sql.Stmt
+	deleteRelationStmt                   *sql.Stmt
+	selectMaxRelationIDStmt              *sql.Stmt
 }
 
 func NewPostgresRelationsTable(db *sql.DB) (tables.Relations, error) {
@@ -78,10 +90,16 @@ func NewPostgresRelationsTable(db *sql.DB) (tables.Relations, error) {
 	if s.insertRelationStmt, err = db.Prepare(insertRelationSQL); err != nil {
 		return nil, err
 	}
-	if s.selectRelationsInRangeStmt, err = db.Prepare(selectRelationsInRangeSQL); err != nil {
+	if s.selectRelationsInRangeAscStmt, err = db.Prepare(selectRelationsInRangeAscSQL); err != nil {
 		return nil, err
 	}
-	if s.selectRelationsByTypeInRangeStmt, err = db.Prepare(selectRelationsByTypeInRangeSQL); err != nil {
+	if s.selectRelationsInRangeDescStmt, err = db.Prepare(selectRelationsInRangeDescSQL); err != nil {
+		return nil, err
+	}
+	if s.selectRelationsByTypeInRangeAscStmt, err = db.Prepare(selectRelationsByTypeInRangeAscSQL); err != nil {
+		return nil, err
+	}
+	if s.selectRelationsByTypeInRangeDescStmt, err = db.Prepare(selectRelationsByTypeInRangeDescSQL); err != nil {
 		return nil, err
 	}
 	if s.deleteRelationStmt, err = db.Prepare(deleteRelationSQL); err != nil {
@@ -121,13 +139,22 @@ func (s *relationsStatements) SelectRelationsInRange(
 	r types.Range, limit int,
 ) (map[string][]types.RelationEntry, types.StreamPosition, error) {
 	var lastPos types.StreamPosition
+	var stmt *sql.Stmt
 	var rows *sql.Rows
 	var err error
 	if relType != "" {
-		stmt := sqlutil.TxStmt(txn, s.selectRelationsByTypeInRangeStmt)
+		if r.Backwards {
+			stmt = sqlutil.TxStmt(txn, s.selectRelationsByTypeInRangeDescStmt)
+		} else {
+			stmt = sqlutil.TxStmt(txn, s.selectRelationsByTypeInRangeAscStmt)
+		}
 		rows, err = stmt.QueryContext(ctx, roomID, eventID, relType, r.Low(), r.High(), limit)
 	} else {
-		stmt := sqlutil.TxStmt(txn, s.selectRelationsInRangeStmt)
+		if r.Backwards {
+			stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeDescStmt)
+		} else {
+			stmt = sqlutil.TxStmt(txn, s.selectRelationsInRangeAscStmt)
+		}
 		rows, err = stmt.QueryContext(ctx, roomID, eventID, r.Low(), r.High(), limit)
 	}
 	if err != nil {
