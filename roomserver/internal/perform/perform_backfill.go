@@ -78,7 +78,7 @@ func (r *Backfiller) PerformBackfill(
 	}
 
 	// Scan the event tree for events to send back.
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -95,6 +95,9 @@ func (r *Backfiller) PerformBackfill(
 	}
 
 	for _, event := range loadedEvents {
+		if _, ok := redactEventIDs[event.EventID()]; ok {
+			event.Redact()
+		}
 		response.Events = append(response.Events, event.Headered(info.RoomVersion))
 	}
 

@@ -324,7 +324,7 @@ func slowGetHistoryVisibilityState(
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
-) ([]types.EventNID, error) {
+) ([]types.EventNID, map[string]struct{}, error) {
 	var resultNIDs []types.EventNID
 	var err error
 	var allowed bool
@@ -345,6 +345,7 @@ func ScanEventTree(
 
 	var checkedServerInRoom bool
 	var isServerInRoom bool
+	redactEventIDs := make(map[string]struct{})
 
 	// Loop through the event IDs to retrieve the requested events and go
 	// through the whole tree (up to the provided limit) using the events'
@@ -358,7 +359,7 @@ BFSLoop:
 		// Retrieve the events to process from the database.
 		events, err = db.EventsFromIDs(ctx, front)
 		if err != nil {
-			return resultNIDs, err
+			return resultNIDs, redactEventIDs, err
 		}
 
 		if !checkedServerInRoom && len(events) > 0 {
@@ -395,16 +396,16 @@ BFSLoop:
 						)
 						// drop the error, as we will often error at the DB level if we don't have the prev_event itself. Let's
 						// just return what we have.
-						return resultNIDs, nil
+						return resultNIDs, redactEventIDs, nil
 					}
 
 					// If the event hasn't been seen before and the HS
 					// requesting to retrieve it is allowed to do so, add it to
 					// the list of events to retrieve.
-					if allowed {
-						next = append(next, pre)
-					} else {
+					next = append(next, pre)
+					if !allowed {
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
+						redactEventIDs[pre] = struct{}{}
 					}
 				}
 			}
@@ -413,7 +414,7 @@ BFSLoop:
 		front = next
 	}
 
-	return resultNIDs, err
+	return resultNIDs, redactEventIDs, err
 }
 
 func QueryLatestEventsAndState(
