@@ -329,6 +329,7 @@ func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	if oqs.disabled {
 		return
 	}
+	oqs.statistics.ForServer(srv).RemoveBlacklist()
 	if queue := oqs.getQueue(srv); queue != nil {
 		queue.wakeQueueIfNeeded()
 	}
