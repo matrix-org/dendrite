@@ -16,21 +16,21 @@ func Test_1(t *testing.T) {
 	room1 := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice, test.RoomPreset(test.PresetPublicChat))
 
-	authEvens := make([]string, 0, 4)
+	authEventIDs := make([]string, 0, 4)
 	authEvents := []*gomatrixserverlib.Event{}
 
 	// Add the legal auth events from room2
 	for _, x := range room2.Events() {
 		if x.Type() == gomatrixserverlib.MRoomCreate {
-			authEvens = append(authEvens, x.EventID())
+			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
 		if x.Type() == gomatrixserverlib.MRoomPowerLevels {
-			authEvens = append(authEvens, x.EventID())
+			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
 		if x.Type() == gomatrixserverlib.MRoomJoinRules {
-			authEvens = append(authEvens, x.EventID())
+			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
 	}
@@ -38,7 +38,7 @@ func Test_1(t *testing.T) {
 	// Add the illegal auth event from room1
 	for _, x := range room1.Events() {
 		if x.Type() == gomatrixserverlib.MRoomMember {
-			authEvens = append(authEvens, x.EventID())
+			authEventIDs = append(authEventIDs, x.EventID())
 			authEvents = append(authEvents, x.Event)
 		}
 	}
@@ -46,7 +46,7 @@ func Test_1(t *testing.T) {
 	// Craft the illegal join event
 	ev := room2.CreateEvent(t, bob, "m.room.member", map[string]interface{}{
 		"membership": "join",
-	}, test.WithStateKey(bob.ID), test.WithAuthIDs(authEvens))
+	}, test.WithStateKey(bob.ID), test.WithAuthIDs(authEventIDs))
 
 	// Add the auth events to the allower
 	allower := gomatrixserverlib.NewAuthEvents(nil)
