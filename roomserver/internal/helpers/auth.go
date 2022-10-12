@@ -19,10 +19,11 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // CheckForSoftFail returns true if the event should be soft-failed
@@ -129,6 +130,14 @@ type authEvents struct {
 	stateKeyNIDMap map[string]types.EventStateKeyNID
 	state          stateEntryMap
 	events         EventMap
+}
+
+func (ae *authEvents) Valid() bool {
+	roomIDs := make(map[string]struct{})
+	for _, ev := range ae.events {
+		roomIDs[ev.RoomID()] = struct{}{}
+	}
+	return len(roomIDs) <= 1
 }
 
 // Create implements gomatrixserverlib.AuthEventProvider
