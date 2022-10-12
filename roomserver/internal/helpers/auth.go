@@ -133,12 +133,8 @@ type authEvents struct {
 }
 
 // Valid verifies that all auth events are from the same room.
-func (ae *authEvents) Valid() bool {
-	roomID := ""
+func (ae *authEvents) Valid(roomID string) bool {
 	for i := range ae.events {
-		if i == 0 {
-			roomID = ae.events[i].RoomID()
-		}
 		if roomID != ae.events[i].RoomID() {
 			return false
 		}
