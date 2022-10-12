@@ -132,12 +132,18 @@ type authEvents struct {
 	events         EventMap
 }
 
+// Valid verifies that all auth events are from the same room.
 func (ae *authEvents) Valid() bool {
-	roomIDs := make(map[string]struct{})
-	for _, ev := range ae.events {
-		roomIDs[ev.RoomID()] = struct{}{}
+	roomID := ""
+	for i := range ae.events {
+		if i == 0 {
+			roomID = ae.events[i].RoomID()
+		}
+		if roomID != ae.events[i].RoomID() {
+			return false
+		}
 	}
-	return len(roomIDs) <= 1
+	return true
 }
 
 // Create implements gomatrixserverlib.AuthEventProvider

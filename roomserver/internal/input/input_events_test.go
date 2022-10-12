@@ -8,7 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 )
 
-func Test_1(t *testing.T) {
+func Test_EventAuth(t *testing.T) {
 	alice := test.NewUser(t)
 	bob := test.NewUser(t)
 
@@ -35,7 +35,7 @@ func Test_1(t *testing.T) {
 		}
 	}
 
-	// Add the illegal auth event from room1
+	// Add the illegal auth event from room1 (rooms are different)
 	for _, x := range room1.Events() {
 		if x.Type() == gomatrixserverlib.MRoomMember {
 			authEventIDs = append(authEventIDs, x.EventID())
@@ -43,7 +43,7 @@ func Test_1(t *testing.T) {
 		}
 	}
 
-	// Craft the illegal join event
+	// Craft the illegal join event, with auth events from different rooms
 	ev := room2.CreateEvent(t, bob, "m.room.member", map[string]interface{}{
 		"membership": "join",
 	}, test.WithStateKey(bob.ID), test.WithAuthIDs(authEventIDs))
