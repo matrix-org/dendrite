@@ -636,7 +636,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	// If there were no entries returned, there were no relations, so stop at this point.
 	if len(entries) == 0 {
-		return nil, "", "", nil
+		return clientEvents, "", "", nil
 	}
 
 	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
