@@ -81,6 +81,13 @@ func (p *PDUStreamProvider) CompleteSync(
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline
 
+	// If we're lazy-loading memberships then we can exclude those from the sync.
+	if req.Filter.Room.State.LazyLoadMembers {
+		if t := req.Filter.Room.State.NotTypes; t != nil {
+			*t = append(*t, gomatrixserverlib.MRoomMember)
+		}
+	}
+
 	if err = p.addIgnoredUsersToFilter(ctx, snapshot, req, &eventFilter); err != nil {
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
