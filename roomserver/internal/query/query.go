@@ -453,7 +453,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -470,7 +470,9 @@ func (r *Queryer) QueryMissingEvents(
 			if verr != nil {
 				return verr
 			}
-
+			if _, ok := redactEventIDs[event.EventID()]; ok {
+				event.Redact()
+			}
 			response.Events = append(response.Events, event.Headered(roomVersion))
 		}
 	}
@@ -799,7 +801,7 @@ func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUser
 	}
 	roomIDs = roomIDs[:j]
 
-	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs)
+	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs, req.LocalOnly)
 	if err != nil {
 		return err
 	}
@@ -872,7 +874,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// but we don't specify an authorised via user, since the event auth
 	// will allow the join anyway.
 	var pending bool
-	if pending, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
+	if pending, _, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
 		return fmt.Errorf("helpers.IsInvitePending: %w", err)
 	} else if pending {
 		res.Allowed = true

@@ -2,19 +2,18 @@ package process
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 type ProcessContext struct {
-	wg       *sync.WaitGroup    // used to wait for components to shutdown
-	ctx      context.Context    // cancelled when Stop is called
-	shutdown context.CancelFunc // shut down Dendrite
-	degraded atomic.Bool
+	mu       sync.RWMutex
+	wg       *sync.WaitGroup     // used to wait for components to shutdown
+	ctx      context.Context     // cancelled when Stop is called
+	shutdown context.CancelFunc  // shut down Dendrite
+	degraded map[string]struct{} // reasons why the process is degraded
 }
 
 func NewProcessContext() *ProcessContext {
@@ -50,13 +49,25 @@ func (b *ProcessContext) WaitForComponentsToFinish() {
 	b.wg.Wait()
 }
 
-func (b *ProcessContext) Degraded() {
-	if b.degraded.CompareAndSwap(false, true) {
-		logrus.Warn("Dendrite is running in a degraded state")
-		sentry.CaptureException(fmt.Errorf("Process is running in a degraded state"))
+func (b *ProcessContext) Degraded(err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.degraded[err.Error()]; !ok {
+		logrus.WithError(err).Warn("Dendrite has entered a degraded state")
+		sentry.CaptureException(err)
+		b.degraded[err.Error()] = struct{}{}
 	}
 }
 
-func (b *ProcessContext) IsDegraded() bool {
-	return b.degraded.Load()
+func (b *ProcessContext) IsDegraded() (bool, []string) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if len(b.degraded) == 0 {
+		return false, nil
+	}
+	reasons := make([]string, 0, len(b.degraded))
+	for reason := range b.degraded {
+		reasons = append(reasons, reason)
+	}
+	return true, reasons
 }
