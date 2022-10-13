@@ -43,7 +43,7 @@ func newRelationsTable(t *testing.T, dbType test.DBType) (tables.Relations, *sql
 
 func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Range, expected []types.RelationEntry) {
 	ctx := context.Background()
-	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", r, 50)
+	relations, _, err := tab.SelectRelationsInRange(ctx, nil, roomID, "a", "", "", r, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +60,7 @@ func compareRelationsToExpected(t *testing.T, tab tables.Relations, r types.Rang
 }
 
 const roomID = "!roomid:server"
+const childType = "m.room.something"
 const relType = "m.reaction"
 
 func TestRelationsTable(t *testing.T) {
@@ -70,7 +71,7 @@ func TestRelationsTable(t *testing.T) {
 
 		// Insert some relations
 		for _, child := range []string{"b", "c", "d"} {
-			if err := tab.InsertRelation(ctx, nil, roomID, "a", child, relType); err != nil {
+			if err := tab.InsertRelation(ctx, nil, roomID, "a", child, childType, relType); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -138,7 +139,7 @@ func TestRelationsTable(t *testing.T) {
 
 		// Insert some new relations
 		for _, child := range []string{"e", "f", "g", "h"} {
-			if err := tab.InsertRelation(ctx, nil, roomID, "a", child, relType); err != nil {
+			if err := tab.InsertRelation(ctx, nil, roomID, "a", child, childType, relType); err != nil {
 				t.Fatal(err)
 			}
 		}

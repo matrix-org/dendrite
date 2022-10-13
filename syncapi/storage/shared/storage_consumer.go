@@ -606,7 +606,7 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 			return d.Relations.InsertRelation(
 				ctx, txn, event.RoomID(), content.Relations.EventID,
-				event.EventID(), content.Relations.RelationType,
+				event.EventID(), event.Type(), content.Relations.RelationType,
 			)
 		})
 	}

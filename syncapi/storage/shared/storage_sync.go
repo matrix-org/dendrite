@@ -626,7 +626,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	// First look up any relations from the database. We add one to the limit here
 	// so that we can tell if we're overflowing, as we will only set the "next_batch"
 	// in the response if we are.
-	relations, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, r, limit+1)
+	relations, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, eventType, r, limit+1)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("d.Relations.SelectRelationsInRange: %w", err)
 	}
@@ -672,9 +672,6 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	// type if it was specified.
 	clientEvents = make([]gomatrixserverlib.ClientEvent, 0, len(events))
 	for _, event := range events {
-		if eventType != "" && event.Type() != eventType {
-			continue
-		}
 		clientEvents = append(
 			clientEvents,
 			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
