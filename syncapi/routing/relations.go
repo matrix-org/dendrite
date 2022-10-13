@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -70,6 +71,7 @@ func Relations(req *http.Request, device *api.Device, syncDB storage.Database, r
 
 	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
+		logrus.WithError(err).Error("Failed to get snapshot for relations")
 		return jsonerror.InternalServerError()
 	}
 	var succeeded bool

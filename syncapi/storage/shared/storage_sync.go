@@ -598,8 +598,6 @@ func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context)
 func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (
 	clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error,
 ) {
-	clientEvents = []gomatrixserverlib.ClientEvent{}
-	eventIDs := []string{}
 	r := types.Range{
 		From:      from,
 		To:        to,
@@ -625,7 +623,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 		}
 	}
 
-	// First up look up any relations from the database. We add one to the limit here
+	// First look up any relations from the database. We add one to the limit here
 	// so that we can tell if we're overflowing, as we will only set the "next_batch"
 	// in the response if we are.
 	relations, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, r, limit+1)
@@ -646,7 +644,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	// If there were no entries returned, there were no relations, so stop at this point.
 	if len(entries) == 0 {
-		return clientEvents, "", "", nil
+		return []gomatrixserverlib.ClientEvent{}, "", "", nil
 	}
 
 	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
@@ -661,6 +659,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	// Extract all of the event IDs from the relation entries so that we can pull the
 	// events out of the database. Then go and fetch the events.
+	eventIDs := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		eventIDs = append(eventIDs, entry.EventID)
 	}
@@ -671,6 +670,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	// Convert the events into client events, and optionally filter based on the event
 	// type if it was specified.
+	clientEvents = make([]gomatrixserverlib.ClientEvent, 0, len(events))
 	for _, event := range events {
 		if eventType != "" && event.Type() != eventType {
 			continue
