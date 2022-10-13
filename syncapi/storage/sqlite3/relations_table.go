@@ -1,5 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,34 +39,33 @@ const insertRelationSQL = "" +
 	"INSERT INTO syncapi_relations (" +
 	"  id, room_id, event_id, child_event_id, rel_type" +
 	") VALUES ($1, $2, $3, $4, $5) " +
-	" ON CONFLICT (room_id, event_id, child_event_id, rel_type) DO UPDATE SET event_id=EXCLUDED.event_id" +
-	" RETURNING id"
+	" ON CONFLICT DO NOTHING"
 
 const deleteRelationSQL = "" +
 	"DELETE FROM syncapi_relations WHERE room_id = $1 AND child_event_id = $2"
 
 const selectRelationsInRangeAscSQL = "" +
-	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
+	"SELECT id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND id > $3 AND id <= $4" +
 	" ORDER BY id ASC LIMIT $5"
 
 const selectRelationsInRangeDescSQL = "" +
-	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
+	"SELECT id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND id >= $3 AND id < $4" +
 	" ORDER BY id DESC LIMIT $5"
 
 const selectRelationsByTypeInRangeAscSQL = "" +
-	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
+	"SELECT id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id > $4 AND id <= $5" +
 	" ORDER BY id ASC LIMIT $6"
 
 const selectRelationsByTypeInRangeDescSQL = "" +
-	"SELECT id, room_id, child_event_id, rel_type FROM syncapi_relations" +
+	"SELECT id, child_event_id, rel_type FROM syncapi_relations" +
 	" WHERE room_id = $1 AND event_id = $2 AND rel_type = $3 AND id >= $4 AND id < $5" +
 	" ORDER BY id DESC LIMIT $6"
 
 const selectMaxRelationIDSQL = "" +
-	"SELECT MAX(id) FROM syncapi_relations"
+	"SELECT COALESCE(MAX(id), 0) FROM syncapi_relations"
 
 type relationsStatements struct {
 	streamIDStatements                   *StreamIDStatements
@@ -88,39 +86,27 @@ func NewSqliteRelationsTable(db *sql.DB, streamID *StreamIDStatements) (tables.R
 	if err != nil {
 		return nil, err
 	}
-	if s.insertRelationStmt, err = db.Prepare(insertRelationSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRelationsInRangeAscStmt, err = db.Prepare(selectRelationsInRangeAscSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRelationsInRangeDescStmt, err = db.Prepare(selectRelationsInRangeDescSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRelationsByTypeInRangeAscStmt, err = db.Prepare(selectRelationsByTypeInRangeAscSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRelationsByTypeInRangeDescStmt, err = db.Prepare(selectRelationsByTypeInRangeDescSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteRelationStmt, err = db.Prepare(deleteRelationSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxRelationIDStmt, err = db.Prepare(selectMaxRelationIDSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertRelationStmt, insertRelationSQL},
+		{&s.selectRelationsInRangeAscStmt, selectRelationsInRangeAscSQL},
+		{&s.selectRelationsInRangeDescStmt, selectRelationsInRangeDescSQL},
+		{&s.selectRelationsByTypeInRangeAscStmt, selectRelationsByTypeInRangeAscSQL},
+		{&s.selectRelationsByTypeInRangeDescStmt, selectRelationsByTypeInRangeDescSQL},
+		{&s.deleteRelationStmt, deleteRelationSQL},
+		{&s.selectMaxRelationIDStmt, selectMaxRelationIDSQL},
+	}.Prepare(db)
 }
 
 func (s *relationsStatements) InsertRelation(
 	ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, relType string,
-) (streamPos types.StreamPosition, err error) {
+) (err error) {
+	var streamPos types.StreamPosition
 	if streamPos, err = s.streamIDStatements.nextRelationID(ctx, txn); err != nil {
 		return
 	}
-	err = sqlutil.TxStmt(txn, s.insertRelationStmt).QueryRowContext(
+	_, err = sqlutil.TxStmt(txn, s.insertRelationStmt).ExecContext(
 		ctx, streamPos, roomID, eventID, childEventID, relType,
-	).Scan(&streamPos)
+	)
 	return
 }
 
@@ -131,9 +117,6 @@ func (s *relationsStatements) DeleteRelation(
 	_, err := stmt.ExecContext(
 		ctx, roomID, childEventID,
 	)
-	if err == sql.ErrNoRows {
-		return nil
-	}
 	return err
 }
 
@@ -166,20 +149,19 @@ func (s *relationsStatements) SelectRelationsInRange(
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRelationsInRange: rows.close() failed")
 	result := map[string][]types.RelationEntry{}
+	var (
+		id           types.StreamPosition
+		childEventID string
+		relationType string
+	)
 	for rows.Next() {
-		var (
-			id           types.StreamPosition
-			roomID       string
-			childEventID string
-			relType      string
-		)
-		if err = rows.Scan(&id, &roomID, &childEventID, &relType); err != nil {
+		if err = rows.Scan(&id, &childEventID, &relationType); err != nil {
 			return nil, lastPos, err
 		}
 		if id > lastPos {
 			lastPos = id
 		}
-		result[relType] = append(result[relType], types.RelationEntry{
+		result[relationType] = append(result[relationType], types.RelationEntry{
 			Position: id,
 			EventID:  childEventID,
 		})
@@ -193,11 +175,7 @@ func (s *relationsStatements) SelectRelationsInRange(
 func (s *relationsStatements) SelectMaxRelationID(
 	ctx context.Context, txn *sql.Tx,
 ) (id int64, err error) {
-	var nullableID sql.NullInt64
 	stmt := sqlutil.TxStmt(txn, s.selectMaxRelationIDStmt)
-	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
-	if nullableID.Valid {
-		id = nullableID.Int64
-	}
+	err = stmt.QueryRowContext(ctx).Scan(&id)
 	return
 }

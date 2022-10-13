@@ -604,11 +604,10 @@ func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib
 		return nil
 	default:
 		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-			_, err := d.Relations.InsertRelation(
+			return d.Relations.InsertRelation(
 				ctx, txn, event.RoomID(), content.Relations.EventID,
 				event.EventID(), content.Relations.RelationType,
 			)
-			return err
 		})
 	}
 }

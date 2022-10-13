@@ -605,18 +605,23 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 		To:        to,
 		Backwards: backwards,
 	}
-	if r.Backwards {
-		if r.From == 0 {
-			if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
-				return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
-			}
-			r.From++
+
+	if r.Backwards && r.From == 0 {
+		// If we're working backwards (dir=b) and there's no ?from= specified then
+		// we will automatically want to work backwards from the current position,
+		// so find out what that is.
+		if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
 		}
-	} else {
-		if r.To == 0 {
-			if r.To, err = d.MaxStreamPositionForRelations(ctx); err != nil {
-				return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
-			}
+		// The result normally isn't inclusive of the event *at* the ?from=
+		// position, so add 1 here so that we include the most recent relation.
+		r.From++
+	} else if !r.Backwards && r.To == 0 {
+		// If we're working forwards (dir=f) and there's no ?to= specified then
+		// we will automatically want to work forwards towards the current position,
+		// so find out what that is.
+		if r.To, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
 		}
 	}
 
@@ -645,7 +650,9 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	}
 
 	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
-	// could be.
+	// could be. We've requested an extra event by adding one to the limit already so
+	// that we can determine whether or not to provide a "next_batch", so trim off that
+	// event off the end if needs be.
 	if len(entries) > limit {
 		entries = entries[:len(entries)-1]
 		nextBatch = fmt.Sprintf("%d", entries[len(entries)-1].Position)
@@ -653,7 +660,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	// TODO: set prevBatch? doesn't seem to affect the tests...
 
 	// Extract all of the event IDs from the relation entries so that we can pull the
-	// events out of the database.
+	// events out of the database. Then go and fetch the events.
 	for _, entry := range entries {
 		eventIDs = append(eventIDs, entry.EventID)
 	}
