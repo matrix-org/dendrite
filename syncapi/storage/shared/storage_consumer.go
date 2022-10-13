@@ -53,6 +53,7 @@ type Database struct {
 	NotificationData    tables.NotificationData
 	Ignores             tables.Ignores
 	Presence            tables.Presence
+	Relations           tables.Relations
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
@@ -579,10 +580,40 @@ func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID s
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
 
-func (s *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
+func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
 		gomatrixserverlib.MRoomName,
 		gomatrixserverlib.MRoomTopic,
 		"m.room.message",
+	})
+}
+
+func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+	var content gomatrixserverlib.RelationContent
+	if err := json.Unmarshal(event.Content(), &content); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
+	switch {
+	case content.Relations == nil:
+		return nil
+	case content.Relations.EventID == "":
+		return nil
+	case content.Relations.RelationType == "":
+		return nil
+	case event.Type() == gomatrixserverlib.MRoomRedaction:
+		return nil
+	default:
+		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			return d.Relations.InsertRelation(
+				ctx, txn, event.RoomID(), content.Relations.EventID,
+				event.EventID(), event.Type(), content.Relations.RelationType,
+			)
+		})
+	}
+}
+
+func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Relations.DeleteRelation(ctx, txn, roomID, redactedEventID)
 	})
 }

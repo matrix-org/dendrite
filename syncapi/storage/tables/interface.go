@@ -206,3 +206,22 @@ type Presence interface {
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
 	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (presences map[string]*types.PresenceInternal, err error)
 }
+
+type Relations interface {
+	// Inserts a relation which refers from the child event ID to the event ID in the given room.
+	// If the relation already exists then this function will do nothing and return no error.
+	InsertRelation(ctx context.Context, txn *sql.Tx, roomID, eventID, childEventID, childEventType, relType string) (err error)
+	// Deletes a relation which already exists as the result of an event redaction. If the relation
+	// does not exist then this function will do nothing and return no error.
+	DeleteRelation(ctx context.Context, txn *sql.Tx, roomID, childEventID string) error
+	// SelectRelationsInRange will return relations grouped by relation type within the given range.
+	// The map is relType -> []entry. If a relType parameter is specified then the results will only
+	// contain relations of that type, otherwise if "" is specified then all relations in the range
+	// will be returned, inclusive of the "to" position but excluding the "from" position. The stream
+	// position returned is the maximum position of the returned results.
+	SelectRelationsInRange(ctx context.Context, txn *sql.Tx, roomID, eventID, relType, eventType string, r types.Range, limit int) (map[string][]types.RelationEntry, types.StreamPosition, error)
+	// SelectMaxRelationID returns the maximum ID of all relations, used to determine what the boundaries
+	// should be if there are no boundaries supplied (i.e. we want to work backwards but don't have a
+	// "from" or want to work forwards and don't have a "to").
+	SelectMaxRelationID(ctx context.Context, txn *sql.Tx) (id int64, err error)
+}
