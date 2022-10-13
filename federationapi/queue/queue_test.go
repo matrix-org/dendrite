@@ -50,7 +50,7 @@ type fakeDatabase struct {
 	associatedEDUs     map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}
 }
 
-func (d fakeDatabase) StoreJSON(ctx context.Context, js string) (*shared.Receipt, error) {
+func (d *fakeDatabase) StoreJSON(ctx context.Context, js string) (*shared.Receipt, error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -71,7 +71,7 @@ func (d fakeDatabase) StoreJSON(ctx context.Context, js string) (*shared.Receipt
 	return nil, errors.New("Failed to determine type of json to store")
 }
 
-func (d fakeDatabase) GetPendingPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (pdus map[*shared.Receipt]*gomatrixserverlib.HeaderedEvent, err error) {
+func (d *fakeDatabase) GetPendingPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (pdus map[*shared.Receipt]*gomatrixserverlib.HeaderedEvent, err error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -86,7 +86,7 @@ func (d fakeDatabase) GetPendingPDUs(ctx context.Context, serverName gomatrixser
 	return pdus, nil
 }
 
-func (d fakeDatabase) GetPendingEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (edus map[*shared.Receipt]*gomatrixserverlib.EDU, err error) {
+func (d *fakeDatabase) GetPendingEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, limit int) (edus map[*shared.Receipt]*gomatrixserverlib.EDU, err error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -101,7 +101,7 @@ func (d fakeDatabase) GetPendingEDUs(ctx context.Context, serverName gomatrixser
 	return edus, nil
 }
 
-func (d fakeDatabase) AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error {
+func (d *fakeDatabase) AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -116,7 +116,7 @@ func (d fakeDatabase) AssociatePDUWithDestination(ctx context.Context, transacti
 	}
 }
 
-func (d fakeDatabase) AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt, eduType string, expireEDUTypes map[string]time.Duration) error {
+func (d *fakeDatabase) AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt, eduType string, expireEDUTypes map[string]time.Duration) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -131,7 +131,7 @@ func (d fakeDatabase) AssociateEDUWithDestination(ctx context.Context, serverNam
 	}
 }
 
-func (d fakeDatabase) CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error {
+func (d *fakeDatabase) CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -144,7 +144,7 @@ func (d fakeDatabase) CleanPDUs(ctx context.Context, serverName gomatrixserverli
 	return nil
 }
 
-func (d fakeDatabase) CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error {
+func (d *fakeDatabase) CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -157,7 +157,7 @@ func (d fakeDatabase) CleanEDUs(ctx context.Context, serverName gomatrixserverli
 	return nil
 }
 
-func (d fakeDatabase) GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error) {
+func (d *fakeDatabase) GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -168,7 +168,7 @@ func (d fakeDatabase) GetPendingPDUCount(ctx context.Context, serverName gomatri
 	return count, nil
 }
 
-func (d fakeDatabase) GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error) {
+func (d *fakeDatabase) GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -179,7 +179,7 @@ func (d fakeDatabase) GetPendingEDUCount(ctx context.Context, serverName gomatri
 	return count, nil
 }
 
-func (d fakeDatabase) GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
+func (d *fakeDatabase) GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -190,7 +190,7 @@ func (d fakeDatabase) GetPendingPDUServerNames(ctx context.Context) ([]gomatrixs
 	return servers, nil
 }
 
-func (d fakeDatabase) GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
+func (d *fakeDatabase) GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -201,7 +201,7 @@ func (d fakeDatabase) GetPendingEDUServerNames(ctx context.Context) ([]gomatrixs
 	return servers, nil
 }
 
-func (d fakeDatabase) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {
+func (d *fakeDatabase) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -209,7 +209,7 @@ func (d fakeDatabase) AddServerToBlacklist(serverName gomatrixserverlib.ServerNa
 	return nil
 }
 
-func (d fakeDatabase) RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error {
+func (d *fakeDatabase) RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -217,7 +217,7 @@ func (d fakeDatabase) RemoveServerFromBlacklist(serverName gomatrixserverlib.Ser
 	return nil
 }
 
-func (d fakeDatabase) RemoveAllServersFromBlacklist() error {
+func (d *fakeDatabase) RemoveAllServersFromBlacklist() error {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -225,7 +225,7 @@ func (d fakeDatabase) RemoveAllServersFromBlacklist() error {
 	return nil
 }
 
-func (d fakeDatabase) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
+func (d *fakeDatabase) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	dbMutex.Lock()
 	defer dbMutex.Unlock()
 
@@ -263,7 +263,7 @@ func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixse
 }
 
 func createDatabase() storage.Database {
-	return fakeDatabase{
+	return &fakeDatabase{
 		pendingPDUServers:  make(map[gomatrixserverlib.ServerName]struct{}),
 		pendingEDUServers:  make(map[gomatrixserverlib.ServerName]struct{}),
 		blacklistedServers: make(map[gomatrixserverlib.ServerName]struct{}),
@@ -273,8 +273,9 @@ func createDatabase() storage.Database {
 	}
 }
 
-func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {
+func mustCreateEvent(t *testing.T) *gomatrixserverlib.HeaderedEvent {
 	t.Helper()
+	content := `{"type":"m.room.message"}`
 	ev, err := gomatrixserverlib.NewEventFromTrustedJSON([]byte(content), false, gomatrixserverlib.RoomVersionV10)
 	if err != nil {
 		t.Fatalf("failed to create event: %v", err)
@@ -310,7 +311,7 @@ func TestSendTransactionOnSuccessRemovedFromDB(t *testing.T) {
 	destination := gomatrixserverlib.ServerName("remotehost")
 	db, fc, queues := testSetup(failuresUntilBlacklist, true)
 
-	ev := mustCreateEvent(t, `{"type":"m.room.message"}`)
+	ev := mustCreateEvent(t)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 	assert.NoError(t, err)
 
@@ -334,7 +335,7 @@ func TestSendTransactionOnFailStoredInDB(t *testing.T) {
 	destination := gomatrixserverlib.ServerName("remotehost")
 	db, fc, queues := testSetup(failuresUntilBlacklist, false)
 
-	ev := mustCreateEvent(t, `{"type":"m.room.message"}`)
+	ev := mustCreateEvent(t)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 	assert.NoError(t, err)
 
@@ -359,7 +360,7 @@ func TestSendTransactionMultipleFailuresBlacklisted(t *testing.T) {
 	destination := gomatrixserverlib.ServerName("remotehost")
 	db, fc, queues := testSetup(failuresUntilBlacklist, false)
 
-	ev := mustCreateEvent(t, `{"type":"m.room.message"}`)
+	ev := mustCreateEvent(t)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 	assert.NoError(t, err)
 
@@ -386,7 +387,7 @@ func TestRetryServerSendsSuccessfully(t *testing.T) {
 	destination := gomatrixserverlib.ServerName("remotehost")
 	db, fc, queues := testSetup(failuresUntilBlacklist, false)
 
-	ev := mustCreateEvent(t, `{"type":"m.room.message"}`)
+	ev := mustCreateEvent(t)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 	assert.NoError(t, err)
 
