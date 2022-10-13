@@ -45,6 +45,7 @@ func Setup(
 	lazyLoadCache caching.LazyLoadCache,
 	fts *fulltext.Search,
 ) {
+	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
 	// TODO: Add AS support for all handlers below.
@@ -106,6 +107,48 @@ func Setup(
 				rsAPI, syncDB,
 				vars["roomId"], vars["eventId"],
 				lazyLoadCache,
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Relations(
+				req, device, syncDB, rsAPI,
+				vars["roomId"], vars["eventId"], "", "",
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Relations(
+				req, device, syncDB, rsAPI,
+				vars["roomId"], vars["eventId"], vars["relType"], "",
+			)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}/{eventType}",
+		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+
+			return Relations(
+				req, device, syncDB, rsAPI,
+				vars["roomId"], vars["eventId"], vars["relType"], vars["eventType"],
 			)
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
