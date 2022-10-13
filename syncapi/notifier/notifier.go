@@ -48,6 +48,7 @@ type Notifier struct {
 	lastCleanUpTime time.Time
 	// This map is reused to prevent allocations and GC pressure in SharedUsers.
 	_sharedUserMap map[string]struct{}
+	_wakeupUserMap map[string]struct{}
 }
 
 // NewNotifier creates a new notifier set to the given sync position.
@@ -61,6 +62,7 @@ func NewNotifier() *Notifier {
 		lock:                   &sync.RWMutex{},
 		lastCleanUpTime:        time.Now(),
 		_sharedUserMap:         map[string]struct{}{},
+		_wakeupUserMap:         map[string]struct{}{},
 	}
 }
 
@@ -408,12 +410,16 @@ func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]types.P
 // specified user IDs, and also the specified peekingDevices
 func (n *Notifier) _wakeupUsers(userIDs []string, peekingDevices []types.PeekingDevice, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
+		n._wakeupUserMap[userID] = struct{}{}
+	}
+	for userID := range n._wakeupUserMap {
 		for _, stream := range n._fetchUserStreams(userID) {
 			if stream == nil {
 				continue
 			}
 			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 		}
+		delete(n._wakeupUserMap, userID)
 	}
 
 	for _, peekingDevice := range peekingDevices {

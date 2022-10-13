@@ -151,6 +151,33 @@ func TestQueryProfile(t *testing.T) {
 	})
 }
 
+// TestPasswordlessLoginFails ensures that a passwordless account cannot
+// be logged into using an arbitrary password (effectively a regression test
+// for https://github.com/matrix-org/dendrite/issues/2780).
+func TestPasswordlessLoginFails(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+		defer close()
+		_, err := accountDB.CreateAccount(ctx, "auser", "", "", api.AccountTypeAppService)
+		if err != nil {
+			t.Fatalf("failed to make account: %s", err)
+		}
+
+		userReq := &api.QueryAccountByPasswordRequest{
+			Localpart:         "auser",
+			PlaintextPassword: "apassword",
+		}
+		userRes := &api.QueryAccountByPasswordResponse{}
+		if err := userAPI.QueryAccountByPassword(ctx, userReq, userRes); err != nil {
+			t.Fatal(err)
+		}
+		if userRes.Exists || userRes.Account != nil {
+			t.Fatal("QueryAccountByPassword should not return correctly for a passwordless account")
+		}
+	})
+}
+
 func TestLoginToken(t *testing.T) {
 	ctx := context.Background()
 

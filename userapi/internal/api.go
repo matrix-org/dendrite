@@ -838,6 +838,8 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 		return nil
 	case bcrypt.ErrMismatchedHashAndPassword: // user exists, but password doesn't match
 		return nil
+	case bcrypt.ErrHashTooShort: // user exists, but probably a passwordless account
+		return nil
 	default:
 		res.Exists = true
 		res.Account = acc

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -204,20 +205,17 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 		deviceIDMap[d] = true
 	}
 	var result []api.DeviceMessage
+	var displayName sql.NullString
 	for rows.Next() {
 		dk := api.DeviceMessage{
-			Type:       api.TypeDeviceKeyUpdate,
-			DeviceKeys: &api.DeviceKeys{},
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
+				UserID: userID,
+			},
 		}
-		dk.UserID = userID
-		var keyJSON string
-		var streamID int64
-		var displayName sql.NullString
-		if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID, &displayName); err != nil {
+		if err := rows.Scan(&dk.DeviceID, &dk.KeyJSON, &dk.StreamID, &displayName); err != nil {
 			return nil, err
 		}
-		dk.KeyJSON = []byte(keyJSON)
-		dk.StreamID = streamID
 		if displayName.Valid {
 			dk.DisplayName = displayName.String
 		}

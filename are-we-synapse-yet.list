@@ -643,7 +643,7 @@ fed Inbound federation redacts events from erased users
 fme Outbound federation can request missing events 
 fme Inbound federation can return missing events for world_readable visibility 
 fme Inbound federation can return missing events for shared visibility 
-fme Inbound federation can return missing events for invite visibility 
+fme Inbound federation can return missing events for invited visibility
 fme Inbound federation can return missing events for joined visibility 
 fme outliers whose auth_events are in a different room are correctly rejected 
 fbk Outbound federation can backfill events 
