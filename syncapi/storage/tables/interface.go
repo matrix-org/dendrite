@@ -217,7 +217,8 @@ type Relations interface {
 	// SelectRelationsInRange will return relations grouped by relation type within the given range.
 	// The map is relType -> []entry. If a relType parameter is specified then the results will only
 	// contain relations of that type, otherwise if "" is specified then all relations in the range
-	// will be returned. The stream position returned is the maximum position of the returned results.
+	// will be returned, inclusive of the "to" position but excluding the "from" position. The stream
+	// position returned is the maximum position of the returned results.
 	SelectRelationsInRange(ctx context.Context, txn *sql.Tx, roomID, eventID, relType string, r types.Range, limit int) (map[string][]types.RelationEntry, types.StreamPosition, error)
 	// SelectMaxRelationID returns the maximum ID of all relations, used to determine what the boundaries
 	// should be if there are no boundaries supplied (i.e. we want to work backwards but don't have a
