@@ -50,7 +50,6 @@ require (
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
-	gotest.tools/v3 v3.0.3
 	nhooyr.io/websocket v1.8.7
 )
 
@@ -129,6 +128,7 @@ require (
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.0.3 // indirect
 )
 
 go 1.18
