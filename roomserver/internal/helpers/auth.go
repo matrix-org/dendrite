@@ -130,16 +130,12 @@ type authEvents struct {
 	stateKeyNIDMap map[string]types.EventStateKeyNID
 	state          stateEntryMap
 	events         EventMap
+	valid          bool
 }
 
 // Valid verifies that all auth events are from the same room.
-func (ae *authEvents) Valid(roomID string) bool {
-	for i := range ae.events {
-		if roomID != ae.events[i].RoomID() {
-			return false
-		}
-	}
-	return true
+func (ae *authEvents) Valid() bool {
+	return ae.valid
 }
 
 // Create implements gomatrixserverlib.AuthEventProvider
@@ -208,6 +204,7 @@ func loadAuthEvents(
 	needed gomatrixserverlib.StateNeeded,
 	state []types.StateEntry,
 ) (result authEvents, err error) {
+	result.valid = true
 	// Look up the numeric IDs for the state keys needed for auth.
 	var neededStateKeys []string
 	neededStateKeys = append(neededStateKeys, needed.Member...)
@@ -228,6 +225,16 @@ func loadAuthEvents(
 	}
 	if result.events, err = db.Events(ctx, eventNIDs); err != nil {
 		return
+	}
+	roomID := ""
+	for _, ev := range result.events {
+		if ev.RoomID() != "" {
+			roomID = ev.RoomID()
+		}
+		if ev.RoomID() != roomID {
+			result.valid = false
+			break
+		}
 	}
 	return
 }
