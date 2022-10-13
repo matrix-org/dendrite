@@ -75,6 +75,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
 	}
+
 	// Create a database entry that associates the given PDU NID with
 	// this destination queue. We'll then be able to retrieve the PDU
 	// later.
@@ -108,6 +109,8 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		case oq.notify <- struct{}{}:
 		default:
 		}
+	} else {
+		oq.overflowed.Store(true)
 	}
 }
 
@@ -153,6 +156,8 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		case oq.notify <- struct{}{}:
 		default:
 		}
+	} else {
+		oq.overflowed.Store(true)
 	}
 }
 
@@ -335,6 +340,11 @@ func (oq *destinationQueue) backgroundSend() {
 			// We failed to send the transaction. Mark it as a failure.
 			oq.statistics.Failure()
 
+			// Queue up another attempt since the transaction failed.
+			select {
+			case oq.notify <- struct{}{}:
+			default:
+			}
 		} else if transaction {
 			// If we successfully sent the transaction then clear out
 			// the pending events and EDUs, and wipe our transaction ID.
