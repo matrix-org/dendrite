@@ -119,7 +119,7 @@ func Setup(
 			}
 
 			return Relations(
-				req, device, syncDB,
+				req, device, syncDB, rsAPI,
 				vars["roomId"], vars["eventId"], "", "",
 			)
 		}),
@@ -133,7 +133,7 @@ func Setup(
 			}
 
 			return Relations(
-				req, device, syncDB,
+				req, device, syncDB, rsAPI,
 				vars["roomId"], vars["eventId"], vars["relType"], "",
 			)
 		}),
@@ -147,7 +147,7 @@ func Setup(
 			}
 
 			return Relations(
-				req, device, syncDB,
+				req, device, syncDB, rsAPI,
 				vars["roomId"], vars["eventId"], vars["relType"], vars["eventType"],
 			)
 		}),

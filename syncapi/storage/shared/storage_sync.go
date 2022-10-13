@@ -596,7 +596,7 @@ func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context)
 }
 
 func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (
-	clientEvents []gomatrixserverlib.ClientEvent, prevBatch, nextBatch string, err error,
+	events []types.StreamEvent, prevBatch, nextBatch string, err error,
 ) {
 	r := types.Range{
 		From:      from,
@@ -644,7 +644,7 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	// If there were no entries returned, there were no relations, so stop at this point.
 	if len(entries) == 0 {
-		return []gomatrixserverlib.ClientEvent{}, "", "", nil
+		return nil, "", "", nil
 	}
 
 	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
@@ -663,20 +663,10 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	for _, entry := range entries {
 		eventIDs = append(eventIDs, entry.EventID)
 	}
-	events, err := d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, true)
+	events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, true)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("d.OutputEvents.SelectEvents: %w", err)
 	}
 
-	// Convert the events into client events, and optionally filter based on the event
-	// type if it was specified.
-	clientEvents = make([]gomatrixserverlib.ClientEvent, 0, len(events))
-	for _, event := range events {
-		clientEvents = append(
-			clientEvents,
-			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
-		)
-	}
-
-	return clientEvents, prevBatch, nextBatch, nil
+	return events, prevBatch, nextBatch, nil
 }

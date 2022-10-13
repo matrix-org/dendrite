@@ -24,9 +24,11 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/dendrite/userapi/api"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type RelationsResponse struct {
@@ -36,7 +38,12 @@ type RelationsResponse struct {
 }
 
 // nolint:gocyclo
-func Relations(req *http.Request, device *api.Device, syncDB storage.Database, roomID, eventID, relType, eventType string) util.JSONResponse {
+func Relations(
+	req *http.Request, device *userapi.Device,
+	syncDB storage.Database,
+	rsAPI api.SyncRoomserverAPI,
+	roomID, eventID, relType, eventType string,
+) util.JSONResponse {
 	var err error
 	var from, to types.StreamPosition
 	var limit int
@@ -77,12 +84,36 @@ func Relations(req *http.Request, device *api.Device, syncDB storage.Database, r
 	var succeeded bool
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
-	res := &RelationsResponse{}
-	res.Chunk, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
+	res := &RelationsResponse{
+		Chunk: []gomatrixserverlib.ClientEvent{},
+	}
+	var events []types.StreamEvent
+	events, res.PrevBatch, res.NextBatch, err = snapshot.RelationsFor(
 		req.Context(), roomID, eventID, relType, eventType, from, to, dir == "b", limit,
 	)
 	if err != nil {
 		return util.ErrorResponse(err)
+	}
+
+	headeredEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
+	for _, event := range events {
+		headeredEvents = append(headeredEvents, event.HeaderedEvent)
+	}
+
+	// Apply history visibility to the result events.
+	filteredEvents, err := internal.ApplyHistoryVisibilityFilter(req.Context(), snapshot, rsAPI, headeredEvents, nil, device.UserID, "relations")
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+
+	// Convert the events into client events, and optionally filter based on the event
+	// type if it was specified.
+	res.Chunk = make([]gomatrixserverlib.ClientEvent, 0, len(filteredEvents))
+	for _, event := range filteredEvents {
+		res.Chunk = append(
+			res.Chunk,
+			gomatrixserverlib.ToClientEvent(event.Event, gomatrixserverlib.FormatAll),
+		)
 	}
 
 	succeeded = true
