@@ -38,6 +38,7 @@ type DatabaseTransaction interface {
 	MaxStreamPositionForSendToDeviceMessages(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForNotificationData(ctx context.Context) (types.StreamPosition, error)
 	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
+	MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error)
 
 	CurrentState(ctx context.Context, roomID string, stateFilterPart *gomatrixserverlib.StateFilter, excludeEventIDs []string) ([]*gomatrixserverlib.HeaderedEvent, error)
 	GetStateDeltasForFullStateSync(ctx context.Context, device *userapi.Device, r types.Range, userID string, stateFilter *gomatrixserverlib.StateFilter) ([]types.StateDelta, []string, error)
@@ -107,6 +108,7 @@ type DatabaseTransaction interface {
 	GetUserUnreadNotificationCountsForRooms(ctx context.Context, userID string, roomIDs map[string]string) (map[string]*eventutil.NotificationData, error)
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
+	RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (events []types.StreamEvent, prevBatch, nextBatch string, err error)
 }
 
 type Database interface {
@@ -174,6 +176,8 @@ type Database interface {
 	StoreReceipt(ctx context.Context, roomId, receiptType, userId, eventId string, timestamp gomatrixserverlib.Timestamp) (pos types.StreamPosition, err error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
 	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
+	UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
+	RedactRelations(ctx context.Context, roomID, redactedEventID string) error
 }
 
 type Presence interface {
