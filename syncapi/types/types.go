@@ -492,9 +492,11 @@ func (jr JoinResponse) MarshalJSON() ([]byte, error) {
 		}
 
 	}
-	if jr.UnreadNotifications != nil &&
-		jr.UnreadNotifications.NotificationCount == 0 && jr.UnreadNotifications.HighlightCount == 0 {
-		a.UnreadNotifications = nil
+	if jr.UnreadNotifications != nil {
+		// if everything else is nil, also remove UnreadNotifications
+		if a.State == nil && a.Ephemeral == nil && a.AccountData == nil && a.Timeline == nil && a.Summary == nil {
+			a.UnreadNotifications = nil
+		}
 	}
 	return json.Marshal(a)
 }
