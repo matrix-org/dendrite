@@ -194,12 +194,16 @@ func (r *Inputer) Start() error {
 	// Make sure that we match the expected inactivity threshold.
 	stream := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent)
 	for consumer := range r.JetStream.Consumers(stream) {
-		if consumer.Config.InactiveThreshold == inactiveThreshold {
-			continue
-		}
-		consumer.Config.InactiveThreshold = inactiveThreshold
-		if _, cerr := r.JetStream.UpdateConsumer(stream, &consumer.Config); cerr != nil {
-			logrus.WithError(cerr).Warnf("Failed to update inactive threshold on consumer %q", consumer.Name)
+		switch {
+		case consumer.Config.Durable == "":
+			continue // Ignore ephemeral consumers
+		case consumer.Config.InactiveThreshold == inactiveThreshold:
+			continue // Ignore consumers that already have the correct threshold
+		default:
+			consumer.Config.InactiveThreshold = inactiveThreshold
+			if _, cerr := r.JetStream.UpdateConsumer(stream, &consumer.Config); cerr != nil {
+				logrus.WithError(cerr).Warnf("Failed to update inactive threshold on consumer %q", consumer.Name)
+			}
 		}
 	}
 
