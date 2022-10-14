@@ -19,8 +19,15 @@ package input
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -31,11 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // TODO: Does this value make sense?
@@ -196,7 +198,7 @@ func (r *Inputer) processRoomEvent(
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	if err = r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+	if err = r.fetchAuthEvents(ctx, logger, roomInfo, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
@@ -336,7 +338,7 @@ func (r *Inputer) processRoomEvent(
 	// doesn't have any associated state to store and we don't need to
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
-		logger.Debug("Stored outlier")
+		logger.WithField("rejected", isRejected).Debug("Stored outlier")
 		hooks.Run(hooks.KindNewEventPersisted, headered)
 		return nil
 	}
@@ -536,6 +538,7 @@ func (r *Inputer) processStateBefore(
 func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
 	logger *logrus.Entry,
+	roomInfo *types.RoomInfo,
 	event *gomatrixserverlib.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
 	known map[string]*types.Event,
@@ -557,9 +560,19 @@ func (r *Inputer) fetchAuthEvents(
 			continue
 		}
 		ev := authEvents[0]
+
+		isRejected := false
+		if roomInfo != nil {
+			isRejected, err = r.DB.IsEventRejected(ctx, roomInfo.RoomNID, ev.EventID())
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("r.DB.IsEventRejected failed: %w", err)
+			}
+		}
 		known[authEventID] = &ev // don't take the pointer of the iterated event
-		if err = auth.AddEvent(ev.Event); err != nil {
-			return fmt.Errorf("auth.AddEvent: %w", err)
+		if !isRejected {
+			if err = auth.AddEvent(ev.Event); err != nil {
+				return fmt.Errorf("auth.AddEvent: %w", err)
+			}
 		}
 	}
 
