@@ -26,8 +26,8 @@ require (
 	github.com/matrix-org/pinecone v0.0.0-20220929155234-2ce51dd4a42c
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
-	github.com/nats-io/nats-server/v2 v2.9.2
-	github.com/nats-io/nats.go v1.17.0
+	github.com/nats-io/nats-server/v2 v2.9.3
+	github.com/nats-io/nats.go v1.18.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
