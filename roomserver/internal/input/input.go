@@ -130,6 +130,13 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 				DeliverPolicy: nats.DeliverAllPolicy,
 				FilterSubject: subject,
 				AckWait:       MaximumMissingProcessingTime + (time.Second * 10),
+
+				// If the consumer is inactive for a while then we will allow NATS
+				// to clean it up. This prevents us from holding onto durable
+				// consumers indefinitely for rooms that might no longer be active,
+				// since they do have a small overhead. If the room becomes active
+				// again then we'll recreate the consumer anyway.
+				InactiveThreshold: time.Hour,
 			},
 		); err != nil {
 			logrus.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
