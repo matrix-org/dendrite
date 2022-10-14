@@ -94,7 +94,7 @@ type Inputer struct {
 // indefinitely for rooms that might no longer be active, since they do
 // have an interest overhead in the NATS Server. If the room becomes
 // active again then we'll recreate the consumer anyway.
-const inactiveThreshold = time.Minute
+const inactiveThreshold = time.Hour * 24
 
 type worker struct {
 	phony.Inbox
