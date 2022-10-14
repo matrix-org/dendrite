@@ -1,5 +1,22 @@
 # Changelog
 
+## Dendrite 0.10.3 (2022-10-14)
+
+### Features
+
+* Event relations are now tracked and support for the `/room/{roomID}/relations/...` client API endpoints have been added
+* Support has been added for private read receipts
+* The built-in NATS Server has been updated to version 2.9.3
+
+### Fixes
+
+* The `unread_notifications` are now always populated in joined room responses
+* The `/get_missing_events` federation API endpoint should now work correctly for rooms with `joined` and `invited` visibility settings, returning redacted events for events that other servers are not allowed to see
+* The `/event` client API endpoint now applies history visibility correctly
+* Read markers should now be updated much more reliably
+* A rare bug in the sync API which could cause some `join` memberships to be incorrectly overwritten by other memberships when working out which rooms to populate has been fixed
+* The federation API now correctly updates the joined hosts table during a state rewrite
+
 ## Dendrite 0.10.2 (2022-10-07)
 
 ### Features
