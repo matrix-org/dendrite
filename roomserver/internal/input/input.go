@@ -152,6 +152,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 			nats.DeliverAll(),
 			nats.AckWait(MaximumMissingProcessingTime+(time.Second*10)),
 			nats.Bind(r.InputRoomEventTopic, consumer),
+			nats.InactiveThreshold(time.Hour),
 		)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to subscribe to stream for room %q", w.roomID)
