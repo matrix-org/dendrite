@@ -3,6 +3,9 @@ package config
 type Monolith struct {
 	HTTPBindAddr  HTTPAddress `yaml:"http_bind_address"`
 	HTTPSBindAddr HTTPAddress `yaml:"https_bind_address"`
+
+	TlsCertificatePath Path `yaml:"tls_cert_path"`
+	TlsPrivateKeyPath  Path `yaml:"tls_key_path"`
 }
 
 func (c *Monolith) Defaults(opts DefaultOpts) {

@@ -11,9 +11,16 @@ version: 2
 global:
   # Monolith specific configuration
   monolith:
-    # HTTP and HTTPS bind address
+    # HTTP listener bind address
     http_bind_address: http://:8008
+
+    # HTTPS listener bind address.
+    # Only used when a valid cert and key are provided.
     https_bind_address: https://:8448
+
+    # Path to PEM formated X509 certificate and private key
+    tls_cert_path: ""
+    tls_key_path: ""
 
   # The domain name of this homeserver.
   server_name: localhost
