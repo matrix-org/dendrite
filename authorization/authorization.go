@@ -17,7 +17,7 @@ package authorization
 type AuthorizationArgs struct {
 	RoomId     string
 	UserId     string
-	Permission string
+	Permission Permission
 }
 
 type Authorization interface {
