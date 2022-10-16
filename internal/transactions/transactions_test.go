@@ -15,6 +15,7 @@ package transactions
 import (
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -27,8 +28,10 @@ type fakeType struct {
 }
 
 func TestCompare(t *testing.T) {
-	c1 := CacheKey{"1", "2", ""}
-	c2 := CacheKey{"1", "2", ""}
+	u1, _ := url.Parse("/send/1?accessToken=123")
+	u2, _ := url.Parse("/send/1")
+	c1 := CacheKey{"1", "2", filepath.Dir(u1.Path)}
+	c2 := CacheKey{"1", "2", filepath.Dir(u2.Path)}
 	if !reflect.DeepEqual(c1, c2) {
 		t.Fatalf("Cache keys differ: %+v <> %+v", c1, c2)
 	}
