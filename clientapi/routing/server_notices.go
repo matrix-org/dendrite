@@ -21,13 +21,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/roomserver/version"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -73,7 +74,7 @@ func SendServerNotice(
 
 	if txnID != nil {
 		// Try to fetch response from transactionsCache
-		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
+		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID, req.URL); ok {
 			return *res
 		}
 	}
@@ -251,7 +252,7 @@ func SendServerNotice(
 	}
 	// Add response to transactionsCache
 	if txnID != nil {
-		txnCache.AddTransaction(device.AccessToken, *txnID, &res)
+		txnCache.AddTransaction(device.AccessToken, *txnID, req.URL, &res)
 	}
 
 	// Take a note of how long it took to generate the event vs submit
