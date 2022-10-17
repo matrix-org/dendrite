@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
-	"github.com/matrix-org/dendrite/userapi/storage/sqlite3/deltas"
 
 	// Import the postgres database driver.
 	_ "github.com/lib/pq"

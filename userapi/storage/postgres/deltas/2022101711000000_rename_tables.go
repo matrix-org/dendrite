@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/lib/pq"
 )
 
 var renameTableMappings = map[string]string{
@@ -33,19 +35,36 @@ var renameIndicesMappings = map[string]string{
 }
 
 func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
+	// I know what you're thinking: you're wondering "why doesn't this use $1
+	// and pass variadic parameters to ExecContext?" — the answer is because
+	// PostgreSQL doesn't expect the table name to be specified as a substituted
+	// argument in that way so it results in a syntax error in the query.
+
 	for old, new := range renameTableMappings {
-		if _, err := tx.ExecContext(ctx, "ALTER TABLE IF EXISTS $1 RENAME TO $2;", old, new); err != nil {
+		q := fmt.Sprintf(
+			"ALTER TABLE IF EXISTS %s RENAME TO %s;",
+			pq.QuoteIdentifier(old), pq.QuoteIdentifier(new),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("rename table %q to %q error: %w", old, new, err)
 		}
 	}
 	for old, new := range renameSequenceMappings {
-		if _, err := tx.ExecContext(ctx, "ALTER SEQUENCE IF EXISTS $1 RENAME TO $2;", old, new); err != nil {
-			return fmt.Errorf("rename sequence %q to %q error: %w", old, new, err)
+		q := fmt.Sprintf(
+			"ALTER SEQUENCE IF EXISTS %s RENAME TO %s;",
+			pq.QuoteIdentifier(old), pq.QuoteIdentifier(new),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("rename table %q to %q error: %w", old, new, err)
 		}
 	}
 	for old, new := range renameIndicesMappings {
-		if _, err := tx.ExecContext(ctx, "ALTER INDEX IF EXISTS $1 RENAME TO $2;", old, new); err != nil {
-			return fmt.Errorf("rename index %q to %q error: %w", old, new, err)
+		q := fmt.Sprintf(
+			"ALTER INDEX IF EXISTS %s RENAME TO %s;",
+			pq.QuoteIdentifier(old), pq.QuoteIdentifier(new),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("rename table %q to %q error: %w", old, new, err)
 		}
 	}
 	return nil
@@ -53,18 +72,30 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 
 func DownRenameTables(ctx context.Context, tx *sql.Tx) error {
 	for old, new := range renameTableMappings {
-		if _, err := tx.ExecContext(ctx, "ALTER TABLE IF EXISTS $1 RENAME TO $2;", new, old); err != nil {
+		q := fmt.Sprintf(
+			"ALTER TABLE IF EXISTS %s RENAME TO %s;",
+			pq.QuoteIdentifier(new), pq.QuoteIdentifier(old),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("rename table %q to %q error: %w", new, old, err)
 		}
 	}
 	for old, new := range renameSequenceMappings {
-		if _, err := tx.ExecContext(ctx, "ALTER SEQUENCE IF EXISTS $1 RENAME TO $2;", new, old); err != nil {
-			return fmt.Errorf("rename sequence %q to %q error: %w", new, old, err)
+		q := fmt.Sprintf(
+			"ALTER SEQUENCE IF EXISTS %s RENAME TO %s;",
+			pq.QuoteIdentifier(new), pq.QuoteIdentifier(old),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("rename table %q to %q error: %w", new, old, err)
 		}
 	}
 	for old, new := range renameIndicesMappings {
-		if _, err := tx.ExecContext(ctx, "ALTER INDEX IF EXISTS $1 RENAME TO $2;", new, old); err != nil {
-			return fmt.Errorf("rename index %q to %q error: %w", new, old, err)
+		q := fmt.Sprintf(
+			"ALTER INDEX IF EXISTS %s RENAME TO %s;",
+			pq.QuoteIdentifier(new), pq.QuoteIdentifier(old),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("rename table %q to %q error: %w", new, old, err)
 		}
 	}
 	return nil
