@@ -26,7 +26,7 @@ import (
 )
 
 const keyBackupTableSchema = `
-CREATE TABLE IF NOT EXISTS account_e2e_room_keys (
+CREATE TABLE IF NOT EXISTS userapi_key_backups (
     user_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     session_id TEXT NOT NULL,
@@ -37,31 +37,31 @@ CREATE TABLE IF NOT EXISTS account_e2e_room_keys (
     is_verified BOOLEAN NOT NULL,
     session_data TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON account_e2e_room_keys(user_id, room_id, session_id, version);
-CREATE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON account_e2e_room_keys(user_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON userapi_key_backups(user_id, room_id, session_id, version);
+CREATE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON userapi_key_backups(user_id, version);
 `
 
 const insertBackupKeySQL = "" +
-	"INSERT INTO account_e2e_room_keys(user_id, room_id, session_id, version, first_message_index, forwarded_count, is_verified, session_data) " +
+	"INSERT INTO userapi_key_backups(user_id, room_id, session_id, version, first_message_index, forwarded_count, is_verified, session_data) " +
 	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
 
 const updateBackupKeySQL = "" +
-	"UPDATE account_e2e_room_keys SET first_message_index=$1, forwarded_count=$2, is_verified=$3, session_data=$4 " +
+	"UPDATE userapi_key_backups SET first_message_index=$1, forwarded_count=$2, is_verified=$3, session_data=$4 " +
 	"WHERE user_id=$5 AND room_id=$6 AND session_id=$7 AND version=$8"
 
 const countKeysSQL = "" +
-	"SELECT COUNT(*) FROM account_e2e_room_keys WHERE user_id = $1 AND version = $2"
+	"SELECT COUNT(*) FROM userapi_key_backups WHERE user_id = $1 AND version = $2"
 
 const selectKeysSQL = "" +
-	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
 	"WHERE user_id = $1 AND version = $2"
 
 const selectKeysByRoomIDSQL = "" +
-	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
 	"WHERE user_id = $1 AND version = $2 AND room_id = $3"
 
 const selectKeysByRoomIDAndSessionIDSQL = "" +
-	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM account_e2e_room_keys " +
+	"SELECT room_id, session_id, first_message_index, forwarded_count, is_verified, session_data FROM userapi_key_backups " +
 	"WHERE user_id = $1 AND version = $2 AND room_id = $3 AND session_id = $4"
 
 type keyBackupStatements struct {
