@@ -34,6 +34,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -46,7 +47,7 @@ type OutputClientDataConsumer struct {
 	topic        string
 	topicReIndex string
 	db           storage.Database
-	stream       types.StreamProvider
+	stream       streams.StreamProvider
 	notifier     *notifier.Notifier
 	serverName   gomatrixserverlib.ServerName
 	fts          *fulltext.Search
@@ -61,7 +62,7 @@ func NewOutputClientDataConsumer(
 	nats *nats.Conn,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 	fts *fulltext.Search,
 ) *OutputClientDataConsumer {
 	return &OutputClientDataConsumer{

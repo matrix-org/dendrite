@@ -307,7 +307,7 @@ Alternative server names do not cause a routing loop
 Events whose auth_events are in the wrong room do not mess up the room state
 Inbound federation can return events
 Inbound federation can return missing events for world_readable visibility
-Inbound federation can return missing events for invite visibility
+Inbound federation can return missing events for invited visibility
 Inbound federation can get public room list
 PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
 PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
@@ -743,3 +743,8 @@ User in private room doesn't appear in user directory
 User joining then leaving public room appears and dissappears from directory
 User in remote room doesn't appear in user directory after server left room
 User in shared private room does appear in user directory until leave
+Existing members see new member's presence
+Inbound federation can return missing events for joined visibility
+outliers whose auth_events are in a different room are correctly rejected
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count

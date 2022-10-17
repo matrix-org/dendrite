@@ -27,12 +27,14 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -45,8 +47,8 @@ type OutputRoomEventConsumer struct {
 	durable      string
 	topic        string
 	db           storage.Database
-	pduStream    types.StreamProvider
-	inviteStream types.StreamProvider
+	pduStream    streams.StreamProvider
+	inviteStream streams.StreamProvider
 	notifier     *notifier.Notifier
 	fts          *fulltext.Search
 }
@@ -58,8 +60,8 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	pduStream types.StreamProvider,
-	inviteStream types.StreamProvider,
+	pduStream streams.StreamProvider,
+	inviteStream streams.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
 	fts *fulltext.Search,
 ) *OutputRoomEventConsumer {
@@ -146,6 +148,16 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
 	}
+
+	if err = s.db.RedactRelations(ctx, msg.RedactedBecause.RoomID(), msg.RedactedEventID); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":           msg.RedactedBecause.RoomID(),
+			"event_id":          msg.RedactedBecause.EventID(),
+			"redacted_event_id": msg.RedactedEventID,
+		}).WithError(err).Warn("Failed to redact relations")
+		return err
+	}
+
 	// fake a room event so we notify clients about the redaction, as if it were
 	// a normal event.
 	return s.onNewRoomEvent(ctx, api.OutputNewRoomEvent{
@@ -269,6 +281,14 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
+	}
+
 	s.pduStream.Advance(pduPos)
 	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
@@ -311,6 +331,15 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("failed to index fulltext element")
+	}
+
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":  ev.RoomID(),
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -449,8 +478,15 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	}
 	stateKey := *event.StateKey()
 
-	prevEvent, err := s.db.GetStateEvent(
-		context.TODO(), event.RoomID(), event.Type(), stateKey,
+	snapshot, err := s.db.NewDatabaseSnapshot(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
+	prevEvent, err := snapshot.GetStateEvent(
+		s.ctx, event.RoomID(), event.Type(), stateKey,
 	)
 	if err != nil {
 		return event, err
@@ -467,6 +503,7 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	}
 
 	event.Event, err = event.SetUnsigned(prev)
+	succeeded = true
 	return event, err
 }
 

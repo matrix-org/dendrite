@@ -68,14 +68,18 @@ CREATE TABLE IF NOT EXISTS roomserver_membership (
 
 var selectJoinedUsersSetForRoomsAndUserSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
-	" WHERE room_nid = ANY($1) AND target_nid = ANY($2) AND" +
-	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" WHERE (target_local OR $1 = false)" +
+	" AND room_nid = ANY($2) AND target_nid = ANY($3)" +
+	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" AND forgotten = false" +
 	" GROUP BY target_nid"
 
 var selectJoinedUsersSetForRoomsSQL = "" +
 	"SELECT target_nid, COUNT(room_nid) FROM roomserver_membership" +
-	" WHERE room_nid = ANY($1) AND" +
-	" membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) + " and forgotten = false" +
+	" WHERE (target_local OR $1 = false) " +
+	" AND room_nid = ANY($2)" +
+	" AND membership_nid = " + fmt.Sprintf("%d", tables.MembershipStateJoin) +
+	" AND forgotten = false" +
 	" GROUP BY target_nid"
 
 // Insert a row in to membership table so that it can be locked by the
@@ -334,6 +338,7 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(
 	ctx context.Context, txn *sql.Tx,
 	roomNIDs []types.RoomNID,
 	userNIDs []types.EventStateKeyNID,
+	localOnly bool,
 ) (map[types.EventStateKeyNID]int, error) {
 	var (
 		rows *sql.Rows
@@ -342,9 +347,9 @@ func (s *membershipStatements) SelectJoinedUsersSetForRooms(
 	stmt := sqlutil.TxStmt(txn, s.selectJoinedUsersSetForRoomsStmt)
 	if len(userNIDs) > 0 {
 		stmt = sqlutil.TxStmt(txn, s.selectJoinedUsersSetForRoomsAndUserStmt)
-		rows, err = stmt.QueryContext(ctx, pq.Array(roomNIDs), pq.Array(userNIDs))
+		rows, err = stmt.QueryContext(ctx, localOnly, pq.Array(roomNIDs), pq.Array(userNIDs))
 	} else {
-		rows, err = stmt.QueryContext(ctx, pq.Array(roomNIDs))
+		rows, err = stmt.QueryContext(ctx, localOnly, pq.Array(roomNIDs))
 	}
 
 	if err != nil {

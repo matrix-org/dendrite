@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
@@ -232,24 +233,40 @@ func loadConfig(
 		return nil, err
 	}
 
-	for i, oldPrivateKey := range c.Global.OldVerifyKeys {
-		var oldPrivateKeyData []byte
+	for _, key := range c.Global.OldVerifyKeys {
+		switch {
+		case key.PrivateKeyPath != "":
+			var oldPrivateKeyData []byte
+			oldPrivateKeyPath := absPath(basePath, key.PrivateKeyPath)
+			oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read %q: %w", oldPrivateKeyPath, err)
+			}
 
-		oldPrivateKeyPath := absPath(basePath, oldPrivateKey.PrivateKeyPath)
-		oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
-		if err != nil {
-			return nil, err
+			// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
+			// a number of private keys out there with non-compatible symbols in them due
+			// to lack of validation in Synapse, we won't enforce that for old verify keys.
+			keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
+			if perr != nil {
+				return nil, fmt.Errorf("failed to parse %q: %w", oldPrivateKeyPath, perr)
+			}
+
+			key.KeyID = keyID
+			key.PrivateKey = privateKey
+			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
+
+		case key.KeyID == "":
+			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
+
+		case len(key.PublicKey) == ed25519.PublicKeySize:
+			continue
+
+		case len(key.PublicKey) > 0:
+			return nil, fmt.Errorf("the supplied 'public_key' is the wrong length")
+
+		default:
+			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
 		}
-
-		// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
-		// a number of private keys out there with non-compatible symbols in them due
-		// to lack of validation in Synapse, we won't enforce that for old verify keys.
-		keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
-		if perr != nil {
-			return nil, perr
-		}
-
-		c.Global.OldVerifyKeys[i].KeyID, c.Global.OldVerifyKeys[i].PrivateKey = keyID, privateKey
 	}
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
@@ -275,6 +292,9 @@ func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error))
 // Derive generates data that is derived from various values provided in
 // the config file.
 func (config *Dendrite) Derive() error {
+	// Replace selected config with env variables.
+	config.replaceWithEnvVariables()
+
 	// Determine registrations flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -558,6 +578,58 @@ func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err 
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)
+}
+
+/*
+*
+Replace selected config with environment variables
+*/
+
+func (config *Dendrite) replaceWithEnvVariables() {
+	// Replace selected fields with env variables
+
+	config.Global.ServerName = gomatrixserverlib.ServerName(
+		replaceWithEnvVariables(string(config.Global.ServerName)),
+	)
+	logrus.Infof("Matrix ServerName=%s\n", config.Global.ServerName)
+
+	config.Global.DatabaseOptions.ConnectionString = DataSource(
+		replaceWithEnvVariables(
+			string(config.Global.DatabaseOptions.ConnectionString),
+		),
+	)
+
+	// If env variable is set, convert the deployment chain IDs from the env
+	// variable into []int and replace the ChainIDs field.
+	if config.ClientAPI.PublicKeyAuthentication.Ethereum.Enabled {
+		deploymentChainIDs := replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.DeploymentChainIDs)
+		chainIds := strings.Split(deploymentChainIDs, ",")
+		if len(chainIds) > 0 && chainIds[0] != "" {
+			var ids []int
+			for _, id := range chainIds {
+				id, err := strconv.Atoi(strings.TrimSpace(id))
+				if err == nil {
+					ids = append(ids, id)
+				}
+			}
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainIDs = ids
+		}
+		logrus.Infof("Supported Ethereum chain IDs=%d\n", config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainIDs)
+	}
+}
+
+var regexpEnvVariables = regexp.MustCompile(`\$\{(?P<Var>\w+)\}`)
+var varIndex = regexpEnvVariables.SubexpIndex("Var")
+
+func replaceWithEnvVariables(value string) string {
+	matches := regexpEnvVariables.FindAllStringSubmatch(value, -1)
+	for _, m := range matches {
+		if varIndex < len(m) {
+			envValue := os.Getenv(m[varIndex])
+			value = strings.ReplaceAll(value, fmt.Sprintf("${%s}", m[varIndex]), envValue)
+		}
+	}
+	return value
 }
 
 // logrusLogger is a small wrapper that implements jaeger.Logger using logrus.

@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -40,7 +41,7 @@ type OutputNotificationDataConsumer struct {
 	topic     string
 	db        storage.Database
 	notifier  *notifier.Notifier
-	stream    types.StreamProvider
+	stream    streams.StreamProvider
 }
 
 // NewOutputNotificationDataConsumer creates a new consumer. Call
@@ -51,7 +52,7 @@ func NewOutputNotificationDataConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputNotificationDataConsumer {
 	s := &OutputNotificationDataConsumer{
 		ctx:       process.Context(),

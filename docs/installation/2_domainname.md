@@ -87,6 +87,12 @@ and contain the following JSON document:
 For example, this can be done with the following Caddy config:
 
 ```
+handle /.well-known/matrix/server {
+	header Content-Type application/json
+	header Access-Control-Allow-Origin *
+	respond `"m.server": "matrix.example.com:8448"`
+}
+
 handle /.well-known/matrix/client {
 	header Content-Type application/json
 	header Access-Control-Allow-Origin *

@@ -17,10 +17,11 @@ package storage
 import (
 	"context"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type Database interface {
@@ -104,7 +105,7 @@ type Database interface {
 	// Look up the active invites targeting a user in a room and return the
 	// numeric state key IDs for the user IDs who sent them along with the event IDs for the invites.
 	// Returns an error if there was a problem talking to the database.
-	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, err error)
+	GetInvitesForUser(ctx context.Context, roomNID types.RoomNID, targetUserNID types.EventStateKeyNID) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, inviteEventJSON []byte, err error)
 	// Save a given room alias with the room ID it refers to.
 	// Returns an error if there was a problem talking to the database.
 	SetRoomAlias(ctx context.Context, alias string, roomID string, creatorUserID string) error
@@ -157,7 +158,7 @@ type Database interface {
 	// If a tuple has the StateKey of '*' and allowWildcards=true then all state events with the EventType should be returned.
 	GetBulkStateContent(ctx context.Context, roomIDs []string, tuples []gomatrixserverlib.StateKeyTuple, allowWildcards bool) ([]tables.StrippedEvent, error)
 	// JoinedUsersSetInRooms returns how many times each of the given users appears across the given rooms.
-	JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string) (map[string]int, error)
+	JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string, localOnly bool) (map[string]int, error)
 	// GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
 	GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error)
 	// GetServerInRoom returns true if we think a server is in a given room or false otherwise.

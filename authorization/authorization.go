@@ -14,22 +14,12 @@
 
 package authorization
 
-import "github.com/matrix-org/dendrite/setup/config"
-
 type AuthorizationArgs struct {
 	RoomId     string
 	UserId     string
-	Permission string
+	Permission Permission
 }
 
 type Authorization interface {
 	IsAllowed(args AuthorizationArgs) (bool, error)
-}
-
-func NewClientApiAuthorization(cfg *config.ClientAPI) Authorization {
-	// Load authorization manager for Zion
-	//if cfg.PublicKeyAuthentication.Ethereum.EnableAuthz {
-	//}
-
-	return &DefaultAuthorization{}
 }
