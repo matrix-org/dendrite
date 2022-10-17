@@ -172,7 +172,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 			"membership": gomatrixserverlib.Join,
 		}, test.WithStateKey(user.ID))
 		// Insert the same event again, but with different positions, which should get updated
-		if err := table.UpsertMembership(ctx, nil, ev, 2, 2); err != nil {
+		if err = table.UpsertMembership(ctx, nil, ev, 2, 2); err != nil {
 			t.Fatalf("failed to upsert membership: %s", err)
 		}
 
