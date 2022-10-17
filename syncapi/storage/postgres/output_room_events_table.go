@@ -28,8 +28,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -138,13 +139,8 @@ const selectStateInRangeSQL = "" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
 	" AND room_id = ANY($3)" +
-	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
-	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
-	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
-	" AND ( $8::bool IS NULL   OR     contains_url = $8  )" +
 	" ORDER BY id ASC" +
-	" LIMIT $9"
+	" LIMIT $4"
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -241,14 +237,8 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	stateFilter *gomatrixserverlib.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
-	senders, notSenders := getSendersStateFilterFilter(stateFilter)
 	rows, err := stmt.QueryContext(
 		ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
-		pq.StringArray(senders),
-		pq.StringArray(notSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
-		stateFilter.ContainsURL,
 		stateFilter.Limit,
 	)
 	if err != nil {

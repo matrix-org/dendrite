@@ -29,8 +29,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -191,9 +192,9 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	}
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, stmtSQL, inputParams,
-		stateFilter.Senders, stateFilter.NotSenders,
-		stateFilter.Types, stateFilter.NotTypes,
-		nil, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderAsc,
+		nil, nil,
+		nil, nil,
+		nil, nil, stateFilter.Limit, FilterOrderAsc,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
