@@ -35,17 +35,17 @@ var renameIndicesMappings = map[string]string{
 func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 	for old, new := range renameTableMappings {
 		if _, err := tx.ExecContext(ctx, "ALTER TABLE IF EXISTS $1 RENAME TO $2;", old, new); err != nil {
-			return fmt.Errorf("rename %q to %q error: %w", old, new, err)
+			return fmt.Errorf("rename table %q to %q error: %w", old, new, err)
 		}
 	}
 	for old, new := range renameSequenceMappings {
 		if _, err := tx.ExecContext(ctx, "ALTER SEQUENCE IF EXISTS $1 RENAME TO $2;", old, new); err != nil {
-			return fmt.Errorf("rename %q to %q error: %w", old, new, err)
+			return fmt.Errorf("rename sequence %q to %q error: %w", old, new, err)
 		}
 	}
 	for old, new := range renameIndicesMappings {
 		if _, err := tx.ExecContext(ctx, "ALTER INDEX IF EXISTS $1 RENAME TO $2;", old, new); err != nil {
-			return fmt.Errorf("rename %q to %q error: %w", old, new, err)
+			return fmt.Errorf("rename index %q to %q error: %w", old, new, err)
 		}
 	}
 	return nil
@@ -54,17 +54,17 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 func DownRenameTables(ctx context.Context, tx *sql.Tx) error {
 	for old, new := range renameTableMappings {
 		if _, err := tx.ExecContext(ctx, "ALTER TABLE IF EXISTS $1 RENAME TO $2;", new, old); err != nil {
-			return fmt.Errorf("rename %q to %q error: %w", new, old, err)
+			return fmt.Errorf("rename table %q to %q error: %w", new, old, err)
 		}
 	}
 	for old, new := range renameSequenceMappings {
 		if _, err := tx.ExecContext(ctx, "ALTER SEQUENCE IF EXISTS $1 RENAME TO $2;", new, old); err != nil {
-			return fmt.Errorf("rename %q to %q error: %w", new, old, err)
+			return fmt.Errorf("rename sequence %q to %q error: %w", new, old, err)
 		}
 	}
 	for old, new := range renameIndicesMappings {
 		if _, err := tx.ExecContext(ctx, "ALTER INDEX IF EXISTS $1 RENAME TO $2;", new, old); err != nil {
-			return fmt.Errorf("rename %q to %q error: %w", new, old, err)
+			return fmt.Errorf("rename index %q to %q error: %w", new, old, err)
 		}
 	}
 	return nil
