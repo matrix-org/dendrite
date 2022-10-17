@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS userapi_login_tokens (
 );
 
 -- This index allows efficient garbage collection of expired tokens.
-CREATE INDEX IF NOT EXISTS login_tokens_expiration_idx ON userapi_login_tokens(token_expires_at);
+CREATE INDEX IF NOT EXISTS userapi_login_tokens_expiration_idx ON userapi_login_tokens(token_expires_at);
 `
 
 const insertLoginTokenSQL = "" +

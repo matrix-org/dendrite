@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS userapi_key_backups (
     is_verified BOOLEAN NOT NULL,
     session_data TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS e2e_room_keys_idx ON userapi_key_backups(user_id, room_id, session_id, version);
-CREATE INDEX IF NOT EXISTS e2e_room_keys_versions_idx ON userapi_key_backups(user_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_key_backups_idx ON userapi_key_backups(user_id, room_id, session_id, version);
+CREATE INDEX IF NOT EXISTS userapi_key_backups_versions_idx ON userapi_key_backups(user_id, version);
 `
 
 const insertBackupKeySQL = "" +
