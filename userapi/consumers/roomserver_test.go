@@ -15,8 +15,7 @@ import (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	defer close()
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
@@ -25,7 +24,10 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, close
+	return db, func() {
+		close()
+		baseclose()
+	}
 }
 
 func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {

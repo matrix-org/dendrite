@@ -30,8 +30,7 @@ var (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	defer close()
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -39,7 +38,10 @@ func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, fun
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
-	return db, close
+	return db, func() {
+		close()
+		baseclose()
+	}
 }
 
 // Tests storing and getting account data

@@ -49,8 +49,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
-	base, close := testrig.CreateBaseDendrite(t, dbType)
-	defer close()
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	accountDB, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -66,9 +65,12 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	}
 
 	return &internal.UserInternalAPI{
-		DB:         accountDB,
-		ServerName: cfg.Matrix.ServerName,
-	}, accountDB, close
+			DB:         accountDB,
+			ServerName: cfg.Matrix.ServerName,
+		}, accountDB, func() {
+			close()
+			baseclose()
+		}
 }
 
 func TestQueryProfile(t *testing.T) {
