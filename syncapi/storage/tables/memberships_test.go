@@ -110,8 +110,6 @@ func testHeroes(t *testing.T, ctx context.Context, table tables.Memberships, use
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
-			// no membership queried
 			got, err := table.SelectHeroes(ctx, nil, room.ID, user.ID, tc.memberships)
 			if err != nil {
 				t.Fatalf("unable to select heroes: %s", err)
@@ -129,7 +127,7 @@ func testHeroes(t *testing.T, ctx context.Context, table tables.Memberships, use
 
 func testMembershipCount(t *testing.T, ctx context.Context, table tables.Memberships, room *test.Room) {
 	t.Run("membership counts are correct", func(t *testing.T) {
-		// After 10 events, we should have 6 users
+		// After 10 events, we should have 6 users (5 create related [incl. one member event], 5 member events = 6 users)
 		count, err := table.SelectMembershipCount(ctx, nil, room.ID, gomatrixserverlib.Join, 10)
 		if err != nil {
 			t.Fatalf("failed to get membership count: %s", err)
@@ -176,6 +174,7 @@ func testUpsert(t *testing.T, ctx context.Context, table tables.Memberships, mem
 			t.Fatalf("failed to upsert membership: %s", err)
 		}
 
+		// Verify the position got updated
 		membership, pos, err = table.SelectMembershipForUser(ctx, nil, room.ID, user.ID, 10)
 		if err != nil {
 			t.Fatalf("failed to select membership: %s", err)
