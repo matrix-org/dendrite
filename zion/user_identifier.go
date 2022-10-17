@@ -1,38 +1,45 @@
 package zion
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
-var regexpMatrixId = regexp.MustCompile(`^@eip155=3a(?P<ChainId>[0-9]+)=3a(?P<LocalPart>0x[0-9a-fA-F]+):(?P<HomeServer>.*)$`)
+var regexpMatrixId = regexp.MustCompile(`^@eip155=3a(?P<ChainId>[0-9]+)=3a(?P<Address>0x[0-9a-fA-F]+):(?P<HomeServer>.*)$`)
 var chainIdIndex = regexpMatrixId.SubexpIndex("ChainId")
-var localPartIndex = regexpMatrixId.SubexpIndex("LocalPart")
+var addressIndex = regexpMatrixId.SubexpIndex("Address")
 
 //var homeServerIndex = regexpMatrixId.SubexpIndex("HomeServer")
 
 type UserIdentifier struct {
-	accountAddress common.Address
-	chainId        int
+	AccountAddress common.Address
+	ChainId        int
+	MatrixUserId   string
+	LocalPart      string
 }
 
 func CreateUserIdentifier(matrixUserId string) UserIdentifier {
 	matches := regexpMatrixId.FindStringSubmatch(matrixUserId)
-	accountAddress := ""
+	address := ""
 	chainId := -1
+	localPart := ""
 
 	if chainIdIndex < len(matches) {
 		chainId, _ = strconv.Atoi(matches[chainIdIndex])
 	}
 
-	if localPartIndex < len(matches) {
-		accountAddress = matches[localPartIndex]
+	if addressIndex < len(matches) {
+		address = matches[addressIndex]
+		localPart = fmt.Sprintf("@eip155=3a%d=3a%s", chainId, address)
 	}
 
 	return UserIdentifier{
-		accountAddress: common.HexToAddress(accountAddress),
-		chainId:        chainId,
+		AccountAddress: common.HexToAddress(address),
+		ChainId:        chainId,
+		MatrixUserId:   matrixUserId,
+		LocalPart:      localPart,
 	}
 }

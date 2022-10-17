@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/joho/godotenv"
 	"github.com/matrix-org/dendrite/authorization"
+	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	zion_goerli "github.com/matrix-org/dendrite/zion/contracts/goerli/zion_goerli"
 	zion_localhost "github.com/matrix-org/dendrite/zion/contracts/localhost/zion_localhost"
 	log "github.com/sirupsen/logrus"
@@ -24,17 +25,20 @@ var localhostJson []byte
 var goerliJson []byte
 
 type ZionAuthorization struct {
+	store                 Store
 	spaceManagerLocalhost *zion_localhost.ZionSpaceManagerLocalhost
 	spaceManagerGoerli    *zion_goerli.ZionSpaceManagerGoerli
 }
 
-func NewZionAuthorization() (authorization.Authorization, error) {
+func NewZionAuthorization(rsAPI roomserver.ClientRoomserverAPI) (authorization.Authorization, error) {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Errorln("error loading .env file", err)
 	}
 
 	var auth ZionAuthorization
+
+	auth.store = NewStore(rsAPI)
 
 	localhost, err := newZionSpaceManagerLocalhost(os.Getenv(localhostEndpointUrl))
 	if err != nil {
@@ -54,31 +58,40 @@ func NewZionAuthorization() (authorization.Authorization, error) {
 func (za *ZionAuthorization) IsAllowed(args authorization.AuthorizationArgs) (bool, error) {
 	userIdentifier := CreateUserIdentifier(args.UserId)
 
-	switch userIdentifier.chainId {
+	// Find out if roomId is a space or a channel.
+	roomInfo := za.store.GetRoomInfo(args.RoomId, userIdentifier)
+
+	// Owner of the space / channel is always allowed to proceed.
+	if roomInfo.IsOwner {
+		return true, nil
+	}
+
+	switch userIdentifier.ChainId {
 	case 1337, 31337:
-		return za.IsAllowedLocalhost(args.RoomId, userIdentifier.accountAddress, args.Permission)
+		return za.isAllowedLocalhost(roomInfo, userIdentifier.AccountAddress, args.Permission)
 	case 5:
-		return za.IsAllowedGoerli(args.RoomId, userIdentifier.accountAddress, args.Permission)
+		return za.isAllowedGoerli(roomInfo, userIdentifier.AccountAddress, args.Permission)
 	default:
-		log.Errorf("Unsupported chain id: %d\n", userIdentifier.chainId)
+		log.Errorf("Unsupported chain id: %d\n", userIdentifier.ChainId)
 	}
 
 	return false, nil
 }
 
-func (za *ZionAuthorization) IsAllowedLocalhost(roomId string, user common.Address, permission authorization.Permission) (bool, error) {
+func (za *ZionAuthorization) isAllowedLocalhost(
+	roomInfo RoomInfo,
+	user common.Address,
+	permission authorization.Permission,
+) (bool, error) {
 	if za.spaceManagerLocalhost != nil {
 		permission := zion_localhost.DataTypesPermission{
 			Name: permission.String(),
 		}
 
-		addr := user.Hex()
-		_ = addr
-
 		isEntitled, err := za.spaceManagerLocalhost.IsEntitled(
 			nil,
-			roomId,
-			"", // todo: Support channelId
+			roomInfo.SpaceNetworkId,
+			roomInfo.ChannelNetworkId,
 			user,
 			permission,
 		)
@@ -93,7 +106,11 @@ func (za *ZionAuthorization) IsAllowedLocalhost(roomId string, user common.Addre
 	return false, nil
 }
 
-func (za *ZionAuthorization) IsAllowedGoerli(roomId string, user common.Address, permission authorization.Permission) (bool, error) {
+func (za *ZionAuthorization) isAllowedGoerli(
+	roomInfo RoomInfo,
+	user common.Address,
+	permission authorization.Permission,
+) (bool, error) {
 	if za.spaceManagerGoerli != nil {
 		permission := zion_goerli.DataTypesPermission{
 			Name: permission.String(),
@@ -101,8 +118,8 @@ func (za *ZionAuthorization) IsAllowedGoerli(roomId string, user common.Address,
 
 		isEntitled, err := za.spaceManagerGoerli.IsEntitled(
 			nil,
-			roomId,
-			"", // todo: support channelId
+			roomInfo.SpaceNetworkId,
+			roomInfo.ChannelNetworkId,
 			user,
 			permission,
 		)
