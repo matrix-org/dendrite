@@ -70,6 +70,7 @@ func Setup(
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
+		"org.matrix.msc2285.stable":    true,
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
