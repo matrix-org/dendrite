@@ -162,23 +162,25 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	if !ok || oq == nil {
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
-			queues:           oqs,
-			db:               oqs.db,
-			process:          oqs.process,
-			rsAPI:            oqs.rsAPI,
-			origin:           oqs.origin,
-			destination:      destination,
-			client:           oqs.client,
-			statistics:       oqs.statistics.ForServer(destination),
-			notify:           make(chan struct{}, 1),
-			interruptBackoff: make(chan bool),
-			signing:          oqs.signing,
+			queues:      oqs,
+			db:          oqs.db,
+			process:     oqs.process,
+			rsAPI:       oqs.rsAPI,
+			origin:      oqs.origin,
+			destination: destination,
+			client:      oqs.client,
+			statistics:  oqs.statistics.ForServer(destination),
+			notify:      make(chan struct{}, 1),
+			signing:     oqs.signing,
 		}
+		oq.statistics.AssignBackoffNotifier(oq.handleBackoffNotifier)
 		oqs.queues[destination] = oq
 	}
 	return oq
 }
 
+// clearQueue removes the queue for the provided destination from the
+// set of destination queues.
 func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
@@ -334,6 +336,7 @@ func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	}
 	oqs.statistics.ForServer(srv).RemoveBlacklist()
 	if queue := oqs.getQueue(srv); queue != nil {
+		queue.statistics.ClearBackoff()
 		queue.wakeQueueIfNeeded()
 	}
 }
