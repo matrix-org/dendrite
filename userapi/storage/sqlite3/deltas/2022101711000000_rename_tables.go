@@ -58,7 +58,7 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		query = strings.Replace(query, old, new, 1)
-		if _, err := tx.ExecContext(ctx, "DROP INDEX %s;", old); err != nil {
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("DROP INDEX %s;", old)); err != nil {
 			return fmt.Errorf("drop index %q to %q error: %w", old, new, err)
 		}
 		if _, err := tx.ExecContext(ctx, query); err != nil {
