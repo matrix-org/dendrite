@@ -99,7 +99,7 @@ func (s *FederationInternalAPI) handleLocalKeys(
 	results map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult,
 ) {
 	for req := range requests {
-		if req.ServerName != s.cfg.Matrix.ServerName {
+		if s.cfg.Matrix.IsLocalServerName(req.ServerName) {
 			continue
 		}
 		if req.KeyID == s.cfg.Matrix.KeyID {

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -24,23 +25,23 @@ import (
 // usernameParam can either be a user ID or just the localpart/username.
 // If serverName is passed, it is verified against the domain obtained from usernameParam (if present)
 // Returns error in case of invalid usernameParam.
-func ParseUsernameParam(usernameParam string, expectedServerName *gomatrixserverlib.ServerName) (string, error) {
+func ParseUsernameParam(usernameParam string, cfg *config.Global) (string, gomatrixserverlib.ServerName, error) {
 	localpart := usernameParam
 
 	if strings.HasPrefix(usernameParam, "@") {
 		lp, domain, err := gomatrixserverlib.SplitID('@', usernameParam)
 
 		if err != nil {
-			return "", errors.New("invalid username")
+			return "", "", errors.New("invalid username")
 		}
 
-		if expectedServerName != nil && domain != *expectedServerName {
-			return "", errors.New("user ID does not belong to this server")
+		if !cfg.IsLocalServerName(domain) {
+			return "", "", errors.New("user ID does not belong to this server")
 		}
 
-		localpart = lp
+		return lp, domain, nil
 	}
-	return localpart, nil
+	return localpart, cfg.ServerName, nil
 }
 
 // MakeUserID generates user ID from localpart & server name

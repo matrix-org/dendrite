@@ -76,7 +76,7 @@ func NewInternalAPI(
 	userAPI := &internal.UserInternalAPI{
 		DB:                   db,
 		SyncProducer:         syncProducer,
-		ServerName:           cfg.Matrix.ServerName,
+		Config:               cfg,
 		AppServices:          appServices,
 		KeyAPI:               keyAPI,
 		RSAPI:                rsAPI,

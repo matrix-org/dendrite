@@ -318,8 +318,9 @@ type QuerySearchProfilesResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformAccountCreationRequest struct {
-	AccountType AccountType // Required: whether this is a guest or user account
-	Localpart   string      // Required: The localpart for this account. Ignored if account type is guest.
+	AccountType AccountType                  // Required: whether this is a guest or user account
+	Localpart   string                       // Required: The localpart for this account. Ignored if account type is guest.
+	ServerName  gomatrixserverlib.ServerName // optional: if not specified, default server name used instead
 
 	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
 	Password     string // optional: if missing then this account will be a passwordless account
@@ -360,7 +361,8 @@ type PerformLastSeenUpdateResponse struct {
 // PerformDeviceCreationRequest is the request for PerformDeviceCreation
 type PerformDeviceCreationRequest struct {
 	Localpart   string
-	AccessToken string // optional: if blank one will be made on your behalf
+	ServerName  gomatrixserverlib.ServerName // optional: if blank, default server name used
+	AccessToken string                       // optional: if blank one will be made on your behalf
 	// optional: if nil an ID is generated for you. If set, replaces any existing device session,
 	// which will generate a new access token and invalidate the old one.
 	DeviceID *string
@@ -384,7 +386,8 @@ type PerformDeviceCreationResponse struct {
 
 // PerformAccountDeactivationRequest is the request for PerformAccountDeactivation
 type PerformAccountDeactivationRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName // optional: if blank, default server name used
 }
 
 // PerformAccountDeactivationResponse is the response for PerformAccountDeactivation
@@ -432,6 +435,18 @@ type Device struct {
 	// this is the appservice ID.
 	AppserviceID string
 	AccountType  AccountType
+}
+
+func (d *Device) UserDomain() gomatrixserverlib.ServerName {
+	_, domain, err := gomatrixserverlib.SplitID('@', d.UserID)
+	if err != nil {
+		// This really is catastrophic because it means that someone
+		// managed to forge a malformed user ID for a device during
+		// login.
+		// TODO: Is there a better way to deal with this than panic?
+		panic(err)
+	}
+	return domain
 }
 
 // Account represents a Matrix account on this home server.
@@ -577,7 +592,9 @@ type Notification struct {
 }
 
 type PerformSetAvatarURLRequest struct {
-	Localpart, AvatarURL string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	AvatarURL  string
 }
 type PerformSetAvatarURLResponse struct{}
 
@@ -603,7 +620,9 @@ type QueryAccountByPasswordResponse struct {
 }
 
 type PerformUpdateDisplayNameRequest struct {
-	Localpart, DisplayName string
+	Localpart   string
+	ServerName  gomatrixserverlib.ServerName
+	DisplayName string
 }
 
 type QueryLocalpartForThreePIDRequest struct {

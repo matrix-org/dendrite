@@ -12,7 +12,12 @@ import (
 
 type Global struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
+	//
+	// Deprecated: Don't check this.
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+
+	// The secondary server names, used for virtual hosting.
+	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"-"`
 
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
@@ -118,6 +123,18 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.ServerNotices.Verify(configErrs, isMonolith)
 	c.ReportStats.Verify(configErrs, isMonolith)
 	c.Cache.Verify(configErrs, isMonolith)
+}
+
+func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool {
+	if c.ServerName == serverName {
+		return true
+	}
+	for _, serverName := range c.SecondaryServerNames {
+		if c.ServerName == serverName {
+			return true
+		}
+	}
+	return false
 }
 
 type OldVerifyKeys struct {

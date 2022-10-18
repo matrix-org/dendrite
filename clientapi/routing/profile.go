@@ -112,7 +112,7 @@ func SetAvatarURL(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
@@ -136,14 +136,16 @@ func SetAvatarURL(
 	}
 	oldProfile := &authtypes.Profile{
 		Localpart:   localpart,
+		ServerName:  string(domain),
 		DisplayName: res.DisplayName,
 		AvatarURL:   res.AvatarURL,
 	}
 
 	setRes := &userapi.PerformSetAvatarURLResponse{}
 	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
-		Localpart: localpart,
-		AvatarURL: r.AvatarURL,
+		Localpart:  localpart,
+		ServerName: domain,
+		AvatarURL:  r.AvatarURL,
 	}, setRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return jsonerror.InternalServerError()
@@ -161,6 +163,7 @@ func SetAvatarURL(
 
 	newProfile := authtypes.Profile{
 		Localpart:   localpart,
+		ServerName:  string(domain),
 		DisplayName: oldProfile.DisplayName,
 		AvatarURL:   r.AvatarURL,
 	}
@@ -180,7 +183,7 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
+	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, domain, domain, nil, true); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -241,7 +244,7 @@ func SetDisplayName(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
@@ -265,12 +268,14 @@ func SetDisplayName(
 	}
 	oldProfile := &authtypes.Profile{
 		Localpart:   localpart,
+		ServerName:  string(domain),
 		DisplayName: pRes.DisplayName,
 		AvatarURL:   pRes.AvatarURL,
 	}
 
 	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
 		Localpart:   localpart,
+		ServerName:  domain,
 		DisplayName: r.DisplayName,
 	}, &struct{}{})
 	if err != nil {
@@ -290,6 +295,7 @@ func SetDisplayName(
 
 	newProfile := authtypes.Profile{
 		Localpart:   localpart,
+		ServerName:  string(domain),
 		DisplayName: r.DisplayName,
 		AvatarURL:   oldProfile.AvatarURL,
 	}
@@ -309,7 +315,7 @@ func SetDisplayName(
 		return jsonerror.InternalServerError()
 	}
 
-	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
+	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, domain, domain, nil, true); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -335,7 +341,7 @@ func getProfile(
 		return nil, err
 	}
 
-	if domain != cfg.Matrix.ServerName {
+	if !cfg.Matrix.IsLocalServerName(domain) {
 		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {

@@ -105,12 +105,13 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		return jsonerror.InternalServerError()
 	}
 
+	serverName := device.UserDomain()
 	if err = roomserverAPI.SendEvents(
 		ctx, rsAPI,
 		roomserverAPI.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerName,
+		serverName,
+		serverName,
 		nil,
 		false,
 	); err != nil {
@@ -271,7 +272,7 @@ func sendInvite(
 		Event:           event,
 		InviteRoomState: nil, // ask the roomserver to draw up invite room state for us
 		RoomVersion:     event.RoomVersion,
-		SendAsServer:    string(cfg.Matrix.ServerName),
+		SendAsServer:    string(device.UserDomain()),
 	}, &inviteRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 		return util.JSONResponse{
@@ -341,7 +342,7 @@ func loadProfile(
 	}
 
 	var profile *authtypes.Profile
-	if serverName == cfg.Matrix.ServerName {
+	if !cfg.Matrix.IsLocalServerName(serverName) {
 		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	} else {
 		profile = &authtypes.Profile{}
