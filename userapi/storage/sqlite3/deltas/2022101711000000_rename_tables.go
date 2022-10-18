@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
-	"github.com/lib/pq"
 )
 
 var renameTableMappings = map[string]string{
@@ -43,8 +41,7 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		q := fmt.Sprintf(
-			"ALTER TABLE %s RENAME TO %s;",
-			pq.QuoteIdentifier(old), pq.QuoteIdentifier(new),
+			"ALTER TABLE %s RENAME TO %s;", old, new,
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("rename table %q to %q error: %w", old, new, err)
@@ -61,7 +58,7 @@ func UpRenameTables(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		query = strings.Replace(query, old, new, 1)
-		if _, err := tx.ExecContext(ctx, "DROP INDEX %s;", pq.QuoteIdentifier(old)); err != nil {
+		if _, err := tx.ExecContext(ctx, "DROP INDEX %s;", old); err != nil {
 			return fmt.Errorf("drop index %q to %q error: %w", old, new, err)
 		}
 		if _, err := tx.ExecContext(ctx, query); err != nil {
@@ -84,8 +81,7 @@ func DownRenameTables(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		q := fmt.Sprintf(
-			"ALTER TABLE %s RENAME TO %s;",
-			pq.QuoteIdentifier(new), pq.QuoteIdentifier(old),
+			"ALTER TABLE %s RENAME TO %s;", new, old,
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("rename table %q to %q error: %w", new, old, err)
@@ -102,7 +98,7 @@ func DownRenameTables(ctx context.Context, tx *sql.Tx) error {
 			return err
 		}
 		query = strings.Replace(query, new, old, 1)
-		if _, err := tx.ExecContext(ctx, "DROP INDEX %s;", pq.QuoteIdentifier(new)); err != nil {
+		if _, err := tx.ExecContext(ctx, "DROP INDEX %s;", new); err != nil {
 			return fmt.Errorf("drop index %q to %q error: %w", new, old, err)
 		}
 		if _, err := tx.ExecContext(ctx, query); err != nil {
