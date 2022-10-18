@@ -16,6 +16,7 @@ package syncapi
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the SyncAPI
@@ -134,4 +136,24 @@ func AddPublicRoutes(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
 		rsAPI, cfg, base.Caches, base.Fulltext,
 	)
+
+	go func() {
+		ctx := context.Background()
+		for {
+			notify, err := syncDB.ExpirePresence(ctx)
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire presence")
+			}
+			for i := range notify {
+				requestPool.Presence.Store(notify[i].UserID, types.PresenceInternal{
+					Presence: types.PresenceOffline,
+				})
+				notifier.OnNewPresence(types.StreamingToken{
+					PresencePosition: notify[i].StreamPos,
+				}, notify[i].UserID)
+
+			}
+			time.Sleep(types.PresenceExpireInterval)
+		}
+	}()
 }

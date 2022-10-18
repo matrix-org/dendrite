@@ -205,6 +205,8 @@ type Presence interface {
 	GetPresenceForUser(ctx context.Context, txn *sql.Tx, userID string) (presence *types.PresenceInternal, err error)
 	GetMaxPresenceID(ctx context.Context, txn *sql.Tx) (pos types.StreamPosition, err error)
 	GetPresenceAfter(ctx context.Context, txn *sql.Tx, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (presences map[string]*types.PresenceInternal, err error)
+	ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error)
+	UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error
 }
 
 type Relations interface {

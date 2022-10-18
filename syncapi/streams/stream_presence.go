@@ -17,7 +17,6 @@ package streams
 import (
 	"context"
 	"encoding/json"
-	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/tidwall/gjson"
@@ -29,8 +28,6 @@ import (
 
 type PresenceStreamProvider struct {
 	DefaultStreamProvider
-	// cache contains previously sent presence updates to avoid unneeded updates
-	cache    sync.Map
 	notifier *notifier.Notifier
 }
 
@@ -114,18 +111,6 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		if req.Device.UserID != presence.UserID && !p.notifier.IsSharedUser(req.Device.UserID, presence.UserID) {
 			continue
 		}
-		cacheKey := req.Device.UserID + req.Device.ID + presence.UserID
-		pres, ok := p.cache.Load(cacheKey)
-		if ok {
-			// skip already sent presence
-			prevPresence := pres.(*types.PresenceInternal)
-			currentlyActive := prevPresence.CurrentlyActive()
-			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
-			if skip {
-				req.Log.Tracef("Skipping presence, no change (%s)", presence.UserID)
-				continue
-			}
-		}
 
 		if _, known := types.PresenceFromString(presence.ClientFields.Presence); known {
 			presence.ClientFields.LastActiveAgo = presence.LastActiveAgo()
@@ -153,7 +138,6 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		if len(req.Response.Presence.Events) == req.Filter.Presence.Limit {
 			break
 		}
-		p.cache.Store(cacheKey, presence)
 	}
 
 	if len(req.Response.Presence.Events) == 0 {

@@ -72,7 +72,7 @@ const selectNotificationSQL = "" +
 	") AND NOT read ORDER BY localpart, id LIMIT $4"
 
 const selectNotificationCountSQL = "" +
-	"SELECT COUNT(*) FROM userapi_notifications WHERE localpart = $1 AND (" +
+	"SELECT COUNT(DISTINCT(room_id)) FROM userapi_notifications WHERE localpart = $1 AND (" +
 	"(($2 & 1) <> 0 AND highlight) OR (($2 & 2) <> 0 AND NOT highlight)" +
 	") AND NOT read"
 

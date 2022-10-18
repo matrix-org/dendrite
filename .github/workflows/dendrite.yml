@@ -14,51 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  wasm:
-    name: WASM build test
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    if: ${{ false }} # disable for now
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-wasm-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-wasm
-
-      - name: Install Node
-        uses: actions/setup-node@v2
-        with:
-          node-version: 14
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Reconfigure Git to use HTTPS auth for repo packages
-        run: >
-          git config --global url."https://github.com/".insteadOf
-          ssh://git@github.com/
-
-      - name: Install test dependencies
-        working-directory: ./test/wasm
-        run: npm ci
-
-      - name: Test
-        run: ./test-dendritejs.sh
 
   # Run golangci-lint
   lint:
@@ -74,7 +29,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
 
-  # run go test with different go versions
+  # run go test with go 1.18
   test:
     timeout-minutes: 5
     name: Unit tests (Go ${{ matrix.go }})
@@ -124,7 +79,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: dendrite
 
-  # build Dendrite for linux with different architectures and go versions
+  # build Dendrite for linux amd64 with go 1.18
   build:
     name: Build for Linux
     timeout-minutes: 10
@@ -134,7 +89,7 @@ jobs:
       matrix:
         go: ["1.18", "1.19"]
         goos: ["linux"]
-        goarch: ["amd64", "386"]
+        goarch: ["amd64"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -159,43 +114,10 @@ jobs:
           CGO_CFLAGS: -fno-stack-protector
         run: go build -trimpath -v -o "bin/" ./cmd/...
 
-  # build for Windows 64-bit
-  build_windows:
-    name: Build for Windows
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go: ["1.18", "1.19"]
-        goos: ["windows"]
-        goarch: ["amd64"]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go ${{ matrix.go }}
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ matrix.go }}
-      - name: Install dependencies
-        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}
-      - env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 1
-          CC: "/usr/bin/x86_64-w64-mingw32-gcc"
-        run: go build -trimpath -v -o "bin/" ./cmd/...
-
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
     name: Initial tests passed
-    needs: [lint, test, build, build_windows]
+    needs: [lint, test, build]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:
@@ -300,13 +222,12 @@ jobs:
         run: /src/are-we-synapse-yet.py /logs/results.tap -v
         continue-on-error: true # not fatal
       - name: Upload Sytest logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
           path: |
-            /logs/results.tap
-            /logs/**/*.log*
+            /logs
 
   # run Complement
   complement:
@@ -370,7 +291,7 @@ jobs:
               continue
             fi
 
-            (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
+            (wget -O - "https://github.com/globekeeper/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
 
       # Build initial Dendrite image
