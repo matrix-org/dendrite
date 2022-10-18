@@ -21,8 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/eventutil"
 )
 
 type Preset int
@@ -174,11 +175,17 @@ func (r *Room) CreateEvent(t *testing.T, creator *User, eventType string, conten
 	if err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to StateNeededForEventBuilder: %s", eventType, err)
 	}
+
 	refs, err := eventsNeeded.AuthEventReferences(&r.authEvents)
 	if err != nil {
 		t.Fatalf("CreateEvent[%s]: failed to AuthEventReferences: %s", eventType, err)
 	}
 	builder.AuthEvents = refs
+
+	if len(mod.authEvents) > 0 {
+		builder.AuthEvents = mod.authEvents
+	}
+
 	ev, err := builder.Build(
 		mod.originServerTS, mod.origin, mod.keyID,
 		mod.privKey, r.Version,

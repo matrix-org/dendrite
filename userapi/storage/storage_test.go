@@ -16,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
@@ -29,14 +30,18 @@ var (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
+	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
-	return db, close
+	return db, func() {
+		close()
+		baseclose()
+	}
 }
 
 // Tests storing and getting account data
@@ -192,19 +197,18 @@ func Test_Devices(t *testing.T) {
 		newName := "new display name"
 		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
 		assert.NoError(t, err, "unable to update device displayname")
+		updatedAfterTimestamp := time.Now().Unix()
 		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1", "Element Web")
 		assert.NoError(t, err, "unable to update device last seen")
 
 		deviceWithID.DisplayName = newName
 		deviceWithID.LastSeenIP = "127.0.0.1"
-		deviceWithID.LastSeenTS = int64(gomatrixserverlib.AsTimestamp(time.Now().Truncate(time.Second)))
 		gotDevice, err = db.GetDeviceByID(ctx, localpart, deviceWithID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 2, len(devices))
 		assert.Equal(t, deviceWithID.DisplayName, gotDevice.DisplayName)
 		assert.Equal(t, deviceWithID.LastSeenIP, gotDevice.LastSeenIP)
-		truncatedTime := gomatrixserverlib.Timestamp(gotDevice.LastSeenTS).Time().Truncate(time.Second)
-		assert.Equal(t, gomatrixserverlib.Timestamp(deviceWithID.LastSeenTS), gomatrixserverlib.AsTimestamp(truncatedTime))
+		assert.Greater(t, gotDevice.LastSeenTS, updatedAfterTimestamp)
 
 		// create one more device and remove the devices step by step
 		newDeviceID := util.RandomString(16)

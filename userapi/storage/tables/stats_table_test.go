@@ -106,7 +106,7 @@ func mustUpdateDeviceLastSeen(
 	timestamp time.Time,
 ) {
 	t.Helper()
-	_, err := db.ExecContext(ctx, "UPDATE device_devices SET last_seen_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
+	_, err := db.ExecContext(ctx, "UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
@@ -119,7 +119,7 @@ func mustUserUpdateRegistered(
 	localpart string,
 	timestamp time.Time,
 ) {
-	_, err := db.ExecContext(ctx, "UPDATE account_accounts SET created_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
+	_, err := db.ExecContext(ctx, "UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
