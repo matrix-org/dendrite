@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
+
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type SyncRequest struct {
@@ -21,6 +22,8 @@ type SyncRequest struct {
 
 	// Updated by the PDU stream.
 	Rooms map[string]string
+	// Updated by the PDU stream.
+	NewlyJoined map[string]struct{}
 	// Updated by the PDU stream.
 	IgnoredUsers IgnoredUsers
 }

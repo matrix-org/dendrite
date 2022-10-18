@@ -185,6 +185,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 		// If this room was joined in this sync, try to fetch
 		// as much timeline events as allowed by the filter.
 		if delta.NewlyJoined {
+			req.NewlyJoined[delta.RoomID] = struct{}{}
 			// Reverse the range, so we get the most recent first.
 			// This will be limited by the eventFilter.
 			newRange = types.Range{
