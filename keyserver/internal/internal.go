@@ -70,6 +70,11 @@ func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perform
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
+	otks, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	if err != nil {
+		return err
+	}
+	res.OneTimeKeyCounts = []api.OneTimeKeysCount{*otks}
 	return nil
 }
 
@@ -207,15 +212,13 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 		return nil
 	}
 	maxStreamID := int64(0)
+	// remove deleted devices
+	var result []api.DeviceMessage
 	for _, m := range msgs {
 		if m.StreamID > maxStreamID {
 			maxStreamID = m.StreamID
 		}
-	}
-	// remove deleted devices
-	var result []api.DeviceMessage
-	for _, m := range msgs {
-		if m.KeyJSON == nil {
+		if m.KeyJSON == nil || len(m.KeyJSON) == 0 {
 			continue
 		}
 		result = append(result, m)
@@ -233,7 +236,7 @@ func (a *KeyInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *ap
 		return err
 	}
 	if len(knownDevices) == 0 {
-		return fmt.Errorf("unknown user %s", req.UserID)
+		return nil // fmt.Errorf("unknown user %s", req.UserID)
 	}
 
 	for i := range knownDevices {

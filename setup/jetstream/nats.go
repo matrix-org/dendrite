@@ -179,9 +179,9 @@ func setupNATS(process *process.ProcessContext, cfg *config.JetStream, nc *natsc
 					// We've managed to add the stream in memory.  What's on the
 					// disk will be left alone, but our ability to recover from a
 					// future crash will be limited. Yell about it.
-					sentry.CaptureException(fmt.Errorf("Stream %q is running in-memory; this may be due to data corruption in the JetStream storage directory, investigate as soon as possible", namespaced.Name))
-					logrus.Warn("Stream is running in-memory; this may be due to data corruption in the JetStream storage directory, investigate as soon as possible")
-					process.Degraded()
+					err := fmt.Errorf("Stream %q is running in-memory; this may be due to data corruption in the JetStream storage directory", namespaced.Name)
+					sentry.CaptureException(err)
+					process.Degraded(err)
 				}
 			}
 		}

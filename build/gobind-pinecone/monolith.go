@@ -126,7 +126,9 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.PineconeManager.RemovePeers()
-	m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	for _, uri := range strings.Split(uri, ",") {
+		m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	}
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -279,19 +281,21 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.JetStream.InMemory = true
-	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/%s", m.StorageDirectory, prefix))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-account.db", m.StorageDirectory, prefix))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-mediaapi.db", m.StorageDirectory))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
-	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
-	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
+	cfg.Global.JetStream.InMemory = false
+	cfg.Global.JetStream.StoragePath = config.Path(filepath.Join(m.CacheDirectory, prefix))
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.MediaAPI.BasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
+	cfg.MediaAPI.AbsBasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+	cfg.SyncAPI.Fulltext.Enabled = true
+	cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(m.CacheDirectory, "search"))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}

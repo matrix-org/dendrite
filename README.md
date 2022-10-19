@@ -79,7 +79,7 @@ $ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --co
 
 # Create an user account (add -admin for an admin user).
 # Specify the localpart only, e.g. 'alice' for '@alice:domain.com'
-$ ./bin/create-account --config dendrite.yaml --url http://localhost:8008 --username alice
+$ ./bin/create-account --config dendrite.yaml --username alice
 ```
 
 Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
@@ -90,7 +90,7 @@ We use a script called Are We Synapse Yet which checks Sytest compliance rates. 
 test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
 updates with CI. As of August 2022 we're at around 90% CS API coverage and 95% Federation coverage, though check
 CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
-servers such as matrix.org reasonably well, although there are still some missing features (like Search).
+servers such as matrix.org reasonably well, although there are still some missing features (like SSO and Third-party ID APIs).
 
 We are prioritising features that will benefit single-user homeservers first (e.g Receipts, E2E) rather
 than features that massive deployments may be interested in (OpenID, Guests, Admin APIs, AS API).
@@ -112,6 +112,7 @@ This means Dendrite supports amongst others:
 - Guests
 - User Directory
 - Presence
+- Fulltext search
 
 ## Contributing
 

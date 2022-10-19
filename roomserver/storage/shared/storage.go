@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 )
 
 // Ideally, when we have both events we should redact the event JSON and forget about the redaction, but we currently
@@ -445,7 +446,7 @@ func (d *Database) GetInvitesForUser(
 	ctx context.Context,
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
-) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, err error) {
+) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, inviteEventJSON []byte, err error) {
 	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 }
 
@@ -1280,7 +1281,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 }
 
 // JoinedUsersSetInRooms returns a map of how many times the given users appear in the specified rooms.
-func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string) (map[string]int, error) {
+func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string, localOnly bool) (map[string]int, error) {
 	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, nil, roomIDs)
 	if err != nil {
 		return nil, err
@@ -1295,7 +1296,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 		userNIDs = append(userNIDs, nid)
 		nidToUserID[nid] = id
 	}
-	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, nil, roomNIDs, userNIDs)
+	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, nil, roomNIDs, userNIDs, localOnly)
 	if err != nil {
 		return nil, err
 	}

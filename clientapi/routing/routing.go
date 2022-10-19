@@ -369,15 +369,6 @@ func Setup(
 				nil, cfg, rsAPI, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
-	v3mux.Handle("/rooms/{roomID}/event/{eventID}",
-		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
-		}),
-	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/state", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -1354,7 +1345,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 
-			return SetReceipt(req, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
+			return SetReceipt(req, userAPI, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/presence/{userId}/status",

@@ -64,7 +64,7 @@ var (
 	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
 	isAdmin            = flag.Bool("admin", false, "Create an admin account")
 	resetPassword      = flag.Bool("reset-password", false, "Deprecated")
-	serverURL          = flag.String("url", "https://localhost:8448", "The URL to connect to.")
+	serverURL          = flag.String("url", "http://localhost:8008", "The URL to connect to.")
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 	timeout            = flag.Duration("timeout", time.Second*30, "Timeout for the http client when connecting to the server")
 )

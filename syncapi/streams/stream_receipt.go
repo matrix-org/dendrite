@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type ReceiptStreamProvider struct {
@@ -52,7 +53,6 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 	lastPos, receipts, err := snapshot.RoomReceiptsAfter(ctx, joinedRooms, from)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.RoomReceiptsAfter failed")
-		_ = snapshot.Reset()
 		return from
 	}
 
@@ -67,6 +67,10 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		if _, ok := req.IgnoredUsers.List[receipt.UserID]; ok {
 			continue
 		}
+		// Don't send private read receipts to other users
+		if receipt.Type == "m.read.private" && req.Device.UserID != receipt.UserID {
+			continue
+		}
 		receiptsByRoom[receipt.RoomID] = append(receiptsByRoom[receipt.RoomID], receipt)
 	}
 
@@ -77,9 +81,9 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 			continue
 		}
 
-		jr := *types.NewJoinResponse()
-		if existing, ok := req.Response.Rooms.Join[roomID]; ok {
-			jr = existing
+		jr, ok := req.Response.Rooms.Join[roomID]
+		if !ok {
+			jr = types.NewJoinResponse()
 		}
 
 		ev := gomatrixserverlib.ClientEvent{

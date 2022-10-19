@@ -35,8 +35,9 @@ type AccountData struct {
 }
 
 type ReadMarkerJSON struct {
-	FullyRead string `json:"m.fully_read"`
-	Read      string `json:"m.read"`
+	FullyRead   string `json:"m.fully_read"`
+	Read        string `json:"m.read"`
+	ReadPrivate string `json:"m.read.private"`
 }
 
 // NotificationData contains statistics about notifications, sent from

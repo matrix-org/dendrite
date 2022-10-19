@@ -3,6 +3,7 @@ package streams
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
@@ -46,7 +47,6 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	countsByRoom, err := snapshot.GetUserUnreadNotificationCountsForRooms(ctx, req.Device.UserID, req.Rooms)
 	if err != nil {
 		req.Log.WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
-		_ = snapshot.Reset()
 		return from
 	}
 
@@ -54,7 +54,7 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 	for roomID, jr := range req.Response.Rooms.Join {
 		counts := countsByRoom[roomID]
 		if counts == nil {
-			continue
+			counts = &eventutil.NotificationData{}
 		}
 		jr.UnreadNotifications = &types.UnreadNotifications{
 			HighlightCount:    counts.UnreadHighlightCount,

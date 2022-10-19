@@ -54,7 +54,6 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 	)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.GetAccountDataInRange failed")
-		_ = snapshot.Reset()
 		return from
 	}
 
@@ -91,9 +90,9 @@ func (p *AccountDataStreamProvider) IncrementalSync(
 				}
 			} else {
 				if roomData, ok := dataRes.RoomAccountData[roomID][dataType]; ok {
-					joinData := *types.NewJoinResponse()
-					if existing, ok := req.Response.Rooms.Join[roomID]; ok {
-						joinData = existing
+					joinData, ok := req.Response.Rooms.Join[roomID]
+					if !ok {
+						joinData = types.NewJoinResponse()
 					}
 					joinData.AccountData.Events = append(
 						joinData.AccountData.Events,
