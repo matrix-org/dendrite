@@ -13,20 +13,25 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
+	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "", 4, 0, 0, "")
 	if err != nil {
 		t.Fatalf("failed to create new user db: %v", err)
 	}
-	return db, close
+	return db, func() {
+		close()
+		baseclose()
+	}
 }
 
 func mustCreateEvent(t *testing.T, content string) *gomatrixserverlib.HeaderedEvent {

@@ -75,7 +75,7 @@ const selectDailyMessagesSQL = `
 
 const countUsersLastSeenAfterSQL = "" +
 	"SELECT COUNT(*) FROM (" +
-	" SELECT localpart FROM device_devices WHERE last_seen_ts > $1 " +
+	" SELECT localpart FROM userapi_devices WHERE last_seen_ts > $1 " +
 	" GROUP BY localpart" +
 	" ) u"
 
@@ -92,7 +92,7 @@ R30Users counts the number of 30 day retained users, defined as:
 const countR30UsersSQL = `
 SELECT platform, COUNT(*) FROM (
 	SELECT users.localpart, platform, users.created_ts, MAX(uip.last_seen_ts)
-	FROM account_accounts users
+	FROM userapi_accounts users
 	INNER JOIN
 	(SELECT 
 		localpart, last_seen_ts,
@@ -105,7 +105,7 @@ SELECT platform, COUNT(*) FROM (
         	ELSE 'unknown'
 		END
     	AS platform
-		FROM device_devices
+		FROM userapi_devices
 	) uip
 	ON users.localpart = uip.localpart
 	AND users.account_type <> 4
@@ -155,7 +155,7 @@ GROUP BY client_type
 `
 
 const countUserByAccountTypeSQL = `
-SELECT COUNT(*) FROM account_accounts WHERE account_type IN ($1)
+SELECT COUNT(*) FROM userapi_accounts WHERE account_type IN ($1)
 `
 
 // $1 = Guest AccountType
@@ -168,7 +168,7 @@ SELECT user_type, COUNT(*) AS count FROM (
         WHEN account_type = $4 AND appservice_id IS NULL THEN 'guest'
 		WHEN account_type IN ($5) AND appservice_id IS NOT NULL THEN 'bridged'
 	END AS user_type
-    FROM account_accounts
+    FROM userapi_accounts
     WHERE created_ts > $8
 ) AS t GROUP BY user_type
 `
@@ -177,14 +177,14 @@ SELECT user_type, COUNT(*) AS count FROM (
 const updateUserDailyVisitsSQL = `
 INSERT INTO userapi_daily_visits(localpart, device_id, timestamp, user_agent)
 	SELECT u.localpart, u.device_id, $1, MAX(u.user_agent)
-	FROM device_devices AS u
+	FROM userapi_devices AS u
 	LEFT JOIN (
 		SELECT localpart, device_id, timestamp FROM userapi_daily_visits
 		WHERE timestamp = $1
 	) udv
 	ON u.localpart = udv.localpart AND u.device_id = udv.device_id
-	INNER JOIN device_devices d ON d.localpart = u.localpart
-	INNER JOIN account_accounts a ON a.localpart = u.localpart
+	INNER JOIN userapi_devices d ON d.localpart = u.localpart
+	INNER JOIN userapi_accounts a ON a.localpart = u.localpart
 	WHERE $2 <= d.last_seen_ts AND d.last_seen_ts < $3
 	AND a.account_type in (1, 3)
 	GROUP BY u.localpart, u.device_id

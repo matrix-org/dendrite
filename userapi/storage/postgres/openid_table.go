@@ -13,7 +13,7 @@ import (
 
 const openIDTokenSchema = `
 -- Stores data about openid tokens issued for accounts.
-CREATE TABLE IF NOT EXISTS open_id_tokens (
+CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 	-- The value of the token issued to a user
 	token TEXT NOT NULL PRIMARY KEY,
     -- The Matrix user ID for this account
@@ -24,10 +24,10 @@ CREATE TABLE IF NOT EXISTS open_id_tokens (
 `
 
 const insertOpenIDTokenSQL = "" +
-	"INSERT INTO open_id_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_openid_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
 
 const selectOpenIDTokenSQL = "" +
-	"SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
+	"SELECT localpart, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
 type openIDTokenStatements struct {
 	insertTokenStmt *sql.Stmt

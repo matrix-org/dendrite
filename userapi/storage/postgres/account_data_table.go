@@ -26,7 +26,7 @@ import (
 
 const accountDataSchema = `
 -- Stores data about accounts data.
-CREATE TABLE IF NOT EXISTS account_data (
+CREATE TABLE IF NOT EXISTS userapi_account_datas (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL,
     -- The room ID for this data (empty string if not specific to a room)
@@ -41,15 +41,15 @@ CREATE TABLE IF NOT EXISTS account_data (
 `
 
 const insertAccountDataSQL = `
-	INSERT INTO account_data(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
+	INSERT INTO userapi_account_datas(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
 	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
 const selectAccountDataSQL = "" +
-	"SELECT room_id, type, content FROM account_data WHERE localpart = $1"
+	"SELECT room_id, type, content FROM userapi_account_datas WHERE localpart = $1"
 
 const selectAccountDataByTypeSQL = "" +
-	"SELECT content FROM account_data WHERE localpart = $1 AND room_id = $2 AND type = $3"
+	"SELECT content FROM userapi_account_datas WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
 type accountDataStatements struct {
 	insertAccountDataStmt       *sql.Stmt
