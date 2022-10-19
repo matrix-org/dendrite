@@ -81,12 +81,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 	readPos := msg.Header.Get(jetstream.EventID)
 	evType := msg.Header.Get("type")
 
-	switch {
-	case readPos == "":
-		return true
-	case evType == "m.read": // allowed
-	case evType == "m.read.private": // allowed
-	default:
+	if readPos == "" || (evType != "m.read" && evType != "m.read.private") {
 		return true
 	}
 
