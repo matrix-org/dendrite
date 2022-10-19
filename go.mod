@@ -22,7 +22,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20221014061925-a132619fa241
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20221018085104-a72a83f0e19a
 	github.com/matrix-org/pinecone v0.0.0-20221007145426-3adc85477dd3
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
@@ -50,6 +50,7 @@ require (
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
+	gotest.tools/v3 v3.4.0
 	nhooyr.io/websocket v1.8.7
 )
 
@@ -127,7 +128,6 @@ require (
 	gopkg.in/macaroon.v2 v2.1.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gotest.tools/v3 v3.4.0 // indirect
 )
 
 go 1.18

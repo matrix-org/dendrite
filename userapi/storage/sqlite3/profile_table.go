@@ -27,7 +27,7 @@ import (
 
 const profilesSchema = `
 -- Stores data about accounts profiles.
-CREATE TABLE IF NOT EXISTS account_profiles (
+CREATE TABLE IF NOT EXISTS userapi_profiles (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
     -- The display name for this account
@@ -38,19 +38,19 @@ CREATE TABLE IF NOT EXISTS account_profiles (
 `
 
 const insertProfileSQL = "" +
-	"INSERT INTO account_profiles(localpart, display_name, avatar_url) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_profiles(localpart, display_name, avatar_url) VALUES ($1, $2, $3)"
 
 const selectProfileByLocalpartSQL = "" +
-	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1"
+	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart = $1"
 
 const setAvatarURLSQL = "" +
-	"UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2"
+	"UPDATE userapi_profiles SET avatar_url = $1 WHERE localpart = $2"
 
 const setDisplayNameSQL = "" +
-	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
+	"UPDATE userapi_profiles SET display_name = $1 WHERE localpart = $2"
 
 const selectProfilesBySearchSQL = "" +
-	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
+	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
 type profilesStatements struct {
 	db                           *sql.DB

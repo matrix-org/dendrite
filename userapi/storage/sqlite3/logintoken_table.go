@@ -32,7 +32,7 @@ type loginTokenStatements struct {
 }
 
 const loginTokenSchema = `
-CREATE TABLE IF NOT EXISTS login_tokens (
+CREATE TABLE IF NOT EXISTS userapi_login_tokens (
 	-- The random value of the token issued to a user
 	token TEXT NOT NULL PRIMARY KEY,
 	-- When the token expires
@@ -43,17 +43,17 @@ CREATE TABLE IF NOT EXISTS login_tokens (
 );
 
 -- This index allows efficient garbage collection of expired tokens.
-CREATE INDEX IF NOT EXISTS login_tokens_expiration_idx ON login_tokens(token_expires_at);
+CREATE INDEX IF NOT EXISTS login_tokens_expiration_idx ON userapi_login_tokens(token_expires_at);
 `
 
 const insertLoginTokenSQL = "" +
-	"INSERT INTO login_tokens(token, token_expires_at, user_id) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_login_tokens(token, token_expires_at, user_id) VALUES ($1, $2, $3)"
 
 const deleteLoginTokenSQL = "" +
-	"DELETE FROM login_tokens WHERE token = $1 OR token_expires_at <= $2"
+	"DELETE FROM userapi_login_tokens WHERE token = $1 OR token_expires_at <= $2"
 
 const selectLoginTokenSQL = "" +
-	"SELECT user_id FROM login_tokens WHERE token = $1 AND token_expires_at > $2"
+	"SELECT user_id FROM userapi_login_tokens WHERE token = $1 AND token_expires_at > $2"
 
 func NewSQLiteLoginTokenTable(db *sql.DB) (tables.LoginTokenTable, error) {
 	s := &loginTokenStatements{}
@@ -78,7 +78,7 @@ func (s *loginTokenStatements) InsertLoginToken(ctx context.Context, txn *sql.Tx
 // deleteByToken removes the named token.
 //
 // As a simple way to garbage-collect stale tokens, we also remove all expired tokens.
-// The login_tokens_expiration_idx index should make that efficient.
+// The userapi_login_tokens_expiration_idx index should make that efficient.
 func (s *loginTokenStatements) DeleteLoginToken(ctx context.Context, txn *sql.Tx, token string) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteStmt)
 	res, err := stmt.ExecContext(ctx, token, time.Now().UTC())

@@ -8,8 +8,8 @@ import (
 
 func UpIsActive(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
-	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
-CREATE TABLE account_accounts (
+	ALTER TABLE userapi_accounts RENAME TO userapi_accounts_tmp;
+CREATE TABLE userapi_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
     password_hash TEXT,
@@ -17,13 +17,13 @@ CREATE TABLE account_accounts (
     is_deactivated BOOLEAN DEFAULT 0
 );
 INSERT
-    INTO account_accounts (
+    INTO userapi_accounts (
       localpart, created_ts, password_hash, appservice_id
     ) SELECT
         localpart, created_ts, password_hash, appservice_id
-    FROM account_accounts_tmp
+    FROM userapi_accounts_tmp
 ;
-DROP TABLE account_accounts_tmp;`)
+DROP TABLE userapi_accounts_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
@@ -32,21 +32,21 @@ DROP TABLE account_accounts_tmp;`)
 
 func DownIsActive(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
-	ALTER TABLE account_accounts RENAME TO account_accounts_tmp;
-CREATE TABLE account_accounts (
+	ALTER TABLE userapi_accounts RENAME TO userapi_accounts_tmp;
+CREATE TABLE userapi_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
     created_ts BIGINT NOT NULL,
     password_hash TEXT,
     appservice_id TEXT
 );
 INSERT
-    INTO account_accounts (
+    INTO userapi_accounts (
       localpart, created_ts, password_hash, appservice_id
     ) SELECT
         localpart, created_ts, password_hash, appservice_id
-    FROM account_accounts_tmp
+    FROM userapi_accounts_tmp
 ;
-DROP TABLE account_accounts_tmp;`)
+DROP TABLE userapi_accounts_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}
