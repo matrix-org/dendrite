@@ -542,9 +542,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 		}
 		// refresh entries from DB: unlike remoteKeysFromDatabase we know we previously had no device info for this
 		// user so the fact that we're populating all devices here isn't a problem so long as we have devices.
-		respMu.Lock()
 		err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, respMu, userID, nil)
-		respMu.Unlock()
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				logrus.ErrorKey: err,
@@ -568,6 +566,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	res.Failures[serverName] = map[string]interface{}{
 		"message": err.Error(),
 	}
+	respMu.Unlock()
 
 	// last ditch, use the cache only. This is good for when clients hit /keys/query and the remote server
 	// is down, better to return something than nothing at all. Clients can know about the failure by
@@ -578,11 +577,11 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	}
 
 	// Sytest expects no failures, if we still could retrieve keys, e.g. from local cache
+	respMu.Lock()
 	if len(res.DeviceKeys) > 0 {
 		delete(res.Failures, serverName)
 	}
 	respMu.Unlock()
-
 }
 
 func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
