@@ -23,7 +23,7 @@ type SyncRequest struct {
 	// Updated by the PDU stream.
 	Rooms map[string]string
 	// Updated by the PDU stream.
-	NewlyJoined map[string]struct{}
+	MembershipChanges map[string]struct{}
 	// Updated by the PDU stream.
 	IgnoredUsers IgnoredUsers
 }

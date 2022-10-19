@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
@@ -69,19 +70,20 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		return from
 	}
 
+	if len(presences) == 0 {
+		return to
+	}
+
 	// add newly joined rooms user presences
-	if len(req.NewlyJoined) > 0 {
-		newlyJoinedRoomIDs := make([]string, 0, len(req.NewlyJoined))
-		for roomID := range req.NewlyJoined {
-			newlyJoinedRoomIDs = append(newlyJoinedRoomIDs, roomID)
-		}
+	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
+	if len(newlyJoined) > 0 {
 		// TODO: Check if this is working better than before.
-		if err = p.notifier.LoadRooms(ctx, p.DB, newlyJoinedRoomIDs); err != nil {
+		if err = p.notifier.LoadRooms(ctx, p.DB, newlyJoined); err != nil {
 			req.Log.WithError(err).Error("unable to refresh notifier lists")
 			return from
 		}
 	NewlyJoinedLoop:
-		for _, roomID := range newlyJoinedRoomIDs {
+		for _, roomID := range newlyJoined {
 			roomUsers := p.notifier.JoinedUsers(roomID)
 			for i := range roomUsers {
 				// we already got a presence from this user
@@ -101,8 +103,6 @@ func (p *PresenceStreamProvider) IncrementalSync(
 				}
 			}
 		}
-	} else {
-		return to
 	}
 
 	lastPos := from
@@ -121,7 +121,8 @@ func (p *PresenceStreamProvider) IncrementalSync(
 			prevPresence := pres.(*types.PresenceInternal)
 			currentlyActive := prevPresence.CurrentlyActive()
 			skip := prevPresence.Equals(presence) && currentlyActive && req.Device.UserID != presence.UserID
-			if skip {
+			_, membershipChange := req.MembershipChanges[presence.UserID]
+			if skip && !membershipChange {
 				req.Log.Tracef("Skipping presence, no change (%s)", presence.UserID)
 				continue
 			}
@@ -161,4 +162,37 @@ func (p *PresenceStreamProvider) IncrementalSync(
 	}
 
 	return lastPos
+}
+
+func joinedRooms(res *types.Response, userID string) []string {
+	var roomIDs []string
+	for roomID, join := range res.Rooms.Join {
+		// we would expect to see our join event somewhere if we newly joined the room.
+		// Normal events get put in the join section so it's not enough to know the room ID is present in 'join'.
+		newlyJoined := membershipEventPresent(join.State.Events, userID)
+		if newlyJoined {
+			roomIDs = append(roomIDs, roomID)
+			continue
+		}
+		newlyJoined = membershipEventPresent(join.Timeline.Events, userID)
+		if newlyJoined {
+			roomIDs = append(roomIDs, roomID)
+		}
+	}
+	return roomIDs
+}
+
+func membershipEventPresent(events []gomatrixserverlib.ClientEvent, userID string) bool {
+	for _, ev := range events {
+		// it's enough to know that we have our member event here, don't need to check membership content
+		// as it's implied by being in the respective section of the sync response.
+		if ev.Type == gomatrixserverlib.MRoomMember && ev.StateKey != nil && *ev.StateKey == userID {
+			// ignore e.g. join -> join changes
+			if gjson.GetBytes(ev.Unsigned, "prev_content.membership").Str == gjson.GetBytes(ev.Content, "membership").Str {
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }
