@@ -39,12 +39,6 @@ Events in rooms with AS-hosted room aliases are sent to AS server
 Inviting an AS-hosted user asks the AS server
 Accesing an AS-hosted room alias asks the AS server
 
-# Flakey, need additional investigation
-
-Messages that notify from another user increment notification_count
-Messages that highlight from another user increment unread highlight count
-Notifications can be viewed with GET /notifications
-
 # More flakey
 
 Guest users can join guest_access rooms
