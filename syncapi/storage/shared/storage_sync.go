@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type DatabaseTransaction struct {
@@ -372,7 +371,6 @@ func (d *DatabaseTransaction) GetStateDeltas(
 				// If our membership is now join but the previous membership wasn't
 				// then this is a "join transition", so we'll insert this room.
 				if prevMembership != membership {
-					newlyJoinedRooms[roomID] = true
 					// Get the full room state, as we'll send that down for a newly
 					// joined room instead of a delta.
 					var s []types.StreamEvent
@@ -386,6 +384,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 					// Add the information for this room into the state so that
 					// it will get added with all of the rest of the joined rooms.
 					state[roomID] = s
+					newlyJoinedRooms[roomID] = true
 				}
 
 				// We won't add joined rooms into the delta at this point as they
