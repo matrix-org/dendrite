@@ -472,7 +472,9 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 		close(resultCh)
 	}()
 
-	for result := range resultCh {
+	processResult := func(result *gomatrixserverlib.RespQueryKeys) {
+		respMu.Lock()
+		defer respMu.Unlock()
 		for userID, nest := range result.DeviceKeys {
 			res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			for deviceID, deviceKey := range nest {
@@ -494,6 +496,10 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 		// TODO: do we want to persist these somewhere now
 		// that we have fetched them?
+	}
+
+	for result := range resultCh {
+		processResult(result)
 	}
 }
 
