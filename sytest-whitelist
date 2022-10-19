@@ -747,3 +747,8 @@ Inbound federation can return missing events for joined visibility
 outliers whose auth_events are in a different room are correctly rejected
 Messages that notify from another user increment notification_count
 Messages that highlight from another user increment unread highlight count
+Newly joined room has correct timeline in incremental sync
+When user joins a room the state is included in the next sync
+When user joins a room the state is included in a gapped sync
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
