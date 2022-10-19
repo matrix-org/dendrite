@@ -752,3 +752,4 @@ When user joins a room the state is included in the next sync
 When user joins a room the state is included in a gapped sync
 Messages that notify from another user increment notification_count
 Messages that highlight from another user increment unread highlight count
+Notifications can be viewed with GET /notifications
