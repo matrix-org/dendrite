@@ -264,7 +264,7 @@ func Setup(
 			if !isAllowed {
 				return util.JSONResponse{
 					Code: http.StatusUnauthorized,
-					JSON: jsonerror.Forbidden(""),
+					JSON: jsonerror.Forbidden("Unauthorised"),
 				}
 			}
 
