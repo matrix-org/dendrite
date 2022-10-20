@@ -21,16 +21,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/gomatrix"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/atomic"
+
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrix"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 const (
@@ -541,6 +542,8 @@ func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int)
 	// the pending events and EDUs, and wipe our transaction ID.
 	oq.statistics.Success()
 	oq.pendingMutex.Lock()
+	defer oq.pendingMutex.Unlock()
+
 	for i := range oq.pendingPDUs[:pduCount] {
 		oq.pendingPDUs[i] = nil
 	}
@@ -549,7 +552,6 @@ func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int)
 	}
 	oq.pendingPDUs = oq.pendingPDUs[pduCount:]
 	oq.pendingEDUs = oq.pendingEDUs[eduCount:]
-	oq.pendingMutex.Unlock()
 
 	if len(oq.pendingPDUs) > 0 || len(oq.pendingEDUs) > 0 {
 		select {
