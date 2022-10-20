@@ -1004,9 +1004,12 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 		err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 		assert.NoError(t, err)
 
+		// NOTE : The server can be blacklisted before this, so manually inject the event
+		// into the database.
 		edu := mustCreateEDU(t)
-		errEDU := queues.SendEDU(edu, "localhost", []gomatrixserverlib.ServerName{destination})
-		assert.NoError(t, errEDU)
+		ephemeralJSON, _ := json.Marshal(edu)
+		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
+		db.AssociateEDUWithDestination(pc.Context(), destination, nid, edu.Type, nil)
 
 		checkBlacklisted := func(log poll.LogT) poll.Result {
 			if fc.txCount.Load() == failuresUntilBlacklist {
