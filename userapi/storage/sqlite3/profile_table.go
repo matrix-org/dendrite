@@ -104,26 +104,40 @@ func (s *profilesStatements) SelectProfileByLocalpart(
 
 func (s *profilesStatements) SetAvatarURL(
 	ctx context.Context, txn *sql.Tx, localpart string, avatarURL string,
-) (*authtypes.Profile, error) {
+) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{
 		Localpart: localpart,
 		AvatarURL: avatarURL,
 	}
+	old, err := s.SelectProfileByLocalpart(ctx, localpart)
+	if err != nil {
+		return old, false, err
+	}
+	if old.AvatarURL == avatarURL {
+		return old, false, nil
+	}
 	stmt := sqlutil.TxStmt(txn, s.setAvatarURLStmt)
-	err := stmt.QueryRowContext(ctx, avatarURL, localpart).Scan(&profile.DisplayName)
-	return profile, err
+	err = stmt.QueryRowContext(ctx, avatarURL, localpart).Scan(&profile.DisplayName)
+	return profile, true, err
 }
 
 func (s *profilesStatements) SetDisplayName(
 	ctx context.Context, txn *sql.Tx, localpart string, displayName string,
-) (*authtypes.Profile, error) {
+) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{
 		Localpart:   localpart,
 		DisplayName: displayName,
 	}
+	old, err := s.SelectProfileByLocalpart(ctx, localpart)
+	if err != nil {
+		return old, false, err
+	}
+	if old.DisplayName == displayName {
+		return old, false, nil
+	}
 	stmt := sqlutil.TxStmt(txn, s.setDisplayNameStmt)
-	err := stmt.QueryRowContext(ctx, displayName, localpart).Scan(&profile.AvatarURL)
-	return profile, err
+	err = stmt.QueryRowContext(ctx, displayName, localpart).Scan(&profile.AvatarURL)
+	return profile, true, err
 }
 
 func (s *profilesStatements) SelectProfilesBySearch(

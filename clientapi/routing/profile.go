@@ -135,35 +135,17 @@ func SetAvatarURL(
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return jsonerror.InternalServerError()
 	}
-
-	var roomsRes api.QueryRoomsForUserResponse
-	err = rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
-		UserID:         device.UserID,
-		WantMembership: "join",
-	}, &roomsRes)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
-		return jsonerror.InternalServerError()
-	}
-
-	events, err := buildMembershipEvents(
-		req.Context(), roomsRes.RoomIDs, *setRes.Profile, userID, cfg, evTime, rsAPI,
-	)
-	switch e := err.(type) {
-	case nil:
-	case gomatrixserverlib.BadJSONError:
+	// No need to build new membership events, since nothing changed
+	if !setRes.Changed {
 		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(e.Error()),
+			Code: http.StatusOK,
+			JSON: struct{}{},
 		}
-	default:
-		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
-		return jsonerror.InternalServerError()
 	}
 
-	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+	response, err := updateProfile(req.Context(), rsAPI, device, setRes.Profile, userID, cfg, evTime)
+	if err != nil {
+		return response
 	}
 
 	return util.JSONResponse{
@@ -245,19 +227,42 @@ func SetDisplayName(
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return jsonerror.InternalServerError()
 	}
+	// No need to build new membership events, since nothing changed
+	if !profileRes.Changed {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: struct{}{},
+		}
+	}
 
+	response, err := updateProfile(req.Context(), rsAPI, device, profileRes.Profile, userID, cfg, evTime)
+	if err != nil {
+		return response
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+func updateProfile(
+	ctx context.Context, rsAPI api.ClientRoomserverAPI, device *userapi.Device,
+	profile *authtypes.Profile,
+	userID string, cfg *config.ClientAPI, evTime time.Time,
+) (util.JSONResponse, error) {
 	var res api.QueryRoomsForUserResponse
-	err = rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
+	err := rsAPI.QueryRoomsForUser(ctx, &api.QueryRoomsForUserRequest{
 		UserID:         device.UserID,
 		WantMembership: "join",
 	}, &res)
 	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
-		return jsonerror.InternalServerError()
+		util.GetLogger(ctx).WithError(err).Error("QueryRoomsForUser failed")
+		return jsonerror.InternalServerError(), err
 	}
 
 	events, err := buildMembershipEvents(
-		req.Context(), res.RoomIDs, *profileRes.Profile, userID, cfg, evTime, rsAPI,
+		ctx, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -265,21 +270,17 @@ func SetDisplayName(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(e.Error()),
-		}
+		}, e
 	default:
-		util.GetLogger(req.Context()).WithError(err).Error("buildMembershipEvents failed")
-		return jsonerror.InternalServerError()
+		util.GetLogger(ctx).WithError(err).Error("buildMembershipEvents failed")
+		return jsonerror.InternalServerError(), e
 	}
 
-	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
-		return jsonerror.InternalServerError()
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
+		return jsonerror.InternalServerError(), err
 	}
-
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: struct{}{},
-	}
+	return util.JSONResponse{}, nil
 }
 
 // getProfile gets the full profile of a user by querying the database or a

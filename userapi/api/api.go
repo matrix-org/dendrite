@@ -581,6 +581,7 @@ type PerformSetAvatarURLRequest struct {
 }
 type PerformSetAvatarURLResponse struct {
 	Profile *authtypes.Profile `json:"profile"`
+	Changed bool               `json:"changed"`
 }
 
 type QueryNumericLocalpartResponse struct {
@@ -610,6 +611,7 @@ type PerformUpdateDisplayNameRequest struct {
 
 type PerformUpdateDisplayNameResponse struct {
 	Profile *authtypes.Profile `json:"profile"`
+	Changed bool               `json:"changed"`
 }
 
 type QueryLocalpartForThreePIDRequest struct {

@@ -170,7 +170,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
 		return err
 	}
 
@@ -813,8 +813,9 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 }
 
 func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
-	profile, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	profile, changed, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
 	res.Profile = profile
+	res.Changed = changed
 	return err
 }
 
@@ -850,8 +851,9 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 }
 
 func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, res *api.PerformUpdateDisplayNameResponse) error {
-	profile, err := a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+	profile, changed, err := a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
 	res.Profile = profile
+	res.Changed = changed
 	return err
 }
 

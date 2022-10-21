@@ -96,9 +96,9 @@ func (d *Database) GetProfileByLocalpart(
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetAvatarURL(
 	ctx context.Context, localpart string, avatarURL string,
-) (profile *authtypes.Profile, err error) {
+) (profile *authtypes.Profile, changed bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		profile, err = d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
+		profile, changed, err = d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
 		return err
 	})
 	return
@@ -108,9 +108,9 @@ func (d *Database) SetAvatarURL(
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetDisplayName(
 	ctx context.Context, localpart string, displayName string,
-) (profile *authtypes.Profile, err error) {
+) (profile *authtypes.Profile, changed bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		profile, err = d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
+		profile, changed, err = d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
 		return err
 	})
 	return
