@@ -277,6 +277,7 @@ func (r sendServerNoticeRequest) valid() (ok bool) {
 // It returns an userapi.Device, which is used for building the event
 func getSenderDevice(
 	ctx context.Context,
+	rsAPI api.ClientRoomserverAPI,
 	userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) (*userapi.Device, error) {
@@ -291,14 +292,30 @@ func getSenderDevice(
 		return nil, err
 	}
 
-	// set the avatarurl for the user
-	res := &userapi.PerformSetAvatarURLResponse{}
+	// Set the avatarurl for the user
+	avatarRes := &userapi.PerformSetAvatarURLResponse{}
 	if err = userAPI.SetAvatarURL(ctx, &userapi.PerformSetAvatarURLRequest{
 		Localpart: cfg.Matrix.ServerNotices.LocalPart,
 		AvatarURL: cfg.Matrix.ServerNotices.AvatarURL,
-	}, res); err != nil {
+	}, avatarRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
+	}
+
+	profile := avatarRes.Profile
+
+	// Set the displayname for the user
+	displayNameRes := &userapi.PerformUpdateDisplayNameResponse{}
+	if err = userAPI.SetDisplayName(ctx, &userapi.PerformUpdateDisplayNameRequest{
+		Localpart:   cfg.Matrix.ServerNotices.LocalPart,
+		DisplayName: cfg.Matrix.ServerNotices.DisplayName,
+	}, displayNameRes); err != nil {
+		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
+		return nil, err
+	}
+
+	if displayNameRes.Changed {
+		profile.DisplayName = cfg.Matrix.ServerNotices.DisplayName
 	}
 
 	// Check if we got existing devices
@@ -310,7 +327,15 @@ func getSenderDevice(
 		return nil, err
 	}
 
+	// We've got an existing account, return the first device of it
 	if len(deviceRes.Devices) > 0 {
+		// If there were changes to the profile, create a new membership event
+		if displayNameRes.Changed || avatarRes.Changed {
+			_, err = updateProfile(ctx, rsAPI, &deviceRes.Devices[0], profile, accRes.Account.UserID, cfg, time.Now())
+			if err != nil {
+				return nil, err
+			}
+		}
 		return &deviceRes.Devices[0], nil
 	}
 
