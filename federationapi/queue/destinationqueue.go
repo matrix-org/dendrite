@@ -76,27 +76,21 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		return
 	}
 
-	// Check if the destination is blacklisted. If it isn't then wake
-	// up the queue.
-	if !oq.statistics.Blacklisted() {
-		// If there's room in memory to hold the event then add it to the
-		// list.
-		oq.pendingMutex.Lock()
-		if len(oq.pendingPDUs) < maxPDUsInMemory {
-			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:     event,
-				receipt: receipt,
-			})
-		} else {
-			oq.overflowed.Store(true)
-		}
-		oq.pendingMutex.Unlock()
-
-		if !oq.backingOff.Load() {
-			oq.wakeQueueAndNotify()
-		}
+	// If there's room in memory to hold the event then add it to the
+	// list.
+	oq.pendingMutex.Lock()
+	if len(oq.pendingPDUs) < maxPDUsInMemory {
+		oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
+			pdu:     event,
+			receipt: receipt,
+		})
 	} else {
 		oq.overflowed.Store(true)
+	}
+	oq.pendingMutex.Unlock()
+
+	if !oq.backingOff.Load() {
+		oq.wakeQueueAndNotify()
 	}
 }
 
@@ -108,27 +102,22 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
 	}
-	// Check if the destination is blacklisted. If it isn't then wake
-	// up the queue.
-	if !oq.statistics.Blacklisted() {
-		// If there's room in memory to hold the event then add it to the
-		// list.
-		oq.pendingMutex.Lock()
-		if len(oq.pendingEDUs) < maxEDUsInMemory {
-			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:     event,
-				receipt: receipt,
-			})
-		} else {
-			oq.overflowed.Store(true)
-		}
-		oq.pendingMutex.Unlock()
 
-		if !oq.backingOff.Load() {
-			oq.wakeQueueAndNotify()
-		}
+	// If there's room in memory to hold the event then add it to the
+	// list.
+	oq.pendingMutex.Lock()
+	if len(oq.pendingEDUs) < maxEDUsInMemory {
+		oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
+			edu:     event,
+			receipt: receipt,
+		})
 	} else {
 		oq.overflowed.Store(true)
+	}
+	oq.pendingMutex.Unlock()
+
+	if !oq.backingOff.Load() {
+		oq.wakeQueueAndNotify()
 	}
 }
 

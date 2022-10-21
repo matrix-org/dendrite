@@ -248,7 +248,7 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil {
+		if queue := oqs.getQueue(destination); queue != nil && !queue.statistics.Blacklisted() {
 			queue.sendEvent(ev, nid)
 		} else {
 			delete(destmap, destination)
@@ -336,7 +336,7 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil {
+		if queue := oqs.getQueue(destination); queue != nil && !queue.statistics.Blacklisted() {
 			queue.sendEDU(e, nid)
 		} else {
 			delete(destmap, destination)
