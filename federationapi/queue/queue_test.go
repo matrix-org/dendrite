@@ -25,6 +25,10 @@ import (
 	"go.uber.org/atomic"
 	"gotest.tools/v3/poll"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -34,9 +38,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *process.ProcessContext, func()) {
@@ -158,15 +159,18 @@ func (d *fakeDatabase) GetPendingEDUs(ctx context.Context, serverName gomatrixse
 	return edus, nil
 }
 
-func (d *fakeDatabase) AssociatePDUWithDestination(ctx context.Context, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt) error {
+func (d *fakeDatabase) AssociatePDUWithDestinations(ctx context.Context, destinations map[gomatrixserverlib.ServerName]struct{}, receipt *shared.Receipt) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
 	if _, ok := d.pendingPDUs[receipt]; ok {
-		if _, ok := d.associatedPDUs[serverName]; !ok {
-			d.associatedPDUs[serverName] = make(map[*shared.Receipt]struct{})
+		for destination := range destinations {
+			if _, ok := d.associatedPDUs[destination]; !ok {
+				d.associatedPDUs[destination] = make(map[*shared.Receipt]struct{})
+			}
+			d.associatedPDUs[destination][receipt] = struct{}{}
 		}
-		d.associatedPDUs[serverName][receipt] = struct{}{}
+
 		return nil
 	} else {
 		return errors.New("PDU doesn't exist")
@@ -365,6 +369,7 @@ func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	}()
 
 	ev := mustCreatePDU(t)
+	t.Logf("Queues: %+v", queues)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 	assert.NoError(t, err)
 
@@ -821,15 +826,15 @@ func TestSendPDUBatches(t *testing.T) {
 		<-pc.WaitForShutdown()
 	}()
 
+	destinations := map[gomatrixserverlib.ServerName]struct{}{destination: {}}
 	// Populate database with > maxPDUsPerTransaction
 	pduMultiplier := uint32(3)
 	for i := 0; i < maxPDUsPerTransaction*int(pduMultiplier); i++ {
 		ev := mustCreatePDU(t)
 		headeredJSON, _ := json.Marshal(ev)
 		nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-		now := gomatrixserverlib.AsTimestamp(time.Now())
-		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, i))
-		db.AssociatePDUWithDestination(pc.Context(), transactionID, destination, nid)
+		err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
+		assert.NoError(t, err, "failed to associate PDU with destinations")
 	}
 
 	ev := mustCreatePDU(t)
@@ -907,16 +912,17 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 		<-pc.WaitForShutdown()
 	}()
 
+	destinations := map[gomatrixserverlib.ServerName]struct{}{destination: {}}
 	// Populate database with > maxEDUsPerTransaction
 	multiplier := uint32(3)
-
 	for i := 0; i < maxPDUsPerTransaction*int(multiplier)+1; i++ {
 		ev := mustCreatePDU(t)
 		headeredJSON, _ := json.Marshal(ev)
 		nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-		now := gomatrixserverlib.AsTimestamp(time.Now())
-		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, i))
-		db.AssociatePDUWithDestination(pc.Context(), transactionID, destination, nid)
+		t.Logf("DB: %+v", db)
+		t.Logf("Destinations: %+v", destinations)
+		err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
+		assert.NoError(t, err, "failed to associate PDU with destinations")
 	}
 
 	for i := 0; i < maxEDUsPerTransaction*int(multiplier); i++ {
@@ -960,13 +966,12 @@ func TestExternalFailureBackoffDoesntStartQueue(t *testing.T) {
 
 	dest := queues.getQueue(destination)
 	queues.statistics.ForServer(destination).Failure()
-
+	destinations := map[gomatrixserverlib.ServerName]struct{}{destination: {}}
 	ev := mustCreatePDU(t)
 	headeredJSON, _ := json.Marshal(ev)
 	nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-	now := gomatrixserverlib.AsTimestamp(time.Now())
-	transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d-%d", now, 1))
-	db.AssociatePDUWithDestination(pc.Context(), transactionID, destination, nid)
+	err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
+	assert.NoError(t, err, "failed to associate PDU with destinations")
 
 	pollEnd := time.Now().Add(3 * time.Second)
 	runningCheck := func(log poll.LogT) poll.Result {

@@ -76,18 +76,6 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		return
 	}
 
-	// Create a database entry that associates the given PDU NID with
-	// this destination queue. We'll then be able to retrieve the PDU
-	// later.
-	if err := oq.db.AssociatePDUWithDestination(
-		oq.process.Context(),
-		"",             // TODO: remove this, as we don't need to persist the transaction ID
-		oq.destination, // the destination server name
-		receipt,        // NIDs from federationapi_queue_json table
-	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
-		return
-	}
 	// Check if the destination is blacklisted. If it isn't then wake
 	// up the queue.
 	if !oq.statistics.Blacklisted() {
