@@ -353,6 +353,19 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 
+			isAllowedInviter, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+				RoomId:     vars["roomID"],
+				UserId:     device.UserID,
+				Permission: authz.PermissionInvite,
+			})
+
+			if !isAllowedInviter {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Inviter not allowed"),
+				}
+			}
+
 			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
