@@ -431,6 +431,13 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		return
 	}
 
+	// Only notify clients about retired invite events, if the user didn't accept the invite.
+	// The PDU stream will also receive an event about accepting the invitation, so there should
+	// be a "smooth" transition from invite -> join, and not invite -> leave -> join
+	if msg.Membership == gomatrixserverlib.Join {
+		return
+	}
+
 	// Notify any active sync requests that the invite has been retired.
 	s.inviteStream.Advance(pduPos)
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)

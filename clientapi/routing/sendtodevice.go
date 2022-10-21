@@ -16,12 +16,13 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/dendrite/internal/transactions"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/util"
 )
 
 // SendToDevice handles PUT /_matrix/client/r0/sendToDevice/{eventType}/{txnId}
@@ -33,7 +34,7 @@ func SendToDevice(
 	eventType string, txnID *string,
 ) util.JSONResponse {
 	if txnID != nil {
-		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID); ok {
+		if res, ok := txnCache.FetchTransaction(device.AccessToken, *txnID, req.URL); ok {
 			return *res
 		}
 	}
@@ -63,7 +64,7 @@ func SendToDevice(
 	}
 
 	if txnID != nil {
-		txnCache.AddTransaction(device.AccessToken, *txnID, &res)
+		txnCache.AddTransaction(device.AccessToken, *txnID, req.URL, &res)
 	}
 
 	return res

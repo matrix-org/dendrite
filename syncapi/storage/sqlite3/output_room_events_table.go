@@ -29,8 +29,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -189,21 +190,36 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	for _, roomID := range roomIDs {
 		inputParams = append(inputParams, roomID)
 	}
-	stmt, params, err := prepareWithFilters(
-		s.db, txn, stmtSQL, inputParams,
-		stateFilter.Senders, stateFilter.NotSenders,
-		stateFilter.Types, stateFilter.NotTypes,
-		nil, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderAsc,
+	var (
+		stmt   *sql.Stmt
+		params []any
+		err    error
 	)
+	if stateFilter != nil {
+		stmt, params, err = prepareWithFilters(
+			s.db, txn, stmtSQL, inputParams,
+			stateFilter.Senders, stateFilter.NotSenders,
+			stateFilter.Types, stateFilter.NotTypes,
+			nil, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderAsc,
+		)
+	} else {
+		stmt, params, err = prepareWithFilters(
+			s.db, txn, stmtSQL, inputParams,
+			nil, nil,
+			nil, nil,
+			nil, nil, int(r.High()-r.Low()), FilterOrderAsc,
+		)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectStateInRange: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "selectStateInRange: rows.close() failed")
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
@@ -269,6 +285,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
 	stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectMaxEventID: stmt.close() failed")
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
@@ -323,6 +340,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+	defer internal.CloseAndLogIfError(ctx, insertStmt, "InsertEvent: stmt.close() failed")
 	_, err = insertStmt.ExecContext(
 		ctx,
 		streamPos,
@@ -367,6 +385,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	if err != nil {
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectRecentEvents: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -415,6 +434,8 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectEarlyEvents: stmt.close() failed")
+
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
@@ -456,6 +477,8 @@ func (s *outputRoomEventsStatements) SelectEvents(
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectEvents: stmt.close() failed")
+
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
@@ -558,6 +581,10 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 		filter.Types, filter.NotTypes,
 		nil, filter.ContainsURL, filter.Limit, FilterOrderDesc,
 	)
+	if err != nil {
+		return
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectContextBeforeEvent: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -596,6 +623,10 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		filter.Types, filter.NotTypes,
 		nil, filter.ContainsURL, filter.Limit, FilterOrderAsc,
 	)
+	if err != nil {
+		return
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectContextAfterEvent: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {

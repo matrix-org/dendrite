@@ -7,9 +7,7 @@ import (
 )
 
 func TestBackoff(t *testing.T) {
-	stats := Statistics{
-		FailuresUntilBlacklist: 7,
-	}
+	stats := NewStatistics(nil, 7)
 	server := ServerStatistics{
 		statistics: &stats,
 		serverName: "test.com",
@@ -36,7 +34,7 @@ func TestBackoff(t *testing.T) {
 
 		// Get the duration.
 		_, blacklist := server.BackoffInfo()
-		duration := time.Until(until).Round(time.Second)
+		duration := time.Until(until)
 
 		// Unset the backoff, or otherwise our next call will think that
 		// there's a backoff in progress and return the same result.
@@ -57,8 +55,17 @@ func TestBackoff(t *testing.T) {
 
 		// Check if the duration is what we expect.
 		t.Logf("Backoff %d is for %s", i, duration)
-		if wanted := time.Second * time.Duration(math.Exp2(float64(i))); !blacklist && duration != wanted {
-			t.Fatalf("Backoff %d should have been %s but was %s", i, wanted, duration)
+		roundingAllowance := 0.01
+		minDuration := time.Millisecond * time.Duration(math.Exp2(float64(i))*minJitterMultiplier*1000-roundingAllowance)
+		maxDuration := time.Millisecond * time.Duration(math.Exp2(float64(i))*maxJitterMultiplier*1000+roundingAllowance)
+		var inJitterRange bool
+		if duration >= minDuration && duration <= maxDuration {
+			inJitterRange = true
+		} else {
+			inJitterRange = false
+		}
+		if !blacklist && !inJitterRange {
+			t.Fatalf("Backoff %d should have been between %s and %s but was %s", i, minDuration, maxDuration, duration)
 		}
 	}
 }
