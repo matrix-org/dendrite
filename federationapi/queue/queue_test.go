@@ -372,7 +372,6 @@ func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	}()
 
 	ev := mustCreatePDU(t)
-	t.Logf("Queues: %+v", queues)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
 	assert.NoError(t, err)
 
@@ -924,8 +923,6 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 		ev := mustCreatePDU(t)
 		headeredJSON, _ := json.Marshal(ev)
 		nid, _ := db.StoreJSON(pc.Context(), string(headeredJSON))
-		t.Logf("DB: %+v", db)
-		t.Logf("Destinations: %+v", destinations)
 		err := db.AssociatePDUWithDestinations(pc.Context(), destinations, nid)
 		assert.NoError(t, err, "failed to associate PDU with destinations")
 	}
