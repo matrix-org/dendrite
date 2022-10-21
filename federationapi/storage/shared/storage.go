@@ -52,6 +52,10 @@ type Receipt struct {
 	nid int64
 }
 
+func NewReceipt(nid int64) Receipt {
+	return Receipt{nid: nid}
+}
+
 func (r *Receipt) String() string {
 	return fmt.Sprintf("%d", r.nid)
 }

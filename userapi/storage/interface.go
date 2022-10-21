@@ -31,8 +31,8 @@ import (
 type Profile interface {
 	GetProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
 	SearchProfiles(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
-	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) error
-	SetDisplayName(ctx context.Context, localpart string, displayName string) error
+	SetAvatarURL(ctx context.Context, localpart string, avatarURL string) (*authtypes.Profile, bool, error)
+	SetDisplayName(ctx context.Context, localpart string, displayName string) (*authtypes.Profile, bool, error)
 }
 
 type Account interface {
