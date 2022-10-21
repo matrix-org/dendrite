@@ -1,5 +1,23 @@
 # Changelog
 
+## Dendrite 0.10.4 (2022-10-21)
+
+### Features
+
+* Various tables belonging to the user API will be renamed so that they are namespaced with the `userapi_` prefix
+  * Note that, after upgrading to this version, you should not revert to an older version of Dendrite as the database changes **will not** be reverted automatically
+* The backoff and retry behaviour in the federation API has been refactored and improved
+
+### Fixes
+
+* Private read receipt support is now advertised in the client `/versions` endpoint
+* Private read receipts will now clear notification counts properly
+* A bug where a false `leave` membership transition was inserted into the timeline after accepting an invite has been fixed
+* Some panics caused by concurrent map writes in the key server have been fixed
+* The sync API now calculates membership transitions from state deltas more accurately
+* Transaction IDs are now scoped to endpoints, which should fix some bugs where transaction ID reuse could cause nonsensical cached responses from some endpoints
+* The length of the `type`, `sender`, `state_key` and `room_id` fields in events are now verified by number of bytes rather than codepoints after a spec clarification, reverting a change made in Dendrite 0.9.6
+
 ## Dendrite 0.10.3 (2022-10-14)
 
 ### Features
