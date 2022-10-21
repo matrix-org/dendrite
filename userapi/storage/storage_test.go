@@ -382,12 +382,13 @@ func Test_Profile(t *testing.T) {
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
-		gotProfile, err = db.SetDisplayName(ctx, aliceLocalpart, "Alice")
+		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, "Alice")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.NoError(t, err, "unable to set displayname")
+		assert.True(t, changed)
 
 		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		gotProfile, changed, err := db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
 		assert.NoError(t, err, "unable to set avatar url")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.True(t, changed)

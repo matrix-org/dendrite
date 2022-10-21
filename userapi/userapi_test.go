@@ -23,13 +23,14 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/dendrite/userapi/inthttp"
-	"github.com/matrix-org/gomatrixserverlib"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -83,10 +84,10 @@ func TestQueryProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
-	if err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
+	if _, _, err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
 		t.Fatalf("failed to set avatar url: %s", err)
 	}
-	if err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
+	if _, _, err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
 		t.Fatalf("failed to set display name: %s", err)
 	}
 
