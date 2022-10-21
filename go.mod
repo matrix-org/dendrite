@@ -1,5 +1,7 @@
 module github.com/matrix-org/dendrite
 
+replace github.com/lib/pq => github.com/neilalexander/pq v0.0.0-20221021154939-f33261b5c420
+
 require (
 	github.com/Arceliar/ironwood v0.0.0-20220903132624-ee60c16bcfcf
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
