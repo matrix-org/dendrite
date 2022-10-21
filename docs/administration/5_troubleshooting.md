@@ -77,5 +77,12 @@ If there aren't, you will see a log lines like this:
 level=warning msg="IMPORTANT: Process file descriptor limit is currently 65535, it is recommended to raise the limit for Dendrite to at least 65535 to avoid issues"
 ```
 
-Follow the [Optimisation](../installation/10_optimisation.md) instructions to correct the
+Follow the [Optimisation](../installation/11_optimisation.md) instructions to correct the
 available number of file descriptors.
+
+## 6. STUN/TURN Server tester
+
+If you are experiencing problems with VoIP or video calls, you should check that Dendrite
+is able to successfully connect your TURN server using 
+[Matrix VoIP Tester](https://test.voip.librepush.net/). This can highlight any issues
+that the server may encounter so that you can begin the troubleshooting process.

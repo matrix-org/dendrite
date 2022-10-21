@@ -64,12 +64,13 @@ var (
 	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
 	isAdmin            = flag.Bool("admin", false, "Create an admin account")
 	resetPassword      = flag.Bool("reset-password", false, "Deprecated")
-	serverURL          = flag.String("url", "https://localhost:8448", "The URL to connect to.")
+	serverURL          = flag.String("url", "http://localhost:8008", "The URL to connect to.")
 	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
+	timeout            = flag.Duration("timeout", time.Second*30, "Timeout for the http client when connecting to the server")
 )
 
 var cl = http.Client{
-	Timeout:   time.Second * 10,
+	Timeout:   time.Second * 30,
 	Transport: http.DefaultTransport,
 }
 
@@ -83,6 +84,10 @@ func main() {
 
 	if *resetPassword {
 		logrus.Fatalf("The reset-password flag has been replaced by the POST /_dendrite/admin/resetPassword/{localpart} admin API.")
+	}
+
+	if cfg.ClientAPI.RegistrationSharedSecret == "" {
+		logrus.Fatalln("Shared secret registration is not enabled, enable it by setting a shared secret in the config: 'client_api.registration_shared_secret'")
 	}
 
 	if *username == "" {
@@ -104,6 +109,8 @@ func main() {
 		logrus.Fatalln(err)
 	}
 
+	cl.Timeout = *timeout
+
 	accessToken, err := sharedSecretRegister(cfg.ClientAPI.RegistrationSharedSecret, *serverURL, *username, pass, *isAdmin)
 	if err != nil {
 		logrus.Fatalln("Failed to create the account:", err.Error())
@@ -120,8 +127,8 @@ type sharedSecretRegistrationRequest struct {
 	Admin    bool   `json:"admin"`
 }
 
-func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, admin bool) (accesToken string, err error) {
-	registerURL := fmt.Sprintf("%s/_synapse/admin/v1/register", serverURL)
+func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, admin bool) (accessToken string, err error) {
+	registerURL := fmt.Sprintf("%s/_synapse/admin/v1/register", strings.Trim(serverURL, "/"))
 	nonceReq, err := http.NewRequest(http.MethodGet, registerURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("unable to create http request: %w", err)
@@ -172,7 +179,10 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 		body, _ = io.ReadAll(regResp.Body)
 		return "", fmt.Errorf(gjson.GetBytes(body, "error").Str)
 	}
-	r, _ := io.ReadAll(regResp.Body)
+	r, err := io.ReadAll(regResp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body (HTTP %d): %w", regResp.StatusCode, err)
+	}
 
 	return gjson.GetBytes(r, "access_token").Str, nil
 }

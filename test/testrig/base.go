@@ -22,20 +22,34 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nats-io/nats.go"
+
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/nats-io/nats.go"
 )
 
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
 	var cfg config.Dendrite
-	cfg.Defaults(false)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   false,
+		Monolithic: true,
+	})
 	cfg.Global.JetStream.InMemory = true
 	switch dbType {
 	case test.DBTypePostgres:
-		cfg.Global.Defaults(true)   // autogen a signing key
-		cfg.MediaAPI.Defaults(true) // autogen a media path
+		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
+			Generate:   true,
+			Monolithic: true,
+		})
+		cfg.MediaAPI.Defaults(config.DefaultOpts{ // autogen a media path
+			Generate:   true,
+			Monolithic: true,
+		})
+		cfg.SyncAPI.Fulltext.Defaults(config.DefaultOpts{ // use in memory fts
+			Generate:   true,
+			Monolithic: true,
+		})
 		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
@@ -49,7 +63,10 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		}
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
 	case test.DBTypeSQLite:
-		cfg.Defaults(true) // sets a sqlite db per component
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: false, // because we need a database per component
+		})
 		cfg.Global.ServerName = "test"
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
@@ -57,7 +74,6 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), func() {
 			// cleanup db files. This risks getting out of sync as we add more database strings :(
 			dbFiles := []config.DataSource{
-				cfg.AppServiceAPI.Database.ConnectionString,
 				cfg.FederationAPI.Database.ConnectionString,
 				cfg.KeyServer.Database.ConnectionString,
 				cfg.MSCs.Database.ConnectionString,
@@ -83,9 +99,13 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nats.Conn) {
 	if cfg == nil {
 		cfg = &config.Dendrite{}
-		cfg.Defaults(true)
+		cfg.Defaults(config.DefaultOpts{
+			Generate:   true,
+			Monolithic: true,
+		})
 	}
 	cfg.Global.JetStream.InMemory = true
+	cfg.SyncAPI.Fulltext.InMemory = true
 	base := base.NewBaseDendrite(cfg, "Tests")
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc

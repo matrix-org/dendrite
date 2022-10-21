@@ -227,6 +227,7 @@ type QueryStateAndAuthChainResponse struct {
 	// Do all the previous events exist on this roomserver?
 	// If some of previous events do not exist this will be false and StateEvents will be empty.
 	PrevEventsExist bool `json:"prev_events_exist"`
+	StateKnown      bool `json:"state_known"`
 	// The state and auth chain events that were requested.
 	// The lists will be in an arbitrary order.
 	StateEvents     []*gomatrixserverlib.HeaderedEvent `json:"state_events"`
@@ -277,6 +278,7 @@ type QuerySharedUsersRequest struct {
 	OtherUserIDs   []string
 	ExcludeRoomIDs []string
 	IncludeRoomIDs []string
+	LocalOnly      bool
 }
 
 type QuerySharedUsersResponse struct {
@@ -438,6 +440,7 @@ type QueryMembershipAtEventRequest struct {
 
 // QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
 type QueryMembershipAtEventResponse struct {
-	// Memberships is a map from eventID to a list of events (if any).
+	// Memberships is a map from eventID to a list of events (if any). Events that
+	// do not have known state will return an empty array here.
 	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
 }

@@ -144,7 +144,6 @@ Server correctly handles incoming m.device_list_update
 If remote user leaves room, changes device and rejoins we see update in sync
 If remote user leaves room, changes device and rejoins we see update in /keys/changes
 If remote user leaves room we no longer receive device updates
-If a device list update goes missing, the server resyncs on the next one
 Server correctly resyncs when client query keys and there is no remote cache
 Server correctly resyncs when server leaves and rejoins a room
 Device list doesn't change if remote server is down
@@ -307,7 +306,7 @@ Alternative server names do not cause a routing loop
 Events whose auth_events are in the wrong room do not mess up the room state
 Inbound federation can return events
 Inbound federation can return missing events for world_readable visibility
-Inbound federation can return missing events for invite visibility
+Inbound federation can return missing events for invited visibility
 Inbound federation can get public room list
 PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
 PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
@@ -633,7 +632,6 @@ Test that rejected pushers are removed.
 Trying to add push rule with no scope fails with 400
 Trying to add push rule with invalid scope fails with 400
 Forward extremities remain so even after the next events are populated as outliers
-If a device list update goes missing, the server resyncs on the next one
 uploading self-signing key notifies over federation
 uploading signed devices gets propagated over federation
 Device list doesn't change if remote server is down
@@ -744,3 +742,14 @@ User in private room doesn't appear in user directory
 User joining then leaving public room appears and dissappears from directory
 User in remote room doesn't appear in user directory after server left room
 User in shared private room does appear in user directory until leave
+Existing members see new member's presence
+Inbound federation can return missing events for joined visibility
+outliers whose auth_events are in a different room are correctly rejected
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
+Newly joined room has correct timeline in incremental sync
+When user joins a room the state is included in the next sync
+When user joins a room the state is included in a gapped sync
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
+Notifications can be viewed with GET /notifications

@@ -9,14 +9,16 @@ import (
 )
 
 const (
-	UserID  = "user_id"
-	RoomID  = "room_id"
-	EventID = "event_id"
+	UserID        = "user_id"
+	RoomID        = "room_id"
+	EventID       = "event_id"
+	RoomEventType = "output_room_event_type"
 )
 
 var (
 	InputRoomEvent          = "InputRoomEvent"
 	InputDeviceListUpdate   = "InputDeviceListUpdate"
+	InputSigningKeyUpdate   = "InputSigningKeyUpdate"
 	OutputRoomEvent         = "OutputRoomEvent"
 	OutputSendToDeviceEvent = "OutputSendToDeviceEvent"
 	OutputKeyChangeEvent    = "OutputKeyChangeEvent"
@@ -28,6 +30,7 @@ var (
 	OutputReadUpdate        = "OutputReadUpdate"
 	RequestPresence         = "GetPresence"
 	OutputPresenceEvent     = "OutputPresenceEvent"
+	InputFulltextReindex    = "InputFulltextReindex"
 )
 
 var safeCharacters = regexp.MustCompile("[^A-Za-z0-9$]+")
@@ -48,6 +51,11 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      InputDeviceListUpdate,
+		Retention: nats.InterestPolicy,
+		Storage:   nats.FileStorage,
+	},
+	{
+		Name:      InputSigningKeyUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},
@@ -84,16 +92,6 @@ var streams = []*nats.StreamConfig{
 	},
 	{
 		Name:      OutputNotificationData,
-		Retention: nats.InterestPolicy,
-		Storage:   nats.FileStorage,
-	},
-	{
-		Name:      OutputStreamEvent,
-		Retention: nats.InterestPolicy,
-		Storage:   nats.FileStorage,
-	},
-	{
-		Name:      OutputReadUpdate,
 		Retention: nats.InterestPolicy,
 		Storage:   nats.FileStorage,
 	},

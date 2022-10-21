@@ -20,6 +20,12 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -34,11 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/nats-io/nats.go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
@@ -69,6 +70,7 @@ func Setup(
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
+		"org.matrix.msc2285.stable":    true,
 	}
 	for _, msc := range cfg.MSCs.MSCs {
 		unstableFeatures["org.matrix."+msc] = true
@@ -133,7 +135,7 @@ func Setup(
 					}
 				}
 				if req.Method == http.MethodPost {
-					return handleSharedSecretRegistration(userAPI, sr, req)
+					return handleSharedSecretRegistration(cfg, userAPI, sr, req)
 				}
 				return util.JSONResponse{
 					Code: http.StatusMethodNotAllowed,
@@ -161,10 +163,22 @@ func Setup(
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 
+	dendriteAdminRouter.Handle("/admin/fulltext/reindex",
+		httputil.MakeAdminAPI("admin_fultext_reindex", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminReindex(req, cfg, device, natsClient)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	dendriteAdminRouter.Handle("/admin/refreshDevices/{userID}",
+		httputil.MakeAdminAPI("admin_refresh_devices", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return AdminMarkAsStale(req, cfg, keyAPI)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, cfg)
+		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
 		}
@@ -354,15 +368,6 @@ func Setup(
 				nil, cfg, rsAPI, transactionsCache)
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
-	v3mux.Handle("/rooms/{roomID}/event/{eventID}",
-		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-			if err != nil {
-				return util.ErrorResponse(err)
-			}
-			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, rsAPI)
-		}),
-	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/state", httputil.MakeAuthAPI("room_state", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -1339,7 +1344,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 
-			return SetReceipt(req, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
+			return SetReceipt(req, userAPI, syncProducer, device, vars["roomId"], vars["receiptType"], vars["eventId"])
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
 	v3mux.Handle("/presence/{userId}/status",

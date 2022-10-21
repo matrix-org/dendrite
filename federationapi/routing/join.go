@@ -203,14 +203,6 @@ func SendJoin(
 		}
 	}
 
-	// Check that the event is from the server sending the request.
-	if event.Origin() != request.Origin() {
-		return util.JSONResponse{
-			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The join must be sent by the server it originated on"),
-		}
-	}
-
 	// Check that a state key is provided.
 	if event.StateKey() == nil || event.StateKeyEquals("") {
 		return util.JSONResponse{
@@ -228,16 +220,16 @@ func SendJoin(
 	// Check that the sender belongs to the server that is sending us
 	// the request. By this point we've already asserted that the sender
 	// and the state key are equal so we don't need to check both.
-	var domain gomatrixserverlib.ServerName
-	if _, domain, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
+	var serverName gomatrixserverlib.ServerName
+	if _, serverName, err = gomatrixserverlib.SplitID('@', event.Sender()); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("The sender of the join is invalid"),
 		}
-	} else if domain != request.Origin() {
+	} else if serverName != request.Origin() {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("The sender of the join must belong to the origin server"),
+			JSON: jsonerror.Forbidden("The sender does not match the server that originated the request"),
 		}
 	}
 
@@ -292,7 +284,7 @@ func SendJoin(
 		}
 	}
 	verifyRequests := []gomatrixserverlib.VerifyJSONRequest{{
-		ServerName:             event.Origin(),
+		ServerName:             serverName,
 		Message:                redacted,
 		AtTS:                   event.OriginServerTS(),
 		StrictValidityChecking: true,
@@ -327,6 +319,12 @@ func SendJoin(
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Room does not exist"),
+		}
+	}
+	if !stateAndAuthChainResponse.StateKnown {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("State not known"),
 		}
 	}
 

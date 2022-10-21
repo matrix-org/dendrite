@@ -22,13 +22,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
@@ -45,6 +47,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -65,6 +68,7 @@ const (
 	PeerTypeRemote    = pineconeRouter.PeerTypeRemote
 	PeerTypeMulticast = pineconeRouter.PeerTypeMulticast
 	PeerTypeBluetooth = pineconeRouter.PeerTypeBluetooth
+	PeerTypeBonjour   = pineconeRouter.PeerTypeBonjour
 )
 
 type DendriteMonolith struct {
@@ -81,6 +85,10 @@ type DendriteMonolith struct {
 	userAPI           userapiAPI.UserInternalAPI
 }
 
+func (m *DendriteMonolith) PublicKey() string {
+	return m.PineconeRouter.PublicKey().String()
+}
+
 func (m *DendriteMonolith) BaseURL() string {
 	return fmt.Sprintf("http://%s", m.listener.Addr().String())
 }
@@ -91,6 +99,20 @@ func (m *DendriteMonolith) PeerCount(peertype int) int {
 
 func (m *DendriteMonolith) SessionCount() int {
 	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
+}
+
+func (m *DendriteMonolith) RegisterNetworkInterface(name string, index int, mtu int, up bool, broadcast bool, loopback bool, pointToPoint bool, multicast bool, addrs string) {
+	m.PineconeMulticast.RegisterInterface(pineconeMulticast.InterfaceInfo{
+		Name:         name,
+		Index:        index,
+		Mtu:          mtu,
+		Up:           up,
+		Broadcast:    broadcast,
+		Loopback:     loopback,
+		PointToPoint: pointToPoint,
+		Multicast:    multicast,
+		Addrs:        addrs,
+	})
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -104,7 +126,9 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.PineconeManager.RemovePeers()
-	m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	for _, uri := range strings.Split(uri, ",") {
+		m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	}
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -133,32 +157,21 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) 
 	go func() {
 		conduit.portMutex.Lock()
 		defer conduit.portMutex.Unlock()
-	loop:
-		for i := 1; i <= 10; i++ {
-			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
-			var err error
-			conduit.port, err = m.PineconeRouter.Connect(
-				l,
-				pineconeRouter.ConnectionZone(zone),
-				pineconeRouter.ConnectionPeerType(peertype),
-			)
-			switch err {
-			case io.ErrClosedPipe:
-				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
-				return
-			case io.EOF:
-				logrus.Errorf("Authenticated connect failed due to EOF (attempt %d)", i)
-				break loop
-			case nil:
-				logrus.Errorf("Authenticated connect succeeded, connected to port %d (attempt %d)", conduit.port, i)
-				return
-			default:
-				logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
-				time.Sleep(time.Second)
-			}
+
+		logrus.Errorf("Attempting authenticated connect")
+		var err error
+		if conduit.port, err = m.PineconeRouter.Connect(
+			l,
+			pineconeRouter.ConnectionZone(zone),
+			pineconeRouter.ConnectionPeerType(peertype),
+		); err != nil {
+			logrus.Errorf("Authenticated connect failed: %s", err)
+			_ = l.Close()
+			_ = r.Close()
+			_ = conduit.Close()
+			return
 		}
-		_ = l.Close()
-		_ = r.Close()
+		logrus.Infof("Authenticated connect succeeded (port %d)", conduit.port)
 	}()
 	return conduit, nil
 }
@@ -204,27 +217,45 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 
 // nolint:gocyclo
 func (m *DendriteMonolith) Start() {
-	var err error
 	var sk ed25519.PrivateKey
 	var pk ed25519.PublicKey
-	keyfile := fmt.Sprintf("%s/p2p.key", m.StorageDirectory)
-	if _, err = os.Stat(keyfile); os.IsNotExist(err) {
-		if pk, sk, err = ed25519.GenerateKey(nil); err != nil {
-			panic(err)
+
+	keyfile := filepath.Join(m.StorageDirectory, "p2p.pem")
+	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
+		oldkeyfile := filepath.Join(m.StorageDirectory, "p2p.key")
+		if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
+			if err = test.NewMatrixKey(keyfile); err != nil {
+				panic("failed to generate a new PEM key: " + err.Error())
+			}
+			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+				panic("failed to load PEM key: " + err.Error())
+			}
+			if len(sk) != ed25519.PrivateKeySize {
+				panic("the private key is not long enough")
+			}
+		} else {
+			if sk, err = os.ReadFile(oldkeyfile); err != nil {
+				panic("failed to read the old private key: " + err.Error())
+			}
+			if len(sk) != ed25519.PrivateKeySize {
+				panic("the private key is not long enough")
+			}
+			if err = test.SaveMatrixKey(keyfile, sk); err != nil {
+				panic("failed to convert the private key to PEM format: " + err.Error())
+			}
 		}
-		if err = ioutil.WriteFile(keyfile, sk, 0644); err != nil {
-			panic(err)
-		}
-	} else if err == nil {
-		if sk, err = ioutil.ReadFile(keyfile); err != nil {
-			panic(err)
+	} else {
+		if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
+			panic("failed to load PEM key: " + err.Error())
 		}
 		if len(sk) != ed25519.PrivateKeySize {
 			panic("the private key is not long enough")
 		}
-		pk = sk.Public().(ed25519.PublicKey)
 	}
 
+	pk = sk.Public().(ed25519.PublicKey)
+
+	var err error
 	m.listener, err = net.Listen("tcp", "localhost:65432")
 	if err != nil {
 		panic(err)
@@ -236,31 +267,35 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
-	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk, false)
+	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
 	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
 	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter, nil)
 
 	prefix := hex.EncodeToString(pk)
 	cfg := &config.Dendrite{}
-	cfg.Defaults(true)
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.JetStream.InMemory = true
-	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/%s", m.StorageDirectory, prefix))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-account.db", m.StorageDirectory, prefix))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-mediaapi.db", m.StorageDirectory))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
-	cfg.AppServiceAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-appservice.db", m.StorageDirectory, prefix))
-	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
-	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
+	cfg.Global.JetStream.InMemory = false
+	cfg.Global.JetStream.StoragePath = config.Path(filepath.Join(m.CacheDirectory, prefix))
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.MediaAPI.BasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
+	cfg.MediaAPI.AbsBasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+	cfg.SyncAPI.Fulltext.Enabled = true
+	cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(m.CacheDirectory, "search"))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
@@ -374,6 +409,7 @@ func (m *DendriteMonolith) Stop() {
 const MaxFrameSize = types.MaxFrameSize
 
 type Conduit struct {
+	closed    atomic.Bool
 	conn      net.Conn
 	port      types.SwitchPortID
 	portMutex sync.Mutex
@@ -386,10 +422,16 @@ func (c *Conduit) Port() int {
 }
 
 func (c *Conduit) Read(b []byte) (int, error) {
+	if c.closed.Load() {
+		return 0, io.EOF
+	}
 	return c.conn.Read(b)
 }
 
 func (c *Conduit) ReadCopy() ([]byte, error) {
+	if c.closed.Load() {
+		return nil, io.EOF
+	}
 	var buf [65535 * 2]byte
 	n, err := c.conn.Read(buf[:])
 	if err != nil {
@@ -399,9 +441,16 @@ func (c *Conduit) ReadCopy() ([]byte, error) {
 }
 
 func (c *Conduit) Write(b []byte) (int, error) {
+	if c.closed.Load() {
+		return 0, io.EOF
+	}
 	return c.conn.Write(b)
 }
 
 func (c *Conduit) Close() error {
+	if c.closed.Load() {
+		return io.ErrClosedPipe
+	}
+	c.closed.Store(true)
 	return c.conn.Close()
 }

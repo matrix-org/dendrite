@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
@@ -178,6 +179,10 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 		u.newStateNID = u.oldStateNID
 	}
 
+	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
+		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
+	}
+
 	update, err := u.makeOutputNewRoomEvent()
 	if err != nil {
 		return fmt.Errorf("u.makeOutputNewRoomEvent: %w", err)
@@ -194,10 +199,6 @@ func (u *latestEventsUpdater) doUpdateLatestEvents() error {
 	// necessary bookkeeping we'll keep the event sending synchronous for now.
 	if err = u.api.OutputProducer.ProduceRoomEvents(u.event.RoomID(), updates); err != nil {
 		return fmt.Errorf("u.api.WriteOutputEvents: %w", err)
-	}
-
-	if err = u.updater.SetLatestEvents(u.roomInfo.RoomNID, u.latest, u.stateAtEvent.EventNID, u.newStateNID); err != nil {
-		return fmt.Errorf("u.updater.SetLatestEvents: %w", err)
 	}
 
 	if err = u.updater.MarkEventAsSent(u.stateAtEvent.EventNID); err != nil {
@@ -263,19 +264,30 @@ func (u *latestEventsUpdater) latestState() error {
 		return fmt.Errorf("roomState.CalculateAndStoreStateAfterEvents: %w", err)
 	}
 
-	// Now that we have a new state snapshot based on the latest events,
-	// we can compare that new snapshot to the previous one and see what
-	// has changed. This gives us one list of removed state events and
-	// another list of added ones. Replacing a value for a state-key tuple
-	// will result one removed (the old event) and one added (the new event).
-	u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
-		ctx, u.oldStateNID, u.newStateNID,
-	)
-	if err != nil {
-		return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+	// Include information about what changed in the state transition. If the
+	// event rewrites the state (i.e. is a federated join) then we will simply
+	// include the entire state snapshot as added events, as the "RewritesState"
+	// flag in the output event signals downstream components to purge their
+	// room state first. If it doesn't rewrite the state then we will work out
+	// what the difference is between the state snapshots and send that. In all
+	// cases where a state event is being replaced, the old state event will
+	// appear in "removed" and the replacement will appear in "added".
+	if u.rewritesState {
+		u.removed = []types.StateEntry{}
+		u.added, err = roomState.LoadStateAtSnapshot(ctx, u.newStateNID)
+		if err != nil {
+			return fmt.Errorf("roomState.LoadStateAtSnapshot: %w", err)
+		}
+	} else {
+		u.removed, u.added, err = roomState.DifferenceBetweeenStateSnapshots(
+			ctx, u.oldStateNID, u.newStateNID,
+		)
+		if err != nil {
+			return fmt.Errorf("roomState.DifferenceBetweenStateSnapshots: %w", err)
+		}
 	}
 
-	if removed := len(u.removed) - len(u.added); removed > 0 {
+	if removed := len(u.removed) - len(u.added); !u.rewritesState && removed > 0 {
 		logrus.WithFields(logrus.Fields{
 			"event_id":      u.event.EventID(),
 			"room_id":       u.event.RoomID(),
@@ -283,7 +295,19 @@ func (u *latestEventsUpdater) latestState() error {
 			"new_state_nid": u.newStateNID,
 			"old_latest":    u.oldLatest.EventIDs(),
 			"new_latest":    u.latest.EventIDs(),
-		}).Errorf("Unexpected state deletion (removing %d events)", removed)
+		}).Warnf("State reset detected (removing %d events)", removed)
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetLevel("warning")
+			scope.SetContext("State reset", map[string]interface{}{
+				"Event ID":      u.event.EventID(),
+				"Old state NID": fmt.Sprintf("%d", u.oldStateNID),
+				"New state NID": fmt.Sprintf("%d", u.newStateNID),
+				"Old latest":    u.oldLatest.EventIDs(),
+				"New latest":    u.latest.EventIDs(),
+				"State removed": removed,
+			})
+			sentry.CaptureMessage("State reset detected")
+		})
 	}
 
 	// Also work out the state before the event removes and the event

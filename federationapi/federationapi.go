@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/federationapi/api"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
@@ -33,10 +35,10 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
@@ -66,6 +68,7 @@ func AddPublicRoutes(
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		ServerName:             cfg.Matrix.ServerName,
 		UserAPI:                userAPI,
 	}
@@ -113,17 +116,14 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := &statistics.Statistics{
-		DB:                     federationDB,
-		FailuresUntilBlacklist: cfg.FederationMaxRetries,
-	}
+	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
 
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, rsAPI, stats,
+		cfg.Matrix.ServerName, federation, rsAPI, &stats,
 		&queue.SigningInfo{
 			KeyID:      cfg.Matrix.KeyID,
 			PrivateKey: cfg.Matrix.PrivateKey,
@@ -180,5 +180,5 @@ func NewInternalAPI(
 	}
 	time.AfterFunc(time.Minute, cleanExpiredEDUs)
 
-	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
+	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, &stats, caches, queues, keyRing)
 }

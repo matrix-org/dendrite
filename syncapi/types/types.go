@@ -37,6 +37,7 @@ var (
 type StateDelta struct {
 	RoomID      string
 	StateEvents []*gomatrixserverlib.HeaderedEvent
+	NewlyJoined bool
 	Membership  string
 	// The PDU stream position of the latest membership event for this user, if applicable.
 	// Can be 0 if there is no membership event in this delta.
@@ -45,6 +46,14 @@ type StateDelta struct {
 
 // StreamPosition represents the offset in the sync stream a client is at.
 type StreamPosition int64
+
+func NewStreamPositionFromString(s string) (StreamPosition, error) {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	return StreamPosition(n), nil
+}
 
 // StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
 type StreamEvent struct {
@@ -326,29 +335,57 @@ type PrevEventRef struct {
 	PrevSender    string          `json:"prev_sender"`
 }
 
+type DeviceLists struct {
+	Changed []string `json:"changed,omitempty"`
+	Left    []string `json:"left,omitempty"`
+}
+
+type RoomsResponse struct {
+	Join   map[string]*JoinResponse   `json:"join,omitempty"`
+	Peek   map[string]*JoinResponse   `json:"peek,omitempty"`
+	Invite map[string]*InviteResponse `json:"invite,omitempty"`
+	Leave  map[string]*LeaveResponse  `json:"leave,omitempty"`
+}
+
+type ToDeviceResponse struct {
+	Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
+}
+
 // Response represents a /sync API response. See https://matrix.org/docs/spec/client_server/r0.2.0.html#get-matrix-client-r0-sync
 type Response struct {
-	NextBatch   StreamingToken `json:"next_batch"`
-	AccountData struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
-	} `json:"account_data,omitempty"`
-	Presence struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
-	} `json:"presence,omitempty"`
-	Rooms struct {
-		Join   map[string]JoinResponse   `json:"join,omitempty"`
-		Peek   map[string]JoinResponse   `json:"peek,omitempty"`
-		Invite map[string]InviteResponse `json:"invite,omitempty"`
-		Leave  map[string]LeaveResponse  `json:"leave,omitempty"`
-	} `json:"rooms,omitempty"`
-	ToDevice struct {
-		Events []gomatrixserverlib.SendToDeviceEvent `json:"events,omitempty"`
-	} `json:"to_device,omitempty"`
-	DeviceLists struct {
-		Changed []string `json:"changed,omitempty"`
-		Left    []string `json:"left,omitempty"`
-	} `json:"device_lists,omitempty"`
-	DeviceListsOTKCount map[string]int `json:"device_one_time_keys_count,omitempty"`
+	NextBatch           StreamingToken    `json:"next_batch"`
+	AccountData         *ClientEvents     `json:"account_data,omitempty"`
+	Presence            *ClientEvents     `json:"presence,omitempty"`
+	Rooms               *RoomsResponse    `json:"rooms,omitempty"`
+	ToDevice            *ToDeviceResponse `json:"to_device,omitempty"`
+	DeviceLists         *DeviceLists      `json:"device_lists,omitempty"`
+	DeviceListsOTKCount map[string]int    `json:"device_one_time_keys_count,omitempty"`
+}
+
+func (r Response) MarshalJSON() ([]byte, error) {
+	type alias Response
+	a := alias(r)
+	if r.AccountData != nil && len(r.AccountData.Events) == 0 {
+		a.AccountData = nil
+	}
+	if r.Presence != nil && len(r.Presence.Events) == 0 {
+		a.Presence = nil
+	}
+	if r.DeviceLists != nil {
+		if len(r.DeviceLists.Left) == 0 && len(r.DeviceLists.Changed) == 0 {
+			a.DeviceLists = nil
+		}
+	}
+	if r.Rooms != nil {
+		if len(r.Rooms.Join) == 0 && len(r.Rooms.Peek) == 0 &&
+			len(r.Rooms.Invite) == 0 && len(r.Rooms.Leave) == 0 {
+			a.Rooms = nil
+		}
+	}
+	if r.ToDevice != nil && len(r.ToDevice.Events) == 0 {
+		a.ToDevice = nil
+	}
+	return json.Marshal(a)
 }
 
 func (r *Response) HasUpdates() bool {
@@ -369,18 +406,21 @@ func NewResponse() *Response {
 	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
 	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
-	res.Rooms.Join = map[string]JoinResponse{}
-	res.Rooms.Peek = map[string]JoinResponse{}
-	res.Rooms.Invite = map[string]InviteResponse{}
-	res.Rooms.Leave = map[string]LeaveResponse{}
+	res.Rooms = &RoomsResponse{
+		Join:   map[string]*JoinResponse{},
+		Peek:   map[string]*JoinResponse{},
+		Invite: map[string]*InviteResponse{},
+		Leave:  map[string]*LeaveResponse{},
+	}
 
 	// Also pre-intialise empty slices or else we'll insert 'null' instead of '[]' for the value.
 	// TODO: We really shouldn't have to do all this to coerce encoding/json to Do The Right Thing. We should
 	//       really be using our own Marshal/Unmarshal implementations otherwise this may prove to be a CPU bottleneck.
 	//       This also applies to NewJoinResponse, NewInviteResponse and NewLeaveResponse.
-	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
-	res.Presence.Events = []gomatrixserverlib.ClientEvent{}
-	res.ToDevice.Events = []gomatrixserverlib.SendToDeviceEvent{}
+	res.AccountData = &ClientEvents{}
+	res.Presence = &ClientEvents{}
+	res.DeviceLists = &DeviceLists{}
+	res.ToDevice = &ToDeviceResponse{}
 	res.DeviceListsOTKCount = map[string]int{}
 
 	return &res
@@ -397,41 +437,80 @@ func (r *Response) IsEmpty() bool {
 		len(r.ToDevice.Events) == 0
 }
 
+type UnreadNotifications struct {
+	HighlightCount    int `json:"highlight_count"`
+	NotificationCount int `json:"notification_count"`
+}
+
+type ClientEvents struct {
+	Events []gomatrixserverlib.ClientEvent `json:"events,omitempty"`
+}
+
+type Timeline struct {
+	Events    []gomatrixserverlib.ClientEvent `json:"events"`
+	Limited   bool                            `json:"limited"`
+	PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
+}
+
+type Summary struct {
+	Heroes             []string `json:"m.heroes,omitempty"`
+	JoinedMemberCount  *int     `json:"m.joined_member_count,omitempty"`
+	InvitedMemberCount *int     `json:"m.invited_member_count,omitempty"`
+}
+
 // JoinResponse represents a /sync response for a room which is under the 'join' or 'peek' key.
 type JoinResponse struct {
-	Summary struct {
-		Heroes             []string `json:"m.heroes,omitempty"`
-		JoinedMemberCount  *int     `json:"m.joined_member_count,omitempty"`
-		InvitedMemberCount *int     `json:"m.invited_member_count,omitempty"`
-	} `json:"summary"`
-	State struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"state"`
-	Timeline struct {
-		Events    []gomatrixserverlib.ClientEvent `json:"events"`
-		Limited   bool                            `json:"limited"`
-		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
-	} `json:"timeline"`
-	Ephemeral struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"ephemeral"`
-	AccountData struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"account_data"`
-	UnreadNotifications struct {
-		HighlightCount    int `json:"highlight_count"`
-		NotificationCount int `json:"notification_count"`
-	} `json:"unread_notifications"`
+	Summary              *Summary      `json:"summary,omitempty"`
+	State                *ClientEvents `json:"state,omitempty"`
+	Timeline             *Timeline     `json:"timeline,omitempty"`
+	Ephemeral            *ClientEvents `json:"ephemeral,omitempty"`
+	AccountData          *ClientEvents `json:"account_data,omitempty"`
+	*UnreadNotifications `json:"unread_notifications,omitempty"`
+}
+
+func (jr JoinResponse) MarshalJSON() ([]byte, error) {
+	type alias JoinResponse
+	a := alias(jr)
+	if jr.State != nil && len(jr.State.Events) == 0 {
+		a.State = nil
+	}
+	if jr.Ephemeral != nil && len(jr.Ephemeral.Events) == 0 {
+		a.Ephemeral = nil
+	}
+	if jr.AccountData != nil && len(jr.AccountData.Events) == 0 {
+		a.AccountData = nil
+	}
+	if jr.Timeline != nil && len(jr.Timeline.Events) == 0 {
+		a.Timeline = nil
+	}
+	if jr.Summary != nil {
+		var nilPtr int
+		joinedEmpty := jr.Summary.JoinedMemberCount == nil || jr.Summary.JoinedMemberCount == &nilPtr
+		invitedEmpty := jr.Summary.InvitedMemberCount == nil || jr.Summary.InvitedMemberCount == &nilPtr
+		if joinedEmpty && invitedEmpty && len(jr.Summary.Heroes) == 0 {
+			a.Summary = nil
+		}
+
+	}
+	if jr.UnreadNotifications != nil {
+		// if everything else is nil, also remove UnreadNotifications
+		if a.State == nil && a.Ephemeral == nil && a.AccountData == nil && a.Timeline == nil && a.Summary == nil {
+			a.UnreadNotifications = nil
+		}
+	}
+	return json.Marshal(a)
 }
 
 // NewJoinResponse creates an empty response with initialised arrays.
 func NewJoinResponse() *JoinResponse {
-	res := JoinResponse{}
-	res.State.Events = []gomatrixserverlib.ClientEvent{}
-	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
-	res.Ephemeral.Events = []gomatrixserverlib.ClientEvent{}
-	res.AccountData.Events = []gomatrixserverlib.ClientEvent{}
-	return &res
+	return &JoinResponse{
+		Summary:             &Summary{},
+		State:               &ClientEvents{},
+		Timeline:            &Timeline{},
+		Ephemeral:           &ClientEvents{},
+		AccountData:         &ClientEvents{},
+		UnreadNotifications: &UnreadNotifications{},
+	}
 }
 
 // InviteResponse represents a /sync response for a room which is under the 'invite' key.
@@ -466,21 +545,28 @@ func NewInviteResponse(event *gomatrixserverlib.HeaderedEvent) *InviteResponse {
 
 // LeaveResponse represents a /sync response for a room which is under the 'leave' key.
 type LeaveResponse struct {
-	State struct {
-		Events []gomatrixserverlib.ClientEvent `json:"events"`
-	} `json:"state"`
-	Timeline struct {
-		Events    []gomatrixserverlib.ClientEvent `json:"events"`
-		Limited   bool                            `json:"limited"`
-		PrevBatch *TopologyToken                  `json:"prev_batch,omitempty"`
-	} `json:"timeline"`
+	State    *ClientEvents `json:"state,omitempty"`
+	Timeline *Timeline     `json:"timeline,omitempty"`
+}
+
+func (lr LeaveResponse) MarshalJSON() ([]byte, error) {
+	type alias LeaveResponse
+	a := alias(lr)
+	if lr.State != nil && len(lr.State.Events) == 0 {
+		a.State = nil
+	}
+	if lr.Timeline != nil && len(lr.Timeline.Events) == 0 {
+		a.Timeline = nil
+	}
+	return json.Marshal(a)
 }
 
 // NewLeaveResponse creates an empty response with initialised arrays.
 func NewLeaveResponse() *LeaveResponse {
-	res := LeaveResponse{}
-	res.State.Events = []gomatrixserverlib.ClientEvent{}
-	res.Timeline.Events = []gomatrixserverlib.ClientEvent{}
+	res := LeaveResponse{
+		State:    &ClientEvents{},
+		Timeline: &Timeline{},
+	}
 	return &res
 }
 
@@ -500,19 +586,6 @@ type Peek struct {
 	RoomID  string
 	New     bool
 	Deleted bool
-}
-
-type ReadUpdate struct {
-	UserID    string         `json:"user_id"`
-	RoomID    string         `json:"room_id"`
-	Read      StreamPosition `json:"read,omitempty"`
-	FullyRead StreamPosition `json:"fully_read,omitempty"`
-}
-
-// StreamEvent is the same as gomatrixserverlib.Event but also has the PDU stream position for this event.
-type StreamedEvent struct {
-	Event          *gomatrixserverlib.HeaderedEvent `json:"event"`
-	StreamPosition StreamPosition                   `json:"stream_position"`
 }
 
 // OutputReceiptEvent is an entry in the receipt output kafka log
@@ -535,4 +608,9 @@ type OutputSendToDeviceEvent struct {
 
 type IgnoredUsers struct {
 	List map[string]interface{} `json:"ignored_users"`
+}
+
+type RelationEntry struct {
+	Position StreamPosition
+	EventID  string
 }

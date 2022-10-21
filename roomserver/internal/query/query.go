@@ -72,13 +72,10 @@ func (r *Queryer) QueryStateAfterEvents(
 
 	prevStates, err := r.DB.StateAtEventIDs(ctx, request.PrevEventIDs)
 	if err != nil {
-		switch err.(type) {
-		case types.MissingEventError:
-			util.GetLogger(ctx).Errorf("QueryStateAfterEvents: MissingEventError: %s", err)
+		if _, ok := err.(types.MissingEventError); ok {
 			return nil
-		default:
-			return err
 		}
+		return err
 	}
 	response.PrevEventsExist = true
 
@@ -95,6 +92,12 @@ func (r *Queryer) QueryStateAfterEvents(
 		)
 	}
 	if err != nil {
+		if _, ok := err.(types.MissingEventError); ok {
+			return nil
+		}
+		if _, ok := err.(types.MissingStateError); ok {
+			return nil
+		}
 		return err
 	}
 
@@ -103,7 +106,7 @@ func (r *Queryer) QueryStateAfterEvents(
 		return err
 	}
 
-	if len(request.PrevEventIDs) > 1 && len(request.StateToFetch) == 0 {
+	if len(request.PrevEventIDs) > 1 {
 		var authEventIDs []string
 		for _, e := range stateEvents {
 			authEventIDs = append(authEventIDs, e.AuthEventIDs()...)
@@ -205,6 +208,9 @@ func (r *Queryer) QueryMembershipForUser(
 	return err
 }
 
+// QueryMembershipAtEvent returns the known memberships at a given event.
+// If the state before an event is not known, an empty list will be returned
+// for that event instead.
 func (r *Queryer) QueryMembershipAtEvent(
 	ctx context.Context,
 	request *api.QueryMembershipAtEventRequest,
@@ -234,7 +240,11 @@ func (r *Queryer) QueryMembershipAtEvent(
 	}
 
 	for _, eventID := range request.EventIDs {
-		stateEntry := stateEntries[eventID]
+		stateEntry, ok := stateEntries[eventID]
+		if !ok {
+			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
+			continue
+		}
 		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
@@ -443,7 +453,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -460,7 +470,9 @@ func (r *Queryer) QueryMissingEvents(
 			if verr != nil {
 				return verr
 			}
-
+			if _, ok := redactEventIDs[event.EventID()]; ok {
+				event.Redact()
+			}
 			response.Events = append(response.Events, event.Headered(roomVersion))
 		}
 	}
@@ -500,10 +512,11 @@ func (r *Queryer) QueryStateAndAuthChain(
 	}
 
 	var stateEvents []*gomatrixserverlib.Event
-	stateEvents, rejected, err := r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
+	stateEvents, rejected, stateMissing, err := r.loadStateAtEventIDs(ctx, info, request.PrevEventIDs)
 	if err != nil {
 		return err
 	}
+	response.StateKnown = !stateMissing
 	response.IsRejected = rejected
 	response.PrevEventsExist = true
 
@@ -539,15 +552,18 @@ func (r *Queryer) QueryStateAndAuthChain(
 	return err
 }
 
-func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, bool, error) {
+// first bool: is rejected, second bool: state missing
+func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomInfo, eventIDs []string) ([]*gomatrixserverlib.Event, bool, bool, error) {
 	roomState := state.NewStateResolution(r.DB, roomInfo)
 	prevStates, err := r.DB.StateAtEventIDs(ctx, eventIDs)
 	if err != nil {
 		switch err.(type) {
 		case types.MissingEventError:
-			return nil, false, nil
+			return nil, false, true, nil
+		case types.MissingStateError:
+			return nil, false, true, nil
 		default:
-			return nil, false, err
+			return nil, false, false, err
 		}
 	}
 	// Currently only used on /state and /state_ids
@@ -564,12 +580,11 @@ func (r *Queryer) loadStateAtEventIDs(ctx context.Context, roomInfo *types.RoomI
 		ctx, prevStates,
 	)
 	if err != nil {
-		return nil, rejected, err
+		return nil, rejected, false, err
 	}
 
 	events, err := helpers.LoadStateEvents(ctx, r.DB, stateEntries)
-
-	return events, rejected, err
+	return events, rejected, false, err
 }
 
 type eventsFromIDs func(context.Context, []string) ([]types.Event, error)
@@ -786,7 +801,7 @@ func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUser
 	}
 	roomIDs = roomIDs[:j]
 
-	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs)
+	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs, req.LocalOnly)
 	if err != nil {
 		return err
 	}
@@ -859,7 +874,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// but we don't specify an authorised via user, since the event auth
 	// will allow the join anyway.
 	var pending bool
-	if pending, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
+	if pending, _, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
 		return fmt.Errorf("helpers.IsInvitePending: %w", err)
 	} else if pending {
 		res.Allowed = true

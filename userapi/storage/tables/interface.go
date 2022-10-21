@@ -84,8 +84,8 @@ type OpenIDTable interface {
 type ProfileTable interface {
 	InsertProfile(ctx context.Context, txn *sql.Tx, localpart string) error
 	SelectProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
-	SetAvatarURL(ctx context.Context, txn *sql.Tx, localpart string, avatarURL string) (err error)
-	SetDisplayName(ctx context.Context, txn *sql.Tx, localpart string, displayName string) (err error)
+	SetAvatarURL(ctx context.Context, txn *sql.Tx, localpart string, avatarURL string) (*authtypes.Profile, bool, error)
+	SetDisplayName(ctx context.Context, txn *sql.Tx, localpart string, displayName string) (*authtypes.Profile, bool, error)
 	SelectProfilesBySearch(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
 }
 
@@ -105,9 +105,9 @@ type PusherTable interface {
 
 type NotificationTable interface {
 	Clean(ctx context.Context, txn *sql.Tx) error
-	Insert(ctx context.Context, txn *sql.Tx, localpart, eventID string, pos int64, highlight bool, n *api.Notification) error
-	DeleteUpTo(ctx context.Context, txn *sql.Tx, localpart, roomID string, pos int64) (affected bool, _ error)
-	UpdateRead(ctx context.Context, txn *sql.Tx, localpart, roomID string, pos int64, v bool) (affected bool, _ error)
+	Insert(ctx context.Context, txn *sql.Tx, localpart, eventID string, pos uint64, highlight bool, n *api.Notification) error
+	DeleteUpTo(ctx context.Context, txn *sql.Tx, localpart, roomID string, pos uint64) (affected bool, _ error)
+	UpdateRead(ctx context.Context, txn *sql.Tx, localpart, roomID string, pos uint64, v bool) (affected bool, _ error)
 	Select(ctx context.Context, txn *sql.Tx, localpart string, fromID int64, limit int, filter NotificationFilter) ([]*api.Notification, int64, error)
 	SelectCount(ctx context.Context, txn *sql.Tx, localpart string, filter NotificationFilter) (int64, error)
 	SelectRoomCounts(ctx context.Context, txn *sql.Tx, localpart, roomID string) (total int64, highlight int64, _ error)

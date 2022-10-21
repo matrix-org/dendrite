@@ -3,17 +3,24 @@ package streams
 import (
 	"context"
 
+	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type NotificationDataStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 }
 
-func (p *NotificationDataStreamProvider) Setup() {
-	p.StreamProvider.Setup()
+func (p *NotificationDataStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseTransaction,
+) {
+	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
-	id, err := p.DB.MaxStreamPositionForNotificationData(context.Background())
+	p.latestMutex.Lock()
+	defer p.latestMutex.Unlock()
+
+	id, err := snapshot.MaxStreamPositionForNotificationData(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -22,34 +29,39 @@ func (p *NotificationDataStreamProvider) Setup() {
 
 func (p *NotificationDataStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *NotificationDataStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
-	from, to types.StreamPosition,
+	from, _ types.StreamPosition,
 ) types.StreamPosition {
-	// We want counts for all possible rooms, so always start from zero.
-	countsByRoom, err := p.DB.GetUserUnreadNotificationCounts(ctx, req.Device.UserID, from, to)
+	// Get the unread notifications for rooms in our join response.
+	// This is to ensure clients always have an unread notification section
+	// and can display the correct numbers.
+	countsByRoom, err := snapshot.GetUserUnreadNotificationCountsForRooms(ctx, req.Device.UserID, req.Rooms)
 	if err != nil {
-		req.Log.WithError(err).Error("GetUserUnreadNotificationCounts failed")
+		req.Log.WithError(err).Error("GetUserUnreadNotificationCountsForRooms failed")
 		return from
 	}
 
-	// We're merely decorating existing rooms. Note that the Join map
-	// values are not pointers.
+	// We're merely decorating existing rooms.
 	for roomID, jr := range req.Response.Rooms.Join {
 		counts := countsByRoom[roomID]
 		if counts == nil {
-			continue
+			counts = &eventutil.NotificationData{}
 		}
-
-		jr.UnreadNotifications.HighlightCount = counts.UnreadHighlightCount
-		jr.UnreadNotifications.NotificationCount = counts.UnreadNotificationCount
+		jr.UnreadNotifications = &types.UnreadNotifications{
+			HighlightCount:    counts.UnreadHighlightCount,
+			NotificationCount: counts.UnreadNotificationCount,
+		}
 		req.Response.Rooms.Join[roomID] = jr
 	}
-	return to
+
+	return p.LatestPosition(ctx)
 }

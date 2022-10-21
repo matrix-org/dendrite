@@ -18,11 +18,16 @@ global:
   private_key: matrix_key.pem
 
   # The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
-  # to old signing private keys that were formerly in use on this domain. These
+  # to old signing keys that were formerly in use on this domain name. These
   # keys will not be used for federation request or event signing, but will be
   # provided to any other homeserver that asks when trying to verify old events.
   old_private_keys:
+  #  If the old private key file is available:
   #  - private_key: old_matrix_key.pem
+  #    expired_at: 1601024554498
+  #  If only the public key (in base64 format) and key ID are known:
+  #  - public_key: mn59Kxfdq9VziYHSBzI7+EDPDcBS2Xl7jeUdiiQcOnM=
+  #    key_id: ed25519:mykeyid
   #    expired_at: 1601024554498
 
   # How long a remote server can cache our server signing key before requesting it
@@ -132,13 +137,6 @@ app_service_api:
     listen: http://[::]:7777 # The listen address for incoming API requests
     connect: http://app_service_api:7777 # The connect address for other components to use
 
-  # Database configuration for this component.
-  database:
-    connection_string: postgresql://username:password@hostname/dendrite_appservice?sslmode=disable
-    max_open_conns: 10
-    max_idle_conns: 2
-    conn_max_lifetime: -1
-
   # Disable the validation of TLS certificates of appservices. This is
   # not recommended in production since it may allow appservice traffic
   # to be sent to an insecure endpoint.
@@ -235,6 +233,13 @@ federation_api:
   # Disable the validation of TLS certificates of remote federated homeservers. Do not
   # enable this option in production as it presents a security risk!
   disable_tls_validation: false
+
+  # Disable HTTP keepalives, which also prevents connection reuse. Dendrite will typically
+  # keep HTTP connections open to remote hosts for 5 minutes as they can be reused much
+  # more quickly than opening new connections each time. Disabling keepalives will close
+  # HTTP connections immediately after a successful request but may result in more CPU and
+  # memory being used on TLS handshakes for each new connection instead.
+  disable_http_keepalives: false
 
   # Perspective keyservers to use as a backup when direct key fetches fail. This may
   # be required to satisfy key requests for servers that are no longer online when
@@ -336,6 +341,19 @@ sync_api:
     max_open_conns: 10
     max_idle_conns: 2
     conn_max_lifetime: -1
+
+  # Configuration for the full-text search engine.
+  search:
+    # Whether or not search is enabled.
+    enabled: false
+
+    # The path where the search index will be created in.
+    index_path: "./searchindex"
+
+    # The language most likely to be used on the server - used when indexing, to
+    # ensure the returned results match expectations. A full list of possible languages
+    # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    language: "en"
 
   # This option controls which HTTP header to inspect to find the real remote IP
   # address of the client. This is likely required if Dendrite is running behind

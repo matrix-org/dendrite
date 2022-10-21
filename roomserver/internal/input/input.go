@@ -36,6 +36,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/query"
 	"github.com/matrix-org/dendrite/roomserver/producers"
 	"github.com/matrix-org/dendrite/roomserver/storage"
+	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
@@ -88,6 +89,13 @@ type Inputer struct {
 	Queryer *query.Queryer
 }
 
+// If a room consumer is inactive for a while then we will allow NATS
+// to clean it up. This stops us from holding onto durable consumers
+// indefinitely for rooms that might no longer be active, since they do
+// have an interest overhead in the NATS Server. If the room becomes
+// active again then we'll recreate the consumer anyway.
+const inactiveThreshold = time.Hour * 24
+
 type worker struct {
 	phony.Inbox
 	sync.Mutex
@@ -124,11 +132,12 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 		if _, err := w.r.JetStream.AddConsumer(
 			r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent),
 			&nats.ConsumerConfig{
-				Durable:       consumer,
-				AckPolicy:     nats.AckAllPolicy,
-				DeliverPolicy: nats.DeliverAllPolicy,
-				FilterSubject: subject,
-				AckWait:       MaximumMissingProcessingTime + (time.Second * 10),
+				Durable:           consumer,
+				AckPolicy:         nats.AckAllPolicy,
+				DeliverPolicy:     nats.DeliverAllPolicy,
+				FilterSubject:     subject,
+				AckWait:           MaximumMissingProcessingTime + (time.Second * 10),
+				InactiveThreshold: inactiveThreshold,
 			},
 		); err != nil {
 			logrus.WithError(err).Errorf("Failed to create consumer for room %q", w.roomID)
@@ -144,6 +153,7 @@ func (r *Inputer) startWorkerForRoom(roomID string) {
 			nats.DeliverAll(),
 			nats.AckWait(MaximumMissingProcessingTime+(time.Second*10)),
 			nats.Bind(r.InputRoomEventTopic, consumer),
+			nats.InactiveThreshold(inactiveThreshold),
 		)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to subscribe to stream for room %q", w.roomID)
@@ -175,9 +185,25 @@ func (r *Inputer) Start() error {
 		},
 		nats.HeadersOnly(),
 		nats.DeliverAll(),
-		nats.AckAll(),
+		nats.AckExplicit(),
+		nats.ReplayInstant(),
 		nats.BindStream(r.InputRoomEventTopic),
 	)
+
+	// Make sure that the room consumers have the right config.
+	stream := r.Cfg.Matrix.JetStream.Prefixed(jetstream.InputRoomEvent)
+	for consumer := range r.JetStream.Consumers(stream) {
+		switch {
+		case consumer.Config.Durable == "":
+			continue // Ignore ephemeral consumers
+		case consumer.Config.InactiveThreshold != inactiveThreshold:
+			consumer.Config.InactiveThreshold = inactiveThreshold
+			if _, cerr := r.JetStream.UpdateConsumer(stream, &consumer.Config); cerr != nil {
+				logrus.WithError(cerr).Warnf("Failed to update inactive threshold on consumer %q", consumer.Name)
+			}
+		}
+	}
+
 	return err
 }
 
@@ -187,6 +213,9 @@ func (w *worker) _next() {
 	// Look up what the next event is that's waiting to be processed.
 	ctx, cancel := context.WithTimeout(w.r.ProcessContext.Context(), time.Minute)
 	defer cancel()
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("room_id", w.roomID)
+	}
 	msgs, err := w.subscription.Fetch(1, nats.Context(ctx))
 	switch err {
 	case nil:
@@ -238,6 +267,9 @@ func (w *worker) _next() {
 		return
 	}
 
+	if scope := sentry.CurrentHub().Scope(); scope != nil {
+		scope.SetTag("event_id", inputRoomEvent.Event.EventID())
+	}
 	roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Inc()
 	defer roomserverInputBackpressure.With(prometheus.Labels{"room_id": w.roomID}).Dec()
 
@@ -247,14 +279,24 @@ func (w *worker) _next() {
 	// it was a synchronous request.
 	var errString string
 	if err = w.r.processRoomEvent(w.r.ProcessContext.Context(), &inputRoomEvent); err != nil {
-		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-			sentry.CaptureException(err)
+		switch err.(type) {
+		case types.RejectedError:
+			// Don't send events that were rejected to Sentry
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver rejected event")
+		default:
+			if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				sentry.CaptureException(err)
+			}
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"room_id":  w.roomID,
+				"event_id": inputRoomEvent.Event.EventID(),
+				"type":     inputRoomEvent.Event.Type(),
+			}).Warn("Roomserver failed to process event")
 		}
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"room_id":  w.roomID,
-			"event_id": inputRoomEvent.Event.EventID(),
-			"type":     inputRoomEvent.Event.Type(),
-		}).Warn("Roomserver failed to process async event")
 		_ = msg.Term()
 		errString = err.Error()
 	} else {

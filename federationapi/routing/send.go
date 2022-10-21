@@ -22,6 +22,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
@@ -31,10 +37,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -349,6 +351,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
 					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+						sentry.CaptureException(err)
 						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 							"sender":    directPayload.Sender,
 							"user_id":   userID,
@@ -358,7 +361,10 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
-			t.processDeviceListUpdate(ctx, e)
+			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, t.Origin); err != nil {
+				sentry.CaptureException(err)
+				util.GetLogger(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
+			}
 		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := map[string]types.FederationReceiptMRead{}
@@ -391,7 +397,8 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case types.MSigningKeyUpdate:
-			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
+			if err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin); err != nil {
+				sentry.CaptureException(err)
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
 		case gomatrixserverlib.MPresence:
@@ -431,42 +438,6 @@ func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 	return nil
 }
 
-func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
-	var updatePayload keyapi.CrossSigningKeyUpdate
-	if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
-		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-			"user_id": updatePayload.UserID,
-		}).Debug("Failed to unmarshal signing key update")
-		return err
-	}
-	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
-		return nil
-	} else if serverName == t.ourServerName {
-		return nil
-	} else if serverName != t.Origin {
-		return nil
-	}
-	keys := gomatrixserverlib.CrossSigningKeys{}
-	if updatePayload.MasterKey != nil {
-		keys.MasterKey = *updatePayload.MasterKey
-	}
-	if updatePayload.SelfSigningKey != nil {
-		keys.SelfSigningKey = *updatePayload.SelfSigningKey
-	}
-	uploadReq := &keyapi.PerformUploadDeviceKeysRequest{
-		CrossSigningKeys: keys,
-		UserID:           updatePayload.UserID,
-	}
-	uploadRes := &keyapi.PerformUploadDeviceKeysResponse{}
-	if err := t.keyAPI.PerformUploadDeviceKeys(ctx, uploadReq, uploadRes); err != nil {
-		return err
-	}
-	if uploadRes.Error != nil {
-		return uploadRes.Error
-	}
-	return nil
-}
-
 // processReceiptEvent sends receipt events to JetStream
 func (t *txnReq) processReceiptEvent(ctx context.Context,
 	userID, roomID, receiptType string,
@@ -488,22 +459,4 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 	}
 
 	return nil
-}
-
-func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverlib.EDU) {
-	var payload gomatrixserverlib.DeviceListUpdateEvent
-	if err := json.Unmarshal(e.Content, &payload); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal device list update event")
-		return
-	}
-	if _, serverName, err := gomatrixserverlib.SplitID('@', payload.UserID); err != nil {
-		return
-	} else if serverName == t.ourServerName {
-		return
-	} else if serverName != t.Origin {
-		return
-	}
-	if err := t.producer.SendDeviceListUpdate(ctx, &payload); err != nil {
-		util.GetLogger(ctx).WithError(err).WithField("user_id", payload.UserID).Error("failed to InputDeviceListUpdate")
-	}
 }

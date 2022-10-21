@@ -79,14 +79,13 @@ func (r *Leaver) performLeaveRoomByID(
 ) ([]api.OutputEvent, error) {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
+	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
-		var host gomatrixserverlib.ServerName
-		_, host, err = gomatrixserverlib.SplitID('@', senderUser)
-		if err != nil {
+		_, senderDomain, serr := gomatrixserverlib.SplitID('@', senderUser)
+		if serr != nil {
 			return nil, fmt.Errorf("sender %q is invalid", senderUser)
 		}
-		if host != r.Cfg.Matrix.ServerName {
+		if senderDomain != r.Cfg.Matrix.ServerName {
 			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
 		}
 		// check that this is not a "server notice room"
@@ -172,6 +171,12 @@ func (r *Leaver) performLeaveRoomByID(
 		return nil, fmt.Errorf("eventutil.BuildEvent: %w", err)
 	}
 
+	// Get the sender domain.
+	_, senderDomain, serr := gomatrixserverlib.SplitID('@', event.Sender())
+	if serr != nil {
+		return nil, fmt.Errorf("sender %q is invalid", event.Sender())
+	}
+
 	// Give our leave event to the roomserver input stream. The
 	// roomserver will process the membership change and notify
 	// downstream automatically.
@@ -180,7 +185,7 @@ func (r *Leaver) performLeaveRoomByID(
 			{
 				Kind:         api.KindNew,
 				Event:        event.Headered(buildRes.RoomVersion),
-				Origin:       event.Origin(),
+				Origin:       senderDomain,
 				SendAsServer: string(r.Cfg.Matrix.ServerName),
 			},
 		},

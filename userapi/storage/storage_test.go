@@ -7,17 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
-	"github.com/matrix-org/dendrite/internal/pushrules"
-	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/pushrules"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/dendrite/userapi/storage"
+	"github.com/matrix-org/dendrite/userapi/storage/tables"
 )
 
 const loginTokenLifetime = time.Minute
@@ -28,14 +30,18 @@ var (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
+	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
-	return db, close
+	return db, func() {
+		close()
+		baseclose()
+	}
 }
 
 // Tests storing and getting account data
@@ -191,19 +197,18 @@ func Test_Devices(t *testing.T) {
 		newName := "new display name"
 		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
 		assert.NoError(t, err, "unable to update device displayname")
+		updatedAfterTimestamp := time.Now().Unix()
 		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1", "Element Web")
 		assert.NoError(t, err, "unable to update device last seen")
 
 		deviceWithID.DisplayName = newName
 		deviceWithID.LastSeenIP = "127.0.0.1"
-		deviceWithID.LastSeenTS = int64(gomatrixserverlib.AsTimestamp(time.Now().Truncate(time.Second)))
 		gotDevice, err = db.GetDeviceByID(ctx, localpart, deviceWithID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 2, len(devices))
 		assert.Equal(t, deviceWithID.DisplayName, gotDevice.DisplayName)
 		assert.Equal(t, deviceWithID.LastSeenIP, gotDevice.LastSeenIP)
-		truncatedTime := gomatrixserverlib.Timestamp(gotDevice.LastSeenTS).Time().Truncate(time.Second)
-		assert.Equal(t, gomatrixserverlib.Timestamp(deviceWithID.LastSeenTS), gomatrixserverlib.AsTimestamp(truncatedTime))
+		assert.Greater(t, gotDevice.LastSeenTS, updatedAfterTimestamp)
 
 		// create one more device and remove the devices step by step
 		newDeviceID := util.RandomString(16)
@@ -377,15 +382,23 @@ func Test_Profile(t *testing.T) {
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
-		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		err = db.SetDisplayName(ctx, aliceLocalpart, "Alice")
-		assert.NoError(t, err, "unable to set displayname")
-		err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
-		assert.NoError(t, err, "unable to set avatar url")
-		// verify profile
-		gotProfile, err = db.GetProfileByLocalpart(ctx, aliceLocalpart)
-		assert.NoError(t, err, "unable to get profile by localpart")
+		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, "Alice")
 		assert.Equal(t, wantProfile, gotProfile)
+		assert.NoError(t, err, "unable to set displayname")
+		assert.True(t, changed)
+
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		assert.Equal(t, wantProfile, gotProfile)
+		assert.True(t, changed)
+
+		// Setting the same avatar again doesn't change anything
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		assert.Equal(t, wantProfile, gotProfile)
+		assert.False(t, changed)
 
 		// search profiles
 		searchRes, err := db.SearchProfiles(ctx, "Alice", 2)
@@ -513,7 +526,7 @@ func Test_Notification(t *testing.T) {
 				RoomID: roomID,
 				TS:     gomatrixserverlib.AsTimestamp(ts),
 			}
-			err = db.InsertNotification(ctx, aliceLocalpart, eventID, int64(i+1), nil, notification)
+			err = db.InsertNotification(ctx, aliceLocalpart, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")
 		}
 

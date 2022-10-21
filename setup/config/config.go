@@ -212,7 +212,10 @@ func loadConfig(
 	monolithic bool,
 ) (*Dendrite, error) {
 	var c Dendrite
-	c.Defaults(false)
+	c.Defaults(DefaultOpts{
+		Generate:   false,
+		Monolithic: monolithic,
+	})
 	c.IsMonolith = monolithic
 
 	var err error
@@ -225,33 +228,44 @@ func loadConfig(
 	}
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
-	privateKeyData, err := readFile(privateKeyPath)
-	if err != nil {
+	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
 		return nil, err
 	}
 
-	if c.Global.KeyID, c.Global.PrivateKey, err = readKeyPEM(privateKeyPath, privateKeyData, true); err != nil {
-		return nil, err
-	}
+	for _, key := range c.Global.OldVerifyKeys {
+		switch {
+		case key.PrivateKeyPath != "":
+			var oldPrivateKeyData []byte
+			oldPrivateKeyPath := absPath(basePath, key.PrivateKeyPath)
+			oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read %q: %w", oldPrivateKeyPath, err)
+			}
 
-	for i, oldPrivateKey := range c.Global.OldVerifyKeys {
-		var oldPrivateKeyData []byte
+			// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
+			// a number of private keys out there with non-compatible symbols in them due
+			// to lack of validation in Synapse, we won't enforce that for old verify keys.
+			keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
+			if perr != nil {
+				return nil, fmt.Errorf("failed to parse %q: %w", oldPrivateKeyPath, perr)
+			}
 
-		oldPrivateKeyPath := absPath(basePath, oldPrivateKey.PrivateKeyPath)
-		oldPrivateKeyData, err = readFile(oldPrivateKeyPath)
-		if err != nil {
-			return nil, err
+			key.KeyID = keyID
+			key.PrivateKey = privateKey
+			key.PublicKey = gomatrixserverlib.Base64Bytes(privateKey.Public().(ed25519.PublicKey))
+
+		case key.KeyID == "":
+			return nil, fmt.Errorf("'key_id' must be specified if 'public_key' is specified")
+
+		case len(key.PublicKey) == ed25519.PublicKeySize:
+			continue
+
+		case len(key.PublicKey) > 0:
+			return nil, fmt.Errorf("the supplied 'public_key' is the wrong length")
+
+		default:
+			return nil, fmt.Errorf("either specify a 'private_key' path or supply both 'public_key' and 'key_id'")
 		}
-
-		// NOTSPEC: Ordinarily we should enforce key ID formatting, but since there are
-		// a number of private keys out there with non-compatible symbols in them due
-		// to lack of validation in Synapse, we won't enforce that for old verify keys.
-		keyID, privateKey, perr := readKeyPEM(oldPrivateKeyPath, oldPrivateKeyData, false)
-		if perr != nil {
-			return nil, perr
-		}
-
-		c.Global.OldVerifyKeys[i].KeyID, c.Global.OldVerifyKeys[i].PrivateKey = keyID, privateKey
 	}
 
 	c.MediaAPI.AbsBasePath = Path(absPath(basePath, c.MediaAPI.BasePath))
@@ -264,6 +278,14 @@ func loadConfig(
 
 	c.Wiring()
 	return &c, nil
+}
+
+func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error)) (gomatrixserverlib.KeyID, ed25519.PrivateKey, error) {
+	privateKeyData, err := readFile(privateKeyPath)
+	if err != nil {
+		return "", nil, err
+	}
+	return readKeyPEM(privateKeyPath, privateKeyData, true)
 }
 
 // Derive generates data that is derived from various values provided in
@@ -303,21 +325,25 @@ func (config *Dendrite) Derive() error {
 	return nil
 }
 
+type DefaultOpts struct {
+	Generate   bool
+	Monolithic bool
+}
+
 // SetDefaults sets default config values if they are not explicitly set.
-func (c *Dendrite) Defaults(generate bool) {
+func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.Version = Version
 
-	c.Global.Defaults(generate)
-	c.ClientAPI.Defaults(generate)
-	c.FederationAPI.Defaults(generate)
-	c.KeyServer.Defaults(generate)
-	c.MediaAPI.Defaults(generate)
-	c.RoomServer.Defaults(generate)
-	c.SyncAPI.Defaults(generate)
-	c.UserAPI.Defaults(generate)
-	c.AppServiceAPI.Defaults(generate)
-	c.MSCs.Defaults(generate)
-
+	c.Global.Defaults(opts)
+	c.ClientAPI.Defaults(opts)
+	c.FederationAPI.Defaults(opts)
+	c.KeyServer.Defaults(opts)
+	c.MediaAPI.Defaults(opts)
+	c.RoomServer.Defaults(opts)
+	c.SyncAPI.Defaults(opts)
+	c.UserAPI.Defaults(opts)
+	c.AppServiceAPI.Defaults(opts)
+	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
 

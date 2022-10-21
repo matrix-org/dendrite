@@ -49,6 +49,20 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	return &d, nil
 }
 
+func (d *SyncServerDatasource) NewDatabaseSnapshot(ctx context.Context) (*shared.DatabaseTransaction, error) {
+	return &shared.DatabaseTransaction{
+		Database: &d.Database,
+		// not setting a transaction because SQLite doesn't support it
+	}, nil
+}
+
+func (d *SyncServerDatasource) NewDatabaseTransaction(ctx context.Context) (*shared.DatabaseTransaction, error) {
+	return &shared.DatabaseTransaction{
+		Database: &d.Database,
+		// not setting a transaction because SQLite doesn't support it
+	}, nil
+}
+
 func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err = d.streamID.Prepare(d.db); err != nil {
 		return err
@@ -109,6 +123,10 @@ func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	relations, err := NewSqliteRelationsTable(d.db, &d.streamID)
+	if err != nil {
+		return err
+	}
 
 	// apply migrations which need multiple tables
 	m := sqlutil.NewMigrator(d.db)
@@ -139,6 +157,7 @@ func (d *SyncServerDatasource) prepare(ctx context.Context) (err error) {
 		NotificationData:    notificationData,
 		Ignores:             ignores,
 		Presence:            presence,
+		Relations:           relations,
 	}
 	return nil
 }

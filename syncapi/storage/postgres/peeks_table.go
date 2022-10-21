@@ -152,9 +152,9 @@ func (s *peekStatements) SelectPeeksInRange(
 }
 
 func (s *peekStatements) SelectPeekingDevices(
-	ctx context.Context,
+	ctx context.Context, txn *sql.Tx,
 ) (peekingDevices map[string][]types.PeekingDevice, err error) {
-	rows, err := s.selectPeekingDevicesStmt.QueryContext(ctx)
+	rows, err := sqlutil.TxStmt(txn, s.selectPeekingDevicesStmt).QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}

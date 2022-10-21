@@ -24,24 +24,28 @@ func TestRuleSetEvaluatorMatchEvent(t *testing.T) {
 		Default: false,
 		Enabled: true,
 	}
+	defaultRuleset := DefaultGlobalRuleSet("test", "test")
 	tsts := []struct {
 		Name    string
 		RuleSet RuleSet
 		Want    *Rule
+		Event   *gomatrixserverlib.Event
 	}{
-		{"empty", RuleSet{}, nil},
-		{"defaultCanWin", RuleSet{Override: []*Rule{defaultEnabled}}, defaultEnabled},
-		{"userWins", RuleSet{Override: []*Rule{defaultEnabled, userEnabled}}, userEnabled},
-		{"defaultOverrideWins", RuleSet{Override: []*Rule{defaultEnabled}, Underride: []*Rule{userEnabled}}, defaultEnabled},
-		{"overrideContent", RuleSet{Override: []*Rule{userEnabled}, Content: []*Rule{userEnabled2}}, userEnabled},
-		{"overrideRoom", RuleSet{Override: []*Rule{userEnabled}, Room: []*Rule{userEnabled2}}, userEnabled},
-		{"overrideSender", RuleSet{Override: []*Rule{userEnabled}, Sender: []*Rule{userEnabled2}}, userEnabled},
-		{"overrideUnderride", RuleSet{Override: []*Rule{userEnabled}, Underride: []*Rule{userEnabled2}}, userEnabled},
+		{"empty", RuleSet{}, nil, ev},
+		{"defaultCanWin", RuleSet{Override: []*Rule{defaultEnabled}}, defaultEnabled, ev},
+		{"userWins", RuleSet{Override: []*Rule{defaultEnabled, userEnabled}}, userEnabled, ev},
+		{"defaultOverrideWins", RuleSet{Override: []*Rule{defaultEnabled}, Underride: []*Rule{userEnabled}}, defaultEnabled, ev},
+		{"overrideContent", RuleSet{Override: []*Rule{userEnabled}, Content: []*Rule{userEnabled2}}, userEnabled, ev},
+		{"overrideRoom", RuleSet{Override: []*Rule{userEnabled}, Room: []*Rule{userEnabled2}}, userEnabled, ev},
+		{"overrideSender", RuleSet{Override: []*Rule{userEnabled}, Sender: []*Rule{userEnabled2}}, userEnabled, ev},
+		{"overrideUnderride", RuleSet{Override: []*Rule{userEnabled}, Underride: []*Rule{userEnabled2}}, userEnabled, ev},
+		{"reactions don't notify", *defaultRuleset, &mRuleReactionDefinition, mustEventFromJSON(t, `{"type":"m.reaction"}`)},
+		{"receipts don't notify", *defaultRuleset, nil, mustEventFromJSON(t, `{"type":"m.receipt"}`)},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
-			rse := NewRuleSetEvaluator(nil, &tst.RuleSet)
-			got, err := rse.MatchEvent(ev)
+			rse := NewRuleSetEvaluator(fakeEvaluationContext{3}, &tst.RuleSet)
+			got, err := rse.MatchEvent(tst.Event)
 			if err != nil {
 				t.Fatalf("MatchEvent failed: %v", err)
 			}
@@ -128,7 +132,7 @@ func TestConditionMatches(t *testing.T) {
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
-			got, err := conditionMatches(&tst.Cond, mustEventFromJSON(t, tst.EventJSON), &fakeEvaluationContext{})
+			got, err := conditionMatches(&tst.Cond, mustEventFromJSON(t, tst.EventJSON), &fakeEvaluationContext{2})
 			if err != nil {
 				t.Fatalf("conditionMatches failed: %v", err)
 			}
@@ -139,10 +143,10 @@ func TestConditionMatches(t *testing.T) {
 	}
 }
 
-type fakeEvaluationContext struct{}
+type fakeEvaluationContext struct{ memberCount int }
 
-func (fakeEvaluationContext) UserDisplayName() string       { return "Dear User" }
-func (fakeEvaluationContext) RoomMemberCount() (int, error) { return 2, nil }
+func (fakeEvaluationContext) UserDisplayName() string         { return "Dear User" }
+func (f fakeEvaluationContext) RoomMemberCount() (int, error) { return f.memberCount, nil }
 func (fakeEvaluationContext) HasPowerLevel(userID, levelKey string) (bool, error) {
 	return userID == "@poweruser:example.com" && levelKey == "powerlevel", nil
 }

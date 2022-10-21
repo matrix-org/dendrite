@@ -16,6 +16,8 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/consumers"
@@ -26,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
@@ -57,10 +58,10 @@ func NewInternalAPI(
 		FedClient:  fedClient,
 		Producer:   keyChangeProducer,
 	}
-	updater := internal.NewDeviceListUpdater(db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
 	ap.Updater = updater
 	go func() {
-		if err = updater.Start(); err != nil {
+		if err := updater.Start(); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")
 		}
 	}()
@@ -68,8 +69,15 @@ func NewInternalAPI(
 	dlConsumer := consumers.NewDeviceListUpdateConsumer(
 		base.ProcessContext, cfg, js, updater,
 	)
-	if err = dlConsumer.Start(); err != nil {
+	if err := dlConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start device list consumer")
+	}
+
+	sigConsumer := consumers.NewSigningKeyUpdateConsumer(
+		base.ProcessContext, cfg, js, ap,
+	)
+	if err := sigConsumer.Start(); err != nil {
+		logrus.WithError(err).Panic("failed to start signing key consumer")
 	}
 
 	return ap

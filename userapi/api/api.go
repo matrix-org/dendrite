@@ -96,7 +96,7 @@ type ClientUserAPI interface {
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error
-	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error
+	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *PerformUpdateDisplayNameResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
@@ -579,7 +579,10 @@ type Notification struct {
 type PerformSetAvatarURLRequest struct {
 	Localpart, AvatarURL string
 }
-type PerformSetAvatarURLResponse struct{}
+type PerformSetAvatarURLResponse struct {
+	Profile *authtypes.Profile `json:"profile"`
+	Changed bool               `json:"changed"`
+}
 
 type QueryNumericLocalpartResponse struct {
 	ID int64
@@ -604,6 +607,11 @@ type QueryAccountByPasswordResponse struct {
 
 type PerformUpdateDisplayNameRequest struct {
 	Localpart, DisplayName string
+}
+
+type PerformUpdateDisplayNameResponse struct {
+	Profile *authtypes.Profile `json:"profile"`
+	Changed bool               `json:"changed"`
 }
 
 type QueryLocalpartForThreePIDRequest struct {

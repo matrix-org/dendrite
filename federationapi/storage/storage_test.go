@@ -31,10 +31,11 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Dat
 
 func TestExpireEDUs(t *testing.T) {
 	var expireEDUTypes = map[string]time.Duration{
-		gomatrixserverlib.MReceipt: time.Millisecond,
+		gomatrixserverlib.MReceipt: 0,
 	}
 
 	ctx := context.Background()
+	destinations := map[gomatrixserverlib.ServerName]struct{}{"localhost": {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateFederationDatabase(t, dbType)
 		defer close()
@@ -43,7 +44,7 @@ func TestExpireEDUs(t *testing.T) {
 			receipt, err := db.StoreJSON(ctx, "{}")
 			assert.NoError(t, err)
 
-			err = db.AssociateEDUWithDestination(ctx, "localhost", receipt, gomatrixserverlib.MReceipt, expireEDUTypes)
+			err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, gomatrixserverlib.MReceipt, expireEDUTypes)
 			assert.NoError(t, err)
 		}
 		// add data without expiry
@@ -51,7 +52,7 @@ func TestExpireEDUs(t *testing.T) {
 		assert.NoError(t, err)
 
 		// m.read_marker gets the default expiry of 24h, so won't be deleted further down in this test
-		err = db.AssociateEDUWithDestination(ctx, "localhost", receipt, "m.read_marker", expireEDUTypes)
+		err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, "m.read_marker", expireEDUTypes)
 		assert.NoError(t, err)
 
 		// Delete expired EDUs
@@ -67,7 +68,7 @@ func TestExpireEDUs(t *testing.T) {
 		receipt, err = db.StoreJSON(ctx, "{}")
 		assert.NoError(t, err)
 
-		err = db.AssociateEDUWithDestination(ctx, "localhost", receipt, gomatrixserverlib.MDirectToDevice, expireEDUTypes)
+		err = db.AssociateEDUWithDestinations(ctx, destinations, receipt, gomatrixserverlib.MDirectToDevice, expireEDUTypes)
 		assert.NoError(t, err)
 
 		err = db.DeleteExpiredEDUs(ctx)

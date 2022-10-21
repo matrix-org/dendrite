@@ -7,21 +7,25 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 type InviteStreamProvider struct {
-	StreamProvider
+	DefaultStreamProvider
 }
 
-func (p *InviteStreamProvider) Setup() {
-	p.StreamProvider.Setup()
+func (p *InviteStreamProvider) Setup(
+	ctx context.Context, snapshot storage.DatabaseTransaction,
+) {
+	p.DefaultStreamProvider.Setup(ctx, snapshot)
 
 	p.latestMutex.Lock()
 	defer p.latestMutex.Unlock()
 
-	id, err := p.DB.MaxStreamPositionForInvites(context.Background())
+	id, err := snapshot.MaxStreamPositionForInvites(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -30,13 +34,15 @@ func (p *InviteStreamProvider) Setup() {
 
 func (p *InviteStreamProvider) CompleteSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 ) types.StreamPosition {
-	return p.IncrementalSync(ctx, req, 0, p.LatestPosition(ctx))
+	return p.IncrementalSync(ctx, snapshot, req, 0, p.LatestPosition(ctx))
 }
 
 func (p *InviteStreamProvider) IncrementalSync(
 	ctx context.Context,
+	snapshot storage.DatabaseTransaction,
 	req *types.SyncRequest,
 	from, to types.StreamPosition,
 ) types.StreamPosition {
@@ -45,7 +51,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		To:   to,
 	}
 
-	invites, retiredInvites, err := p.DB.InviteEventsInRange(
+	invites, retiredInvites, maxID, err := snapshot.InviteEventsInRange(
 		ctx, req.Device.UserID, r,
 	)
 	if err != nil {
@@ -59,26 +65,36 @@ func (p *InviteStreamProvider) IncrementalSync(
 			continue
 		}
 		ir := types.NewInviteResponse(inviteEvent)
-		req.Response.Rooms.Invite[roomID] = *ir
+		req.Response.Rooms.Invite[roomID] = ir
 	}
 
+	// When doing an initial sync, we don't want to add retired invites, as this
+	// can add rooms we were invited to, but already left.
+	if from == 0 {
+		return to
+	}
 	for roomID := range retiredInvites {
-		if _, ok := req.Response.Rooms.Join[roomID]; !ok {
-			lr := types.NewLeaveResponse()
-			h := sha256.Sum256(append([]byte(roomID), []byte(strconv.FormatInt(int64(to), 10))...))
-			lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{
-				// fake event ID which muxes in the to position
-				EventID:        "$" + base64.RawURLEncoding.EncodeToString(h[:]),
-				OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
-				RoomID:         roomID,
-				Sender:         req.Device.UserID,
-				StateKey:       &req.Device.UserID,
-				Type:           "m.room.member",
-				Content:        gomatrixserverlib.RawJSON(`{"membership":"leave"}`),
-			})
-			req.Response.Rooms.Leave[roomID] = *lr
+		if _, ok := req.Response.Rooms.Invite[roomID]; ok {
+			continue
 		}
+		if _, ok := req.Response.Rooms.Join[roomID]; ok {
+			continue
+		}
+		lr := types.NewLeaveResponse()
+		h := sha256.Sum256(append([]byte(roomID), []byte(strconv.FormatInt(int64(to), 10))...))
+		lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{
+			// fake event ID which muxes in the to position
+			EventID:        "$" + base64.RawURLEncoding.EncodeToString(h[:]),
+			OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
+			RoomID:         roomID,
+			Sender:         req.Device.UserID,
+			StateKey:       &req.Device.UserID,
+			Type:           "m.room.member",
+			Content:        gomatrixserverlib.RawJSON(`{"membership":"leave"}`),
+		})
+		req.Response.Rooms.Leave[roomID] = lr
+
 	}
 
-	return to
+	return maxID
 }

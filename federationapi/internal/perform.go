@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/consumers"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/consumers"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
 // PerformLeaveRequest implements api.FederationInternalAPI
@@ -95,6 +96,7 @@ func (r *FederationInternalAPI) PerformJoin(
 			request.Content,
 			serverName,
 			supportedVersions,
+			request.Unsigned,
 		); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"server_name": serverName,
@@ -139,6 +141,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	content map[string]interface{},
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
+	unsigned map[string]interface{},
 ) error {
 	// Try to perform a make_join using the information supplied in the
 	// request.
@@ -217,7 +220,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		var remoteEvent *gomatrixserverlib.Event
 		remoteEvent, err = respSendJoin.Event.UntrustedEvent(respMakeJoin.RoomVersion)
 		if err == nil && isWellFormedMembershipEvent(
-			remoteEvent, roomID, userID, r.cfg.Matrix.ServerName,
+			remoteEvent, roomID, userID,
 		) {
 			event = remoteEvent
 		}
@@ -259,7 +262,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if err != nil {
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
-	logrus.WithField("hosts", joinedHosts).WithField("room", roomID).Info("Joined federated room with hosts")
+	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
 	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
 		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
@@ -267,6 +270,14 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
+	if unsigned != nil {
+		event, err = event.SetUnsigned(unsigned)
+		if err != nil {
+			// non-fatal, log and continue
+			logrus.WithError(err).Errorf("Failed to set unsigned content")
+		}
+	}
+
 	if err = roomserverAPI.SendEventWithState(
 		context.Background(),
 		r.rsAPI,
@@ -285,16 +296,13 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 
 // isWellFormedMembershipEvent returns true if the event looks like a legitimate
 // membership event.
-func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string, origin gomatrixserverlib.ServerName) bool {
+func isWellFormedMembershipEvent(event *gomatrixserverlib.Event, roomID, userID string) bool {
 	if membership, err := event.Membership(); err != nil {
 		return false
 	} else if membership != gomatrixserverlib.Join {
 		return false
 	}
 	if event.RoomID() != roomID {
-		return false
-	}
-	if event.Origin() != origin {
 		return false
 	}
 	if !event.StateKeyEquals(userID) {

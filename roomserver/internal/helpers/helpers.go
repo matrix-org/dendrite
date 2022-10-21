@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/auth"
 	"github.com/matrix-org/dendrite/roomserver/state"
@@ -14,8 +17,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 // TODO: temporary package which has helper functions used by both internal/perform packages.
@@ -97,35 +98,35 @@ func IsServerCurrentlyInRoom(ctx context.Context, db storage.Database, serverNam
 func IsInvitePending(
 	ctx context.Context, db storage.Database,
 	roomID, userID string,
-) (bool, string, string, error) {
+) (bool, string, string, *gomatrixserverlib.Event, error) {
 	// Look up the room NID for the supplied room ID.
 	info, err := db.RoomInfo(ctx, roomID)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.RoomInfo: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.RoomInfo: %w", err)
 	}
 	if info == nil {
-		return false, "", "", fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
+		return false, "", "", nil, fmt.Errorf("cannot get RoomInfo: unknown room ID %s", roomID)
 	}
 
 	// Look up the state key NID for the supplied user ID.
 	targetUserNIDs, err := db.EventStateKeyNIDs(ctx, []string{userID})
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeyNIDs: %w", err)
 	}
 	targetUserNID, targetUserFound := targetUserNIDs[userID]
 	if !targetUserFound {
-		return false, "", "", fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
+		return false, "", "", nil, fmt.Errorf("missing NID for user %q (%+v)", userID, targetUserNIDs)
 	}
 
 	// Let's see if we have an event active for the user in the room. If
 	// we do then it will contain a server name that we can direct the
 	// send_leave to.
-	senderUserNIDs, eventIDs, err := db.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
+	senderUserNIDs, eventIDs, eventJSON, err := db.GetInvitesForUser(ctx, info.RoomNID, targetUserNID)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.GetInvitesForUser: %w", err)
 	}
 	if len(senderUserNIDs) == 0 {
-		return false, "", "", nil
+		return false, "", "", nil, nil
 	}
 	userNIDToEventID := make(map[types.EventStateKeyNID]string)
 	for i, nid := range senderUserNIDs {
@@ -135,18 +136,20 @@ func IsInvitePending(
 	// Look up the user ID from the NID.
 	senderUsers, err := db.EventStateKeys(ctx, senderUserNIDs)
 	if err != nil {
-		return false, "", "", fmt.Errorf("r.DB.EventStateKeys: %w", err)
+		return false, "", "", nil, fmt.Errorf("r.DB.EventStateKeys: %w", err)
 	}
 	if len(senderUsers) == 0 {
-		return false, "", "", fmt.Errorf("no senderUsers")
+		return false, "", "", nil, fmt.Errorf("no senderUsers")
 	}
 
 	senderUser, senderUserFound := senderUsers[senderUserNIDs[0]]
 	if !senderUserFound {
-		return false, "", "", fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
+		return false, "", "", nil, fmt.Errorf("missing user for NID %d (%+v)", senderUserNIDs[0], senderUsers)
 	}
 
-	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], nil
+	event, err := gomatrixserverlib.NewEventFromTrustedJSON(eventJSON, false, info.RoomVersion)
+
+	return true, senderUser, userNIDToEventID[senderUserNIDs[0]], event, err
 }
 
 // GetMembershipsAtState filters the state events to
@@ -254,8 +257,15 @@ func CheckServerAllowedToSeeEvent(
 			return false, err
 		}
 	default:
-		// Something else went wrong
-		return false, err
+		switch err.(type) {
+		case types.MissingStateError:
+			// If there's no state then we assume it's open visibility, as Synapse does:
+			// https://github.com/matrix-org/synapse/blob/aec87a0f9369a3015b2a53469f88d1de274e8b71/synapse/visibility.py#L654-L655
+			return true, nil
+		default:
+			// Something else went wrong
+			return false, err
+		}
 	}
 	return auth.IsServerAllowed(serverName, isServerInRoom, stateAtEvent), nil
 }
@@ -314,7 +324,7 @@ func slowGetHistoryVisibilityState(
 func ScanEventTree(
 	ctx context.Context, db storage.Database, info *types.RoomInfo, front []string, visited map[string]bool, limit int,
 	serverName gomatrixserverlib.ServerName,
-) ([]types.EventNID, error) {
+) ([]types.EventNID, map[string]struct{}, error) {
 	var resultNIDs []types.EventNID
 	var err error
 	var allowed bool
@@ -335,6 +345,7 @@ func ScanEventTree(
 
 	var checkedServerInRoom bool
 	var isServerInRoom bool
+	redactEventIDs := make(map[string]struct{})
 
 	// Loop through the event IDs to retrieve the requested events and go
 	// through the whole tree (up to the provided limit) using the events'
@@ -348,7 +359,7 @@ BFSLoop:
 		// Retrieve the events to process from the database.
 		events, err = db.EventsFromIDs(ctx, front)
 		if err != nil {
-			return resultNIDs, err
+			return resultNIDs, redactEventIDs, err
 		}
 
 		if !checkedServerInRoom && len(events) > 0 {
@@ -385,16 +396,16 @@ BFSLoop:
 						)
 						// drop the error, as we will often error at the DB level if we don't have the prev_event itself. Let's
 						// just return what we have.
-						return resultNIDs, nil
+						return resultNIDs, redactEventIDs, nil
 					}
 
 					// If the event hasn't been seen before and the HS
 					// requesting to retrieve it is allowed to do so, add it to
 					// the list of events to retrieve.
-					if allowed {
-						next = append(next, pre)
-					} else {
+					next = append(next, pre)
+					if !allowed {
 						util.GetLogger(ctx).WithField("server", serverName).WithField("event_id", pre).Info("Not allowed to see event")
+						redactEventIDs[pre] = struct{}{}
 					}
 				}
 			}
@@ -403,7 +414,7 @@ BFSLoop:
 		front = next
 	}
 
-	return resultNIDs, err
+	return resultNIDs, redactEventIDs, err
 }
 
 func QueryLatestEventsAndState(

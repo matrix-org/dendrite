@@ -7,6 +7,7 @@ on:
   pull_request:
   release:
     types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -341,7 +342,7 @@ jobs:
         # See https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md specifically GOROOT_1_17_X64
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
-          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+          go get -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
 
       - name: Run actions/checkout@v2 for dendrite
         uses: actions/checkout@v2
@@ -375,6 +376,8 @@ jobs:
       # Build initial Dendrite image
       - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
+        env:
+          DOCKER_BUILDKIT: 1
 
       # Run Complement
       - run: |

@@ -135,15 +135,22 @@ func getState(
 		return nil, nil, &resErr
 	}
 
-	if response.IsRejected {
+	switch {
+	case !response.RoomExists:
+		return nil, nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Room not found"),
+		}
+	case !response.StateKnown:
+		return nil, nil, &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("State not known"),
+		}
+	case response.IsRejected:
 		return nil, nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
 			JSON: jsonerror.NotFound("Event not found"),
 		}
-	}
-
-	if !response.RoomExists {
-		return nil, nil, &util.JSONResponse{Code: http.StatusNotFound, JSON: nil}
 	}
 
 	return response.StateEvents, response.AuthChainEvents, nil

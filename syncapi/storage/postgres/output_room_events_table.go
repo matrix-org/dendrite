@@ -28,9 +28,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
-	log "github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -77,6 +77,8 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_sender_idx ON syncapi_output_room_events (sender);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events (room_id);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON syncapi_output_room_events (exclude_from_sync);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON syncapi_output_room_events ((add_state_ids IS NOT NULL));
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
 `
 
 const insertEventSQL = "" +
@@ -132,7 +134,7 @@ const updateEventJSONSQL = "" +
 	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
-const selectStateInRangeSQL = "" +
+const selectStateInRangeFilteredSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
@@ -144,6 +146,15 @@ const selectStateInRangeSQL = "" +
 	" AND ( $8::bool IS NULL   OR     contains_url = $8  )" +
 	" ORDER BY id ASC" +
 	" LIMIT $9"
+
+// In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
+const selectStateInRangeSQL = "" +
+	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
+	" FROM syncapi_output_room_events" +
+	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" AND room_id = ANY($3)" +
+	" ORDER BY id ASC" +
+	" LIMIT $4"
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -167,20 +178,24 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
+
 type outputRoomEventsStatements struct {
-	insertEventStmt               *sql.Stmt
-	selectEventsStmt              *sql.Stmt
-	selectEventsWitFilterStmt     *sql.Stmt
-	selectMaxEventIDStmt          *sql.Stmt
-	selectRecentEventsStmt        *sql.Stmt
-	selectRecentEventsForSyncStmt *sql.Stmt
-	selectEarlyEventsStmt         *sql.Stmt
-	selectStateInRangeStmt        *sql.Stmt
-	updateEventJSONStmt           *sql.Stmt
-	deleteEventsForRoomStmt       *sql.Stmt
-	selectContextEventStmt        *sql.Stmt
-	selectContextBeforeEventStmt  *sql.Stmt
-	selectContextAfterEventStmt   *sql.Stmt
+	insertEventStmt                *sql.Stmt
+	selectEventsStmt               *sql.Stmt
+	selectEventsWitFilterStmt      *sql.Stmt
+	selectMaxEventIDStmt           *sql.Stmt
+	selectRecentEventsStmt         *sql.Stmt
+	selectRecentEventsForSyncStmt  *sql.Stmt
+	selectEarlyEventsStmt          *sql.Stmt
+	selectStateInRangeFilteredStmt *sql.Stmt
+	selectStateInRangeStmt         *sql.Stmt
+	updateEventJSONStmt            *sql.Stmt
+	deleteEventsForRoomStmt        *sql.Stmt
+	selectContextEventStmt         *sql.Stmt
+	selectContextBeforeEventStmt   *sql.Stmt
+	selectContextAfterEventStmt    *sql.Stmt
+	selectSearchStmt               *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -210,21 +225,23 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
 		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
 		{&s.selectEarlyEventsStmt, selectEarlyEventsSQL},
+		{&s.selectStateInRangeFilteredStmt, selectStateInRangeFilteredSQL},
 		{&s.selectStateInRangeStmt, selectStateInRangeSQL},
 		{&s.updateEventJSONStmt, updateEventJSONSQL},
 		{&s.deleteEventsForRoomStmt, deleteEventsForRoomSQL},
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.selectSearchStmt, selectSearchSQL},
 	}.Prepare(db)
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	_, err = sqlutil.TxStmt(txn, s.updateEventJSONStmt).ExecContext(ctx, headeredJSON, event.EventID())
 	return err
 }
 
@@ -235,17 +252,28 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
-	senders, notSenders := getSendersStateFilterFilter(stateFilter)
-	rows, err := stmt.QueryContext(
-		ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
-		pq.StringArray(senders),
-		pq.StringArray(notSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
-		stateFilter.ContainsURL,
-		stateFilter.Limit,
-	)
+	var rows *sql.Rows
+	var err error
+	if stateFilter != nil {
+		stmt := sqlutil.TxStmt(txn, s.selectStateInRangeFilteredStmt)
+		senders, notSenders := getSendersStateFilterFilter(stateFilter)
+		rows, err = stmt.QueryContext(
+			ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
+			pq.StringArray(senders),
+			pq.StringArray(notSenders),
+			pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
+			pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
+			stateFilter.ContainsURL,
+			stateFilter.Limit,
+		)
+	} else {
+		stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
+		rows, err = stmt.QueryContext(
+			ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
+			r.High()-r.Low(),
+		)
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -272,16 +300,6 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 		)
 		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &excludeFromSync, &addIDs, &delIDs, &historyVisibility); err != nil {
 			return nil, nil, err
-		}
-		// Sanity check for deleted state and whine if we see it. We don't need to do anything
-		// since it'll just mark the event as not being needed.
-		if len(addIDs) < len(delIDs) {
-			log.WithFields(log.Fields{
-				"since":   r.From,
-				"current": r.To,
-				"adds":    addIDs,
-				"dels":    delIDs,
-			}).Warn("StateBetween: ignoring deleted state")
 		}
 
 		// TODO: Handle redacted events
@@ -640,6 +658,30 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 			TransactionID:   transactionID,
 			ExcludeFromSync: excludeFromSync,
 		})
+	}
+	return result, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmt(txn, s.selectSearchStmt).QueryContext(ctx, afterID, pq.StringArray(types), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var eventID string
+	var id int64
+	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result[id] = ev
 	}
 	return result, rows.Err()
 }

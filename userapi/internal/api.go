@@ -28,10 +28,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/matrix-org/dendrite/appservice/types"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/internal/eventutil"
-	"github.com/matrix-org/dendrite/internal/pushrules"
+	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	rsapi "github.com/matrix-org/dendrite/roomserver/api"
@@ -41,6 +40,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	userapiUtil "github.com/matrix-org/dendrite/userapi/util"
 )
 
 type UserInternalAPI struct {
@@ -53,6 +53,7 @@ type UserInternalAPI struct {
 	AppServices []config.ApplicationService
 	KeyAPI      keyapi.UserKeyAPI
 	RSAPI       rsapi.UserRoomserverAPI
+	PgClient    pushgateway.Client
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -75,6 +76,11 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 		ignoredUsers = &synctypes.IgnoredUsers{}
 		_ = json.Unmarshal(req.AccountData, ignoredUsers)
 	}
+	if req.DataType == "m.fully_read" {
+		if err := a.setFullyRead(ctx, req); err != nil {
+			return err
+		}
+	}
 	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
 		RoomID:       req.RoomID,
 		Type:         req.DataType,
@@ -82,6 +88,44 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	}); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("a.SyncProducer.SendAccountData failed")
 		return fmt.Errorf("failed to send account data to output: %w", err)
+	}
+	return nil
+}
+
+func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccountDataRequest) error {
+	var output eventutil.ReadMarkerJSON
+
+	if err := json.Unmarshal(req.AccountData, &output); err != nil {
+		return err
+	}
+	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
+		return nil
+	}
+	if domain != a.ServerName {
+		return nil
+	}
+
+	deleted, err := a.DB.DeleteNotificationsUpTo(ctx, localpart, req.RoomID, uint64(gomatrixserverlib.AsTimestamp(time.Now())))
+	if err != nil {
+		logrus.WithError(err).Errorf("UserInternalAPI.setFullyRead: DeleteNotificationsUpTo failed")
+		return err
+	}
+
+	if err = a.SyncProducer.GetAndSendNotificationData(ctx, req.UserID, req.RoomID); err != nil {
+		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: GetAndSendNotificationData failed")
+		return err
+	}
+
+	// nothing changed, no need to notify the push gateway
+	if !deleted {
+		return nil
+	}
+
+	if err = userapiUtil.NotifyUserCountsAsync(ctx, a.PgClient, localpart, a.DB); err != nil {
+		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
+		return err
 	}
 	return nil
 }
@@ -126,7 +170,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
 		return err
 	}
 
@@ -454,7 +498,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 	// Create a dummy device for AS user
 	dev := api.Device{
 		// Use AS dummy device ID
-		ID: types.AppServiceDeviceID,
+		ID: "AS_Device",
 		// AS dummy device has AS's token.
 		AccessToken:  token,
 		AppserviceID: appService.ID,
@@ -752,71 +796,27 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
-		Type: pushRulesAccountDataType,
-	}); err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
-	}
 	return nil
 }
 
 func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
-	userReq := api.QueryAccountDataRequest{
-		UserID:   req.UserID,
-		DataType: pushRulesAccountDataType,
+	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	if err != nil {
+		return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
 	}
-	var userRes api.QueryAccountDataResponse
-	if err := a.QueryAccountData(ctx, &userReq, &userRes); err != nil {
-		return err
+	pushRules, err := a.DB.QueryPushRules(ctx, localpart)
+	if err != nil {
+		return fmt.Errorf("failed to query push rules: %w", err)
 	}
-	bs, ok := userRes.GlobalAccountData[pushRulesAccountDataType]
-	if ok {
-		// Legacy Dendrite users will have completely empty push rules, so we should
-		// detect that situation and set some defaults.
-		var rules struct {
-			G struct {
-				Content   []json.RawMessage `json:"content"`
-				Override  []json.RawMessage `json:"override"`
-				Room      []json.RawMessage `json:"room"`
-				Sender    []json.RawMessage `json:"sender"`
-				Underride []json.RawMessage `json:"underride"`
-			} `json:"global"`
-		}
-		if err := json.Unmarshal([]byte(bs), &rules); err == nil {
-			count := len(rules.G.Content) + len(rules.G.Override) +
-				len(rules.G.Room) + len(rules.G.Sender) + len(rules.G.Underride)
-			ok = count > 0
-		}
-	}
-	if !ok {
-		// If we didn't find any default push rules then we should just generate some
-		// fresh ones.
-		localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
-		if err != nil {
-			return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
-		}
-		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, a.ServerName)
-		prbs, err := json.Marshal(pushRuleSets)
-		if err != nil {
-			return fmt.Errorf("failed to marshal default push rules: %w", err)
-		}
-		if err := a.DB.SaveAccountData(ctx, localpart, "", pushRulesAccountDataType, json.RawMessage(prbs)); err != nil {
-			return fmt.Errorf("failed to save default push rules: %w", err)
-		}
-		res.RuleSets = pushRuleSets
-		return nil
-	}
-	var data pushrules.AccountRuleSets
-	if err := json.Unmarshal([]byte(bs), &data); err != nil {
-		util.GetLogger(ctx).WithError(err).Error("json.Unmarshal of push rules failed")
-		return err
-	}
-	res.RuleSets = &data
+	res.RuleSets = pushRules
 	return nil
 }
 
 func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
-	return a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	profile, changed, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	res.Profile = profile
+	res.Changed = changed
+	return err
 }
 
 func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.QueryNumericLocalpartResponse) error {
@@ -841,6 +841,8 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 		return nil
 	case bcrypt.ErrMismatchedHashAndPassword: // user exists, but password doesn't match
 		return nil
+	case bcrypt.ErrHashTooShort: // user exists, but probably a passwordless account
+		return nil
 	default:
 		res.Exists = true
 		res.Account = acc
@@ -848,8 +850,11 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 	}
 }
 
-func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, _ *struct{}) error {
-	return a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, res *api.PerformUpdateDisplayNameResponse) error {
+	profile, changed, err := a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+	res.Profile = profile
+	res.Changed = changed
+	return err
 }
 
 func (a *UserInternalAPI) QueryLocalpartForThreePID(ctx context.Context, req *api.QueryLocalpartForThreePIDRequest, res *api.QueryLocalpartForThreePIDResponse) error {

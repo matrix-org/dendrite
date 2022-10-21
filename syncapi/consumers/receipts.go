@@ -16,22 +16,20 @@ package consumers
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"strconv"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
-	"github.com/matrix-org/dendrite/syncapi/producers"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
@@ -41,10 +39,9 @@ type OutputReceiptEventConsumer struct {
 	durable    string
 	topic      string
 	db         storage.Database
-	stream     types.StreamProvider
+	stream     streams.StreamProvider
 	notifier   *notifier.Notifier
 	serverName gomatrixserverlib.ServerName
-	producer   *producers.UserAPIReadProducer
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -55,8 +52,7 @@ func NewOutputReceiptEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
-	producer *producers.UserAPIReadProducer,
+	stream streams.StreamProvider,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
 		ctx:        process.Context(),
@@ -67,19 +63,19 @@ func NewOutputReceiptEventConsumer(
 		notifier:   notifier,
 		stream:     stream,
 		serverName: cfg.Matrix.ServerName,
-		producer:   producer,
 	}
 }
 
 // Start consuming receipts events.
 func (s *OutputReceiptEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
-func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	output := types.OutputReceiptEvent{
 		UserID:  msg.Header.Get(jetstream.UserID),
 		RoomID:  msg.Header.Get(jetstream.RoomID),
@@ -110,42 +106,8 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msg *nats.Ms
 		return true
 	}
 
-	if err = s.sendReadUpdate(ctx, output); err != nil {
-		log.WithError(err).WithFields(logrus.Fields{
-			"user_id": output.UserID,
-			"room_id": output.RoomID,
-		}).Errorf("Failed to generate read update")
-		sentry.CaptureException(err)
-		return false
-	}
-
 	s.stream.Advance(streamPos)
 	s.notifier.OnNewReceipt(output.RoomID, types.StreamingToken{ReceiptPosition: streamPos})
 
 	return true
-}
-
-func (s *OutputReceiptEventConsumer) sendReadUpdate(ctx context.Context, output types.OutputReceiptEvent) error {
-	if output.Type != "m.read" {
-		return nil
-	}
-	_, serverName, err := gomatrixserverlib.SplitID('@', output.UserID)
-	if err != nil {
-		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-	}
-	if serverName != s.serverName {
-		return nil
-	}
-	var readPos types.StreamPosition
-	if output.EventID != "" {
-		if _, readPos, err = s.db.PositionInTopology(ctx, output.EventID); err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("s.db.PositionInTopology (Read): %w", err)
-		}
-	}
-	if readPos > 0 {
-		if err := s.producer.SendReadUpdate(output.UserID, output.RoomID, readPos, 0); err != nil {
-			return fmt.Errorf("s.producer.SendReadUpdate: %w", err)
-		}
-	}
-	return nil
 }

@@ -68,6 +68,12 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.BadJSON("A username must be supplied."),
 		}
 	}
+	if len(r.Password) == 0 {
+		return nil, &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.BadJSON("A password must be supplied."),
+		}
+	}
 	localpart, err := userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
 	if err != nil {
 		return nil, &util.JSONResponse{

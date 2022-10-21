@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -36,7 +37,7 @@ type OutputTypingEventConsumer struct {
 	durable   string
 	topic     string
 	eduCache  *caching.EDUCache
-	stream    types.StreamProvider
+	stream    streams.StreamProvider
 	notifier  *notifier.Notifier
 }
 
@@ -48,7 +49,7 @@ func NewOutputTypingEventConsumer(
 	js nats.JetStreamContext,
 	eduCache *caching.EDUCache,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputTypingEventConsumer {
 	return &OutputTypingEventConsumer{
 		ctx:       process.Context(),
@@ -64,12 +65,13 @@ func NewOutputTypingEventConsumer(
 // Start consuming typing events.
 func (s *OutputTypingEventConsumer) Start() error {
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.topic, s.durable, s.onMessage,
-		nats.DeliverAll(), nats.ManualAck(),
+		s.ctx, s.jetstream, s.topic, s.durable, 1,
+		s.onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 }
 
-func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *OutputTypingEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	roomID := msg.Header.Get(jetstream.RoomID)
 	userID := msg.Header.Get(jetstream.UserID)
 	typing, err := strconv.ParseBool(msg.Header.Get("typing"))

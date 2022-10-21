@@ -38,9 +38,9 @@ var defaultExpireEDUTypes = map[string]time.Duration{
 // AssociateEDUWithDestination creates an association that the
 // destination queues will use to determine which JSON blobs to send
 // to which servers.
-func (d *Database) AssociateEDUWithDestination(
+func (d *Database) AssociateEDUWithDestinations(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	destinations map[gomatrixserverlib.ServerName]struct{},
 	receipt *Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
@@ -53,23 +53,24 @@ func (d *Database) AssociateEDUWithDestination(
 		// Keep EDUs for at least x minutes before deleting them
 		expiresAt = gomatrixserverlib.AsTimestamp(time.Now().Add(duration))
 	}
-	// We forcibly set m.direct_to_device events to 0, as we always want them
-	// to be delivered. (required for E2EE)
-	if eduType == gomatrixserverlib.MDirectToDevice {
+	// We forcibly set m.direct_to_device and m.device_list_update events
+	// to 0, as we always want them to be delivered. (required for E2EE)
+	if eduType == gomatrixserverlib.MDirectToDevice || eduType == gomatrixserverlib.MDeviceListUpdate {
 		expiresAt = 0
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationQueueEDUs.InsertQueueEDU(
-			ctx,         // context
-			txn,         // SQL transaction
-			eduType,     // EDU type for coalescing
-			serverName,  // destination server name
-			receipt.nid, // NID from the federationapi_queue_json table
-			expiresAt,   // The timestamp this EDU will expire
-		); err != nil {
-			return fmt.Errorf("InsertQueueEDU: %w", err)
+		var err error
+		for destination := range destinations {
+			err = d.FederationQueueEDUs.InsertQueueEDU(
+				ctx,         // context
+				txn,         // SQL transaction
+				eduType,     // EDU type for coalescing
+				destination, // destination server name
+				receipt.nid, // NID from the federationapi_queue_json table
+				expiresAt,   // The timestamp this EDU will expire
+			)
 		}
-		return nil
+		return err
 	})
 }
 
@@ -110,6 +111,7 @@ func (d *Database) GetPendingEDUs(
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
 			edus[&Receipt{nid}] = &event
+			d.Cache.StoreFederationQueuedEDU(nid, &event)
 		}
 
 		return nil
@@ -177,19 +179,17 @@ func (d *Database) GetPendingEDUServerNames(
 	return d.FederationQueueEDUs.SelectQueueEDUServerNames(ctx, nil)
 }
 
-// DeleteExpiredEDUs deletes expired EDUs
+// DeleteExpiredEDUs deletes expired EDUs and evicts them from the cache.
 func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	var jsonNIDs []int64
+	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) (err error) {
 		expiredBefore := gomatrixserverlib.AsTimestamp(time.Now())
-		jsonNIDs, err := d.FederationQueueEDUs.SelectExpiredEDUs(ctx, txn, expiredBefore)
+		jsonNIDs, err = d.FederationQueueEDUs.SelectExpiredEDUs(ctx, txn, expiredBefore)
 		if err != nil {
 			return err
 		}
 		if len(jsonNIDs) == 0 {
 			return nil
-		}
-		for i := range jsonNIDs {
-			d.Cache.EvictFederationQueuedEDU(jsonNIDs[i])
 		}
 
 		if err = d.FederationQueueJSON.DeleteQueueJSON(ctx, txn, jsonNIDs); err != nil {
@@ -198,4 +198,14 @@ func (d *Database) DeleteExpiredEDUs(ctx context.Context) error {
 
 		return d.FederationQueueEDUs.DeleteExpiredEDUs(ctx, txn, expiredBefore)
 	})
+
+	if err != nil {
+		return err
+	}
+
+	for i := range jsonNIDs {
+		d.Cache.EvictFederationQueuedEDU(jsonNIDs[i])
+	}
+
+	return nil
 }

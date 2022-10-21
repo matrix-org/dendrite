@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -39,7 +40,7 @@ type PresenceConsumer struct {
 	requestTopic  string
 	presenceTopic string
 	db            storage.Database
-	stream        types.StreamProvider
+	stream        streams.StreamProvider
 	notifier      *notifier.Notifier
 	deviceAPI     api.SyncUserAPI
 	cfg           *config.SyncAPI
@@ -54,7 +55,7 @@ func NewPresenceConsumer(
 	nats *nats.Conn,
 	db storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 	deviceAPI api.SyncUserAPI,
 ) *PresenceConsumer {
 	return &PresenceConsumer{
@@ -128,12 +129,13 @@ func (s *PresenceConsumer) Start() error {
 		return nil
 	}
 	return jetstream.JetStreamConsumer(
-		s.ctx, s.jetstream, s.presenceTopic, s.durable, s.onMessage,
+		s.ctx, s.jetstream, s.presenceTopic, s.durable, 1, s.onMessage,
 		nats.DeliverAll(), nats.ManualAck(), nats.HeadersOnly(),
 	)
 }
 
-func (s *PresenceConsumer) onMessage(ctx context.Context, msg *nats.Msg) bool {
+func (s *PresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
+	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	userID := msg.Header.Get(jetstream.UserID)
 	presence := msg.Header.Get("presence")
 	timestamp := msg.Header.Get("last_active_ts")

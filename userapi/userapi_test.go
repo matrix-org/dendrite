@@ -23,12 +23,14 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/userapi"
-	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/matrix-org/dendrite/internal/httputil"
+	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/dendrite/userapi/inthttp"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -48,9 +50,9 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	if opts.loginTokenLifetime == 0 {
 		opts.loginTokenLifetime = api.DefaultLoginTokenLifetime * time.Millisecond
 	}
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-
-	accountDB, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
+	accountDB, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, serverName, bcrypt.MinCost, config.DefaultOpenIDTokenLifetimeMS, opts.loginTokenLifetime, "")
 	if err != nil {
@@ -64,9 +66,12 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	}
 
 	return &internal.UserInternalAPI{
-		DB:         accountDB,
-		ServerName: cfg.Matrix.ServerName,
-	}, accountDB, close
+			DB:         accountDB,
+			ServerName: cfg.Matrix.ServerName,
+		}, accountDB, func() {
+			close()
+			baseclose()
+		}
 }
 
 func TestQueryProfile(t *testing.T) {
@@ -79,10 +84,10 @@ func TestQueryProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
-	if err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
+	if _, _, err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
 		t.Fatalf("failed to set avatar url: %s", err)
 	}
-	if err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
+	if _, _, err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
 		t.Fatalf("failed to set display name: %s", err)
 	}
 
@@ -148,6 +153,33 @@ func TestQueryProfile(t *testing.T) {
 	})
 	t.Run("Monolith", func(t *testing.T) {
 		runCases(userAPI, false)
+	})
+}
+
+// TestPasswordlessLoginFails ensures that a passwordless account cannot
+// be logged into using an arbitrary password (effectively a regression test
+// for https://github.com/matrix-org/dendrite/issues/2780).
+func TestPasswordlessLoginFails(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+		defer close()
+		_, err := accountDB.CreateAccount(ctx, "auser", "", "", api.AccountTypeAppService)
+		if err != nil {
+			t.Fatalf("failed to make account: %s", err)
+		}
+
+		userReq := &api.QueryAccountByPasswordRequest{
+			Localpart:         "auser",
+			PlaintextPassword: "apassword",
+		}
+		userRes := &api.QueryAccountByPasswordResponse{}
+		if err := userAPI.QueryAccountByPassword(ctx, userReq, userRes); err != nil {
+			t.Fatal(err)
+		}
+		if userRes.Exists || userRes.Account != nil {
+			t.Fatal("QueryAccountByPassword should not return correctly for a passwordless account")
+		}
 	})
 }
 

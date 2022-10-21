@@ -13,6 +13,8 @@
 package transactions
 
 import (
+	"net/url"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -29,6 +31,7 @@ type txnsMap map[CacheKey]*util.JSONResponse
 type CacheKey struct {
 	AccessToken string
 	TxnID       string
+	Endpoint    string
 }
 
 // Cache represents a temporary store for response entries.
@@ -57,14 +60,14 @@ func NewWithCleanupPeriod(cleanupPeriod time.Duration) *Cache {
 	return &t
 }
 
-// FetchTransaction looks up an entry for the (accessToken, txnID) tuple in Cache.
+// FetchTransaction looks up an entry for the (accessToken, txnID, req.URL) tuple in Cache.
 // Looks in both the txnMaps.
 // Returns (JSON response, true) if txnID is found, else the returned bool is false.
-func (t *Cache) FetchTransaction(accessToken, txnID string) (*util.JSONResponse, bool) {
+func (t *Cache) FetchTransaction(accessToken, txnID string, u *url.URL) (*util.JSONResponse, bool) {
 	t.RLock()
 	defer t.RUnlock()
 	for _, txns := range t.txnsMaps {
-		res, ok := txns[CacheKey{accessToken, txnID}]
+		res, ok := txns[CacheKey{accessToken, txnID, filepath.Dir(u.Path)}]
 		if ok {
 			return res, true
 		}
@@ -72,13 +75,12 @@ func (t *Cache) FetchTransaction(accessToken, txnID string) (*util.JSONResponse,
 	return nil, false
 }
 
-// AddTransaction adds an entry for the (accessToken, txnID) tuple in Cache.
+// AddTransaction adds an entry for the (accessToken, txnID, req.URL) tuple in Cache.
 // Adds to the front txnMap.
-func (t *Cache) AddTransaction(accessToken, txnID string, res *util.JSONResponse) {
+func (t *Cache) AddTransaction(accessToken, txnID string, u *url.URL, res *util.JSONResponse) {
 	t.Lock()
 	defer t.Unlock()
-
-	t.txnsMaps[0][CacheKey{accessToken, txnID}] = res
+	t.txnsMaps[0][CacheKey{accessToken, txnID, filepath.Dir(u.Path)}] = res
 }
 
 // cacheCleanService is responsible for cleaning up entries after cleanupPeriod.
