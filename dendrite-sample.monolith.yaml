@@ -178,7 +178,7 @@ client_api:
     ethereum:
       enabled: false
       version: 1
-      chain_ids: []
+      chain_id: 1337
 
   # Whether to require reCAPTCHA for registration. If you have enabled registration
   # then this is HIGHLY RECOMMENDED to reduce the risk of your homeserver being used

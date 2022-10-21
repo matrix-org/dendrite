@@ -26,8 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test"
-	"github.com/matrix-org/dendrite/userapi/api"
+	testutil "github.com/matrix-org/dendrite/test"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
@@ -40,20 +39,18 @@ type registerContext struct {
 	userInteractive *auth.UserInteractive
 }
 
-func createRegisterContext(t *testing.T) *registerContext {
-	chainIds := []int{4}
-
+func createRegisterContext(_ *testing.T) *registerContext {
 	cfg := &config.ClientAPI{
 		Matrix: &config.Global{
-			ServerName: test.TestServerName,
+			ServerName: testutil.TestServerName,
 		},
 		Derived:                        &config.Derived{},
 		PasswordAuthenticationDisabled: true,
 		PublicKeyAuthentication: config.PublicKeyAuthentication{
 			Ethereum: config.EthereumAuthConfig{
-				Enabled:  true,
-				Version:  1,
-				ChainIDs: chainIds,
+				Enabled: true,
+				Version: 1,
+				ChainID: testutil.EthereumTestNetworkId,
 			},
 		},
 	}
@@ -129,7 +126,7 @@ func (ua *fakePublicKeyUserApi) PerformDeviceCreation(
 	req *uapi.PerformDeviceCreationRequest,
 	res *uapi.PerformDeviceCreationResponse) error {
 	res.DeviceCreated = true
-	res.Device = &api.Device{
+	res.Device = &uapi.Device{
 		ID:          "device_id",
 		UserID:      req.Localpart,
 		AccessToken: req.AccessToken,
@@ -142,11 +139,11 @@ func (ua *fakePublicKeyUserApi) PerformAccountCreation(
 	req *uapi.PerformAccountCreationRequest,
 	res *uapi.PerformAccountCreationResponse) error {
 	res.AccountCreated = true
-	res.Account = &api.Account{
+	res.Account = &uapi.Account{
 		AppServiceID: req.AppServiceID,
 		Localpart:    req.Localpart,
-		ServerName:   test.TestServerName,
-		UserID:       fmt.Sprintf("@%s:%s", req.Localpart, test.TestServerName),
+		ServerName:   testutil.TestServerName,
+		UserID:       fmt.Sprintf("@%s:%s", req.Localpart, testutil.TestServerName),
 		AccountType:  req.AccountType,
 	}
 	return nil
@@ -173,8 +170,6 @@ func (*fakePublicKeyUserApi) QueryLoginToken(ctx context.Context, req *uapi.Quer
 func newRegistrationSession(
 	t *testing.T,
 	userId string,
-	cfg *config.ClientAPI,
-	userInteractive *auth.UserInteractive,
 	userAPI *fakePublicKeyUserApi,
 ) string {
 	body := fmt.Sprintf(`{
@@ -214,20 +209,18 @@ func newRegistrationSession(
 func TestRegisterEthereum(t *testing.T) {
 	// Setup
 	var userAPI fakePublicKeyUserApi
-	wallet, _ := test.CreateTestAccount()
-	message, _ := test.CreateEip4361TestMessage(wallet.PublicAddress)
-	signature, _ := test.SignMessage(message.String(), wallet.PrivateKey)
+	wallet, _ := testutil.CreateTestAccount()
+	message, _ := testutil.CreateEip4361TestMessage(wallet.PublicAddress)
+	signature, _ := testutil.SignMessage(message.String(), wallet.PrivateKey)
 	registerContext := createRegisterContext(t)
 	sessionId := newRegistrationSession(
 		t,
 		wallet.Eip155UserId,
-		registerContext.config,
-		registerContext.userInteractive,
 		&userAPI,
 	)
 
 	// Escape \t and \n. Work around for marshalling and unmarshalling message.
-	msgStr := test.FromEip4361MessageToString(message)
+	msgStr := testutil.FromEip4361MessageToString(message)
 	body := fmt.Sprintf(`{
 		"username": "%v",
 		"auth": {
@@ -339,7 +332,10 @@ func TestNewRegistrationSession(t *testing.T) {
 		params,
 		"[object]")
 	ethParams := params.(config.EthereumAuthParams)
-	assert.NotEmptyf(ethParams.ChainIDs, "ChainIDs actual: empty, expected not empty")
+	assert.Equalf(
+		testutil.EthereumTestNetworkId,
+		ethParams.ChainID,
+		"ChainID actual: %d, expected %d", ethParams.ChainID, testutil.EthereumTestNetworkId)
 	assert.NotEmptyf(ethParams.Version, "Version actual: \"\", expected: not empty")
 }
 

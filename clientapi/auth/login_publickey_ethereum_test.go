@@ -24,7 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/dendrite/test"
+	testutil "github.com/matrix-org/dendrite/test"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,20 +34,18 @@ type loginContext struct {
 	userInteractive *UserInteractive
 }
 
-func createLoginContext(t *testing.T) *loginContext {
-	chainIds := []int{4}
-
+func createLoginContext(_ *testing.T) *loginContext {
 	cfg := &config.ClientAPI{
 		Matrix: &config.Global{
-			ServerName: test.TestServerName,
+			ServerName: testutil.TestServerName,
 		},
 		Derived:                        &config.Derived{},
 		PasswordAuthenticationDisabled: true,
 		PublicKeyAuthentication: config.PublicKeyAuthentication{
 			Ethereum: config.EthereumAuthConfig{
-				Enabled:  true,
-				Version:  1,
-				ChainIDs: chainIds,
+				Enabled: true,
+				Version: 1,
+				ChainID: testutil.EthereumTestNetworkId,
 			},
 		},
 	}
@@ -154,9 +152,9 @@ func TestLoginPublicKeyEthereum(t *testing.T) {
 	var userAPI fakePublicKeyUserApi
 	ctx := context.Background()
 	loginContext := createLoginContext(t)
-	wallet, _ := test.CreateTestAccount()
-	message, _ := test.CreateEip4361TestMessage(wallet.PublicAddress)
-	signature, _ := test.SignMessage(message.String(), wallet.PrivateKey)
+	wallet, _ := testutil.CreateTestAccount()
+	message, _ := testutil.CreateEip4361TestMessage(wallet.PublicAddress)
+	signature, _ := testutil.SignMessage(message.String(), wallet.PrivateKey)
 	sessionId := publicKeyTestSession(
 		&ctx,
 		loginContext.config,
@@ -165,7 +163,7 @@ func TestLoginPublicKeyEthereum(t *testing.T) {
 	)
 
 	// Escape \t and \n. Work around for marshalling and unmarshalling message.
-	msgStr := test.FromEip4361MessageToString(message)
+	msgStr := testutil.FromEip4361MessageToString(message)
 	body := fmt.Sprintf(`{
 		"type": "m.login.publickey",
 		"auth": {
@@ -219,8 +217,8 @@ func TestLoginPublicKeyEthereumMissingSignature(t *testing.T) {
 	var userAPI fakePublicKeyUserApi
 	ctx := context.Background()
 	loginContext := createLoginContext(t)
-	wallet, _ := test.CreateTestAccount()
-	message, _ := test.CreateEip4361TestMessage(wallet.PublicAddress)
+	wallet, _ := testutil.CreateTestAccount()
+	message, _ := testutil.CreateEip4361TestMessage(wallet.PublicAddress)
 	sessionId := publicKeyTestSession(
 		&ctx,
 		loginContext.config,
@@ -229,7 +227,7 @@ func TestLoginPublicKeyEthereumMissingSignature(t *testing.T) {
 	)
 
 	// Escape \t and \n. Work around for marshalling and unmarshalling message.
-	msgStr := test.FromEip4361MessageToString(message)
+	msgStr := testutil.FromEip4361MessageToString(message)
 	body := fmt.Sprintf(`{
 		"type": "m.login.publickey",
 		"auth": {
@@ -280,7 +278,7 @@ func TestLoginPublicKeyEthereumEmptyMessage(t *testing.T) {
 	var userAPI fakePublicKeyUserApi
 	ctx := context.Background()
 	loginContext := createLoginContext(t)
-	wallet, _ := test.CreateTestAccount()
+	wallet, _ := testutil.CreateTestAccount()
 	sessionId := publicKeyTestSession(
 		&ctx,
 		loginContext.config,
@@ -333,7 +331,7 @@ func TestLoginPublicKeyEthereumWrongUserId(t *testing.T) {
 	var userAPI fakePublicKeyUserApi
 	ctx := context.Background()
 	loginContext := createLoginContext(t)
-	wallet, _ := test.CreateTestAccount()
+	wallet, _ := testutil.CreateTestAccount()
 	sessionId := publicKeyTestSession(
 		&ctx,
 		loginContext.config,

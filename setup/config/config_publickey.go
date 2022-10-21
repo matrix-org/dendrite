@@ -9,21 +9,18 @@ type AuthParams interface {
 }
 
 type EthereumAuthParams struct {
-	Version  uint  `json:"version"`
-	ChainIDs []int `json:"chain_ids"`
+	Version uint `json:"version"`
+	ChainID int  `json:"chain_id"`
 }
 
 func (p EthereumAuthParams) GetParams() interface{} {
-	copyP := p
-	copyP.ChainIDs = make([]int, len(p.ChainIDs))
-	copy(copyP.ChainIDs, p.ChainIDs)
-	return copyP
+	return p
 }
 
 type EthereumAuthConfig struct {
-	Enabled  bool  `yaml:"enabled"`
-	Version  uint  `yaml:"version"`
-	ChainIDs []int `yaml:"chain_ids"`
+	Enabled bool `yaml:"enabled"`
+	Version uint `yaml:"version"`
+	ChainID int  `yaml:"chain_id"`
 }
 
 type PublicKeyAuthentication struct {
@@ -47,8 +44,8 @@ func (pk *PublicKeyAuthentication) GetPublicKeyRegistrationParams() map[string]i
 	params := make(map[string]interface{})
 	if pk.Ethereum.Enabled {
 		p := EthereumAuthParams{
-			Version:  pk.Ethereum.Version,
-			ChainIDs: pk.Ethereum.ChainIDs,
+			Version: pk.Ethereum.Version,
+			ChainID: pk.Ethereum.ChainID,
 		}
 		params[authtypes.LoginTypePublicKeyEthereum] = p
 	}
