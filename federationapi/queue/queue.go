@@ -24,6 +24,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -247,9 +248,23 @@ func (oqs *OutgoingQueues) SendEvent(
 	}
 
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil {
+		if queue := oqs.getQueue(destination); queue != nil && !queue.statistics.Blacklisted() {
 			queue.sendEvent(ev, nid)
+		} else {
+			delete(destmap, destination)
 		}
+	}
+
+	// Create a database entry that associates the given PDU NID with
+	// this destinations queue. We'll then be able to retrieve the PDU
+	// later.
+	if err := oqs.db.AssociatePDUWithDestinations(
+		oqs.process.Context(),
+		destmap,
+		nid, // NIDs from federationapi_queue_json table
+	); err != nil {
+		logrus.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
+		return err
 	}
 
 	return nil
@@ -321,9 +336,25 @@ func (oqs *OutgoingQueues) SendEDU(
 	}
 
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil {
+		if queue := oqs.getQueue(destination); queue != nil && !queue.statistics.Blacklisted() {
 			queue.sendEDU(e, nid)
+		} else {
+			delete(destmap, destination)
 		}
+	}
+
+	// Create a database entry that associates the given PDU NID with
+	// this destination queue. We'll then be able to retrieve the PDU
+	// later.
+	if err := oqs.db.AssociateEDUWithDestinations(
+		oqs.process.Context(),
+		destmap, // the destination server name
+		nid,     // NIDs from federationapi_queue_json table
+		e.Type,
+		nil, // this will use the default expireEDUTypes map
+	); err != nil {
+		logrus.WithError(err).Errorf("failed to associate EDU with destinations")
+		return err
 	}
 
 	return nil

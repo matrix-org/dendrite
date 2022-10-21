@@ -76,39 +76,21 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		return
 	}
 
-	// Create a database entry that associates the given PDU NID with
-	// this destination queue. We'll then be able to retrieve the PDU
-	// later.
-	if err := oq.db.AssociatePDUWithDestination(
-		oq.process.Context(),
-		"",             // TODO: remove this, as we don't need to persist the transaction ID
-		oq.destination, // the destination server name
-		receipt,        // NIDs from federationapi_queue_json table
-	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate PDU %q with destination %q", event.EventID(), oq.destination)
-		return
-	}
-	// Check if the destination is blacklisted. If it isn't then wake
-	// up the queue.
-	if !oq.statistics.Blacklisted() {
-		// If there's room in memory to hold the event then add it to the
-		// list.
-		oq.pendingMutex.Lock()
-		if len(oq.pendingPDUs) < maxPDUsInMemory {
-			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:     event,
-				receipt: receipt,
-			})
-		} else {
-			oq.overflowed.Store(true)
-		}
-		oq.pendingMutex.Unlock()
-
-		if !oq.backingOff.Load() {
-			oq.wakeQueueAndNotify()
-		}
+	// If there's room in memory to hold the event then add it to the
+	// list.
+	oq.pendingMutex.Lock()
+	if len(oq.pendingPDUs) < maxPDUsInMemory {
+		oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
+			pdu:     event,
+			receipt: receipt,
+		})
 	} else {
 		oq.overflowed.Store(true)
+	}
+	oq.pendingMutex.Unlock()
+
+	if !oq.backingOff.Load() {
+		oq.wakeQueueAndNotify()
 	}
 }
 
@@ -120,40 +102,22 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
 	}
-	// Create a database entry that associates the given PDU NID with
-	// this destination queue. We'll then be able to retrieve the PDU
-	// later.
-	if err := oq.db.AssociateEDUWithDestination(
-		oq.process.Context(),
-		oq.destination, // the destination server name
-		receipt,        // NIDs from federationapi_queue_json table
-		event.Type,
-		nil, // this will use the default expireEDUTypes map
-	); err != nil {
-		logrus.WithError(err).Errorf("failed to associate EDU with destination %q", oq.destination)
-		return
-	}
-	// Check if the destination is blacklisted. If it isn't then wake
-	// up the queue.
-	if !oq.statistics.Blacklisted() {
-		// If there's room in memory to hold the event then add it to the
-		// list.
-		oq.pendingMutex.Lock()
-		if len(oq.pendingEDUs) < maxEDUsInMemory {
-			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:     event,
-				receipt: receipt,
-			})
-		} else {
-			oq.overflowed.Store(true)
-		}
-		oq.pendingMutex.Unlock()
 
-		if !oq.backingOff.Load() {
-			oq.wakeQueueAndNotify()
-		}
+	// If there's room in memory to hold the event then add it to the
+	// list.
+	oq.pendingMutex.Lock()
+	if len(oq.pendingEDUs) < maxEDUsInMemory {
+		oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
+			edu:     event,
+			receipt: receipt,
+		})
 	} else {
 		oq.overflowed.Store(true)
+	}
+	oq.pendingMutex.Unlock()
+
+	if !oq.backingOff.Load() {
+		oq.wakeQueueAndNotify()
 	}
 }
 
