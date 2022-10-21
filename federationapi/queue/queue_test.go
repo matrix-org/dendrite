@@ -177,15 +177,18 @@ func (d *fakeDatabase) AssociatePDUWithDestinations(ctx context.Context, destina
 	}
 }
 
-func (d *fakeDatabase) AssociateEDUWithDestination(ctx context.Context, serverName gomatrixserverlib.ServerName, receipt *shared.Receipt, eduType string, expireEDUTypes map[string]time.Duration) error {
+func (d *fakeDatabase) AssociateEDUWithDestinations(ctx context.Context, destinations map[gomatrixserverlib.ServerName]struct{}, receipt *shared.Receipt, eduType string, expireEDUTypes map[string]time.Duration) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
 	if _, ok := d.pendingEDUs[receipt]; ok {
-		if _, ok := d.associatedEDUs[serverName]; !ok {
-			d.associatedEDUs[serverName] = make(map[*shared.Receipt]struct{})
+		for destination := range destinations {
+			if _, ok := d.associatedEDUs[destination]; !ok {
+				d.associatedEDUs[destination] = make(map[*shared.Receipt]struct{})
+			}
+			d.associatedEDUs[destination][receipt] = struct{}{}
 		}
-		d.associatedEDUs[serverName][receipt] = struct{}{}
+
 		return nil
 	} else {
 		return errors.New("EDU doesn't exist")
@@ -870,13 +873,15 @@ func TestSendEDUBatches(t *testing.T) {
 		<-pc.WaitForShutdown()
 	}()
 
+	destinations := map[gomatrixserverlib.ServerName]struct{}{destination: {}}
 	// Populate database with > maxEDUsPerTransaction
 	eduMultiplier := uint32(3)
 	for i := 0; i < maxEDUsPerTransaction*int(eduMultiplier); i++ {
 		ev := mustCreateEDU(t)
 		ephemeralJSON, _ := json.Marshal(ev)
 		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
-		db.AssociateEDUWithDestination(pc.Context(), destination, nid, ev.Type, nil)
+		err := db.AssociateEDUWithDestinations(pc.Context(), destinations, nid, ev.Type, nil)
+		assert.NoError(t, err, "failed to associate EDU with destinations")
 	}
 
 	ev := mustCreateEDU(t)
@@ -929,7 +934,8 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 		ev := mustCreateEDU(t)
 		ephemeralJSON, _ := json.Marshal(ev)
 		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
-		db.AssociateEDUWithDestination(pc.Context(), destination, nid, ev.Type, nil)
+		err := db.AssociateEDUWithDestinations(pc.Context(), destinations, nid, ev.Type, nil)
+		assert.NoError(t, err, "failed to associate EDU with destinations")
 	}
 
 	ev := mustCreateEDU(t)
@@ -993,6 +999,7 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := gomatrixserverlib.ServerName("remotehost")
+	destinations := map[gomatrixserverlib.ServerName]struct{}{destination: {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, false, t, dbType, true)
 		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
@@ -1014,7 +1021,8 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 		edu := mustCreateEDU(t)
 		ephemeralJSON, _ := json.Marshal(edu)
 		nid, _ := db.StoreJSON(pc.Context(), string(ephemeralJSON))
-		db.AssociateEDUWithDestination(pc.Context(), destination, nid, edu.Type, nil)
+		err = db.AssociateEDUWithDestinations(pc.Context(), destinations, nid, edu.Type, nil)
+		assert.NoError(t, err, "failed to associate EDU with destinations")
 
 		checkBlacklisted := func(log poll.LogT) poll.Result {
 			if fc.txCount.Load() == failuresUntilBlacklist {

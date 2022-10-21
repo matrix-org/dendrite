@@ -338,7 +338,23 @@ func (oqs *OutgoingQueues) SendEDU(
 	for destination := range destmap {
 		if queue := oqs.getQueue(destination); queue != nil {
 			queue.sendEDU(e, nid)
+		} else {
+			delete(destmap, destination)
 		}
+	}
+
+	// Create a database entry that associates the given PDU NID with
+	// this destination queue. We'll then be able to retrieve the PDU
+	// later.
+	if err := oqs.db.AssociateEDUWithDestinations(
+		oqs.process.Context(),
+		destmap, // the destination server name
+		nid,     // NIDs from federationapi_queue_json table
+		e.Type,
+		nil, // this will use the default expireEDUTypes map
+	); err != nil {
+		logrus.WithError(err).Errorf("failed to associate EDU with destinations")
+		return err
 	}
 
 	return nil
