@@ -382,15 +382,23 @@ func Test_Profile(t *testing.T) {
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
-		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		err = db.SetDisplayName(ctx, aliceLocalpart, "Alice")
-		assert.NoError(t, err, "unable to set displayname")
-		err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
-		assert.NoError(t, err, "unable to set avatar url")
-		// verify profile
-		gotProfile, err = db.GetProfileByLocalpart(ctx, aliceLocalpart)
-		assert.NoError(t, err, "unable to get profile by localpart")
+		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, "Alice")
 		assert.Equal(t, wantProfile, gotProfile)
+		assert.NoError(t, err, "unable to set displayname")
+		assert.True(t, changed)
+
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		assert.Equal(t, wantProfile, gotProfile)
+		assert.True(t, changed)
+
+		// Setting the same avatar again doesn't change anything
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		assert.Equal(t, wantProfile, gotProfile)
+		assert.False(t, changed)
 
 		// search profiles
 		searchRes, err := db.SearchProfiles(ctx, "Alice", 2)

@@ -178,7 +178,7 @@ func Setup(
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		serverNotificationSender, err := getSenderDevice(context.Background(), userAPI, cfg)
+		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
 		if err != nil {
 			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
 		}
