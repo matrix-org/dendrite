@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
@@ -27,7 +29,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/util"
@@ -126,20 +127,6 @@ func SetAvatarURL(
 		}
 	}
 
-	res := &userapi.QueryProfileResponse{}
-	err = profileAPI.QueryProfile(req.Context(), &userapi.QueryProfileRequest{
-		UserID: userID,
-	}, res)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.QueryProfile failed")
-		return jsonerror.InternalServerError()
-	}
-	oldProfile := &authtypes.Profile{
-		Localpart:   localpart,
-		DisplayName: res.DisplayName,
-		AvatarURL:   res.AvatarURL,
-	}
-
 	setRes := &userapi.PerformSetAvatarURLResponse{}
 	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
 		Localpart: localpart,
@@ -159,14 +146,8 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
-	newProfile := authtypes.Profile{
-		Localpart:   localpart,
-		DisplayName: oldProfile.DisplayName,
-		AvatarURL:   r.AvatarURL,
-	}
-
 	events, err := buildMembershipEvents(
-		req.Context(), roomsRes.RoomIDs, newProfile, userID, cfg, evTime, rsAPI,
+		req.Context(), roomsRes.RoomIDs, *setRes.Profile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -255,24 +236,11 @@ func SetDisplayName(
 		}
 	}
 
-	pRes := &userapi.QueryProfileResponse{}
-	err = profileAPI.QueryProfile(req.Context(), &userapi.QueryProfileRequest{
-		UserID: userID,
-	}, pRes)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.QueryProfile failed")
-		return jsonerror.InternalServerError()
-	}
-	oldProfile := &authtypes.Profile{
-		Localpart:   localpart,
-		DisplayName: pRes.DisplayName,
-		AvatarURL:   pRes.AvatarURL,
-	}
-
+	profileRes := &userapi.PerformUpdateDisplayNameResponse{}
 	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
 		Localpart:   localpart,
 		DisplayName: r.DisplayName,
-	}, &struct{}{})
+	}, profileRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetDisplayName failed")
 		return jsonerror.InternalServerError()
@@ -288,14 +256,8 @@ func SetDisplayName(
 		return jsonerror.InternalServerError()
 	}
 
-	newProfile := authtypes.Profile{
-		Localpart:   localpart,
-		DisplayName: r.DisplayName,
-		AvatarURL:   oldProfile.AvatarURL,
-	}
-
 	events, err := buildMembershipEvents(
-		req.Context(), res.RoomIDs, newProfile, userID, cfg, evTime, rsAPI,
+		req.Context(), res.RoomIDs, *profileRes.Profile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:

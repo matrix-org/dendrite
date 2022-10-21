@@ -44,10 +44,12 @@ const selectProfileByLocalpartSQL = "" +
 	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart = $1"
 
 const setAvatarURLSQL = "" +
-	"UPDATE userapi_profiles SET avatar_url = $1 WHERE localpart = $2"
+	"UPDATE userapi_profiles SET avatar_url = $1 WHERE localpart = $2" +
+	" RETURNING display_name"
 
 const setDisplayNameSQL = "" +
-	"UPDATE userapi_profiles SET display_name = $1 WHERE localpart = $2"
+	"UPDATE userapi_profiles SET display_name = $1 WHERE localpart = $2" +
+	" RETURNING avatar_url"
 
 const selectProfilesBySearchSQL = "" +
 	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
@@ -100,16 +102,26 @@ func (s *profilesStatements) SelectProfileByLocalpart(
 
 func (s *profilesStatements) SetAvatarURL(
 	ctx context.Context, txn *sql.Tx, localpart string, avatarURL string,
-) (err error) {
-	_, err = s.setAvatarURLStmt.ExecContext(ctx, avatarURL, localpart)
-	return
+) (*authtypes.Profile, error) {
+	profile := &authtypes.Profile{
+		Localpart: localpart,
+		AvatarURL: avatarURL,
+	}
+	stmt := sqlutil.TxStmt(txn, s.setAvatarURLStmt)
+	err := stmt.QueryRowContext(ctx, avatarURL, localpart).Scan(&profile.DisplayName)
+	return profile, err
 }
 
 func (s *profilesStatements) SetDisplayName(
 	ctx context.Context, txn *sql.Tx, localpart string, displayName string,
-) (err error) {
-	_, err = s.setDisplayNameStmt.ExecContext(ctx, displayName, localpart)
-	return
+) (*authtypes.Profile, error) {
+	profile := &authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: displayName,
+	}
+	stmt := sqlutil.TxStmt(txn, s.setDisplayNameStmt)
+	err := stmt.QueryRowContext(ctx, displayName, localpart).Scan(&profile.AvatarURL)
+	return profile, err
 }
 
 func (s *profilesStatements) SelectProfilesBySearch(

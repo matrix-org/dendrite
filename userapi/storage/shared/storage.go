@@ -96,20 +96,24 @@ func (d *Database) GetProfileByLocalpart(
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetAvatarURL(
 	ctx context.Context, localpart string, avatarURL string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
+) (profile *authtypes.Profile, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		profile, err = d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
+		return err
 	})
+	return
 }
 
 // SetDisplayName updates the display name of the profile associated with the given
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetDisplayName(
 	ctx context.Context, localpart string, displayName string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
+) (profile *authtypes.Profile, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		profile, err = d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
+		return err
 	})
+	return
 }
 
 // SetPassword sets the account password to the given hash.
