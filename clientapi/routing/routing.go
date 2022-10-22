@@ -263,7 +263,7 @@ func Setup(
 			if !isAllowed {
 				return util.JSONResponse{
 					Code: http.StatusUnauthorized,
-					JSON: jsonerror.Forbidden(""),
+					JSON: jsonerror.Forbidden("Unauthorised"),
 				}
 			}
 
@@ -350,6 +350,19 @@ func Setup(
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
+			}
+
+			isAllowedInviter, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+				RoomId:     vars["roomID"],
+				UserId:     device.UserID,
+				Permission: authz.PermissionInvite,
+			})
+
+			if !isAllowedInviter {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Inviter not allowed"),
+				}
 			}
 
 			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
