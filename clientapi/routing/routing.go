@@ -432,7 +432,7 @@ func Setup(
 		if r := rateLimits.Limit(req, nil); r != nil {
 			return *r
 		}
-		return Register(req, userAPI, cfg)
+		return Register(req, userAPI, rsAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {

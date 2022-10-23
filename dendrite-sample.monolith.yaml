@@ -181,6 +181,9 @@ client_api:
   recaptcha_bypass_secret: ""
   recaptcha_siteverify_api: ""
 
+#  auto_join_rooms:
+#    - "#main:matrix.org"
+
   # TURN server information that this homeserver should send to clients.
   turn:
     turn_user_lifetime: "5m"

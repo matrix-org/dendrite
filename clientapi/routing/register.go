@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"io"
 	"net/http"
 	"net/url"
@@ -536,6 +537,7 @@ func validateApplicationService(
 func Register(
 	req *http.Request,
 	userAPI userapi.ClientUserAPI,
+	clientRsApi rsAPI.ClientRoomserverAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	defer req.Body.Close() // nolint: errcheck
@@ -632,7 +634,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
+	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr, clientRsApi)
 }
 
 func handleGuestRegistration(
@@ -707,6 +709,7 @@ func handleRegistrationFlow(
 	userAPI userapi.ClientUserAPI,
 	accessToken string,
 	accessTokenErr error,
+	clientRsApi rsAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	// TODO: Enable registration config flag
 	// TODO: Guest account upgrading
@@ -775,8 +778,7 @@ func handleRegistrationFlow(
 	// Check if the user's registration flow has been completed successfully
 	// A response with current registration flow and remaining available methods
 	// will be returned if a flow has not been successfully completed yet
-	return checkAndCompleteFlow(sessions.getCompletedStages(sessionID),
-		req, r, sessionID, cfg, userAPI)
+	return checkAndCompleteFlow(sessions.getCompletedStages(sessionID), req, r, sessionID, cfg, userAPI, clientRsApi)
 }
 
 // handleApplicationServiceRegistration handles the registration of an
@@ -825,15 +827,25 @@ func handleApplicationServiceRegistration(
 // checkAndCompleteFlow checks if a given registration flow is completed given
 // a set of allowed flows. If so, registration is completed, otherwise a
 // response with
-func checkAndCompleteFlow(
-	flow []authtypes.LoginType,
+func checkAndCompleteFlow(flow []authtypes.LoginType,
 	req *http.Request,
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
-) util.JSONResponse {
+	clientRsApi rsAPI.ClientRoomserverAPI) util.JSONResponse {
+
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
+		// POST register behavior: add user to room
+		for room := range cfg.AutoJoinRooms {
+			err := addUserToRoom(req.Context(), clientRsApi, cfg.AutoJoinRooms[room], r.Username,
+				userutil.MakeUserID(r.Username, cfg.Matrix.ServerName))
+			if err != nil {
+				log.Fatal(err)
+				return util.JSONResponse{Code: http.StatusInternalServerError,
+					JSON: errorResponse(req.Context(), err, "Cannot add user to room.")}
+			}
+		}
 		// This flow was completed, registration can continue
 		return completeRegistration(
 			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
@@ -848,6 +860,24 @@ func checkAndCompleteFlow(
 		JSON: newUserInteractiveResponse(sessionID,
 			cfg.Derived.Registration.Flows, cfg.Derived.Registration.Params),
 	}
+}
+
+func addUserToRoom(
+	ctx context.Context,
+	clientRsAPI rsAPI.ClientRoomserverAPI,
+	roomID string,
+	username string,
+	userID string,
+) error {
+	addGroupContent := make(map[string]interface{})
+	addGroupContent["displayname"] = username
+	joinReq := rsAPI.PerformJoinRequest{
+		RoomIDOrAlias: roomID,
+		UserID:        userID,
+		Content:       addGroupContent,
+	}
+	joinRes := rsAPI.PerformJoinResponse{}
+	return clientRsAPI.PerformJoin(ctx, &joinReq, &joinRes)
 }
 
 // completeRegistration runs some rudimentary checks against the submitted
