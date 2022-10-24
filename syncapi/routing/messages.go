@@ -83,18 +83,18 @@ func OnIncomingMessagesRequest(
 	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 
 	// check if the user has already forgotten about this room
-	isForgotten, roomExists, err := checkIsRoomForgotten(req.Context(), roomID, device.UserID, rsAPI)
+	membershipResp, err := getMembershipForUser(req.Context(), roomID, device.UserID, rsAPI)
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
-	if !roomExists {
+	if !membershipResp.RoomExists {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("room does not exist"),
 		}
 	}
 
-	if isForgotten {
+	if membershipResp.IsRoomForgotten {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("user already forgot about this room"),
@@ -195,6 +195,25 @@ func OnIncomingMessagesRequest(
 		}
 	}
 
+	// If the user already left the room, grep events from before that
+	if membershipResp.Membership == gomatrixserverlib.Leave {
+		var token types.TopologyToken
+		token, err = snapshot.EventPositionInTopology(req.Context(), membershipResp.EventID)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+			}
+		}
+		if backwardOrdering {
+			from = token
+		} else {
+			// Increment, so we would get events the user isn't allowed to see anymore
+			token.Depth++
+			token.PDUPosition++
+			to = token
+		}
+	}
+
 	mReq := messagesReq{
 		ctx:              req.Context(),
 		db:               db,
@@ -283,17 +302,16 @@ func (m *messagesResp) applyLazyLoadMembers(
 	}
 }
 
-func checkIsRoomForgotten(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (forgotten bool, exists bool, err error) {
+func getMembershipForUser(ctx context.Context, roomID, userID string, rsAPI api.SyncRoomserverAPI) (resp api.QueryMembershipForUserResponse, err error) {
 	req := api.QueryMembershipForUserRequest{
 		RoomID: roomID,
 		UserID: userID,
 	}
-	resp := api.QueryMembershipForUserResponse{}
 	if err := rsAPI.QueryMembershipForUser(ctx, &req, &resp); err != nil {
-		return false, false, err
+		return api.QueryMembershipForUserResponse{}, err
 	}
 
-	return resp.IsRoomForgotten, resp.RoomExists, nil
+	return resp, nil
 }
 
 // retrieveEvents retrieves events from the local database for a request on
@@ -313,7 +331,11 @@ func (r *messagesReq) retrieveEvents() (
 	}
 
 	var events []*gomatrixserverlib.HeaderedEvent
-	util.GetLogger(r.ctx).WithField("start", start).WithField("end", end).Infof("Fetched %d events locally", len(streamEvents))
+	util.GetLogger(r.ctx).WithFields(logrus.Fields{
+		"start":     r.from,
+		"end":       r.to,
+		"backwards": r.backwardOrdering,
+	}).Infof("Fetched %d events locally", len(streamEvents))
 
 	// There can be two reasons for streamEvents to be empty: either we've
 	// reached the oldest event in the room (or the most recent one, depending
