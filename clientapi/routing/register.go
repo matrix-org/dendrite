@@ -725,7 +725,7 @@ func handleRegistrationFlow(
 	// the login type specifically requests it.
 	if r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil {
 		return handleApplicationServiceRegistration(
-			accessToken, accessTokenErr, req, r, cfg, userAPI,
+			accessToken, accessTokenErr, req, r, cfg, userAPI, clientRsApi,
 		)
 	}
 
@@ -796,6 +796,7 @@ func handleApplicationServiceRegistration(
 	r registerRequest,
 	cfg *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
+	clientRsApi rsAPI.ClientRoomserverAPI,
 ) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
@@ -819,8 +820,8 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
+		req.Context(), userAPI, clientRsApi, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
+		cfg, r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
 	)
 }
 
@@ -836,20 +837,10 @@ func checkAndCompleteFlow(flow []authtypes.LoginType,
 	clientRsApi rsAPI.ClientRoomserverAPI) util.JSONResponse {
 
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
-		// POST register behavior: add user to room
-		for room := range cfg.AutoJoinRooms {
-			err := addUserToRoom(req.Context(), clientRsApi, cfg.AutoJoinRooms[room], r.Username,
-				userutil.MakeUserID(r.Username, cfg.Matrix.ServerName))
-			if err != nil {
-				log.Fatal(err)
-				return util.JSONResponse{Code: http.StatusInternalServerError,
-					JSON: errorResponse(req.Context(), err, "Cannot add user to room.")}
-			}
-		}
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
-			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
+			req.Context(), userAPI, clientRsApi, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
+			cfg, r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
 		)
 	}
 	sessions.addParams(sessionID, r)
@@ -862,6 +853,8 @@ func checkAndCompleteFlow(flow []authtypes.LoginType,
 	}
 }
 
+// Add user to a room. This function currently working for auto_join_rooms config,
+// which can add a newly registered user to a specified room.
 func addUserToRoom(
 	ctx context.Context,
 	clientRsAPI rsAPI.ClientRoomserverAPI,
@@ -870,6 +863,9 @@ func addUserToRoom(
 	userID string,
 ) error {
 	addGroupContent := make(map[string]interface{})
+	// This make sure the user's username can be displayed correctly.
+	// Because the newly-registered user doesn't have an avatar,
+	// the avatar_url is not needed.
 	addGroupContent["displayname"] = username
 	joinReq := rsAPI.PerformJoinRequest{
 		RoomIDOrAlias: roomID,
@@ -889,7 +885,9 @@ func addUserToRoom(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.ClientUserAPI,
+	clientRsApi rsAPI.ClientRoomserverAPI,
 	username, password, appserviceID, ipAddr, userAgent, sessionID string,
+	cfg *config.ClientAPI,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 	accType userapi.AccountType,
@@ -974,6 +972,17 @@ func completeRegistration(
 		DeviceID:    devRes.Device.ID,
 	}
 	sessions.addCompletedRegistration(sessionID, result)
+
+	defer func() {
+		// POST register behavior: add user to room specified in the configuration "auto_join_rooms"
+		for room := range cfg.AutoJoinRooms {
+			err := addUserToRoom(context.Background(), clientRsApi, cfg.AutoJoinRooms[room], username,
+				userutil.MakeUserID(username, cfg.Matrix.ServerName))
+			if err != nil {
+				log.WithError(err).Errorf("user %s failed to auto-join room %s", username, cfg.AutoJoinRooms[room])
+			}
+		}
+	}()
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
@@ -1089,7 +1098,7 @@ func RegisterAvailable(
 	}
 }
 
-func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.ClientUserAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
+func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.ClientUserAPI, clientRsApi rsAPI.ClientRoomserverAPI, sr *SharedSecretRegistration, req *http.Request) util.JSONResponse {
 	ssrr, err := NewSharedSecretRegistrationRequest(req.Body)
 	if err != nil {
 		return util.JSONResponse{
@@ -1122,5 +1131,5 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, clientRsApi, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", cfg, false, &ssrr.User, &deviceID, accType)
 }
