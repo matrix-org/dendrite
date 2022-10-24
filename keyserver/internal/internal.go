@@ -257,6 +257,8 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	res.UserSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.Failures = make(map[string]interface{})
 
+	logrus.Print("QueryKeys:", req.UserID, req.UserToDevices)
+
 	// get cross-signing keys from the database
 	a.crossSigningKeysFromDatabase(ctx, req, res)
 
