@@ -206,11 +206,6 @@ func OnIncomingMessagesRequest(
 		}
 		if backwardOrdering {
 			from = token
-		} else {
-			// Increment, so we would get events the user isn't allowed to see anymore
-			token.Depth++
-			token.PDUPosition++
-			to = token
 		}
 	}
 
