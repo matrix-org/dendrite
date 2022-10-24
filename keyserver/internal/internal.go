@@ -257,10 +257,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	res.UserSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.Failures = make(map[string]interface{})
 
-	logrus.Print("QueryKeys:", req.UserID, req.UserToDevices)
-
-	// get cross-signing keys from the database
-	a.crossSigningKeysFromDatabase(ctx, req, res)
+	logrus.Print("QueryKeys:", req.UserID, req.Timeout, req.UserToDevices)
 
 	// make a map from domain to device keys
 	domainToDeviceKeys := make(map[string]map[string][]string)
@@ -337,6 +334,9 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		// perform key queries for remote devices
 		a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys, domainToCrossSigningKeys)
 	}
+
+	// get cross-signing keys from the database
+	a.crossSigningKeysFromDatabase(ctx, req, res)
 
 	// Finally, append signatures that we know about
 	// TODO: This is horrible because we need to round-trip the signature from
