@@ -388,7 +388,7 @@ func (h *httpUserInternalAPI) QueryAccountByPassword(
 func (h *httpUserInternalAPI) SetDisplayName(
 	ctx context.Context,
 	request *api.PerformUpdateDisplayNameRequest,
-	response *struct{},
+	response *api.PerformUpdateDisplayNameResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"SetDisplayName", h.apiURL+PerformSetDisplayNamePath,

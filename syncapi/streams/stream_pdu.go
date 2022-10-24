@@ -194,7 +194,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 			}
 		}
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req.Response); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 				return newPos
@@ -225,7 +225,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	delta types.StateDelta,
 	eventFilter *gomatrixserverlib.RoomEventFilter,
 	stateFilter *gomatrixserverlib.StateFilter,
-	res *types.Response,
+	req *types.SyncRequest,
 ) (types.StreamPosition, error) {
 	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
 		// make sure we don't leak recent events after the leave event.
@@ -290,8 +290,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	hasMembershipChange := false
 	for _, recentEvent := range recentStreamEvents {
 		if recentEvent.Type() == gomatrixserverlib.MRoomMember && recentEvent.StateKey() != nil {
+			if membership, _ := recentEvent.Membership(); membership == gomatrixserverlib.Join {
+				req.MembershipChanges[*recentEvent.StateKey()] = struct{}{}
+			}
 			hasMembershipChange = true
-			break
 		}
 	}
 
@@ -318,9 +320,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
 		// If we are limited by the filter AND the history visibility filter
 		// didn't "remove" events, return that the response is limited.
-		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
+		jr.Timeline.Limited = (limited && len(events) == len(recentEvents)) || delta.NewlyJoined
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Join[delta.RoomID] = jr
+		req.Response.Rooms.Join[delta.RoomID] = jr
 
 	case gomatrixserverlib.Peek:
 		jr := types.NewJoinResponse()
@@ -329,7 +331,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Peek[delta.RoomID] = jr
+		req.Response.Rooms.Peek[delta.RoomID] = jr
 
 	case gomatrixserverlib.Leave:
 		fallthrough // transitions to leave are the same as ban
@@ -342,7 +344,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		// didn't "remove" events, return that the response is limited.
 		lr.Timeline.Limited = limited && len(events) == len(recentEvents)
 		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Leave[delta.RoomID] = lr
+		req.Response.Rooms.Leave[delta.RoomID] = lr
 	}
 
 	return latestPosition, nil

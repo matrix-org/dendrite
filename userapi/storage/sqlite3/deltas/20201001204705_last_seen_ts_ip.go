@@ -8,8 +8,8 @@ import (
 
 func UpLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
-    ALTER TABLE device_devices RENAME TO device_devices_tmp;
-    CREATE TABLE device_devices (
+    ALTER TABLE userapi_devices RENAME TO userapi_devices_tmp;
+    CREATE TABLE userapi_devices (
         access_token TEXT PRIMARY KEY,
         session_id INTEGER,
         device_id TEXT ,
@@ -22,12 +22,12 @@ func UpLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
         UNIQUE (localpart, device_id)
     );
     INSERT
-    INTO device_devices (
+    INTO userapi_devices (
         access_token, session_id, device_id, localpart, created_ts, display_name, last_seen_ts, ip, user_agent
     )  SELECT
            access_token, session_id, device_id, localpart, created_ts, display_name, created_ts, '', ''
-    FROM device_devices_tmp;
-    DROP TABLE device_devices_tmp;`)
+    FROM userapi_devices_tmp;
+    DROP TABLE userapi_devices_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
@@ -36,8 +36,8 @@ func UpLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
 
 func DownLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
-ALTER TABLE device_devices RENAME TO device_devices_tmp;
-CREATE TABLE IF NOT EXISTS device_devices (
+ALTER TABLE userapi_devices RENAME TO userapi_devices_tmp;
+CREATE TABLE IF NOT EXISTS userapi_devices (
     access_token TEXT PRIMARY KEY,
     session_id INTEGER,
     device_id TEXT ,
@@ -47,12 +47,12 @@ CREATE TABLE IF NOT EXISTS device_devices (
     UNIQUE (localpart, device_id)
 );
 INSERT
-INTO device_devices (
+INTO userapi_devices (
     access_token, session_id, device_id, localpart, created_ts, display_name
 ) SELECT
        access_token, session_id, device_id, localpart, created_ts, display_name
-FROM device_devices_tmp;
-DROP TABLE device_devices_tmp;`)
+FROM userapi_devices_tmp;
+DROP TABLE userapi_devices_tmp;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute downgrade: %w", err)
 	}

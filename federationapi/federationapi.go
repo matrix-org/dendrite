@@ -116,17 +116,14 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := &statistics.Statistics{
-		DB:                     federationDB,
-		FailuresUntilBlacklist: cfg.FederationMaxRetries,
-	}
+	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
 
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, rsAPI, stats,
+		cfg.Matrix.ServerName, federation, rsAPI, &stats,
 		&queue.SigningInfo{
 			KeyID:      cfg.Matrix.KeyID,
 			PrivateKey: cfg.Matrix.PrivateKey,
@@ -183,5 +180,5 @@ func NewInternalAPI(
 	}
 	time.AfterFunc(time.Minute, cleanExpiredEDUs)
 
-	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
+	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, &stats, caches, queues, keyRing)
 }

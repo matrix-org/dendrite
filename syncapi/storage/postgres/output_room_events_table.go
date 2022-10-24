@@ -28,8 +28,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 
 	"github.com/lib/pq"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -133,7 +134,7 @@ const updateEventJSONSQL = "" +
 	"UPDATE syncapi_output_room_events SET headered_event_json=$1 WHERE event_id=$2"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
-const selectStateInRangeSQL = "" +
+const selectStateInRangeFilteredSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
 	" FROM syncapi_output_room_events" +
 	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
@@ -145,6 +146,15 @@ const selectStateInRangeSQL = "" +
 	" AND ( $8::bool IS NULL   OR     contains_url = $8  )" +
 	" ORDER BY id ASC" +
 	" LIMIT $9"
+
+// In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
+const selectStateInRangeSQL = "" +
+	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
+	" FROM syncapi_output_room_events" +
+	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" AND room_id = ANY($3)" +
+	" ORDER BY id ASC" +
+	" LIMIT $4"
 
 const deleteEventsForRoomSQL = "" +
 	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
@@ -171,20 +181,21 @@ const selectContextAfterEventSQL = "" +
 const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
 
 type outputRoomEventsStatements struct {
-	insertEventStmt               *sql.Stmt
-	selectEventsStmt              *sql.Stmt
-	selectEventsWitFilterStmt     *sql.Stmt
-	selectMaxEventIDStmt          *sql.Stmt
-	selectRecentEventsStmt        *sql.Stmt
-	selectRecentEventsForSyncStmt *sql.Stmt
-	selectEarlyEventsStmt         *sql.Stmt
-	selectStateInRangeStmt        *sql.Stmt
-	updateEventJSONStmt           *sql.Stmt
-	deleteEventsForRoomStmt       *sql.Stmt
-	selectContextEventStmt        *sql.Stmt
-	selectContextBeforeEventStmt  *sql.Stmt
-	selectContextAfterEventStmt   *sql.Stmt
-	selectSearchStmt              *sql.Stmt
+	insertEventStmt                *sql.Stmt
+	selectEventsStmt               *sql.Stmt
+	selectEventsWitFilterStmt      *sql.Stmt
+	selectMaxEventIDStmt           *sql.Stmt
+	selectRecentEventsStmt         *sql.Stmt
+	selectRecentEventsForSyncStmt  *sql.Stmt
+	selectEarlyEventsStmt          *sql.Stmt
+	selectStateInRangeFilteredStmt *sql.Stmt
+	selectStateInRangeStmt         *sql.Stmt
+	updateEventJSONStmt            *sql.Stmt
+	deleteEventsForRoomStmt        *sql.Stmt
+	selectContextEventStmt         *sql.Stmt
+	selectContextBeforeEventStmt   *sql.Stmt
+	selectContextAfterEventStmt    *sql.Stmt
+	selectSearchStmt               *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -214,6 +225,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectRecentEventsStmt, selectRecentEventsSQL},
 		{&s.selectRecentEventsForSyncStmt, selectRecentEventsForSyncSQL},
 		{&s.selectEarlyEventsStmt, selectEarlyEventsSQL},
+		{&s.selectStateInRangeFilteredStmt, selectStateInRangeFilteredSQL},
 		{&s.selectStateInRangeStmt, selectStateInRangeSQL},
 		{&s.updateEventJSONStmt, updateEventJSONSQL},
 		{&s.deleteEventsForRoomStmt, deleteEventsForRoomSQL},
@@ -240,17 +252,28 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	ctx context.Context, txn *sql.Tx, r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter, roomIDs []string,
 ) (map[string]map[string]bool, map[string]types.StreamEvent, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
-	senders, notSenders := getSendersStateFilterFilter(stateFilter)
-	rows, err := stmt.QueryContext(
-		ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
-		pq.StringArray(senders),
-		pq.StringArray(notSenders),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
-		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
-		stateFilter.ContainsURL,
-		stateFilter.Limit,
-	)
+	var rows *sql.Rows
+	var err error
+	if stateFilter != nil {
+		stmt := sqlutil.TxStmt(txn, s.selectStateInRangeFilteredStmt)
+		senders, notSenders := getSendersStateFilterFilter(stateFilter)
+		rows, err = stmt.QueryContext(
+			ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
+			pq.StringArray(senders),
+			pq.StringArray(notSenders),
+			pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.Types)),
+			pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
+			stateFilter.ContainsURL,
+			stateFilter.Limit,
+		)
+	} else {
+		stmt := sqlutil.TxStmt(txn, s.selectStateInRangeStmt)
+		rows, err = stmt.QueryContext(
+			ctx, r.Low(), r.High(), pq.StringArray(roomIDs),
+			r.High()-r.Low(),
+		)
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
