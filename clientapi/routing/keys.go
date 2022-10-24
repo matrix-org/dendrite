@@ -99,7 +99,11 @@ func (r *queryKeysRequest) GetTimeout() time.Duration {
 	if r.Timeout == 0 {
 		return 10 * time.Second
 	}
-	return time.Duration(r.Timeout) * time.Millisecond
+	timeout := time.Duration(r.Timeout) * time.Millisecond
+	if timeout > time.Second*20 {
+		timeout = time.Second * 20
+	}
+	return timeout
 }
 
 func QueryKeys(req *http.Request, keyAPI api.ClientKeyAPI, device *userapi.Device) util.JSONResponse {
