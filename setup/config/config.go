@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -587,11 +588,15 @@ Replace selected config with environment variables
 
 func (config *Dendrite) replaceWithEnvVariables() {
 	// Replace selected fields with env variables
+	err := godotenv.Load(".env")
+	if err != nil {
+		logrus.Errorln("error loading .env file", err)
+	}
 
 	config.Global.ServerName = gomatrixserverlib.ServerName(
 		replaceWithEnvVariables(string(config.Global.ServerName)),
 	)
-	logrus.Infof("Matrix ServerName=%s\n", config.Global.ServerName)
+	logrus.Infof("Matrix ServerName=%s", config.Global.ServerName)
 
 	config.Global.DatabaseOptions.ConnectionString = DataSource(
 		replaceWithEnvVariables(
@@ -602,19 +607,21 @@ func (config *Dendrite) replaceWithEnvVariables() {
 	// If env variable is set, convert the deployment chain IDs from the env
 	// variable into []int and replace the ChainIDs field.
 	if config.ClientAPI.PublicKeyAuthentication.Ethereum.Enabled {
-		deploymentChainIDs := replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.DeploymentChainIDs)
-		chainIds := strings.Split(deploymentChainIDs, ",")
-		if len(chainIds) > 0 && chainIds[0] != "" {
-			var ids []int
-			for _, id := range chainIds {
-				id, err := strconv.Atoi(strings.TrimSpace(id))
-				if err == nil {
-					ids = append(ids, id)
-				}
+		strChainId := replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.DeploymentChainID)
+		if strChainId != "" {
+			id, err := strconv.Atoi(strings.TrimSpace(strChainId))
+			if err == nil {
+				config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainID = id
 			}
-			config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainIDs = ids
 		}
-		logrus.Infof("Supported Ethereum chain IDs=%d\n", config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainIDs)
+
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl = replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl)
+
+		logrus.Infof(
+			"Supported Ethereum chain ID=%d, network URL=%s",
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainID,
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl,
+		)
 	}
 }
 

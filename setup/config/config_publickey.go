@@ -9,23 +9,21 @@ type AuthParams interface {
 }
 
 type EthereumAuthParams struct {
-	Version  uint  `json:"version"`
-	ChainIDs []int `json:"chain_ids"`
+	Version uint `json:"version"`
+	ChainID int  `json:"chain_id"`
 }
 
 func (p EthereumAuthParams) GetParams() interface{} {
-	copyP := p
-	copyP.ChainIDs = make([]int, len(p.ChainIDs))
-	copy(copyP.ChainIDs, p.ChainIDs)
-	return copyP
+	return p
 }
 
 type EthereumAuthConfig struct {
-	Enabled            bool   `yaml:"enabled"`
-	Version            uint   `yaml:"version"`
-	ChainIDs           []int  `yaml:"chain_ids"`
-	DeploymentChainIDs string `yaml:"deployment_chain_ids"` // For deployment: use env variable strings to override the chain IDs.
-	EnableAuthz        bool   `yaml:"enable_authz"`         // Flag to enable / disable authorization during development
+	Enabled           bool   `yaml:"enabled"`
+	Version           uint   `yaml:"version"`
+	ChainID           int    `yaml:"chain_id"`
+	DeploymentChainID string `yaml:"deployment_chain_id"` // For deployment: use env variable string to override the chain ID.
+	NetworkUrl        string `yaml:"networkUrl"`          // Blockchain network provider URL
+	EnableAuthz       bool   `yaml:"enable_authz"`        // Flag to enable / disable authorization during development
 }
 
 type PublicKeyAuthentication struct {
@@ -49,8 +47,8 @@ func (pk *PublicKeyAuthentication) GetPublicKeyRegistrationParams() map[string]i
 	params := make(map[string]interface{})
 	if pk.Ethereum.Enabled {
 		p := EthereumAuthParams{
-			Version:  pk.Ethereum.Version,
-			ChainIDs: pk.Ethereum.ChainIDs,
+			Version: pk.Ethereum.Version,
+			ChainID: pk.Ethereum.ChainID,
 		}
 		params[authtypes.LoginTypePublicKeyEthereum] = p
 	}

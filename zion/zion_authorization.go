@@ -2,20 +2,14 @@ package zion
 
 import (
 	_ "embed"
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/joho/godotenv"
 	"github.com/matrix-org/dendrite/authorization"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	zion_goerli "github.com/matrix-org/dendrite/zion/contracts/goerli/zion_goerli"
 	zion_localhost "github.com/matrix-org/dendrite/zion/contracts/localhost/zion_localhost"
 	log "github.com/sirupsen/logrus"
-)
-
-const (
-	localhostEndpointUrl = "LOCALHOST_ENDPOINT" // .env
-	goerliEndpointUrl    = "GOERLI_ENDPOINT"    // .env
 )
 
 //go:embed contracts/localhost/addresses/space-manager.json
@@ -28,29 +22,41 @@ type ZionAuthorization struct {
 	store                 Store
 	spaceManagerLocalhost *zion_localhost.ZionSpaceManagerLocalhost
 	spaceManagerGoerli    *zion_goerli.ZionSpaceManagerGoerli
+	chainId               int
 }
 
-func NewZionAuthorization(rsAPI roomserver.ClientRoomserverAPI) (authorization.Authorization, error) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Errorln("error loading .env file", err)
+func NewZionAuthorization(
+	cfg *config.ClientAPI,
+	rsAPI roomserver.ClientRoomserverAPI,
+) (authorization.Authorization, error) {
+	if cfg.PublicKeyAuthentication.Ethereum.NetworkUrl == "" {
+		log.Errorf("No blockchain network url specified in config\n")
+		return nil, nil
 	}
 
 	var auth ZionAuthorization
 
+	auth.chainId = cfg.PublicKeyAuthentication.Ethereum.ChainID
 	auth.store = NewStore(rsAPI)
 
-	localhost, err := newZionSpaceManagerLocalhost(os.Getenv(localhostEndpointUrl))
-	if err != nil {
-		log.Errorln("error instantiating ZionSpaceManagerLocalhost", err)
-	}
-	auth.spaceManagerLocalhost = localhost
+	switch auth.chainId {
+	case 1337, 31337:
+		localhost, err := newZionSpaceManagerLocalhost(cfg.PublicKeyAuthentication.Ethereum.NetworkUrl)
+		if err != nil {
+			log.Errorln("error instantiating ZionSpaceManagerLocalhost", err)
+		}
+		auth.spaceManagerLocalhost = localhost
 
-	goerli, err := newZionSpaceManagerGoerli(os.Getenv(goerliEndpointUrl))
-	if err != nil {
-		log.Errorln("error instantiating ZionSpaceManagerGoerli", err)
+	case 5:
+		goerli, err := newZionSpaceManagerGoerli(cfg.PublicKeyAuthentication.Ethereum.NetworkUrl)
+		if err != nil {
+			log.Errorln("error instantiating ZionSpaceManagerGoerli", err)
+		}
+		auth.spaceManagerGoerli = goerli
+
+	default:
+		log.Errorf("Unsupported chain id: %d\n", auth.chainId)
 	}
-	auth.spaceManagerGoerli = goerli
 
 	return &auth, nil
 }
@@ -66,13 +72,13 @@ func (za *ZionAuthorization) IsAllowed(args authorization.AuthorizationArgs) (bo
 		return true, nil
 	}
 
-	switch userIdentifier.ChainId {
+	switch za.chainId {
 	case 1337, 31337:
 		return za.isAllowedLocalhost(roomInfo, userIdentifier.AccountAddress, args.Permission)
 	case 5:
 		return za.isAllowedGoerli(roomInfo, userIdentifier.AccountAddress, args.Permission)
 	default:
-		log.Errorf("Unsupported chain id: %d\n", userIdentifier.ChainId)
+		log.Errorf("Unsupported chain id: %d", userIdentifier.ChainId)
 	}
 
 	return false, nil
