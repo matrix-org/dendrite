@@ -257,8 +257,6 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	res.UserSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.Failures = make(map[string]interface{})
 
-	logrus.Print("QueryKeys:", req.UserID, req.Timeout, req.UserToDevices)
-
 	// make a map from domain to device keys
 	domainToDeviceKeys := make(map[string]map[string][]string)
 	domainToCrossSigningKeys := make(map[string]map[string]struct{})
@@ -335,7 +333,8 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys, domainToCrossSigningKeys)
 	}
 
-	// get cross-signing keys from the database
+	// Now that we've done the potentially expensive work of asking the federation,
+	// try filling the cross-signing keys from the database that we know about.
 	a.crossSigningKeysFromDatabase(ctx, req, res)
 
 	// Finally, append signatures that we know about
