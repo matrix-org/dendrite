@@ -129,8 +129,8 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 	if c.ServerName == serverName {
 		return true
 	}
-	for _, serverName := range c.SecondaryServerNames {
-		if c.ServerName == serverName {
+	for _, secondaryName := range c.SecondaryServerNames {
+		if secondaryName == serverName {
 			return true
 		}
 	}

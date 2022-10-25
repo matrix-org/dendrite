@@ -47,7 +47,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase
 		connStr, dbClose := test.PrepareDBConnectionString(t, dbType)
 		db, err := storage.NewDatabase(b, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
-		}, b.Caches, b.Cfg.Global.ServerName)
+		}, b.Caches, b.Cfg.Global.IsLocalServerName)
 		if err != nil {
 			t.Fatalf("NewDatabase returned %s", err)
 		}

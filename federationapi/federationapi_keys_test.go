@@ -87,6 +87,7 @@ func TestMain(m *testing.M) {
 			cfg.Global.JetStream.StoragePath = config.Path(d)
 			cfg.Global.KeyID = serverKeyID
 			cfg.Global.KeyValidityPeriod = s.validity
+			cfg.FederationAPI.KeyPerspectives = nil
 			f, err := os.CreateTemp(d, "federation_keys_test*.db")
 			if err != nil {
 				return -1
