@@ -18,20 +18,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/config"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/types"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type getMembershipResponse struct {
 	Chunk []gomatrixserverlib.ClientEvent `json:"chunk"`
-}
-
-type getJoinedRoomsResponse struct {
-	JoinedRooms []string `json:"joined_rooms"`
 }
 
 // https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-rooms-roomid-joined-members
@@ -51,19 +49,22 @@ type databaseJoinedMember struct {
 	AvatarURL   string `json:"avatar_url"`
 }
 
-// GetMemberships implements GET /rooms/{roomId}/members
+// GetMemberships implements
+//
+//	GET /rooms/{roomId}/members
+//	GET /rooms/{roomId}/joined_members
 func GetMemberships(
-	req *http.Request, device *userapi.Device, roomID string, joinedOnly bool,
-	_ *config.ClientAPI,
-	rsAPI api.ClientRoomserverAPI,
+	req *http.Request, device *userapi.Device, roomID string,
+	syncDB storage.Database, rsAPI api.SyncRoomserverAPI,
+	joinedOnly bool, membership, notMembership *string, at string,
 ) util.JSONResponse {
-	queryReq := api.QueryMembershipsForRoomRequest{
-		JoinedOnly: joinedOnly,
-		RoomID:     roomID,
-		Sender:     device.UserID,
+	queryReq := api.QueryMembershipForUserRequest{
+		RoomID: roomID,
+		UserID: device.UserID,
 	}
-	var queryRes api.QueryMembershipsForRoomResponse
-	if err := rsAPI.QueryMembershipsForRoom(req.Context(), &queryReq, &queryRes); err != nil {
+
+	var queryRes api.QueryMembershipForUserResponse
+	if err := rsAPI.QueryMembershipForUser(req.Context(), &queryReq, &queryRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryMembershipsForRoom failed")
 		return jsonerror.InternalServerError()
 	}
@@ -75,16 +76,48 @@ func GetMemberships(
 		}
 	}
 
+	db, err := syncDB.NewDatabaseSnapshot(req.Context())
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+
+	atToken, err := types.NewTopologyTokenFromString(at)
+	if err != nil {
+		if queryRes.HasBeenInRoom && !queryRes.IsInRoom {
+			// If you have left the room then this will be the members of the room when you left.
+			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
+		} else {
+			// If you are joined to the room then this will be the current members of the room.
+			atToken, err = db.MaxTopologicalPosition(req.Context(), roomID)
+		}
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("unable to get 'atToken'")
+			return jsonerror.InternalServerError()
+		}
+	}
+
+	eventIDs, err := db.SelectMemberships(req.Context(), roomID, atToken, membership, notMembership)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("db.SelectMemberships failed")
+		return jsonerror.InternalServerError()
+	}
+
+	result, err := db.Events(req.Context(), eventIDs)
+	if err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("db.Events failed")
+		return jsonerror.InternalServerError()
+	}
+
 	if joinedOnly {
 		var res getJoinedMembersResponse
 		res.Joined = make(map[string]joinedMember)
-		for _, ev := range queryRes.JoinEvents {
+		for _, ev := range result {
 			var content databaseJoinedMember
-			if err := json.Unmarshal(ev.Content, &content); err != nil {
+			if err := json.Unmarshal(ev.Content(), &content); err != nil {
 				util.GetLogger(req.Context()).WithError(err).Error("failed to unmarshal event content")
 				return jsonerror.InternalServerError()
 			}
-			res.Joined[ev.Sender] = joinedMember(content)
+			res.Joined[ev.Sender()] = joinedMember(content)
 		}
 		return util.JSONResponse{
 			Code: http.StatusOK,
@@ -93,29 +126,6 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{queryRes.JoinEvents},
-	}
-}
-
-func GetJoinedRooms(
-	req *http.Request,
-	device *userapi.Device,
-	rsAPI api.ClientRoomserverAPI,
-) util.JSONResponse {
-	var res api.QueryRoomsForUserResponse
-	err := rsAPI.QueryRoomsForUser(req.Context(), &api.QueryRoomsForUserRequest{
-		UserID:         device.UserID,
-		WantMembership: "join",
-	}, &res)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("QueryRoomsForUser failed")
-		return jsonerror.InternalServerError()
-	}
-	if res.RoomIDs == nil {
-		res.RoomIDs = []string{}
-	}
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: getJoinedRoomsResponse{res.RoomIDs},
+		JSON: getMembershipResponse{gomatrixserverlib.HeaderedToClientEvents(result, gomatrixserverlib.FormatSync)},
 	}
 }

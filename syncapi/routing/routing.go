@@ -172,4 +172,37 @@ func Setup(
 			return Search(req, device, syncDB, fts, nextBatch)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/members",
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			var membership, notMembership *string
+			if req.URL.Query().Has("membership") {
+				m := req.URL.Query().Get("membership")
+				membership = &m
+			}
+			if req.URL.Query().Has("not_membership") {
+				m := req.URL.Query().Get("not_membership")
+				notMembership = &m
+			}
+
+			at := req.URL.Query().Get("at")
+			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, false, membership, notMembership, at)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/rooms/{roomID}/joined_members",
+		httputil.MakeAuthAPI("rooms_members", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			at := req.URL.Query().Get("at")
+			membership := gomatrixserverlib.Join
+			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, true, &membership, nil, at)
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
 }
