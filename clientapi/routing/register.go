@@ -973,8 +973,9 @@ func completeRegistration(
 	}
 	sessions.addCompletedRegistration(sessionID, result)
 
-	defer func() {
-		// POST register behavior: add user to room specified in the configuration "auto_join_rooms"
+	// POST register behaviour: check if the user is a normal user.
+	// If the user is a normal user, add user to room specified in the configuration "auto_join_rooms".
+	if accType != userapi.AccountTypeAppService && appserviceID == "" {
 		for room := range cfg.AutoJoinRooms {
 			err := addUserToRoom(context.Background(), clientRsApi, cfg.AutoJoinRooms[room], username,
 				userutil.MakeUserID(username, cfg.Matrix.ServerName))
@@ -982,7 +983,7 @@ func completeRegistration(
 				log.WithError(err).Errorf("user %s failed to auto-join room %s", username, cfg.AutoJoinRooms[room])
 			}
 		}
-	}()
+	}
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
