@@ -208,8 +208,8 @@ func TestRenewalBehaviour(t *testing.T) {
 	// happy at this point that the key that we already have is from the past
 	// then repeating a key fetch should cause us to try and renew the key.
 	// If so, then the new key will end up in our cache.
-
 	serverC.renew()
+	time.Sleep(time.Second / 2)
 
 	res, err = serverA.api.FetchKeys(
 		context.Background(),
