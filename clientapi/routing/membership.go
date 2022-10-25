@@ -342,7 +342,7 @@ func loadProfile(
 	}
 
 	var profile *authtypes.Profile
-	if !cfg.Matrix.IsLocalServerName(serverName) {
+	if cfg.Matrix.IsLocalServerName(serverName) {
 		profile, err = appserviceAPI.RetrieveUserProfile(ctx, userID, asAPI, profileAPI)
 	} else {
 		profile = &authtypes.Profile{}
