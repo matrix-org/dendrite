@@ -283,7 +283,6 @@ func Test_UserStatistics(t *testing.T) {
 					t.Fatalf("unable to update daily visits stats: %v", err)
 				}
 			}
-
 			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
