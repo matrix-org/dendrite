@@ -1,7 +1,5 @@
 module github.com/matrix-org/dendrite
 
-replace github.com/matrix-org/gomatrixserverlib => github.com/matrix-org/gomatrixserverlib v0.0.0-20221025111511-1228c5bb7e09
-
 require (
 	github.com/Arceliar/ironwood v0.0.0-20220903132624-ee60c16bcfcf
 	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
@@ -24,7 +22,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20221021091412-7c772f1b388a
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20221025142407-17b0be811afa
 	github.com/matrix-org/pinecone v0.0.0-20221007145426-3adc85477dd3
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
