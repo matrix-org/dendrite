@@ -109,6 +109,12 @@ func GetMemberships(
 	}
 
 	if joinedOnly {
+		if !queryRes.IsInRoom {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
+			}
+		}
 		var res getJoinedMembersResponse
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range result {
