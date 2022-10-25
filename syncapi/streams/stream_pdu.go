@@ -227,14 +227,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	stateFilter *gomatrixserverlib.StateFilter,
 	req *types.SyncRequest,
 ) (types.StreamPosition, error) {
-	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
-		// make sure we don't leak recent events after the leave event.
-		// TODO: History visibility makes this somewhat complex to handle correctly. For example:
-		// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
-		// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
-		//       in a single /sync request
-		// This is all "okay" assuming history_visibility == "shared" which it is by default.
-		r.To = delta.MembershipPos
+
+	originalLimit := eventFilter.Limit
+	if r.Backwards {
+		eventFilter.Limit = int(r.From - r.To)
 	}
 	recentStreamEvents, limited, err := snapshot.RecentEvents(
 		ctx, delta.RoomID, r,
@@ -301,6 +297,12 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
+	}
+
+	if r.Backwards && len(events) > originalLimit {
+		// We're going backwards and the events are ordered chronologically, so take the last `limit` events
+		events = events[len(events)-originalLimit:]
+		limited = true
 	}
 
 	if len(delta.StateEvents) > 0 {
