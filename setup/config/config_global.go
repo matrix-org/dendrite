@@ -12,8 +12,6 @@ import (
 
 type Global struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	//
-	// Deprecated: Don't check this.
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 
 	// The secondary server names, used for virtual hosting.
