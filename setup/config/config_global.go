@@ -170,7 +170,7 @@ type ServerNotices struct {
 	// The displayname to be used when sending notices
 	DisplayName string `yaml:"display_name"`
 	// The avatar of this user
-	AvatarURL string `yaml:"avatar"`
+	AvatarURL string `yaml:"avatar_url"`
 	// The roomname to be used when creating messages
 	RoomName string `yaml:"room_name"`
 }
