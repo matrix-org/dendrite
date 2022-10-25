@@ -21,7 +21,6 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -119,7 +118,6 @@ func (s *membershipsStatements) UpsertMembership(
 		streamPos,
 		topologicalPos,
 	)
-	logrus.Debugf("XXX: upserMembership: %d %d %s", streamPos, topologicalPos, *event.StateKey())
 	return err
 }
 
@@ -185,7 +183,6 @@ func (s *membershipsStatements) SelectMemberships(
 		if err = rows.Scan(&eventID); err != nil {
 			return
 		}
-		logrus.Debugf("XXX: eventID: %s", eventID)
 		eventIDs = append(eventIDs, eventID)
 	}
 	return eventIDs, rows.Err()
