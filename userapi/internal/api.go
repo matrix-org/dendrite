@@ -202,6 +202,7 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	if serverName == "" {
 		serverName = a.Config.Matrix.ServerName
 	}
+	_ = serverName
 	// XXXX: Use the server name here
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
