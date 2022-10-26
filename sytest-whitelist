@@ -757,3 +757,4 @@ Can get rooms/{roomId}/messages for a departed room (SPEC-216)
 Local device key changes appear in /keys/changes
 Can get rooms/{roomId}/members at a given point
 Can filter rooms/{roomId}/members
+Current state appears in timeline in private history with many messages after
