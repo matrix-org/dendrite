@@ -247,7 +247,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
-	destQueues := []*destinationQueue{}
+	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
 		if queue := oqs.getQueue(destination); queue != nil {
 			destQueues = append(destQueues, queue)
@@ -344,7 +344,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
-	destQueues := []*destinationQueue{}
+	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
 		if queue := oqs.getQueue(destination); queue != nil {
 			destQueues = append(destQueues, queue)
