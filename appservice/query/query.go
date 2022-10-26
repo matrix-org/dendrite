@@ -26,7 +26,6 @@ import (
 	"sync"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice/api"
@@ -292,7 +291,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, as := range a.Cfg.Derived.ApplicationServices {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+req.Protocol, &proto); err != nil {
-				logrus.WithError(err).Error("unable to get 'protocol' from application service")
+				log.WithError(err).Error("unable to get 'protocol' from application service")
 				continue
 			}
 
@@ -322,7 +321,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, p := range as.Protocols {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+p, &proto); err != nil {
-				logrus.WithError(err).Error("unable to get protocolResponse from application service")
+				log.WithError(err).Error("unable to get protocolResponse from application service")
 				continue
 			}
 			existing, ok := response[p]
