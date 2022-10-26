@@ -548,6 +548,9 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	if serverName == "" {
 		serverName = a.Config.Matrix.ServerName
 	}
+	if !a.Config.Matrix.IsLocalServerName(serverName) {
+		return fmt.Errorf("server name %q not locally configured", serverName)
+	}
 
 	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
 		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),

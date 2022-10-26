@@ -119,6 +119,13 @@ func SetAvatarURL(
 		return jsonerror.InternalServerError()
 	}
 
+	if !cfg.Matrix.IsLocalServerName(domain) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID does not belong to a locally configured domain"),
+		}
+	}
+
 	evTime, err := httputil.ParseTSParam(req)
 	if err != nil {
 		return util.JSONResponse{
@@ -209,6 +216,13 @@ func SetDisplayName(
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
+	}
+
+	if !cfg.Matrix.IsLocalServerName(domain) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID does not belong to a locally configured domain"),
+		}
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
