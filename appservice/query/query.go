@@ -181,13 +181,14 @@ func requestDo[T thirdpartyResponses](client *http.Client, url string, response 
 	// try v1 and unstable appservice endpoints
 	for _, version := range []string{"v1", "unstable"} {
 		var resp *http.Response
+		var body []byte
 		asURL := strings.Replace(origURL, "unstable", version, 1)
 		resp, err = client.Get(asURL)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close() // nolint: errcheck
-		body, err := io.ReadAll(resp.Body)
+		body, err = io.ReadAll(resp.Body)
 		if err != nil {
 			continue
 		}
