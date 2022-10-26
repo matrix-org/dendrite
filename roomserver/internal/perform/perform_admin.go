@@ -117,6 +117,11 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			PrevEvents: prevEvents,
 		}
 
+		_, senderDomain, err := gomatrixserverlib.SplitID('@', fledglingEvent.Sender)
+		if err != nil {
+			continue
+		}
+
 		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
@@ -146,8 +151,8 @@ func (r *Admin) PerformAdminEvacuateRoom(
 		inputEvents = append(inputEvents, api.InputRoomEvent{
 			Kind:         api.KindNew,
 			Event:        event,
-			Origin:       r.Cfg.Matrix.ServerName,
-			SendAsServer: string(r.Cfg.Matrix.ServerName),
+			Origin:       senderDomain,
+			SendAsServer: string(senderDomain),
 		})
 		res.Affected = append(res.Affected, stateKey)
 		prevEvents = []gomatrixserverlib.EventReference{
@@ -176,7 +181,7 @@ func (r *Admin) PerformAdminEvacuateUser(
 		}
 		return nil
 	}
-	if domain != r.Cfg.Matrix.ServerName {
+	if !r.Cfg.Matrix.IsLocalServerName(domain) {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  "Can only evacuate local users using this endpoint",
