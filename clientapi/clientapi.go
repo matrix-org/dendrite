@@ -15,6 +15,8 @@
 package clientapi
 
 import (
+	"github.com/matrix-org/gomatrixserverlib"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -26,7 +28,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddPublicRoutes sets up and registers HTTP handlers for the ClientAPI component.
@@ -65,5 +66,6 @@ func AddPublicRoutes(
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
 		extRoomsProvider, mscCfg, natsClient,
+		base.Cfg.AppServiceAPI.DisableTLSValidation,
 	)
 }
