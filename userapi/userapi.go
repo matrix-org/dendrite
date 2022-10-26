@@ -82,6 +82,7 @@ func NewInternalAPI(
 		RSAPI:                rsAPI,
 		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
 		PgClient:             pgClient,
+		Cfg:                  cfg,
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(
