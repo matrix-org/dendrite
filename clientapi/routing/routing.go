@@ -62,7 +62,6 @@ func Setup(
 	keyAPI keyserverAPI.ClientKeyAPI,
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
-	appserviceDisableTLSValidation bool,
 ) {
 	prometheus.MustRegister(amtRegUsers, sendEventDuration)
 
