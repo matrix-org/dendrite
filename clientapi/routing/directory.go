@@ -75,7 +75,7 @@ func DirectoryRoom(
 	if res.RoomID == "" {
 		// If we don't know it locally, do a federation query.
 		// But don't send the query to ourselves.
-		if domain != cfg.Matrix.ServerName {
+		if !cfg.Matrix.IsLocalServerName(domain) {
 			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
 			if fedErr != nil {
 				// TODO: Return 502 if the remote server errored.
@@ -127,7 +127,7 @@ func SetLocalAlias(
 		}
 	}
 
-	if domain != cfg.Matrix.ServerName {
+	if !cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Alias must be on local homeserver"),

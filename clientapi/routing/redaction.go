@@ -131,7 +131,8 @@ func SendRedaction(
 			JSON: jsonerror.NotFound("Room does not exist"),
 		}
 	}
-	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, false); err != nil {
+	domain := device.UserDomain()
+	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, domain, domain, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
 		return jsonerror.InternalServerError()
 	}

@@ -70,7 +70,7 @@ func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, device *userapi
 	if err != nil {
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
-	if domain != cfg.Matrix.ServerName {
+	if !cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("User ID must belong to this server."),
@@ -169,7 +169,7 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI api.Clien
 	if err != nil {
 		return util.MessageResponse(http.StatusBadRequest, err.Error())
 	}
-	if domain == cfg.Matrix.ServerName {
+	if cfg.Matrix.IsLocalServerName(domain) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidParam("Can not mark local device list as stale"),
