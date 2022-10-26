@@ -129,7 +129,7 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 	}
 
 	// Error if the chainId is not supported by the server.
-	if pk.config.PublicKeyAuthentication.Ethereum.ChainID != message.GetChainID() {
+	if pk.config.PublicKeyAuthentication.Ethereum.GetChainID() != message.GetChainID() {
 		return false, jsonerror.Forbidden("chainId")
 	}
 

@@ -186,9 +186,8 @@ client_api:
     ethereum:
       enabled: true
       version: 1
-      chain_id: 5 
-      deployment_chain_id: ${CHAIN_ID}
-      networkUrl: ${BLOCKCHAIN_PROVIDER_URL}
+      chain_id: ${CHAIN_ID}
+      network_url: ${BLOCKCHAIN_PROVIDER_URL}
       enable_authz: ${ENABLE_AUTHZ}
 
   # Whether to require reCAPTCHA for registration.

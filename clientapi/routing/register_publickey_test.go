@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -48,9 +49,9 @@ func createRegisterContext(_ *testing.T) *registerContext {
 		PasswordAuthenticationDisabled: true,
 		PublicKeyAuthentication: config.PublicKeyAuthentication{
 			Ethereum: config.EthereumAuthConfig{
-				Enabled: true,
-				Version: 1,
-				ChainID: testutil.EthereumTestNetworkId,
+				Enabled:       true,
+				Version:       1,
+				ConfigChainID: strconv.Itoa(testutil.EthereumTestNetworkId),
 			},
 		},
 	}

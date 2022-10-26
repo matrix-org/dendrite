@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -587,7 +586,9 @@ Replace selected config with environment variables
 */
 
 func (config *Dendrite) replaceWithEnvVariables() {
-	// Replace selected fields with env variables
+	// If env variable is set, get the value from the env
+	// variable and replace it in each supported field.
+
 	err := godotenv.Load(".env")
 	if err != nil {
 		logrus.Errorln("error loading .env file", err)
@@ -604,23 +605,21 @@ func (config *Dendrite) replaceWithEnvVariables() {
 		),
 	)
 
-	// If env variable is set, convert the deployment chain IDs from the env
-	// variable into []int and replace the ChainIDs field.
 	if config.ClientAPI.PublicKeyAuthentication.Ethereum.Enabled {
-		strChainId := replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.DeploymentChainID)
-		if strChainId != "" {
-			id, err := strconv.Atoi(strings.TrimSpace(strChainId))
-			if err == nil {
-				config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainID = id
-			}
-		}
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID =
+			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID)
 
-		config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl = replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl)
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl =
+			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl)
+
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz =
+			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz)
 
 		logrus.Infof(
-			"Supported Ethereum chain ID=%d, network URL=%s",
-			config.ClientAPI.PublicKeyAuthentication.Ethereum.ChainID,
+			"Supported Ethereum chain_id=%v, network_url=%v, enable_authz=%v",
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID,
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl,
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz,
 		)
 	}
 }

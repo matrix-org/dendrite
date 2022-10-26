@@ -175,7 +175,7 @@ client_api:
       enabled: false
       version: 1
       chain_id: 31337
-      networkUrl: "http://127.0.0.1:8545"
+      network_url: "http://127.0.0.1:8545"
 
   # Whether to require reCAPTCHA for registration. If you have enabled registration
   # then this is HIGHLY RECOMMENDED to reduce the risk of your homeserver being used

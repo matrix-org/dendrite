@@ -27,7 +27,7 @@ import (
 	"github.com/spruceid/siwe-go"
 )
 
-const EthereumTestNetworkId = 1337 // Localhost chain ID
+const EthereumTestNetworkId int = 31337 // Localhost chain ID
 const TestServerName = "localhost"
 
 type EthereumTestWallet struct {

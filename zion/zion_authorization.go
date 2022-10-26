@@ -36,7 +36,7 @@ func NewZionAuthorization(
 
 	var auth ZionAuthorization
 
-	auth.chainId = cfg.PublicKeyAuthentication.Ethereum.ChainID
+	auth.chainId = cfg.PublicKeyAuthentication.Ethereum.GetChainID()
 	auth.store = NewStore(rsAPI)
 
 	switch auth.chainId {
