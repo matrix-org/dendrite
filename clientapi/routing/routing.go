@@ -135,7 +135,7 @@ func Setup(
 					}
 				}
 				if req.Method == http.MethodPost {
-					return handleSharedSecretRegistration(cfg, userAPI, rsAPI, sr, req)
+					return handleSharedSecretRegistration(cfg, userAPI, sr, req)
 				}
 				return util.JSONResponse{
 					Code: http.StatusMethodNotAllowed,
@@ -432,7 +432,7 @@ func Setup(
 		if r := rateLimits.Limit(req, nil); r != nil {
 			return *r
 		}
-		return Register(req, userAPI, rsAPI, cfg)
+		return Register(req, userAPI, cfg)
 	})).Methods(http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/register/available", httputil.MakeExternalAPI("registerAvailable", func(req *http.Request) util.JSONResponse {

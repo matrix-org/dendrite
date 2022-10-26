@@ -29,10 +29,6 @@ type ClientAPI struct {
 	// is forbidden either way.
 	GuestsDisabled bool `yaml:"guests_disabled"`
 
-	// Users who register on this homeserver will automatically
-	// be joined to the rooms listed under this option.
-	AutoJoinRooms []string `yaml:"auto_join_rooms"`
-
 	// Boolean stating whether catpcha registration is enabled
 	// and required
 	RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
