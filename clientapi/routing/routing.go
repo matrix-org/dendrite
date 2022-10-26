@@ -843,17 +843,17 @@ func Setup(
 
 	v3mux.Handle("/thirdparty/protocols",
 		httputil.MakeAuthAPI("thirdparty_protocols", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
-			return Protocols(req, asAPI, device)
+			return Protocols(req, asAPI, device, "")
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/thirdparty/protocol/{protocolID}",
-		httputil.MakeAuthAPI("thirdparty_protocol", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeAuthAPI("thirdparty_protocols", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
-			return Protocol(req, asAPI, device, vars["protocolID"])
+			return Protocols(req, asAPI, device, vars["protocolID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 

@@ -27,30 +27,9 @@ import (
 
 // Protocols implements
 //
-//	GET /_matrix/client/v3/thirdparty/protocols
-func Protocols(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, device *api.Device) util.JSONResponse {
-	resp := &appserviceAPI.ProtocolResponse{}
-
-	if err := asAPI.Protocols(req.Context(), &appserviceAPI.ProtocolRequest{Protocol: ""}, resp); err != nil {
-		return jsonerror.InternalServerError()
-	}
-	if !resp.Exists {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("No protocols registered"),
-		}
-	}
-	return util.JSONResponse{
-		Code: http.StatusOK,
-		JSON: resp.Protocols,
-	}
-}
-
-// Protocol implements
-//
 //	GET /_matrix/client/v3/thirdparty/protocols/{protocol}
-func Protocol(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, device *api.Device, protocol string) util.JSONResponse {
-
+//	GET /_matrix/client/v3/thirdparty/protocols
+func Protocols(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, device *api.Device, protocol string) util.JSONResponse {
 	resp := &appserviceAPI.ProtocolResponse{}
 
 	if err := asAPI.Protocols(req.Context(), &appserviceAPI.ProtocolRequest{Protocol: protocol}, resp); err != nil {
@@ -62,9 +41,15 @@ func Protocol(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, devi
 			JSON: jsonerror.NotFound("The protocol is unknown."),
 		}
 	}
+	if protocol != "" {
+		return util.JSONResponse{
+			Code: http.StatusOK,
+			JSON: resp.Protocols[protocol],
+		}
+	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: resp.Protocols[protocol],
+		JSON: resp.Protocols,
 	}
 }
 
