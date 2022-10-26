@@ -54,6 +54,7 @@ type UserInternalAPI struct {
 	KeyAPI      keyapi.UserKeyAPI
 	RSAPI       rsapi.UserRoomserverAPI
 	PgClient    pushgateway.Client
+	Cfg         *config.UserAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -174,9 +175,51 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return err
 	}
 
+	postRegisterJoinRooms(a.Cfg, acc, a.RSAPI)
+
 	res.AccountCreated = true
 	res.Account = acc
 	return nil
+}
+
+func postRegisterJoinRooms(cfg *config.UserAPI, acc *api.Account, rsAPI rsapi.UserRoomserverAPI) {
+	// POST register behaviour: check if the user is a normal user.
+	// If the user is a normal user, add user to room specified in the configuration "auto_join_rooms".
+	if acc.AccountType != api.AccountTypeAppService && acc.AppServiceID == "" {
+		for room := range cfg.AutoJoinRooms {
+			userID := userutil.MakeUserID(acc.Localpart, cfg.Matrix.ServerName)
+			err := addUserToRoom(context.Background(), rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"user_id": userID,
+					"room":    cfg.AutoJoinRooms[room],
+				}).WithError(err).Errorf("user failed to auto-join room")
+			}
+		}
+	}
+}
+
+// Add user to a room. This function currently working for auto_join_rooms config,
+// which can add a newly registered user to a specified room.
+func addUserToRoom(
+	ctx context.Context,
+	rsAPI rsapi.UserRoomserverAPI,
+	roomID string,
+	username string,
+	userID string,
+) error {
+	addGroupContent := make(map[string]interface{})
+	// This make sure the user's username can be displayed correctly.
+	// Because the newly-registered user doesn't have an avatar,
+	// the avatar_url is not needed.
+	addGroupContent["displayname"] = username
+	joinReq := rsapi.PerformJoinRequest{
+		RoomIDOrAlias: roomID,
+		UserID:        userID,
+		Content:       addGroupContent,
+	}
+	joinRes := rsapi.PerformJoinResponse{}
+	return rsAPI.PerformJoin(ctx, &joinReq, &joinRes)
 }
 
 func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
