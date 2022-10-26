@@ -67,11 +67,12 @@ type DataTypesCreateSpaceData struct {
 	SpaceNetworkId string
 }
 
-// DataTypesCreateSpaceTokenEntitlementData is an auto generated low-level Go binding around an user-defined struct.
-type DataTypesCreateSpaceTokenEntitlementData struct {
-	Permissions              []string
-	RoleName                 string
-	ExternalTokenEntitlement DataTypesExternalTokenEntitlement
+// DataTypesCreateSpaceEntitlementData is an auto generated low-level Go binding around an user-defined struct.
+type DataTypesCreateSpaceEntitlementData struct {
+	RoleName                  string
+	Permissions               []DataTypesPermission
+	ExternalTokenEntitlements []DataTypesExternalTokenEntitlement
+	Users                     []common.Address
 }
 
 // DataTypesEntitlementModuleInfo is an auto generated low-level Go binding around an user-defined struct.
@@ -100,12 +101,6 @@ type DataTypesPermission struct {
 	Name string
 }
 
-// DataTypesRole is an auto generated low-level Go binding around an user-defined struct.
-type DataTypesRole struct {
-	RoleId *big.Int
-	Name   string
-}
-
 // DataTypesSpaceInfo is an auto generated low-level Go binding around an user-defined struct.
 type DataTypesSpaceInfo struct {
 	SpaceId   *big.Int
@@ -119,7 +114,7 @@ type DataTypesSpaceInfo struct {
 
 // ZionSpaceManagerLocalhostMetaData contains all meta data concerning the ZionSpaceManagerLocalhost contract.
 var ZionSpaceManagerLocalhostMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"permissionRegistry\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"ChannelDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"DefaultEntitlementModuleNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"DefaultPermissionsManagerNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementAlreadyWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementModuleNotSupported\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementNotWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidParameters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotAllowed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SpaceDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SpaceNFTNotSet\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"name\":\"addPermissionToRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementModuleAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"entitlementData\",\"type\":\"bytes\"}],\"name\":\"addRoleToEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.CreateChannelData\",\"name\":\"data\",\"type\":\"tuple\"}],\"name\":\"createChannel\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"name\":\"createRole\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"spaceName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.CreateSpaceData\",\"name\":\"info\",\"type\":\"tuple\"}],\"name\":\"createSpace\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"spaceName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.CreateSpaceData\",\"name\":\"info\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"string[]\",\"name\":\"permissions\",\"type\":\"string[]\"},{\"internalType\":\"string\",\"name\":\"roleName\",\"type\":\"string\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"tag\",\"type\":\"string\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isSingleToken\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"internalType\":\"structDataTypes.ExternalToken[]\",\"name\":\"tokens\",\"type\":\"tuple[]\"}],\"internalType\":\"structDataTypes.ExternalTokenEntitlement\",\"name\":\"externalTokenEntitlement\",\"type\":\"tuple\"}],\"internalType\":\"structDataTypes.CreateSpaceTokenEntitlementData\",\"name\":\"entitlement\",\"type\":\"tuple\"}],\"name\":\"createSpaceWithTokenEntitlement\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"}],\"name\":\"getChannelIdByNetworkId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"}],\"name\":\"getChannelInfoByChannelId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"channelId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.ChannelInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getChannelsBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"idCounter\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"channelId\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.Channel[]\",\"name\":\"channels\",\"type\":\"tuple[]\"}],\"internalType\":\"structDataTypes.Channels\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getEntitlementModulesBySpaceId\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"entitlementModules\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getEntitlementsInfoBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"description\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.EntitlementModuleInfo[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"permissionType\",\"type\":\"bytes32\"}],\"name\":\"getPermissionFromMap\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"}],\"name\":\"getPermissionsBySpaceIdByRoleId\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"}],\"name\":\"getRoleBySpaceIdByRoleId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Role\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getRolesBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"}],\"name\":\"getSpaceIdByNetworkId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getSpaceInfoBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"spaceId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.SpaceInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getSpaceOwnerBySpaceId\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"ownerAddress\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSpaces\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"spaceId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.SpaceInfo[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"name\":\"isEntitled\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementModuleAddress\",\"type\":\"address\"}],\"name\":\"isEntitlementModuleWhitelisted\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementModuleAddress\",\"type\":\"address\"},{\"internalType\":\"uint256[]\",\"name\":\"roleIds\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"removeEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"name\":\"removePermissionFromRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"}],\"name\":\"removeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"name\":\"setChannelAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entitlementModule\",\"type\":\"address\"}],\"name\":\"setDefaultTokenEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entitlementModule\",\"type\":\"address\"}],\"name\":\"setDefaultUserEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"name\":\"setSpaceAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spaceNFTAddress\",\"type\":\"address\"}],\"name\":\"setSpaceNFT\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementAddress\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"whitelist\",\"type\":\"bool\"}],\"name\":\"whitelistEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_permissionRegistry\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_roleManager\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"ChannelDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"DefaultEntitlementModuleNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"DefaultPermissionsManagerNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementAlreadyWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementModuleNotSupported\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementNotWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidParameters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotAllowed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SpaceDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SpaceNFTNotSet\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"name\":\"addPermissionToRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementModuleAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"entitlementData\",\"type\":\"bytes\"}],\"name\":\"addRoleToEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.CreateChannelData\",\"name\":\"data\",\"type\":\"tuple\"}],\"name\":\"createChannel\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"channelId\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"name\":\"createRole\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"spaceName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.CreateSpaceData\",\"name\":\"info\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"roleName\",\"type\":\"string\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission[]\",\"name\":\"permissions\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"tag\",\"type\":\"string\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isSingleToken\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\"}],\"internalType\":\"structDataTypes.ExternalToken[]\",\"name\":\"tokens\",\"type\":\"tuple[]\"}],\"internalType\":\"structDataTypes.ExternalTokenEntitlement[]\",\"name\":\"externalTokenEntitlements\",\"type\":\"tuple[]\"},{\"internalType\":\"address[]\",\"name\":\"users\",\"type\":\"address[]\"}],\"internalType\":\"structDataTypes.CreateSpaceEntitlementData\",\"name\":\"entitlementData\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission[]\",\"name\":\"everyonePermissions\",\"type\":\"tuple[]\"}],\"name\":\"createSpace\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"}],\"name\":\"getChannelIdByNetworkId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"}],\"name\":\"getChannelInfoByChannelId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"channelId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.ChannelInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getChannelsBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"idCounter\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"channelId\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.Channel[]\",\"name\":\"channels\",\"type\":\"tuple[]\"}],\"internalType\":\"structDataTypes.Channels\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getEntitlementModulesBySpaceId\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getEntitlementsInfoBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"description\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.EntitlementModuleInfo[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"permissionType\",\"type\":\"bytes32\"}],\"name\":\"getPermissionFromMap\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"}],\"name\":\"getSpaceIdByNetworkId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getSpaceInfoBySpaceId\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"spaceId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.SpaceInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"}],\"name\":\"getSpaceOwnerBySpaceId\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getSpaces\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"spaceId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"networkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.SpaceInfo[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"name\":\"isEntitled\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementModuleAddress\",\"type\":\"address\"}],\"name\":\"isEntitlementModuleWhitelisted\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementModuleAddress\",\"type\":\"address\"},{\"internalType\":\"uint256[]\",\"name\":\"roleIds\",\"type\":\"uint256[]\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"removeEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Permission\",\"name\":\"permission\",\"type\":\"tuple\"}],\"name\":\"removePermissionFromRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"}],\"name\":\"removeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"name\":\"setChannelAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entitlementModule\",\"type\":\"address\"}],\"name\":\"setDefaultTokenEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"entitlementModule\",\"type\":\"address\"}],\"name\":\"setDefaultUserEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"name\":\"setSpaceAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spaceNFTAddress\",\"type\":\"address\"}],\"name\":\"setSpaceNFT\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"entitlementAddress\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"whitelist\",\"type\":\"bool\"}],\"name\":\"whitelistEntitlementModule\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
 // ZionSpaceManagerLocalhostABI is the input ABI used to generate the binding from.
@@ -363,7 +358,7 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetCha
 
 // GetEntitlementModulesBySpaceId is a free data retrieval call binding the contract method 0x141b6498.
 //
-// Solidity: function getEntitlementModulesBySpaceId(string spaceId) view returns(address[] entitlementModules)
+// Solidity: function getEntitlementModulesBySpaceId(string spaceId) view returns(address[])
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetEntitlementModulesBySpaceId(opts *bind.CallOpts, spaceId string) ([]common.Address, error) {
 	var out []interface{}
 	err := _ZionSpaceManagerLocalhost.contract.Call(opts, &out, "getEntitlementModulesBySpaceId", spaceId)
@@ -380,14 +375,14 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetEntitlemen
 
 // GetEntitlementModulesBySpaceId is a free data retrieval call binding the contract method 0x141b6498.
 //
-// Solidity: function getEntitlementModulesBySpaceId(string spaceId) view returns(address[] entitlementModules)
+// Solidity: function getEntitlementModulesBySpaceId(string spaceId) view returns(address[])
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) GetEntitlementModulesBySpaceId(spaceId string) ([]common.Address, error) {
 	return _ZionSpaceManagerLocalhost.Contract.GetEntitlementModulesBySpaceId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId)
 }
 
 // GetEntitlementModulesBySpaceId is a free data retrieval call binding the contract method 0x141b6498.
 //
-// Solidity: function getEntitlementModulesBySpaceId(string spaceId) view returns(address[] entitlementModules)
+// Solidity: function getEntitlementModulesBySpaceId(string spaceId) view returns(address[])
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetEntitlementModulesBySpaceId(spaceId string) ([]common.Address, error) {
 	return _ZionSpaceManagerLocalhost.Contract.GetEntitlementModulesBySpaceId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId)
 }
@@ -425,7 +420,7 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetEnt
 
 // GetPermissionFromMap is a free data retrieval call binding the contract method 0x9ea4d532.
 //
-// Solidity: function getPermissionFromMap(bytes32 permissionType) view returns((string) permission)
+// Solidity: function getPermissionFromMap(bytes32 permissionType) view returns((string))
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetPermissionFromMap(opts *bind.CallOpts, permissionType [32]byte) (DataTypesPermission, error) {
 	var out []interface{}
 	err := _ZionSpaceManagerLocalhost.contract.Call(opts, &out, "getPermissionFromMap", permissionType)
@@ -442,109 +437,16 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetPermission
 
 // GetPermissionFromMap is a free data retrieval call binding the contract method 0x9ea4d532.
 //
-// Solidity: function getPermissionFromMap(bytes32 permissionType) view returns((string) permission)
+// Solidity: function getPermissionFromMap(bytes32 permissionType) view returns((string))
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) GetPermissionFromMap(permissionType [32]byte) (DataTypesPermission, error) {
 	return _ZionSpaceManagerLocalhost.Contract.GetPermissionFromMap(&_ZionSpaceManagerLocalhost.CallOpts, permissionType)
 }
 
 // GetPermissionFromMap is a free data retrieval call binding the contract method 0x9ea4d532.
 //
-// Solidity: function getPermissionFromMap(bytes32 permissionType) view returns((string) permission)
+// Solidity: function getPermissionFromMap(bytes32 permissionType) view returns((string))
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetPermissionFromMap(permissionType [32]byte) (DataTypesPermission, error) {
 	return _ZionSpaceManagerLocalhost.Contract.GetPermissionFromMap(&_ZionSpaceManagerLocalhost.CallOpts, permissionType)
-}
-
-// GetPermissionsBySpaceIdByRoleId is a free data retrieval call binding the contract method 0x7074047c.
-//
-// Solidity: function getPermissionsBySpaceIdByRoleId(string spaceId, uint256 roleId) view returns((string)[])
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetPermissionsBySpaceIdByRoleId(opts *bind.CallOpts, spaceId string, roleId *big.Int) ([]DataTypesPermission, error) {
-	var out []interface{}
-	err := _ZionSpaceManagerLocalhost.contract.Call(opts, &out, "getPermissionsBySpaceIdByRoleId", spaceId, roleId)
-
-	if err != nil {
-		return *new([]DataTypesPermission), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]DataTypesPermission)).(*[]DataTypesPermission)
-
-	return out0, err
-
-}
-
-// GetPermissionsBySpaceIdByRoleId is a free data retrieval call binding the contract method 0x7074047c.
-//
-// Solidity: function getPermissionsBySpaceIdByRoleId(string spaceId, uint256 roleId) view returns((string)[])
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) GetPermissionsBySpaceIdByRoleId(spaceId string, roleId *big.Int) ([]DataTypesPermission, error) {
-	return _ZionSpaceManagerLocalhost.Contract.GetPermissionsBySpaceIdByRoleId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId, roleId)
-}
-
-// GetPermissionsBySpaceIdByRoleId is a free data retrieval call binding the contract method 0x7074047c.
-//
-// Solidity: function getPermissionsBySpaceIdByRoleId(string spaceId, uint256 roleId) view returns((string)[])
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetPermissionsBySpaceIdByRoleId(spaceId string, roleId *big.Int) ([]DataTypesPermission, error) {
-	return _ZionSpaceManagerLocalhost.Contract.GetPermissionsBySpaceIdByRoleId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId, roleId)
-}
-
-// GetRoleBySpaceIdByRoleId is a free data retrieval call binding the contract method 0xb3ff31b2.
-//
-// Solidity: function getRoleBySpaceIdByRoleId(string spaceId, uint256 roleId) view returns((uint256,string))
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetRoleBySpaceIdByRoleId(opts *bind.CallOpts, spaceId string, roleId *big.Int) (DataTypesRole, error) {
-	var out []interface{}
-	err := _ZionSpaceManagerLocalhost.contract.Call(opts, &out, "getRoleBySpaceIdByRoleId", spaceId, roleId)
-
-	if err != nil {
-		return *new(DataTypesRole), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(DataTypesRole)).(*DataTypesRole)
-
-	return out0, err
-
-}
-
-// GetRoleBySpaceIdByRoleId is a free data retrieval call binding the contract method 0xb3ff31b2.
-//
-// Solidity: function getRoleBySpaceIdByRoleId(string spaceId, uint256 roleId) view returns((uint256,string))
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) GetRoleBySpaceIdByRoleId(spaceId string, roleId *big.Int) (DataTypesRole, error) {
-	return _ZionSpaceManagerLocalhost.Contract.GetRoleBySpaceIdByRoleId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId, roleId)
-}
-
-// GetRoleBySpaceIdByRoleId is a free data retrieval call binding the contract method 0xb3ff31b2.
-//
-// Solidity: function getRoleBySpaceIdByRoleId(string spaceId, uint256 roleId) view returns((uint256,string))
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetRoleBySpaceIdByRoleId(spaceId string, roleId *big.Int) (DataTypesRole, error) {
-	return _ZionSpaceManagerLocalhost.Contract.GetRoleBySpaceIdByRoleId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId, roleId)
-}
-
-// GetRolesBySpaceId is a free data retrieval call binding the contract method 0x4bf2abb2.
-//
-// Solidity: function getRolesBySpaceId(string spaceId) view returns((uint256,string)[])
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetRolesBySpaceId(opts *bind.CallOpts, spaceId string) ([]DataTypesRole, error) {
-	var out []interface{}
-	err := _ZionSpaceManagerLocalhost.contract.Call(opts, &out, "getRolesBySpaceId", spaceId)
-
-	if err != nil {
-		return *new([]DataTypesRole), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]DataTypesRole)).(*[]DataTypesRole)
-
-	return out0, err
-
-}
-
-// GetRolesBySpaceId is a free data retrieval call binding the contract method 0x4bf2abb2.
-//
-// Solidity: function getRolesBySpaceId(string spaceId) view returns((uint256,string)[])
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) GetRolesBySpaceId(spaceId string) ([]DataTypesRole, error) {
-	return _ZionSpaceManagerLocalhost.Contract.GetRolesBySpaceId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId)
-}
-
-// GetRolesBySpaceId is a free data retrieval call binding the contract method 0x4bf2abb2.
-//
-// Solidity: function getRolesBySpaceId(string spaceId) view returns((uint256,string)[])
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetRolesBySpaceId(spaceId string) ([]DataTypesRole, error) {
-	return _ZionSpaceManagerLocalhost.Contract.GetRolesBySpaceId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId)
 }
 
 // GetSpaceIdByNetworkId is a free data retrieval call binding the contract method 0x9ddd0d6b.
@@ -611,7 +513,7 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetSpa
 
 // GetSpaceOwnerBySpaceId is a free data retrieval call binding the contract method 0x2a4bdf25.
 //
-// Solidity: function getSpaceOwnerBySpaceId(string spaceId) view returns(address ownerAddress)
+// Solidity: function getSpaceOwnerBySpaceId(string spaceId) view returns(address)
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetSpaceOwnerBySpaceId(opts *bind.CallOpts, spaceId string) (common.Address, error) {
 	var out []interface{}
 	err := _ZionSpaceManagerLocalhost.contract.Call(opts, &out, "getSpaceOwnerBySpaceId", spaceId)
@@ -628,14 +530,14 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCaller) GetSpaceOwner
 
 // GetSpaceOwnerBySpaceId is a free data retrieval call binding the contract method 0x2a4bdf25.
 //
-// Solidity: function getSpaceOwnerBySpaceId(string spaceId) view returns(address ownerAddress)
+// Solidity: function getSpaceOwnerBySpaceId(string spaceId) view returns(address)
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) GetSpaceOwnerBySpaceId(spaceId string) (common.Address, error) {
 	return _ZionSpaceManagerLocalhost.Contract.GetSpaceOwnerBySpaceId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId)
 }
 
 // GetSpaceOwnerBySpaceId is a free data retrieval call binding the contract method 0x2a4bdf25.
 //
-// Solidity: function getSpaceOwnerBySpaceId(string spaceId) view returns(address ownerAddress)
+// Solidity: function getSpaceOwnerBySpaceId(string spaceId) view returns(address)
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostCallerSession) GetSpaceOwnerBySpaceId(spaceId string) (common.Address, error) {
 	return _ZionSpaceManagerLocalhost.Contract.GetSpaceOwnerBySpaceId(&_ZionSpaceManagerLocalhost.CallOpts, spaceId)
 }
@@ -787,170 +689,149 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) Ad
 
 // AddRoleToEntitlementModule is a paid mutator transaction binding the contract method 0xbbd7358a.
 //
-// Solidity: function addRoleToEntitlementModule(string spaceId, string channelId, address entitlementModuleAddress, uint256 roleId, bytes entitlementData) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) AddRoleToEntitlementModule(opts *bind.TransactOpts, spaceId string, channelId string, entitlementModuleAddress common.Address, roleId *big.Int, entitlementData []byte) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "addRoleToEntitlementModule", spaceId, channelId, entitlementModuleAddress, roleId, entitlementData)
+// Solidity: function addRoleToEntitlementModule(string spaceNetworkId, string channelNetworkId, address entitlementModuleAddress, uint256 roleId, bytes entitlementData) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) AddRoleToEntitlementModule(opts *bind.TransactOpts, spaceNetworkId string, channelNetworkId string, entitlementModuleAddress common.Address, roleId *big.Int, entitlementData []byte) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "addRoleToEntitlementModule", spaceNetworkId, channelNetworkId, entitlementModuleAddress, roleId, entitlementData)
 }
 
 // AddRoleToEntitlementModule is a paid mutator transaction binding the contract method 0xbbd7358a.
 //
-// Solidity: function addRoleToEntitlementModule(string spaceId, string channelId, address entitlementModuleAddress, uint256 roleId, bytes entitlementData) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) AddRoleToEntitlementModule(spaceId string, channelId string, entitlementModuleAddress common.Address, roleId *big.Int, entitlementData []byte) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.AddRoleToEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, channelId, entitlementModuleAddress, roleId, entitlementData)
+// Solidity: function addRoleToEntitlementModule(string spaceNetworkId, string channelNetworkId, address entitlementModuleAddress, uint256 roleId, bytes entitlementData) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) AddRoleToEntitlementModule(spaceNetworkId string, channelNetworkId string, entitlementModuleAddress common.Address, roleId *big.Int, entitlementData []byte) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.AddRoleToEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, channelNetworkId, entitlementModuleAddress, roleId, entitlementData)
 }
 
 // AddRoleToEntitlementModule is a paid mutator transaction binding the contract method 0xbbd7358a.
 //
-// Solidity: function addRoleToEntitlementModule(string spaceId, string channelId, address entitlementModuleAddress, uint256 roleId, bytes entitlementData) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) AddRoleToEntitlementModule(spaceId string, channelId string, entitlementModuleAddress common.Address, roleId *big.Int, entitlementData []byte) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.AddRoleToEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, channelId, entitlementModuleAddress, roleId, entitlementData)
+// Solidity: function addRoleToEntitlementModule(string spaceNetworkId, string channelNetworkId, address entitlementModuleAddress, uint256 roleId, bytes entitlementData) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) AddRoleToEntitlementModule(spaceNetworkId string, channelNetworkId string, entitlementModuleAddress common.Address, roleId *big.Int, entitlementData []byte) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.AddRoleToEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, channelNetworkId, entitlementModuleAddress, roleId, entitlementData)
 }
 
 // CreateChannel is a paid mutator transaction binding the contract method 0x79960fe1.
 //
-// Solidity: function createChannel((string,string,string) data) returns(uint256)
+// Solidity: function createChannel((string,string,string) data) returns(uint256 channelId)
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) CreateChannel(opts *bind.TransactOpts, data DataTypesCreateChannelData) (*types.Transaction, error) {
 	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "createChannel", data)
 }
 
 // CreateChannel is a paid mutator transaction binding the contract method 0x79960fe1.
 //
-// Solidity: function createChannel((string,string,string) data) returns(uint256)
+// Solidity: function createChannel((string,string,string) data) returns(uint256 channelId)
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) CreateChannel(data DataTypesCreateChannelData) (*types.Transaction, error) {
 	return _ZionSpaceManagerLocalhost.Contract.CreateChannel(&_ZionSpaceManagerLocalhost.TransactOpts, data)
 }
 
 // CreateChannel is a paid mutator transaction binding the contract method 0x79960fe1.
 //
-// Solidity: function createChannel((string,string,string) data) returns(uint256)
+// Solidity: function createChannel((string,string,string) data) returns(uint256 channelId)
 func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) CreateChannel(data DataTypesCreateChannelData) (*types.Transaction, error) {
 	return _ZionSpaceManagerLocalhost.Contract.CreateChannel(&_ZionSpaceManagerLocalhost.TransactOpts, data)
 }
 
 // CreateRole is a paid mutator transaction binding the contract method 0xd2192dbf.
 //
-// Solidity: function createRole(string spaceId, string name) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) CreateRole(opts *bind.TransactOpts, spaceId string, name string) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "createRole", spaceId, name)
+// Solidity: function createRole(string spaceNetworkId, string name) returns(uint256 roleId)
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) CreateRole(opts *bind.TransactOpts, spaceNetworkId string, name string) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "createRole", spaceNetworkId, name)
 }
 
 // CreateRole is a paid mutator transaction binding the contract method 0xd2192dbf.
 //
-// Solidity: function createRole(string spaceId, string name) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) CreateRole(spaceId string, name string) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.CreateRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, name)
+// Solidity: function createRole(string spaceNetworkId, string name) returns(uint256 roleId)
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) CreateRole(spaceNetworkId string, name string) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.CreateRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, name)
 }
 
 // CreateRole is a paid mutator transaction binding the contract method 0xd2192dbf.
 //
-// Solidity: function createRole(string spaceId, string name) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) CreateRole(spaceId string, name string) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.CreateRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, name)
+// Solidity: function createRole(string spaceNetworkId, string name) returns(uint256 roleId)
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) CreateRole(spaceNetworkId string, name string) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.CreateRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, name)
 }
 
-// CreateSpace is a paid mutator transaction binding the contract method 0x50b88cf7.
+// CreateSpace is a paid mutator transaction binding the contract method 0xd9d94cb7.
 //
-// Solidity: function createSpace((string,string) info) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) CreateSpace(opts *bind.TransactOpts, info DataTypesCreateSpaceData) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "createSpace", info)
+// Solidity: function createSpace((string,string) info, (string,(string)[],(string,(address,uint256,bool,uint256)[])[],address[]) entitlementData, (string)[] everyonePermissions) returns(uint256)
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) CreateSpace(opts *bind.TransactOpts, info DataTypesCreateSpaceData, entitlementData DataTypesCreateSpaceEntitlementData, everyonePermissions []DataTypesPermission) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "createSpace", info, entitlementData, everyonePermissions)
 }
 
-// CreateSpace is a paid mutator transaction binding the contract method 0x50b88cf7.
+// CreateSpace is a paid mutator transaction binding the contract method 0xd9d94cb7.
 //
-// Solidity: function createSpace((string,string) info) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) CreateSpace(info DataTypesCreateSpaceData) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.CreateSpace(&_ZionSpaceManagerLocalhost.TransactOpts, info)
+// Solidity: function createSpace((string,string) info, (string,(string)[],(string,(address,uint256,bool,uint256)[])[],address[]) entitlementData, (string)[] everyonePermissions) returns(uint256)
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) CreateSpace(info DataTypesCreateSpaceData, entitlementData DataTypesCreateSpaceEntitlementData, everyonePermissions []DataTypesPermission) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.CreateSpace(&_ZionSpaceManagerLocalhost.TransactOpts, info, entitlementData, everyonePermissions)
 }
 
-// CreateSpace is a paid mutator transaction binding the contract method 0x50b88cf7.
+// CreateSpace is a paid mutator transaction binding the contract method 0xd9d94cb7.
 //
-// Solidity: function createSpace((string,string) info) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) CreateSpace(info DataTypesCreateSpaceData) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.CreateSpace(&_ZionSpaceManagerLocalhost.TransactOpts, info)
-}
-
-// CreateSpaceWithTokenEntitlement is a paid mutator transaction binding the contract method 0xc2f4a853.
-//
-// Solidity: function createSpaceWithTokenEntitlement((string,string) info, (string[],string,(string,(address,uint256,bool,uint256)[])) entitlement) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) CreateSpaceWithTokenEntitlement(opts *bind.TransactOpts, info DataTypesCreateSpaceData, entitlement DataTypesCreateSpaceTokenEntitlementData) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "createSpaceWithTokenEntitlement", info, entitlement)
-}
-
-// CreateSpaceWithTokenEntitlement is a paid mutator transaction binding the contract method 0xc2f4a853.
-//
-// Solidity: function createSpaceWithTokenEntitlement((string,string) info, (string[],string,(string,(address,uint256,bool,uint256)[])) entitlement) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) CreateSpaceWithTokenEntitlement(info DataTypesCreateSpaceData, entitlement DataTypesCreateSpaceTokenEntitlementData) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.CreateSpaceWithTokenEntitlement(&_ZionSpaceManagerLocalhost.TransactOpts, info, entitlement)
-}
-
-// CreateSpaceWithTokenEntitlement is a paid mutator transaction binding the contract method 0xc2f4a853.
-//
-// Solidity: function createSpaceWithTokenEntitlement((string,string) info, (string[],string,(string,(address,uint256,bool,uint256)[])) entitlement) returns(uint256)
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) CreateSpaceWithTokenEntitlement(info DataTypesCreateSpaceData, entitlement DataTypesCreateSpaceTokenEntitlementData) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.CreateSpaceWithTokenEntitlement(&_ZionSpaceManagerLocalhost.TransactOpts, info, entitlement)
+// Solidity: function createSpace((string,string) info, (string,(string)[],(string,(address,uint256,bool,uint256)[])[],address[]) entitlementData, (string)[] everyonePermissions) returns(uint256)
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) CreateSpace(info DataTypesCreateSpaceData, entitlementData DataTypesCreateSpaceEntitlementData, everyonePermissions []DataTypesPermission) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.CreateSpace(&_ZionSpaceManagerLocalhost.TransactOpts, info, entitlementData, everyonePermissions)
 }
 
 // RemoveEntitlement is a paid mutator transaction binding the contract method 0xa3a39cb9.
 //
-// Solidity: function removeEntitlement(string spaceId, string channelId, address entitlementModuleAddress, uint256[] roleIds, bytes data) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) RemoveEntitlement(opts *bind.TransactOpts, spaceId string, channelId string, entitlementModuleAddress common.Address, roleIds []*big.Int, data []byte) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "removeEntitlement", spaceId, channelId, entitlementModuleAddress, roleIds, data)
+// Solidity: function removeEntitlement(string spaceNetworkId, string channelNetworkId, address entitlementModuleAddress, uint256[] roleIds, bytes data) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) RemoveEntitlement(opts *bind.TransactOpts, spaceNetworkId string, channelNetworkId string, entitlementModuleAddress common.Address, roleIds []*big.Int, data []byte) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "removeEntitlement", spaceNetworkId, channelNetworkId, entitlementModuleAddress, roleIds, data)
 }
 
 // RemoveEntitlement is a paid mutator transaction binding the contract method 0xa3a39cb9.
 //
-// Solidity: function removeEntitlement(string spaceId, string channelId, address entitlementModuleAddress, uint256[] roleIds, bytes data) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) RemoveEntitlement(spaceId string, channelId string, entitlementModuleAddress common.Address, roleIds []*big.Int, data []byte) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.RemoveEntitlement(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, channelId, entitlementModuleAddress, roleIds, data)
+// Solidity: function removeEntitlement(string spaceNetworkId, string channelNetworkId, address entitlementModuleAddress, uint256[] roleIds, bytes data) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) RemoveEntitlement(spaceNetworkId string, channelNetworkId string, entitlementModuleAddress common.Address, roleIds []*big.Int, data []byte) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.RemoveEntitlement(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, channelNetworkId, entitlementModuleAddress, roleIds, data)
 }
 
 // RemoveEntitlement is a paid mutator transaction binding the contract method 0xa3a39cb9.
 //
-// Solidity: function removeEntitlement(string spaceId, string channelId, address entitlementModuleAddress, uint256[] roleIds, bytes data) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) RemoveEntitlement(spaceId string, channelId string, entitlementModuleAddress common.Address, roleIds []*big.Int, data []byte) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.RemoveEntitlement(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, channelId, entitlementModuleAddress, roleIds, data)
+// Solidity: function removeEntitlement(string spaceNetworkId, string channelNetworkId, address entitlementModuleAddress, uint256[] roleIds, bytes data) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) RemoveEntitlement(spaceNetworkId string, channelNetworkId string, entitlementModuleAddress common.Address, roleIds []*big.Int, data []byte) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.RemoveEntitlement(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, channelNetworkId, entitlementModuleAddress, roleIds, data)
 }
 
 // RemovePermissionFromRole is a paid mutator transaction binding the contract method 0x4832a4ec.
 //
-// Solidity: function removePermissionFromRole(string spaceId, uint256 roleId, (string) permission) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) RemovePermissionFromRole(opts *bind.TransactOpts, spaceId string, roleId *big.Int, permission DataTypesPermission) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "removePermissionFromRole", spaceId, roleId, permission)
+// Solidity: function removePermissionFromRole(string spaceNetworkId, uint256 roleId, (string) permission) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) RemovePermissionFromRole(opts *bind.TransactOpts, spaceNetworkId string, roleId *big.Int, permission DataTypesPermission) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "removePermissionFromRole", spaceNetworkId, roleId, permission)
 }
 
 // RemovePermissionFromRole is a paid mutator transaction binding the contract method 0x4832a4ec.
 //
-// Solidity: function removePermissionFromRole(string spaceId, uint256 roleId, (string) permission) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) RemovePermissionFromRole(spaceId string, roleId *big.Int, permission DataTypesPermission) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.RemovePermissionFromRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, roleId, permission)
+// Solidity: function removePermissionFromRole(string spaceNetworkId, uint256 roleId, (string) permission) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) RemovePermissionFromRole(spaceNetworkId string, roleId *big.Int, permission DataTypesPermission) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.RemovePermissionFromRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, roleId, permission)
 }
 
 // RemovePermissionFromRole is a paid mutator transaction binding the contract method 0x4832a4ec.
 //
-// Solidity: function removePermissionFromRole(string spaceId, uint256 roleId, (string) permission) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) RemovePermissionFromRole(spaceId string, roleId *big.Int, permission DataTypesPermission) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.RemovePermissionFromRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, roleId, permission)
+// Solidity: function removePermissionFromRole(string spaceNetworkId, uint256 roleId, (string) permission) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) RemovePermissionFromRole(spaceNetworkId string, roleId *big.Int, permission DataTypesPermission) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.RemovePermissionFromRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, roleId, permission)
 }
 
 // RemoveRole is a paid mutator transaction binding the contract method 0x8b0e905a.
 //
-// Solidity: function removeRole(string spaceId, uint256 roleId) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) RemoveRole(opts *bind.TransactOpts, spaceId string, roleId *big.Int) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "removeRole", spaceId, roleId)
+// Solidity: function removeRole(string spaceNetworkId, uint256 roleId) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) RemoveRole(opts *bind.TransactOpts, spaceNetworkId string, roleId *big.Int) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "removeRole", spaceNetworkId, roleId)
 }
 
 // RemoveRole is a paid mutator transaction binding the contract method 0x8b0e905a.
 //
-// Solidity: function removeRole(string spaceId, uint256 roleId) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) RemoveRole(spaceId string, roleId *big.Int) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.RemoveRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, roleId)
+// Solidity: function removeRole(string spaceNetworkId, uint256 roleId) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) RemoveRole(spaceNetworkId string, roleId *big.Int) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.RemoveRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, roleId)
 }
 
 // RemoveRole is a paid mutator transaction binding the contract method 0x8b0e905a.
 //
-// Solidity: function removeRole(string spaceId, uint256 roleId) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) RemoveRole(spaceId string, roleId *big.Int) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.RemoveRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, roleId)
+// Solidity: function removeRole(string spaceNetworkId, uint256 roleId) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) RemoveRole(spaceNetworkId string, roleId *big.Int) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.RemoveRole(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, roleId)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -1102,23 +983,23 @@ func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) Tr
 
 // WhitelistEntitlementModule is a paid mutator transaction binding the contract method 0xe798ff3f.
 //
-// Solidity: function whitelistEntitlementModule(string spaceId, address entitlementAddress, bool whitelist) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) WhitelistEntitlementModule(opts *bind.TransactOpts, spaceId string, entitlementAddress common.Address, whitelist bool) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "whitelistEntitlementModule", spaceId, entitlementAddress, whitelist)
+// Solidity: function whitelistEntitlementModule(string spaceNetworkId, address entitlementAddress, bool whitelist) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactor) WhitelistEntitlementModule(opts *bind.TransactOpts, spaceNetworkId string, entitlementAddress common.Address, whitelist bool) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.contract.Transact(opts, "whitelistEntitlementModule", spaceNetworkId, entitlementAddress, whitelist)
 }
 
 // WhitelistEntitlementModule is a paid mutator transaction binding the contract method 0xe798ff3f.
 //
-// Solidity: function whitelistEntitlementModule(string spaceId, address entitlementAddress, bool whitelist) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) WhitelistEntitlementModule(spaceId string, entitlementAddress common.Address, whitelist bool) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.WhitelistEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, entitlementAddress, whitelist)
+// Solidity: function whitelistEntitlementModule(string spaceNetworkId, address entitlementAddress, bool whitelist) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostSession) WhitelistEntitlementModule(spaceNetworkId string, entitlementAddress common.Address, whitelist bool) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.WhitelistEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, entitlementAddress, whitelist)
 }
 
 // WhitelistEntitlementModule is a paid mutator transaction binding the contract method 0xe798ff3f.
 //
-// Solidity: function whitelistEntitlementModule(string spaceId, address entitlementAddress, bool whitelist) returns()
-func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) WhitelistEntitlementModule(spaceId string, entitlementAddress common.Address, whitelist bool) (*types.Transaction, error) {
-	return _ZionSpaceManagerLocalhost.Contract.WhitelistEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceId, entitlementAddress, whitelist)
+// Solidity: function whitelistEntitlementModule(string spaceNetworkId, address entitlementAddress, bool whitelist) returns()
+func (_ZionSpaceManagerLocalhost *ZionSpaceManagerLocalhostTransactorSession) WhitelistEntitlementModule(spaceNetworkId string, entitlementAddress common.Address, whitelist bool) (*types.Transaction, error) {
+	return _ZionSpaceManagerLocalhost.Contract.WhitelistEntitlementModule(&_ZionSpaceManagerLocalhost.TransactOpts, spaceNetworkId, entitlementAddress, whitelist)
 }
 
 // ZionSpaceManagerLocalhostOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the ZionSpaceManagerLocalhost contract.
