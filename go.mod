@@ -23,7 +23,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20221025142407-17b0be811afa
-	github.com/matrix-org/pinecone v0.0.0-20221007145426-3adc85477dd3
+	github.com/matrix-org/pinecone v0.0.0-20221026160848-639feeff74d6
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/nats-io/nats-server/v2 v2.9.3
