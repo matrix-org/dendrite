@@ -549,14 +549,24 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return err
 	}
 
-	pusherReq := &api.PerformPusherDeletionRequest{
-		Localpart: req.Localpart,
-	}
-	if err := a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+	threepids, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart)
+	if err != nil {
 		return err
 	}
 
-	err := a.DB.DeactivateAccount(ctx, req.Localpart)
+	err = a.DB.RemoveThreePIDAssociation(ctx, threepids[0].Address, threepids[0].Medium)
+	if err != nil {
+		return err
+	}
+
+	pusherReq := &api.PerformPusherDeletionRequest{
+		Localpart: req.Localpart,
+	}
+	if err = a.PerformPusherDeletion(ctx, pusherReq, &struct{}{}); err != nil {
+		return err
+	}
+
+	err = a.DB.DeactivateAccount(ctx, req.Localpart)
 	res.AccountDeactivated = err == nil
 	return err
 }
