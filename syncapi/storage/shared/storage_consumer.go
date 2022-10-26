@@ -617,3 +617,19 @@ func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID 
 		return d.Relations.DeleteRelation(ctx, txn, roomID, redactedEventID)
 	})
 }
+
+func (s *Database) ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error) {
+	return s.Presence.ExpirePresence(ctx)
+}
+
+func (d *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
+	return d.Presence.GetMaxPresenceID(ctx, nil)
+}
+
+func (d *Database) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceAfter(ctx, nil, after, filter)
+}
+
+func (s *Database) UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error {
+	return s.Presence.UpdateLastActive(ctx, userId, lastActiveTs)
+}

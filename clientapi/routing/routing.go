@@ -32,6 +32,7 @@ import (
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
+	"github.com/matrix-org/dendrite/clientapi/ratelimit"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/internal/transactions"
@@ -66,6 +67,7 @@ func Setup(
 	prometheus.MustRegister(amtRegUsers, sendEventDuration)
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
+	rateLimitsFailedLogin := ratelimit.NewRtFailedLogin(&cfg.RtFailedLogin)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
 
 	unstableFeatures := map[string]bool{
@@ -575,7 +577,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/account/password",
-		httputil.MakeAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+		httputil.MakeConditionalAuthAPI("password", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			if r := rateLimits.Limit(req, device); r != nil {
 				return *r
 			}
@@ -599,7 +601,7 @@ func Setup(
 			if r := rateLimits.Limit(req, nil); r != nil {
 				return *r
 			}
-			return Login(req, userAPI, cfg)
+			return Login(req, userAPI, cfg, rateLimitsFailedLogin)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
