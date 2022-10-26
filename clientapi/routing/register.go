@@ -699,7 +699,8 @@ func handleGuestRegistration(
 // handleRegistrationFlow will direct and complete registration flow stages
 // that the client has requested.
 // nolint: gocyclo
-func handleRegistrationFlow(req *http.Request,
+func handleRegistrationFlow(
+	req *http.Request,
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
@@ -774,7 +775,8 @@ func handleRegistrationFlow(req *http.Request,
 	// Check if the user's registration flow has been completed successfully
 	// A response with current registration flow and remaining available methods
 	// will be returned if a flow has not been successfully completed yet
-	return checkAndCompleteFlow(sessions.getCompletedStages(sessionID), req, r, sessionID, cfg, userAPI)
+	return checkAndCompleteFlow(sessions.getCompletedStages(sessionID),
+		req, r, sessionID, cfg, userAPI)
 }
 
 // handleApplicationServiceRegistration handles the registration of an
@@ -785,7 +787,14 @@ func handleRegistrationFlow(req *http.Request,
 // at an earlier step of the registration workflow, or if the provided access
 // token doesn't belong to a valid AS, or if there was an issue completing the
 // registration process.
-func handleApplicationServiceRegistration(accessToken string, tokenErr error, req *http.Request, r registerRequest, cfg *config.ClientAPI, userAPI userapi.ClientUserAPI) util.JSONResponse {
+func handleApplicationServiceRegistration(
+	accessToken string,
+	tokenErr error,
+	req *http.Request,
+	r registerRequest,
+	cfg *config.ClientAPI,
+	userAPI userapi.ClientUserAPI,
+) util.JSONResponse {
 	// Check if we previously had issues extracting the access token from the
 	// request.
 	if tokenErr != nil {
@@ -816,16 +825,20 @@ func handleApplicationServiceRegistration(accessToken string, tokenErr error, re
 // checkAndCompleteFlow checks if a given registration flow is completed given
 // a set of allowed flows. If so, registration is completed, otherwise a
 // response with
-func checkAndCompleteFlow(flow []authtypes.LoginType,
+func checkAndCompleteFlow(
+	flow []authtypes.LoginType,
 	req *http.Request,
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
-	userAPI userapi.ClientUserAPI) util.JSONResponse {
-
+	userAPI userapi.ClientUserAPI,
+) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
-		return completeRegistration(req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser)
+		return completeRegistration(
+			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
+		)
 	}
 	sessions.addParams(sessionID, r)
 	// There are still more stages to complete.
