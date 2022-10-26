@@ -167,6 +167,7 @@ type UserRoomserverAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse) error
 }
 
 type FederationRoomserverAPI interface {
