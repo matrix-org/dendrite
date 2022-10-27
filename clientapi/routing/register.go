@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+    "net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -336,6 +337,7 @@ func validateRecaptcha(
 	response string,
 	clientip string,
 ) *util.JSONResponse {
+    ip,_ ,_ := net.SplitHostPort(clientip)
 	if !cfg.RecaptchaEnabled {
 		return &util.JSONResponse{
 			Code: http.StatusConflict,
@@ -355,7 +357,7 @@ func validateRecaptcha(
 		url.Values{
 			"secret":   {cfg.RecaptchaPrivateKey},
 			"response": {response},
-			"remoteip": {clientip},
+			"remoteip": {ip},
 		},
 	)
 
@@ -382,7 +384,7 @@ func validateRecaptcha(
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
+			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()+"\n"+ string(body) + "\n"+clientip),
 		}
 	}
 
@@ -748,7 +750,8 @@ func handleRegistrationFlow(
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
-		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
+        clientIp, _, _ := net.SplitHostPort(req.RemoteAddr)
+		resErr := validateRecaptcha(cfg, r.Auth.Response, clientIp)
 		if resErr != nil {
 			return *resErr
 		}
