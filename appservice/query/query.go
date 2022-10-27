@@ -311,7 +311,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		resp.Protocols = map[string]api.ASProtocolResponse{
 			req.Protocol: response,
 		}
-
+		a.ProtocolCache[req.Protocol] = response
 		return nil
 	}
 
@@ -321,7 +321,7 @@ func (a *AppServiceQueryAPI) Protocols(
 		for _, p := range as.Protocols {
 			var proto api.ASProtocolResponse
 			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+p, &proto); err != nil {
-				log.WithError(err).Error("unable to get protocolResponse from application service")
+				log.WithError(err).Error("unable to get 'protocol' from application service")
 				continue
 			}
 			existing, ok := response[p]
