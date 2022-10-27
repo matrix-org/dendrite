@@ -2,8 +2,11 @@ package tables_test
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
@@ -11,7 +14,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func mustCreatePublishedTable(t *testing.T, dbType test.DBType) (tab tables.Published, close func()) {
@@ -74,6 +76,6 @@ func TestPublishedTable(t *testing.T) {
 		// should now be false, due to the upsert
 		publishedRes, err := tab.SelectPublishedFromRoomID(ctx, nil, room.ID)
 		assert.NoError(t, err)
-		assert.False(t, publishedRes)
+		assert.False(t, publishedRes, fmt.Sprintf("expected room %s to be unpublished", room.ID))
 	})
 }

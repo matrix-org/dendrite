@@ -21,11 +21,11 @@ import (
 )
 
 func UpPulishedAppservice(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_published ADD COLUMN IF NOT EXISTS appservice_id TEXT;`)
+	_, err := tx.ExecContext(ctx, `ALTER TABLE roomserver_published ADD COLUMN IF NOT EXISTS appservice_id TEXT NOT NULL;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}
-	_, err = tx.ExecContext(ctx, `ALTER TABLE roomserver_published ADD COLUMN IF NOT EXISTS network_id TEXT;`)
+	_, err = tx.ExecContext(ctx, `ALTER TABLE roomserver_published ADD COLUMN IF NOT EXISTS network_id TEXT NOT NULL;`)
 	if err != nil {
 		return fmt.Errorf("failed to execute upgrade: %w", err)
 	}

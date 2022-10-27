@@ -28,18 +28,20 @@ const publishedSchema = `
 -- Stores which rooms are published in the room directory
 CREATE TABLE IF NOT EXISTS roomserver_published (
     -- The room ID of the room
-    room_id TEXT NOT NULL PRIMARY KEY,
+    room_id TEXT NOT NULL,
     -- The appservice ID of the room
-    appservice_id TEXT,
+    appservice_id TEXT NOT NULL,
     -- The network_id of the room
-    network_id TEXT,
+    network_id TEXT NOT NULL,
     -- Whether it is published or not
-    published BOOLEAN NOT NULL DEFAULT false
+    published BOOLEAN NOT NULL DEFAULT false,
+    PRIMARY KEY (room_id, appservice_id, network_id)
 );
 `
 
 const upsertPublishedSQL = "" +
-	"INSERT OR REPLACE INTO roomserver_published (room_id, published) VALUES ($1, $2)"
+	"INSERT INTO roomserver_published (room_id, appservice_id, network_id, published) VALUES ($1, $2, $3, $4)" +
+	" ON CONFLICT (room_id, appservice_id, network_id) DO UPDATE SET published = $4"
 
 const selectAllPublishedSQL = "" +
 	"SELECT room_id FROM roomserver_published WHERE published = $1 ORDER BY room_id ASC"
@@ -83,7 +85,7 @@ func (s *publishedStatements) UpsertRoomPublished(
 	ctx context.Context, txn *sql.Tx, roomID string, published bool,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
-	_, err := stmt.ExecContext(ctx, roomID, published)
+	_, err := stmt.ExecContext(ctx, roomID, "", "", published)
 	return err
 }
 
