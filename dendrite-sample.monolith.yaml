@@ -316,6 +316,14 @@ user_api:
   # The default lifetime is 3600000ms (60 minutes).
   # openid_token_lifetime_ms: 3600000
 
+  # Users who register on this homeserver will automatically be joined to the rooms listed under "auto_join_rooms" option.
+  # By default, any room aliases included in this list will be created as a publicly joinable room
+  # when the first user registers for the homeserver. If the room already exists,
+  # make certain it is a publicly joinable room, i.e. the join rule of the room must be set to 'public'.
+  # As Spaces are just rooms under the hood, Space aliases may also be used.
+  auto_join_rooms:
+  #  - "#main:matrix.org"
+
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on
 # how this works and how to set it up.

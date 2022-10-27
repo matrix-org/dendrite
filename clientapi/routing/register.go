@@ -414,7 +414,7 @@ func UserIDIsWithinApplicationServiceNamespace(
 		return false
 	}
 
-	if domain != cfg.Matrix.ServerName {
+	if !cfg.Matrix.IsLocalServerName(domain) {
 		return false
 	}
 

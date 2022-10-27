@@ -164,6 +164,7 @@ func TestFederationAPIJoinThenKeyUpdate(t *testing.T) {
 func testFederationAPIJoinThenKeyUpdate(t *testing.T, dbType test.DBType) {
 	base, close := testrig.CreateBaseDendrite(t, dbType)
 	base.Cfg.FederationAPI.PreferDirectFetch = true
+	base.Cfg.FederationAPI.KeyPerspectives = nil
 	defer close()
 	jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)

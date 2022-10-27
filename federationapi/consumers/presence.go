@@ -38,7 +38,7 @@ type OutputPresenceConsumer struct {
 	durable                 string
 	db                      storage.Database
 	queues                  *queue.OutgoingQueues
-	ServerName              gomatrixserverlib.ServerName
+	isLocalServerName       func(gomatrixserverlib.ServerName) bool
 	topic                   string
 	outboundPresenceEnabled bool
 }
@@ -56,7 +56,7 @@ func NewOutputPresenceConsumer(
 		jetstream:               js,
 		queues:                  queues,
 		db:                      store,
-		ServerName:              cfg.Matrix.ServerName,
+		isLocalServerName:       cfg.Matrix.IsLocalServerName,
 		durable:                 cfg.Matrix.JetStream.Durable("FederationAPIPresenceConsumer"),
 		topic:                   cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		outboundPresenceEnabled: cfg.Matrix.Presence.EnableOutbound,
@@ -85,7 +85,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
 		return true
 	}
-	if serverName != t.ServerName {
+	if !t.isLocalServerName(serverName) {
 		return true
 	}
 
@@ -127,7 +127,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MPresence,
-		Origin: string(t.ServerName),
+		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
@@ -135,7 +135,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	log.Tracef("sending presence EDU to %d servers", len(joined))
-	if err = t.queues.SendEDU(edu, t.ServerName, joined); err != nil {
+	if err = t.queues.SendEDU(edu, serverName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

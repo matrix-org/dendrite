@@ -35,7 +35,7 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.FederationCache, serverName gomatrixserverlib.ServerName) (*Database, error) {
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(gomatrixserverlib.ServerName) bool) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
@@ -95,7 +95,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	}
 	d.Database = shared.Database{
 		DB:                       d.db,
-		ServerName:               serverName,
+		IsLocalServerName:        isLocalServerName,
 		Cache:                    cache,
 		Writer:                   d.writer,
 		FederationJoinedHosts:    joinedHosts,
