@@ -61,7 +61,7 @@ func (a *FederationInternalAPI) ClaimKeys(
 		logrus.Infof("XXX: ClaimKeys type-cast error: %s %+v", s, res)
 		return gomatrixserverlib.RespClaimKeys{}, fmt.Errorf("typecast error")
 	}
-	logrus.Infof("XXX: ClaimKeys response: %s %+v", s, ires.(gomatrixserverlib.RespClaimKeys))
+	logrus.Infof("XXX: ClaimKeys response: %s %+v (%+v)", s, ires, res)
 	return res, nil
 }
 
