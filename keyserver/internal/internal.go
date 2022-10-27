@@ -148,6 +148,8 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 
 			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, gomatrixserverlib.ServerName(domain), keysToClaim)
 
+			util.GetLogger(ctx).WithError(err).Infof("Server %s response: %+v", domain, claimKeyRes)
+
 			mu.Lock()
 			defer mu.Unlock()
 
