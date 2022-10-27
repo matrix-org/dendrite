@@ -68,7 +68,7 @@ func publicRooms(
 
 	var queryRes roomserverAPI.QueryPublishedRoomsResponse
 	err = rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{
-		NetworkdID: request.NetworkID,
+		NetworkID: request.NetworkID,
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
