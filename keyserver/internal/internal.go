@@ -136,8 +136,12 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 	util.GetLogger(ctx).WithField("num_servers", len(domainToDeviceKeys)).Info("Claiming remote keys from servers")
 	wg.Add(len(domainToDeviceKeys))
 
+	util.GetLogger(ctx).Infof("Domain to device keys: %+v", domainToDeviceKeys)
+
 	for d, k := range domainToDeviceKeys {
 		go func(domain string, keysToClaim map[string]map[string]string) {
+			util.GetLogger(ctx).Infof("Keys to claim from %s: %+v", domain, keysToClaim)
+
 			fedCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
 			defer wg.Done()
