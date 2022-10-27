@@ -384,7 +384,7 @@ func validateRecaptcha(
 	if err != nil {
 		return &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()+"\n"+ string(body) + "\n"+clientip),
+			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
 		}
 	}
 
@@ -750,8 +750,7 @@ func handleRegistrationFlow(
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
-        clientIp, _, _ := net.SplitHostPort(req.RemoteAddr)
-		resErr := validateRecaptcha(cfg, r.Auth.Response, clientIp)
+		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
 		if resErr != nil {
 			return *resErr
 		}
