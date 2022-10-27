@@ -46,13 +46,17 @@ const upsertPublishedSQL = "" +
 const selectAllPublishedSQL = "" +
 	"SELECT room_id FROM roomserver_published WHERE published = $1 ORDER BY room_id ASC"
 
+const selectNetworkPublishedSQL = "" +
+	"SELECT room_id FROM roomserver_published WHERE published = $1 AND network_id = $2 ORDER BY room_id ASC"
+
 const selectPublishedSQL = "" +
 	"SELECT published FROM roomserver_published WHERE room_id = $1"
 
 type publishedStatements struct {
-	upsertPublishedStmt    *sql.Stmt
-	selectAllPublishedStmt *sql.Stmt
-	selectPublishedStmt    *sql.Stmt
+	upsertPublishedStmt        *sql.Stmt
+	selectAllPublishedStmt     *sql.Stmt
+	selectPublishedStmt        *sql.Stmt
+	selectNetworkPublishedStmt *sql.Stmt
 }
 
 func CreatePublishedTable(db *sql.DB) error {
@@ -75,6 +79,7 @@ func PreparePublishedTable(db *sql.DB) (tables.Published, error) {
 		{&s.upsertPublishedStmt, upsertPublishedSQL},
 		{&s.selectAllPublishedStmt, selectAllPublishedSQL},
 		{&s.selectPublishedStmt, selectPublishedSQL},
+		{&s.selectNetworkPublishedStmt, selectNetworkPublishedSQL},
 	}.Prepare(db)
 }
 
@@ -98,10 +103,18 @@ func (s *publishedStatements) SelectPublishedFromRoomID(
 }
 
 func (s *publishedStatements) SelectAllPublishedRooms(
-	ctx context.Context, txn *sql.Tx, published bool,
+	ctx context.Context, txn *sql.Tx, networkID string, published bool,
 ) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectAllPublishedStmt)
-	rows, err := stmt.QueryContext(ctx, published)
+	var rows *sql.Rows
+	var err error
+	if networkID != "" {
+		stmt := sqlutil.TxStmt(txn, s.selectNetworkPublishedStmt)
+		rows, err = stmt.QueryContext(ctx, published, networkID)
+	} else {
+		stmt := sqlutil.TxStmt(txn, s.selectAllPublishedStmt)
+		rows, err = stmt.QueryContext(ctx, published)
+
+	}
 	if err != nil {
 		return nil, err
 	}

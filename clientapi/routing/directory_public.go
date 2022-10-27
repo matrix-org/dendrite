@@ -39,14 +39,17 @@ var (
 )
 
 type PublicRoomReq struct {
-	Since  string `json:"since,omitempty"`
-	Limit  int16  `json:"limit,omitempty"`
-	Filter filter `json:"filter,omitempty"`
-	Server string `json:"server,omitempty"`
+	Since              string `json:"since,omitempty"`
+	Limit              int16  `json:"limit,omitempty"`
+	Filter             filter `json:"filter,omitempty"`
+	Server             string `json:"server,omitempty"`
+	IncludeAllNetworks bool   `json:"include_all_networks,omitempty"`
+	NetworkID          string `json:"third_party_instance_id,omitempty"`
 }
 
 type filter struct {
-	SearchTerms string `json:"generic_search_term,omitempty"`
+	SearchTerms string   `json:"generic_search_term,omitempty"`
+	RoomTypes   []string `json:"room_types,omitempty"` // TODO: Implement filter on this
 }
 
 // GetPostPublicRooms implements GET and POST /publicRooms
@@ -59,6 +62,13 @@ func GetPostPublicRooms(
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
+	}
+
+	if request.IncludeAllNetworks && request.NetworkID != "" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
+		}
 	}
 
 	serverName := gomatrixserverlib.ServerName(request.Server)

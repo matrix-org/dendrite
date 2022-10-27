@@ -141,7 +141,7 @@ type Database interface {
 	// Publish or unpublish a room from the room directory.
 	PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error
 	// Returns a list of room IDs for rooms which are published.
-	GetPublishedRooms(ctx context.Context) ([]string, error)
+	GetPublishedRooms(ctx context.Context, networkID string) ([]string, error)
 	// Returns whether a given room is published or not.
 	GetPublishedRoom(ctx context.Context, roomID string) (bool, error)
 

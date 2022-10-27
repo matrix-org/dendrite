@@ -148,7 +148,7 @@ type Membership interface {
 type Published interface {
 	UpsertRoomPublished(ctx context.Context, txn *sql.Tx, roomID, appserviceID, networkID string, published bool) (err error)
 	SelectPublishedFromRoomID(ctx context.Context, txn *sql.Tx, roomID string) (published bool, err error)
-	SelectAllPublishedRooms(ctx context.Context, txn *sql.Tx, published bool) ([]string, error)
+	SelectAllPublishedRooms(ctx context.Context, txn *sql.Tx, networkdID string, published bool) ([]string, error)
 }
 
 type RedactionInfo struct {

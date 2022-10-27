@@ -65,7 +65,7 @@ func TestPublishedTable(t *testing.T) {
 		sort.Strings(publishedRooms)
 
 		// check that we get the expected published rooms
-		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, true)
+		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, "", true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
 
@@ -79,5 +79,22 @@ func TestPublishedTable(t *testing.T) {
 		publishedRes, err := tab.SelectPublishedFromRoomID(ctx, nil, room.ID)
 		assert.NoError(t, err)
 		assert.False(t, publishedRes, fmt.Sprintf("expected room %s to be unpublished", room.ID))
+
+		// network specific test
+		nwID = "irc"
+		room = test.NewRoom(t, alice)
+		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, true)
+		assert.NoError(t, err)
+		publishedRooms = append(publishedRooms, room.ID)
+		sort.Strings(publishedRooms)
+		// should only return the room for network "irc"
+		allNWPublished, err := tab.SelectAllPublishedRooms(ctx, nil, nwID, true)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{room.ID}, allNWPublished)
+
+		// check that we still get all published rooms regardless networkID
+		roomIDs, err = tab.SelectAllPublishedRooms(ctx, nil, "", true)
+		assert.NoError(t, err)
+		assert.Equal(t, publishedRooms, roomIDs)
 	})
 }
