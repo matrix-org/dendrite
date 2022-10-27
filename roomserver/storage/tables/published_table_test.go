@@ -65,7 +65,7 @@ func TestPublishedTable(t *testing.T) {
 		sort.Strings(publishedRooms)
 
 		// check that we get the expected published rooms
-		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, "", true)
+		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, "", true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
 
@@ -88,12 +88,12 @@ func TestPublishedTable(t *testing.T) {
 		publishedRooms = append(publishedRooms, room.ID)
 		sort.Strings(publishedRooms)
 		// should only return the room for network "irc"
-		allNWPublished, err := tab.SelectAllPublishedRooms(ctx, nil, nwID, true)
+		allNWPublished, err := tab.SelectAllPublishedRooms(ctx, nil, nwID, true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{room.ID}, allNWPublished)
 
 		// check that we still get all published rooms regardless networkID
-		roomIDs, err = tab.SelectAllPublishedRooms(ctx, nil, "", true)
+		roomIDs, err = tab.SelectAllPublishedRooms(ctx, nil, "", true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
 	})

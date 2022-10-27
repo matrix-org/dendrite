@@ -44,7 +44,7 @@ const upsertPublishedSQL = "" +
 	"ON CONFLICT (room_id, appservice_id, network_id) DO UPDATE SET published=$4"
 
 const selectAllPublishedSQL = "" +
-	"SELECT room_id FROM roomserver_published WHERE published = $1 ORDER BY room_id ASC"
+	"SELECT room_id FROM roomserver_published WHERE published = $1 AND CASE WHEN $2 THEN 1=1 ELSE network_id = '' END ORDER BY room_id ASC"
 
 const selectNetworkPublishedSQL = "" +
 	"SELECT room_id FROM roomserver_published WHERE published = $1 AND network_id = $2 ORDER BY room_id ASC"
@@ -103,7 +103,7 @@ func (s *publishedStatements) SelectPublishedFromRoomID(
 }
 
 func (s *publishedStatements) SelectAllPublishedRooms(
-	ctx context.Context, txn *sql.Tx, networkID string, published bool,
+	ctx context.Context, txn *sql.Tx, networkID string, published, includeAllNetworks bool,
 ) ([]string, error) {
 	var rows *sql.Rows
 	var err error
@@ -112,7 +112,7 @@ func (s *publishedStatements) SelectAllPublishedRooms(
 		rows, err = stmt.QueryContext(ctx, published, networkID)
 	} else {
 		stmt := sqlutil.TxStmt(txn, s.selectAllPublishedStmt)
-		rows, err = stmt.QueryContext(ctx, published)
+		rows, err = stmt.QueryContext(ctx, published, includeAllNetworks)
 
 	}
 	if err != nil {

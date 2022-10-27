@@ -258,8 +258,9 @@ type QueryRoomVersionForRoomResponse struct {
 
 type QueryPublishedRoomsRequest struct {
 	// Optional. If specified, returns whether this room is published or not.
-	RoomID     string
-	NetworkdID string
+	RoomID             string
+	NetworkID          string
+	IncludeAllNetworks bool
 }
 
 type QueryPublishedRoomsResponse struct {

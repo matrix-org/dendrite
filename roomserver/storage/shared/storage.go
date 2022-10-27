@@ -732,8 +732,8 @@ func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, e
 	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
 }
 
-func (d *Database) GetPublishedRooms(ctx context.Context, networkID string) ([]string, error) {
-	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true)
+func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error) {
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true, includeAllNetworks)
 }
 
 func (d *Database) MissingAuthPrevEvents(
