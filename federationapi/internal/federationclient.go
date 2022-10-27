@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 // Functions here are "proxying" calls to the gomatrixserverlib federation
@@ -44,12 +45,18 @@ func (a *FederationInternalAPI) ClaimKeys(
 ) (gomatrixserverlib.RespClaimKeys, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
+
+	logrus.Infof("XXX: ClaimKeys request: %s %+v", s, oneTimeKeys)
+
 	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.ClaimKeys(ctx, s, oneTimeKeys)
 	})
 	if err != nil {
+		logrus.Infof("XXX: ClaimKeys error: %s %+v", s, err)
 		return gomatrixserverlib.RespClaimKeys{}, err
 	}
+	logrus.Infof("XXX: ClaimKeys response: %s %+v", s, ires.(gomatrixserverlib.RespClaimKeys))
+
 	return ires.(gomatrixserverlib.RespClaimKeys), nil
 }
 
