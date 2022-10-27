@@ -722,9 +722,9 @@ func (d *Database) storeEvent(
 	}, redactionEvent, redactedEventID, err
 }
 
-func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
+func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, publish)
+		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, appserviceID, networkID, publish)
 	})
 }
 

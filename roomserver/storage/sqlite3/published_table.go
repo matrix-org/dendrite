@@ -82,10 +82,10 @@ func PreparePublishedTable(db *sql.DB) (tables.Published, error) {
 }
 
 func (s *publishedStatements) UpsertRoomPublished(
-	ctx context.Context, txn *sql.Tx, roomID string, published bool,
+	ctx context.Context, txn *sql.Tx, roomID, appserviceID, networkID string, published bool,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.upsertPublishedStmt)
-	_, err := stmt.ExecContext(ctx, roomID, "", "", published)
+	_, err := stmt.ExecContext(ctx, roomID, appserviceID, networkID, published)
 	return err
 }
 

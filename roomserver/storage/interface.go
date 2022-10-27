@@ -139,7 +139,7 @@ type Database interface {
 	// Returns an error if the retrieval went wrong.
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
 	// Publish or unpublish a room from the room directory.
-	PublishRoom(ctx context.Context, roomID string, publish bool) error
+	PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error
 	// Returns a list of room IDs for rooms which are published.
 	GetPublishedRooms(ctx context.Context) ([]string, error)
 	// Returns whether a given room is published or not.
