@@ -31,13 +31,13 @@ import (
 
 // OutputTypingConsumer consumes events that originate in the clientapi.
 type OutputTypingConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	db         storage.Database
-	queues     *queue.OutgoingQueues
-	ServerName gomatrixserverlib.ServerName
-	topic      string
+	ctx               context.Context
+	jetstream         nats.JetStreamContext
+	durable           string
+	db                storage.Database
+	queues            *queue.OutgoingQueues
+	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	topic             string
 }
 
 // NewOutputTypingConsumer creates a new OutputTypingConsumer. Call Start() to begin consuming typing events.
@@ -49,13 +49,13 @@ func NewOutputTypingConsumer(
 	store storage.Database,
 ) *OutputTypingConsumer {
 	return &OutputTypingConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		queues:     queues,
-		db:         store,
-		ServerName: cfg.Matrix.ServerName,
-		durable:    cfg.Matrix.JetStream.Durable("FederationAPITypingConsumer"),
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		ctx:               process.Context(),
+		jetstream:         js,
+		queues:            queues,
+		db:                store,
+		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		durable:           cfg.Matrix.JetStream.Durable("FederationAPITypingConsumer"),
+		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 	}
 }
 
@@ -87,7 +87,7 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 		_ = msg.Ack()
 		return true
 	}
-	if typingServerName != t.ServerName {
+	if !t.isLocalServerName(typingServerName) {
 		return true
 	}
 
@@ -111,7 +111,7 @@ func (t *OutputTypingConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) 
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
-	if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
+	if err := t.queues.SendEDU(edu, typingServerName, names); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}
