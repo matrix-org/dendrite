@@ -20,6 +20,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 )
 
@@ -28,6 +29,10 @@ const publishedSchema = `
 CREATE TABLE IF NOT EXISTS roomserver_published (
     -- The room ID of the room
     room_id TEXT NOT NULL PRIMARY KEY,
+    -- The appservice ID of the room
+    appservice_id TEXT,
+    -- The network_id of the room
+    network_id TEXT,
     -- Whether it is published or not
     published BOOLEAN NOT NULL DEFAULT false
 );
@@ -51,7 +56,15 @@ type publishedStatements struct {
 
 func CreatePublishedTable(db *sql.DB) error {
 	_, err := db.Exec(publishedSchema)
-	return err
+	if err != nil {
+		return err
+	}
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "roomserver: published appservice",
+		Up:      deltas.UpPulishedAppservice,
+	})
+	return m.Up(context.Background())
 }
 
 func PreparePublishedTable(db *sql.DB) (tables.Published, error) {
