@@ -39,14 +39,17 @@ var (
 )
 
 type PublicRoomReq struct {
-	Since  string `json:"since,omitempty"`
-	Limit  int16  `json:"limit,omitempty"`
-	Filter filter `json:"filter,omitempty"`
-	Server string `json:"server,omitempty"`
+	Since              string `json:"since,omitempty"`
+	Limit              int64  `json:"limit,omitempty"`
+	Filter             filter `json:"filter,omitempty"`
+	Server             string `json:"server,omitempty"`
+	IncludeAllNetworks bool   `json:"include_all_networks,omitempty"`
+	NetworkID          string `json:"third_party_instance_id,omitempty"`
 }
 
 type filter struct {
-	SearchTerms string `json:"generic_search_term,omitempty"`
+	SearchTerms string   `json:"generic_search_term,omitempty"`
+	RoomTypes   []string `json:"room_types,omitempty"` // TODO: Implement filter on this
 }
 
 // GetPostPublicRooms implements GET and POST /publicRooms
@@ -59,6 +62,13 @@ func GetPostPublicRooms(
 	var request PublicRoomReq
 	if fillErr := fillPublicRoomsReq(req, &request); fillErr != nil {
 		return *fillErr
+	}
+
+	if request.IncludeAllNetworks && request.NetworkID != "" {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidParam("include_all_networks and third_party_instance_id can not be used together"),
+		}
 	}
 
 	serverName := gomatrixserverlib.ServerName(request.Server)
@@ -97,7 +107,7 @@ func publicRooms(
 	response := gomatrixserverlib.RespPublicRooms{
 		Chunk: []gomatrixserverlib.PublicRoom{},
 	}
-	var limit int16
+	var limit int64
 	var offset int64
 	limit = request.Limit
 	if limit == 0 {
@@ -114,7 +124,7 @@ func publicRooms(
 
 	var rooms []gomatrixserverlib.PublicRoom
 	if request.Since == "" {
-		rooms = refreshPublicRoomCache(ctx, rsAPI, extRoomsProvider)
+		rooms = refreshPublicRoomCache(ctx, rsAPI, extRoomsProvider, request)
 	} else {
 		rooms = getPublicRoomsFromCache()
 	}
@@ -176,7 +186,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 				JSON: jsonerror.BadJSON("limit param is not a number"),
 			}
 		}
-		request.Limit = int16(limit)
+		request.Limit = int64(limit)
 		request.Since = httpReq.FormValue("since")
 		request.Server = httpReq.FormValue("server")
 	} else {
@@ -204,7 +214,7 @@ func fillPublicRoomsReq(httpReq *http.Request, request *PublicRoomReq) *util.JSO
 //	 limit=3&since=6  => G     (prev='3', next='')
 //
 //	A value of '-1' for prev/next indicates no position.
-func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int16) (subset []gomatrixserverlib.PublicRoom, prev, next int) {
+func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int64) (subset []gomatrixserverlib.PublicRoom, prev, next int) {
 	prev = -1
 	next = -1
 
@@ -230,6 +240,7 @@ func sliceInto(slice []gomatrixserverlib.PublicRoom, since int64, limit int16) (
 
 func refreshPublicRoomCache(
 	ctx context.Context, rsAPI roomserverAPI.ClientRoomserverAPI, extRoomsProvider api.ExtraPublicRoomsProvider,
+	request PublicRoomReq,
 ) []gomatrixserverlib.PublicRoom {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
@@ -238,8 +249,17 @@ func refreshPublicRoomCache(
 		extraRooms = extRoomsProvider.Rooms()
 	}
 
+	// TODO: this is only here to make Sytest happy, for now.
+	ns := strings.Split(request.NetworkID, "|")
+	if len(ns) == 2 {
+		request.NetworkID = ns[1]
+	}
+
 	var queryRes roomserverAPI.QueryPublishedRoomsResponse
-	err := rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{}, &queryRes)
+	err := rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{
+		NetworkID:          request.NetworkID,
+		IncludeAllNetworks: request.IncludeAllNetworks,
+	}, &queryRes)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return publicRoomsCache
