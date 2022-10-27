@@ -27,23 +27,23 @@ import (
 // AssociatePDUWithDestination creates an association that the
 // destination queues will use to determine which JSON blobs to send
 // to which servers.
-func (d *Database) AssociatePDUWithDestination(
+func (d *Database) AssociatePDUWithDestinations(
 	ctx context.Context,
-	transactionID gomatrixserverlib.TransactionID,
-	serverName gomatrixserverlib.ServerName,
+	destinations map[gomatrixserverlib.ServerName]struct{},
 	receipt *Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationQueuePDUs.InsertQueuePDU(
-			ctx,           // context
-			txn,           // SQL transaction
-			transactionID, // transaction ID
-			serverName,    // destination server name
-			receipt.nid,   // NID from the federationapi_queue_json table
-		); err != nil {
-			return fmt.Errorf("InsertQueuePDU: %w", err)
+		var err error
+		for destination := range destinations {
+			err = d.FederationQueuePDUs.InsertQueuePDU(
+				ctx,         // context
+				txn,         // SQL transaction
+				"",          // transaction ID
+				destination, // destination server name
+				receipt.nid, // NID from the federationapi_queue_json table
+			)
 		}
-		return nil
+		return err
 	})
 }
 

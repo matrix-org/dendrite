@@ -16,6 +16,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
@@ -29,14 +30,18 @@ var (
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	base, baseclose := testrig.CreateBaseDendrite(t, dbType)
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
-	db, err := storage.NewUserAPIDatabase(nil, &config.DatabaseOptions{
+	db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, "localhost", bcrypt.MinCost, openIDLifetimeMS, loginTokenLifetime, "_server")
 	if err != nil {
 		t.Fatalf("NewUserAPIDatabase returned %s", err)
 	}
-	return db, close
+	return db, func() {
+		close()
+		baseclose()
+	}
 }
 
 // Tests storing and getting account data
@@ -377,15 +382,23 @@ func Test_Profile(t *testing.T) {
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
-		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		err = db.SetDisplayName(ctx, aliceLocalpart, "Alice")
-		assert.NoError(t, err, "unable to set displayname")
-		err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
-		assert.NoError(t, err, "unable to set avatar url")
-		// verify profile
-		gotProfile, err = db.GetProfileByLocalpart(ctx, aliceLocalpart)
-		assert.NoError(t, err, "unable to get profile by localpart")
+		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, "Alice")
 		assert.Equal(t, wantProfile, gotProfile)
+		assert.NoError(t, err, "unable to set displayname")
+		assert.True(t, changed)
+
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		assert.Equal(t, wantProfile, gotProfile)
+		assert.True(t, changed)
+
+		// Setting the same avatar again doesn't change anything
+		wantProfile.AvatarURL = "mxc://aliceAvatar"
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		assert.NoError(t, err, "unable to set avatar url")
+		assert.Equal(t, wantProfile, gotProfile)
+		assert.False(t, changed)
 
 		// search profiles
 		searchRes, err := db.SearchProfiles(ctx, "Alice", 2)
