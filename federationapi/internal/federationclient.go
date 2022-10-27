@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -55,9 +56,13 @@ func (a *FederationInternalAPI) ClaimKeys(
 		logrus.Infof("XXX: ClaimKeys error: %s %+v", s, err)
 		return gomatrixserverlib.RespClaimKeys{}, err
 	}
+	res, ok := ires.(gomatrixserverlib.RespClaimKeys)
+	if !ok {
+		logrus.Infof("XXX: ClaimKeys type-cast error: %s %+v", s, res)
+		return gomatrixserverlib.RespClaimKeys{}, fmt.Errorf("typecast error")
+	}
 	logrus.Infof("XXX: ClaimKeys response: %s %+v", s, ires.(gomatrixserverlib.RespClaimKeys))
-
-	return ires.(gomatrixserverlib.RespClaimKeys), nil
+	return res, nil
 }
 
 func (a *FederationInternalAPI) QueryKeys(
