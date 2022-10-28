@@ -168,8 +168,10 @@ type PerformBackfillResponse struct {
 }
 
 type PerformPublishRequest struct {
-	RoomID     string
-	Visibility string
+	RoomID       string
+	Visibility   string
+	AppserviceID string
+	NetworkID    string
 }
 
 type PerformPublishResponse struct {

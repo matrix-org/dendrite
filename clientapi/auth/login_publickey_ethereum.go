@@ -67,7 +67,7 @@ func (pk LoginPublicKeyEthereum) GetType() string {
 }
 
 func (pk LoginPublicKeyEthereum) AccountExists(ctx context.Context) (string, *jsonerror.MatrixError) {
-	localPart, err := userutil.ParseUsernameParam(pk.UserId, &pk.config.Matrix.ServerName)
+	localPart, _, err := userutil.ParseUsernameParam(pk.UserId, pk.config.Matrix)
 	if err != nil {
 		// userId does not exist
 		return "", jsonerror.Forbidden("the address is incorrect, or the account does not exist.")

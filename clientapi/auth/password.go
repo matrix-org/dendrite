@@ -74,7 +74,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.BadJSON("A password must be supplied."),
 		}
 	}
-	localpart, err := userutil.ParseUsernameParam(username, &t.Config.Matrix.ServerName)
+	localpart, _, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,

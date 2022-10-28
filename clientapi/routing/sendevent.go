@@ -94,6 +94,7 @@ func SendEvent(
 	// create a mutex for the specific user in the specific room
 	// this avoids a situation where events that are received in quick succession are sent to the roomserver in a jumbled order
 	userID := device.UserID
+	domain := device.UserDomain()
 	mutex, _ := userRoomSendMutexes.LoadOrStore(roomID+userID, &sync.Mutex{})
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
@@ -185,8 +186,8 @@ func SendEvent(
 		[]*gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
-		cfg.Matrix.ServerName,
-		cfg.Matrix.ServerName,
+		domain,
+		domain,
 		txnAndSessionID,
 		false,
 	); err != nil {

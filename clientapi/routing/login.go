@@ -82,7 +82,7 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		authErr2 := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		authErr2 := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
 		cleanup(req.Context(), &authErr2)
 		return authErr2
 	}
@@ -93,7 +93,7 @@ func Login(
 }
 
 func completeAuth(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.ClientUserAPI, login *auth.Login,
+	ctx context.Context, cfg *config.Global, userAPI userapi.ClientUserAPI, login *auth.Login,
 	ipAddr, userAgent string,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
@@ -102,7 +102,7 @@ func completeAuth(
 		return jsonerror.InternalServerError()
 	}
 
-	localpart, err := userutil.ParseUsernameParam(login.Username(), &serverName)
+	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
 		return jsonerror.InternalServerError()

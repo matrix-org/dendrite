@@ -44,7 +44,7 @@ func (a *FederationInternalAPI) ClaimKeys(
 ) (gomatrixserverlib.RespClaimKeys, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
-	ires, err := a.doRequestIfNotBackingOffOrBlacklisted(s, func() (interface{}, error) {
+	ires, err := a.doRequestIfNotBlacklisted(s, func() (interface{}, error) {
 		return a.federation.ClaimKeys(ctx, s, oneTimeKeys)
 	})
 	if err != nil {

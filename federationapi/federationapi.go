@@ -69,7 +69,7 @@ func AddPublicRoutes(
 		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
 		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
-		ServerName:             cfg.Matrix.ServerName,
+		Config:                 cfg,
 		UserAPI:                userAPI,
 	}
 
@@ -107,7 +107,7 @@ func NewInternalAPI(
 ) api.FederationInternalAPI {
 	cfg := &base.Cfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.ServerName)
+	federationDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
