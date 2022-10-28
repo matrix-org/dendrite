@@ -128,7 +128,6 @@ func ToToken(provider StreamProvider, position types.StreamPosition) types.Strea
 	default:
 		panic(fmt.Sprintf("unknown stream provider: %T", t))
 	}
-	return types.StreamingToken{}
 }
 
 func IncrementalPositions(provider StreamProvider, current, since types.StreamingToken) (types.StreamPosition, types.StreamPosition) {
@@ -154,5 +153,4 @@ func IncrementalPositions(provider StreamProvider, current, since types.Streamin
 	default:
 		panic(fmt.Sprintf("unknown stream provider: %T", t))
 	}
-	return 0, 0
 }

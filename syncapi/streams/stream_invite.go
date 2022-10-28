@@ -80,6 +80,7 @@ func (p *InviteStreamProvider) IncrementalSync(
 		if _, ok := req.Response.Rooms.Join[roomID]; ok {
 			continue
 		}
+
 		lr := types.NewLeaveResponse()
 		h := sha256.Sum256(append([]byte(roomID), []byte(strconv.FormatInt(int64(to), 10))...))
 		lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{

@@ -21,6 +21,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -101,6 +102,7 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		Rooms:             make(map[string]string),   // Populated by the PDU stream
 		WantFullState:     wantFullState,             //
 		MembershipChanges: make(map[string]struct{}), // Populated by the PDU stream
+		SyncMu:            &sync.Mutex{},
 	}, nil
 }
 

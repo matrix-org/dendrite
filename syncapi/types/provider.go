@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -26,6 +27,7 @@ type SyncRequest struct {
 	MembershipChanges map[string]struct{}
 	// Updated by the PDU stream.
 	IgnoredUsers IgnoredUsers
+	SyncMu       *sync.Mutex
 }
 
 func (r *SyncRequest) IsRoomPresent(roomID string) bool {

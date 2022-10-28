@@ -326,6 +326,8 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 				succeeded = err == nil
 				sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
 			}()
+			syncReq.SyncMu.Lock()
+			defer syncReq.SyncMu.Unlock()
 			return f(snapshot)
 		}
 
