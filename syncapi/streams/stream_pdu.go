@@ -257,7 +257,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// or not, it needs the m.room.create event which may be chronologically outside
 	// the filter limit.
 	if !delta.NewlyJoined {
-		delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
+		delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents)
 	}
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
