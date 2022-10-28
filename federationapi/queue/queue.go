@@ -378,14 +378,24 @@ func (oqs *OutgoingQueues) SendEDU(
 	return nil
 }
 
+// IsServerBlacklisted returns whether or not the provided server is currently
+// blacklisted.
+func (oqs *OutgoingQueues) IsServerBlacklisted(srv gomatrixserverlib.ServerName) bool {
+	return oqs.statistics.ForServer(srv).Blacklisted()
+}
+
 // RetryServer attempts to resend events to the given server if we had given up.
 func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	if oqs.disabled {
 		return
 	}
-	oqs.statistics.ForServer(srv).RemoveBlacklist()
+
+	serverStatistics := oqs.statistics.ForServer(srv)
+	forceWakeup := serverStatistics.Blacklisted()
+	serverStatistics.RemoveBlacklist()
+	serverStatistics.ClearBackoff()
+
 	if queue := oqs.getQueue(srv); queue != nil {
-		queue.statistics.ClearBackoff()
-		queue.wakeQueueIfNeeded()
+		queue.wakeQueueIfEventsPending(forceWakeup)
 	}
 }

@@ -30,6 +30,12 @@ type FederationInternalAPI interface {
 		request *PerformBroadcastEDURequest,
 		response *PerformBroadcastEDUResponse,
 	) error
+
+	PerformWakeupServers(
+		ctx context.Context,
+		request *PerformWakeupServersRequest,
+		response *PerformWakeupServersResponse,
+	) error
 }
 
 type ClientFederationAPI interface {
@@ -211,6 +217,13 @@ type PerformBroadcastEDURequest struct {
 }
 
 type PerformBroadcastEDUResponse struct {
+}
+
+type PerformWakeupServersRequest struct {
+	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+}
+
+type PerformWakeupServersResponse struct {
 }
 
 type InputPublicKeysRequest struct {
