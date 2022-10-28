@@ -113,12 +113,12 @@ func AuthFallback(
 
 	serveRecaptcha := func() {
 		data := map[string]string{
-			"myUrl":   req.URL.String(),
-			"session": sessionID,
-            "apiJsUrl": cfg.RecaptchaApiJsUrl,
-			"sitekey": cfg.RecaptchaPublicKey,
-            "sitekeyClass": cfg.RecaptchaSitekeyClass,
-            "formField": cfg.RecaptchaFormField,
+			"myUrl":        req.URL.String(),
+			"session":      sessionID,
+			"apiJsUrl":     cfg.RecaptchaApiJsUrl,
+			"sitekey":      cfg.RecaptchaPublicKey,
+			"sitekeyClass": cfg.RecaptchaSitekeyClass,
+			"formField":    cfg.RecaptchaFormField,
 		}
 		serveTemplate(w, recaptchaTemplate, data)
 	}
