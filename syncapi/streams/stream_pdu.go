@@ -216,6 +216,9 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
+// Limit the recent events to X when going backwards
+const recentEventBackwardsLimit = 100
+
 // nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
@@ -229,9 +232,15 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 ) (types.StreamPosition, error) {
 
 	originalLimit := eventFilter.Limit
-	if r.Backwards {
-		eventFilter.Limit = int(r.From - r.To)
+	// If we're going backwards, grep at least X events, this is mostly to satisfy Sytest
+	if r.Backwards && originalLimit < recentEventBackwardsLimit {
+		eventFilter.Limit = recentEventBackwardsLimit // TODO: Figure out a better way
+		diff := r.From - r.To
+		if diff > 0 && diff < recentEventBackwardsLimit {
+			eventFilter.Limit = int(diff)
+		}
 	}
+
 	recentStreamEvents, limited, err := snapshot.RecentEvents(
 		ctx, delta.RoomID, r,
 		eventFilter, true, true,
