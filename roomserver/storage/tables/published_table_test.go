@@ -2,8 +2,11 @@ package tables_test
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/postgres"
@@ -11,7 +14,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func mustCreatePublishedTable(t *testing.T, dbType test.DBType) (tab tables.Published, close func()) {
@@ -46,10 +48,12 @@ func TestPublishedTable(t *testing.T) {
 
 		// Publish some rooms
 		publishedRooms := []string{}
+		asID := ""
+		nwID := ""
 		for i := 0; i < 10; i++ {
 			room := test.NewRoom(t, alice)
 			published := i%2 == 0
-			err := tab.UpsertRoomPublished(ctx, nil, room.ID, published)
+			err := tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, published)
 			assert.NoError(t, err)
 			if published {
 				publishedRooms = append(publishedRooms, room.ID)
@@ -61,19 +65,36 @@ func TestPublishedTable(t *testing.T) {
 		sort.Strings(publishedRooms)
 
 		// check that we get the expected published rooms
-		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, true)
+		roomIDs, err := tab.SelectAllPublishedRooms(ctx, nil, "", true, true)
 		assert.NoError(t, err)
 		assert.Equal(t, publishedRooms, roomIDs)
 
 		// test an actual upsert
 		room := test.NewRoom(t, alice)
-		err = tab.UpsertRoomPublished(ctx, nil, room.ID, true)
+		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, true)
 		assert.NoError(t, err)
-		err = tab.UpsertRoomPublished(ctx, nil, room.ID, false)
+		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, false)
 		assert.NoError(t, err)
 		// should now be false, due to the upsert
 		publishedRes, err := tab.SelectPublishedFromRoomID(ctx, nil, room.ID)
 		assert.NoError(t, err)
-		assert.False(t, publishedRes)
+		assert.False(t, publishedRes, fmt.Sprintf("expected room %s to be unpublished", room.ID))
+
+		// network specific test
+		nwID = "irc"
+		room = test.NewRoom(t, alice)
+		err = tab.UpsertRoomPublished(ctx, nil, room.ID, asID, nwID, true)
+		assert.NoError(t, err)
+		publishedRooms = append(publishedRooms, room.ID)
+		sort.Strings(publishedRooms)
+		// should only return the room for network "irc"
+		allNWPublished, err := tab.SelectAllPublishedRooms(ctx, nil, nwID, true, true)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{room.ID}, allNWPublished)
+
+		// check that we still get all published rooms regardless networkID
+		roomIDs, err = tab.SelectAllPublishedRooms(ctx, nil, "", true, true)
+		assert.NoError(t, err)
+		assert.Equal(t, publishedRooms, roomIDs)
 	})
 }

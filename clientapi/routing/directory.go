@@ -18,14 +18,15 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 type roomDirectoryResponse struct {
@@ -305,6 +306,46 @@ func SetVisibility(
 	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
 		RoomID:     roomID,
 		Visibility: v.Visibility,
+	}, &publishRes); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
+	if publishRes.Error != nil {
+		util.GetLogger(req.Context()).WithError(publishRes.Error).Error("PerformPublish failed")
+		return publishRes.Error.JSONResponse()
+	}
+
+	return util.JSONResponse{
+		Code: http.StatusOK,
+		JSON: struct{}{},
+	}
+}
+
+func SetVisibilityAS(
+	req *http.Request, rsAPI roomserverAPI.ClientRoomserverAPI, dev *userapi.Device,
+	networkID, roomID string,
+) util.JSONResponse {
+	if dev.AccountType != userapi.AccountTypeAppService {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("Only appservice may use this endpoint"),
+		}
+	}
+	var v roomVisibility
+
+	// If the method is delete, we simply mark the visibility as private
+	if req.Method == http.MethodDelete {
+		v.Visibility = "private"
+	} else {
+		if reqErr := httputil.UnmarshalJSONRequest(req, &v); reqErr != nil {
+			return *reqErr
+		}
+	}
+	var publishRes roomserverAPI.PerformPublishResponse
+	if err := rsAPI.PerformPublish(req.Context(), &roomserverAPI.PerformPublishRequest{
+		RoomID:       roomID,
+		Visibility:   v.Visibility,
+		NetworkID:    networkID,
+		AppserviceID: dev.AppserviceID,
 	}, &publishRes); err != nil {
 		return jsonerror.InternalAPIError(req.Context(), err)
 	}
