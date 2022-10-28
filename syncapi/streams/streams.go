@@ -130,3 +130,29 @@ func ToToken(provider StreamProvider, position types.StreamPosition) types.Strea
 	}
 	return types.StreamingToken{}
 }
+
+func IncrementalPositions(provider StreamProvider, current, since types.StreamingToken) (types.StreamPosition, types.StreamPosition) {
+	switch t := provider.(type) {
+	case *PDUStreamProvider:
+		return current.PDUPosition, since.PDUPosition
+	case *TypingStreamProvider:
+		return current.TypingPosition, since.TypingPosition
+	case *ReceiptStreamProvider:
+		return current.ReceiptPosition, since.ReceiptPosition
+	case *SendToDeviceStreamProvider:
+		return current.SendToDevicePosition, since.SendToDevicePosition
+	case *InviteStreamProvider:
+		return current.InvitePosition, since.InvitePosition
+	case *AccountDataStreamProvider:
+		return current.AccountDataPosition, since.AccountDataPosition
+	case *DeviceListStreamProvider:
+		return current.DeviceListPosition, since.DeviceListPosition
+	case *NotificationDataStreamProvider:
+		return current.NotificationDataPosition, since.NotificationDataPosition
+	case *PresenceStreamProvider:
+		return current.PresencePosition, since.PresencePosition
+	default:
+		panic(fmt.Sprintf("unknown stream provider: %T", t))
+	}
+	return 0, 0
+}
