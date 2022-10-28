@@ -16,16 +16,19 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/util"
 )
 
 const stateDataSchema = `
@@ -113,14 +116,20 @@ func (s *stateBlockStatements) BulkSelectStateBlockEntries(
 	results := make([][]types.EventNID, len(stateBlockNIDs))
 	i := 0
 	var stateBlockNID types.StateBlockNID
-	var result pq.Int64Array
+	var result []byte
+	var parsed int64
 	for ; rows.Next(); i++ {
 		if err = rows.Scan(&stateBlockNID, &result); err != nil {
 			return nil, err
 		}
-		r := make([]types.EventNID, len(result))
-		for x := range result {
-			r[x] = types.EventNID(result[x])
+		split := bytes.Split(result[1:len(result)-1], []byte(","))
+		r := make([]types.EventNID, len(split))
+		for x, y := range split {
+			parsed, err = strconv.ParseInt(string(y), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			r[x] = types.EventNID(parsed)
 		}
 		results[i] = r
 	}
