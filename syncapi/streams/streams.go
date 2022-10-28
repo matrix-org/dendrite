@@ -2,6 +2,7 @@ package streams
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -102,4 +103,30 @@ func (s *Streams) Latest(ctx context.Context) types.StreamingToken {
 		DeviceListPosition:       s.DeviceListStreamProvider.LatestPosition(ctx),
 		PresencePosition:         s.PresenceStreamProvider.LatestPosition(ctx),
 	}
+}
+
+func ToToken(provider StreamProvider, position types.StreamPosition) types.StreamingToken {
+	switch t := provider.(type) {
+	case *PDUStreamProvider:
+		return types.StreamingToken{PDUPosition: position}
+	case *TypingStreamProvider:
+		return types.StreamingToken{TypingPosition: position}
+	case *ReceiptStreamProvider:
+		return types.StreamingToken{ReceiptPosition: position}
+	case *SendToDeviceStreamProvider:
+		return types.StreamingToken{SendToDevicePosition: position}
+	case *InviteStreamProvider:
+		return types.StreamingToken{InvitePosition: position}
+	case *AccountDataStreamProvider:
+		return types.StreamingToken{AccountDataPosition: position}
+	case *DeviceListStreamProvider:
+		return types.StreamingToken{DeviceListPosition: position}
+	case *NotificationDataStreamProvider:
+		return types.StreamingToken{NotificationDataPosition: position}
+	case *PresenceStreamProvider:
+		return types.StreamingToken{PresencePosition: position}
+	default:
+		panic(fmt.Sprintf("unknown stream provider: %T", t))
+	}
+	return types.StreamingToken{}
 }
