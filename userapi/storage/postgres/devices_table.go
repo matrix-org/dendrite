@@ -31,10 +31,10 @@ import (
 
 const devicesSchema = `
 -- This sequence is used for automatic allocation of session_id.
-CREATE SEQUENCE IF NOT EXISTS device_session_id_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS userapi_device_session_id_seq START 1;
 
 -- Stores data about devices.
-CREATE TABLE IF NOT EXISTS device_devices (
+CREATE TABLE IF NOT EXISTS userapi_devices (
     -- The access token granted to this device. This has to be the primary key
     -- so we can distinguish which device is making a given request.
     access_token TEXT NOT NULL PRIMARY KEY,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS device_devices (
     -- This can be used as a secure substitution of the access token in situations
     -- where data is associated with access tokens (e.g. transaction storage),
     -- so we don't have to store users' access tokens everywhere.
-    session_id BIGINT NOT NULL DEFAULT nextval('device_session_id_seq'),
+    session_id BIGINT NOT NULL DEFAULT nextval('userapi_device_session_id_seq'),
     -- The device identifier. This only needs to uniquely identify a device for a given user, not globally.
     -- access_tokens will be clobbered based on the device ID for a user.
     device_id TEXT NOT NULL,
@@ -65,39 +65,39 @@ CREATE TABLE IF NOT EXISTS device_devices (
 );
 
 -- Device IDs must be unique for a given user.
-CREATE UNIQUE INDEX IF NOT EXISTS device_localpart_id_idx ON device_devices(localpart, device_id);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_devices(localpart, device_id);
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO device_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
+	"INSERT INTO userapi_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT session_id, device_id, localpart FROM device_devices WHERE access_token = $1"
+	"SELECT session_id, device_id, localpart FROM userapi_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
-	"SELECT display_name, last_seen_ts, ip FROM device_devices WHERE localpart = $1 and device_id = $2"
+	"SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 and device_id = $2"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM device_devices WHERE localpart = $1 AND device_id != $2 ORDER BY last_seen_ts DESC"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM userapi_devices WHERE localpart = $1 AND device_id != $2 ORDER BY last_seen_ts DESC"
 
 const updateDeviceNameSQL = "" +
-	"UPDATE device_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
+	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
 
 const deleteDeviceSQL = "" +
-	"DELETE FROM device_devices WHERE device_id = $1 AND localpart = $2"
+	"DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2"
 
 const deleteDevicesByLocalpartSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1 AND device_id != $2"
+	"DELETE FROM userapi_devices WHERE localpart = $1 AND device_id != $2"
 
 const deleteDevicesSQL = "" +
-	"DELETE FROM device_devices WHERE localpart = $1 AND device_id = ANY($2)"
+	"DELETE FROM userapi_devices WHERE localpart = $1 AND device_id = ANY($2)"
 
 const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, display_name, last_seen_ts FROM device_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
+	"SELECT device_id, localpart, display_name, last_seen_ts FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
 
 const updateDeviceLastSeen = "" +
-	"UPDATE device_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND device_id = $5"
+	"UPDATE userapi_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND device_id = $5"
 
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt

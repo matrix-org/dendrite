@@ -27,7 +27,7 @@ import (
 
 const profilesSchema = `
 -- Stores data about accounts profiles.
-CREATE TABLE IF NOT EXISTS account_profiles (
+CREATE TABLE IF NOT EXISTS userapi_profiles (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
     -- The display name for this account
@@ -38,19 +38,27 @@ CREATE TABLE IF NOT EXISTS account_profiles (
 `
 
 const insertProfileSQL = "" +
-	"INSERT INTO account_profiles(localpart, display_name, avatar_url) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_profiles(localpart, display_name, avatar_url) VALUES ($1, $2, $3)"
 
 const selectProfileByLocalpartSQL = "" +
-	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart = $1"
+	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart = $1"
 
 const setAvatarURLSQL = "" +
-	"UPDATE account_profiles SET avatar_url = $1 WHERE localpart = $2"
+	"UPDATE userapi_profiles AS new" +
+	" SET avatar_url = $1" +
+	" FROM userapi_profiles AS old" +
+	" WHERE new.localpart = $2" +
+	" RETURNING new.display_name, old.avatar_url <> new.avatar_url"
 
 const setDisplayNameSQL = "" +
-	"UPDATE account_profiles SET display_name = $1 WHERE localpart = $2"
+	"UPDATE userapi_profiles AS new" +
+	" SET display_name = $1" +
+	" FROM userapi_profiles AS old" +
+	" WHERE new.localpart = $2" +
+	" RETURNING new.avatar_url, old.display_name <> new.display_name"
 
 const selectProfilesBySearchSQL = "" +
-	"SELECT localpart, display_name, avatar_url FROM account_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
+	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
 type profilesStatements struct {
 	serverNoticesLocalpart       string
@@ -100,16 +108,28 @@ func (s *profilesStatements) SelectProfileByLocalpart(
 
 func (s *profilesStatements) SetAvatarURL(
 	ctx context.Context, txn *sql.Tx, localpart string, avatarURL string,
-) (err error) {
-	_, err = s.setAvatarURLStmt.ExecContext(ctx, avatarURL, localpart)
-	return
+) (*authtypes.Profile, bool, error) {
+	profile := &authtypes.Profile{
+		Localpart: localpart,
+		AvatarURL: avatarURL,
+	}
+	var changed bool
+	stmt := sqlutil.TxStmt(txn, s.setAvatarURLStmt)
+	err := stmt.QueryRowContext(ctx, avatarURL, localpart).Scan(&profile.DisplayName, &changed)
+	return profile, changed, err
 }
 
 func (s *profilesStatements) SetDisplayName(
 	ctx context.Context, txn *sql.Tx, localpart string, displayName string,
-) (err error) {
-	_, err = s.setDisplayNameStmt.ExecContext(ctx, displayName, localpart)
-	return
+) (*authtypes.Profile, bool, error) {
+	profile := &authtypes.Profile{
+		Localpart:   localpart,
+		DisplayName: displayName,
+	}
+	var changed bool
+	stmt := sqlutil.TxStmt(txn, s.setDisplayNameStmt)
+	err := stmt.QueryRowContext(ctx, displayName, localpart).Scan(&profile.AvatarURL, &changed)
+	return profile, changed, err
 }
 
 func (s *profilesStatements) SelectProfilesBySearch(

@@ -168,7 +168,7 @@ func (t *UserInternalAPITrace) QueryAccountAvailability(ctx context.Context, req
 	return err
 }
 
-func (t *UserInternalAPITrace) SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error {
+func (t *UserInternalAPITrace) SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *PerformUpdateDisplayNameResponse) error {
 	err := t.Impl.SetDisplayName(ctx, req, res)
 	util.GetLogger(ctx).Infof("SetDisplayName req=%+v res=%+v", js(req), js(res))
 	return err

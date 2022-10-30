@@ -179,7 +179,10 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 		body, _ = io.ReadAll(regResp.Body)
 		return "", fmt.Errorf(gjson.GetBytes(body, "error").Str)
 	}
-	r, _ := io.ReadAll(regResp.Body)
+	r, err := io.ReadAll(regResp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body (HTTP %d): %w", regResp.StatusCode, err)
+	}
 
 	return gjson.GetBytes(r, "access_token").Str, nil
 }
