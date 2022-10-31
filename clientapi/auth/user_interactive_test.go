@@ -24,7 +24,10 @@ var (
 	}
 )
 
-type fakeAccountDatabase struct{}
+type fakeAccountDatabase struct {
+	api.UserLoginAPI
+	api.ClientUserAPI
+}
 
 func (d *fakeAccountDatabase) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
 	return nil
@@ -50,7 +53,8 @@ func setup() *UserInteractive {
 			ServerName: serverName,
 		},
 	}
-	return NewUserInteractive(&fakeAccountDatabase{}, cfg)
+	accountApi := fakeAccountDatabase{}
+	return NewUserInteractive(&accountApi, &accountApi, cfg)
 }
 
 func TestUserInteractiveChallenge(t *testing.T) {

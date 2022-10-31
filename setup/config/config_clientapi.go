@@ -55,6 +55,12 @@ type ClientAPI struct {
 	RateLimiting RateLimiting `yaml:"rate_limiting"`
 
 	MSCs *MSCs `yaml:"-"`
+
+	// Disable password authentication.
+	PasswordAuthenticationDisabled bool `yaml:"password_authentication_disabled"`
+
+	// Public key authentication
+	PublicKeyAuthentication PublicKeyAuthentication `yaml:"public_key_authentication"`
 }
 
 func (c *ClientAPI) Defaults(opts DefaultOpts) {

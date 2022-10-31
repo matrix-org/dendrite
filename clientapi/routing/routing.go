@@ -27,8 +27,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
+	authz "github.com/matrix-org/dendrite/authorization"
 	"github.com/matrix-org/dendrite/clientapi/api"
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	clientApiAuthz "github.com/matrix-org/dendrite/clientapi/authorization"
 	clientutil "github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
@@ -41,6 +43,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
+
+var ReleaseVersion string
 
 // Setup registers HTTP handlers with the given ServeMux. It also supplies the given http.Client
 // to clients which need to make outbound HTTP requests.
@@ -63,10 +67,16 @@ func Setup(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
+
+	logrus.WithFields(logrus.Fields{
+		"ReleaseVersion": ReleaseVersion,
+	}).Info("Started clientAPI router with ReleaseVersion")
+
 	prometheus.MustRegister(amtRegUsers, sendEventDuration)
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
-	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
+	userInteractiveAuth := auth.NewUserInteractive(userAPI, userAPI, cfg)
+	authorization := clientApiAuthz.NewAuthorization(cfg, rsAPI)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
@@ -103,6 +113,7 @@ func Setup(
 				JSON: struct {
 					Versions         []string        `json:"versions"`
 					UnstableFeatures map[string]bool `json:"unstable_features"`
+					ReleaseVersion   string          `json:"release_version"`
 				}{Versions: []string{
 					"r0.0.1",
 					"r0.1.0",
@@ -114,7 +125,7 @@ func Setup(
 					"v1.0",
 					"v1.1",
 					"v1.2",
-				}, UnstableFeatures: unstableFeatures},
+				}, UnstableFeatures: unstableFeatures, ReleaseVersion: ReleaseVersion},
 			}
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
@@ -249,6 +260,20 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
+
+			isAllowed, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+				RoomId:     vars["roomIDOrAlias"],
+				UserId:     device.UserID,
+				Permission: authz.PermissionRead,
+			})
+
+			if !isAllowed {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Unauthorised"),
+				}
+			}
+
 			return JoinRoomByIDOrAlias(
 				req, device, rsAPI, userAPI, vars["roomIDOrAlias"],
 			)
@@ -333,6 +358,20 @@ func Setup(
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
+
+			isAllowedInviter, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+				RoomId:     vars["roomID"],
+				UserId:     device.UserID,
+				Permission: authz.PermissionInvite,
+			})
+
+			if !isAllowedInviter {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Inviter not allowed"),
+				}
+			}
+
 			return SendInvite(req, userAPI, device, vars["roomID"], cfg, rsAPI, asAPI)
 		}),
 	).Methods(http.MethodPost, http.MethodOptions)
@@ -626,7 +665,7 @@ func Setup(
 			if r := rateLimits.Limit(req, nil); r != nil {
 				return *r
 			}
-			return Login(req, userAPI, cfg)
+			return Login(req, userAPI, userInteractiveAuth, cfg)
 		}),
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 

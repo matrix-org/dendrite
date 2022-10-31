@@ -25,7 +25,7 @@ echo "Installing golangci-lint..."
 
 # Make a backup of go.{mod,sum} first
 cp go.mod go.mod.bak && cp go.sum go.sum.bak
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
 
 # Run linting
 echo "Looking for lint..."

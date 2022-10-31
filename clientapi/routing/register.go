@@ -33,6 +33,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -157,6 +158,13 @@ func (d *sessionsDict) startTimer(duration time.Duration, sessionID string) {
 	})
 }
 
+func (d *sessionsDict) hasSession(sessionID string) bool {
+	d.RLock()
+	defer d.RUnlock()
+	_, ok := d.sessions[sessionID]
+	return ok
+}
+
 // addCompletedSessionStage records that a session has completed an auth stage
 // also starts a timer to delete the session once done.
 func (d *sessionsDict) addCompletedSessionStage(sessionID string, stage authtypes.LoginType) {
@@ -241,7 +249,7 @@ type authDict struct {
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
-type userInteractiveResponse struct {
+type UserInteractiveResponse struct {
 	Flows     []authtypes.Flow       `json:"flows"`
 	Completed []authtypes.LoginType  `json:"completed"`
 	Params    map[string]interface{} `json:"params"`
@@ -254,9 +262,18 @@ func newUserInteractiveResponse(
 	sessionID string,
 	fs []authtypes.Flow,
 	params map[string]interface{},
-) userInteractiveResponse {
-	return userInteractiveResponse{
-		fs, sessions.getCompletedStages(sessionID), params, sessionID,
+) UserInteractiveResponse {
+	paramsCopy := mapsutil.MapCopy(params)
+	for key, element := range paramsCopy {
+		p := auth.GetAuthParams(element)
+		if p != nil {
+			// If an auth flow has params, make a new copy
+			// and send it as part of the response.
+			paramsCopy[key] = p
+		}
+	}
+	return UserInteractiveResponse{
+		fs, sessions.getCompletedStages(sessionID), paramsCopy, sessionID,
 	}
 }
 
@@ -616,6 +633,10 @@ func Register(
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("A known registration type (e.g. m.login.application_service) must be specified if an access_token is provided"),
 		}
+
+	case r.Auth.Type == authtypes.LoginTypePublicKey && cfg.PublicKeyAuthentication.Enabled():
+		// Skip checks here. Will be validated later.
+
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
@@ -634,7 +655,7 @@ func Register(
 		"session_id": r.Auth.Session,
 	}).Info("Processing registration request")
 
-	return handleRegistrationFlow(req, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
+	return handleRegistrationFlow(req, reqBody, r, sessionID, cfg, userAPI, accessToken, accessTokenErr)
 }
 
 func handleGuestRegistration(
@@ -703,6 +724,7 @@ func handleGuestRegistration(
 // nolint: gocyclo
 func handleRegistrationFlow(
 	req *http.Request,
+	reqBody []byte,
 	r registerRequest,
 	sessionID string,
 	cfg *config.ClientAPI,
@@ -761,7 +783,17 @@ func handleRegistrationFlow(
 	case authtypes.LoginTypeDummy:
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
-		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+		if !cfg.PasswordAuthenticationDisabled {
+			sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+		}
+
+	case authtypes.LoginTypePublicKey:
+		_, authType, err := handlePublicKeyRegistration(cfg, reqBody, &r, userAPI)
+		if err != nil {
+			return *err
+		}
+
+		sessions.addCompletedSessionStage(sessionID, authType)
 
 	case "":
 		// An empty auth type means that we want to fetch the available
