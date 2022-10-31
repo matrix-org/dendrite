@@ -251,8 +251,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
-	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
+	recentEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		snapshot.StreamEventsToEvents(device, recentStreamEvents),
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	)
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
 		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
@@ -262,10 +264,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
 		return r.To, nil
 	}
-
-	// Sort the events so that we can pick out the latest events from both sections.
-	recentEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(recentEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
-	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(delta.StateEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
 
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
@@ -313,6 +311,14 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		events = events[len(events)-originalLimit:]
 		limited = true
 	}
+
+	// Now that we've filtered the timeline, work out which state events are still
+	// left. Anything that appears in the filtered timeline will be removed from the
+	// "state" section and kept in "timeline".
+	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		removeDuplicates(delta.StateEvents, recentEvents),
+		gomatrixserverlib.TopologicalOrderByAuthEvents,
+	)
 
 	if len(delta.StateEvents) > 0 {
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
