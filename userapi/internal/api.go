@@ -553,10 +553,11 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	if err != nil {
 		return err
 	}
-
-	err = a.DB.RemoveThreePIDAssociation(ctx, threepids[0].Address, threepids[0].Medium)
-	if err != nil {
-		return err
+	for i := 0; i < len(threepids); i++ {
+		err = a.DB.RemoveThreePIDAssociation(ctx, threepids[i].Address, threepids[i].Medium)
+		if err != nil {
+			return err
+		}
 	}
 
 	pusherReq := &api.PerformPusherDeletionRequest{
