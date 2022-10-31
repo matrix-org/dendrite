@@ -251,8 +251,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
-	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
+	recentEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		snapshot.StreamEventsToEvents(device, recentStreamEvents),
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	)
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
 		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
@@ -262,10 +264,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
 		return r.To, nil
 	}
-
-	// Sort the events so that we can pick out the latest events from both sections.
-	recentEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(recentEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
-	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(delta.StateEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
 
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
@@ -313,6 +311,14 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		events = events[len(events)-originalLimit:]
 		limited = true
 	}
+
+	// Now that we've filtered the timeline, work out which state events are still
+	// left. Anything that appears in the filtered timeline will be removed from the
+	// "state" section and kept in "timeline".
+	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		removeDuplicates(delta.StateEvents, recentEvents),
+		gomatrixserverlib.TopologicalOrderByAuthEvents,
+	)
 
 	if len(delta.StateEvents) > 0 {
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
@@ -507,7 +513,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
@@ -521,7 +526,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	limited = limited && len(events) == len(recentEvents)
-
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	if stateFilter.LazyLoadMembers {
 		if err != nil {
 			return nil, err
