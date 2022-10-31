@@ -128,6 +128,11 @@ func Test_Accounts(t *testing.T) {
 		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, "newPassword")
 		assert.Error(t, err, "expected an error, got none")
 
+		// This should return an empty slice, as the account is deactivated and the 3pid is unbound
+		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
+		assert.NoError(t, err, "failed to get 3pid for account")
+		assert.Equal(t, len(threepids), 0)
+
 		_, err = db.GetAccountByLocalpart(ctx, "unusename")
 		assert.Error(t, err, "expected an error for non existent localpart")
 
