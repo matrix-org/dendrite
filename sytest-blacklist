@@ -40,4 +40,9 @@ Accesing an AS-hosted room alias asks the AS server
 Guest users can join guest_access rooms
 
 # This will fail in HTTP API mode, so blacklisted for now
+
 If a device list update goes missing, the server resyncs on the next one
+
+# Might be a bug in the test because leaves do appear :-(
+
+Leaves are present in non-gapped incremental syncs

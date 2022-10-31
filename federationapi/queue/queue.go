@@ -247,9 +247,10 @@ func (oqs *OutgoingQueues) SendEvent(
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
+	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil && !queue.statistics.Blacklisted() {
-			queue.sendEvent(ev, nid)
+		if queue := oqs.getQueue(destination); queue != nil {
+			destQueues = append(destQueues, queue)
 		} else {
 			delete(destmap, destination)
 		}
@@ -265,6 +266,14 @@ func (oqs *OutgoingQueues) SendEvent(
 	); err != nil {
 		logrus.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
 		return err
+	}
+
+	// NOTE : PDUs should be associated with destinations before sending
+	// them, otherwise this is technically a race.
+	// If the send completes before they are associated then they won't
+	// get properly cleaned up in the database.
+	for _, queue := range destQueues {
+		queue.sendEvent(ev, nid)
 	}
 
 	return nil
@@ -335,26 +344,35 @@ func (oqs *OutgoingQueues) SendEDU(
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
+	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
-		if queue := oqs.getQueue(destination); queue != nil && !queue.statistics.Blacklisted() {
-			queue.sendEDU(e, nid)
+		if queue := oqs.getQueue(destination); queue != nil {
+			destQueues = append(destQueues, queue)
 		} else {
 			delete(destmap, destination)
 		}
 	}
 
 	// Create a database entry that associates the given PDU NID with
-	// this destination queue. We'll then be able to retrieve the PDU
+	// these destination queues. We'll then be able to retrieve the PDU
 	// later.
 	if err := oqs.db.AssociateEDUWithDestinations(
 		oqs.process.Context(),
-		destmap, // the destination server name
+		destmap, // the destination server names
 		nid,     // NIDs from federationapi_queue_json table
 		e.Type,
 		nil, // this will use the default expireEDUTypes map
 	); err != nil {
 		logrus.WithError(err).Errorf("failed to associate EDU with destinations")
 		return err
+	}
+
+	// NOTE : EDUs should be associated with destinations before sending
+	// them, otherwise this is technically a race.
+	// If the send completes before they are associated then they won't
+	// get properly cleaned up in the database.
+	for _, queue := range destQueues {
+		queue.sendEDU(e, nid)
 	}
 
 	return nil

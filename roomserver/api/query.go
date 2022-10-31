@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -257,7 +258,9 @@ type QueryRoomVersionForRoomResponse struct {
 
 type QueryPublishedRoomsRequest struct {
 	// Optional. If specified, returns whether this room is published or not.
-	RoomID string
+	RoomID             string
+	NetworkID          string
+	IncludeAllNetworks bool
 }
 
 type QueryPublishedRoomsResponse struct {

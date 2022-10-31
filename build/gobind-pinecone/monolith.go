@@ -101,18 +101,46 @@ func (m *DendriteMonolith) SessionCount() int {
 	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
 }
 
-func (m *DendriteMonolith) RegisterNetworkInterface(name string, index int, mtu int, up bool, broadcast bool, loopback bool, pointToPoint bool, multicast bool, addrs string) {
-	m.PineconeMulticast.RegisterInterface(pineconeMulticast.InterfaceInfo{
-		Name:         name,
-		Index:        index,
-		Mtu:          mtu,
-		Up:           up,
-		Broadcast:    broadcast,
-		Loopback:     loopback,
-		PointToPoint: pointToPoint,
-		Multicast:    multicast,
-		Addrs:        addrs,
-	})
+type InterfaceInfo struct {
+	Name         string
+	Index        int
+	Mtu          int
+	Up           bool
+	Broadcast    bool
+	Loopback     bool
+	PointToPoint bool
+	Multicast    bool
+	Addrs        string
+}
+
+type InterfaceRetriever interface {
+	CacheCurrentInterfaces() int
+	GetCachedInterface(index int) *InterfaceInfo
+}
+
+func (m *DendriteMonolith) RegisterNetworkCallback(intfCallback InterfaceRetriever) {
+	callback := func() []pineconeMulticast.InterfaceInfo {
+		count := intfCallback.CacheCurrentInterfaces()
+		intfs := []pineconeMulticast.InterfaceInfo{}
+		for i := 0; i < count; i++ {
+			iface := intfCallback.GetCachedInterface(i)
+			if iface != nil {
+				intfs = append(intfs, pineconeMulticast.InterfaceInfo{
+					Name:         iface.Name,
+					Index:        iface.Index,
+					Mtu:          iface.Mtu,
+					Up:           iface.Up,
+					Broadcast:    iface.Broadcast,
+					Loopback:     iface.Loopback,
+					PointToPoint: iface.PointToPoint,
+					Multicast:    iface.Multicast,
+					Addrs:        iface.Addrs,
+				})
+			}
+		}
+		return intfs
+	}
+	m.PineconeMulticast.RegisterNetworkCallback(callback)
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
