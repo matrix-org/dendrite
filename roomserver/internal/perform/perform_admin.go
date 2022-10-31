@@ -236,3 +236,145 @@ func (r *Admin) PerformAdminEvacuateUser(
 	}
 	return nil
 }
+
+func (r *Admin) PerformAdminDownloadState(
+	ctx context.Context,
+	req *api.PerformAdminDownloadStateRequest,
+	res *api.PerformAdminDownloadStateResponse,
+) error {
+	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.RoomInfo: %s", err),
+		}
+		return nil
+	}
+
+	if roomInfo == nil || roomInfo.IsStub() {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("room %q not found", req.RoomID),
+		}
+		return nil
+	}
+
+	fwdExtremities, _, depth, err := r.DB.LatestEventIDs(ctx, roomInfo.RoomNID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.DB.LatestEventIDs: %s", err),
+		}
+		return nil
+	}
+
+	authEventMap := map[string]*gomatrixserverlib.Event{}
+	stateEventMap := map[string]*gomatrixserverlib.Event{}
+
+	for _, fwdExtremity := range fwdExtremities {
+		var state gomatrixserverlib.RespState
+		state, err = r.Inputer.FSAPI.LookupState(ctx, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		if err != nil {
+			res.Error = &api.PerformError{
+				Code: api.PerformErrorBadRequest,
+				Msg:  fmt.Sprintf("r.Inputer.FSAPI.LookupState (%q): %s", fwdExtremity.EventID, err),
+			}
+			return nil
+		}
+		for _, authEvent := range state.AuthEvents.UntrustedEvents(roomInfo.RoomVersion) {
+			if err = authEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+				continue
+			}
+			authEventMap[authEvent.EventID()] = authEvent
+		}
+		for _, stateEvent := range state.StateEvents.UntrustedEvents(roomInfo.RoomVersion) {
+			if err = stateEvent.VerifyEventSignatures(ctx, r.Inputer.KeyRing); err != nil {
+				continue
+			}
+			stateEventMap[stateEvent.EventID()] = stateEvent
+		}
+	}
+
+	authEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(authEventMap))
+	stateEvents := make([]*gomatrixserverlib.HeaderedEvent, 0, len(stateEventMap))
+	stateIDs := make([]string, 0, len(stateEventMap))
+
+	for _, authEvent := range authEventMap {
+		authEvents = append(authEvents, authEvent.Headered(roomInfo.RoomVersion))
+	}
+	for _, stateEvent := range stateEventMap {
+		stateEvents = append(stateEvents, stateEvent.Headered(roomInfo.RoomVersion))
+		stateIDs = append(stateIDs, stateEvent.EventID())
+	}
+
+	builder := &gomatrixserverlib.EventBuilder{
+		Type:    "org.matrix.dendrite.state_download",
+		Sender:  req.UserID,
+		RoomID:  req.RoomID,
+		Content: gomatrixserverlib.RawJSON("{}"),
+	}
+
+	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("gomatrixserverlib.StateNeededForEventBuilder: %s", err),
+		}
+		return nil
+	}
+
+	queryRes := &api.QueryLatestEventsAndStateResponse{
+		RoomExists:   true,
+		RoomVersion:  roomInfo.RoomVersion,
+		LatestEvents: fwdExtremities,
+		StateEvents:  stateEvents,
+		Depth:        depth,
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, time.Now(), &eventsNeeded, queryRes)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("eventutil.BuildEvent: %s", err),
+		}
+		return nil
+	}
+
+	inputReq := &api.InputRoomEventsRequest{
+		Asynchronous: false,
+	}
+	inputRes := &api.InputRoomEventsResponse{}
+
+	for _, authEvent := range append(authEvents, stateEvents...) {
+		inputReq.InputRoomEvents = append(inputReq.InputRoomEvents, api.InputRoomEvent{
+			Kind:  api.KindOutlier,
+			Event: authEvent,
+		})
+	}
+
+	inputReq.InputRoomEvents = append(inputReq.InputRoomEvents, api.InputRoomEvent{
+		Kind:          api.KindNew,
+		Event:         ev,
+		Origin:        r.Cfg.Matrix.ServerName,
+		HasState:      true,
+		StateEventIDs: stateIDs,
+		SendAsServer:  string(r.Cfg.Matrix.ServerName),
+	})
+
+	if err := r.Inputer.InputRoomEvents(ctx, inputReq, inputRes); err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.Inputer.InputRoomEvents: %s", err),
+		}
+		return nil
+	}
+
+	if inputRes.ErrMsg != "" {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  inputRes.ErrMsg,
+		}
+	}
+
+	return nil
+}
