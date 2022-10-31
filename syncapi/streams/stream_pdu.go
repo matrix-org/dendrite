@@ -526,7 +526,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	limited = limited && len(events) == len(recentEvents)
-
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	if stateFilter.LazyLoadMembers {
 		if err != nil {
 			return nil, err
@@ -546,9 +546,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	jr.Timeline.Limited = limited && len(events) == len(recentEvents)
-	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(
-		removeDuplicates(stateEvents, recentEvents), gomatrixserverlib.FormatSync,
-	)
+	jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(stateEvents, gomatrixserverlib.FormatSync)
 	return jr, nil
 }
 
