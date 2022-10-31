@@ -315,10 +315,17 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Now that we've filtered the timeline, work out which state events are still
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
-	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		removeDuplicates(delta.StateEvents, recentEvents),
-		gomatrixserverlib.TopologicalOrderByAuthEvents,
-	)
+
+	// Don't remove the state events if this is a newly joined room. The member
+	// needs the full room state. For example, to figure out if the room is a space
+	// or not, it needs the m.room.create event which may be chronologically outside
+	// the filter limit.
+	if !delta.NewlyJoined {
+		delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+			removeDuplicates(delta.StateEvents, recentEvents),
+			gomatrixserverlib.TopologicalOrderByAuthEvents,
+		)
+	}
 
 	if len(delta.StateEvents) > 0 {
 		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())

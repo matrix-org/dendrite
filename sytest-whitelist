@@ -106,7 +106,6 @@ Can download filter
 Lazy loading parameters in the filter are strictly boolean
 Can sync
 Can sync a joined room
-Newly joined room is included in an incremental sync
 User is offline if they set_presence=offline in their sync
 Changes to state are included in an incremental sync
 A change to displayname should appear in incremental /sync
@@ -224,7 +223,6 @@ Can't deactivate account with wrong password
 After deactivating account, can't log in with password
 After deactivating account, can't log in with an email
 Remote room alias queries can handle Unicode
-Newly joined room is included in an incremental sync after invite
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
 Local room members see posted message events
 Fetching eventstream a second time doesn't yield the message again
