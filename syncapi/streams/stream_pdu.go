@@ -77,6 +77,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("p.DB.RoomIDsWithMembership failed")
 		return from
 	}
+	req.JoinedRooms = joinedRoomIDs
 
 	stateFilter := req.Filter.Room.State
 	eventFilter := req.Filter.Room.Timeline

@@ -227,3 +227,7 @@ type Relations interface {
 	// "from" or want to work forwards and don't have a "to").
 	SelectMaxRelationID(ctx context.Context, txn *sql.Tx) (id int64, err error)
 }
+
+type MultiRoom interface {
+	SelectMultiRoomData(ctx context.Context, r *types.Range, joinedRooms []string, txn *sql.Tx) ([]*types.MultiRoomDataRow, error)
+}

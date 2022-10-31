@@ -50,14 +50,26 @@ func AddPublicRoutes(
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	syncDB, err := storage.NewSyncServerDatasource(base, &cfg.Database)
+	syncDB, mrq, err := storage.NewSyncServerDatasource(base, &cfg.Database)
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to sync db")
 	}
 
+	go func() {
+		var affected int64
+		for {
+			affected, err = mrq.DeleteMultiRoomVisibilityByExpireTS(context.Background(), time.Now().Unix())
+			if err != nil {
+				logrus.WithError(err).Error("failed to expire multiroom visibility")
+			}
+			logrus.WithField("rows", affected).Info("expired multiroom visibility")
+			time.Sleep(time.Minute)
+		}
+	}()
+
 	eduCache := caching.NewTypingCache()
 	notifier := notifier.NewNotifier()
-	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, base.Caches, notifier)
+	streams := streams.NewSyncStreamProviders(syncDB, userAPI, rsAPI, keyAPI, eduCache, base.Caches, notifier, mrq)
 	notifier.SetCurrentPosition(streams.Latest(context.Background()))
 	if err = notifier.Load(context.Background(), syncDB); err != nil {
 		logrus.WithError(err).Panicf("failed to load notifier ")
@@ -130,6 +142,13 @@ func AddPublicRoutes(
 	)
 	if err = receiptConsumer.Start(); err != nil {
 		logrus.WithError(err).Panicf("failed to start receipts consumer")
+	}
+
+	multiRoomConsumer := consumers.NewOutputMultiRoomDataConsumer(
+		base.ProcessContext, cfg, js, mrq, notifier, streams.MultiRoomStreamProvider,
+	)
+	if err = multiRoomConsumer.Start(); err != nil {
+		logrus.WithError(err).Panicf("failed to start multiroom consumer")
 	}
 
 	routing.Setup(

@@ -29,7 +29,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
 
-  # run go test with go 1.18
+  # run go test with go 1.19
   test:
     timeout-minutes: 5
     name: Unit tests (Go ${{ matrix.go }})
@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -87,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.19"]
         goos: ["linux"]
         goarch: ["amd64"]
     steps:
@@ -126,56 +126,6 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
-  # run database upgrade tests
-  upgrade_test:
-    name: Upgrade tests
-    timeout-minutes: 20
-    needs: initial-tests-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.18"
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-upgrade
-      - name: Build upgrade-tests
-        run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade
-        run: ./dendrite-upgrade-tests --head .
-
-  # run database upgrade tests, skipping over one version
-  upgrade_test_direct:
-    name: Upgrade tests from HEAD-2
-    timeout-minutes: 20
-    needs: initial-tests-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.18"
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-upgrade
-      - name: Build upgrade-tests
-        run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade
-        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
-
   # run Sytest in different variations
   sytest:
     timeout-minutes: 20
@@ -186,11 +136,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite
-
-          - label: SQLite, full HTTP APIs
-            api: full-http
-
           - label: PostgreSQL
             postgres: postgres
 
@@ -239,11 +184,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite
-
-          - label: SQLite, full HTTP APIs
-            api: full-http
-
           - label: PostgreSQL
             postgres: Postgres
 
@@ -316,8 +256,6 @@ jobs:
     needs:
       [
         initial-tests-done,
-        upgrade_test,
-        upgrade_test_direct,
         sytest,
         complement,
       ]

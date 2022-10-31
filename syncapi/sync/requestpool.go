@@ -407,6 +407,14 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 						)
 					},
 				),
+				MultiRoomDataPosition: withTransaction(
+					syncReq.Since.MultiRoomDataPosition,
+					func(txn storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.MultiRoomStreamProvider.CompleteSync(
+							syncReq.Context, txn, syncReq,
+						)
+					},
+				),
 			}
 		} else {
 			// Incremental sync
@@ -488,6 +496,15 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(txn storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.PresenceStreamProvider.IncrementalSync(
 							syncReq.Context, txn, syncReq,
+							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
+						)
+					},
+				),
+				MultiRoomDataPosition: withTransaction(
+					syncReq.Since.MultiRoomDataPosition,
+					func(snapshot storage.DatabaseTransaction) types.StreamPosition {
+						return rp.streams.MultiRoomStreamProvider.IncrementalSync(
+							syncReq.Context, snapshot, syncReq,
 							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
 						)
 					},

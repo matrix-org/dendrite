@@ -430,6 +430,17 @@ func Setup(
 		}),
 	).Methods(http.MethodPut, http.MethodOptions)
 
+	v3mux.Handle("/multiroom/{dataType}",
+		httputil.MakeAuthAPI("send_multiroom", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			dataType := vars["dataType"]
+			return PostMultiroom(req, device, syncProducer, dataType)
+		}),
+	).Methods(http.MethodPost, http.MethodOptions)
+
 	v3mux.Handle("/register", httputil.MakeExternalAPI("register", func(req *http.Request) util.JSONResponse {
 		if r := rateLimits.Limit(req, nil); r != nil {
 			return *r
