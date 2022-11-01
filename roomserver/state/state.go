@@ -18,17 +18,18 @@ package state
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type StateResolutionStorage interface {
@@ -37,6 +38,7 @@ type StateResolutionStorage interface {
 	StateBlockNIDs(ctx context.Context, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
 	StateEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
+	BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
@@ -131,21 +133,12 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	defer span.Finish()
 
 	// De-dupe snapshotNIDs
-	snapshotNIDMap := make(map[types.StateSnapshotNID][]string) // map from snapshot NID to eventIDs
-	for i := range eventIDs {
-		eventID := eventIDs[i]
-		snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
-		if err != nil && err != sql.ErrNoRows {
-			return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
-		}
-		if snapshotNID == 0 {
-			// If we don't know a state snapshot for this event then we can't calculate
-			// memberships at the time of the event, so skip over it. This means that
-			// it isn't guaranteed that the response map will contain every single event.
-			continue
-		}
-		snapshotNIDMap[snapshotNID] = append(snapshotNIDMap[snapshotNID], eventID)
+	start := time.Now()
+	snapshotNIDMap, err := v.db.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
+	if err != nil {
+		return nil, err
 	}
+	logrus.Debugf("XXX: duration to lookup snapshot nids: %s", time.Since(start))
 
 	snapshotNIDs := make([]types.StateSnapshotNID, 0, len(snapshotNIDMap))
 	for nid := range snapshotNIDMap {
@@ -157,27 +150,52 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		return nil, err
 	}
 
+	var wantStateBlocks []types.StateBlockNID
+	for _, x := range stateBlockNIDLists {
+		wantStateBlocks = append(wantStateBlocks, x.StateBlockNIDs...)
+	}
+
+	start = time.Now()
+	stateEntryLists, err := v.db.StateEntriesForTuples(ctx, uniqueStateBlockNIDs(wantStateBlocks), []types.StateKeyTuple{
+		{
+			EventTypeNID:     types.MRoomMemberNID,
+			EventStateKeyNID: stateKeyNID,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("XXX: duration to lookup StateEntriesForTuples: %s", time.Since(start))
+
+	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
+	stateEntriesMap := stateEntryListMap(stateEntryLists)
+
 	result := make(map[string][]types.StateEntry)
+	start = time.Now()
 	for _, stateBlockNIDList := range stateBlockNIDLists {
-		// Query the membership event for the user at the given stateblocks
-		stateEntryLists, err := v.db.StateEntriesForTuples(ctx, stateBlockNIDList.StateBlockNIDs, []types.StateKeyTuple{
-			{
-				EventTypeNID:     types.MRoomMemberNID,
-				EventStateKeyNID: stateKeyNID,
-			},
-		})
-		if err != nil {
-			return nil, err
+		stateBlockNIDs, ok := stateBlockNIDsMap.lookup(stateBlockNIDList.StateSnapshotNID)
+		if !ok {
+			// This should only get hit if the database is corrupt.
+			// It should be impossible for an event to reference a NID that doesn't exist
+			panic(fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID))
 		}
 
-		evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
+		for _, stateBlockNID := range stateBlockNIDs {
+			entries, ok := stateEntriesMap.lookup(stateBlockNID)
+			if !ok {
+				// This should only get hit if the database is corrupt.
+				// It should be impossible for an event to reference a NID that doesn't exist
+				panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+			}
 
-		for _, evID := range evIDs {
-			for _, x := range stateEntryLists {
-				result[evID] = append(result[evID], x.StateEntries...)
+			evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
+
+			for _, evID := range evIDs {
+				result[evID] = append(result[evID], entries...)
 			}
 		}
 	}
+	logrus.Debugf("XXX: duration to generate list: %s", time.Since(start))
 
 	return result, nil
 }

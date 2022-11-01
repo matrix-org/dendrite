@@ -44,6 +44,7 @@ type Events interface {
 		referenceSHA256 []byte, authEventNIDs []types.EventNID, depth int64, isRejected bool,
 	) (types.EventNID, types.StateSnapshotNID, error)
 	SelectEvent(ctx context.Context, txn *sql.Tx, eventID string) (types.EventNID, types.StateSnapshotNID, error)
+	BulkSelectSnapshotsFromEventIDs(ctx context.Context, txn *sql.Tx, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
 	// bulkSelectStateEventByID lookups a list of state events by event ID.
 	// If any of the requested events are missing from the database it returns a types.MissingEventError
 	BulkSelectStateEventByID(ctx context.Context, txn *sql.Tx, eventIDs []string, excludeRejected bool) ([]types.StateEntry, error)

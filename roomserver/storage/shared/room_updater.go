@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type RoomUpdater struct {
@@ -184,6 +185,10 @@ func (u *RoomUpdater) EventIDs(
 	ctx context.Context, eventNIDs []types.EventNID,
 ) (map[types.EventNID]string, error) {
 	return u.d.EventsTable.BulkSelectEventID(ctx, u.txn, eventNIDs)
+}
+
+func (u *RoomUpdater) BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error) {
+	return u.d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, u.txn, eventIDs)
 }
 
 func (u *RoomUpdater) StateAtEventIDs(

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -239,6 +240,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("unable to get state before event: %w", err)
 	}
 
+	start := time.Now()
 	for _, eventID := range request.EventIDs {
 		stateEntry, ok := stateEntries[eventID]
 		if !ok {
@@ -259,6 +261,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 		}
 		response.Memberships[eventID] = res
 	}
+	logrus.Debugf("XXX: GetMembershipsAtState duration: %s", time.Since(start))
 
 	return nil
 }
