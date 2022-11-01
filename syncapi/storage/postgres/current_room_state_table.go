@@ -100,6 +100,9 @@ const selectJoinedUsersSQL = "" +
 const selectJoinedUsersInRoomSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id = ANY($1)"
 
+const selectRoomMembershipOfUserSQL = "" +
+	"SELECT membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND state_key = $2"
+
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
@@ -123,6 +126,7 @@ type currentRoomStateStatements struct {
 	selectEventsWithEventIDsStmt       *sql.Stmt
 	selectStateEventStmt               *sql.Stmt
 	selectSharedUsersStmt              *sql.Stmt
+	selectRoomMembershipOfUserStmt     *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -164,6 +168,9 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 		return nil, err
 	}
 	if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
+		return nil, err
+	}
+	if s.selectRoomMembershipOfUserStmt, err = db.Prepare(selectRoomMembershipOfUserSQL); err != nil {
 		return nil, err
 	}
 	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
@@ -448,4 +455,28 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 		result = append(result, stateKey)
 	}
 	return result, rows.Err()
+}
+
+func (s *currentRoomStateStatements) SelectRoomMembershipOfUser(
+	ctx context.Context,
+	txn *sql.Tx,
+	roomID string,
+	userID string,
+) (string, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomMembershipOfUserStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, userID)
+	if err != nil {
+		return "", err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomMembershipOfUserStmt: rows.close() failed")
+
+	for rows.Next() {
+		var membership string
+		if err := rows.Scan(&membership); err != nil {
+			return "", err
+		}
+		return membership, nil
+	}
+
+	return "", nil
 }

@@ -688,3 +688,16 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 
 	return events, prevBatch, nextBatch, nil
 }
+
+func (d *DatabaseTransaction) IsMemberOfRoom(
+	ctx context.Context,
+	roomID string,
+	userID string,
+) (bool, error) {
+	membership, err := d.CurrentRoomState.SelectRoomMembershipOfUser(ctx, d.txn, roomID, userID)
+	if err != nil {
+		return false, err
+	}
+
+	return membership == gomatrixserverlib.Join, nil
+}
