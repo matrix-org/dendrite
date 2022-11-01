@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -60,7 +59,7 @@ const selectEventSQL = "" +
 	"SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
 
 const bulkSelectSnapshotsForEventIDsSQL = "" +
-	"SELECT event_id, state_snapshot_nid FROM roomserver_events WHERE event_id = ANY($1)"
+	"SELECT event_id, state_snapshot_nid FROM roomserver_events WHERE event_id IN ($1)"
 
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
@@ -213,12 +212,23 @@ func (s *eventStatements) SelectEvent(
 func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
 	ctx context.Context, txn *sql.Tx, eventIDs []string,
 ) (map[types.StateSnapshotNID][]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.bulkSelectSnapshotsForEventIDsStmt)
-
-	rows, err := stmt.QueryContext(ctx, pq.Array(eventIDs))
+	qry := strings.Replace(bulkSelectSnapshotsForEventIDsSQL, "($1)", sqlutil.QueryVariadic(len(eventIDs)), 1)
+	stmt, err := s.db.Prepare(qry)
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "BulkSelectSnapshotsFromEventIDs: stmt.close() failed")
+
+	params := make([]interface{}, len(eventIDs))
+	for i := range eventIDs {
+		params[i] = eventIDs[i]
+	}
+
+	rows, err := stmt.QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectSnapshotsFromEventIDs: rows.close() failed")
 
 	var eventID string
 	var stateNID types.StateSnapshotNID
