@@ -955,7 +955,6 @@ func (v *StateResolution) resolveConflictsV2(
 	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
 	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
 	gotAuthEvents := make(map[string]struct{}, estimate*3)
-	authDifference := make([]*gomatrixserverlib.Event, 0, estimate)
 	knownAuthEvents := make(map[string]types.Event, estimate*3)
 
 	// For each conflicted event, let's try and get the needed auth events.
@@ -1003,41 +1002,6 @@ func (v *StateResolution) resolveConflictsV2(
 	// longer need this after this point.
 	gotAuthEvents = nil // nolint:ineffassign
 
-	// This function helps us to work out whether an event exists in one of the
-	// auth sets.
-	isInAuthList := func(k string, event *gomatrixserverlib.Event) bool {
-		for _, e := range authSets[k] {
-			if e.EventID() == event.EventID() {
-				return true
-			}
-		}
-		return false
-	}
-
-	// This function works out if an event exists in all of the auth sets.
-	isInAllAuthLists := func(event *gomatrixserverlib.Event) bool {
-		for k := range authSets {
-			if !isInAuthList(k, event) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// Look through all of the auth events that we've been given and work out if
-	// there are any events which don't appear in all of the auth sets. If they
-	// don't then we add them to the auth difference.
-	func() {
-		span, _ := opentracing.StartSpanFromContext(ctx, "isInAllAuthLists")
-		defer span.Finish()
-
-		for _, event := range authEvents {
-			if !isInAllAuthLists(event) {
-				authDifference = append(authDifference, event)
-			}
-		}
-	}()
-
 	// Resolve the conflicts.
 	resolvedEvents := func() []*gomatrixserverlib.Event {
 		span, _ := opentracing.StartSpanFromContext(ctx, "gomatrixserverlib.ResolveStateConflictsV2")
@@ -1047,7 +1011,6 @@ func (v *StateResolution) resolveConflictsV2(
 			conflictedEvents,
 			nonConflictedEvents,
 			authEvents,
-			authDifference,
 		)
 	}()
 
