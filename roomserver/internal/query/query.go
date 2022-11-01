@@ -702,7 +702,7 @@ func (r *Queryer) QueryPublishedRooms(
 		}
 		return err
 	}
-	rooms, err := r.DB.GetPublishedRooms(ctx)
+	rooms, err := r.DB.GetPublishedRooms(ctx, req.NetworkID, req.IncludeAllNetworks)
 	if err != nil {
 		return err
 	}
