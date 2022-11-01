@@ -179,7 +179,13 @@ client_api:
   recaptcha_public_key: ""
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
-  recaptcha_siteverify_api: ""
+  
+  # To use hcaptcha.com instead of ReCAPTCHA, set the following parameters, otherwise just keep them empty.
+  # recaptcha_siteverify_api: "https://hcaptcha.com/siteverify"
+  # recaptcha_api_js_url: "https://js.hcaptcha.com/1/api.js"
+  # recaptcha_form_field: "h-captcha-response"
+  # recaptcha_sitekey_class: "h-captcha"
+
 
   # TURN server information that this homeserver should send to clients.
   turn:

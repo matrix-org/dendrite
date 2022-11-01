@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -336,6 +337,7 @@ func validateRecaptcha(
 	response string,
 	clientip string,
 ) *util.JSONResponse {
+	ip, _, _ := net.SplitHostPort(clientip)
 	if !cfg.RecaptchaEnabled {
 		return &util.JSONResponse{
 			Code: http.StatusConflict,
@@ -355,7 +357,7 @@ func validateRecaptcha(
 		url.Values{
 			"secret":   {cfg.RecaptchaPrivateKey},
 			"response": {response},
-			"remoteip": {clientip},
+			"remoteip": {ip},
 		},
 	)
 
