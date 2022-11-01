@@ -27,7 +27,6 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -132,13 +131,11 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadMembershipAtEvent")
 	defer span.Finish()
 
-	// De-dupe snapshotNIDs
-	start := time.Now()
+	// Get a mapping from snapshotNID -> eventIDs
 	snapshotNIDMap, err := v.db.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("XXX: duration to lookup snapshot nids: %s", time.Since(start))
 
 	snapshotNIDs := make([]types.StateSnapshotNID, 0, len(snapshotNIDMap))
 	for nid := range snapshotNIDMap {
@@ -155,7 +152,6 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		wantStateBlocks = append(wantStateBlocks, x.StateBlockNIDs...)
 	}
 
-	start = time.Now()
 	stateEntryLists, err := v.db.StateEntriesForTuples(ctx, uniqueStateBlockNIDs(wantStateBlocks), []types.StateKeyTuple{
 		{
 			EventTypeNID:     types.MRoomMemberNID,
@@ -165,13 +161,11 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	if err != nil {
 		return nil, err
 	}
-	logrus.Debugf("XXX: duration to lookup StateEntriesForTuples: %s", time.Since(start))
 
 	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
 	result := make(map[string][]types.StateEntry)
-	start = time.Now()
 	for _, stateBlockNIDList := range stateBlockNIDLists {
 		stateBlockNIDs, ok := stateBlockNIDsMap.lookup(stateBlockNIDList.StateSnapshotNID)
 		if !ok {
@@ -195,7 +189,6 @@ func (v *StateResolution) LoadMembershipAtEvent(
 			}
 		}
 	}
-	logrus.Debugf("XXX: duration to generate list: %s", time.Since(start))
 
 	return result, nil
 }
