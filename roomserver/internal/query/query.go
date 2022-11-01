@@ -255,9 +255,9 @@ func (r *Queryer) QueryMembershipAtEvent(
 	}
 
 	var memberships []types.Event
-	for i, eventID := range request.EventIDs {
+	for _, eventID := range request.EventIDs {
 		stateEntry, ok := stateEntries[eventID]
-		if !ok {
+		if !ok || len(stateEntry) == 0 {
 			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
 			continue
 		}
@@ -265,7 +265,7 @@ func (r *Queryer) QueryMembershipAtEvent(
 		// If we can short circuit, e.g. we only have 0 or 1 membership events, we only get the memberships
 		// once. If we have more than one membership event, we need to get the state for each state entry.
 		if canShortCircuit {
-			if i == 0 {
+			if len(memberships) == 0 {
 				memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
 			}
 		} else {
