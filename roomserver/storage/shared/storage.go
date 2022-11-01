@@ -722,9 +722,9 @@ func (d *Database) storeEvent(
 	}, redactionEvent, redactedEventID, err
 }
 
-func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
+func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, publish)
+		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, appserviceID, networkID, publish)
 	})
 }
 
@@ -732,8 +732,8 @@ func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, e
 	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
 }
 
-func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
-	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
+func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error) {
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true, includeAllNetworks)
 }
 
 func (d *Database) MissingAuthPrevEvents(

@@ -106,8 +106,6 @@ Can download filter
 Lazy loading parameters in the filter are strictly boolean
 Can sync
 Can sync a joined room
-Newly joined room is included in an incremental sync
-Newly joined room includes presence in incremental sync
 User is offline if they set_presence=offline in their sync
 Changes to state are included in an incremental sync
 A change to displayname should appear in incremental /sync
@@ -225,7 +223,6 @@ Can't deactivate account with wrong password
 After deactivating account, can't log in with password
 After deactivating account, can't log in with an email
 Remote room alias queries can handle Unicode
-Newly joined room is included in an incremental sync after invite
 Inbound /v1/make_join rejects remote attempts to join local users to rooms
 Local room members see posted message events
 Fetching eventstream a second time doesn't yield the message again
@@ -700,7 +697,7 @@ We do send redundant membership state across incremental syncs if asked
 Rejecting invite over federation doesn't break incremental /sync
 Gapped incremental syncs include all state changes
 Old leaves are present in gapped incremental syncs
-Leaves are present in non-gapped incremental syncs
+#Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
 Presence can be set from sync
 /state returns M_NOT_FOUND for a rejected message event
@@ -748,3 +745,16 @@ Inbound federation can return missing events for joined visibility
 outliers whose auth_events are in a different room are correctly rejected
 Messages that notify from another user increment notification_count
 Messages that highlight from another user increment unread highlight count
+Newly joined room has correct timeline in incremental sync
+When user joins a room the state is included in the next sync
+When user joins a room the state is included in a gapped sync
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
+Notifications can be viewed with GET /notifications
+Can get rooms/{roomId}/messages for a departed room (SPEC-216)
+Local device key changes appear in /keys/changes
+Can get rooms/{roomId}/members at a given point
+Can filter rooms/{roomId}/members
+Current state appears in timeline in private history with many messages after
+AS can publish rooms in their own list
+AS and main public room lists are separate

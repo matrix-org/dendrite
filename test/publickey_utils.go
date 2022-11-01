@@ -27,7 +27,7 @@ import (
 	"github.com/spruceid/siwe-go"
 )
 
-const EthereumTestNetworkId = 4 // Rinkeby test network ID
+const EthereumTestNetworkId int = 31337 // Localhost chain ID
 const TestServerName = "localhost"
 
 type EthereumTestWallet struct {
@@ -68,7 +68,7 @@ func CreateEip4361TestMessage(
 	publicAddress string,
 ) (*siwe.Message, error) {
 	options := make(map[string]interface{})
-	options["chainId"] = 4 // Rinkeby test network
+	options["chainId"] = EthereumTestNetworkId
 	options["statement"] = "This is a test statement"
 	message, err := siwe.InitMessage(
 		TestServerName,

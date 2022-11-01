@@ -60,6 +60,13 @@ func (r *Upgrader) performRoomUpgrade(
 ) (string, *api.PerformError) {
 	roomID := req.RoomID
 	userID := req.UserID
+	_, userDomain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return "", &api.PerformError{
+			Code: api.PerformErrorNotAllowed,
+			Msg:  "Error validating the user ID",
+		}
+	}
 	evTime := time.Now()
 
 	// Return an immediate error if the room does not exist
@@ -80,7 +87,7 @@ func (r *Upgrader) performRoomUpgrade(
 
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	newRoomID := fmt.Sprintf("!%s:%s", util.RandomString(16), r.Cfg.Matrix.ServerName)
+	newRoomID := fmt.Sprintf("!%s:%s", util.RandomString(16), userDomain)
 
 	// Get the existing room state for the old room.
 	oldRoomReq := &api.QueryLatestEventsAndStateRequest{
@@ -107,12 +114,12 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// Send the setup events to the new room
-	if pErr = r.sendInitialEvents(ctx, evTime, userID, newRoomID, string(req.RoomVersion), eventsToMake); pErr != nil {
+	if pErr = r.sendInitialEvents(ctx, evTime, userID, userDomain, newRoomID, string(req.RoomVersion), eventsToMake); pErr != nil {
 		return "", pErr
 	}
 
 	// 5. Send the tombstone event to the old room
-	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent, string(r.Cfg.Matrix.ServerName)); pErr != nil {
+	if pErr = r.sendHeaderedEvent(ctx, userDomain, tombstoneEvent, string(userDomain)); pErr != nil {
 		return "", pErr
 	}
 
@@ -122,7 +129,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// If the old room had a canonical alias event, it should be deleted in the old room
-	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, userID, roomID); pErr != nil {
+	if pErr = r.clearOldCanonicalAliasEvent(ctx, oldRoomRes, evTime, userID, userDomain, roomID); pErr != nil {
 		return "", pErr
 	}
 
@@ -132,7 +139,7 @@ func (r *Upgrader) performRoomUpgrade(
 	}
 
 	// 6. Restrict power levels in the old room
-	if pErr = r.restrictOldRoomPowerLevels(ctx, evTime, userID, roomID); pErr != nil {
+	if pErr = r.restrictOldRoomPowerLevels(ctx, evTime, userID, userDomain, roomID); pErr != nil {
 		return "", pErr
 	}
 
@@ -154,7 +161,7 @@ func (r *Upgrader) getRoomPowerLevels(ctx context.Context, roomID string) (*goma
 	return powerLevelContent, nil
 }
 
-func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.Time, userID, roomID string) *api.PerformError {
+func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.Time, userID string, userDomain gomatrixserverlib.ServerName, roomID string) *api.PerformError {
 	restrictedPowerLevelContent, pErr := r.getRoomPowerLevels(ctx, roomID)
 	if pErr != nil {
 		return pErr
@@ -183,7 +190,7 @@ func (r *Upgrader) restrictOldRoomPowerLevels(ctx context.Context, evTime time.T
 			return resErr
 		}
 	} else {
-		if resErr = r.sendHeaderedEvent(ctx, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers); resErr != nil {
+		if resErr = r.sendHeaderedEvent(ctx, userDomain, restrictedPowerLevelsHeadered, api.DoNotSendToOtherServers); resErr != nil {
 			return resErr
 		}
 	}
@@ -223,7 +230,7 @@ func moveLocalAliases(ctx context.Context,
 	return nil
 }
 
-func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, evTime time.Time, userID, roomID string) *api.PerformError {
+func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api.QueryLatestEventsAndStateResponse, evTime time.Time, userID string, userDomain gomatrixserverlib.ServerName, roomID string) *api.PerformError {
 	for _, event := range oldRoom.StateEvents {
 		if event.Type() != gomatrixserverlib.MRoomCanonicalAlias || !event.StateKeyEquals("") {
 			continue
@@ -254,7 +261,7 @@ func (r *Upgrader) clearOldCanonicalAliasEvent(ctx context.Context, oldRoom *api
 			return resErr
 		}
 	} else {
-		if resErr = r.sendHeaderedEvent(ctx, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers); resErr != nil {
+		if resErr = r.sendHeaderedEvent(ctx, userDomain, emptyCanonicalAliasEvent, api.DoNotSendToOtherServers); resErr != nil {
 			return resErr
 		}
 	}
@@ -495,7 +502,7 @@ func (r *Upgrader) generateInitialEvents(ctx context.Context, oldRoom *api.Query
 	return eventsToMake, nil
 }
 
-func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID, newRoomID, newVersion string, eventsToMake []fledglingEvent) *api.PerformError {
+func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, userID string, userDomain gomatrixserverlib.ServerName, newRoomID, newVersion string, eventsToMake []fledglingEvent) *api.PerformError {
 	var err error
 	var builtEvents []*gomatrixserverlib.HeaderedEvent
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
@@ -519,7 +526,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var event *gomatrixserverlib.Event
-		event, err = r.buildEvent(&builder, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion))
+		event, err = r.buildEvent(&builder, userDomain, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion))
 		if err != nil {
 			return &api.PerformError{
 				Msg: fmt.Sprintf("Failed to build new %q event: %s", builder.Type, err),
@@ -547,7 +554,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		inputs = append(inputs, api.InputRoomEvent{
 			Kind:         api.KindNew,
 			Event:        event,
-			Origin:       r.Cfg.Matrix.ServerName,
+			Origin:       userDomain,
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 	}
@@ -668,6 +675,7 @@ func createTemporaryPowerLevels(powerLevelContent *gomatrixserverlib.PowerLevelC
 
 func (r *Upgrader) sendHeaderedEvent(
 	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
 	headeredEvent *gomatrixserverlib.HeaderedEvent,
 	sendAsServer string,
 ) *api.PerformError {
@@ -675,7 +683,7 @@ func (r *Upgrader) sendHeaderedEvent(
 	inputs = append(inputs, api.InputRoomEvent{
 		Kind:         api.KindNew,
 		Event:        headeredEvent,
-		Origin:       r.Cfg.Matrix.ServerName,
+		Origin:       serverName,
 		SendAsServer: sendAsServer,
 	})
 	if err := api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
@@ -689,6 +697,7 @@ func (r *Upgrader) sendHeaderedEvent(
 
 func (r *Upgrader) buildEvent(
 	builder *gomatrixserverlib.EventBuilder,
+	serverName gomatrixserverlib.ServerName,
 	provider gomatrixserverlib.AuthEventProvider,
 	evTime time.Time,
 	roomVersion gomatrixserverlib.RoomVersion,
@@ -703,7 +712,7 @@ func (r *Upgrader) buildEvent(
 	}
 	builder.AuthEvents = refs
 	event, err := builder.Build(
-		evTime, r.Cfg.Matrix.ServerName, r.Cfg.Matrix.KeyID,
+		evTime, serverName, r.Cfg.Matrix.KeyID,
 		r.Cfg.Matrix.PrivateKey, roomVersion,
 	)
 	if err != nil {

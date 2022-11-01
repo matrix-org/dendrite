@@ -10,8 +10,8 @@ import (
 
 func NewAuthorization(cfg *config.ClientAPI, rsAPI roomserver.ClientRoomserverAPI) authorization.Authorization {
 	// Load authorization manager for Zion
-	if cfg.PublicKeyAuthentication.Ethereum.EnableAuthz {
-		auth, err := zion.NewZionAuthorization(rsAPI)
+	if cfg.PublicKeyAuthentication.Ethereum.GetEnableAuthZ() {
+		auth, err := zion.NewZionAuthorization(cfg, rsAPI)
 
 		if err != nil {
 			log.Errorln("Failed to initialise Zion authorization manager. Using default.", err)

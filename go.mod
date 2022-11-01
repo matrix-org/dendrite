@@ -1,10 +1,8 @@
 module github.com/matrix-org/dendrite
 
-go 1.19
-
 require (
-	github.com/Arceliar/ironwood v0.0.0-20220924160422-ed4b6d4750b6
-	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d
+	github.com/Arceliar/ironwood v0.0.0-20221025225125-45b4281814c2
+	github.com/Arceliar/phony v0.0.0-20210209235338-dde1a8dca979
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/MFAshby/stdemuxerhook v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
@@ -15,7 +13,7 @@ require (
 	github.com/docker/docker v20.10.19+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.10.25
-	github.com/getsentry/sentry-go v0.13.0
+	github.com/getsentry/sentry-go v0.14.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -27,8 +25,8 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20221014061925-a132619fa241
-	github.com/matrix-org/pinecone v0.0.0-20221007145426-3adc85477dd3
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20221031151122-0885c35ebe74
+	github.com/matrix-org/pinecone v0.0.0-20221026160848-639feeff74d6
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/nats-io/nats-server/v2 v2.9.3
@@ -47,7 +45,7 @@ require (
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
-	github.com/yggdrasil-network/yggdrasil-go v0.4.5-0.20220901155642-4f2abece817c
+	github.com/yggdrasil-network/yggdrasil-go v0.4.6
 	go.uber.org/atomic v1.10.0
 	golang.org/x/crypto v0.0.0-20221012134737-56aed061732a
 	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69
@@ -56,6 +54,7 @@ require (
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
+	gotest.tools/v3 v3.4.0
 	nhooyr.io/websocket v1.8.7
 )
 
@@ -64,10 +63,8 @@ require (
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/RoaringBitmap/roaring v1.2.1 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
-	github.com/anacrolix/envpprof v1.2.1 // indirect
-	github.com/anacrolix/missinggo v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.2.0 // indirect
+	github.com/bits-and-blooms/bitset v1.3.3 // indirect
 	github.com/blevesearch/bleve_index_api v1.0.3 // indirect
 	github.com/blevesearch/geo v0.1.15 // indirect
 	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect
@@ -83,7 +80,7 @@ require (
 	github.com/blevesearch/zapx/v13 v13.3.5 // indirect
 	github.com/blevesearch/zapx/v14 v14.3.5 // indirect
 	github.com/blevesearch/zapx/v15 v15.3.5 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5 // indirect
@@ -96,9 +93,9 @@ require (
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
-	github.com/gogo/protobuf v1.2.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
+	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -148,5 +145,6 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gotest.tools/v3 v3.4.0 // indirect
 )
+
+go 1.19

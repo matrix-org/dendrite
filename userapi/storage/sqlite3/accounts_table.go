@@ -32,7 +32,7 @@ import (
 
 const accountsSchema = `
 -- Stores data about accounts.
-CREATE TABLE IF NOT EXISTS account_accounts (
+CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
     -- When this account was first created, as a unix timestamp (ms resolution).
@@ -51,22 +51,22 @@ CREATE TABLE IF NOT EXISTS account_accounts (
 `
 
 const insertAccountSQL = "" +
-	"INSERT INTO account_accounts(localpart, created_ts, password_hash, appservice_id, account_type) VALUES ($1, $2, $3, $4, $5)"
+	"INSERT INTO userapi_accounts(localpart, created_ts, password_hash, appservice_id, account_type) VALUES ($1, $2, $3, $4, $5)"
 
 const updatePasswordSQL = "" +
-	"UPDATE account_accounts SET password_hash = $1 WHERE localpart = $2"
+	"UPDATE userapi_accounts SET password_hash = $1 WHERE localpart = $2"
 
 const deactivateAccountSQL = "" +
-	"UPDATE account_accounts SET is_deactivated = 1 WHERE localpart = $1"
+	"UPDATE userapi_accounts SET is_deactivated = 1 WHERE localpart = $1"
 
 const selectAccountByLocalpartSQL = "" +
-	"SELECT localpart, appservice_id, account_type FROM account_accounts WHERE localpart = $1"
+	"SELECT localpart, appservice_id, account_type FROM userapi_accounts WHERE localpart = $1"
 
 const selectPasswordHashSQL = "" +
-	"SELECT password_hash FROM account_accounts WHERE localpart = $1 AND is_deactivated = 0"
+	"SELECT password_hash FROM userapi_accounts WHERE localpart = $1 AND is_deactivated = 0"
 
 const selectNewNumericLocalpartSQL = "" +
-	"SELECT COALESCE(MAX(CAST(localpart AS INT)), 0) FROM account_accounts WHERE CAST(localpart AS INT) <> 0"
+	"SELECT COALESCE(MAX(CAST(localpart AS INT)), 0) FROM userapi_accounts WHERE CAST(localpart AS INT) <> 0"
 
 type accountsStatements struct {
 	db                            *sql.DB

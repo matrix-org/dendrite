@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/setup/config"
+	testutil "github.com/matrix-org/dendrite/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,7 +73,10 @@ func TestLoginPublicKeyNewSession(t *testing.T) {
 		params,
 		"[object]")
 	ethParams := params.(config.EthereumAuthParams)
-	assert.NotEmptyf(ethParams.ChainIDs, "ChainIDs actual: empty, expected not empty")
+	assert.Equalf(
+		testutil.EthereumTestNetworkId,
+		ethParams.ChainID,
+		"ChainID actual: %d, expected %d", ethParams.ChainID, testutil.EthereumTestNetworkId)
 	assert.NotEmptyf(ethParams.Version, "Version actual: \"\", expected: not empty")
 }
 

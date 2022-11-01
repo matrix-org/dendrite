@@ -67,7 +67,7 @@ func (pk LoginPublicKeyEthereum) GetType() string {
 }
 
 func (pk LoginPublicKeyEthereum) AccountExists(ctx context.Context) (string, *jsonerror.MatrixError) {
-	localPart, err := userutil.ParseUsernameParam(pk.UserId, &pk.config.Matrix.ServerName)
+	localPart, _, err := userutil.ParseUsernameParam(pk.UserId, pk.config.Matrix)
 	if err != nil {
 		// userId does not exist
 		return "", jsonerror.Forbidden("the address is incorrect, or the account does not exist.")
@@ -129,7 +129,7 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 	}
 
 	// Error if the chainId is not supported by the server.
-	if !contains(pk.config.PublicKeyAuthentication.Ethereum.ChainIDs, message.GetChainID()) {
+	if pk.config.PublicKeyAuthentication.Ethereum.GetChainID() != message.GetChainID() {
 		return false, jsonerror.Forbidden("chainId")
 	}
 
@@ -155,13 +155,4 @@ func (pk LoginPublicKeyEthereum) verifyMessageUserId(message *siwe.Message) bool
 	// Case-insensitive comparison to make sure the user ID matches the expected
 	// one derived from the signed message.
 	return pk.UserId == strings.ToLower(expectedUserId)
-}
-
-func contains(list []int, element int) bool {
-	for _, i := range list {
-		if i == element {
-			return true
-		}
-	}
-	return false
 }

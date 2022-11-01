@@ -34,13 +34,13 @@ import (
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
 type OutputReceiptConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	db         storage.Database
-	queues     *queue.OutgoingQueues
-	ServerName gomatrixserverlib.ServerName
-	topic      string
+	ctx               context.Context
+	jetstream         nats.JetStreamContext
+	durable           string
+	db                storage.Database
+	queues            *queue.OutgoingQueues
+	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	topic             string
 }
 
 // NewOutputReceiptConsumer creates a new OutputReceiptConsumer. Call Start() to begin consuming typing events.
@@ -52,13 +52,13 @@ func NewOutputReceiptConsumer(
 	store storage.Database,
 ) *OutputReceiptConsumer {
 	return &OutputReceiptConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		queues:     queues,
-		db:         store,
-		ServerName: cfg.Matrix.ServerName,
-		durable:    cfg.Matrix.JetStream.Durable("FederationAPIReceiptConsumer"),
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		ctx:               process.Context(),
+		jetstream:         js,
+		queues:            queues,
+		db:                store,
+		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		durable:           cfg.Matrix.JetStream.Durable("FederationAPIReceiptConsumer"),
+		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 	}
 }
 
@@ -95,7 +95,7 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 		log.WithError(err).WithField("user_id", receipt.UserID).Error("failed to extract domain from receipt sender")
 		return true
 	}
-	if receiptServerName != t.ServerName {
+	if !t.isLocalServerName(receiptServerName) {
 		return true
 	}
 
@@ -134,14 +134,14 @@ func (t *OutputReceiptConsumer) onMessage(ctx context.Context, msgs []*nats.Msg)
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MReceipt,
-		Origin: string(t.ServerName),
+		Origin: string(receiptServerName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
 
-	if err := t.queues.SendEDU(edu, t.ServerName, names); err != nil {
+	if err := t.queues.SendEDU(edu, receiptServerName, names); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

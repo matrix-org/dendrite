@@ -1,6 +1,9 @@
 package config
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
@@ -9,23 +12,48 @@ type AuthParams interface {
 }
 
 type EthereumAuthParams struct {
-	Version  uint  `json:"version"`
-	ChainIDs []int `json:"chain_ids"`
+	Version uint `json:"version"`
+	ChainID int  `json:"chain_id"`
 }
 
 func (p EthereumAuthParams) GetParams() interface{} {
-	copyP := p
-	copyP.ChainIDs = make([]int, len(p.ChainIDs))
-	copy(copyP.ChainIDs, p.ChainIDs)
-	return copyP
+	return p
 }
 
 type EthereumAuthConfig struct {
-	Enabled            bool   `yaml:"enabled"`
-	Version            uint   `yaml:"version"`
-	ChainIDs           []int  `yaml:"chain_ids"`
-	DeploymentChainIDs string `yaml:"deployment_chain_ids"` // For deployment: use env variable strings to override the chain IDs.
-	EnableAuthz        bool   `yaml:"enable_authz"`         // Flag to enable / disable authorization during development
+	Enabled           bool   `yaml:"enabled"`
+	Version           uint   `yaml:"version"`
+	NetworkUrl        string `yaml:"network_url"`  // Blockchain network provider URL
+	ConfigChainID     string `yaml:"chain_id"`     // Blockchain chain ID. Env variable can replace this property.
+	ConfigEnableAuthz string `yaml:"enable_authz"` // Enable / disable authorization during development. Will be removed when feature is done.
+	chainID           int
+	enableAuthz       bool
+}
+
+func (c *EthereumAuthConfig) GetChainID() int {
+	if c.ConfigChainID != "" {
+		v := strings.TrimSpace(c.ConfigChainID)
+		id, err := strconv.Atoi(v)
+		if err == nil {
+			c.chainID = id
+		}
+		// No need to do this again.
+		c.ConfigChainID = ""
+	}
+	return c.chainID
+}
+
+func (c *EthereumAuthConfig) GetEnableAuthZ() bool {
+	if c.ConfigEnableAuthz != "" {
+		v := strings.TrimSpace(c.ConfigEnableAuthz)
+		boolValue, err := strconv.ParseBool(v)
+		if err == nil {
+			c.enableAuthz = boolValue
+		}
+		// No need to do this again.
+		c.ConfigEnableAuthz = ""
+	}
+	return c.enableAuthz
 }
 
 type PublicKeyAuthentication struct {
@@ -49,8 +77,8 @@ func (pk *PublicKeyAuthentication) GetPublicKeyRegistrationParams() map[string]i
 	params := make(map[string]interface{})
 	if pk.Ethereum.Enabled {
 		p := EthereumAuthParams{
-			Version:  pk.Ethereum.Version,
-			ChainIDs: pk.Ethereum.ChainIDs,
+			Version: pk.Ethereum.Version,
+			ChainID: pk.Ethereum.GetChainID(),
 		}
 		params[authtypes.LoginTypePublicKeyEthereum] = p
 	}

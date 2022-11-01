@@ -29,7 +29,7 @@ import (
 
 type Database struct {
 	DB                       *sql.DB
-	ServerName               gomatrixserverlib.ServerName
+	IsLocalServerName        func(gomatrixserverlib.ServerName) bool
 	Cache                    caching.FederationCache
 	Writer                   sqlutil.Writer
 	FederationQueuePDUs      tables.FederationQueuePDUs
@@ -50,6 +50,10 @@ type Database struct {
 // successfully.
 type Receipt struct {
 	nid int64
+}
+
+func NewReceipt(nid int64) Receipt {
+	return Receipt{nid: nid}
 }
 
 func (r *Receipt) String() string {
@@ -120,7 +124,7 @@ func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string,
 	}
 	if excludeSelf {
 		for i, server := range servers {
-			if server == d.ServerName {
+			if d.IsLocalServerName(server) {
 				servers = append(servers[:i], servers[i+1:]...)
 			}
 		}

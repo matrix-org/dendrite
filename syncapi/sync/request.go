@@ -91,15 +91,16 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	})
 
 	return &types.SyncRequest{
-		Context:       req.Context(),           //
-		Log:           logger,                  //
-		Device:        &device,                 //
-		Response:      types.NewResponse(),     // Populated by all streams
-		Filter:        filter,                  //
-		Since:         since,                   //
-		Timeout:       timeout,                 //
-		Rooms:         make(map[string]string), // Populated by the PDU stream
-		WantFullState: wantFullState,           //
+		Context:           req.Context(),             //
+		Log:               logger,                    //
+		Device:            &device,                   //
+		Response:          types.NewResponse(),       // Populated by all streams
+		Filter:            filter,                    //
+		Since:             since,                     //
+		Timeout:           timeout,                   //
+		Rooms:             make(map[string]string),   // Populated by the PDU stream
+		WantFullState:     wantFullState,             //
+		MembershipChanges: make(map[string]struct{}), // Populated by the PDU stream
 	}, nil
 }
 

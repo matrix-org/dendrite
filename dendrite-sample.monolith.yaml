@@ -178,7 +178,8 @@ client_api:
     ethereum:
       enabled: false
       version: 1
-      chain_ids: []
+      chain_id: 31337
+      network_url: "http://127.0.0.1:8545"
 
   # Whether to require reCAPTCHA for registration. If you have enabled registration
   # then this is HIGHLY RECOMMENDED to reduce the risk of your homeserver being used
@@ -189,7 +190,13 @@ client_api:
   recaptcha_public_key: ""
   recaptcha_private_key: ""
   recaptcha_bypass_secret: ""
-  recaptcha_siteverify_api: ""
+  
+  # To use hcaptcha.com instead of ReCAPTCHA, set the following parameters, otherwise just keep them empty.
+  # recaptcha_siteverify_api: "https://hcaptcha.com/siteverify"
+  # recaptcha_api_js_url: "https://js.hcaptcha.com/1/api.js"
+  # recaptcha_form_field: "h-captcha-response"
+  # recaptcha_sitekey_class: "h-captcha"
+
 
   # TURN server information that this homeserver should send to clients.
   turn:
@@ -319,6 +326,14 @@ user_api:
   # is considered to be valid in milliseconds.
   # The default lifetime is 3600000ms (60 minutes).
   # openid_token_lifetime_ms: 3600000
+
+  # Users who register on this homeserver will automatically be joined to the rooms listed under "auto_join_rooms" option.
+  # By default, any room aliases included in this list will be created as a publicly joinable room
+  # when the first user registers for the homeserver. If the room already exists,
+  # make certain it is a publicly joinable room, i.e. the join rule of the room must be set to 'public'.
+  # As Spaces are just rooms under the hood, Space aliases may also be used.
+  auto_join_rooms:
+  #  - "#main:matrix.org"
 
 # Configuration for Opentracing.
 # See https://github.com/matrix-org/dendrite/tree/master/docs/tracing for information on

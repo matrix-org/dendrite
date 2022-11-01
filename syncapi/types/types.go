@@ -234,6 +234,9 @@ func (t *TopologyToken) StreamToken() StreamingToken {
 }
 
 func (t TopologyToken) String() string {
+	if t.Depth <= 0 && t.PDUPosition <= 0 {
+		return ""
+	}
 	return fmt.Sprintf("t%d_%d", t.Depth, t.PDUPosition)
 }
 
@@ -407,7 +410,8 @@ func (r *Response) HasUpdates() bool {
 func NewResponse() *Response {
 	res := Response{}
 	// Pre-initialise the maps. Synapse will return {} even if there are no rooms under a specific section,
-	// so let's do the same thing. Bonus: this means we can't get dreaded 'assignment to entry in nil map' errors.
+	// so let's do the same thing. Bonus this means we can't get dreaded 'assignment to entry in nil map' errors.
+
 	res.Rooms = &RoomsResponse{
 		Join:                map[string]*JoinResponse{},
 		Peek:                map[string]*JoinResponse{},

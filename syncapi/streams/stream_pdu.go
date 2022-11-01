@@ -101,7 +101,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
-			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
+			if ctxErr := req.Context.Err(); ctxErr != nil || jerr == sql.ErrTxDone {
 				return from
 			}
 			continue
@@ -194,7 +194,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 			}
 		}
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req.Response); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 				return newPos
@@ -216,6 +216,9 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
+// Limit the recent events to X when going backwards
+const recentEventBackwardsLimit = 100
+
 // nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
@@ -225,17 +228,19 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	delta types.StateDelta,
 	eventFilter *gomatrixserverlib.RoomEventFilter,
 	stateFilter *gomatrixserverlib.StateFilter,
-	res *types.Response,
+	req *types.SyncRequest,
 ) (types.StreamPosition, error) {
-	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
-		// make sure we don't leak recent events after the leave event.
-		// TODO: History visibility makes this somewhat complex to handle correctly. For example:
-		// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
-		// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
-		//       in a single /sync request
-		// This is all "okay" assuming history_visibility == "shared" which it is by default.
-		r.To = delta.MembershipPos
+
+	originalLimit := eventFilter.Limit
+	// If we're going backwards, grep at least X events, this is mostly to satisfy Sytest
+	if r.Backwards && originalLimit < recentEventBackwardsLimit {
+		eventFilter.Limit = recentEventBackwardsLimit // TODO: Figure out a better way
+		diff := r.From - r.To
+		if diff > 0 && diff < recentEventBackwardsLimit {
+			eventFilter.Limit = int(diff)
+		}
 	}
+
 	recentStreamEvents, limited, err := snapshot.RecentEvents(
 		ctx, delta.RoomID, r,
 		eventFilter, true, true,
@@ -246,8 +251,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
-	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
+	recentEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		snapshot.StreamEventsToEvents(device, recentStreamEvents),
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	)
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
 		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
@@ -257,10 +264,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
 		return r.To, nil
 	}
-
-	// Sort the events so that we can pick out the latest events from both sections.
-	recentEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(recentEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
-	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(delta.StateEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
 
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
@@ -290,8 +293,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	hasMembershipChange := false
 	for _, recentEvent := range recentStreamEvents {
 		if recentEvent.Type() == gomatrixserverlib.MRoomMember && recentEvent.StateKey() != nil {
+			if membership, _ := recentEvent.Membership(); membership == gomatrixserverlib.Join {
+				req.MembershipChanges[*recentEvent.StateKey()] = struct{}{}
+			}
 			hasMembershipChange = true
-			break
 		}
 	}
 
@@ -299,6 +304,27 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
+	}
+
+	if r.Backwards && len(events) > originalLimit {
+		// We're going backwards and the events are ordered chronologically, so take the last `limit` events
+		events = events[len(events)-originalLimit:]
+		limited = true
+	}
+
+	// Now that we've filtered the timeline, work out which state events are still
+	// left. Anything that appears in the filtered timeline will be removed from the
+	// "state" section and kept in "timeline".
+
+	// Don't remove the state events if this is a newly joined room. The member
+	// needs the full room state. For example, to figure out if the room is a space
+	// or not, it needs the m.room.create event which may be chronologically outside
+	// the filter limit.
+	if !delta.NewlyJoined {
+		delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+			removeDuplicates(delta.StateEvents, recentEvents),
+			gomatrixserverlib.TopologicalOrderByAuthEvents,
+		)
 	}
 
 	if len(delta.StateEvents) > 0 {
@@ -318,9 +344,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
 		// If we are limited by the filter AND the history visibility filter
 		// didn't "remove" events, return that the response is limited.
-		jr.Timeline.Limited = limited && len(events) == len(recentEvents)
+		jr.Timeline.Limited = (limited && len(events) == len(recentEvents)) || delta.NewlyJoined
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Join[delta.RoomID] = jr
+		req.Response.Rooms.Join[delta.RoomID] = jr
 
 	case gomatrixserverlib.Peek:
 		jr := types.NewJoinResponse()
@@ -329,7 +355,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(recentEvents, gomatrixserverlib.FormatSync)
 		jr.Timeline.Limited = limited
 		jr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Peek[delta.RoomID] = jr
+		req.Response.Rooms.Peek[delta.RoomID] = jr
 
 	case gomatrixserverlib.Leave:
 		fallthrough // transitions to leave are the same as ban
@@ -342,7 +368,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		// didn't "remove" events, return that the response is limited.
 		lr.Timeline.Limited = limited && len(events) == len(recentEvents)
 		lr.State.Events = gomatrixserverlib.HeaderedToClientEvents(delta.StateEvents, gomatrixserverlib.FormatSync)
-		res.Rooms.Leave[delta.RoomID] = lr
+		req.Response.Rooms.Leave[delta.RoomID] = lr
 	}
 
 	return latestPosition, nil
@@ -471,7 +497,13 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	var prevBatch *types.TopologyToken
 	if len(recentStreamEvents) > 0 {
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
-		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, recentStreamEvents[0].EventID())
+		event := recentStreamEvents[0]
+		// If this is the beginning of the room, we can't go back further. We're going to return
+		// the TopologyToken from the last event instead. (Synapse returns the /sync next_Batch)
+		if event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("") {
+			event = recentStreamEvents[len(recentStreamEvents)-1]
+		}
+		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, event.EventID())
 		if err != nil {
 			return
 		}
@@ -488,7 +520,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
@@ -502,7 +533,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	limited = limited && len(events) == len(recentEvents)
-
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	if stateFilter.LazyLoadMembers {
 		if err != nil {
 			return nil, err

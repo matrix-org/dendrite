@@ -26,7 +26,7 @@ import (
 
 const threepidSchema = `
 -- Stores data about third party identifiers
-CREATE TABLE IF NOT EXISTS account_threepid (
+CREATE TABLE IF NOT EXISTS userapi_threepids (
 	-- The third party identifier
 	threepid TEXT NOT NULL,
 	-- The 3PID medium
@@ -37,20 +37,20 @@ CREATE TABLE IF NOT EXISTS account_threepid (
 	PRIMARY KEY(threepid, medium)
 );
 
-CREATE INDEX IF NOT EXISTS account_threepid_localpart ON account_threepid(localpart);
+CREATE INDEX IF NOT EXISTS userapi_threepid_idx ON userapi_threepids(localpart);
 `
 
 const selectLocalpartForThreePIDSQL = "" +
-	"SELECT localpart FROM account_threepid WHERE threepid = $1 AND medium = $2"
+	"SELECT localpart FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
 
 const selectThreePIDsForLocalpartSQL = "" +
-	"SELECT threepid, medium FROM account_threepid WHERE localpart = $1"
+	"SELECT threepid, medium FROM userapi_threepids WHERE localpart = $1"
 
 const insertThreePIDSQL = "" +
-	"INSERT INTO account_threepid (threepid, medium, localpart) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_threepids (threepid, medium, localpart) VALUES ($1, $2, $3)"
 
 const deleteThreePIDSQL = "" +
-	"DELETE FROM account_threepid WHERE threepid = $1 AND medium = $2"
+	"DELETE FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
 
 type threepidStatements struct {
 	selectLocalpartForThreePIDStmt  *sql.Stmt
