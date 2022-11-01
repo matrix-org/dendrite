@@ -105,12 +105,3 @@ func (p *InviteStreamProvider) IncrementalSync(
 
 	return maxID
 }
-
-func contains(values []string, findVal string) bool {
-	for _, v := range values {
-		if v == findVal {
-			return true
-		}
-	}
-	return false
-}
