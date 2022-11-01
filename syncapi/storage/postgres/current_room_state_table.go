@@ -475,7 +475,10 @@ func (s *currentRoomStateStatements) SelectRoomMembershipOfUser(
 		if err := rows.Scan(&membership); err != nil {
 			return "", err
 		}
-		return membership, nil
+		// Found the membership info
+		if membership != "" {
+			return membership, rows.Err()
+		}
 	}
 
 	return "", nil
