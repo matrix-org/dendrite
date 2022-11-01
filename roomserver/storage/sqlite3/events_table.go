@@ -23,11 +23,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const eventsSchema = `
@@ -56,6 +57,9 @@ const insertEventSQL = `
 
 const selectEventSQL = "" +
 	"SELECT event_nid, state_snapshot_nid FROM roomserver_events WHERE event_id = $1"
+
+const bulkSelectSnapshotsForEventIDsSQL = "" +
+	"SELECT event_id, state_snapshot_nid FROM roomserver_events WHERE event_id IN ($1)"
 
 // Bulk lookup of events by string ID.
 // Sort by the numeric IDs for event type and state key.
@@ -124,6 +128,7 @@ type eventStatements struct {
 	db                                            *sql.DB
 	insertEventStmt                               *sql.Stmt
 	selectEventStmt                               *sql.Stmt
+	bulkSelectSnapshotsForEventIDsStmt            *sql.Stmt
 	bulkSelectStateEventByIDStmt                  *sql.Stmt
 	bulkSelectStateEventByIDExcludingRejectedStmt *sql.Stmt
 	bulkSelectStateAtEventByIDStmt                *sql.Stmt
@@ -153,6 +158,7 @@ func PrepareEventsTable(db *sql.DB) (tables.Events, error) {
 	return s, sqlutil.StatementList{
 		{&s.insertEventStmt, insertEventSQL},
 		{&s.selectEventStmt, selectEventSQL},
+		{&s.bulkSelectSnapshotsForEventIDsStmt, bulkSelectSnapshotsForEventIDsSQL},
 		{&s.bulkSelectStateEventByIDStmt, bulkSelectStateEventByIDSQL},
 		{&s.bulkSelectStateEventByIDExcludingRejectedStmt, bulkSelectStateEventByIDExcludingRejectedSQL},
 		{&s.bulkSelectStateAtEventByIDStmt, bulkSelectStateAtEventByIDSQL},
@@ -201,6 +207,40 @@ func (s *eventStatements) SelectEvent(
 	selectStmt := sqlutil.TxStmt(txn, s.selectEventStmt)
 	err := selectStmt.QueryRowContext(ctx, eventID).Scan(&eventNID, &stateNID)
 	return types.EventNID(eventNID), types.StateSnapshotNID(stateNID), err
+}
+
+func (s *eventStatements) BulkSelectSnapshotsFromEventIDs(
+	ctx context.Context, txn *sql.Tx, eventIDs []string,
+) (map[types.StateSnapshotNID][]string, error) {
+	qry := strings.Replace(bulkSelectSnapshotsForEventIDsSQL, "($1)", sqlutil.QueryVariadic(len(eventIDs)), 1)
+	stmt, err := s.db.Prepare(qry)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "BulkSelectSnapshotsFromEventIDs: stmt.close() failed")
+
+	params := make([]interface{}, len(eventIDs))
+	for i := range eventIDs {
+		params[i] = eventIDs[i]
+	}
+
+	rows, err := stmt.QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "BulkSelectSnapshotsFromEventIDs: rows.close() failed")
+
+	var eventID string
+	var stateNID types.StateSnapshotNID
+	result := make(map[types.StateSnapshotNID][]string)
+	for rows.Next() {
+		if err := rows.Scan(&eventID, &stateNID); err != nil {
+			return nil, err
+		}
+		result[stateNID] = append(result[stateNID], eventID)
+	}
+
+	return result, rows.Err()
 }
 
 // bulkSelectStateEventByID lookups a list of state events by event ID.
