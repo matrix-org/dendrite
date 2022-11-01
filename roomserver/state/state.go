@@ -171,7 +171,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		if !ok {
 			// This should only get hit if the database is corrupt.
 			// It should be impossible for an event to reference a NID that doesn't exist
-			panic(fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID))
+			return nil, fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID)
 		}
 
 		for _, stateBlockNID := range stateBlockNIDs {
@@ -179,7 +179,7 @@ func (v *StateResolution) LoadMembershipAtEvent(
 			if !ok {
 				// This should only get hit if the database is corrupt.
 				// It should be impossible for an event to reference a NID that doesn't exist
-				panic(fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID))
+				return nil, fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID)
 			}
 
 			evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
