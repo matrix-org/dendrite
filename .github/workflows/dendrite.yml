@@ -269,10 +269,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite
+          - label: SQLite (native)
 
-          - label: SQLite, full HTTP APIs
+          - label: SQLite (Cgo)
+            cgo: 1
+
+          - label: SQLite (native), full HTTP APIs
             api: full-http
+
+          - label: SQLite (Cgo), full HTTP APIs
+            api: full-http
+            cgo: 1
 
           - label: PostgreSQL
             postgres: postgres
@@ -288,6 +295,7 @@ jobs:
         POSTGRES: ${{ matrix.postgres && 1}}
         API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
+        CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
       - uses: actions/checkout@v2
       - name: Run Sytest
