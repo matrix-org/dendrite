@@ -42,28 +42,42 @@ type flow struct {
 	Type string `json:"type"`
 }
 
-func passwordLogin() flows {
-	f := flows{}
+func passwordLogin(f *flows) {
 	s := flow{
 		Type: "m.login.password",
 	}
 	f.Flows = append(f.Flows, s)
-	return f
+}
+
+func publicKeyLogin(f *flows) {
+	loginFlow := flow{
+		Type: "m.login.publickey",
+	}
+	f.Flows = append(f.Flows, loginFlow)
 }
 
 // Login implements GET and POST /login
 func Login(
-	req *http.Request, userAPI userapi.ClientUserAPI,
+	req *http.Request,
+	userAPI userapi.ClientUserAPI,
+	userInteractiveAuth *auth.UserInteractive,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
-		// TODO: support other forms of login other than password, depending on config options
+		f := flows{}
+		if !cfg.PasswordAuthenticationDisabled {
+			passwordLogin(&f)
+		}
+		if cfg.PublicKeyAuthentication.Enabled() {
+			publicKeyLogin(&f)
+		}
+		// TODO: support other forms of login depending on config options
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: passwordLogin(),
+			JSON: f,
 		}
 	} else if req.Method == http.MethodPost {
-		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, userAPI, userAPI, cfg)
+		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, userAPI, userAPI, userAPI, userInteractiveAuth, cfg)
 		if authErr != nil {
 			return *authErr
 		}

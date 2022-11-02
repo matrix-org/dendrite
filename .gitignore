@@ -53,6 +53,7 @@ _testmain.go
 
 # Default configuration file
 dendrite.yaml
+zion-appservice.yaml
 
 # Database files
 *.db
@@ -73,3 +74,8 @@ complement/
 docs/_site
 
 media_store/
+
+# Debug
+**/__debug_bin
+
+.env

@@ -315,10 +315,12 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Now that we've filtered the timeline, work out which state events are still
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
-	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		removeDuplicates(delta.StateEvents, recentEvents),
-		gomatrixserverlib.TopologicalOrderByAuthEvents,
-	)
+	if !delta.NewlyJoined {
+		delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+			removeDuplicates(delta.StateEvents, recentEvents),
+			gomatrixserverlib.TopologicalOrderByAuthEvents,
+		)
+	}
 
 	if len(delta.StateEvents) > 0 {
 		if last := delta.StateEvents[len(delta.StateEvents)-1]; last != nil {

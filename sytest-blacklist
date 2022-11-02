@@ -46,3 +46,8 @@ If a device list update goes missing, the server resyncs on the next one
 # Might be a bug in the test because leaves do appear :-(
 
 Leaves are present in non-gapped incremental syncs
+
+# Fails due to fix / workaround for this issue https://github.com/matrix-org/dendrite/issues/2842
+
+Newly joined room is included in an incremental sync
+Newly joined room is included in an incremental sync after invite
