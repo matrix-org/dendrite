@@ -88,7 +88,7 @@ func Test_migrations_Up(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				driverName := "sqlite"
+				driverName := sqlutil.SQLITE_DRIVER_NAME
 				if dbType == test.DBTypePostgres {
 					driverName = "postgres"
 				}
@@ -117,7 +117,7 @@ func Test_insertMigration(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		conStr, close := test.PrepareDBConnectionString(t, dbType)
 		defer close()
-		driverName := "sqlite"
+		driverName := sqlutil.SQLITE_DRIVER_NAME
 		if dbType == test.DBTypePostgres {
 			driverName = "postgres"
 		}

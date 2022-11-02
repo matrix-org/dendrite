@@ -30,8 +30,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/sirupsen/logrus"
-
-	_ "modernc.org/sqlite"
 )
 
 var (

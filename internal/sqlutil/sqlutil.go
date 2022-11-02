@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/sirupsen/logrus"
@@ -21,22 +20,12 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 	var driverName, dsn string
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		driverName = "sqlite"
+		driverName = SQLITE_DRIVER_NAME
 		dsn, err = ParseFileURI(dbProperties.ConnectionString)
 		if err != nil {
 			return nil, fmt.Errorf("ParseFileURI: %w", err)
 		}
-
-		// add query parameters to the dsn
-		if strings.Contains(dsn, "?") {
-			dsn += "&"
-		} else {
-			dsn += "?"
-		}
-
-		// wait some time before erroring if the db is locked
-		// https://gitlab.com/cznic/sqlite/-/issues/106#note_1058094993
-		dsn += "_pragma=busy_timeout%3d10000"
+		dsn = sqliteDSNExtension(dsn)
 	case dbProperties.ConnectionString.IsPostgres():
 		driverName = "postgres"
 		dsn = string(dbProperties.ConnectionString)
@@ -51,7 +40,7 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 	if err != nil {
 		return nil, err
 	}
-	if driverName != "sqlite" {
+	if driverName != SQLITE_DRIVER_NAME {
 		logger := logrus.WithFields(logrus.Fields{
 			"max_open_conns":    dbProperties.MaxOpenConns(),
 			"max_idle_conns":    dbProperties.MaxIdleConns(),

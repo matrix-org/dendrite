@@ -25,6 +25,7 @@ require (
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20221101165746-0e4a8bb6db7e
 	github.com/matrix-org/pinecone v0.0.0-20221026160848-639feeff74d6
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
+	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/nats-io/nats-server/v2 v2.9.4
 	github.com/nats-io/nats.go v1.19.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9

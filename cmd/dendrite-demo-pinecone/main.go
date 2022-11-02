@@ -54,8 +54,6 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 
 	"github.com/sirupsen/logrus"
-
-	_ "modernc.org/sqlite"
 )
 
 var (
