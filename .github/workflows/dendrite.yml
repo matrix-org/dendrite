@@ -269,15 +269,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite (native)
+          - label: SQLite/native
 
-          - label: SQLite (Cgo)
+          - label: SQLite/cgo
             cgo: 1
 
-          - label: SQLite (native), full HTTP APIs
+          - label: SQLite/native, full HTTP APIs
             api: full-http
 
-          - label: SQLite (Cgo), full HTTP APIs
+          - label: SQLite/cgo, full HTTP APIs
             api: full-http
             cgo: 1
 
@@ -331,16 +331,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite
+          - label: SQLite/native
 
-          - label: SQLite, full HTTP APIs
+          - label: SQLite/cgo
+            cgo: 1
+
+          - label: SQLite/native, full HTTP APIs
             api: full-http
 
+          - label: SQLite/cgo, full HTTP APIs
+            api: full-http
+            cgo: 1
+
           - label: PostgreSQL
-            postgres: Postgres
+            postgres: postgres
 
           - label: PostgreSQL, full HTTP APIs
-            postgres: Postgres
+            postgres: postgres
             api: full-http
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
@@ -401,6 +408,7 @@ jobs:
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
           API: ${{ matrix.api && 1 }}
+          CGO_ENABLED: ${{ matrix.cgo && 1 }}
         working-directory: complement
 
   integration-tests-done:
