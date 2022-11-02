@@ -44,6 +44,35 @@ CREATE INDEX IF NOT EXISTS userapi_daily_visits_timestamp_idx ON userapi_daily_v
 CREATE INDEX IF NOT EXISTS userapi_daily_visits_localpart_timestamp_idx ON userapi_daily_visits(localpart, timestamp);
 `
 
+const messagesDailySchema = `
+CREATE TABLE IF NOT EXISTS userapi_daily_stats (
+	timestamp BIGINT NOT NULL,
+	server_name TEXT NOT NULL,
+	messages BIGINT NOT NULL,
+	sent_messages BIGINT NOT NULL,
+	e2ee_messages BIGINT NOT NULL,
+	sent_e2ee_messages BIGINT NOT NULL,
+	active_rooms BIGINT NOT NULL,
+	active_e2ee_rooms BIGINT NOT NULL,
+	CONSTRAINT daily_stats_unique UNIQUE (timestamp, server_name)
+);
+`
+
+const upsertDailyMessagesSQL = `
+	INSERT INTO userapi_daily_stats (timestamp, server_name, messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (timestamp, server_name)
+	DO UPDATE SET
+	    messages=messages+excluded.messages, sent_messages=sent_messages+excluded.sent_messages,
+	    e2ee_messages=e2ee_messages+excluded.e2ee_messages, sent_e2ee_messages=sent_e2ee_messages+excluded.sent_e2ee_messages,
+	    active_rooms=MAX($7, active_rooms), active_e2ee_rooms=MAX($8, active_e2ee_rooms)
+`
+
+const selectDailyMessagesSQL = `
+	SELECT messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms
+	FROM userapi_daily_stats
+	WHERE server_name = $1 AND timestamp = $2;
+`
+
 const countUsersLastSeenAfterSQL = "" +
 	"SELECT COUNT(*) FROM (" +
 	" SELECT localpart FROM userapi_devices WHERE last_seen_ts > $1 " +
@@ -176,6 +205,8 @@ type statsStatements struct {
 	countUserByAccountTypeStmt    *sql.Stmt
 	countRegisteredUserByTypeStmt *sql.Stmt
 	dbEngineVersionStmt           *sql.Stmt
+	upsertMessagesStmt            *sql.Stmt
+	selectDailyMessagesStmt       *sql.Stmt
 }
 
 func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.StatsTable, error) {
@@ -189,6 +220,10 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 	if err != nil {
 		return nil, err
 	}
+	_, err = db.Exec(messagesDailySchema)
+	if err != nil {
+		return nil, err
+	}
 	go s.startTimers()
 	return s, sqlutil.StatementList{
 		{&s.countUsersLastSeenAfterStmt, countUsersLastSeenAfterSQL},
@@ -198,6 +233,8 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 		{&s.countUserByAccountTypeStmt, countUserByAccountTypeSQL},
 		{&s.countRegisteredUserByTypeStmt, countRegisteredUserByTypeSQL},
 		{&s.dbEngineVersionStmt, queryDBEngineVersion},
+		{&s.upsertMessagesStmt, upsertDailyMessagesSQL},
+		{&s.selectDailyMessagesStmt, selectDailyMessagesSQL},
 	}.Prepare(db)
 }
 
@@ -450,4 +487,35 @@ func (s *statsStatements) UpdateUserDailyVisits(
 		s.lastUpdate = time.Now()
 	}
 	return err
+}
+
+func (s *statsStatements) UpsertDailyStats(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName, stats types.MessageStats,
+	activeRooms, activeE2EERooms int64,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.upsertMessagesStmt)
+	timestamp := time.Now().Truncate(time.Hour * 24)
+	_, err := stmt.ExecContext(ctx,
+		gomatrixserverlib.AsTimestamp(timestamp),
+		serverName,
+		stats.Messages, stats.SentMessages, stats.MessagesE2EE, stats.SentMessagesE2EE,
+		activeRooms, activeE2EERooms,
+	)
+	return err
+}
+
+func (s *statsStatements) DailyRoomsMessages(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
+) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectDailyMessagesStmt)
+	timestamp := time.Now().Truncate(time.Hour * 24)
+
+	err = stmt.QueryRowContext(ctx, serverName, gomatrixserverlib.AsTimestamp(timestamp)).
+		Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
+	if err != nil && err != sql.ErrNoRows {
+		return msgStats, 0, 0, err
+	}
+	return msgStats, activeRooms, activeE2EERooms, nil
 }

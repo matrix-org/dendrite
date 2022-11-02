@@ -22,11 +22,11 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20221031151122-0885c35ebe74
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20221101165746-0e4a8bb6db7e
 	github.com/matrix-org/pinecone v0.0.0-20221026160848-639feeff74d6
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
-	github.com/nats-io/nats-server/v2 v2.9.3
-	github.com/nats-io/nats.go v1.18.0
+	github.com/nats-io/nats-server/v2 v2.9.4
+	github.com/nats-io/nats.go v1.19.0
 	github.com/neilalexander/utp v0.1.1-0.20210727203401-54ae7b1cd5f9
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
@@ -35,7 +35,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/tidwall/gjson v1.14.3
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
@@ -43,8 +43,8 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.4.6
 	go.uber.org/atomic v1.10.0
 	golang.org/x/crypto v0.1.0
-	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69
-	golang.org/x/mobile v0.0.0-20221012134814-c746ac228303
+	golang.org/x/image v0.1.0
+	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
 	golang.org/x/net v0.1.0
 	golang.org/x/term v0.1.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
@@ -121,11 +121,11 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
-	golang.org/x/exp v0.0.0-20220916125017-b168a2c6b86b // indirect
+	golang.org/x/exp v0.0.0-20221031165847-c99f073a8326 // indirect
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af // indirect
+	golang.org/x/time v0.1.0 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/macaroon.v2 v2.1.0 // indirect

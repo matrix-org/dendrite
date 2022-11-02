@@ -18,13 +18,18 @@ package query
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
+	"sync"
+
+	"github.com/opentracing/opentracing-go"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	opentracing "github.com/opentracing/opentracing-go"
-	log "github.com/sirupsen/logrus"
 )
 
 const roomAliasExistsPath = "/rooms/"
@@ -32,8 +37,10 @@ const userIDExistsPath = "/users/"
 
 // AppServiceQueryAPI is an implementation of api.AppServiceQueryAPI
 type AppServiceQueryAPI struct {
-	HTTPClient *http.Client
-	Cfg        *config.AppServiceAPI
+	HTTPClient    *http.Client
+	Cfg           *config.AppServiceAPI
+	ProtocolCache map[string]api.ASProtocolResponse
+	CacheMu       sync.Mutex
 }
 
 // RoomAliasExists performs a request to '/room/{roomAlias}' on all known
@@ -163,5 +170,180 @@ func (a *AppServiceQueryAPI) UserIDExists(
 	}
 
 	response.UserIDExists = false
+	return nil
+}
+
+type thirdpartyResponses interface {
+	api.ASProtocolResponse | []api.ASUserResponse | []api.ASLocationResponse
+}
+
+func requestDo[T thirdpartyResponses](client *http.Client, url string, response *T) (err error) {
+	origURL := url
+	// try v1 and unstable appservice endpoints
+	for _, version := range []string{"v1", "unstable"} {
+		var resp *http.Response
+		var body []byte
+		asURL := strings.Replace(origURL, "unstable", version, 1)
+		resp, err = client.Get(asURL)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close() // nolint: errcheck
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			continue
+		}
+		return json.Unmarshal(body, &response)
+	}
+	return err
+}
+
+func (a *AppServiceQueryAPI) Locations(
+	ctx context.Context,
+	req *api.LocationRequest,
+	resp *api.LocationResponse,
+) error {
+	params, err := url.ParseQuery(req.Params)
+	if err != nil {
+		return err
+	}
+
+	for _, as := range a.Cfg.Derived.ApplicationServices {
+		var asLocations []api.ASLocationResponse
+		params.Set("access_token", as.HSToken)
+
+		url := as.URL + api.ASLocationPath
+		if req.Protocol != "" {
+			url += "/" + req.Protocol
+		}
+
+		if err := requestDo[[]api.ASLocationResponse](a.HTTPClient, url+"?"+params.Encode(), &asLocations); err != nil {
+			log.WithError(err).Error("unable to get 'locations' from application service")
+			continue
+		}
+
+		resp.Locations = append(resp.Locations, asLocations...)
+	}
+
+	if len(resp.Locations) == 0 {
+		resp.Exists = false
+		return nil
+	}
+	resp.Exists = true
+	return nil
+}
+
+func (a *AppServiceQueryAPI) User(
+	ctx context.Context,
+	req *api.UserRequest,
+	resp *api.UserResponse,
+) error {
+	params, err := url.ParseQuery(req.Params)
+	if err != nil {
+		return err
+	}
+
+	for _, as := range a.Cfg.Derived.ApplicationServices {
+		var asUsers []api.ASUserResponse
+		params.Set("access_token", as.HSToken)
+
+		url := as.URL + api.ASUserPath
+		if req.Protocol != "" {
+			url += "/" + req.Protocol
+		}
+
+		if err := requestDo[[]api.ASUserResponse](a.HTTPClient, url+"?"+params.Encode(), &asUsers); err != nil {
+			log.WithError(err).Error("unable to get 'user' from application service")
+			continue
+		}
+
+		resp.Users = append(resp.Users, asUsers...)
+	}
+
+	if len(resp.Users) == 0 {
+		resp.Exists = false
+		return nil
+	}
+	resp.Exists = true
+	return nil
+}
+
+func (a *AppServiceQueryAPI) Protocols(
+	ctx context.Context,
+	req *api.ProtocolRequest,
+	resp *api.ProtocolResponse,
+) error {
+
+	// get a single protocol response
+	if req.Protocol != "" {
+
+		a.CacheMu.Lock()
+		defer a.CacheMu.Unlock()
+		if proto, ok := a.ProtocolCache[req.Protocol]; ok {
+			resp.Exists = true
+			resp.Protocols = map[string]api.ASProtocolResponse{
+				req.Protocol: proto,
+			}
+			return nil
+		}
+
+		response := api.ASProtocolResponse{}
+		for _, as := range a.Cfg.Derived.ApplicationServices {
+			var proto api.ASProtocolResponse
+			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+req.Protocol, &proto); err != nil {
+				log.WithError(err).Error("unable to get 'protocol' from application service")
+				continue
+			}
+
+			if len(response.Instances) != 0 {
+				response.Instances = append(response.Instances, proto.Instances...)
+			} else {
+				response = proto
+			}
+		}
+
+		if len(response.Instances) == 0 {
+			resp.Exists = false
+			return nil
+		}
+
+		resp.Exists = true
+		resp.Protocols = map[string]api.ASProtocolResponse{
+			req.Protocol: response,
+		}
+		a.ProtocolCache[req.Protocol] = response
+		return nil
+	}
+
+	response := make(map[string]api.ASProtocolResponse, len(a.Cfg.Derived.ApplicationServices))
+
+	for _, as := range a.Cfg.Derived.ApplicationServices {
+		for _, p := range as.Protocols {
+			var proto api.ASProtocolResponse
+			if err := requestDo[api.ASProtocolResponse](a.HTTPClient, as.URL+api.ASProtocolPath+p, &proto); err != nil {
+				log.WithError(err).Error("unable to get 'protocol' from application service")
+				continue
+			}
+			existing, ok := response[p]
+			if !ok {
+				response[p] = proto
+				continue
+			}
+			existing.Instances = append(existing.Instances, proto.Instances...)
+			response[p] = existing
+		}
+	}
+
+	if len(response) == 0 {
+		resp.Exists = false
+		return nil
+	}
+
+	a.CacheMu.Lock()
+	defer a.CacheMu.Unlock()
+	a.ProtocolCache = response
+
+	resp.Exists = true
+	resp.Protocols = response
 	return nil
 }
