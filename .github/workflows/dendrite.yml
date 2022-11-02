@@ -344,10 +344,10 @@ jobs:
             cgo: 1
 
           - label: PostgreSQL
-            postgres: postgres
+            postgres: Postgres
 
           - label: PostgreSQL, full HTTP APIs
-            postgres: postgres
+            postgres: Postgres
             api: full-http
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
