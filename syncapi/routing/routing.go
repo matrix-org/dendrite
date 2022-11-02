@@ -29,7 +29,11 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
+
+	authz "github.com/matrix-org/dendrite/authorization"
+	clientApiAuthz "github.com/matrix-org/dendrite/clientapi/authorization"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	zion "github.com/matrix-org/dendrite/zion"
 )
 
 // Setup configures the given mux with sync-server listeners
@@ -42,9 +46,12 @@ func Setup(
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
 	cfg *config.SyncAPI,
+	clientCfg *config.ClientAPI,
 	lazyLoadCache caching.LazyLoadCache,
 	fts *fulltext.Search,
 ) {
+	syncAuthz := zion.SyncRoomserverStruct{SyncRoomserverAPI: rsAPI}
+	authorization := clientApiAuthz.NewRoomserverAuthorization(clientCfg, syncAuthz)
 	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
@@ -55,6 +62,19 @@ func Setup(
 
 	v3mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+
+		isAllowed, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+			RoomId:     vars["roomID"],
+			UserId:     device.UserID,
+			Permission: authz.PermissionRead,
+		})
+
+		if !isAllowed {
+			return util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.Forbidden("Unauthorised"),
+			}
+		}
 		if err != nil {
 			return util.ErrorResponse(err)
 		}

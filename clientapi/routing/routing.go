@@ -42,6 +42,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	zion "github.com/matrix-org/dendrite/zion"
 )
 
 var ReleaseVersion string
@@ -76,7 +77,8 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, userAPI, cfg)
-	authorization := clientApiAuthz.NewAuthorization(cfg, rsAPI)
+	clientAuthz := zion.ClientRoomserverStruct{ClientRoomserverAPI: rsAPI}
+	authorization := clientApiAuthz.NewRoomserverAuthorization(cfg, clientAuthz)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,
@@ -396,6 +398,20 @@ func Setup(
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+
+			isAllowed, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+				RoomId:     vars["roomID"],
+				UserId:     device.UserID,
+				Permission: authz.PermissionWrite,
+			})
+
+			if !isAllowed {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Unauthorised"),
+				}
+			}
+
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -405,6 +421,20 @@ func Setup(
 	v3mux.Handle("/rooms/{roomID}/send/{eventType}/{txnID}",
 		httputil.MakeAuthAPI("send_message", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+
+			isAllowed, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+				RoomId:     vars["roomID"],
+				UserId:     device.UserID,
+				Permission: authz.PermissionWrite,
+			})
+
+			if !isAllowed {
+				return util.JSONResponse{
+					Code: http.StatusUnauthorized,
+					JSON: jsonerror.Forbidden("Unauthorised to send event"),
+				}
+			}
+
 			if err != nil {
 				return util.ErrorResponse(err)
 			}
@@ -525,7 +555,6 @@ func Setup(
 			return GetVisibility(req, rsAPI, vars["roomID"])
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
-
 	v3mux.Handle("/directory/list/room/{roomID}",
 		httputil.MakeAuthAPI("directory_list", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
