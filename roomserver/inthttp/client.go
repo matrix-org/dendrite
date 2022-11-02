@@ -27,21 +27,6 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-<<<<<<< HEAD
-	RoomserverPerformInvitePath            = "/roomserver/performInvite"
-	RoomserverPerformPeekPath              = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath            = "/roomserver/performUnpeek"
-	RoomserverPerformRoomUpgradePath       = "/roomserver/performRoomUpgrade"
-	RoomserverPerformJoinPath              = "/roomserver/performJoin"
-	RoomserverPerformLeavePath             = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath          = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath           = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
-	RoomserverPerformForgetPath            = "/roomserver/performForget"
-	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
-	RoomserverPerformAdminEvacuateUserPath = "/roomserver/performAdminEvacuateUser"
-	RoomserverPerformAdminPurgeRoomPath    = "/roomserver/performAdminPurgeRoom"
-=======
 	RoomserverPerformInvitePath             = "/roomserver/performInvite"
 	RoomserverPerformPeekPath               = "/roomserver/performPeek"
 	RoomserverPerformUnpeekPath             = "/roomserver/performUnpeek"
@@ -55,7 +40,7 @@ const (
 	RoomserverPerformAdminEvacuateRoomPath  = "/roomserver/performAdminEvacuateRoom"
 	RoomserverPerformAdminEvacuateUserPath  = "/roomserver/performAdminEvacuateUser"
 	RoomserverPerformAdminDownloadStatePath = "/roomserver/performAdminDownloadState"
->>>>>>> main
+	RoomserverPerformAdminPurgeRoomPath     = "/roomserver/performAdminPurgeRoom"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
