@@ -200,7 +200,7 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 			s.db, txn, stmtSQL, inputParams,
 			stateFilter.Senders, stateFilter.NotSenders,
 			stateFilter.Types, stateFilter.NotTypes,
-			nil, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderAsc,
+			nil, stateFilter.ContainsURL, 0, FilterOrderAsc,
 		)
 	} else {
 		stmt, params, err = prepareWithFilters(
