@@ -19,16 +19,37 @@ var localhostJson []byte
 var goerliJson []byte
 
 type ZionAuthorization struct {
-	store                 Store
+	store                 StoreAPI
 	spaceManagerLocalhost *zion_localhost.ZionSpaceManagerLocalhost
 	spaceManagerGoerli    *zion_goerli.ZionSpaceManagerGoerli
 	chainId               int
 }
+type ClientRoomserverStruct struct {
+	roomserver.ClientRoomserverAPI
+}
 
-func NewZionAuthorization(
-	cfg *config.ClientAPI,
-	rsAPI roomserver.ClientRoomserverAPI,
-) (authorization.Authorization, error) {
+type SyncRoomserverStruct struct {
+	roomserver.SyncRoomserverAPI
+}
+
+type RoomserverStoreAPI interface {
+	roomserver.QueryLatestEventsAndStateAPI
+	NewRoomserverStore() StoreAPI
+}
+
+func (c ClientRoomserverStruct) NewRoomserverStore() StoreAPI {
+	return &ClientRoomserverStore{
+		rsAPI: c,
+	}
+}
+
+func (c SyncRoomserverStruct) NewRoomserverStore() StoreAPI {
+	return &SyncRoomserverStore{
+		rsAPI: c,
+	}
+}
+
+func NewZionAuthorization(cfg *config.ClientAPI, rsAPI RoomserverStoreAPI) (authorization.Authorization, error) {
 	if cfg.PublicKeyAuthentication.Ethereum.NetworkUrl == "" {
 		log.Errorf("No blockchain network url specified in config\n")
 		return nil, nil
@@ -37,7 +58,7 @@ func NewZionAuthorization(
 	var auth ZionAuthorization
 
 	auth.chainId = cfg.PublicKeyAuthentication.Ethereum.GetChainID()
-	auth.store = NewStore(rsAPI)
+	auth.store = rsAPI.NewRoomserverStore()
 
 	switch auth.chainId {
 	case 1337, 31337:
