@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -27,9 +28,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	ironwoodtypes "github.com/Arceliar/ironwood/types"
-	yggdrasilconfig "github.com/yggdrasil-network/yggdrasil-go/src/config"
+	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	yggdrasilcore "github.com/yggdrasil-network/yggdrasil-go/src/core"
-	yggdrasildefaults "github.com/yggdrasil-network/yggdrasil-go/src/defaults"
+	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 	yggdrasilmulticast "github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 
 	gologme "github.com/gologme/log"
@@ -37,7 +38,6 @@ import (
 
 type Node struct {
 	core      *yggdrasilcore.Core
-	config    *yggdrasilconfig.NodeConfig
 	multicast *yggdrasilmulticast.Multicast
 	log       *gologme.Logger
 	utpSocket *utp.Socket
@@ -57,43 +57,52 @@ func (n *Node) DialerContext(ctx context.Context, _, address string) (net.Conn, 
 
 func Setup(sk ed25519.PrivateKey, instanceName, storageDirectory, peerURI, listenURI string) (*Node, error) {
 	n := &Node{
-		core:      &yggdrasilcore.Core{},
-		config:    yggdrasildefaults.GenerateConfig(),
-		multicast: &yggdrasilmulticast.Multicast{},
-		log:       gologme.New(logrus.StandardLogger().Writer(), "", 0),
-		incoming:  make(chan net.Conn),
+		log:      gologme.New(logrus.StandardLogger().Writer(), "", 0),
+		incoming: make(chan net.Conn),
 	}
 
-	options := []yggdrasilcore.SetupOption{
-		yggdrasilcore.AdminListenAddress("none"),
-	}
-	if listenURI != "" {
-		options = append(options, yggdrasilcore.ListenAddress(listenURI))
-	}
-	if peerURI != "" {
-		for _, uri := range strings.Split(peerURI, ",") {
-			options = append(options, yggdrasilcore.Peer{
-				URI: uri,
-			})
-		}
-	}
-
-	var err error
-	if n.core, err = yggdrasilcore.New(sk, options...); err != nil {
-		panic(err)
-	}
 	n.log.EnableLevel("error")
 	n.log.EnableLevel("warn")
 	n.log.EnableLevel("info")
-	n.core.SetLogger(n.log)
-	if n.utpSocket, err = utp.NewSocketFromPacketConnNoClose(n.core); err != nil {
-		panic(err)
+
+	{
+		var err error
+		options := []yggdrasilcore.SetupOption{}
+		if listenURI != "" {
+			options = append(options, yggdrasilcore.ListenAddress(listenURI))
+		}
+		if peerURI != "" {
+			for _, uri := range strings.Split(peerURI, ",") {
+				options = append(options, yggdrasilcore.Peer{
+					URI: uri,
+				})
+			}
+		}
+		if n.core, err = core.New(sk[:], n.log, options...); err != nil {
+			panic(err)
+		}
+		n.core.SetLogger(n.log)
+
+		if n.utpSocket, err = utp.NewSocketFromPacketConnNoClose(n.core); err != nil {
+			panic(err)
+		}
 	}
-	if err = n.multicast.Init(n.core, n.config, n.log, nil); err != nil {
-		panic(err)
-	}
-	if err = n.multicast.Start(); err != nil {
-		panic(err)
+
+	// Setup the multicast module.
+	{
+		var err error
+		options := []multicast.SetupOption{
+			multicast.MulticastInterface{
+				Regex:    regexp.MustCompile(".*"),
+				Beacon:   true,
+				Listen:   true,
+				Port:     0,
+				Priority: 0,
+			},
+		}
+		if n.multicast, err = multicast.New(n.core, n.log, options...); err != nil {
+			panic(err)
+		}
 	}
 
 	n.log.Printf("Public key: %x", n.core.PublicKey())
@@ -114,14 +123,7 @@ func (n *Node) DerivedServerName() string {
 }
 
 func (n *Node) PrivateKey() ed25519.PrivateKey {
-	sk := make(ed25519.PrivateKey, ed25519.PrivateKeySize)
-	sb, err := hex.DecodeString(n.config.PrivateKey)
-	if err == nil {
-		copy(sk, sb[:])
-	} else {
-		panic(err)
-	}
-	return sk
+	return n.core.PrivateKey()
 }
 
 func (n *Node) PublicKey() ed25519.PublicKey {

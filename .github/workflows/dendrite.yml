@@ -109,6 +109,11 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
+      - name: Set up gotestfmt
+        uses: gotesttools/gotestfmt-action@v2
+        with:
+          # Optional: pass GITHUB_TOKEN to avoid rate limiting.
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/cache@v3
         with:
           path: |
@@ -117,7 +122,7 @@ jobs:
           key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go${{ matrix.go }}-test-
-      - run: go test ./...
+      - run: go test -json -v ./... 2>&1 | gotestfmt
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
@@ -264,10 +269,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite
+          - label: SQLite native
 
-          - label: SQLite, full HTTP APIs
+          - label: SQLite Cgo
+            cgo: 1
+
+          - label: SQLite native, full HTTP APIs
             api: full-http
+
+          - label: SQLite Cgo, full HTTP APIs
+            api: full-http
+            cgo: 1
 
           - label: PostgreSQL
             postgres: postgres
@@ -283,6 +295,7 @@ jobs:
         POSTGRES: ${{ matrix.postgres && 1}}
         API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
+        CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
       - uses: actions/checkout@v3
       - name: Run Sytest
@@ -318,10 +331,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite
+          - label: SQLite native
 
-          - label: SQLite, full HTTP APIs
+          - label: SQLite Cgo
+            cgo: 1
+
+          - label: SQLite native, full HTTP APIs
             api: full-http
+
+          - label: SQLite Cgo, full HTTP APIs
+            api: full-http
+            cgo: 1
 
           - label: PostgreSQL
             postgres: Postgres
@@ -342,7 +362,7 @@ jobs:
         # See https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md specifically GOROOT_1_17_X64
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
-          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+          go get -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
 
       - name: Run actions/checkout@v3 for dendrite
         uses: actions/checkout@v3
@@ -388,6 +408,7 @@ jobs:
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
           API: ${{ matrix.api && 1 }}
+          CGO_ENABLED: ${{ matrix.cgo && 1 }}
         working-directory: complement
 
   integration-tests-done:

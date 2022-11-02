@@ -111,7 +111,8 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, d
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
 	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID: output.UserID,
+		UserID:    output.UserID,
+		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
 		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
@@ -135,7 +136,8 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
 	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID: output.UserID,
+		UserID:    output.UserID,
+		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
 		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")

@@ -159,6 +159,7 @@ type PerformJoinRequest struct {
 	// The sorted list of servers to try. Servers will be tried sequentially, after de-duplication.
 	ServerNames types.ServerNames      `json:"server_names"`
 	Content     map[string]interface{} `json:"content"`
+	Unsigned    map[string]interface{} `json:"unsigned"`
 }
 
 type PerformJoinResponse struct {

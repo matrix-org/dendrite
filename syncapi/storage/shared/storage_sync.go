@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type DatabaseTransaction struct {
@@ -277,6 +278,7 @@ func (d *DatabaseTransaction) GetBackwardTopologyPos(
 // exclusive of oldPos, inclusive of newPos, for the rooms in which
 // the user has new membership events.
 // A list of joined room IDs is also returned in case the caller needs it.
+// nolint:gocyclo
 func (d *DatabaseTransaction) GetStateDeltas(
 	ctx context.Context, device *userapi.Device,
 	r types.Range, userID string,
@@ -311,7 +313,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	}
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
+	stateNeeded, eventMap, err := d.OutputEvents.SelectStateInRange(ctx, d.txn, r, nil, allRoomIDs)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil, nil
@@ -319,6 +321,22 @@ func (d *DatabaseTransaction) GetStateDeltas(
 		return nil, nil, err
 	}
 	state, err := d.fetchStateEvents(ctx, d.txn, stateNeeded, eventMap)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	// get all the state events ever (i.e. for all available rooms) between these two positions
+	stateNeededFiltered, eventMapFiltered, err := d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+	stateFiltered, err := d.fetchStateEvents(ctx, d.txn, stateNeededFiltered, eventMapFiltered)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil, nil
@@ -360,38 +378,54 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	newlyJoinedRooms := make(map[string]bool, len(state))
 	for roomID, stateStreamEvents := range state {
 		for _, ev := range stateStreamEvents {
-			if membership, prevMembership := getMembershipFromEvent(ev.Event, userID); membership != "" {
-				if membership == gomatrixserverlib.Join && prevMembership != membership {
-					// send full room state down instead of a delta
+			// Look for our membership in the state events and skip over any
+			// membership events that are not related to us.
+			membership, prevMembership := getMembershipFromEvent(ev.Event, userID)
+			if membership == "" {
+				continue
+			}
+
+			if membership == gomatrixserverlib.Join {
+				// If our membership is now join but the previous membership wasn't
+				// then this is a "join transition", so we'll insert this room.
+				if prevMembership != membership {
+					newlyJoinedRooms[roomID] = true
+					// Get the full room state, as we'll send that down for a newly
+					// joined room instead of a delta.
 					var s []types.StreamEvent
-					s, err = d.currentStateStreamEventsForRoom(ctx, roomID, stateFilter)
-					if err != nil {
+					if s, err = d.currentStateStreamEventsForRoom(ctx, roomID, stateFilter); err != nil {
 						if err == sql.ErrNoRows {
 							continue
 						}
 						return nil, nil, err
 					}
-					state[roomID] = s
-					newlyJoinedRooms[roomID] = true
-					continue // we'll add this room in when we do joined rooms
+
+					// Add the information for this room into the state so that
+					// it will get added with all of the rest of the joined rooms.
+					stateFiltered[roomID] = s
 				}
 
-				deltas = append(deltas, types.StateDelta{
-					Membership:    membership,
-					MembershipPos: ev.StreamPosition,
-					StateEvents:   d.StreamEventsToEvents(device, stateStreamEvents),
-					RoomID:        roomID,
-				})
-				break
+				// We won't add joined rooms into the delta at this point as they
+				// are added later on.
+				continue
 			}
+
+			deltas = append(deltas, types.StateDelta{
+				Membership:    membership,
+				MembershipPos: ev.StreamPosition,
+				StateEvents:   d.StreamEventsToEvents(device, stateFiltered[roomID]),
+				RoomID:        roomID,
+			})
+			break
 		}
 	}
 
-	// Add in currently joined rooms
+	// Finally, add in currently joined rooms, including those from the
+	// join transitions above.
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  gomatrixserverlib.Join,
-			StateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
+			StateEvents: d.StreamEventsToEvents(device, stateFiltered[joinedRoomID]),
 			RoomID:      joinedRoomID,
 			NewlyJoined: newlyJoinedRooms[joinedRoomID],
 		})
@@ -572,4 +606,85 @@ func (d *DatabaseTransaction) PresenceAfter(ctx context.Context, after types.Str
 
 func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return d.Presence.GetMaxPresenceID(ctx, d.txn)
+}
+
+func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error) {
+	id, err := d.Relations.SelectMaxRelationID(ctx, d.txn)
+	return types.StreamPosition(id), err
+}
+
+func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (
+	events []types.StreamEvent, prevBatch, nextBatch string, err error,
+) {
+	r := types.Range{
+		From:      from,
+		To:        to,
+		Backwards: backwards,
+	}
+
+	if r.Backwards && r.From == 0 {
+		// If we're working backwards (dir=b) and there's no ?from= specified then
+		// we will automatically want to work backwards from the current position,
+		// so find out what that is.
+		if r.From, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+		}
+		// The result normally isn't inclusive of the event *at* the ?from=
+		// position, so add 1 here so that we include the most recent relation.
+		r.From++
+	} else if !r.Backwards && r.To == 0 {
+		// If we're working forwards (dir=f) and there's no ?to= specified then
+		// we will automatically want to work forwards towards the current position,
+		// so find out what that is.
+		if r.To, err = d.MaxStreamPositionForRelations(ctx); err != nil {
+			return nil, "", "", fmt.Errorf("d.MaxStreamPositionForRelations: %w", err)
+		}
+	}
+
+	// First look up any relations from the database. We add one to the limit here
+	// so that we can tell if we're overflowing, as we will only set the "next_batch"
+	// in the response if we are.
+	relations, _, err := d.Relations.SelectRelationsInRange(ctx, d.txn, roomID, eventID, relType, eventType, r, limit+1)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("d.Relations.SelectRelationsInRange: %w", err)
+	}
+
+	// If we specified a relation type then just get those results, otherwise collate
+	// them from all of the returned relation types.
+	entries := []types.RelationEntry{}
+	if relType != "" {
+		entries = relations[relType]
+	} else {
+		for _, e := range relations {
+			entries = append(entries, e...)
+		}
+	}
+
+	// If there were no entries returned, there were no relations, so stop at this point.
+	if len(entries) == 0 {
+		return nil, "", "", nil
+	}
+
+	// Otherwise, let's try and work out what sensible prev_batch and next_batch values
+	// could be. We've requested an extra event by adding one to the limit already so
+	// that we can determine whether or not to provide a "next_batch", so trim off that
+	// event off the end if needs be.
+	if len(entries) > limit {
+		entries = entries[:len(entries)-1]
+		nextBatch = fmt.Sprintf("%d", entries[len(entries)-1].Position)
+	}
+	// TODO: set prevBatch? doesn't seem to affect the tests...
+
+	// Extract all of the event IDs from the relation entries so that we can pull the
+	// events out of the database. Then go and fetch the events.
+	eventIDs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		eventIDs = append(eventIDs, entry.EventID)
+	}
+	events, err = d.OutputEvents.SelectEvents(ctx, d.txn, eventIDs, nil, true)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("d.OutputEvents.SelectEvents: %w", err)
+	}
+
+	return events, prevBatch, nextBatch, nil
 }

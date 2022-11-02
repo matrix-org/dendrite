@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/types"
@@ -84,8 +86,8 @@ type OpenIDTable interface {
 type ProfileTable interface {
 	InsertProfile(ctx context.Context, txn *sql.Tx, localpart string) error
 	SelectProfileByLocalpart(ctx context.Context, localpart string) (*authtypes.Profile, error)
-	SetAvatarURL(ctx context.Context, txn *sql.Tx, localpart string, avatarURL string) (err error)
-	SetDisplayName(ctx context.Context, txn *sql.Tx, localpart string, displayName string) (err error)
+	SetAvatarURL(ctx context.Context, txn *sql.Tx, localpart string, avatarURL string) (*authtypes.Profile, bool, error)
+	SetDisplayName(ctx context.Context, txn *sql.Tx, localpart string, displayName string) (*authtypes.Profile, bool, error)
 	SelectProfilesBySearch(ctx context.Context, searchString string, limit int) ([]authtypes.Profile, error)
 }
 
@@ -115,7 +117,9 @@ type NotificationTable interface {
 
 type StatsTable interface {
 	UserStatistics(ctx context.Context, txn *sql.Tx) (*types.UserStatistics, *types.DatabaseEngine, error)
+	DailyRoomsMessages(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error)
 	UpdateUserDailyVisits(ctx context.Context, txn *sql.Tx, startTime, lastUpdate time.Time) error
+	UpsertDailyStats(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error
 }
 
 type NotificationFilter uint32

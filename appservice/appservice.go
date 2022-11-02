@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -58,8 +59,10 @@ func NewInternalAPI(
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient: client,
-		Cfg:        &base.Cfg.AppServiceAPI,
+		HTTPClient:    client,
+		Cfg:           &base.Cfg.AppServiceAPI,
+		ProtocolCache: map[string]appserviceAPI.ASProtocolResponse{},
+		CacheMu:       sync.Mutex{},
 	}
 
 	if len(base.Cfg.Derived.ApplicationServices) == 0 {

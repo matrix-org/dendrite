@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/tidwall/gjson"
 )
 
 // Ideally, when we have both events we should redact the event JSON and forget about the redaction, but we currently
@@ -445,7 +446,7 @@ func (d *Database) GetInvitesForUser(
 	ctx context.Context,
 	roomNID types.RoomNID,
 	targetUserNID types.EventStateKeyNID,
-) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, err error) {
+) (senderUserIDs []types.EventStateKeyNID, eventIDs []string, inviteEventJSON []byte, err error) {
 	return d.InvitesTable.SelectInviteActiveForUserInRoom(ctx, nil, targetUserNID, roomNID)
 }
 
@@ -466,6 +467,23 @@ func (d *Database) events(
 			events[nid] = event
 		} else {
 			eventNIDs = append(eventNIDs, nid)
+		}
+	}
+	// If we don't need to get any events from the database, short circuit now
+	if len(eventNIDs) == 0 {
+		results := make([]types.Event, 0, len(inputEventNIDs))
+		for _, nid := range inputEventNIDs {
+			event, ok := events[nid]
+			if !ok || event == nil {
+				return nil, fmt.Errorf("event %d missing", nid)
+			}
+			results = append(results, types.Event{
+				EventNID: nid,
+				Event:    event,
+			})
+		}
+		if !redactionsArePermanent {
+			d.applyRedactions(results)
 		}
 	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
@@ -531,6 +549,12 @@ func (d *Database) events(
 		d.applyRedactions(results)
 	}
 	return results, nil
+}
+
+func (d *Database) BulkSelectSnapshotsFromEventIDs(
+	ctx context.Context, eventIDs []string,
+) (map[types.StateSnapshotNID][]string, error) {
+	return d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, nil, eventIDs)
 }
 
 func (d *Database) MembershipUpdater(
@@ -721,9 +745,9 @@ func (d *Database) storeEvent(
 	}, redactionEvent, redactedEventID, err
 }
 
-func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
+func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, publish)
+		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, appserviceID, networkID, publish)
 	})
 }
 
@@ -731,8 +755,8 @@ func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, e
 	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
 }
 
-func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
-	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
+func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error) {
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true, includeAllNetworks)
 }
 
 func (d *Database) MissingAuthPrevEvents(
@@ -1280,7 +1304,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 }
 
 // JoinedUsersSetInRooms returns a map of how many times the given users appear in the specified rooms.
-func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string) (map[string]int, error) {
+func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs []string, localOnly bool) (map[string]int, error) {
 	roomNIDs, err := d.RoomsTable.BulkSelectRoomNIDs(ctx, nil, roomIDs)
 	if err != nil {
 		return nil, err
@@ -1295,7 +1319,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 		userNIDs = append(userNIDs, nid)
 		nidToUserID[nid] = id
 	}
-	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, nil, roomNIDs, userNIDs)
+	userNIDToCount, err := d.MembershipTable.SelectJoinedUsersSetForRooms(ctx, nil, roomNIDs, userNIDs, localOnly)
 	if err != nil {
 		return nil, err
 	}

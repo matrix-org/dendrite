@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
@@ -16,8 +19,6 @@ import (
 	"github.com/matrix-org/dendrite/userapi/storage/sqlite3"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
 	"github.com/matrix-org/dendrite/userapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 func mustMakeDBs(t *testing.T, dbType test.DBType) (
@@ -106,7 +107,7 @@ func mustUpdateDeviceLastSeen(
 	timestamp time.Time,
 ) {
 	t.Helper()
-	_, err := db.ExecContext(ctx, "UPDATE device_devices SET last_seen_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
+	_, err := db.ExecContext(ctx, "UPDATE userapi_devices SET last_seen_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
@@ -119,7 +120,7 @@ func mustUserUpdateRegistered(
 	localpart string,
 	timestamp time.Time,
 ) {
-	_, err := db.ExecContext(ctx, "UPDATE account_accounts SET created_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
+	_, err := db.ExecContext(ctx, "UPDATE userapi_accounts SET created_ts = $1 WHERE localpart = $2", gomatrixserverlib.AsTimestamp(timestamp), localpart)
 	if err != nil {
 		t.Fatalf("unable to update device last seen")
 	}
@@ -227,7 +228,7 @@ func Test_UserStatistics(t *testing.T) {
 			mustUserUpdateRegistered(t, ctx, db, "user4", time.Now().AddDate(0, -2, 0))
 			mustUpdateDeviceLastSeen(t, ctx, db, "user4", time.Now())
 			startTime := time.Now().AddDate(0, 0, -2)
-			err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24).Add(time.Hour))
+			err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24))
 			if err != nil {
 				t.Fatalf("unable to update daily visits stats: %v", err)
 			}
@@ -278,7 +279,7 @@ func Test_UserStatistics(t *testing.T) {
 				mustUpdateDeviceLastSeen(t, ctx, db, "user1", time.Now().AddDate(0, 0, -i))
 				mustUpdateDeviceLastSeen(t, ctx, db, "user5", time.Now().AddDate(0, 0, -i))
 				startTime := time.Now().AddDate(0, 0, -i)
-				err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24).Add(time.Hour))
+				err := statsDB.UpdateUserDailyVisits(ctx, nil, startTime, startTime.Truncate(time.Hour*24))
 				if err != nil {
 					t.Fatalf("unable to update daily visits stats: %v", err)
 				}

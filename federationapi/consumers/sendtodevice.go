@@ -18,27 +18,29 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // OutputSendToDeviceConsumer consumes events that originate in the clientapi.
 type OutputSendToDeviceConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	db         storage.Database
-	queues     *queue.OutgoingQueues
-	ServerName gomatrixserverlib.ServerName
-	topic      string
+	ctx               context.Context
+	jetstream         nats.JetStreamContext
+	durable           string
+	db                storage.Database
+	queues            *queue.OutgoingQueues
+	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	topic             string
 }
 
 // NewOutputSendToDeviceConsumer creates a new OutputSendToDeviceConsumer. Call Start() to begin consuming send-to-device events.
@@ -50,13 +52,13 @@ func NewOutputSendToDeviceConsumer(
 	store storage.Database,
 ) *OutputSendToDeviceConsumer {
 	return &OutputSendToDeviceConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		queues:     queues,
-		db:         store,
-		ServerName: cfg.Matrix.ServerName,
-		durable:    cfg.Matrix.JetStream.Durable("FederationAPIESendToDeviceConsumer"),
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		ctx:               process.Context(),
+		jetstream:         js,
+		queues:            queues,
+		db:                store,
+		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		durable:           cfg.Matrix.JetStream.Durable("FederationAPIESendToDeviceConsumer"),
+		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 	}
 }
 
@@ -76,34 +78,37 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 	sender := msg.Header.Get("sender")
 	_, originServerName, err := gomatrixserverlib.SplitID('@', sender)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).WithField("user_id", sender).Error("Failed to extract domain from send-to-device sender")
 		return true
 	}
-	if originServerName != t.ServerName {
+	if !t.isLocalServerName(originServerName) {
 		return true
 	}
 	// Extract the send-to-device event from msg.
 	var ote syncTypes.OutputSendToDeviceEvent
 	if err = json.Unmarshal(msg.Data, &ote); err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).Errorf("output log: message parse failed (expected send-to-device)")
 		return true
 	}
 
 	_, destServerName, err := gomatrixserverlib.SplitID('@', ote.UserID)
 	if err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).WithField("user_id", ote.UserID).Error("Failed to extract domain from send-to-device destination")
 		return true
 	}
 
 	// The SyncAPI is already handling sendToDevice for the local server
-	if destServerName == t.ServerName {
+	if t.isLocalServerName(destServerName) {
 		return true
 	}
 
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MDirectToDevice,
-		Origin: string(t.ServerName),
+		Origin: string(originServerName),
 	}
 	tdm := gomatrixserverlib.ToDeviceMessage{
 		Sender:    ote.Sender,
@@ -116,12 +121,13 @@ func (t *OutputSendToDeviceConsumer) onMessage(ctx context.Context, msgs []*nats
 		},
 	}
 	if edu.Content, err = json.Marshal(tdm); err != nil {
+		sentry.CaptureException(err)
 		log.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
 
 	log.Debugf("Sending send-to-device message into %q destination queue", destServerName)
-	if err := t.queues.SendEDU(edu, t.ServerName, []gomatrixserverlib.ServerName{destServerName}); err != nil {
+	if err := t.queues.SendEDU(edu, originServerName, []gomatrixserverlib.ServerName{destServerName}); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}
