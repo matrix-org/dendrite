@@ -469,6 +469,23 @@ func (d *Database) events(
 			eventNIDs = append(eventNIDs, nid)
 		}
 	}
+	// If we don't need to get any events from the database, short circuit now
+	if len(eventNIDs) == 0 {
+		results := make([]types.Event, 0, len(inputEventNIDs))
+		for _, nid := range inputEventNIDs {
+			event, ok := events[nid]
+			if !ok || event == nil {
+				return nil, fmt.Errorf("event %d missing", nid)
+			}
+			results = append(results, types.Event{
+				EventNID: nid,
+				Event:    event,
+			})
+		}
+		if !redactionsArePermanent {
+			d.applyRedactions(results)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -532,6 +549,12 @@ func (d *Database) events(
 		d.applyRedactions(results)
 	}
 	return results, nil
+}
+
+func (d *Database) BulkSelectSnapshotsFromEventIDs(
+	ctx context.Context, eventIDs []string,
+) (map[types.StateSnapshotNID][]string, error) {
+	return d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, nil, eventIDs)
 }
 
 func (d *Database) MembershipUpdater(

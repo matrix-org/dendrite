@@ -301,7 +301,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	// Applies the history visibility rules
-	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
+	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, recentEvents)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 	}
@@ -315,11 +315,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Now that we've filtered the timeline, work out which state events are still
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
-
-	// Don't remove the state events if this is a newly joined room. The member
-	// needs the full room state. For example, to figure out if the room is a space
-	// or not, it needs the m.room.create event which may be chronologically outside
-	// the filter limit.
 	if !delta.NewlyJoined {
 		delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
 			removeDuplicates(delta.StateEvents, recentEvents),
@@ -328,10 +323,14 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	if len(delta.StateEvents) > 0 {
-		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
+		if last := delta.StateEvents[len(delta.StateEvents)-1]; last != nil {
+			updateLatestPosition(last.EventID())
+		}
 	}
 	if len(events) > 0 {
-		updateLatestPosition(events[len(events)-1].EventID())
+		if last := events[len(events)-1]; last != nil {
+			updateLatestPosition(last.EventID())
+		}
 	}
 
 	switch delta.Membership {
@@ -381,12 +380,12 @@ func applyHistoryVisibilityFilter(
 	snapshot storage.DatabaseTransaction,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	roomID, userID string,
-	limit int,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	// We need to make sure we always include the latest states events, if they are in the timeline.
 	// We grep at least limit * 2 events, to ensure we really get the needed events.
-	stateEvents, err := snapshot.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: limit * 2}, nil)
+	filter := gomatrixserverlib.DefaultStateFilter()
+	stateEvents, err := snapshot.CurrentState(ctx, roomID, &filter, nil)
 	if err != nil {
 		// Not a fatal error, we can continue without the stateEvents,
 		// they are only needed if there are state events in the timeline.
@@ -524,7 +523,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
 	if !isPeek {
-		events, err = applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, roomID, device.UserID, eventFilter.Limit, recentEvents)
+		events, err = applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, roomID, device.UserID, recentEvents)
 		if err != nil {
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
@@ -604,7 +603,6 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// Query missing membership events
 	filter := gomatrixserverlib.DefaultStateFilter()
-	filter.Limit = stateFilter.Limit
 	filter.Senders = &wantUsers
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := snapshot.GetStateEventsForRoom(ctx, roomID, &filter)

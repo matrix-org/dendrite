@@ -19,11 +19,13 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AppServiceInternalAPI is used to query user and room alias data from application
@@ -41,6 +43,10 @@ type AppServiceInternalAPI interface {
 		req *UserIDExistsRequest,
 		resp *UserIDExistsResponse,
 	) error
+
+	Locations(ctx context.Context, req *LocationRequest, resp *LocationResponse) error
+	User(ctx context.Context, request *UserRequest, response *UserResponse) error
+	Protocols(ctx context.Context, req *ProtocolRequest, resp *ProtocolResponse) error
 }
 
 // RoomAliasExistsRequest is a request to an application service
@@ -75,6 +81,73 @@ type UserIDExistsRequestAccessToken struct {
 // whether a user ID exists
 type UserIDExistsResponse struct {
 	UserIDExists bool `json:"exists"`
+}
+
+const (
+	ASProtocolPath = "/_matrix/app/unstable/thirdparty/protocol/"
+	ASUserPath     = "/_matrix/app/unstable/thirdparty/user"
+	ASLocationPath = "/_matrix/app/unstable/thirdparty/location"
+)
+
+type ProtocolRequest struct {
+	Protocol string `json:"protocol,omitempty"`
+}
+
+type ProtocolResponse struct {
+	Protocols map[string]ASProtocolResponse `json:"protocols"`
+	Exists    bool                          `json:"exists"`
+}
+
+type ASProtocolResponse struct {
+	FieldTypes     map[string]FieldType `json:"field_types,omitempty"` // NOTSPEC: field_types is required by the spec
+	Icon           string               `json:"icon"`
+	Instances      []ProtocolInstance   `json:"instances"`
+	LocationFields []string             `json:"location_fields"`
+	UserFields     []string             `json:"user_fields"`
+}
+
+type FieldType struct {
+	Placeholder string `json:"placeholder"`
+	Regexp      string `json:"regexp"`
+}
+
+type ProtocolInstance struct {
+	Description string          `json:"desc"`
+	Icon        string          `json:"icon,omitempty"`
+	NetworkID   string          `json:"network_id,omitempty"` // NOTSPEC: network_id is required by the spec
+	Fields      json.RawMessage `json:"fields,omitempty"`     // NOTSPEC: fields is required by the spec
+}
+
+type UserRequest struct {
+	Protocol string `json:"protocol"`
+	Params   string `json:"params"`
+}
+
+type UserResponse struct {
+	Users  []ASUserResponse `json:"users,omitempty"`
+	Exists bool             `json:"exists,omitempty"`
+}
+
+type ASUserResponse struct {
+	Protocol string          `json:"protocol"`
+	UserID   string          `json:"userid"`
+	Fields   json.RawMessage `json:"fields"`
+}
+
+type LocationRequest struct {
+	Protocol string `json:"protocol"`
+	Params   string `json:"params"`
+}
+
+type LocationResponse struct {
+	Locations []ASLocationResponse `json:"locations,omitempty"`
+	Exists    bool                 `json:"exists,omitempty"`
+}
+
+type ASLocationResponse struct {
+	Alias    string          `json:"alias"`
+	Protocol string          `json:"protocol"`
+	Fields   json.RawMessage `json:"fields"`
 }
 
 // RetrieveUserProfile is a wrapper that queries both the local database and

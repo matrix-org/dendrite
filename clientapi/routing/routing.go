@@ -937,12 +937,50 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/thirdparty/protocols",
-		httputil.MakeExternalAPI("thirdparty_protocols", func(req *http.Request) util.JSONResponse {
-			// TODO: Return the third party protcols
-			return util.JSONResponse{
-				Code: http.StatusOK,
-				JSON: struct{}{},
+		httputil.MakeAuthAPI("thirdparty_protocols", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return Protocols(req, asAPI, device, "")
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/thirdparty/protocol/{protocolID}",
+		httputil.MakeAuthAPI("thirdparty_protocols", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
 			}
+			return Protocols(req, asAPI, device, vars["protocolID"])
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/thirdparty/user/{protocolID}",
+		httputil.MakeAuthAPI("thirdparty_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return User(req, asAPI, device, vars["protocolID"], req.URL.Query())
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/thirdparty/user",
+		httputil.MakeAuthAPI("thirdparty_user", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return User(req, asAPI, device, "", req.URL.Query())
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/thirdparty/location/{protocolID}",
+		httputil.MakeAuthAPI("thirdparty_location", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+			if err != nil {
+				return util.ErrorResponse(err)
+			}
+			return Location(req, asAPI, device, vars["protocolID"], req.URL.Query())
+		}),
+	).Methods(http.MethodGet, http.MethodOptions)
+
+	v3mux.Handle("/thirdparty/location",
+		httputil.MakeAuthAPI("thirdparty_location", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+			return Location(req, asAPI, device, "", req.URL.Query())
 		}),
 	).Methods(http.MethodGet, http.MethodOptions)
 
