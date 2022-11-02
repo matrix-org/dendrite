@@ -211,7 +211,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build main pinecone demo image
+      - name: Build main Pinecone demo image
         if: github.ref_name == 'main'
         id: docker_build_demo_pinecone
         uses: docker/build-push-action@v3
@@ -226,7 +226,7 @@ jobs:
             ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-pinecone:${{ github.ref_name }}
             ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-pinecone:${{ github.ref_name }}
 
-      - name: Build release pinecone demo image
+      - name: Build release Pinecone demo image
         if: github.event_name == 'release' # Only for GitHub releases
         id: docker_build_demo_pinecone_release
         uses: docker/build-push-action@v3
@@ -239,7 +239,40 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-pinecone:latest
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-pinecone:${{ env.RELEASE_VERSION }}
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-pinecone:latest
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-pinecone:${{ env.RELEASE_VERSION }}
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}
+
+      - name: Build main Yggdrasil demo image
+        if: github.ref_name == 'main'
+        id: docker_build_demo_yggdrasil
+        uses: docker/build-push-action@v3
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          target: demo-yggdrasil
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:${{ github.ref_name }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:${{ github.ref_name }}
+
+      - name: Build release Yggdrasil demo image
+        if: github.event_name == 'release' # Only for GitHub releases
+        id: docker_build_demo_yggdrasil_release
+        uses: docker/build-push-action@v3
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          build-args: FLAGS="-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}"
+          target: demo-yggdrasil
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}

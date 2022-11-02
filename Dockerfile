@@ -16,7 +16,11 @@ ARG TARGETARCH
 ARG FLAGS
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
-    sh ./build/docker/crossbuild.sh
+    USERARCH=`go env GOARCH` \
+    GOARCH="$TARGETARCH" \
+    GOOS="linux" \
+    CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
+    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
 
 #
 # The dendrite base image; mainly creates a user and switches to it
@@ -56,10 +60,10 @@ ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
 EXPOSE 8008 8448
 
 #
-# Builds the P2P demo image and contains all required binaries
+# Builds the Pinecone P2P demo image and contains all required binaries
 #
 FROM dendrite-base AS demo-pinecone
-LABEL org.opencontainers.image.title="Dendrite (P2P Demo)"
+LABEL org.opencontainers.image.title="Dendrite (Pinecone P2P Demo)"
 
 COPY --from=build /out/create-account /usr/bin/create-account
 COPY --from=build /out/generate-config /usr/bin/generate-config
@@ -73,13 +77,32 @@ ENTRYPOINT ["/usr/bin/dendrite-demo-pinecone"]
 EXPOSE 8008 8448
 
 #
+# Builds the Yggdrasil P2P demo image and contains all required binaries
+#
+FROM dendrite-base AS demo-yggdrasil
+LABEL org.opencontainers.image.title="Dendrite (Yggdrasil P2P Demo)"
+
+COPY --from=build /out/create-account /usr/bin/create-account
+COPY --from=build /out/generate-config /usr/bin/generate-config
+COPY --from=build /out/generate-keys /usr/bin/generate-keys
+COPY --from=build /out/dendrite-demo-yggdrasil /usr/bin/dendrite-demo-yggdrasil
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["/usr/bin/dendrite-demo-yggdrasil"]
+EXPOSE 8008 8448
+
+#
 # Builds the Complement image, used for integration tests
 #
 FROM base AS complement
 LABEL org.opencontainers.image.title="Dendrite (Complement)"
 RUN apk add --no-cache sqlite openssl ca-certificates
-COPY --from=build /out/* /usr/bin/
-RUN rm /usr/bin/dendrite-polylith-multi /usr/bin/dendrite-demo* /usr/bin/dendritejs-pinecone
+
+COPY --from=build /out/generate-config /usr/bin/generate-config
+COPY --from=build /out/generate-keys /usr/bin/generate-keys
+COPY --from=build /out/dendrite-monolith-server /usr/bin/dendrite-monolith-server
 
 WORKDIR /dendrite
 RUN /usr/bin/generate-keys --private-key matrix_key.pem && \
