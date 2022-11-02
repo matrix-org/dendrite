@@ -301,7 +301,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	}
 
 	// Applies the history visibility rules
-	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, eventFilter.Limit, recentEvents)
+	events, err := applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, delta.RoomID, device.UserID, recentEvents)
 	if err != nil {
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 	}
@@ -378,12 +378,12 @@ func applyHistoryVisibilityFilter(
 	snapshot storage.DatabaseTransaction,
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	roomID, userID string,
-	limit int,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	// We need to make sure we always include the latest states events, if they are in the timeline.
 	// We grep at least limit * 2 events, to ensure we really get the needed events.
-	stateEvents, err := snapshot.CurrentState(ctx, roomID, &gomatrixserverlib.StateFilter{Limit: limit * 2}, nil)
+	filter := gomatrixserverlib.DefaultStateFilter()
+	stateEvents, err := snapshot.CurrentState(ctx, roomID, &filter, nil)
 	if err != nil {
 		// Not a fatal error, we can continue without the stateEvents,
 		// they are only needed if there are state events in the timeline.
@@ -521,7 +521,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
 	if !isPeek {
-		events, err = applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, roomID, device.UserID, eventFilter.Limit, recentEvents)
+		events, err = applyHistoryVisibilityFilter(ctx, snapshot, p.rsAPI, roomID, device.UserID, recentEvents)
 		if err != nil {
 			logrus.WithError(err).Error("unable to apply history visibility filter")
 		}
@@ -601,7 +601,6 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	}
 	// Query missing membership events
 	filter := gomatrixserverlib.DefaultStateFilter()
-	filter.Limit = stateFilter.Limit
 	filter.Senders = &wantUsers
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := snapshot.GetStateEventsForRoom(ctx, roomID, &filter)
