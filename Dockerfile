@@ -9,7 +9,7 @@ RUN apk --update --no-cache add bash build-base curl
 #
 # build creates all needed binaries
 #
-FROM base AS build
+FROM --platform=${BUILDPLATFORM} base AS build
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH
