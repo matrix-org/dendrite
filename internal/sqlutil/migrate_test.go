@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	_ "modernc.org/sqlite"
-
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/test"
 )
