@@ -321,10 +321,14 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	)
 
 	if len(delta.StateEvents) > 0 {
-		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
+		if last := delta.StateEvents[len(delta.StateEvents)-1]; last != nil {
+			updateLatestPosition(last.EventID())
+		}
 	}
 	if len(events) > 0 {
-		updateLatestPosition(events[len(events)-1].EventID())
+		if last := events[len(events)-1]; last != nil {
+			updateLatestPosition(last.EventID())
+		}
 	}
 
 	switch delta.Membership {

@@ -24,8 +24,8 @@ func UpPulishedAppservice(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `	ALTER TABLE roomserver_published RENAME TO roomserver_published_tmp;
 CREATE TABLE IF NOT EXISTS roomserver_published (
     room_id TEXT NOT NULL,
-    appservice_id TEXT NOT NULL,
-    network_id TEXT NOT NULL,
+    appservice_id TEXT NOT NULL DEFAULT '',
+    network_id TEXT NOT NULL DEFAULT '',
     published BOOLEAN NOT NULL DEFAULT false,
     CONSTRAINT unique_published_idx PRIMARY KEY (room_id, appservice_id, network_id)
 );
