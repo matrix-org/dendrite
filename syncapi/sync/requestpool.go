@@ -505,7 +505,7 @@ func (rp *RequestPool) OnIncomingSyncRequest(req *http.Request, device *userapi.
 					func(snapshot storage.DatabaseTransaction) types.StreamPosition {
 						return rp.streams.MultiRoomStreamProvider.IncrementalSync(
 							syncReq.Context, snapshot, syncReq,
-							syncReq.Since.PresencePosition, rp.Notifier.CurrentPosition().PresencePosition,
+							syncReq.Since.MultiRoomDataPosition, rp.Notifier.CurrentPosition().MultiRoomDataPosition,
 						)
 					},
 				),

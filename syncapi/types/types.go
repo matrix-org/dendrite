@@ -410,7 +410,8 @@ func (r *Response) HasUpdates() bool {
 		len(r.Rooms.Peek) > 0 ||
 		len(r.ToDevice.Events) > 0 ||
 		len(r.DeviceLists.Changed) > 0 ||
-		len(r.DeviceLists.Left) > 0)
+		len(r.DeviceLists.Left) > 0) ||
+		len(r.MultiRoom) > 0
 }
 
 // NewResponse creates an empty response with initialised maps.
