@@ -9,7 +9,7 @@ They can be found on Docker Hub:
 
 ## Dockerfiles
 
-The `Dockerfile` is a multistage file which can build all three Dendrite
+The `Dockerfile` is a multistage file which can build all four Dendrite
 images depending on the supplied `--target`. From the root of the Dendrite
 repository, run:
 
