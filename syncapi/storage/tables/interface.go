@@ -115,8 +115,6 @@ type CurrentRoomState interface {
 	SelectJoinedUsersInRoom(ctx context.Context, txn *sql.Tx, roomIDs []string) (map[string][]string, error)
 	// SelectSharedUsers returns a subset of otherUserIDs that share a room with userID.
 	SelectSharedUsers(ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string) ([]string, error)
-	// SelectRoomMembershipOfUser returns the membership of the user in the room.
-	SelectRoomMembershipOfUser(ctx context.Context, txn *sql.Tx, roomID string, userID string) (string, error)
 }
 
 // BackwardsExtremities keeps track of backwards extremities for a room.

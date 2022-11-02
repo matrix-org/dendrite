@@ -84,9 +84,6 @@ const selectJoinedUsersSQL = "" +
 const selectJoinedUsersInRoomSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join' AND room_id IN ($1)"
 
-const selectRoomMembershipOfUserSQL = "" +
-	"SELECT membership FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND state_key = $2"
-
 const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
@@ -110,7 +107,6 @@ type currentRoomStateStatements struct {
 	//selectJoinedUsersInRoomStmt      *sql.Stmt - prepared at runtime due to variadic
 	selectStateEventStmt *sql.Stmt
 	//selectSharedUsersSQL             *sql.Stmt - prepared at runtime due to variadic
-	selectRoomMembershipOfUserStmt *sql.Stmt
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
@@ -149,9 +145,6 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 		return nil, err
 	}
 	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRoomMembershipOfUserStmt, err = db.Prepare(selectRoomMembershipOfUserSQL); err != nil {
 		return nil, err
 	}
 	//if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
@@ -490,27 +483,4 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 	)
 
 	return result, err
-}
-
-func (s *currentRoomStateStatements) SelectRoomMembershipOfUser(
-	ctx context.Context, txn *sql.Tx, roomID string, userID string,
-) (string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomMembershipOfUserStmt)
-	rows, err := stmt.QueryContext(ctx, roomID, userID)
-	if err != nil {
-		return "", err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomMembershipOfUserStmt: rows.close() failed")
-
-	membership := ""
-	for rows.Next() {
-		if err := rows.Scan(&membership); err != nil {
-			return "", err
-		}
-		// Found the membership info
-		if membership != "" {
-			return membership, rows.Err()
-		}
-	}
-	return membership, rows.Err()
 }
