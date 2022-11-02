@@ -195,6 +195,11 @@ type Memberships interface {
 	SelectHeroes(ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string) (heroes []string, err error)
 	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
 	PurgeMemberships(ctx context.Context, txn *sql.Tx, roomID string) error
+	SelectMemberships(
+		ctx context.Context, txn *sql.Tx,
+		roomID string, pos types.TopologyToken,
+		membership, notMembership *string,
+	) (eventIDs []string, err error)
 }
 
 type NotificationData interface {

@@ -20,11 +20,12 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // The memberships table is designed to track the last time that
@@ -72,12 +73,21 @@ const selectMembershipBeforeSQL = "" +
 const purgeMembershipsSQL = "" +
 	"DELETE FROM syncapi_memberships WHERE room_id = $1"
 
+const selectMembersSQL = `
+	SELECT event_id FROM (
+		SELECT DISTINCT ON (room_id, user_id) room_id, user_id, event_id, membership FROM syncapi_memberships WHERE room_id = $1 AND topological_pos <= $2 ORDER BY room_id, user_id, stream_pos DESC  
+	) t 
+	WHERE ($3::text IS NULL OR t.membership = $3)
+		AND ($4::text IS NULL OR t.membership <> $4)
+`
+
 type membershipsStatements struct {
 	upsertMembershipStmt        *sql.Stmt
 	selectMembershipCountStmt   *sql.Stmt
 	selectHeroesStmt            *sql.Stmt
 	selectMembershipForUserStmt *sql.Stmt
 	purgeMembershipsStmt        *sql.Stmt
+	selectMembersStmt           *sql.Stmt
 }
 
 func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -92,6 +102,7 @@ func NewPostgresMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 		{&s.selectHeroesStmt, selectHeroesSQL},
 		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
 		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
+		{&s.selectMembersStmt, selectMembersSQL},
 	}.Prepare(db)
 }
 
@@ -165,4 +176,26 @@ func (s *membershipsStatements) PurgeMemberships(
 ) error {
 	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomID)
 	return err
+}
+
+func (s *membershipsStatements) SelectMemberships(
+	ctx context.Context, txn *sql.Tx,
+	roomID string, pos types.TopologyToken,
+	membership, notMembership *string,
+) (eventIDs []string, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembersStmt)
+	rows, err := stmt.QueryContext(ctx, roomID, pos.Depth, membership, notMembership)
+	if err != nil {
+		return
+	}
+	var (
+		eventID string
+	)
+	for rows.Next() {
+		if err = rows.Scan(&eventID); err != nil {
+			return
+		}
+		eventIDs = append(eventIDs, eventID)
+	}
+	return eventIDs, rows.Err()
 }

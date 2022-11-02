@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"math"
 	"strconv"
 	"time"
 
@@ -74,12 +75,14 @@ func (p *InviteStreamProvider) IncrementalSync(
 		return to
 	}
 	for roomID := range retiredInvites {
-		if _, ok := req.Response.Rooms.Invite[roomID]; ok {
+		membership, _, err := snapshot.SelectMembershipForUser(ctx, roomID, req.Device.UserID, math.MaxInt64)
+		// Skip if the user is an existing member of the room.
+		// Otherwise, the NewLeaveResponse will eject the user from the room unintentionally
+		if membership == gomatrixserverlib.Join ||
+			err != nil {
 			continue
 		}
-		if _, ok := req.Response.Rooms.Join[roomID]; ok {
-			continue
-		}
+
 		lr := types.NewLeaveResponse()
 		h := sha256.Sum256(append([]byte(roomID), []byte(strconv.FormatInt(int64(to), 10))...))
 		lr.Timeline.Events = append(lr.Timeline.Events, gomatrixserverlib.ClientEvent{
@@ -93,7 +96,6 @@ func (p *InviteStreamProvider) IncrementalSync(
 			Content:        gomatrixserverlib.RawJSON(`{"membership":"leave"}`),
 		})
 		req.Response.Rooms.Leave[roomID] = lr
-
 	}
 
 	return maxID

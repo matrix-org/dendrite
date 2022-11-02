@@ -2,24 +2,29 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
 )
 
 type PublicRoomReq struct {
-	Since  string `json:"since,omitempty"`
-	Limit  int16  `json:"limit,omitempty"`
-	Filter filter `json:"filter,omitempty"`
+	Since              string `json:"since,omitempty"`
+	Limit              int16  `json:"limit,omitempty"`
+	Filter             filter `json:"filter,omitempty"`
+	IncludeAllNetworks bool   `json:"include_all_networks,omitempty"`
+	NetworkID          string `json:"third_party_instance_id,omitempty"`
 }
 
 type filter struct {
-	SearchTerms string `json:"generic_search_term,omitempty"`
+	SearchTerms string   `json:"generic_search_term,omitempty"`
+	RoomTypes   []string `json:"room_types,omitempty"`
 }
 
 // GetPostPublicRooms implements GET and POST /publicRooms
@@ -57,8 +62,14 @@ func publicRooms(
 		return nil, err
 	}
 
+	if request.IncludeAllNetworks && request.NetworkID != "" {
+		return nil, fmt.Errorf("include_all_networks and third_party_instance_id can not be used together")
+	}
+
 	var queryRes roomserverAPI.QueryPublishedRoomsResponse
-	err = rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{}, &queryRes)
+	err = rsAPI.QueryPublishedRooms(ctx, &roomserverAPI.QueryPublishedRoomsRequest{
+		NetworkID: request.NetworkID,
+	}, &queryRes)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("QueryPublishedRooms failed")
 		return nil, err

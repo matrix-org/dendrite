@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -144,6 +146,8 @@ type Database interface {
 
 type Statistics interface {
 	UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error)
+	DailyRoomsMessages(ctx context.Context, serverName gomatrixserverlib.ServerName) (stats types.MessageStats, activeRooms, activeE2EERooms int64, err error)
+	UpsertDailyRoomsMessages(ctx context.Context, serverName gomatrixserverlib.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error
 }
 
 // Err3PIDInUse is the error returned when trying to save an association involving

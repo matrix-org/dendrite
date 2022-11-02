@@ -77,7 +77,7 @@ func (r *FederationInternalAPI) PerformJoin(
 	seenSet := make(map[gomatrixserverlib.ServerName]bool)
 	var uniqueList []gomatrixserverlib.ServerName
 	for _, srv := range request.ServerNames {
-		if seenSet[srv] || srv == r.cfg.Matrix.ServerName {
+		if seenSet[srv] || r.cfg.Matrix.IsLocalServerName(srv) {
 			continue
 		}
 		seenSet[srv] = true

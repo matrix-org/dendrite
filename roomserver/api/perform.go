@@ -168,8 +168,10 @@ type PerformBackfillResponse struct {
 }
 
 type PerformPublishRequest struct {
-	RoomID     string
-	Visibility string
+	RoomID       string
+	Visibility   string
+	AppserviceID string
+	NetworkID    string
 }
 
 type PerformPublishResponse struct {
@@ -241,5 +243,15 @@ type PerformAdminPurgeRoomRequest struct {
 }
 
 type PerformAdminPurgeRoomResponse struct {
+	Error *PerformError `json:"error,omitempty"`
+}
+
+type PerformAdminDownloadStateRequest struct {
+	RoomID     string                       `json:"room_id"`
+	UserID     string                       `json:"user_id"`
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+}
+
+type PerformAdminDownloadStateResponse struct {
 	Error *PerformError `json:"error,omitempty"`
 }

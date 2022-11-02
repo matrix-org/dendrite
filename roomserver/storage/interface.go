@@ -72,6 +72,7 @@ type Database interface {
 	Events(ctx context.Context, eventNIDs []types.EventNID) ([]types.Event, error)
 	// Look up snapshot NID for an event ID string
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
+	BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
 	// Stores a matrix room event in the database. Returns the room NID, the state snapshot and the redacted event ID if any, or an error.
 	StoreEvent(
 		ctx context.Context, event *gomatrixserverlib.Event, authEventNIDs []types.EventNID,
@@ -139,9 +140,9 @@ type Database interface {
 	// Returns an error if the retrieval went wrong.
 	EventsFromIDs(ctx context.Context, eventIDs []string) ([]types.Event, error)
 	// Publish or unpublish a room from the room directory.
-	PublishRoom(ctx context.Context, roomID string, publish bool) error
+	PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error
 	// Returns a list of room IDs for rooms which are published.
-	GetPublishedRooms(ctx context.Context) ([]string, error)
+	GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error)
 	// Returns whether a given room is published or not.
 	GetPublishedRoom(ctx context.Context, roomID string) (bool, error)
 

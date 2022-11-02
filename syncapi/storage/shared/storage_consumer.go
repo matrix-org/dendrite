@@ -603,3 +603,11 @@ func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID 
 		return d.Relations.DeleteRelation(ctx, txn, roomID, redactedEventID)
 	})
 }
+
+func (d *Database) SelectMemberships(
+	ctx context.Context,
+	roomID string, pos types.TopologyToken,
+	membership, notMembership *string,
+) (eventIDs []string, err error) {
+	return d.Memberships.SelectMemberships(ctx, nil, roomID, pos, membership, notMembership)
+}

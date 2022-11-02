@@ -470,6 +470,23 @@ func (d *Database) events(
 			eventNIDs = append(eventNIDs, nid)
 		}
 	}
+	// If we don't need to get any events from the database, short circuit now
+	if len(eventNIDs) == 0 {
+		results := make([]types.Event, 0, len(inputEventNIDs))
+		for _, nid := range inputEventNIDs {
+			event, ok := events[nid]
+			if !ok || event == nil {
+				return nil, fmt.Errorf("event %d missing", nid)
+			}
+			results = append(results, types.Event{
+				EventNID: nid,
+				Event:    event,
+			})
+		}
+		if !redactionsArePermanent {
+			d.applyRedactions(results)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -533,6 +550,12 @@ func (d *Database) events(
 		d.applyRedactions(results)
 	}
 	return results, nil
+}
+
+func (d *Database) BulkSelectSnapshotsFromEventIDs(
+	ctx context.Context, eventIDs []string,
+) (map[types.StateSnapshotNID][]string, error) {
+	return d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, nil, eventIDs)
 }
 
 func (d *Database) MembershipUpdater(
@@ -723,9 +746,9 @@ func (d *Database) storeEvent(
 	}, redactionEvent, redactedEventID, err
 }
 
-func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
+func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, publish)
+		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, appserviceID, networkID, publish)
 	})
 }
 
@@ -733,8 +756,8 @@ func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, e
 	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
 }
 
-func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
-	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
+func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error) {
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true, includeAllNetworks)
 }
 
 func (d *Database) MissingAuthPrevEvents(

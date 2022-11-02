@@ -42,7 +42,7 @@ CREATE INDEX IF NOT EXISTS keyserver_cross_signing_sigs_idx ON keyserver_cross_s
 
 const selectCrossSigningSigsForTargetSQL = "" +
 	"SELECT origin_user_id, origin_key_id, signature FROM keyserver_cross_signing_sigs" +
-	" WHERE (origin_user_id = $1 OR origin_user_id = target_user_id) AND target_user_id = $2 AND target_key_id = $3"
+	" WHERE (origin_user_id = $1 OR origin_user_id = $2) AND target_user_id = $2 AND target_key_id = $3"
 
 const upsertCrossSigningSigsForTargetSQL = "" +
 	"INSERT INTO keyserver_cross_signing_sigs (origin_user_id, origin_key_id, target_user_id, target_key_id, signature)" +

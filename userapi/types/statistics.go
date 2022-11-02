@@ -28,3 +28,10 @@ type DatabaseEngine struct {
 	Engine  string
 	Version string
 }
+
+type MessageStats struct {
+	Messages         int64
+	SentMessages     int64
+	MessagesE2EE     int64
+	SentMessagesE2EE int64
+}

@@ -294,7 +294,7 @@ type SearchRequest struct {
 				BeforeLimit    int  `json:"before_limit,omitempty"`
 				IncludeProfile bool `json:"include_profile,omitempty"`
 			} `json:"event_context"`
-			Filter    gomatrixserverlib.StateFilter `json:"filter"`
+			Filter    gomatrixserverlib.RoomEventFilter `json:"filter"`
 			Groupings struct {
 				GroupBy []struct {
 					Key string `json:"key"`
