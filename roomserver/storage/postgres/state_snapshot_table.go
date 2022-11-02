@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/util"
+
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/util"
 )
 
 const stateSnapshotSchema = `
@@ -91,6 +92,7 @@ const bulkSelectStateForHistoryVisibilitySQL = `
 	      WHERE state_snapshot_nid = $1
 	    )
 	  )
+	  ORDER BY depth ASC
 	) AS roomserver_events
 	INNER JOIN roomserver_event_state_keys
 	  ON roomserver_events.event_state_key_nid = roomserver_event_state_keys.event_state_key_nid

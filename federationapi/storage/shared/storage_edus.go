@@ -38,9 +38,9 @@ var defaultExpireEDUTypes = map[string]time.Duration{
 // AssociateEDUWithDestination creates an association that the
 // destination queues will use to determine which JSON blobs to send
 // to which servers.
-func (d *Database) AssociateEDUWithDestination(
+func (d *Database) AssociateEDUWithDestinations(
 	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
+	destinations map[gomatrixserverlib.ServerName]struct{},
 	receipt *Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
@@ -59,17 +59,18 @@ func (d *Database) AssociateEDUWithDestination(
 		expiresAt = 0
 	}
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationQueueEDUs.InsertQueueEDU(
-			ctx,         // context
-			txn,         // SQL transaction
-			eduType,     // EDU type for coalescing
-			serverName,  // destination server name
-			receipt.nid, // NID from the federationapi_queue_json table
-			expiresAt,   // The timestamp this EDU will expire
-		); err != nil {
-			return fmt.Errorf("InsertQueueEDU: %w", err)
+		var err error
+		for destination := range destinations {
+			err = d.FederationQueueEDUs.InsertQueueEDU(
+				ctx,         // context
+				txn,         // SQL transaction
+				eduType,     // EDU type for coalescing
+				destination, // destination server name
+				receipt.nid, // NID from the federationapi_queue_json table
+				expiresAt,   // The timestamp this EDU will expire
+			)
 		}
-		return nil
+		return err
 	})
 }
 

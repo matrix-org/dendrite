@@ -148,6 +148,16 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
 	}
+
+	if err = s.db.RedactRelations(ctx, msg.RedactedBecause.RoomID(), msg.RedactedEventID); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":           msg.RedactedBecause.RoomID(),
+			"event_id":          msg.RedactedBecause.EventID(),
+			"redacted_event_id": msg.RedactedEventID,
+		}).WithError(err).Warn("Failed to redact relations")
+		return err
+	}
+
 	// fake a room event so we notify clients about the redaction, as if it were
 	// a normal event.
 	return s.onNewRoomEvent(ctx, api.OutputNewRoomEvent{
@@ -271,6 +281,14 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
+	}
+
 	s.pduStream.Advance(pduPos)
 	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
@@ -313,6 +331,15 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			"event_id": ev.EventID(),
 			"type":     ev.Type(),
 		}).WithError(err).Warn("failed to index fulltext element")
+	}
+
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":  ev.RoomID(),
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -398,6 +425,13 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
 		}).Errorf("roomserver output log: remove invite failure")
+		return
+	}
+
+	// Only notify clients about retired invite events, if the user didn't accept the invite.
+	// The PDU stream will also receive an event about accepting the invitation, so there should
+	// be a "smooth" transition from invite -> join, and not invite -> leave -> join
+	if msg.Membership == gomatrixserverlib.Join {
 		return
 	}
 

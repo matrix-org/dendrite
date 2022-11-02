@@ -154,33 +154,31 @@ func SaveReadMarker(
 		return *resErr
 	}
 
-	if r.FullyRead == "" {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Missing m.fully_read mandatory field"),
+	if r.FullyRead != "" {
+		data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
+		if err != nil {
+			return jsonerror.InternalServerError()
+		}
+
+		dataReq := api.InputAccountDataRequest{
+			UserID:      device.UserID,
+			DataType:    "m.fully_read",
+			RoomID:      roomID,
+			AccountData: data,
+		}
+		dataRes := api.InputAccountDataResponse{}
+		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			return util.ErrorResponse(err)
 		}
 	}
 
-	data, err := json.Marshal(fullyReadEvent{EventID: r.FullyRead})
-	if err != nil {
-		return jsonerror.InternalServerError()
-	}
-
-	dataReq := api.InputAccountDataRequest{
-		UserID:      device.UserID,
-		DataType:    "m.fully_read",
-		RoomID:      roomID,
-		AccountData: data,
-	}
-	dataRes := api.InputAccountDataResponse{}
-	if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
-		return util.ErrorResponse(err)
-	}
-
-	// Handle the read receipt that may be included in the read marker
+	// Handle the read receipts that may be included in the read marker.
 	if r.Read != "" {
-		return SetReceipt(req, syncProducer, device, roomID, "m.read", r.Read)
+		return SetReceipt(req, userAPI, syncProducer, device, roomID, "m.read", r.Read)
+	}
+	if r.ReadPrivate != "" {
+		return SetReceipt(req, userAPI, syncProducer, device, roomID, "m.read.private", r.ReadPrivate)
 	}
 
 	return util.JSONResponse{

@@ -84,8 +84,10 @@ func prepareWithFilters(
 	case FilterOrderDesc:
 		query += " ORDER BY id DESC"
 	}
-	query += fmt.Sprintf(" LIMIT $%d", offset+1)
-	params = append(params, limit)
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", offset+1)
+		params = append(params, limit)
+	}
 
 	var stmt *sql.Stmt
 	var err error

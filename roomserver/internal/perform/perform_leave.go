@@ -52,7 +52,7 @@ func (r *Leaver) PerformLeave(
 	if err != nil {
 		return nil, fmt.Errorf("supplied user ID %q in incorrect format", req.UserID)
 	}
-	if domain != r.Cfg.Matrix.ServerName {
+	if !r.Cfg.Matrix.IsLocalServerName(domain) {
 		return nil, fmt.Errorf("user %q does not belong to this homeserver", req.UserID)
 	}
 	logger := logrus.WithContext(ctx).WithFields(logrus.Fields{
@@ -79,13 +79,13 @@ func (r *Leaver) performLeaveRoomByID(
 ) ([]api.OutputEvent, error) {
 	// If there's an invite outstanding for the room then respond to
 	// that.
-	isInvitePending, senderUser, eventID, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
+	isInvitePending, senderUser, eventID, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID)
 	if err == nil && isInvitePending {
 		_, senderDomain, serr := gomatrixserverlib.SplitID('@', senderUser)
 		if serr != nil {
 			return nil, fmt.Errorf("sender %q is invalid", senderUser)
 		}
-		if senderDomain != r.Cfg.Matrix.ServerName {
+		if !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
 			return r.performFederatedRejectInvite(ctx, req, res, senderUser, eventID)
 		}
 		// check that this is not a "server notice room"
@@ -186,7 +186,7 @@ func (r *Leaver) performLeaveRoomByID(
 				Kind:         api.KindNew,
 				Event:        event.Headered(buildRes.RoomVersion),
 				Origin:       senderDomain,
-				SendAsServer: string(r.Cfg.Matrix.ServerName),
+				SendAsServer: string(senderDomain),
 			},
 		},
 	}

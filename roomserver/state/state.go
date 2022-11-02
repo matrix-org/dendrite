@@ -18,17 +18,17 @@ package state
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
 type StateResolutionStorage interface {
@@ -37,6 +37,7 @@ type StateResolutionStorage interface {
 	StateBlockNIDs(ctx context.Context, stateNIDs []types.StateSnapshotNID) ([]types.StateBlockNIDList, error)
 	StateEntries(ctx context.Context, stateBlockNIDs []types.StateBlockNID) ([]types.StateEntryList, error)
 	SnapshotNIDFromEventID(ctx context.Context, eventID string) (types.StateSnapshotNID, error)
+	BulkSelectSnapshotsFromEventIDs(ctx context.Context, eventIDs []string) (map[types.StateSnapshotNID][]string, error)
 	StateEntriesForTuples(ctx context.Context, stateBlockNIDs []types.StateBlockNID, stateKeyTuples []types.StateKeyTuple) ([]types.StateEntryList, error)
 	StateAtEventIDs(ctx context.Context, eventIDs []string) ([]types.StateAtEvent, error)
 	AddState(ctx context.Context, roomNID types.RoomNID, stateBlockNIDs []types.StateBlockNID, state []types.StateEntry) (types.StateSnapshotNID, error)
@@ -130,21 +131,10 @@ func (v *StateResolution) LoadMembershipAtEvent(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.LoadMembershipAtEvent")
 	defer span.Finish()
 
-	// De-dupe snapshotNIDs
-	snapshotNIDMap := make(map[types.StateSnapshotNID][]string) // map from snapshot NID to eventIDs
-	for i := range eventIDs {
-		eventID := eventIDs[i]
-		snapshotNID, err := v.db.SnapshotNIDFromEventID(ctx, eventID)
-		if err != nil && err != sql.ErrNoRows {
-			return nil, fmt.Errorf("LoadStateAtEvent.SnapshotNIDFromEventID failed for event %s : %w", eventID, err)
-		}
-		if snapshotNID == 0 {
-			// If we don't know a state snapshot for this event then we can't calculate
-			// memberships at the time of the event, so skip over it. This means that
-			// it isn't guaranteed that the response map will contain every single event.
-			continue
-		}
-		snapshotNIDMap[snapshotNID] = append(snapshotNIDMap[snapshotNID], eventID)
+	// Get a mapping from snapshotNID -> eventIDs
+	snapshotNIDMap, err := v.db.BulkSelectSnapshotsFromEventIDs(ctx, eventIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	snapshotNIDs := make([]types.StateSnapshotNID, 0, len(snapshotNIDMap))
@@ -157,24 +147,45 @@ func (v *StateResolution) LoadMembershipAtEvent(
 		return nil, err
 	}
 
+	var wantStateBlocks []types.StateBlockNID
+	for _, x := range stateBlockNIDLists {
+		wantStateBlocks = append(wantStateBlocks, x.StateBlockNIDs...)
+	}
+
+	stateEntryLists, err := v.db.StateEntriesForTuples(ctx, uniqueStateBlockNIDs(wantStateBlocks), []types.StateKeyTuple{
+		{
+			EventTypeNID:     types.MRoomMemberNID,
+			EventStateKeyNID: stateKeyNID,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	stateBlockNIDsMap := stateBlockNIDListMap(stateBlockNIDLists)
+	stateEntriesMap := stateEntryListMap(stateEntryLists)
+
 	result := make(map[string][]types.StateEntry)
 	for _, stateBlockNIDList := range stateBlockNIDLists {
-		// Query the membership event for the user at the given stateblocks
-		stateEntryLists, err := v.db.StateEntriesForTuples(ctx, stateBlockNIDList.StateBlockNIDs, []types.StateKeyTuple{
-			{
-				EventTypeNID:     types.MRoomMemberNID,
-				EventStateKeyNID: stateKeyNID,
-			},
-		})
-		if err != nil {
-			return nil, err
+		stateBlockNIDs, ok := stateBlockNIDsMap.lookup(stateBlockNIDList.StateSnapshotNID)
+		if !ok {
+			// This should only get hit if the database is corrupt.
+			// It should be impossible for an event to reference a NID that doesn't exist
+			return nil, fmt.Errorf("corrupt DB: Missing state snapshot numeric ID %d", stateBlockNIDList.StateSnapshotNID)
 		}
 
-		evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
+		for _, stateBlockNID := range stateBlockNIDs {
+			entries, ok := stateEntriesMap.lookup(stateBlockNID)
+			if !ok {
+				// This should only get hit if the database is corrupt.
+				// It should be impossible for an event to reference a NID that doesn't exist
+				return nil, fmt.Errorf("corrupt DB: Missing state block numeric ID %d", stateBlockNID)
+			}
 
-		for _, evID := range evIDs {
-			for _, x := range stateEntryLists {
-				result[evID] = append(result[evID], x.StateEntries...)
+			evIDs := snapshotNIDMap[stateBlockNIDList.StateSnapshotNID]
+
+			for _, evID := range evIDs {
+				result[evID] = append(result[evID], entries...)
 			}
 		}
 	}
@@ -944,7 +955,6 @@ func (v *StateResolution) resolveConflictsV2(
 	authSets := make(map[string][]*gomatrixserverlib.Event, len(conflicted))
 	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
 	gotAuthEvents := make(map[string]struct{}, estimate*3)
-	authDifference := make([]*gomatrixserverlib.Event, 0, estimate)
 	knownAuthEvents := make(map[string]types.Event, estimate*3)
 
 	// For each conflicted event, let's try and get the needed auth events.
@@ -992,41 +1002,6 @@ func (v *StateResolution) resolveConflictsV2(
 	// longer need this after this point.
 	gotAuthEvents = nil // nolint:ineffassign
 
-	// This function helps us to work out whether an event exists in one of the
-	// auth sets.
-	isInAuthList := func(k string, event *gomatrixserverlib.Event) bool {
-		for _, e := range authSets[k] {
-			if e.EventID() == event.EventID() {
-				return true
-			}
-		}
-		return false
-	}
-
-	// This function works out if an event exists in all of the auth sets.
-	isInAllAuthLists := func(event *gomatrixserverlib.Event) bool {
-		for k := range authSets {
-			if !isInAuthList(k, event) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// Look through all of the auth events that we've been given and work out if
-	// there are any events which don't appear in all of the auth sets. If they
-	// don't then we add them to the auth difference.
-	func() {
-		span, _ := opentracing.StartSpanFromContext(ctx, "isInAllAuthLists")
-		defer span.Finish()
-
-		for _, event := range authEvents {
-			if !isInAllAuthLists(event) {
-				authDifference = append(authDifference, event)
-			}
-		}
-	}()
-
 	// Resolve the conflicts.
 	resolvedEvents := func() []*gomatrixserverlib.Event {
 		span, _ := opentracing.StartSpanFromContext(ctx, "gomatrixserverlib.ResolveStateConflictsV2")
@@ -1036,7 +1011,6 @@ func (v *StateResolution) resolveConflictsV2(
 			conflictedEvents,
 			nonConflictedEvents,
 			authEvents,
-			authDifference,
 		)
 	}()
 

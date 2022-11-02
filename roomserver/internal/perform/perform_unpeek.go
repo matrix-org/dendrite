@@ -67,7 +67,7 @@ func (r *Unpeeker) performUnpeek(
 			Msg:  fmt.Sprintf("Supplied user ID %q in incorrect format", req.UserID),
 		}
 	}
-	if domain != r.Cfg.Matrix.ServerName {
+	if !r.Cfg.Matrix.IsLocalServerName(domain) {
 		return &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("User %q does not belong to this homeserver", req.UserID),
