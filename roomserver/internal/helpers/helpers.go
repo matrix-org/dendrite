@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -159,13 +160,21 @@ func GetMembershipsAtState(
 	ctx context.Context, db storage.Database, stateEntries []types.StateEntry, joinedOnly bool,
 ) ([]types.Event, error) {
 
-	var eventNIDs []types.EventNID
+	var eventNIDs types.EventNIDs
 	for _, entry := range stateEntries {
 		// Filter the events to retrieve to only keep the membership events
 		if entry.EventTypeNID == types.MRoomMemberNID {
 			eventNIDs = append(eventNIDs, entry.EventNID)
 		}
 	}
+
+	// There are no events to get, don't bother asking the database
+	if len(eventNIDs) == 0 {
+		return []types.Event{}, nil
+	}
+
+	sort.Sort(eventNIDs)
+	util.Unique(eventNIDs)
 
 	// Get all of the events in this state
 	stateEvents, err := db.Events(ctx, eventNIDs)

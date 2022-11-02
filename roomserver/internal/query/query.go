@@ -239,16 +239,42 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("unable to get state before event: %w", err)
 	}
 
+	// If we only have one or less state entries, we can short circuit the below
+	// loop and avoid hitting the database
+	allStateEventNIDs := make(map[types.EventNID]types.StateEntry)
+	for _, eventID := range request.EventIDs {
+		stateEntry := stateEntries[eventID]
+		for _, s := range stateEntry {
+			allStateEventNIDs[s.EventNID] = s
+		}
+	}
+
+	var canShortCircuit bool
+	if len(allStateEventNIDs) <= 1 {
+		canShortCircuit = true
+	}
+
+	var memberships []types.Event
 	for _, eventID := range request.EventIDs {
 		stateEntry, ok := stateEntries[eventID]
-		if !ok {
+		if !ok || len(stateEntry) == 0 {
 			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
 			continue
 		}
-		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+
+		// If we can short circuit, e.g. we only have 0 or 1 membership events, we only get the memberships
+		// once. If we have more than one membership event, we need to get the state for each state entry.
+		if canShortCircuit {
+			if len(memberships) == 0 {
+				memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+			}
+		} else {
+			memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+		}
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
 		}
+
 		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
 
 		for i := range memberships {

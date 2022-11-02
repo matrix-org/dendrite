@@ -93,7 +93,6 @@ func Context(
 	}
 
 	stateFilter := gomatrixserverlib.StateFilter{
-		Limit:                   100,
 		NotSenders:              filter.NotSenders,
 		NotTypes:                filter.NotTypes,
 		Senders:                 filter.Senders,

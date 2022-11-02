@@ -1,5 +1,19 @@
 # Changelog
 
+## Dendrite 0.10.6 (2022-11-01)
+
+### Features
+
+* History visibility checks have been optimised, which should speed up response times on a variety of endpoints (including `/sync`, `/messages`, `/context` and others) and reduce database load
+* The built-in NATS Server has been updated to version 2.9.4
+* Some other minor dependencies have been updated
+
+### Fixes
+
+* A panic has been fixed in the sync API PDU stream which could cause requests to fail
+* The `/members` response now contains the `room_id` field, which may fix some E2EE problems with clients using the JS SDK (contributed by [ashkitten](https://github.com/ashkitten))
+* The auth difference calculation in state resolution v2 has been tweaked for clarity (and moved into gomatrixserverlib with the rest of the state resolution code)
+
 ## Dendrite 0.10.5 (2022-10-31)
 
 ### Features
