@@ -50,7 +50,7 @@ require (
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.4.0
-	modernc.org/sqlite v1.19.2
+	modernc.org/sqlite v1.19.3
 	nhooyr.io/websocket v1.8.7
 )
 
