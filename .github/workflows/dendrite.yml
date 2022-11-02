@@ -269,15 +269,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite/native
+          - label: SQLite native
 
-          - label: SQLite/cgo
+          - label: SQLite Cgo
             cgo: 1
 
-          - label: SQLite/native, full HTTP APIs
+          - label: SQLite native, full HTTP APIs
             api: full-http
 
-          - label: SQLite/cgo, full HTTP APIs
+          - label: SQLite Cgo, full HTTP APIs
             api: full-http
             cgo: 1
 
@@ -331,15 +331,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite/native
+          - label: SQLite native
 
-          - label: SQLite/cgo
+          - label: SQLite Cgo
             cgo: 1
 
-          - label: SQLite/native, full HTTP APIs
+          - label: SQLite native, full HTTP APIs
             api: full-http
 
-          - label: SQLite/cgo, full HTTP APIs
+          - label: SQLite Cgo, full HTTP APIs
             api: full-http
             cgo: 1
 
