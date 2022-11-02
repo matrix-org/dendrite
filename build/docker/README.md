@@ -16,7 +16,8 @@ repository, run:
 ```
 docker build . --target monolith -t matrixdotorg/dendrite-monolith
 docker build . --target polylith -t matrixdotorg/dendrite-monolith
-docker build . --target demo-pinecone -t matrixdotorg/dendrite-monolith
+docker build . --target demo-pinecone -t matrixdotorg/dendrite-demo-pinecone
+docker build . --target demo-yggdrasil -t matrixdotorg/dendrite-demo-yggdrasil
 ```
 
 ## Compose files
