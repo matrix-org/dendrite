@@ -20,11 +20,12 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 	var driverName, dsn string
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
-		driverName = "sqlite3"
+		driverName = SQLITE_DRIVER_NAME
 		dsn, err = ParseFileURI(dbProperties.ConnectionString)
 		if err != nil {
 			return nil, fmt.Errorf("ParseFileURI: %w", err)
 		}
+		dsn = sqliteDSNExtension(dsn)
 	case dbProperties.ConnectionString.IsPostgres():
 		driverName = "postgres"
 		dsn = string(dbProperties.ConnectionString)
@@ -39,7 +40,7 @@ func Open(dbProperties *config.DatabaseOptions, writer Writer) (*sql.DB, error) 
 	if err != nil {
 		return nil, err
 	}
-	if driverName != "sqlite3" {
+	if driverName != SQLITE_DRIVER_NAME {
 		logger := logrus.WithFields(logrus.Fields{
 			"max_open_conns":    dbProperties.MaxOpenConns(),
 			"max_idle_conns":    dbProperties.MaxIdleConns(),
