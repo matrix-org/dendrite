@@ -271,14 +271,3 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
-
-  update-docker-images:
-    name: Update Docker images
-    permissions:
-      packages: write
-      contents: read
-    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
-    needs: [integration-tests-done]
-    uses: matrix-org/dendrite/.github/workflows/docker.yml@main
-    secrets:
-      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
