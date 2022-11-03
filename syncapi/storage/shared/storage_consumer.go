@@ -629,6 +629,14 @@ func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID 
 	})
 }
 
+func (d *Database) SelectMemberships(
+	ctx context.Context,
+	roomID string, pos types.TopologyToken,
+	membership, notMembership *string,
+) (eventIDs []string, err error) {
+	return d.Memberships.SelectMemberships(ctx, nil, roomID, pos, membership, notMembership)
+}
+
 func (s *Database) ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error) {
 	return s.Presence.ExpirePresence(ctx)
 }

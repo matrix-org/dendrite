@@ -698,7 +698,7 @@ We do send redundant membership state across incremental syncs if asked
 Rejecting invite over federation doesn't break incremental /sync
 Gapped incremental syncs include all state changes
 Old leaves are present in gapped incremental syncs
-Leaves are present in non-gapped incremental syncs
+#Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
 Presence can be set from sync
 /state returns M_NOT_FOUND for a rejected message event
@@ -752,3 +752,10 @@ When user joins a room the state is included in a gapped sync
 Messages that notify from another user increment notification_count
 Messages that highlight from another user increment unread highlight count
 Notifications can be viewed with GET /notifications
+Can get rooms/{roomId}/messages for a departed room (SPEC-216)
+Local device key changes appear in /keys/changes
+Can get rooms/{roomId}/members at a given point
+Can filter rooms/{roomId}/members
+Current state appears in timeline in private history with many messages after
+AS can publish rooms in their own list
+AS and main public room lists are separate

@@ -66,8 +66,8 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 	}
 
 	return &internal.UserInternalAPI{
-			DB:         accountDB,
-			ServerName: cfg.Matrix.ServerName,
+			DB:     accountDB,
+			Config: cfg,
 		}, accountDB, func() {
 			close()
 			baseclose()

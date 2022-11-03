@@ -17,7 +17,7 @@ func TestSliceInto(t *testing.T) {
 	slice := []gomatrixserverlib.PublicRoom{
 		pubRoom("a"), pubRoom("b"), pubRoom("c"), pubRoom("d"), pubRoom("e"), pubRoom("f"), pubRoom("g"),
 	}
-	limit := int16(3)
+	limit := int64(3)
 	testCases := []struct {
 		since      int64
 		wantPrev   int

@@ -107,10 +107,17 @@ func SetAvatarURL(
 		return *resErr
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
+	}
+
+	if !cfg.Matrix.IsLocalServerName(domain) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID does not belong to a locally configured domain"),
+		}
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -123,8 +130,9 @@ func SetAvatarURL(
 
 	setRes := &userapi.PerformSetAvatarURLResponse{}
 	if err = profileAPI.SetAvatarURL(req.Context(), &userapi.PerformSetAvatarURLRequest{
-		Localpart: localpart,
-		AvatarURL: r.AvatarURL,
+		Localpart:  localpart,
+		ServerName: domain,
+		AvatarURL:  r.AvatarURL,
 	}, setRes); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("profileAPI.SetAvatarURL failed")
 		return jsonerror.InternalServerError()
@@ -198,10 +206,17 @@ func SetDisplayName(
 		}
 	}
 
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
+	}
+
+	if !cfg.Matrix.IsLocalServerName(domain) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("userID does not belong to a locally configured domain"),
+		}
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -215,6 +230,7 @@ func SetDisplayName(
 	profileRes := &userapi.PerformUpdateDisplayNameResponse{}
 	err = profileAPI.SetDisplayName(req.Context(), &userapi.PerformUpdateDisplayNameRequest{
 		Localpart:   localpart,
+		ServerName:  domain,
 		DisplayName: r.DisplayName,
 	}, profileRes)
 	if err != nil {
@@ -255,6 +271,12 @@ func updateProfile(
 		return jsonerror.InternalServerError(), err
 	}
 
+	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError(), err
+	}
+
 	events, err := buildMembershipEvents(
 		ctx, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
 	)
@@ -270,7 +292,7 @@ func updateProfile(
 		return jsonerror.InternalServerError(), e
 	}
 
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, cfg.Matrix.ServerName, cfg.Matrix.ServerName, nil, true); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, domain, domain, nil, true); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError(), err
 	}
@@ -292,7 +314,7 @@ func getProfile(
 		return nil, err
 	}
 
-	if domain != cfg.Matrix.ServerName {
+	if !cfg.Matrix.IsLocalServerName(domain) {
 		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {

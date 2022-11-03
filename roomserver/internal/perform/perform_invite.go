@@ -70,8 +70,8 @@ func (r *Inviter) PerformInvite(
 		}
 		return nil, nil
 	}
-	isTargetLocal := domain == r.Cfg.Matrix.ServerName
-	isOriginLocal := senderDomain == r.Cfg.Matrix.ServerName
+	isTargetLocal := r.Cfg.Matrix.IsLocalServerName(domain)
+	isOriginLocal := r.Cfg.Matrix.IsLocalServerName(senderDomain)
 	if !isOriginLocal && !isTargetLocal {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,

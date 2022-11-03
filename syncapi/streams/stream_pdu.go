@@ -102,7 +102,7 @@ func (p *PDUStreamProvider) CompleteSync(
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
-			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
+			if ctxErr := req.Context.Err(); ctxErr != nil || jerr == sql.ErrTxDone {
 				return from
 			}
 			continue
@@ -217,6 +217,9 @@ func (p *PDUStreamProvider) IncrementalSync(
 	return newPos
 }
 
+// Limit the recent events to X when going backwards
+const recentEventBackwardsLimit = 100
+
 // nolint:gocyclo
 func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	ctx context.Context,
@@ -228,15 +231,17 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	stateFilter *gomatrixserverlib.StateFilter,
 	req *types.SyncRequest,
 ) (types.StreamPosition, error) {
-	if delta.MembershipPos > 0 && delta.Membership == gomatrixserverlib.Leave {
-		// make sure we don't leak recent events after the leave event.
-		// TODO: History visibility makes this somewhat complex to handle correctly. For example:
-		// TODO: This doesn't work for join -> leave in a single /sync request (see events prior to join).
-		// TODO: This will fail on join -> leave -> sensitive msg -> join -> leave
-		//       in a single /sync request
-		// This is all "okay" assuming history_visibility == "shared" which it is by default.
-		r.To = delta.MembershipPos
+
+	originalLimit := eventFilter.Limit
+	// If we're going backwards, grep at least X events, this is mostly to satisfy Sytest
+	if r.Backwards && originalLimit < recentEventBackwardsLimit {
+		eventFilter.Limit = recentEventBackwardsLimit // TODO: Figure out a better way
+		diff := r.From - r.To
+		if diff > 0 && diff < recentEventBackwardsLimit {
+			eventFilter.Limit = int(diff)
+		}
 	}
+
 	recentStreamEvents, limited, err := snapshot.RecentEvents(
 		ctx, delta.RoomID, r,
 		eventFilter, true, true,
@@ -247,8 +252,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
-	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	delta.StateEvents = removeDuplicates(delta.StateEvents, recentEvents) // roll back
+	recentEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		snapshot.StreamEventsToEvents(device, recentStreamEvents),
+		gomatrixserverlib.TopologicalOrderByPrevEvents,
+	)
 	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, recentStreamEvents)
 	if err != nil {
 		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
@@ -258,10 +265,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
 		return r.To, nil
 	}
-
-	// Sort the events so that we can pick out the latest events from both sections.
-	recentEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(recentEvents, gomatrixserverlib.TopologicalOrderByPrevEvents)
-	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(delta.StateEvents, gomatrixserverlib.TopologicalOrderByAuthEvents)
 
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
@@ -304,11 +307,29 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		logrus.WithError(err).Error("unable to apply history visibility filter")
 	}
 
+	if r.Backwards && len(events) > originalLimit {
+		// We're going backwards and the events are ordered chronologically, so take the last `limit` events
+		events = events[len(events)-originalLimit:]
+		limited = true
+	}
+
+	// Now that we've filtered the timeline, work out which state events are still
+	// left. Anything that appears in the filtered timeline will be removed from the
+	// "state" section and kept in "timeline".
+	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
+		removeDuplicates(delta.StateEvents, recentEvents),
+		gomatrixserverlib.TopologicalOrderByAuthEvents,
+	)
+
 	if len(delta.StateEvents) > 0 {
-		updateLatestPosition(delta.StateEvents[len(delta.StateEvents)-1].EventID())
+		if last := delta.StateEvents[len(delta.StateEvents)-1]; last != nil {
+			updateLatestPosition(last.EventID())
+		}
 	}
 	if len(events) > 0 {
-		updateLatestPosition(events[len(events)-1].EventID())
+		if last := events[len(events)-1]; last != nil {
+			updateLatestPosition(last.EventID())
+		}
 	}
 
 	switch delta.Membership {
@@ -474,7 +495,13 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	var prevBatch *types.TopologyToken
 	if len(recentStreamEvents) > 0 {
 		var backwardTopologyPos, backwardStreamPos types.StreamPosition
-		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, recentStreamEvents[0].EventID())
+		event := recentStreamEvents[0]
+		// If this is the beginning of the room, we can't go back further. We're going to return
+		// the TopologyToken from the last event instead. (Synapse returns the /sync next_Batch)
+		if event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("") {
+			event = recentStreamEvents[len(recentStreamEvents)-1]
+		}
+		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, event.EventID())
 		if err != nil {
 			return
 		}
@@ -491,7 +518,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
 	// "Can sync a room with a message with a transaction id" - which does a complete sync to check.
 	recentEvents := snapshot.StreamEventsToEvents(device, recentStreamEvents)
-	stateEvents = removeDuplicates(stateEvents, recentEvents)
 
 	events := recentEvents
 	// Only apply history visibility checks if the response is for joined rooms
@@ -505,7 +531,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	limited = limited && len(events) == len(recentEvents)
-
+	stateEvents = removeDuplicates(stateEvents, recentEvents)
 	if stateFilter.LazyLoadMembers {
 		if err != nil {
 			return nil, err

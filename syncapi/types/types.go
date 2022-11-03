@@ -241,6 +241,9 @@ func (t *TopologyToken) StreamToken() StreamingToken {
 }
 
 func (t TopologyToken) String() string {
+	if t.Depth <= 0 && t.PDUPosition <= 0 {
+		return ""
+	}
 	return fmt.Sprintf("t%d_%d", t.Depth, t.PDUPosition)
 }
 

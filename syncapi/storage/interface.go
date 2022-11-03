@@ -179,6 +179,11 @@ type Database interface {
 	ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error)
 	UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error
 	RedactRelations(ctx context.Context, roomID, redactedEventID string) error
+	SelectMemberships(
+		ctx context.Context,
+		roomID string, pos types.TopologyToken,
+		membership, notMembership *string,
+	) (eventIDs []string, err error)
 }
 
 type Presence interface {
