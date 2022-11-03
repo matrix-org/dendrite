@@ -33,7 +33,6 @@ LABEL org.opencontainers.image.documentation="https://matrix-org.github.io/dendr
 LABEL org.opencontainers.image.vendor="The Matrix.org Foundation C.I.C."
 RUN addgroup dendrite && adduser dendrite -G dendrite -u 1337 -D
 USER dendrite
-WORKDIR /home/dendrite
 
 #
 # Builds the polylith image and only contains the polylith binary
@@ -42,6 +41,9 @@ FROM dendrite-base AS polylith
 LABEL org.opencontainers.image.title="Dendrite (Polylith)"
 
 COPY --from=build /out/dendrite-polylith-multi /usr/bin/
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
 
 ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
 
@@ -55,6 +57,9 @@ COPY --from=build /out/create-account /usr/bin/create-account
 COPY --from=build /out/generate-config /usr/bin/generate-config
 COPY --from=build /out/generate-keys /usr/bin/generate-keys
 COPY --from=build /out/dendrite-monolith-server /usr/bin/dendrite-monolith-server
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
 
 ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
 EXPOSE 8008 8448
