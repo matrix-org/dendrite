@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write   # To upload Trivy sarif files
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -75,7 +76,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: "trivy-results.sarif"
 
@@ -103,6 +104,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write   # To upload Trivy sarif files
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -154,7 +156,7 @@ jobs:
           output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: "trivy-results.sarif"
 
