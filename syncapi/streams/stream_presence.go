@@ -70,6 +70,21 @@ func (p *PresenceStreamProvider) IncrementalSync(
 		return from
 	}
 
+	// Add presence for users which newly joined a room
+	for userID := range req.MembershipChanges {
+		if _, ok := presences[userID]; ok {
+			continue
+		}
+		presences[userID], err = snapshot.GetPresence(ctx, userID)
+		if err != nil {
+			_ = snapshot.Rollback()
+			return from
+		}
+		if len(presences) > req.Filter.Presence.Limit {
+			break
+		}
+	}
+
 	if len(presences) == 0 {
 		return to
 	}
