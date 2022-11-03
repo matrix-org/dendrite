@@ -255,10 +255,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		snapshot.StreamEventsToEvents(device, recentStreamEvents),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
 	)
-	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, recentStreamEvents)
-	if err != nil {
-		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
-	}
 
 	// If we didn't return any events at all then don't bother doing anything else.
 	if len(recentEvents) == 0 && len(delta.StateEvents) == 0 {
@@ -310,6 +306,11 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		// We're going backwards and the events are ordered chronologically, so take the last `limit` events
 		events = events[len(events)-originalLimit:]
 		limited = true
+	}
+
+	prevBatch, err := snapshot.GetBackwardTopologyPos(ctx, events)
+	if err != nil {
+		return r.From, fmt.Errorf("p.DB.GetBackwardTopologyPos: %w", err)
 	}
 
 	// Now that we've filtered the timeline, work out which state events are still
@@ -489,28 +490,6 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		return
 	}
 
-	// Retrieve the backward topology position, i.e. the position of the
-	// oldest event in the room's topology.
-	var prevBatch *types.TopologyToken
-	if len(recentStreamEvents) > 0 {
-		var backwardTopologyPos, backwardStreamPos types.StreamPosition
-		event := recentStreamEvents[0]
-		// If this is the beginning of the room, we can't go back further. We're going to return
-		// the TopologyToken from the last event instead. (Synapse returns the /sync next_Batch)
-		if event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("") {
-			event = recentStreamEvents[len(recentStreamEvents)-1]
-		}
-		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, event.EventID())
-		if err != nil {
-			return
-		}
-		prevBatch = &types.TopologyToken{
-			Depth:       backwardTopologyPos,
-			PDUPosition: backwardStreamPos,
-		}
-		prevBatch.Decrement()
-	}
-
 	p.addRoomSummary(ctx, snapshot, jr, roomID, device.UserID, r.From)
 
 	// We don't include a device here as we don't need to send down
@@ -543,6 +522,28 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		if err != nil && err != sql.ErrNoRows {
 			return nil, err
 		}
+	}
+
+	// Retrieve the backward topology position, i.e. the position of the
+	// oldest event in the room's topology.
+	var prevBatch *types.TopologyToken
+	if len(events) > 0 {
+		var backwardTopologyPos, backwardStreamPos types.StreamPosition
+		event := events[0]
+		// If this is the beginning of the room, we can't go back further. We're going to return
+		// the TopologyToken from the last event instead. (Synapse returns the /sync next_Batch)
+		if event.Type() == gomatrixserverlib.MRoomCreate && event.StateKeyEquals("") {
+			event = events[len(events)-1]
+		}
+		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, event.EventID())
+		if err != nil {
+			return
+		}
+		prevBatch = &types.TopologyToken{
+			Depth:       backwardTopologyPos,
+			PDUPosition: backwardStreamPos,
+		}
+		prevBatch.Decrement()
 	}
 
 	jr.Timeline.PrevBatch = prevBatch
