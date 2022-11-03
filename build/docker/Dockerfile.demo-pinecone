@@ -1,0 +1,30 @@
+FROM docker.io/golang:1.19-alpine AS base
+
+#
+# Needs to be separate from the main Dockerfile for OpenShift,
+# as --target is not supported there.
+#
+
+RUN apk --update --no-cache add bash build-base
+
+WORKDIR /build
+
+COPY . /build
+
+RUN mkdir -p bin
+RUN go build -trimpath -o bin/ ./cmd/dendrite-demo-pinecone
+RUN go build -trimpath -o bin/ ./cmd/create-account
+RUN go build -trimpath -o bin/ ./cmd/generate-keys
+
+FROM alpine:latest
+LABEL org.opencontainers.image.title="Dendrite (Pinecone demo)"
+LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
+LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+COPY --from=base /build/bin/* /usr/bin/
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["/usr/bin/dendrite-demo-pinecone"]

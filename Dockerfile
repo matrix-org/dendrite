@@ -65,40 +65,6 @@ ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]
 EXPOSE 8008 8448
 
 #
-# Builds the Pinecone P2P demo image and contains all required binaries
-#
-FROM dendrite-base AS demo-pinecone
-LABEL org.opencontainers.image.title="Dendrite (Pinecone P2P Demo)"
-
-COPY --from=build /out/create-account /usr/bin/create-account
-COPY --from=build /out/generate-config /usr/bin/generate-config
-COPY --from=build /out/generate-keys /usr/bin/generate-keys
-COPY --from=build /out/dendrite-demo-pinecone /usr/bin/dendrite-demo-pinecone
-
-VOLUME /etc/dendrite
-WORKDIR /etc/dendrite
-
-ENTRYPOINT ["/usr/bin/dendrite-demo-pinecone"]
-EXPOSE 8008 8448
-
-#
-# Builds the Yggdrasil P2P demo image and contains all required binaries
-#
-FROM dendrite-base AS demo-yggdrasil
-LABEL org.opencontainers.image.title="Dendrite (Yggdrasil P2P Demo)"
-
-COPY --from=build /out/create-account /usr/bin/create-account
-COPY --from=build /out/generate-config /usr/bin/generate-config
-COPY --from=build /out/generate-keys /usr/bin/generate-keys
-COPY --from=build /out/dendrite-demo-yggdrasil /usr/bin/dendrite-demo-yggdrasil
-
-VOLUME /etc/dendrite
-WORKDIR /etc/dendrite
-
-ENTRYPOINT ["/usr/bin/dendrite-demo-yggdrasil"]
-EXPOSE 8008 8448
-
-#
 # Builds the Complement image, used for integration tests
 #
 FROM base AS complement
