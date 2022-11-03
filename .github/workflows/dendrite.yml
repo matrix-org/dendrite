@@ -434,6 +434,7 @@ jobs:
     permissions:
       packages: write
       contents: read
+      security-events: write   # To upload Trivy sarif files
     if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
     needs: [integration-tests-done]
     uses: matrix-org/dendrite/.github/workflows/docker.yml@main
