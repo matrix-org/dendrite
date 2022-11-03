@@ -161,21 +161,23 @@ func (p *PresenceStreamProvider) getNeededUsersFromRequest(ctx context.Context, 
 
 	// add newly joined rooms user presences
 	newlyJoined := joinedRooms(req.Response, req.Device.UserID)
-	if len(newlyJoined) > 0 {
-		// TODO: Check if this is working better than before.
-		if err := p.notifier.LoadRooms(ctx, p.DB, newlyJoined); err != nil {
-			req.Log.WithError(err).Error("unable to refresh notifier lists")
-			return getPresenceForUsers, err
-		}
-		for _, roomID := range newlyJoined {
-			roomUsers := p.notifier.JoinedUsers(roomID)
-			for i := range roomUsers {
-				// we already got a presence from this user
-				if _, ok := presences[roomUsers[i]]; ok {
-					continue
-				}
-				getPresenceForUsers = append(getPresenceForUsers, roomUsers[i])
+	if len(newlyJoined) == 0 {
+		return getPresenceForUsers, nil
+	}
+
+	// TODO: Check if this is working better than before.
+	if err := p.notifier.LoadRooms(ctx, p.DB, newlyJoined); err != nil {
+		req.Log.WithError(err).Error("unable to refresh notifier lists")
+		return getPresenceForUsers, err
+	}
+	for _, roomID := range newlyJoined {
+		roomUsers := p.notifier.JoinedUsers(roomID)
+		for i := range roomUsers {
+			// we already got a presence from this user
+			if _, ok := presences[roomUsers[i]]; ok {
+				continue
 			}
+			getPresenceForUsers = append(getPresenceForUsers, roomUsers[i])
 		}
 	}
 	return getPresenceForUsers, nil

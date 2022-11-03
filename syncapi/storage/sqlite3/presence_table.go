@@ -20,8 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -148,7 +146,7 @@ func (p *presenceStatements) GetPresenceForUsers(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, prepStmt, "GetPresenceForUsers: stmt.close() failed")
-	logrus.Debugf("XXX: getting users: %v", userIDs)
+
 	params := make([]interface{}, len(userIDs))
 	for i := range userIDs {
 		params[i] = userIDs[i]
