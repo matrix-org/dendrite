@@ -22,7 +22,7 @@ docker build . --target demo-yggdrasil -t matrixdotorg/dendrite-demo-yggdrasil
 
 ## Compose files
 
-There are three sample `docker-compose` files:
+There are two sample `docker-compose` files:
 
 - `docker-compose.monolith.yml` which runs a monolith Dendrite deployment
 - `docker-compose.polylith.yml` which runs a polylith Dendrite deployment
