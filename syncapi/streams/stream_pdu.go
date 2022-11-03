@@ -316,7 +316,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// left. Anything that appears in the filtered timeline will be removed from the
 	// "state" section and kept in "timeline".
 	delta.StateEvents = gomatrixserverlib.HeaderedReverseTopologicalOrdering(
-		removeDuplicates(delta.StateEvents, recentEvents),
+		removeDuplicates(delta.StateEvents, events),
 		gomatrixserverlib.TopologicalOrderByAuthEvents,
 	)
 
@@ -530,7 +530,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	// If we are limited by the filter AND the history visibility filter
 	// didn't "remove" events, return that the response is limited.
 	limited = limited && len(events) == len(recentEvents)
-	stateEvents = removeDuplicates(stateEvents, recentEvents)
+	stateEvents = removeDuplicates(stateEvents, events)
 	if stateFilter.LazyLoadMembers {
 		if err != nil {
 			return nil, err
