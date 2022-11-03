@@ -108,6 +108,13 @@ func GetPresence(
 	e := presence.Header.Get("error")
 	if e != "" {
 		log.Errorf("received error msg from nats: %s", e)
+		if code := presence.Header.Get("error_code"); code == "404" {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("No status for user found."),
+			}
+		}
+
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: types.PresenceClientResponse{
