@@ -103,18 +103,10 @@ func GetPresence(
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
-
+	log.Debugf("XXX: 1")
 	statusMsg := presence.Header.Get("status_msg")
 	e := presence.Header.Get("error")
 	if e != "" {
-		log.Errorf("received error msg from nats: %s", e)
-		if code := presence.Header.Get("error_code"); code == "404" {
-			return util.JSONResponse{
-				Code: http.StatusNotFound,
-				JSON: jsonerror.NotFound("No status for user found."),
-			}
-		}
-
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: types.PresenceClientResponse{
@@ -122,14 +114,17 @@ func GetPresence(
 			},
 		}
 	}
+	log.Debugf("XXX: 2")
 	lastActive, err := strconv.Atoi(presence.Header.Get("last_active_ts"))
 	if err != nil {
+		log.WithError(err).Errorf("WTF?!")
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
 			JSON: jsonerror.InternalServerError(),
 		}
 	}
 
+	log.Debugf("XXX: 3")
 	p := types.PresenceInternal{LastActiveTS: gomatrixserverlib.Timestamp(lastActive)}
 	currentlyActive := p.CurrentlyActive()
 	return util.JSONResponse{

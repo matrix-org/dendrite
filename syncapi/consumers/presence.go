@@ -89,15 +89,13 @@ func (s *PresenceConsumer) Start() error {
 			}
 			return
 		}
-		if len(presences) == 0 {
-			m.Header.Set("error", "presence does not exist")
-			m.Header.Set("error_code", "404")
-			if err = msg.RespondMsg(msg); err != nil {
-				logrus.WithError(err).Error("Unable to respond to messages")
-			}
-			return
+
+		presence := &types.PresenceInternal{
+			UserID: userID,
 		}
-		presence := presences[0]
+		if len(presences) > 0 {
+			presence = presences[0]
+		}
 
 		deviceRes := api.QueryDevicesResponse{}
 		if err = s.deviceAPI.QueryDevices(s.ctx, &api.QueryDevicesRequest{UserID: userID}, &deviceRes); err != nil {
