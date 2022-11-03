@@ -86,8 +86,8 @@ func SetPusher(
 			if err != nil {
 				return invalidParam("malformed url passed")
 			}
-			if pushUrl.Scheme != "https" {
-				return invalidParam("only https scheme is allowed")
+			if pushUrl.Scheme != "https" && pushUrl.Scheme != "http" {
+				return invalidParam("only https and http schemes are allowed")
 			}
 		}
 

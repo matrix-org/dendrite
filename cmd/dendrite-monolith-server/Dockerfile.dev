@@ -1,0 +1,8 @@
+FROM alpine:latest
+
+COPY dendrite-monolith-server /usr/bin/
+
+VOLUME /etc/dendrite
+WORKDIR /etc/dendrite
+
+ENTRYPOINT ["/usr/bin/dendrite-monolith-server"]

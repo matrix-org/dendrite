@@ -171,7 +171,6 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
 	dbs := map[string]DBType{
 		"postgres": DBTypePostgres,
-		"sqlite":   DBTypeSQLite,
 	}
 	for dbName, dbType := range dbs {
 		dbt := dbType

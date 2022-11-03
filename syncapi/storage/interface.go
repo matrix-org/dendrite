@@ -109,6 +109,7 @@ type DatabaseTransaction interface {
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
 	RelationsFor(ctx context.Context, roomID, eventID, relType, eventType string, from, to types.StreamPosition, backwards bool, limit int) (events []types.StreamEvent, prevBatch, nextBatch string, err error)
+	SelectMultiRoomData(ctx context.Context, r *types.Range, joinedRooms []string) (types.MultiRoom, error)
 }
 
 type Database interface {
@@ -188,6 +189,10 @@ type Database interface {
 type Presence interface {
 	GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error)
 	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
+	PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error)
+	MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error)
+	ExpirePresence(ctx context.Context) ([]types.PresenceNotify, error)
+	UpdateLastActive(ctx context.Context, userId string, lastActiveTs uint64) error
 }
 
 type SharedUsers interface {

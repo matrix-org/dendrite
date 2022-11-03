@@ -36,6 +36,7 @@ type SyncAPIProducer struct {
 	TopicSendToDeviceEvent string
 	TopicTypingEvent       string
 	TopicPresenceEvent     string
+	TopicMultiRoomCast     string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
 	UserAPI                userapi.ClientUserAPI
@@ -156,6 +157,17 @@ func (p *SyncAPIProducer) SendPresence(
 
 	m.Header.Set("last_active_ts", strconv.Itoa(int(gomatrixserverlib.AsTimestamp(time.Now()))))
 
+	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
+	return err
+}
+
+func (p *SyncAPIProducer) SendMultiroom(
+	ctx context.Context, userID string, dataType string, message []byte,
+) error {
+	m := nats.NewMsg(p.TopicMultiRoomCast)
+	m.Header.Set(jetstream.UserID, userID)
+	m.Header.Set("type", dataType)
+	m.Data = message
 	_, err := p.JetStream.PublishMsg(m, nats.Context(ctx))
 	return err
 }

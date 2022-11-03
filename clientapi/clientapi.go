@@ -52,6 +52,7 @@ func AddPublicRoutes(
 		TopicSendToDeviceEvent: cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		TopicTypingEvent:       cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicMultiRoomCast:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputMultiRoomCast),
 		UserAPI:                userAPI,
 		ServerName:             cfg.Matrix.ServerName,
 	}

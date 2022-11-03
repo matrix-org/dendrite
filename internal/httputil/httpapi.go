@@ -87,6 +87,57 @@ func MakeAuthAPI(
 	return MakeExternalAPI(metricsName, h)
 }
 
+// MakeConditionalAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
+// It passes nil device if header is not provided.
+func MakeConditionalAuthAPI(
+	metricsName string, userAPI userapi.QueryAcccessTokenAPI,
+	f func(*http.Request, *userapi.Device) util.JSONResponse,
+) http.Handler {
+	h := func(req *http.Request) util.JSONResponse {
+		var (
+			jsonRes util.JSONResponse
+			dev     *userapi.Device
+		)
+		if _, err := auth.ExtractAccessToken(req); err != nil {
+			dev = nil
+		} else {
+			logger := util.GetLogger(req.Context())
+			var err *util.JSONResponse
+			dev, err = auth.VerifyUserFromRequest(req, userAPI)
+			if err != nil {
+				logger.Debugf("VerifyUserFromRequest %s -> HTTP %d", req.RemoteAddr, err.Code)
+				return *err
+			}
+			// add the user ID to the logger
+			logger = logger.WithField("user_id", dev.UserID)
+			req = req.WithContext(util.ContextWithLogger(req.Context(), logger))
+		}
+		// add the user to Sentry, if enabled
+		hub := sentry.GetHubFromContext(req.Context())
+		if hub != nil {
+			hub.Scope().SetTag("user_id", dev.UserID)
+			hub.Scope().SetTag("device_id", dev.ID)
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				if hub != nil {
+					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+				}
+				// re-panic to return the 500
+				panic(r)
+			}
+		}()
+		jsonRes = f(req, dev)
+		// do not log 4xx as errors as they are client fails, not server fails
+		if hub != nil && jsonRes.Code >= 500 {
+			hub.Scope().SetExtra("response", jsonRes)
+			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
+		}
+		return jsonRes
+	}
+	return MakeExternalAPI(metricsName, h)
+}
+
 // MakeAdminAPI is a wrapper around MakeAuthAPI which enforces that the request can only be
 // completed by a user that is a server administrator.
 func MakeAdminAPI(

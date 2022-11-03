@@ -1,0 +1,8 @@
+version: 1
+packages:
+  - path: ../mrd
+    engine: postgresql
+    schema: ../postgres/schema.sql
+    queries: queries.sql
+    emit_json_tags: true
+    emit_prepared_queries: true
