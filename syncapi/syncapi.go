@@ -45,6 +45,7 @@ func AddPublicRoutes(
 	keyAPI keyapi.SyncKeyAPI,
 ) {
 	cfg := &base.Cfg.SyncAPI
+	clientCfg := &base.Cfg.ClientAPI
 
 	js, natsClient := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
@@ -132,6 +133,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, base.Caches, base.Fulltext,
+		rsAPI, cfg, clientCfg, base.Caches, base.Fulltext,
 	)
 }

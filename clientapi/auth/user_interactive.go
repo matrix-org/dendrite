@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
@@ -75,7 +76,7 @@ type Login struct {
 
 // Username returns the user localpart/user_id in this request, if it exists.
 func (r *Login) Username() string {
-	if r.Identifier.Type == "m.id.user" {
+	if r.Identifier.Type == "m.id.user" || r.Identifier.Type == "m.id.decentralizedid" {
 		return r.Identifier.User
 	}
 	// deprecated but without it Element iOS won't log in
@@ -109,24 +110,39 @@ type UserInteractive struct {
 	Types map[string]Type
 	// Map of session ID to completed login types, will need to be extended in future
 	Sessions map[string][]string
+	Params   map[string]interface{}
 }
 
-func NewUserInteractive(userAccountAPI api.UserLoginAPI, cfg *config.ClientAPI) *UserInteractive {
-	typePassword := &LoginTypePassword{
-		GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
-		Config:               cfg,
-	}
-	return &UserInteractive{
-		Flows: []userInteractiveFlow{
-			{
-				Stages: []string{typePassword.Name()},
-			},
-		},
-		Types: map[string]Type{
-			typePassword.Name(): typePassword,
-		},
+func NewUserInteractive(
+	userAccountAPI api.UserLoginAPI,
+	clientUserAPI api.ClientUserAPI,
+	cfg *config.ClientAPI,
+) *UserInteractive {
+	userInteractive := UserInteractive{
+		Flows:    []userInteractiveFlow{},
+		Types:    make(map[string]Type),
 		Sessions: make(map[string][]string),
+		Params:   make(map[string]interface{}),
 	}
+
+	if !cfg.PasswordAuthenticationDisabled {
+		typePassword := &LoginTypePassword{
+			GetAccountByPassword: userAccountAPI.QueryAccountByPassword,
+			Config:               cfg,
+		}
+		typePassword.AddFLows(&userInteractive)
+	}
+
+	if cfg.PublicKeyAuthentication.Enabled() {
+		typePublicKey := &LoginTypePublicKey{
+			clientUserAPI,
+			&userInteractive,
+			cfg,
+		}
+		typePublicKey.AddFlows(&userInteractive)
+	}
+
+	return &userInteractive
 }
 
 func (u *UserInteractive) IsSingleStageFlow(authType string) bool {
@@ -147,6 +163,12 @@ func (u *UserInteractive) AddCompletedStage(sessionID, authType string) {
 	u.Unlock()
 }
 
+func (u *UserInteractive) DeleteSession(sessionID string) {
+	u.Lock()
+	delete(u.Sessions, sessionID)
+	u.Unlock()
+}
+
 type Challenge struct {
 	Completed []string              `json:"completed"`
 	Flows     []userInteractiveFlow `json:"flows"`
@@ -158,9 +180,19 @@ type Challenge struct {
 // Challenge returns an HTTP 401 with the supported flows for authenticating
 func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 	u.RLock()
+	paramsCopy := mapsutil.MapCopy(u.Params)
 	completed := u.Sessions[sessionID]
 	flows := u.Flows
 	u.RUnlock()
+
+	for key, element := range paramsCopy {
+		p := GetAuthParams(element)
+		if p != nil {
+			// If an auth flow has params,
+			// send it as part of the challenge.
+			paramsCopy[key] = p
+		}
+	}
 
 	return &util.JSONResponse{
 		Code: 401,
@@ -168,7 +200,7 @@ func (u *UserInteractive) challenge(sessionID string) *util.JSONResponse {
 			Completed: completed,
 			Flows:     flows,
 			Session:   sessionID,
-			Params:    make(map[string]interface{}),
+			Params:    paramsCopy,
 		},
 	}
 }
@@ -264,4 +296,13 @@ func (u *UserInteractive) Verify(ctx context.Context, bodyBytes []byte, device *
 	cleanup(ctx, nil)
 	// TODO: Check if there's more stages to go and return an error
 	return login, nil
+}
+
+func GetAuthParams(params interface{}) interface{} {
+	v, ok := params.(config.AuthParams)
+	if ok {
+		p := v.GetParams()
+		return p
+	}
+	return nil
 }

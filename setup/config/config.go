@@ -25,7 +25,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
+	"github.com/matrix-org/dendrite/internal/mapsutil"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
@@ -290,6 +292,9 @@ func LoadMatrixKey(privateKeyPath string, readFile func(string) ([]byte, error))
 // Derive generates data that is derived from various values provided in
 // the config file.
 func (config *Dendrite) Derive() error {
+	// Replace selected config with env variables.
+	config.replaceWithEnvVariables()
+
 	// Determine registrations flows based off config values
 
 	config.Derived.Registration.Params = make(map[string]interface{})
@@ -301,9 +306,19 @@ func (config *Dendrite) Derive() error {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
-	} else {
+	} else if !config.ClientAPI.PasswordAuthenticationDisabled {
 		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
 			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+	}
+	if config.ClientAPI.PublicKeyAuthentication.Enabled() {
+		pkFlows := config.ClientAPI.PublicKeyAuthentication.GetPublicKeyRegistrationFlows()
+		if pkFlows != nil {
+			config.Derived.Registration.Flows = append(config.Derived.Registration.Flows, pkFlows...)
+		}
+		pkParams := config.ClientAPI.PublicKeyAuthentication.GetPublicKeyRegistrationParams()
+		if pkParams != nil {
+			config.Derived.Registration.Params = mapsutil.MapsUnion(config.Derived.Registration.Params, pkParams)
+		}
 	}
 
 	// Load application service configuration files
@@ -563,6 +578,64 @@ func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err 
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)
+}
+
+/*
+*
+Replace selected config with environment variables
+*/
+
+func (config *Dendrite) replaceWithEnvVariables() {
+	// If env variable is set, get the value from the env
+	// variable and replace it in each supported field.
+
+	err := godotenv.Load(".env")
+	if err != nil {
+		logrus.Errorln("error loading .env file", err)
+	}
+
+	config.Global.ServerName = gomatrixserverlib.ServerName(
+		replaceWithEnvVariables(string(config.Global.ServerName)),
+	)
+	logrus.Infof("Matrix ServerName=%s", config.Global.ServerName)
+
+	config.Global.DatabaseOptions.ConnectionString = DataSource(
+		replaceWithEnvVariables(
+			string(config.Global.DatabaseOptions.ConnectionString),
+		),
+	)
+
+	if config.ClientAPI.PublicKeyAuthentication.Ethereum.Enabled {
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID =
+			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID)
+
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl =
+			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl)
+
+		config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz =
+			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz)
+
+		logrus.Infof(
+			"Supported Ethereum chain_id=%v, network_url=%v, enable_authz=%v",
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID,
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl,
+			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz,
+		)
+	}
+}
+
+var regexpEnvVariables = regexp.MustCompile(`\$\{(?P<Var>\w+)\}`)
+var varIndex = regexpEnvVariables.SubexpIndex("Var")
+
+func replaceWithEnvVariables(value string) string {
+	matches := regexpEnvVariables.FindAllStringSubmatch(value, -1)
+	for _, m := range matches {
+		if varIndex < len(m) {
+			envValue := os.Getenv(m[varIndex])
+			value = strings.ReplaceAll(value, fmt.Sprintf("${%s}", m[varIndex]), envValue)
+		}
+	}
+	return value
 }
 
 // logrusLogger is a small wrapper that implements jaeger.Logger using logrus.
