@@ -34,14 +34,13 @@ import (
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
 type OutputPresenceConsumer struct {
-	ctx               context.Context
-	jetstream         nats.JetStreamContext
-	durable           string
-	db                storage.Database
-	queues            *queue.OutgoingQueues
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
-	rsAPI             roomserverAPI.FederationRoomserverAPI
-	roomserverAPI.FederationRoomserverAPI
+	ctx                     context.Context
+	jetstream               nats.JetStreamContext
+	durable                 string
+	db                      storage.Database
+	queues                  *queue.OutgoingQueues
+	isLocalServerName       func(gomatrixserverlib.ServerName) bool
+	rsAPI                   roomserverAPI.FederationRoomserverAPI
 	topic                   string
 	outboundPresenceEnabled bool
 }
