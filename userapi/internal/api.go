@@ -175,7 +175,6 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	if serverName == "" {
 		serverName = a.Config.Matrix.ServerName
 	}
-	// XXXX: Use the server name here
 	acc, err := a.DB.CreateAccount(ctx, req.Localpart, serverName, req.Password, req.AppServiceID, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
@@ -245,13 +244,12 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 		serverName = a.Config.Matrix.ServerName
 	}
 	_ = serverName
-	// XXXX: Use the server name here
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
 		"device_id":    req.DeviceID,
 		"display_name": req.DeviceDisplayName,
 	}).Info("PerformDeviceCreation")
-	dev, err := a.DB.CreateDevice(ctx, req.Localpart, req.DeviceID, req.AccessToken, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
+	dev, err := a.DB.CreateDevice(ctx, req.Localpart, serverName, req.DeviceID, req.AccessToken, req.DeviceDisplayName, req.IPAddr, req.UserAgent)
 	if err != nil {
 		return err
 	}

@@ -79,6 +79,7 @@ func mustMakeAccountAndDevice(
 	accDB tables.AccountsTable,
 	devDB tables.DevicesTable,
 	localpart string,
+	serverName gomatrixserverlib.ServerName,
 	accType api.AccountType,
 	userAgent string,
 ) {
@@ -93,7 +94,7 @@ func mustMakeAccountAndDevice(
 	if err != nil {
 		t.Fatalf("unable to create account: %v", err)
 	}
-	_, err = devDB.InsertDevice(ctx, nil, "deviceID", localpart, util.RandomString(16), nil, "", userAgent)
+	_, err = devDB.InsertDevice(ctx, nil, "deviceID", localpart, serverName, util.RandomString(16), nil, "", userAgent)
 	if err != nil {
 		t.Fatalf("unable to create device: %v", err)
 	}
@@ -150,12 +151,12 @@ func Test_UserStatistics(t *testing.T) {
 		})
 
 		t.Run("Want Users", func(t *testing.T) {
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user1", api.AccountTypeUser, "Element Android")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user2", api.AccountTypeUser, "Element iOS")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user3", api.AccountTypeUser, "Element web")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user4", api.AccountTypeGuest, "Element Electron")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user5", api.AccountTypeAdmin, "gecko")
-			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user6", api.AccountTypeAppService, "gecko")
+			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user1", "localhost", api.AccountTypeUser, "Element Android")
+			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user2", "localhost", api.AccountTypeUser, "Element iOS")
+			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user3", "localhost", api.AccountTypeUser, "Element web")
+			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user4", "localhost", api.AccountTypeGuest, "Element Electron")
+			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user5", "localhost", api.AccountTypeAdmin, "gecko")
+			mustMakeAccountAndDevice(t, ctx, accDB, devDB, "user6", "localhost", api.AccountTypeAppService, "gecko")
 			gotStats, _, err := statsDB.UserStatistics(ctx, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

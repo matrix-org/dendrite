@@ -152,7 +152,7 @@ func Test_Accounts(t *testing.T) {
 
 func Test_Devices(t *testing.T) {
 	alice := test.NewUser(t)
-	localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 	deviceID := util.RandomString(8)
 	accessToken := util.RandomString(16)
@@ -161,7 +161,7 @@ func Test_Devices(t *testing.T) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 
-		deviceWithID, err := db.CreateDevice(ctx, localpart, &deviceID, accessToken, nil, "", "")
+		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
 
 		gotDevice, err := db.GetDeviceByID(ctx, localpart, deviceID)
@@ -174,7 +174,7 @@ func Test_Devices(t *testing.T) {
 
 		// create a device without existing device ID
 		accessToken = util.RandomString(16)
-		deviceWithoutID, err := db.CreateDevice(ctx, localpart, nil, accessToken, nil, "", "")
+		deviceWithoutID, err := db.CreateDevice(ctx, localpart, domain, nil, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
 		gotDeviceWithoutID, err := db.GetDeviceByID(ctx, localpart, deviceWithoutID.ID)
 		assert.NoError(t, err, "unable to get device by id")
@@ -213,7 +213,7 @@ func Test_Devices(t *testing.T) {
 		// create one more device and remove the devices step by step
 		newDeviceID := util.RandomString(16)
 		accessToken = util.RandomString(16)
-		_, err = db.CreateDevice(ctx, localpart, &newDeviceID, accessToken, nil, "", "")
+		_, err = db.CreateDevice(ctx, localpart, domain, &newDeviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create new device")
 
 		devices, err = db.GetDevicesByLocalpart(ctx, localpart)

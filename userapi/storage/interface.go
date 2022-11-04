@@ -70,7 +70,7 @@ type Device interface {
 	// an error will be returned.
 	// If no device ID is given one is generated.
 	// Returns the device on success.
-	CreateDevice(ctx context.Context, localpart string, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
+	CreateDevice(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
 	UpdateDevice(ctx context.Context, localpart, deviceID string, displayName *string) error
 	UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error
 	RemoveDevices(ctx context.Context, localpart string, devices []string) error

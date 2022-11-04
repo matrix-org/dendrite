@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO userapi_devices (device_id, localpart, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
-	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	"INSERT INTO userapi_devices (device_id, localpart, server_name, access_token, created_ts, display_name, session_id, last_seen_ts, ip, user_agent)" +
+	" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
 
 const selectDevicesCountSQL = "" +
 	"SELECT COUNT(access_token) FROM userapi_devices"
@@ -136,8 +136,9 @@ func NewSQLiteDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName) 
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
 func (s *devicesStatements) InsertDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
-	displayName *string, ipAddr, userAgent string,
+	ctx context.Context, txn *sql.Tx, id string,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	accessToken string, displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
@@ -147,7 +148,7 @@ func (s *devicesStatements) InsertDevice(
 		return nil, err
 	}
 	sessionID++
-	if _, err := insertStmt.ExecContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
+	if _, err := insertStmt.ExecContext(ctx, id, localpart, serverName, accessToken, createdTimeMS, displayName, sessionID, createdTimeMS, ipAddr, userAgent); err != nil {
 		return nil, err
 	}
 	return &api.Device{

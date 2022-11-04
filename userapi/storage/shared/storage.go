@@ -569,8 +569,8 @@ func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]ap
 // If no device ID is given one is generated.
 // Returns the device on success.
 func (d *Database) CreateDevice(
-	ctx context.Context, localpart string, deviceID *string, accessToken string,
-	displayName *string, ipAddr, userAgent string,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
 	if deviceID != nil {
 		returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -580,7 +580,7 @@ func (d *Database) CreateDevice(
 				return err
 			}
 
-			dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, accessToken, displayName, ipAddr, userAgent)
+			dev, err = d.Devices.InsertDevice(ctx, txn, *deviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
 			return err
 		})
 	} else {
@@ -595,7 +595,7 @@ func (d *Database) CreateDevice(
 
 			returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 				var err error
-				dev, err = d.Devices.InsertDevice(ctx, txn, newDeviceID, localpart, accessToken, displayName, ipAddr, userAgent)
+				dev, err = d.Devices.InsertDevice(ctx, txn, newDeviceID, localpart, serverName, accessToken, displayName, ipAddr, userAgent)
 				return err
 			})
 			if returnErr == nil {

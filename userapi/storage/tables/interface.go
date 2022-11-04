@@ -43,7 +43,7 @@ type AccountsTable interface {
 }
 
 type DevicesTable interface {
-	InsertDevice(ctx context.Context, txn *sql.Tx, id, localpart, accessToken string, displayName *string, ipAddr, userAgent string) (*api.Device, error)
+	InsertDevice(ctx context.Context, txn *sql.Tx, id, localpart string, serverName gomatrixserverlib.ServerName, accessToken string, displayName *string, ipAddr, userAgent string) (*api.Device, error)
 	DeleteDevice(ctx context.Context, txn *sql.Tx, id, localpart string) error
 	DeleteDevices(ctx context.Context, txn *sql.Tx, localpart string, devices []string) error
 	DeleteDevicesByLocalpart(ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string) error

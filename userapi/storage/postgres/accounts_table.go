@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -67,7 +68,7 @@ const selectPasswordHashSQL = "" +
 	"SELECT password_hash FROM userapi_accounts WHERE localpart = $1 AND server_name = $2 AND is_deactivated = FALSE"
 
 const selectNewNumericLocalpartSQL = "" +
-	"SELECT COALESCE(MAX(localpart::bigint), 0) FROM userapi_accounts WHERE localpart ~ '^[0-9]{1,}$' AND server_name = $2"
+	"SELECT COALESCE(MAX(localpart::bigint), 0) FROM userapi_accounts WHERE localpart ~ '^[0-9]{1,}$' AND server_name = $1"
 
 type accountsStatements struct {
 	insertAccountStmt             *sql.Stmt
@@ -132,7 +133,7 @@ func (s *accountsStatements) InsertAccount(
 		_, err = stmt.ExecContext(ctx, localpart, serverName, createdTimeMS, hash, appserviceID, accountType)
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("insertAccountStmt: %w", err)
 	}
 
 	return &api.Account{

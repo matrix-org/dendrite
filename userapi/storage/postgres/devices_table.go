@@ -17,6 +17,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -70,7 +71,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_dev
 `
 
 const insertDeviceSQL = "" +
-	"INSERT INTO userapi_devices(device_id, localpart, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)" +
+	"INSERT INTO userapi_devices(device_id, localpart, server_name, access_token, created_ts, display_name, last_seen_ts, ip, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
@@ -86,7 +87,7 @@ const updateDeviceNameSQL = "" +
 	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
 
 const deleteDeviceSQL = "" +
-	"DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2"
+	"DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2 AND server_name = $3"
 
 const deleteDevicesByLocalpartSQL = "" +
 	"DELETE FROM userapi_devices WHERE localpart = $1 AND device_id != $2"
@@ -149,18 +150,19 @@ func NewPostgresDevicesTable(db *sql.DB, serverName gomatrixserverlib.ServerName
 // Returns an error if the user already has a device with the given device ID.
 // Returns the device on success.
 func (s *devicesStatements) InsertDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart, accessToken string,
-	displayName *string, ipAddr, userAgent string,
+	ctx context.Context, txn *sql.Tx, id string,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	accessToken string, displayName *string, ipAddr, userAgent string,
 ) (*api.Device, error) {
 	createdTimeMS := time.Now().UnixNano() / 1000000
 	var sessionID int64
 	stmt := sqlutil.TxStmt(txn, s.insertDeviceStmt)
-	if err := stmt.QueryRowContext(ctx, id, localpart, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
-		return nil, err
+	if err := stmt.QueryRowContext(ctx, id, localpart, serverName, accessToken, createdTimeMS, displayName, createdTimeMS, ipAddr, userAgent).Scan(&sessionID); err != nil {
+		return nil, fmt.Errorf("insertDeviceStmt: %w", err)
 	}
 	return &api.Device{
 		ID:          id,
-		UserID:      userutil.MakeUserID(localpart, s.serverName),
+		UserID:      userutil.MakeUserID(localpart, serverName),
 		AccessToken: accessToken,
 		SessionID:   sessionID,
 		LastSeenTS:  createdTimeMS,
@@ -171,10 +173,11 @@ func (s *devicesStatements) InsertDevice(
 
 // deleteDevice removes a single device by id and user localpart.
 func (s *devicesStatements) DeleteDevice(
-	ctx context.Context, txn *sql.Tx, id, localpart string,
+	ctx context.Context, txn *sql.Tx, id string,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteDeviceStmt)
-	_, err := stmt.ExecContext(ctx, id, localpart)
+	_, err := stmt.ExecContext(ctx, id, localpart, serverName)
 	return err
 }
 
