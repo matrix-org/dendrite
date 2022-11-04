@@ -16,6 +16,7 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
@@ -40,6 +41,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.KeyserverFederationAPI,
+	rsAPI rsapi.KeyserverRoomserverAPI,
 ) api.KeyInternalAPI {
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
@@ -47,6 +49,7 @@ func NewInternalAPI(
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
+
 	keyChangeProducer := &producers.KeyChange{
 		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent)),
 		JetStream: js,
@@ -58,7 +61,7 @@ func NewInternalAPI(
 		FedClient:  fedClient,
 		Producer:   keyChangeProducer,
 	}
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, rsAPI) // 8 workers TODO: configurable
 	ap.Updater = updater
 	go func() {
 		if err := updater.Start(); err != nil {

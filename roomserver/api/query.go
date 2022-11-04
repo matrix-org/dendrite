@@ -447,3 +447,11 @@ type QueryMembershipAtEventResponse struct {
 	// do not have known state will return an empty array here.
 	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
 }
+
+type QueryLeftUsersRequest struct {
+	UserIDs []string `json:"user_ids"`
+}
+
+type QueryLeftUsersResponse struct {
+	UserIDs []string `json:"user_ids"`
+}

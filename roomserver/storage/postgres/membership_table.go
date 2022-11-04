@@ -157,6 +157,12 @@ const selectServerInRoomSQL = "" +
 	" JOIN roomserver_event_state_keys ON roomserver_membership.target_nid = roomserver_event_state_keys.event_state_key_nid" +
 	" WHERE membership_nid = $1 AND room_nid = $2 AND event_state_key LIKE '%:' || $3 LIMIT 1"
 
+const selectJoinedUsersSQL = `
+SELECT DISTINCT target_nid
+FROM roomserver_membership m
+WHERE membership_nid > $1 AND target_nid = ANY($2)
+`
+
 type membershipStatements struct {
 	insertMembershipStmt                            *sql.Stmt
 	selectMembershipForUpdateStmt                   *sql.Stmt
@@ -174,6 +180,7 @@ type membershipStatements struct {
 	selectLocalServerInRoomStmt                     *sql.Stmt
 	selectServerInRoomStmt                          *sql.Stmt
 	deleteMembershipStmt                            *sql.Stmt
+	selectJoinedUsersStmt                           *sql.Stmt
 }
 
 func CreateMembershipTable(db *sql.DB) error {
@@ -209,7 +216,31 @@ func PrepareMembershipTable(db *sql.DB) (tables.Membership, error) {
 		{&s.selectLocalServerInRoomStmt, selectLocalServerInRoomSQL},
 		{&s.selectServerInRoomStmt, selectServerInRoomSQL},
 		{&s.deleteMembershipStmt, deleteMembershipSQL},
+		{&s.selectJoinedUsersStmt, selectJoinedUsersSQL},
 	}.Prepare(db)
+}
+
+func (s *membershipStatements) SelectJoinedUsers(
+	ctx context.Context, txn *sql.Tx,
+	targetUserNIDs []types.EventStateKeyNID,
+) ([]types.EventStateKeyNID, error) {
+	result := make([]types.EventStateKeyNID, 0, len(targetUserNIDs))
+
+	stmt := sqlutil.TxStmt(txn, s.selectJoinedUsersStmt)
+	rows, err := stmt.QueryContext(ctx, tables.MembershipStateLeaveOrBan, pq.Array(targetUserNIDs))
+	if err != nil {
+		return nil, err
+	}
+
+	var targetNID types.EventStateKeyNID
+	for rows.Next() {
+		if err = rows.Scan(&targetNID); err != nil {
+			return nil, err
+		}
+		result = append(result, targetNID)
+	}
+
+	return result, rows.Err()
 }
 
 func (s *membershipStatements) InsertMembership(

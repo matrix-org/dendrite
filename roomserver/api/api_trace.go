@@ -19,6 +19,10 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
+func (t *RoomserverInternalAPITrace) QueryLeftUsers(ctx context.Context, req *QueryLeftUsersRequest, res *QueryLeftUsersResponse) error {
+	return t.Impl.QueryLeftUsers(ctx, req, res)
+}
+
 func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }

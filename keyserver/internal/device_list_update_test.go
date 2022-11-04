@@ -53,6 +53,10 @@ type mockDeviceListUpdaterDatabase struct {
 	mu           sync.Mutex // protect staleUsers
 }
 
+func (d *mockDeviceListUpdaterDatabase) DeleteStaleDeviceLists(ctx context.Context, userIDs []string) error {
+	return nil
+}
+
 // StaleDeviceLists returns a list of user IDs ending with the domains provided who have stale device lists.
 // If no domains are given, all user IDs with stale device lists are returned.
 func (d *mockDeviceListUpdaterDatabase) StaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error) {
@@ -147,7 +151,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1, nil)
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -219,7 +223,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, nil)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -288,7 +292,7 @@ func TestDebounce(t *testing.T) {
 		close(incomingFedReq)
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1, nil)
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
