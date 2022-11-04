@@ -7,15 +7,15 @@ import (
 	"github.com/matrix-org/dendrite/authorization"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	zion_goerli "github.com/matrix-org/dendrite/zion/contracts/goerli/zion_goerli"
-	zion_localhost "github.com/matrix-org/dendrite/zion/contracts/localhost/zion_localhost"
+	zion_goerli "github.com/matrix-org/dendrite/zion/contracts/zion_goerli"
+	zion_localhost "github.com/matrix-org/dendrite/zion/contracts/zion_localhost"
 	log "github.com/sirupsen/logrus"
 )
 
-//go:embed contracts/localhost/addresses/space-manager.json
+//go:embed contracts/zion_localhost/space-manager.json
 var localhostJson []byte
 
-//go:embed contracts/goerli/addresses/space-manager.json
+//go:embed contracts/zion_goerli/space-manager.json
 var goerliJson []byte
 
 type ZionAuthorization struct {
