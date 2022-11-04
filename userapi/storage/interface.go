@@ -40,12 +40,12 @@ type Account interface {
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
 	// account already exists, it will return nil, ErrUserExists.
 	CreateAccount(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, plaintextPassword string, appserviceID string, accountType api.AccountType) (*api.Account, error)
-	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
-	GetNewNumericLocalpart(ctx context.Context) (int64, error)
-	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
-	GetAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
-	DeactivateAccount(ctx context.Context, localpart string) (err error)
-	SetPassword(ctx context.Context, localpart string, plaintextPassword string) error
+	GetAccountByPassword(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, plaintextPassword string) (*api.Account, error)
+	GetNewNumericLocalpart(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
+	CheckAccountAvailability(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (bool, error)
+	GetAccountByLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (*api.Account, error)
+	DeactivateAccount(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (err error)
+	SetPassword(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, plaintextPassword string) error
 }
 
 type AccountData interface {

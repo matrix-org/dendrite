@@ -78,7 +78,7 @@ type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
 	UserLoginAPI
-	QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error
+	QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
@@ -335,9 +335,10 @@ type PerformAccountCreationResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformPasswordUpdateRequest struct {
-	Localpart     string // Required: The localpart for this account.
-	Password      string // Required: The new password to set.
-	LogoutDevices bool   // Optional: Whether to log out all user devices.
+	Localpart     string                       // Required: The localpart for this account.
+	ServerName    gomatrixserverlib.ServerName // Required: The domain for this account.
+	Password      string                       // Required: The new password to set.
+	LogoutDevices bool                         // Optional: Whether to log out all user devices.
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
@@ -601,12 +602,17 @@ type PerformSetAvatarURLResponse struct {
 	Changed bool               `json:"changed"`
 }
 
+type QueryNumericLocalpartRequest struct {
+	ServerName gomatrixserverlib.ServerName
+}
+
 type QueryNumericLocalpartResponse struct {
 	ID int64
 }
 
 type QueryAccountAvailabilityRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryAccountAvailabilityResponse struct {
@@ -614,7 +620,9 @@ type QueryAccountAvailabilityResponse struct {
 }
 
 type QueryAccountByPasswordRequest struct {
-	Localpart, PlaintextPassword string
+	Localpart         string
+	ServerName        gomatrixserverlib.ServerName
+	PlaintextPassword string
 }
 
 type QueryAccountByPasswordResponse struct {

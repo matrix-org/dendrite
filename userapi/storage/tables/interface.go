@@ -34,12 +34,12 @@ type AccountDataTable interface {
 }
 
 type AccountsTable interface {
-	InsertAccount(ctx context.Context, txn *sql.Tx, localpart, hash, appserviceID string, accountType api.AccountType) (*api.Account, error)
-	UpdatePassword(ctx context.Context, localpart, passwordHash string) (err error)
-	DeactivateAccount(ctx context.Context, localpart string) (err error)
-	SelectPasswordHash(ctx context.Context, localpart string) (hash string, err error)
-	SelectAccountByLocalpart(ctx context.Context, localpart string) (*api.Account, error)
-	SelectNewNumericLocalpart(ctx context.Context, txn *sql.Tx) (id int64, err error)
+	InsertAccount(ctx context.Context, txn *sql.Tx, localpart string, serverName gomatrixserverlib.ServerName, hash, appserviceID string, accountType api.AccountType) (*api.Account, error)
+	UpdatePassword(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, passwordHash string) (err error)
+	DeactivateAccount(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (err error)
+	SelectPasswordHash(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (hash string, err error)
+	SelectAccountByLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (*api.Account, error)
+	SelectNewNumericLocalpart(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (id int64, err error)
 }
 
 type DevicesTable interface {

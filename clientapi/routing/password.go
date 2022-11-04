@@ -86,7 +86,7 @@ func Password(
 	}
 
 	// Get the local part.
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
@@ -94,8 +94,9 @@ func Password(
 
 	// Ask the user API to perform the password change.
 	passwordReq := &api.PerformPasswordUpdateRequest{
-		Localpart: localpart,
-		Password:  r.NewPassword,
+		Localpart:  localpart,
+		ServerName: domain,
+		Password:   r.NewPassword,
 	}
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {

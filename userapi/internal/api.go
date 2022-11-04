@@ -227,7 +227,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 }
 
 func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
-	if err := a.DB.SetPassword(ctx, req.Localpart, req.Password); err != nil {
+	if err := a.DB.SetPassword(ctx, req.Localpart, req.ServerName, req.Password); err != nil {
 		return err
 	}
 	if req.LogoutDevices {
@@ -527,7 +527,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	if !a.Config.Matrix.IsLocalServerName(domain) {
 		return nil
 	}
-	acc, err := a.DB.GetAccountByLocalpart(ctx, localPart)
+	acc, err := a.DB.GetAccountByLocalpart(ctx, localPart, domain)
 	if err != nil {
 		return err
 	}
@@ -568,7 +568,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 
 	if localpart != "" { // AS is masquerading as another user
 		// Verify that the user is registered
-		account, err := a.DB.GetAccountByLocalpart(ctx, localpart)
+		account, err := a.DB.GetAccountByLocalpart(ctx, localpart, a.Cfg.Matrix.ServerName) // TODO: which server name here?
 		// Verify that the account exists and either appServiceID matches or
 		// it belongs to the appservice user namespaces
 		if err == nil && (account.AppServiceID == appService.ID || appService.IsInterestedInUserID(appServiceUserID)) {
@@ -620,7 +620,7 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return err
 	}
 
-	err := a.DB.DeactivateAccount(ctx, req.Localpart)
+	err := a.DB.DeactivateAccount(ctx, req.Localpart, serverName)
 	res.AccountDeactivated = err == nil
 	return err
 }
@@ -883,8 +883,8 @@ func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetA
 	return err
 }
 
-func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.QueryNumericLocalpartResponse) error {
-	id, err := a.DB.GetNewNumericLocalpart(ctx)
+func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, req *api.QueryNumericLocalpartRequest, res *api.QueryNumericLocalpartResponse) error {
+	id, err := a.DB.GetNewNumericLocalpart(ctx, req.ServerName)
 	if err != nil {
 		return err
 	}
@@ -894,12 +894,12 @@ func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.Qu
 
 func (a *UserInternalAPI) QueryAccountAvailability(ctx context.Context, req *api.QueryAccountAvailabilityRequest, res *api.QueryAccountAvailabilityResponse) error {
 	var err error
-	res.Available, err = a.DB.CheckAccountAvailability(ctx, req.Localpart)
+	res.Available, err = a.DB.CheckAccountAvailability(ctx, req.Localpart, req.ServerName)
 	return err
 }
 
 func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.QueryAccountByPasswordRequest, res *api.QueryAccountByPasswordResponse) error {
-	acc, err := a.DB.GetAccountByPassword(ctx, req.Localpart, req.PlaintextPassword)
+	acc, err := a.DB.GetAccountByPassword(ctx, req.Localpart, req.ServerName, req.PlaintextPassword)
 	switch err {
 	case sql.ErrNoRows: // user does not exist
 		return nil

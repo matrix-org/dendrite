@@ -88,47 +88,47 @@ func Test_Accounts(t *testing.T) {
 		assert.NoError(t, err, "failed to create account")
 		// verify the newly create account is the same as returned by CreateAccount
 		var accGet *api.Account
-		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, "testing")
+		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "testing")
 		assert.NoError(t, err, "failed to get account by password")
 		assert.Equal(t, accAlice, accGet)
-		accGet, err = db.GetAccountByLocalpart(ctx, aliceLocalpart)
+		accGet, err = db.GetAccountByLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to get account by localpart")
 		assert.Equal(t, accAlice, accGet)
 
 		// check account availability
-		available, err := db.CheckAccountAvailability(ctx, aliceLocalpart)
+		available, err := db.CheckAccountAvailability(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to checkout account availability")
 		assert.Equal(t, false, available)
 
-		available, err = db.CheckAccountAvailability(ctx, "unusedname")
+		available, err = db.CheckAccountAvailability(ctx, "unusedname", aliceDomain)
 		assert.NoError(t, err, "failed to checkout account availability")
 		assert.Equal(t, true, available)
 
 		// get guest account numeric aliceLocalpart
-		first, err := db.GetNewNumericLocalpart(ctx)
+		first, err := db.GetNewNumericLocalpart(ctx, aliceDomain)
 		assert.NoError(t, err, "failed to get new numeric localpart")
 		// Create a new account to verify the numeric localpart is updated
 		_, err = db.CreateAccount(ctx, "", aliceDomain, "testing", "", api.AccountTypeGuest)
 		assert.NoError(t, err, "failed to create account")
-		second, err := db.GetNewNumericLocalpart(ctx)
+		second, err := db.GetNewNumericLocalpart(ctx, aliceDomain)
 		assert.NoError(t, err)
 		assert.Greater(t, second, first)
 
 		// update password for alice
-		err = db.SetPassword(ctx, aliceLocalpart, "newPassword")
+		err = db.SetPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.NoError(t, err, "failed to update password")
-		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, "newPassword")
+		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.NoError(t, err, "failed to get account by new password")
 		assert.Equal(t, accAlice, accGet)
 
 		// deactivate account
-		err = db.DeactivateAccount(ctx, aliceLocalpart)
+		err = db.DeactivateAccount(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to deactivate account")
 		// This should fail now, as the account is deactivated
-		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, "newPassword")
+		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.Error(t, err, "expected an error, got none")
 
-		_, err = db.GetAccountByLocalpart(ctx, "unusename")
+		_, err = db.GetAccountByLocalpart(ctx, "unusename", aliceDomain)
 		assert.Error(t, err, "expected an error for non existent localpart")
 
 		// create an empty localpart; this should never happen, but is required to test getting a numeric localpart

@@ -68,9 +68,10 @@ const (
 // GetAccountByPassword returns the account associated with the given localpart and password.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
 func (d *Database) GetAccountByPassword(
-	ctx context.Context, localpart, plaintextPassword string,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	plaintextPassword string,
 ) (*api.Account, error) {
-	hash, err := d.Accounts.SelectPasswordHash(ctx, localpart)
+	hash, err := d.Accounts.SelectPasswordHash(ctx, localpart, serverName)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (d *Database) GetAccountByPassword(
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plaintextPassword)); err != nil {
 		return nil, err
 	}
-	return d.Accounts.SelectAccountByLocalpart(ctx, localpart)
+	return d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName)
 }
 
 // GetProfileByLocalpart returns the profile associated with the given localpart.
@@ -117,14 +118,15 @@ func (d *Database) SetDisplayName(
 
 // SetPassword sets the account password to the given hash.
 func (d *Database) SetPassword(
-	ctx context.Context, localpart, plaintextPassword string,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	plaintextPassword string,
 ) error {
 	hash, err := d.hashPassword(plaintextPassword)
 	if err != nil {
 		return err
 	}
 	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
-		return d.Accounts.UpdatePassword(ctx, localpart, hash)
+		return d.Accounts.UpdatePassword(ctx, localpart, serverName, hash)
 	})
 }
 
@@ -139,7 +141,7 @@ func (d *Database) CreateAccount(
 		// For guest accounts, we create a new numeric local part
 		if accountType == api.AccountTypeGuest {
 			var numLocalpart int64
-			numLocalpart, err = d.Accounts.SelectNewNumericLocalpart(ctx, txn)
+			numLocalpart, err = d.Accounts.SelectNewNumericLocalpart(ctx, txn, serverName)
 			if err != nil {
 				return err
 			}
@@ -170,13 +172,13 @@ func (d *Database) createAccount(
 			return nil, err
 		}
 	}
-	if account, err = d.Accounts.InsertAccount(ctx, txn, localpart, hash, appserviceID, accountType); err != nil {
+	if account, err = d.Accounts.InsertAccount(ctx, txn, localpart, serverName, hash, appserviceID, accountType); err != nil {
 		return nil, sqlutil.ErrUserExists
 	}
 	if err = d.Profiles.InsertProfile(ctx, txn, localpart); err != nil {
 		return nil, err
 	}
-	pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.ServerName)
+	pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, serverName)
 	prbs, err := json.Marshal(pushRuleSets)
 	if err != nil {
 		return nil, err
@@ -262,9 +264,9 @@ func (d *Database) GetAccountDataByType(
 
 // GetNewNumericLocalpart generates and returns a new unused numeric localpart
 func (d *Database) GetNewNumericLocalpart(
-	ctx context.Context,
+	ctx context.Context, serverName gomatrixserverlib.ServerName,
 ) (int64, error) {
-	return d.Accounts.SelectNewNumericLocalpart(ctx, nil)
+	return d.Accounts.SelectNewNumericLocalpart(ctx, nil, serverName)
 }
 
 func (d *Database) hashPassword(plaintext string) (hash string, err error) {
@@ -335,8 +337,8 @@ func (d *Database) GetThreePIDsForLocalpart(
 // CheckAccountAvailability checks if the username/localpart is already present
 // in the database.
 // If the DB returns sql.ErrNoRows the Localpart isn't taken.
-func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string) (bool, error) {
-	_, err := d.Accounts.SelectAccountByLocalpart(ctx, localpart)
+func (d *Database) CheckAccountAvailability(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (bool, error) {
+	_, err := d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}
@@ -346,12 +348,12 @@ func (d *Database) CheckAccountAvailability(ctx context.Context, localpart strin
 // GetAccountByLocalpart returns the account associated with the given localpart.
 // This function assumes the request is authenticated or the account data is used only internally.
 // Returns sql.ErrNoRows if no account exists which matches the given localpart.
-func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string,
+func (d *Database) GetAccountByLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
 ) (*api.Account, error) {
 	// try to get the account with lowercase localpart (majority)
-	acc, err := d.Accounts.SelectAccountByLocalpart(ctx, strings.ToLower(localpart))
+	acc, err := d.Accounts.SelectAccountByLocalpart(ctx, strings.ToLower(localpart), serverName)
 	if err == sql.ErrNoRows {
-		acc, err = d.Accounts.SelectAccountByLocalpart(ctx, localpart) // try with localpart as passed by the request
+		acc, err = d.Accounts.SelectAccountByLocalpart(ctx, localpart, serverName) // try with localpart as passed by the request
 	}
 	return acc, err
 }
@@ -364,9 +366,9 @@ func (d *Database) SearchProfiles(ctx context.Context, searchString string, limi
 }
 
 // DeactivateAccount deactivates the user's account, removing all ability for the user to login again.
-func (d *Database) DeactivateAccount(ctx context.Context, localpart string) (err error) {
+func (d *Database) DeactivateAccount(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (err error) {
 	return d.Writer.Do(nil, nil, func(txn *sql.Tx) error {
-		return d.Accounts.DeactivateAccount(ctx, localpart)
+		return d.Accounts.DeactivateAccount(ctx, localpart, serverName)
 	})
 }
 

@@ -588,12 +588,15 @@ func Register(
 	}
 	// Auto generate a numeric username if r.Username is empty
 	if r.Username == "" {
-		res := &userapi.QueryNumericLocalpartResponse{}
-		if err := userAPI.QueryNumericLocalpart(req.Context(), res); err != nil {
+		nreq := &userapi.QueryNumericLocalpartRequest{
+			ServerName: cfg.Matrix.ServerName, // TODO: might not be right
+		}
+		nres := &userapi.QueryNumericLocalpartResponse{}
+		if err := userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return jsonerror.InternalServerError()
 		}
-		r.Username = strconv.FormatInt(res.ID, 10)
+		r.Username = strconv.FormatInt(nres.ID, 10)
 	}
 
 	// Is this an appservice registration? It will be if the access
