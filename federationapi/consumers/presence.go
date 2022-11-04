@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	fedTypes "github.com/matrix-org/dendrite/federationapi/types"
@@ -112,10 +111,10 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
-	// send this key change to all servers who share rooms with this user.
+	// send this presence to all servers who share rooms with this user.
 	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
 	if err != nil {
-		sentry.CaptureException(err)
+		log.WithError(err).Error("failed to get joined hosts")
 		return true
 	}
 
