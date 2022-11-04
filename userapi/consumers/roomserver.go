@@ -491,7 +491,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 	}
 
 	// Get accountdata to check if the event.Sender() is ignored by mem.LocalPart
-	data, err := s.db.GetAccountDataByType(ctx, mem.Localpart, "", "m.ignored_user_list")
+	data, err := s.db.GetAccountDataByType(ctx, mem.Localpart, mem.Domain, "", "m.ignored_user_list")
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +506,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 			return nil, fmt.Errorf("user %s is ignored", sender)
 		}
 	}
-	ruleSets, err := s.db.QueryPushRules(ctx, mem.Localpart)
+	ruleSets, err := s.db.QueryPushRules(ctx, mem.Localpart, mem.Domain)
 	if err != nil {
 		return nil, err
 	}

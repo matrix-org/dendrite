@@ -132,7 +132,8 @@ func (d *Database) SetPassword(
 // for this account. If no password is supplied, the account will be a passwordless account. If the
 // account already exists, it will return nil, ErrUserExists.
 func (d *Database) CreateAccount(
-	ctx context.Context, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (acc *api.Account, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		// For guest accounts, we create a new numeric local part
@@ -146,7 +147,7 @@ func (d *Database) CreateAccount(
 			plaintextPassword = ""
 			appserviceID = ""
 		}
-		acc, err = d.createAccount(ctx, txn, localpart, plaintextPassword, appserviceID, accountType)
+		acc, err = d.createAccount(ctx, txn, localpart, serverName, plaintextPassword, appserviceID, accountType)
 		return err
 	})
 	return
@@ -155,7 +156,9 @@ func (d *Database) CreateAccount(
 // WARNING! This function assumes that the relevant mutexes have already
 // been taken out by the caller (e.g. CreateAccount or CreateGuestAccount).
 func (d *Database) createAccount(
-	ctx context.Context, txn *sql.Tx, localpart, plaintextPassword, appserviceID string, accountType api.AccountType,
+	ctx context.Context, txn *sql.Tx,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	plaintextPassword, appserviceID string, accountType api.AccountType,
 ) (*api.Account, error) {
 	var err error
 	var account *api.Account
@@ -178,7 +181,7 @@ func (d *Database) createAccount(
 	if err != nil {
 		return nil, err
 	}
-	if err = d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", json.RawMessage(prbs)); err != nil {
+	if err = d.AccountDatas.InsertAccountData(ctx, txn, localpart, serverName, "", "m.push_rules", json.RawMessage(prbs)); err != nil {
 		return nil, err
 	}
 	return account, nil
@@ -186,9 +189,9 @@ func (d *Database) createAccount(
 
 func (d *Database) QueryPushRules(
 	ctx context.Context,
-	localpart string,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) (*pushrules.AccountRuleSets, error) {
-	data, err := d.AccountDatas.SelectAccountDataByType(ctx, localpart, "", "m.push_rules")
+	data, err := d.AccountDatas.SelectAccountDataByType(ctx, localpart, serverName, "", "m.push_rules")
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +205,7 @@ func (d *Database) QueryPushRules(
 			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
 		}
 		err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, "", "m.push_rules", prbs); dbErr != nil {
+			if dbErr := d.AccountDatas.InsertAccountData(ctx, txn, localpart, serverName, "", "m.push_rules", prbs); dbErr != nil {
 				return fmt.Errorf("failed to save default push rules: %w", dbErr)
 			}
 			return nil
@@ -225,22 +228,23 @@ func (d *Database) QueryPushRules(
 // update the corresponding row with the new content
 // Returns a SQL error if there was an issue with the insertion/update
 func (d *Database) SaveAccountData(
-	ctx context.Context, localpart, roomID, dataType string, content json.RawMessage,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	roomID, dataType string, content json.RawMessage,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.AccountDatas.InsertAccountData(ctx, txn, localpart, roomID, dataType, content)
+		return d.AccountDatas.InsertAccountData(ctx, txn, localpart, serverName, roomID, dataType, content)
 	})
 }
 
 // GetAccountData returns account data related to a given localpart
 // If no account data could be found, returns an empty arrays
 // Returns an error if there was an issue with the retrieval
-func (d *Database) GetAccountData(ctx context.Context, localpart string) (
+func (d *Database) GetAccountData(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (
 	global map[string]json.RawMessage,
 	rooms map[string]map[string]json.RawMessage,
 	err error,
 ) {
-	return d.AccountDatas.SelectAccountData(ctx, localpart)
+	return d.AccountDatas.SelectAccountData(ctx, localpart, serverName)
 }
 
 // GetAccountDataByType returns account data matching a given
@@ -248,10 +252,11 @@ func (d *Database) GetAccountData(ctx context.Context, localpart string) (
 // If no account data could be found, returns nil
 // Returns an error if there was an issue with the retrieval
 func (d *Database) GetAccountDataByType(
-	ctx context.Context, localpart, roomID, dataType string,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
+	roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	return d.AccountDatas.SelectAccountDataByType(
-		ctx, localpart, roomID, dataType,
+		ctx, localpart, serverName, roomID, dataType,
 	)
 }
 

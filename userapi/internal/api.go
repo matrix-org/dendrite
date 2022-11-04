@@ -68,7 +68,7 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
 	}
-	if err := a.DB.SaveAccountData(ctx, local, req.RoomID, req.DataType, req.AccountData); err != nil {
+	if err := a.DB.SaveAccountData(ctx, local, domain, req.RoomID, req.DataType, req.AccountData); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("a.DB.SaveAccountData failed")
 		return fmt.Errorf("failed to save account data: %w", err)
 	}
@@ -176,7 +176,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		serverName = a.Config.Matrix.ServerName
 	}
 	// XXXX: Use the server name here
-	acc, err := a.DB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.AccountType)
+	acc, err := a.DB.CreateAccount(ctx, req.Localpart, serverName, req.Password, req.AppServiceID, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
 			switch req.OnConflict {
@@ -476,7 +476,7 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 	}
 	if req.DataType != "" {
 		var data json.RawMessage
-		data, err = a.DB.GetAccountDataByType(ctx, local, req.RoomID, req.DataType)
+		data, err = a.DB.GetAccountDataByType(ctx, local, domain, req.RoomID, req.DataType)
 		if err != nil {
 			return err
 		}
@@ -494,7 +494,7 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 		}
 		return nil
 	}
-	global, rooms, err := a.DB.GetAccountData(ctx, local)
+	global, rooms, err := a.DB.GetAccountData(ctx, local, domain)
 	if err != nil {
 		return err
 	}
@@ -864,11 +864,11 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 }
 
 func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPushRulesRequest, res *api.QueryPushRulesResponse) error {
-	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return fmt.Errorf("failed to split user ID %q for push rules", req.UserID)
 	}
-	pushRules, err := a.DB.QueryPushRules(ctx, localpart)
+	pushRules, err := a.DB.QueryPushRules(ctx, localpart, domain)
 	if err != nil {
 		return fmt.Errorf("failed to query push rules: %w", err)
 	}

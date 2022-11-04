@@ -39,7 +39,7 @@ type Account interface {
 	// CreateAccount makes a new account with the given login name and password, and creates an empty profile
 	// for this account. If no password is supplied, the account will be a passwordless account. If the
 	// account already exists, it will return nil, ErrUserExists.
-	CreateAccount(ctx context.Context, localpart string, plaintextPassword string, appserviceID string, accountType api.AccountType) (*api.Account, error)
+	CreateAccount(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, plaintextPassword string, appserviceID string, accountType api.AccountType) (*api.Account, error)
 	GetAccountByPassword(ctx context.Context, localpart, plaintextPassword string) (*api.Account, error)
 	GetNewNumericLocalpart(ctx context.Context) (int64, error)
 	CheckAccountAvailability(ctx context.Context, localpart string) (bool, error)
@@ -49,14 +49,14 @@ type Account interface {
 }
 
 type AccountData interface {
-	SaveAccountData(ctx context.Context, localpart, roomID, dataType string, content json.RawMessage) error
-	GetAccountData(ctx context.Context, localpart string) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)
+	SaveAccountData(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, roomID, dataType string, content json.RawMessage) error
+	GetAccountData(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (global map[string]json.RawMessage, rooms map[string]map[string]json.RawMessage, err error)
 	// GetAccountDataByType returns account data matching a given
 	// localpart, room ID and type.
 	// If no account data could be found, returns nil
 	// Returns an error if there was an issue with the retrieval
-	GetAccountDataByType(ctx context.Context, localpart, roomID, dataType string) (data json.RawMessage, err error)
-	QueryPushRules(ctx context.Context, localpart string) (*pushrules.AccountRuleSets, error)
+	GetAccountDataByType(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, roomID, dataType string) (data json.RawMessage, err error)
+	QueryPushRules(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (*pushrules.AccountRuleSets, error)
 }
 
 type Device interface {
