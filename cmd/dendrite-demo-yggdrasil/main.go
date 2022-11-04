@@ -156,11 +156,12 @@ func main() {
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
-
 	rsComponent := roomserver.NewInternalAPI(
 		base,
 	)
+
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation, rsComponent)
+
 	rsAPI := rsComponent
 
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
