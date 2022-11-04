@@ -8,6 +8,11 @@ FROM docker.io/golang:1.19-alpine AS base
 #
 >>>>>>>> 5a5e4a4ba659aafc62d142561dbd221c6b8020ec:servers/dendrite/build/docker/Dockerfile.demo-pinecone
 
+#
+# Needs to be separate from the main Dockerfile for OpenShift,
+# as --target is not supported there.
+#
+
 RUN apk --update --no-cache add bash build-base
 
 WORKDIR /build

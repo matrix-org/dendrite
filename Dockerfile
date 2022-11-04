@@ -16,6 +16,7 @@ ARG TARGETARCH
 ARG FLAGS
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
     USERARCH=`go env GOARCH` \
     GOARCH="$TARGETARCH" \
     GOOS="linux" \
