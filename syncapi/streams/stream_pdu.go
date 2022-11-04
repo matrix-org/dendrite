@@ -264,6 +264,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
 	latestPosition := r.To
+	if r.Backwards {
+		latestPosition = r.From
+	}
 	updateLatestPosition := func(mostRecentEventID string) {
 		var pos types.StreamPosition
 		if _, pos, err = snapshot.PositionInTopology(ctx, mostRecentEventID); err == nil {

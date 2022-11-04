@@ -164,7 +164,7 @@ func NewInternalAPI(
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceConsumer(
-		base.ProcessContext, cfg, js, queues, federationDB,
+		base.ProcessContext, cfg, js, queues, federationDB, rsAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")
