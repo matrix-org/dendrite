@@ -43,6 +43,7 @@ const notificationSchema = `
 CREATE TABLE IF NOT EXISTS userapi_notifications (
     id BIGSERIAL PRIMARY KEY,
 	localpart TEXT NOT NULL,
+	server_name TEXT NOT NULL,
 	room_id TEXT NOT NULL,
 	event_id TEXT NOT NULL,
 	stream_pos BIGINT NOT NULL,

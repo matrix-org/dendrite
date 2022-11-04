@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS userapi_pushers (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The Matrix user ID localpart for this pusher
 	localpart TEXT NOT NULL,
+	server_name TEXT NOT NULL,
 	session_id BIGINT DEFAULT NULL,
 	profile_tag TEXT,
 	kind TEXT NOT NULL,

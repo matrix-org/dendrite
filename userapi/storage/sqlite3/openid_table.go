@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 	token TEXT NOT NULL PRIMARY KEY,
     -- The Matrix user ID for this account
 	localpart TEXT NOT NULL,
+	server_name TEXT NOT NULL,
 	-- When the token expires, as a unix timestamp (ms resolution).
 	token_expires_at_ms BIGINT NOT NULL
 );

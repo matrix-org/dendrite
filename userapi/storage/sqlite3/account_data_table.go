@@ -28,6 +28,7 @@ const accountDataSchema = `
 CREATE TABLE IF NOT EXISTS userapi_account_datas (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL,
+	server_name TEXT NOT NULL,
     -- The room ID for this data (empty string if not specific to a room)
     room_id TEXT,
     -- The account data type

@@ -35,6 +35,7 @@ const accountsSchema = `
 CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
+	server_name TEXT NOT NULL,
     -- When this account was first created, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
     -- The password hash for this account. Can be NULL if this is a passwordless account.

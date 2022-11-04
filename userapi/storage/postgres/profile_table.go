@@ -30,6 +30,7 @@ const profilesSchema = `
 CREATE TABLE IF NOT EXISTS userapi_profiles (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
+	server_name TEXT NOT NULL,
     -- The display name for this account
     display_name TEXT,
     -- The URL of the avatar for this account

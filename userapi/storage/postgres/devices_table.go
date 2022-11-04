@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
     -- as it is smaller, makes it clearer that we only manage devices for our own users, and may make
     -- migration to different domain names easier.
     localpart TEXT NOT NULL,
+	server_name TEXT NOT NULL,
     -- When this devices was first recognised on the network, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
     -- The display name, human friendlier than device_id and updatable
