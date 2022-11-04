@@ -147,7 +147,6 @@ const selectStateInRangeFilteredSQL = "" +
 	" ORDER BY id ASC"
 
 // In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
-// In order for us to apply the state updates correctly, rows need to be ordered in the order they were received (id).
 const selectStateInRangeSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
 	" FROM syncapi_output_room_events" +
