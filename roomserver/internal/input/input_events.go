@@ -447,29 +447,7 @@ func (r *Inputer) processRoomEvent(
 func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event *gomatrixserverlib.Event) error {
 	oldRoomID := event.RoomID()
 	newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
-	// un-publish old room
-	if err := r.DB.PublishRoom(ctx, oldRoomID, "", "", false); err != nil {
-		return fmt.Errorf("failed to unpublish room: %w", err)
-	}
-	// publish new room
-	if err := r.DB.PublishRoom(ctx, newRoomID, "", "", true); err != nil {
-		return fmt.Errorf("failed to publish room: %w", err)
-	}
-
-	aliases, err := r.DB.GetAliasesForRoomID(ctx, oldRoomID)
-	if err != nil {
-		return fmt.Errorf("failed to get room aliases: %w", err)
-	}
-
-	for _, alias := range aliases {
-		if err = r.DB.RemoveRoomAlias(ctx, alias); err != nil {
-			fmt.Errorf("failed to remove room alias: %w", err)
-		}
-		if err = r.DB.SetRoomAlias(ctx, alias, newRoomID, event.Sender()); err != nil {
-			return fmt.Errorf("failed to set room alias: %w", err)
-		}
-	}
-	return nil
+	return r.DB.UpgradeRoom(ctx, oldRoomID, newRoomID, event.Sender())
 }
 
 // processStateBefore works out what the state is before the event and
