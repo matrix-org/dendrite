@@ -87,18 +87,21 @@ func (d *Database) GetAccountByPassword(
 // GetProfileByLocalpart returns the profile associated with the given localpart.
 // Returns sql.ErrNoRows if no profile exists which matches the given localpart.
 func (d *Database) GetProfileByLocalpart(
-	ctx context.Context, localpart string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) (*authtypes.Profile, error) {
-	return d.Profiles.SelectProfileByLocalpart(ctx, localpart)
+	return d.Profiles.SelectProfileByLocalpart(ctx, localpart, serverName)
 }
 
 // SetAvatarURL updates the avatar URL of the profile associated with the given
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetAvatarURL(
-	ctx context.Context, localpart string, avatarURL string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	avatarURL string,
 ) (profile *authtypes.Profile, changed bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		profile, changed, err = d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
+		profile, changed, err = d.Profiles.SetAvatarURL(ctx, txn, localpart, serverName, avatarURL)
 		return err
 	})
 	return
@@ -107,10 +110,12 @@ func (d *Database) SetAvatarURL(
 // SetDisplayName updates the display name of the profile associated with the given
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetDisplayName(
-	ctx context.Context, localpart string, displayName string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	displayName string,
 ) (profile *authtypes.Profile, changed bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		profile, changed, err = d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
+		profile, changed, err = d.Profiles.SetDisplayName(ctx, txn, localpart, serverName, displayName)
 		return err
 	})
 	return
@@ -175,7 +180,7 @@ func (d *Database) createAccount(
 	if account, err = d.Accounts.InsertAccount(ctx, txn, localpart, serverName, hash, appserviceID, accountType); err != nil {
 		return nil, sqlutil.ErrUserExists
 	}
-	if err = d.Profiles.InsertProfile(ctx, txn, localpart); err != nil {
+	if err = d.Profiles.InsertProfile(ctx, txn, localpart, serverName); err != nil {
 		return nil, err
 	}
 	pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, serverName)

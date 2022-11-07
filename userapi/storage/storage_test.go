@@ -375,27 +375,27 @@ func Test_Profile(t *testing.T) {
 		_, err = db.CreateAccount(ctx, aliceLocalpart, aliceDomain, "testing", "", api.AccountTypeAdmin)
 		assert.NoError(t, err, "failed to create account")
 
-		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart)
+		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get profile by localpart")
 		wantProfile := &authtypes.Profile{Localpart: aliceLocalpart}
 		assert.Equal(t, wantProfile, gotProfile)
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
-		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, "Alice")
+		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, aliceDomain, "Alice")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.NoError(t, err, "unable to set displayname")
 		assert.True(t, changed)
 
 		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, aliceDomain, "mxc://aliceAvatar")
 		assert.NoError(t, err, "unable to set avatar url")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.True(t, changed)
 
 		// Setting the same avatar again doesn't change anything
 		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, aliceDomain, "mxc://aliceAvatar")
 		assert.NoError(t, err, "unable to set avatar url")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.False(t, changed)

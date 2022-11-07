@@ -214,7 +214,7 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.ServerName, req.Localpart); err != nil {
 		return err
 	}
 
@@ -412,7 +412,7 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	if !a.Config.Matrix.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot query profile of remote users (server name %s)", domain)
 	}
-	prof, err := a.DB.GetProfileByLocalpart(ctx, local)
+	prof, err := a.DB.GetProfileByLocalpart(ctx, local, domain)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil
@@ -883,7 +883,7 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 }
 
 func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
-	profile, changed, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	profile, changed, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.ServerName, req.AvatarURL)
 	res.Profile = profile
 	res.Changed = changed
 	return err
@@ -921,7 +921,7 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 }
 
 func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, res *api.PerformUpdateDisplayNameResponse) error {
-	profile, changed, err := a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+	profile, changed, err := a.DB.SetDisplayName(ctx, req.Localpart, req.ServerName, req.DisplayName)
 	res.Profile = profile
 	res.Changed = changed
 	return err
