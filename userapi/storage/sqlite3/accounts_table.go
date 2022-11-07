@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -90,7 +89,6 @@ func NewSQLiteAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("TABLE CREATED")
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations([]sqlutil.Migration{
 		{
@@ -108,8 +106,6 @@ func NewSQLiteAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("MIGRATIONS RUN")
-	defer fmt.Println("STATEMENTS PREPARED")
 	return s, sqlutil.StatementList{
 		{&s.insertAccountStmt, insertAccountSQL},
 		{&s.updatePasswordStmt, updatePasswordSQL},

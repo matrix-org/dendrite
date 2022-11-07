@@ -33,10 +33,7 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 		)
 		var c int
 		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 0 {
-			fmt.Println("Error:", err)
 			continue
-		} else {
-			fmt.Println("HAPPY DAYS!", table)
 		}
 		q = fmt.Sprintf(
 			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS server_name TEXT NOT NULL DEFAULT '';",
