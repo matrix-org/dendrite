@@ -47,10 +47,10 @@ const selectLocalpartForThreePIDSQL = "" +
 	"SELECT localpart FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
 
 const selectThreePIDsForLocalpartSQL = "" +
-	"SELECT threepid, medium FROM userapi_threepids WHERE localpart = $1"
+	"SELECT threepid, medium FROM userapi_threepids WHERE localpart = $1 AND server_name = $2"
 
 const insertThreePIDSQL = "" +
-	"INSERT INTO userapi_threepids (threepid, medium, localpart) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_threepids (threepid, medium, localpart, server_name) VALUES ($1, $2, $3, $4)"
 
 const deleteThreePIDSQL = "" +
 	"DELETE FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
