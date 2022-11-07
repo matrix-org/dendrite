@@ -1,5 +1,10 @@
 FROM docker.io/golang:1.19-alpine AS base
 
+#
+# Needs to be separate from the main Dockerfile for OpenShift,
+# as --target is not supported there.
+#
+
 RUN apk --update --no-cache add bash build-base
 
 WORKDIR /build

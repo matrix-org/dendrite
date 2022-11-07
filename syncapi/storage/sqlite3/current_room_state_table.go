@@ -277,7 +277,8 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		excludeEventIDs, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderNone,
+		excludeEventIDs, stateFilter.ContainsURL, 0,
+		FilterOrderNone,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)

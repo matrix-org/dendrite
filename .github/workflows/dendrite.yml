@@ -155,8 +155,9 @@ jobs:
         POSTGRES: ${{ matrix.postgres && 1}}
         API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
+        CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Run Sytest
         run: /bootstrap.sh dendrite
         working-directory: /src
@@ -210,8 +211,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
           go get -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
 
-      - name: Run actions/checkout@v2 for dendrite
-        uses: actions/checkout@v2
+      - name: Run actions/checkout@v3 for dendrite
+        uses: actions/checkout@v3
         with:
           path: dendrite
 
@@ -254,6 +255,7 @@ jobs:
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
           API: ${{ matrix.api && 1 }}
+          CGO_ENABLED: ${{ matrix.cgo && 1 }}
         working-directory: complement
 
   integration-tests-done:

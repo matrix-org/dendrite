@@ -46,6 +46,9 @@ If a device list update goes missing, the server resyncs on the next one
 # Might be a bug in the test because leaves do appear :-(
 
 Leaves are present in non-gapped incremental syncs
+
+# Below test was passing for the wrong reason, failing correctly since #2858
+New federated private chats get full presence information (SYN-115)
 If a device list update goes missing, the server resyncs on the next one
 # You'll be shocked to discover this is flakey too
 
