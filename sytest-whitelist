@@ -758,3 +758,4 @@ Can filter rooms/{roomId}/members
 Current state appears in timeline in private history with many messages after
 AS can publish rooms in their own list
 AS and main public room lists are separate
+AS can deactivate a user
