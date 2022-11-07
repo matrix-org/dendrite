@@ -533,7 +533,7 @@ type PerformPusherSetRequest struct {
 
 type PerformPusherDeletionRequest struct {
 	Localpart string
-	SessionID int64
+	SessionID int64 // Pusher corresponding to this SessionID will not be deleted
 }
 
 // Pusher represents a push notification subscriber

@@ -1,0 +1,9 @@
+{
+    "go.lintTool": "golangci-lint",
+    "go.testEnvVars": {
+        "POSTGRES_HOST": "localhost",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "foobar",
+        "POSTGRES_DB": "postgres"
+    }
+}

@@ -280,6 +280,32 @@ func (n *Notifier) _sharedUsers(userID string) []string {
 	return sharedUsers
 }
 
+func (n *Notifier) OnNewMultiRoomData(
+	posUpdate types.StreamingToken, roomIds []string,
+) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	n.currPos.ApplyUpdates(posUpdate)
+	usersInRoom := n._usersInRooms(roomIds)
+
+	n._wakeupUsers(usersInRoom, nil, n.currPos)
+}
+
+func (n *Notifier) _usersInRooms(roomIds []string) []string {
+	for i := range roomIds {
+		for _, userID := range n._joinedUsers(roomIds[i]) {
+			n._sharedUserMap[userID] = struct{}{}
+		}
+	}
+	usersInRooms := make([]string, 0, len(n._sharedUserMap)+1)
+	for userID := range n._sharedUserMap {
+		usersInRooms = append(usersInRooms, userID)
+		delete(n._sharedUserMap, userID)
+	}
+	return usersInRooms
+}
+
 func (n *Notifier) IsSharedUser(userA, userB string) bool {
 	n.lock.RLock()
 	defer n.lock.RUnlock()

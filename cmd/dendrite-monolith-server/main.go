@@ -16,6 +16,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 
 	"github.com/matrix-org/dendrite/appservice"
@@ -45,6 +46,16 @@ var (
 func main() {
 	cfg := setup.ParseFlags(true)
 	httpAddr := config.HTTPAddress("http://" + *httpBindAddr)
+	for _, logging := range cfg.Logging {
+		if logging.Type == "std" {
+			level, err := logrus.ParseLevel(logging.Level)
+			if err != nil {
+				log.Fatal(err)
+			}
+			logrus.SetLevel(level)
+			logrus.SetFormatter(&logrus.JSONFormatter{})
+		}
+	}
 	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
 	httpAPIAddr := httpAddr
 	options := []basepkg.BaseDendriteOptions{}
