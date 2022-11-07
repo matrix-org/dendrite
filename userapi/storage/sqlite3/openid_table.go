@@ -3,6 +3,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -25,10 +26,10 @@ CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 `
 
 const insertOpenIDTokenSQL = "" +
-	"INSERT INTO userapi_openid_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_openid_tokens(token, localpart, server_name, token_expires_at_ms) VALUES ($1, $2, $3, $4)"
 
 const selectOpenIDTokenSQL = "" +
-	"SELECT localpart, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
+	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
 type openIDTokenStatements struct {
 	db              *sql.DB
@@ -57,11 +58,11 @@ func NewSQLiteOpenIDTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (
 func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
 	txn *sql.Tx,
-	token, localpart string,
+	token, localpart string, serverName gomatrixserverlib.ServerName,
 	expiresAtMS int64,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
-	_, err = stmt.ExecContext(ctx, token, localpart, expiresAtMS)
+	_, err = stmt.ExecContext(ctx, token, serverName, localpart, expiresAtMS)
 	return
 }
 
@@ -72,10 +73,13 @@ func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {
 	var openIDTokenAttrs api.OpenIDTokenAttributes
+	var localpart string
+	var serverName gomatrixserverlib.ServerName
 	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
-		&openIDTokenAttrs.UserID,
+		&localpart, &serverName,
 		&openIDTokenAttrs.ExpiresAtMS,
 	)
+	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.WithError(err).Error("Unable to retrieve token from the db")

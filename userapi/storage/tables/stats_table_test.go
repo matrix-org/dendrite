@@ -79,7 +79,7 @@ func mustMakeAccountAndDevice(
 	accDB tables.AccountsTable,
 	devDB tables.DevicesTable,
 	localpart string,
-	serverName gomatrixserverlib.ServerName,
+	serverName gomatrixserverlib.ServerName, // nolint:unparam
 	accType api.AccountType,
 	userAgent string,
 ) {

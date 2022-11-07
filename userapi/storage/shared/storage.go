@@ -383,11 +383,15 @@ func (d *Database) DeactivateAccount(ctx context.Context, localpart string, serv
 // CreateOpenIDToken persists a new token that was issued for OpenID Connect
 func (d *Database) CreateOpenIDToken(
 	ctx context.Context,
-	token, localpart string,
+	token, userID string,
 ) (int64, error) {
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
+	if err != nil {
+		return 0, nil
+	}
 	expiresAtMS := time.Now().UnixNano()/int64(time.Millisecond) + d.OpenIDTokenLifetimeMS
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.OpenIDTokens.InsertOpenIDToken(ctx, txn, token, localpart, expiresAtMS)
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.OpenIDTokens.InsertOpenIDToken(ctx, txn, token, localpart, domain, expiresAtMS)
 	})
 	return expiresAtMS, err
 }
