@@ -1,5 +1,22 @@
 # Changelog
 
+## Dendrite 0.10.7 (2022-11-04)
+
+### Features
+
+* Dendrite will now use a native SQLite port when building with `CGO_ENABLED=0`
+* A number of `thirdparty` endpoints have been added, improving support for appservices
+
+### Fixes
+
+* The `"state"` section of the `/sync` response is no longer limited, so state events should not be dropped unexpectedly
+* The deduplication of the `"timeline"` and `"state"` sections in `/sync` is now performed after applying history visibility, so state events should not be dropped unexpectedly
+* The `prev_batch` token returned by `/sync` is now calculated after applying history visibility, so that the pagination boundaries are correct
+* The room summary membership counts in `/sync` should now be calculated properly in more cases
+* A false membership leave event should no longer be sent down `/sync` as a result of retiring an accepted invite (contributed by [tak-hntlabs](https://github.com/tak-hntlabs))
+* Presence updates are now only sent to other servers for which the user shares rooms
+* A bug which could cause a panic when converting events into the `ClientEvent` format has been fixed
+
 ## Dendrite 0.10.6 (2022-11-01)
 
 ### Features
