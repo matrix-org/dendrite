@@ -74,8 +74,14 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.BadJSON("A password must be supplied."),
 		}
 	}
-	localpart, _, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
 	if err != nil {
+		return nil, &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.InvalidUsername(err.Error()),
+		}
+	}
+	if !t.Config.Matrix.IsLocalServerName(domain) {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.InvalidUsername(err.Error()),
@@ -83,7 +89,11 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	}
 	// Squash username to all lowercase letters
 	res := &api.QueryAccountByPasswordResponse{}
-	err = t.GetAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{Localpart: strings.ToLower(localpart), PlaintextPassword: r.Password}, res)
+	err = t.GetAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+		Localpart:         strings.ToLower(localpart),
+		ServerName:        domain,
+		PlaintextPassword: r.Password,
+	}, res)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -94,6 +104,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if !res.Exists {
 		err = t.GetAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
+			ServerName:        domain,
 			PlaintextPassword: r.Password,
 		}, res)
 		if err != nil {
