@@ -414,7 +414,7 @@ func (r *Inputer) processRoomEvent(
 	// Handle remote room upgrades, e.g. remove published room
 	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
 		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
-			return fmt.Errorf("failed to handle remote room upgrade: %w")
+			return fmt.Errorf("failed to handle remote room upgrade: %w", err)
 		}
 	}
 

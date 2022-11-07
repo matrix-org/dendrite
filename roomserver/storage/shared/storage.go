@@ -1406,7 +1406,7 @@ func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventS
 
 		for _, alias := range aliases {
 			if err = d.RoomAliasesTable.DeleteRoomAlias(ctx, txn, alias); err != nil {
-				fmt.Errorf("failed to remove room alias: %w", err)
+				return fmt.Errorf("failed to remove room alias: %w", err)
 			}
 			if err = d.RoomAliasesTable.InsertRoomAlias(ctx, txn, alias, newRoomID, eventSender); err != nil {
 				return fmt.Errorf("failed to set room alias: %w", err)
