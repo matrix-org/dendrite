@@ -222,7 +222,7 @@ func (s *OutputRoomEventConsumer) copyPushrules(ctx context.Context, oldRoomID s
 		if err != nil {
 			return err
 		}
-		if err := s.db.SaveAccountData(ctx, membership.Localpart, "", "m.push_rules", rules); err != nil {
+		if err = s.db.SaveAccountData(ctx, membership.Localpart, "", "m.push_rules", rules); err != nil {
 			return fmt.Errorf("failed to update pushrules: %w", err)
 		}
 	}
@@ -255,7 +255,8 @@ func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, 
 		}
 		// Only hit the database if we found the old room as a DM for this user
 		if found {
-			data, err := json.Marshal(newDirectChats)
+			var data []byte
+			data, err = json.Marshal(newDirectChats)
 			if err != nil {
 				return true
 			}
@@ -294,8 +295,10 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 		// Handle room upgrades
 		oldRoomID := event.RoomID()
 		newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
-		log.Debugf("XXX: received tombstone event: %s -> %s", oldRoomID, newRoomID)
-		s.handleRoomUpgrade(ctx, oldRoomID, newRoomID, members, roomSize)
+		if err = s.handleRoomUpgrade(ctx, oldRoomID, newRoomID, members, roomSize); err != nil {
+			// while inconvenient, this shouldn't stop us from sending push notifications
+			log.WithError(err).Errorf("UserAPI: failed to handle room upgrade for users")
+		}
 
 	}
 
