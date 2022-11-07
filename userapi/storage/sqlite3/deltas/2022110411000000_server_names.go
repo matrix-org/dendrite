@@ -28,7 +28,18 @@ var serverNamesTables = []string{
 func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib.ServerName) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
-			"ALTER TABLE IF EXISTS %s ADD COLUMN IF NOT EXISTS server_name TEXT NOT NULL DEFAULT '';",
+			"SELECT name FROM sqlite_schema WHERE type='table' AND name=%s;",
+			pq.QuoteIdentifier(table),
+		)
+		var c int
+		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 0 {
+			fmt.Println("Error:", err)
+			continue
+		} else {
+			fmt.Println("HAPPY DAYS!", table)
+		}
+		q = fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS server_name TEXT NOT NULL DEFAULT '';",
 			pq.QuoteIdentifier(table),
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
@@ -48,7 +59,7 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 func DownServerNames(ctx context.Context, tx *sql.Tx) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
-			"ALTER TABLE IF EXISTS %s DELETE COLUMN server_name;",
+			"ALTER TABLE %s DELETE COLUMN server_name;",
 			pq.QuoteIdentifier(table),
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {

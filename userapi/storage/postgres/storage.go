@@ -45,17 +45,24 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		Up:      deltas.UpRenameTables,
 		Down:    deltas.DownRenameTables,
 	})
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: server names",
+		Up: func(ctx context.Context, txn *sql.Tx) error {
+			return deltas.UpServerNames(ctx, txn, serverName)
+		},
+		Down: deltas.DownServerNames,
+	})
 	if err = m.Up(base.Context()); err != nil {
 		return nil, err
 	}
 
-	accountDataTable, err := NewPostgresAccountDataTable(db)
-	if err != nil {
-		return nil, fmt.Errorf("NewPostgresAccountDataTable: %w", err)
-	}
 	accountsTable, err := NewPostgresAccountsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewPostgresAccountsTable: %w", err)
+	}
+	accountDataTable, err := NewPostgresAccountDataTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewPostgresAccountDataTable: %w", err)
 	}
 	devicesTable, err := NewPostgresDevicesTable(db, serverName)
 	if err != nil {
@@ -99,13 +106,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	}
 
 	m = sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: server names",
-		Up: func(ctx context.Context, txn *sql.Tx) error {
-			return deltas.UpServerNames(ctx, txn, serverName)
-		},
-		Down: deltas.DownServerNames,
-	})
+
 	if err = m.Up(base.Context()); err != nil {
 		return nil, err
 	}

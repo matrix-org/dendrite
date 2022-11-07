@@ -54,13 +54,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 
-	accountDataTable, err := NewSQLiteAccountDataTable(db)
-	if err != nil {
-		return nil, fmt.Errorf("NewSQLiteAccountDataTable: %w", err)
-	}
 	accountsTable, err := NewSQLiteAccountsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
+	}
+	accountDataTable, err := NewSQLiteAccountDataTable(db)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteAccountDataTable: %w", err)
 	}
 	devicesTable, err := NewSQLiteDevicesTable(db, serverName)
 	if err != nil {
@@ -102,6 +102,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
 	}
+
+	m = sqlutil.NewMigrator(db)
+
+	if err = m.Up(base.Context()); err != nil {
+		return nil, err
+	}
+
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
 		Accounts:              accountsTable,
