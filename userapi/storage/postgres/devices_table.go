@@ -84,7 +84,7 @@ const selectDevicesByLocalpartSQL = "" +
 	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3 ORDER BY last_seen_ts DESC"
 
 const updateDeviceNameSQL = "" +
-	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"
+	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND server_name = $3 AND device_id = $4"
 
 const deleteDeviceSQL = "" +
 	"DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2 AND server_name = $3"
@@ -189,7 +189,7 @@ func (s *devicesStatements) DeleteDevices(
 	devices []string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteDevicesStmt)
-	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
+	_, err := stmt.ExecContext(ctx, localpart, serverName, pq.Array(devices))
 	return err
 }
 
