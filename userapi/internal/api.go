@@ -124,7 +124,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 		return nil
 	}
 
-	if err = userapiUtil.NotifyUserCountsAsync(ctx, a.PgClient, localpart, a.DB); err != nil {
+	if err = userapiUtil.NotifyUserCountsAsync(ctx, a.PgClient, localpart, domain, a.DB); err != nil {
 		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: NotifyUserCounts failed")
 		return err
 	}
@@ -817,23 +817,23 @@ func (a *UserInternalAPI) PerformPusherSet(ctx context.Context, req *api.Perform
 		}
 	}
 	if req.Pusher.Kind == "" {
-		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart)
+		return a.DB.RemovePusher(ctx, req.Pusher.AppID, req.Pusher.PushKey, req.Localpart, req.ServerName)
 	}
 	if req.Pusher.PushKeyTS == 0 {
 		req.Pusher.PushKeyTS = int64(time.Now().Unix())
 	}
-	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart)
+	return a.DB.UpsertPusher(ctx, req.Pusher, req.Localpart, req.ServerName)
 }
 
 func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.PerformPusherDeletionRequest, res *struct{}) error {
-	pushers, err := a.DB.GetPushers(ctx, req.Localpart)
+	pushers, err := a.DB.GetPushers(ctx, req.Localpart, req.ServerName)
 	if err != nil {
 		return err
 	}
 	for i := range pushers {
 		logrus.Warnf("pusher session: %d, req session: %d", pushers[i].SessionID, req.SessionID)
 		if pushers[i].SessionID != req.SessionID {
-			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart)
+			err := a.DB.RemovePusher(ctx, pushers[i].AppID, pushers[i].PushKey, req.Localpart, req.ServerName)
 			if err != nil {
 				return err
 			}
@@ -844,7 +844,7 @@ func (a *UserInternalAPI) PerformPusherDeletion(ctx context.Context, req *api.Pe
 
 func (a *UserInternalAPI) QueryPushers(ctx context.Context, req *api.QueryPushersRequest, res *api.QueryPushersResponse) error {
 	var err error
-	res.Pushers, err = a.DB.GetPushers(ctx, req.Localpart)
+	res.Pushers, err = a.DB.GetPushers(ctx, req.Localpart, req.ServerName)
 	return err
 }
 

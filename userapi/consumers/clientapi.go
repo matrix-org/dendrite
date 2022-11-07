@@ -118,7 +118,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 	if !updated {
 		return true
 	}
-	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
+	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, domain, s.db); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
 		return false
 	}

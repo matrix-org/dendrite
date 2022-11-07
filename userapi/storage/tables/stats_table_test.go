@@ -90,7 +90,7 @@ func mustMakeAccountAndDevice(
 		appServiceID = util.RandomString(16)
 	}
 
-	_, err := accDB.InsertAccount(ctx, nil, localpart, "localhost", "", appServiceID, accType)
+	_, err := accDB.InsertAccount(ctx, nil, localpart, serverName, "", appServiceID, accType)
 	if err != nil {
 		t.Fatalf("unable to create account: %v", err)
 	}

@@ -519,7 +519,8 @@ const (
 )
 
 type QueryPushersRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryPushersResponse struct {
@@ -527,14 +528,16 @@ type QueryPushersResponse struct {
 }
 
 type PerformPusherSetRequest struct {
-	Pusher    // Anonymous field because that's how clientapi unmarshals it.
-	Localpart string
-	Append    bool `json:"append"`
+	Pusher     // Anonymous field because that's how clientapi unmarshals it.
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	Append     bool `json:"append"`
 }
 
 type PerformPusherDeletionRequest struct {
-	Localpart string
-	SessionID int64
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	SessionID  int64
 }
 
 // Pusher represents a push notification subscriber

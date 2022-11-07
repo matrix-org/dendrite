@@ -107,9 +107,9 @@ type OpenID interface {
 }
 
 type Pusher interface {
-	UpsertPusher(ctx context.Context, p api.Pusher, localpart string) error
-	GetPushers(ctx context.Context, localpart string) ([]api.Pusher, error)
-	RemovePusher(ctx context.Context, appid, pushkey, localpart string) error
+	UpsertPusher(ctx context.Context, p api.Pusher, localpart string, serverName gomatrixserverlib.ServerName) error
+	GetPushers(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) ([]api.Pusher, error)
+	RemovePusher(ctx context.Context, appid, pushkey, localpart string, serverName gomatrixserverlib.ServerName) error
 	RemovePushers(ctx context.Context, appid, pushkey string) error
 }
 

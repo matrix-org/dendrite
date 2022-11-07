@@ -99,9 +99,9 @@ type ThreePIDTable interface {
 }
 
 type PusherTable interface {
-	InsertPusher(ctx context.Context, txn *sql.Tx, session_id int64, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string) error
-	SelectPushers(ctx context.Context, txn *sql.Tx, localpart string) ([]api.Pusher, error)
-	DeletePusher(ctx context.Context, txn *sql.Tx, appid, pushkey, localpart string) error
+	InsertPusher(ctx context.Context, txn *sql.Tx, session_id int64, pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string, serverName gomatrixserverlib.ServerName) error
+	SelectPushers(ctx context.Context, txn *sql.Tx, localpart string, serverName gomatrixserverlib.ServerName) ([]api.Pusher, error)
+	DeletePusher(ctx context.Context, txn *sql.Tx, appid, pushkey, localpart string, serverName gomatrixserverlib.ServerName) error
 	DeletePushers(ctx context.Context, txn *sql.Tx, appid, pushkey string) error
 }
 

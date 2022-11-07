@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // See https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-pushers
@@ -50,22 +51,22 @@ CREATE TABLE IF NOT EXISTS userapi_pushers (
 CREATE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_idx ON userapi_pushers(app_id, pushkey);
 
 -- For faster retrieving by localpart.
-CREATE INDEX IF NOT EXISTS userapi_pusher_localpart_idx ON userapi_pushers(localpart);
+CREATE INDEX IF NOT EXISTS userapi_pusher_localpart_idx ON userapi_pushers(localpart, server_name);
 
 -- Pushkey must be unique for a given user and app.
-CREATE UNIQUE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_localpart_idx ON userapi_pushers(app_id, pushkey, localpart);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_localpart_idx ON userapi_pushers(app_id, pushkey, localpart, server_name);
 `
 
 const insertPusherSQL = "" +
-	"INSERT INTO userapi_pushers (localpart, session_id, pushkey, pushkey_ts_ms, kind, app_id, app_display_name, device_display_name, profile_tag, lang, data)" +
-	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)" +
+	"INSERT INTO userapi_pushers (localpart, server_name, session_id, pushkey, pushkey_ts_ms, kind, app_id, app_display_name, device_display_name, profile_tag, lang, data)" +
+	"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)" +
 	"ON CONFLICT (app_id, pushkey, localpart) DO UPDATE SET session_id = $2, pushkey_ts_ms = $4, kind = $5, app_display_name = $7, device_display_name = $8, profile_tag = $9, lang = $10, data = $11"
 
 const selectPushersSQL = "" +
-	"SELECT session_id, pushkey, pushkey_ts_ms, kind, app_id, app_display_name, device_display_name, profile_tag, lang, data FROM userapi_pushers WHERE localpart = $1"
+	"SELECT session_id, pushkey, pushkey_ts_ms, kind, app_id, app_display_name, device_display_name, profile_tag, lang, data FROM userapi_pushers WHERE localpart = $1 AND server_name = $2"
 
 const deletePusherSQL = "" +
-	"DELETE FROM userapi_pushers WHERE app_id = $1 AND pushkey = $2 AND localpart = $3"
+	"DELETE FROM userapi_pushers WHERE app_id = $1 AND pushkey = $2 AND localpart = $3 AND server_name = $4"
 
 const deletePushersByAppIdAndPushKeySQL = "" +
 	"DELETE FROM userapi_pushers WHERE app_id = $1 AND pushkey = $2"
@@ -96,18 +97,20 @@ type pushersStatements struct {
 // Returns nil error success.
 func (s *pushersStatements) InsertPusher(
 	ctx context.Context, txn *sql.Tx, session_id int64,
-	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data, localpart string,
+	pushkey string, pushkeyTS int64, kind api.PusherKind, appid, appdisplayname, devicedisplayname, profiletag, lang, data,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.insertPusherStmt).ExecContext(ctx, localpart, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
+	_, err := sqlutil.TxStmt(txn, s.insertPusherStmt).ExecContext(ctx, localpart, serverName, session_id, pushkey, pushkeyTS, kind, appid, appdisplayname, devicedisplayname, profiletag, lang, data)
 	logrus.Debugf("Created pusher %d", session_id)
 	return err
 }
 
 func (s *pushersStatements) SelectPushers(
-	ctx context.Context, txn *sql.Tx, localpart string,
+	ctx context.Context, txn *sql.Tx,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) ([]api.Pusher, error) {
 	pushers := []api.Pusher{}
-	rows, err := s.selectPushersStmt.QueryContext(ctx, localpart)
+	rows, err := s.selectPushersStmt.QueryContext(ctx, localpart, serverName)
 
 	if err != nil {
 		return pushers, err
@@ -144,9 +147,10 @@ func (s *pushersStatements) SelectPushers(
 
 // deletePusher removes a single pusher by pushkey and user localpart.
 func (s *pushersStatements) DeletePusher(
-	ctx context.Context, txn *sql.Tx, appid, pushkey, localpart string,
+	ctx context.Context, txn *sql.Tx, appid, pushkey,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.deletePusherStmt).ExecContext(ctx, appid, pushkey, localpart)
+	_, err := sqlutil.TxStmt(txn, s.deletePusherStmt).ExecContext(ctx, appid, pushkey, localpart, serverName)
 	return err
 }
 

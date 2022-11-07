@@ -508,7 +508,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		return nil
 	}
 
-	devicesByURLAndFormat, profileTag, err := s.localPushDevices(ctx, mem.Localpart, tweaks)
+	devicesByURLAndFormat, profileTag, err := s.localPushDevices(ctx, mem.Localpart, mem.Domain, tweaks)
 	if err != nil {
 		return err
 	}
@@ -589,7 +589,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		}
 
 		if len(rejected) > 0 {
-			s.deleteRejectedPushers(ctx, rejected, mem.Localpart)
+			s.deleteRejectedPushers(ctx, rejected, mem.Localpart, mem.Domain)
 		}
 	}()
 
@@ -693,8 +693,8 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 
 // localPushDevices pushes to the configured devices of a local
 // user. The map keys are [url][format].
-func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpart string, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
-	pusherDevices, err := util.GetPushDevices(ctx, localpart, tweaks, s.db)
+func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
+	pusherDevices, err := util.GetPushDevices(ctx, localpart, serverName, tweaks, s.db)
 	if err != nil {
 		return nil, "", err
 	}
@@ -791,7 +791,7 @@ func (s *OutputRoomEventConsumer) notifyHTTP(ctx context.Context, event *gomatri
 }
 
 // deleteRejectedPushers deletes the pushers associated with the given devices.
-func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string) {
+func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, devices []*pushgateway.Device, localpart string, serverName gomatrixserverlib.ServerName) {
 	log.WithFields(log.Fields{
 		"localpart":   localpart,
 		"app_id0":     devices[0].AppID,
@@ -799,7 +799,7 @@ func (s *OutputRoomEventConsumer) deleteRejectedPushers(ctx context.Context, dev
 	}).Warnf("Deleting pushers rejected by the HTTP push gateway")
 
 	for _, d := range devices {
-		if err := s.db.RemovePusher(ctx, d.AppID, d.PushKey, localpart); err != nil {
+		if err := s.db.RemovePusher(ctx, d.AppID, d.PushKey, localpart, serverName); err != nil {
 			log.WithFields(log.Fields{
 				"localpart": localpart,
 			}).WithError(err).Errorf("Unable to delete rejected pusher")

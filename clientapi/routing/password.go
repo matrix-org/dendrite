@@ -123,8 +123,9 @@ func Password(
 		}
 
 		pushersReq := &api.PerformPusherDeletionRequest{
-			Localpart: localpart,
-			SessionID: device.SessionID,
+			Localpart:  localpart,
+			ServerName: domain,
+			SessionID:  device.SessionID,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")

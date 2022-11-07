@@ -768,7 +768,8 @@ func (d *Database) DeleteOldNotifications(ctx context.Context) error {
 }
 
 func (d *Database) UpsertPusher(
-	ctx context.Context, p api.Pusher, localpart string,
+	ctx context.Context, p api.Pusher,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) error {
 	data, err := json.Marshal(p.Data)
 	if err != nil {
@@ -787,25 +788,26 @@ func (d *Database) UpsertPusher(
 			p.ProfileTag,
 			p.Language,
 			string(data),
-			localpart)
+			localpart,
+			serverName)
 	})
 }
 
 // GetPushers returns the pushers matching the given localpart.
 func (d *Database) GetPushers(
-	ctx context.Context, localpart string,
+	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
 ) ([]api.Pusher, error) {
-	return d.Pushers.SelectPushers(ctx, nil, localpart)
+	return d.Pushers.SelectPushers(ctx, nil, localpart, serverName)
 }
 
 // RemovePusher deletes one pusher
 // Invoked when `append` is true and `kind` is null in
 // https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-pushers-set
 func (d *Database) RemovePusher(
-	ctx context.Context, appid, pushkey, localpart string,
+	ctx context.Context, appid, pushkey, localpart string, serverName gomatrixserverlib.ServerName,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart)
+		err := d.Pushers.DeletePusher(ctx, txn, appid, pushkey, localpart, serverName)
 		if err == sql.ErrNoRows {
 			return nil
 		}
