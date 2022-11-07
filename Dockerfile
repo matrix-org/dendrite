@@ -36,19 +36,6 @@ RUN addgroup dendrite && adduser dendrite -G dendrite -u 1337 -D
 USER dendrite
 
 #
-# Builds the polylith image and only contains the polylith binary
-#
-FROM dendrite-base AS polylith
-LABEL org.opencontainers.image.title="Dendrite (Polylith)"
-
-COPY --from=build /out/dendrite-polylith-multi /usr/bin/
-
-VOLUME /etc/dendrite
-WORKDIR /etc/dendrite
-
-ENTRYPOINT ["/usr/bin/dendrite-polylith-multi"]
-
-#
 # Builds the monolith image and contains all required binaries
 #
 FROM dendrite-base AS monolith
