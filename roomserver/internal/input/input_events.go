@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
@@ -409,6 +411,13 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// Handle remote room upgrades, e.g. remove published room
+	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
+		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
+			return fmt.Errorf("failed to handle remote room upgrade: %w")
+		}
+	}
+
 	// processing this event resulted in an event (which may not be the one we're processing)
 	// being redacted. We are guaranteed to have both sides (the redaction/redacted event),
 	// so notify downstream components to redact this event - they should have it if they've
@@ -431,6 +440,35 @@ func (r *Inputer) processRoomEvent(
 	// Everything was OK — the latest events updater didn't error and
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
+	return nil
+}
+
+// handleRemoteRoomUpgrade updates published rooms and room aliases
+func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event *gomatrixserverlib.Event) error {
+	oldRoomID := event.RoomID()
+	newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
+	// un-publish old room
+	if err := r.DB.PublishRoom(ctx, oldRoomID, "", "", false); err != nil {
+		return fmt.Errorf("failed to unpublish room: %w", err)
+	}
+	// publish new room
+	if err := r.DB.PublishRoom(ctx, newRoomID, "", "", true); err != nil {
+		return fmt.Errorf("failed to publish room: %w", err)
+	}
+
+	aliases, err := r.DB.GetAliasesForRoomID(ctx, oldRoomID)
+	if err != nil {
+		return fmt.Errorf("failed to get room aliases: %w", err)
+	}
+
+	for _, alias := range aliases {
+		if err = r.DB.RemoveRoomAlias(ctx, alias); err != nil {
+			fmt.Errorf("failed to remove room alias: %w", err)
+		}
+		if err = r.DB.SetRoomAlias(ctx, alias, newRoomID, event.Sender()); err != nil {
+			return fmt.Errorf("failed to set room alias: %w", err)
+		}
+	}
 	return nil
 }
 
