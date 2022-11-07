@@ -679,6 +679,7 @@ func handleGuestRegistration(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(req.Context(), &userapi.PerformDeviceCreationRequest{
 		Localpart:         res.Account.Localpart,
+		ServerName:        res.Account.ServerName,
 		DeviceDisplayName: r.InitialDisplayName,
 		AccessToken:       token,
 		IPAddr:            req.RemoteAddr,

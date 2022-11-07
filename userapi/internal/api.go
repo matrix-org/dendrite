@@ -214,8 +214,8 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.ServerName, req.Localpart); err != nil {
-		return err
+	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, serverName, req.Localpart); err != nil {
+		return fmt.Errorf("a.DB.SetDisplayName: %w", err)
 	}
 
 	postRegisterJoinRooms(a.Cfg, acc, a.RSAPI)

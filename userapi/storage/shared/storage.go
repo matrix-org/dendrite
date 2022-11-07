@@ -148,7 +148,7 @@ func (d *Database) CreateAccount(
 			var numLocalpart int64
 			numLocalpart, err = d.Accounts.SelectNewNumericLocalpart(ctx, txn, serverName)
 			if err != nil {
-				return err
+				return fmt.Errorf("d.Accounts.SelectNewNumericLocalpart: %w", err)
 			}
 			localpart = strconv.FormatInt(numLocalpart, 10)
 			plaintextPassword = ""
@@ -181,15 +181,15 @@ func (d *Database) createAccount(
 		return nil, sqlutil.ErrUserExists
 	}
 	if err = d.Profiles.InsertProfile(ctx, txn, localpart, serverName); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.Profiles.InsertProfile: %w", err)
 	}
 	pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, serverName)
 	prbs, err := json.Marshal(pushRuleSets)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("json.Marshal: %w", err)
 	}
 	if err = d.AccountDatas.InsertAccountData(ctx, txn, localpart, serverName, "", "m.push_rules", json.RawMessage(prbs)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("d.AccountDatas.InsertAccountData: %w", err)
 	}
 	return account, nil
 }

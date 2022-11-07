@@ -492,11 +492,11 @@ func unmarshalCanonicalAlias(event *gomatrixserverlib.HeaderedEvent) (string, er
 func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, mem *localMembership, roomSize int, roomName string, streamPos uint64) error {
 	actions, err := s.evaluatePushRules(ctx, event, mem, roomSize)
 	if err != nil {
-		return err
+		return fmt.Errorf("s.evaluatePushRules: %w", err)
 	}
 	a, tweaks, err := pushrules.ActionsToTweaks(actions)
 	if err != nil {
-		return err
+		return fmt.Errorf("pushrules.ActionsToTweaks: %w", err)
 	}
 	// TODO: support coalescing.
 	if a != pushrules.NotifyAction && a != pushrules.CoalesceAction {
@@ -510,7 +510,7 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 
 	devicesByURLAndFormat, profileTag, err := s.localPushDevices(ctx, mem.Localpart, mem.Domain, tweaks)
 	if err != nil {
-		return err
+		return fmt.Errorf("s.localPushDevices: %w", err)
 	}
 
 	n := &api.Notification{
@@ -528,17 +528,17 @@ func (s *OutputRoomEventConsumer) notifyLocal(ctx context.Context, event *gomatr
 		TS:         gomatrixserverlib.AsTimestamp(time.Now()),
 	}
 	if err = s.db.InsertNotification(ctx, mem.Localpart, event.EventID(), streamPos, tweaks, n); err != nil {
-		return err
+		return fmt.Errorf("s.db.InsertNotification: %w", err)
 	}
 
 	if err = s.syncProducer.GetAndSendNotificationData(ctx, mem.UserID, event.RoomID()); err != nil {
-		return err
+		return fmt.Errorf("s.syncProducer.GetAndSendNotificationData: %w", err)
 	}
 
 	// We do this after InsertNotification. Thus, this should always return >=1.
 	userNumUnreadNotifs, err := s.db.GetNotificationCount(ctx, mem.Localpart, tables.AllNotifications)
 	if err != nil {
-		return err
+		return fmt.Errorf("s.db.GetNotificationCount: %w", err)
 	}
 
 	log.WithFields(log.Fields{
@@ -696,7 +696,7 @@ func (rse *ruleSetEvalContext) HasPowerLevel(userID, levelKey string) (bool, err
 func (s *OutputRoomEventConsumer) localPushDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, tweaks map[string]interface{}) (map[string]map[string][]*pushgateway.Device, string, error) {
 	pusherDevices, err := util.GetPushDevices(ctx, localpart, serverName, tweaks, s.db)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("util.GetPushDevices: %w", err)
 	}
 
 	var profileTag string

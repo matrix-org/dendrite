@@ -78,10 +78,10 @@ const selectDeviceByTokenSQL = "" +
 	"SELECT session_id, device_id, localpart, server_name FROM userapi_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
-	"SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 and device_id = $2"
+	"SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = $3"
 
 const selectDevicesByLocalpartSQL = "" +
-	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM userapi_devices WHERE localpart = $1 AND device_id != $2 ORDER BY last_seen_ts DESC"
+	"SELECT device_id, display_name, last_seen_ts, ip, user_agent FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3 ORDER BY last_seen_ts DESC"
 
 const updateDeviceNameSQL = "" +
 	"UPDATE userapi_devices SET display_name = $1 WHERE localpart = $2 AND device_id = $3"

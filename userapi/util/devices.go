@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -21,7 +22,7 @@ type PusherDevice struct {
 func GetPushDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, tweaks map[string]interface{}, db storage.Database) ([]*PusherDevice, error) {
 	pushers, err := db.GetPushers(ctx, localpart, serverName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db.GetPushers: %w", err)
 	}
 
 	devices := make([]*PusherDevice, 0, len(pushers))
