@@ -546,16 +546,19 @@ func (d *Database) GetDeviceByAccessToken(
 // GetDeviceByID returns the device matching the given ID.
 // Returns sql.ErrNoRows if no matching device was found.
 func (d *Database) GetDeviceByID(
-	ctx context.Context, localpart, deviceID string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	deviceID string,
 ) (*api.Device, error) {
-	return d.Devices.SelectDeviceByID(ctx, localpart, deviceID)
+	return d.Devices.SelectDeviceByID(ctx, localpart, serverName, deviceID)
 }
 
 // GetDevicesByLocalpart returns the devices matching the given localpart.
 func (d *Database) GetDevicesByLocalpart(
-	ctx context.Context, localpart string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) ([]api.Device, error) {
-	return d.Devices.SelectDevicesByLocalpart(ctx, nil, localpart, "")
+	return d.Devices.SelectDevicesByLocalpart(ctx, nil, localpart, serverName, "")
 }
 
 func (d *Database) GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error) {
@@ -576,7 +579,7 @@ func (d *Database) CreateDevice(
 		returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 			var err error
 			// Revoke existing tokens for this device
-			if err = d.Devices.DeleteDevice(ctx, txn, *deviceID, localpart); err != nil {
+			if err = d.Devices.DeleteDevice(ctx, txn, *deviceID, localpart, serverName); err != nil {
 				return err
 			}
 
@@ -621,10 +624,12 @@ func generateDeviceID() (string, error) {
 // UpdateDevice updates the given device with the display name.
 // Returns SQL error if there are problems and nil on success.
 func (d *Database) UpdateDevice(
-	ctx context.Context, localpart, deviceID string, displayName *string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	deviceID string, displayName *string,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Devices.UpdateDeviceName(ctx, txn, localpart, deviceID, displayName)
+		return d.Devices.UpdateDeviceName(ctx, txn, localpart, serverName, deviceID, displayName)
 	})
 }
 
@@ -633,10 +638,12 @@ func (d *Database) UpdateDevice(
 // If the devices don't exist, it will not return an error
 // If something went wrong during the deletion, it will return the SQL error.
 func (d *Database) RemoveDevices(
-	ctx context.Context, localpart string, devices []string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	devices []string,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.Devices.DeleteDevices(ctx, txn, localpart, devices); err != sql.ErrNoRows {
+		if err := d.Devices.DeleteDevices(ctx, txn, localpart, serverName, devices); err != sql.ErrNoRows {
 			return err
 		}
 		return nil
@@ -647,14 +654,16 @@ func (d *Database) RemoveDevices(
 // database matching the given user ID localpart.
 // If something went wrong during the deletion, it will return the SQL error.
 func (d *Database) RemoveAllDevices(
-	ctx context.Context, localpart, exceptDeviceID string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	exceptDeviceID string,
 ) (devices []api.Device, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		devices, err = d.Devices.SelectDevicesByLocalpart(ctx, txn, localpart, exceptDeviceID)
+		devices, err = d.Devices.SelectDevicesByLocalpart(ctx, txn, localpart, serverName, exceptDeviceID)
 		if err != nil {
 			return err
 		}
-		if err := d.Devices.DeleteDevicesByLocalpart(ctx, txn, localpart, exceptDeviceID); err != sql.ErrNoRows {
+		if err := d.Devices.DeleteDevicesByLocalpart(ctx, txn, localpart, serverName, exceptDeviceID); err != sql.ErrNoRows {
 			return err
 		}
 		return nil
@@ -663,9 +672,9 @@ func (d *Database) RemoveAllDevices(
 }
 
 // UpdateDeviceLastSeen updates a last seen timestamp and the ip address.
-func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error {
+func (d *Database) UpdateDeviceLastSeen(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, deviceID, ipAddr, userAgent string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, deviceID, ipAddr, userAgent)
+		return d.Devices.UpdateDeviceLastSeen(ctx, txn, localpart, serverName, deviceID, ipAddr, userAgent)
 	})
 }
 

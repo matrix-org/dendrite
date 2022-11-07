@@ -75,7 +75,7 @@ const insertDeviceSQL = "" +
 	" RETURNING session_id"
 
 const selectDeviceByTokenSQL = "" +
-	"SELECT session_id, device_id, localpart FROM userapi_devices WHERE access_token = $1"
+	"SELECT session_id, device_id, localpart, server_name FROM userapi_devices WHERE access_token = $1"
 
 const selectDeviceByIDSQL = "" +
 	"SELECT display_name, last_seen_ts, ip FROM userapi_devices WHERE localpart = $1 and device_id = $2"
@@ -90,16 +90,16 @@ const deleteDeviceSQL = "" +
 	"DELETE FROM userapi_devices WHERE device_id = $1 AND localpart = $2 AND server_name = $3"
 
 const deleteDevicesByLocalpartSQL = "" +
-	"DELETE FROM userapi_devices WHERE localpart = $1 AND device_id != $2"
+	"DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id != $3"
 
 const deleteDevicesSQL = "" +
-	"DELETE FROM userapi_devices WHERE localpart = $1 AND device_id = ANY($2)"
+	"DELETE FROM userapi_devices WHERE localpart = $1 AND server_name = $2 AND device_id = ANY($3)"
 
 const selectDevicesByIDSQL = "" +
-	"SELECT device_id, localpart, display_name, last_seen_ts FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
+	"SELECT device_id, localpart, server_name, display_name, last_seen_ts FROM userapi_devices WHERE device_id = ANY($1) ORDER BY last_seen_ts DESC"
 
 const updateDeviceLastSeen = "" +
-	"UPDATE userapi_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND device_id = $5"
+	"UPDATE userapi_devices SET last_seen_ts = $1, ip = $2, user_agent = $3 WHERE localpart = $4 AND server_name = $5 AND device_id = $6"
 
 type devicesStatements struct {
 	insertDeviceStmt             *sql.Stmt
@@ -184,7 +184,9 @@ func (s *devicesStatements) DeleteDevice(
 // deleteDevices removes a single or multiple devices by ids and user localpart.
 // Returns an error if the execution failed.
 func (s *devicesStatements) DeleteDevices(
-	ctx context.Context, txn *sql.Tx, localpart string, devices []string,
+	ctx context.Context, txn *sql.Tx,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	devices []string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteDevicesStmt)
 	_, err := stmt.ExecContext(ctx, localpart, pq.Array(devices))
@@ -194,18 +196,22 @@ func (s *devicesStatements) DeleteDevices(
 // deleteDevicesByLocalpart removes all devices for the
 // given user localpart.
 func (s *devicesStatements) DeleteDevicesByLocalpart(
-	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
+	ctx context.Context, txn *sql.Tx,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	exceptDeviceID string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteDevicesByLocalpartStmt)
-	_, err := stmt.ExecContext(ctx, localpart, exceptDeviceID)
+	_, err := stmt.ExecContext(ctx, localpart, serverName, exceptDeviceID)
 	return err
 }
 
 func (s *devicesStatements) UpdateDeviceName(
-	ctx context.Context, txn *sql.Tx, localpart, deviceID string, displayName *string,
+	ctx context.Context, txn *sql.Tx,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	deviceID string, displayName *string,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.updateDeviceNameStmt)
-	_, err := stmt.ExecContext(ctx, displayName, localpart, deviceID)
+	_, err := stmt.ExecContext(ctx, displayName, localpart, serverName, deviceID)
 	return err
 }
 
@@ -214,10 +220,11 @@ func (s *devicesStatements) SelectDeviceByToken(
 ) (*api.Device, error) {
 	var dev api.Device
 	var localpart string
+	var serverName gomatrixserverlib.ServerName
 	stmt := s.selectDeviceByTokenStmt
-	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.SessionID, &dev.ID, &localpart)
+	err := stmt.QueryRowContext(ctx, accessToken).Scan(&dev.SessionID, &dev.ID, &localpart, &serverName)
 	if err == nil {
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		dev.AccessToken = accessToken
 	}
 	return &dev, err
@@ -226,16 +233,18 @@ func (s *devicesStatements) SelectDeviceByToken(
 // selectDeviceByID retrieves a device from the database with the given user
 // localpart and deviceID
 func (s *devicesStatements) SelectDeviceByID(
-	ctx context.Context, localpart, deviceID string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	deviceID string,
 ) (*api.Device, error) {
 	var dev api.Device
 	var displayName, ip sql.NullString
 	var lastseenTS sql.NullInt64
 	stmt := s.selectDeviceByIDStmt
-	err := stmt.QueryRowContext(ctx, localpart, deviceID).Scan(&displayName, &lastseenTS, &ip)
+	err := stmt.QueryRowContext(ctx, localpart, serverName, deviceID).Scan(&displayName, &lastseenTS, &ip)
 	if err == nil {
 		dev.ID = deviceID
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		if displayName.Valid {
 			dev.DisplayName = displayName.String
 		}
@@ -258,10 +267,11 @@ func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []s
 	var devices []api.Device
 	var dev api.Device
 	var localpart string
+	var serverName gomatrixserverlib.ServerName
 	var lastseents sql.NullInt64
 	var displayName sql.NullString
 	for rows.Next() {
-		if err := rows.Scan(&dev.ID, &localpart, &displayName, &lastseents); err != nil {
+		if err := rows.Scan(&dev.ID, &localpart, &serverName, &displayName, &lastseents); err != nil {
 			return nil, err
 		}
 		if displayName.Valid {
@@ -270,17 +280,19 @@ func (s *devicesStatements) SelectDevicesByID(ctx context.Context, deviceIDs []s
 		if lastseents.Valid {
 			dev.LastSeenTS = lastseents.Int64
 		}
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		devices = append(devices, dev)
 	}
 	return devices, rows.Err()
 }
 
 func (s *devicesStatements) SelectDevicesByLocalpart(
-	ctx context.Context, txn *sql.Tx, localpart, exceptDeviceID string,
+	ctx context.Context, txn *sql.Tx,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	exceptDeviceID string,
 ) ([]api.Device, error) {
 	devices := []api.Device{}
-	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart, exceptDeviceID)
+	rows, err := sqlutil.TxStmt(txn, s.selectDevicesByLocalpartStmt).QueryContext(ctx, localpart, serverName, exceptDeviceID)
 
 	if err != nil {
 		return devices, err
@@ -311,16 +323,16 @@ func (s *devicesStatements) SelectDevicesByLocalpart(
 			dev.UserAgent = useragent.String
 		}
 
-		dev.UserID = userutil.MakeUserID(localpart, s.serverName)
+		dev.UserID = userutil.MakeUserID(localpart, serverName)
 		devices = append(devices, dev)
 	}
 
 	return devices, rows.Err()
 }
 
-func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart, deviceID, ipAddr, userAgent string) error {
+func (s *devicesStatements) UpdateDeviceLastSeen(ctx context.Context, txn *sql.Tx, localpart string, serverName gomatrixserverlib.ServerName, deviceID, ipAddr, userAgent string) error {
 	lastSeenTs := time.Now().UnixNano() / 1000000
 	stmt := sqlutil.TxStmt(txn, s.updateDeviceLastSeenStmt)
-	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, userAgent, localpart, deviceID)
+	_, err := stmt.ExecContext(ctx, lastSeenTs, ipAddr, userAgent, localpart, serverName, deviceID)
 	return err
 }

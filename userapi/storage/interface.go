@@ -61,8 +61,8 @@ type AccountData interface {
 
 type Device interface {
 	GetDeviceByAccessToken(ctx context.Context, token string) (*api.Device, error)
-	GetDeviceByID(ctx context.Context, localpart, deviceID string) (*api.Device, error)
-	GetDevicesByLocalpart(ctx context.Context, localpart string) ([]api.Device, error)
+	GetDeviceByID(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, deviceID string) (*api.Device, error)
+	GetDevicesByLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) ([]api.Device, error)
 	GetDevicesByID(ctx context.Context, deviceIDs []string) ([]api.Device, error)
 	// CreateDevice makes a new device associated with the given user ID localpart.
 	// If there is already a device with the same device ID for this user, that access token will be revoked
@@ -71,11 +71,11 @@ type Device interface {
 	// If no device ID is given one is generated.
 	// Returns the device on success.
 	CreateDevice(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string) (dev *api.Device, returnErr error)
-	UpdateDevice(ctx context.Context, localpart, deviceID string, displayName *string) error
-	UpdateDeviceLastSeen(ctx context.Context, localpart, deviceID, ipAddr, userAgent string) error
-	RemoveDevices(ctx context.Context, localpart string, devices []string) error
+	UpdateDevice(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, deviceID string, displayName *string) error
+	UpdateDeviceLastSeen(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, deviceID, ipAddr, userAgent string) error
+	RemoveDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, devices []string) error
 	// RemoveAllDevices deleted all devices for this user. Returns the devices deleted.
-	RemoveAllDevices(ctx context.Context, localpart, exceptDeviceID string) (devices []api.Device, err error)
+	RemoveAllDevices(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, exceptDeviceID string) (devices []api.Device, err error)
 }
 
 type KeyBackup interface {

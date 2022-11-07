@@ -164,7 +164,7 @@ func Test_Devices(t *testing.T) {
 		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
 
-		gotDevice, err := db.GetDeviceByID(ctx, localpart, deviceID)
+		gotDevice, err := db.GetDeviceByID(ctx, localpart, domain, deviceID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, deviceWithID.ID, gotDevice.ID) // GetDeviceByID doesn't populate all fields
 
@@ -176,12 +176,12 @@ func Test_Devices(t *testing.T) {
 		accessToken = util.RandomString(16)
 		deviceWithoutID, err := db.CreateDevice(ctx, localpart, domain, nil, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
-		gotDeviceWithoutID, err := db.GetDeviceByID(ctx, localpart, deviceWithoutID.ID)
+		gotDeviceWithoutID, err := db.GetDeviceByID(ctx, localpart, domain, deviceWithoutID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, deviceWithoutID.ID, gotDeviceWithoutID.ID) // GetDeviceByID doesn't populate all fields
 
 		// Get devices
-		devices, err := db.GetDevicesByLocalpart(ctx, localpart)
+		devices, err := db.GetDevicesByLocalpart(ctx, localpart, domain)
 		assert.NoError(t, err, "unable to get devices by localpart")
 		assert.Equal(t, 2, len(devices))
 		deviceIDs := make([]string, 0, len(devices))
@@ -195,15 +195,15 @@ func Test_Devices(t *testing.T) {
 
 		// Update device
 		newName := "new display name"
-		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
+		err = db.UpdateDevice(ctx, localpart, domain, deviceWithID.ID, &newName)
 		assert.NoError(t, err, "unable to update device displayname")
 		updatedAfterTimestamp := time.Now().Unix()
-		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1", "Element Web")
+		err = db.UpdateDeviceLastSeen(ctx, localpart, domain, deviceWithID.ID, "127.0.0.1", "Element Web")
 		assert.NoError(t, err, "unable to update device last seen")
 
 		deviceWithID.DisplayName = newName
 		deviceWithID.LastSeenIP = "127.0.0.1"
-		gotDevice, err = db.GetDeviceByID(ctx, localpart, deviceWithID.ID)
+		gotDevice, err = db.GetDeviceByID(ctx, localpart, domain, deviceWithID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 2, len(devices))
 		assert.Equal(t, deviceWithID.DisplayName, gotDevice.DisplayName)
@@ -216,17 +216,17 @@ func Test_Devices(t *testing.T) {
 		_, err = db.CreateDevice(ctx, localpart, domain, &newDeviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create new device")
 
-		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart, domain)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 3, len(devices))
 
-		err = db.RemoveDevices(ctx, localpart, deviceIDs)
+		err = db.RemoveDevices(ctx, localpart, domain, deviceIDs)
 		assert.NoError(t, err, "unable to remove devices")
-		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart, domain)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 1, len(devices))
 
-		deleted, err := db.RemoveAllDevices(ctx, localpart, "")
+		deleted, err := db.RemoveAllDevices(ctx, localpart, domain, "")
 		assert.NoError(t, err, "unable to remove all devices")
 		assert.Equal(t, 1, len(deleted))
 		assert.Equal(t, newDeviceID, deleted[0].ID)

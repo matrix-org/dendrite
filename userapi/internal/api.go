@@ -230,7 +230,7 @@ func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.Pe
 		return err
 	}
 	if req.LogoutDevices {
-		if _, err := a.DB.RemoveAllDevices(context.Background(), req.Localpart, ""); err != nil {
+		if _, err := a.DB.RemoveAllDevices(context.Background(), req.Localpart, req.ServerName, ""); err != nil {
 			return err
 		}
 	}
@@ -243,7 +243,9 @@ func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.Pe
 	if serverName == "" {
 		serverName = a.Config.Matrix.ServerName
 	}
-	_ = serverName
+	if !a.Config.Matrix.IsLocalServerName(serverName) {
+		return fmt.Errorf("server name %s is not local", serverName)
+	}
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
 		"device_id":    req.DeviceID,
@@ -274,12 +276,12 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 	deletedDeviceIDs := req.DeviceIDs
 	if len(req.DeviceIDs) == 0 {
 		var devices []api.Device
-		devices, err = a.DB.RemoveAllDevices(ctx, local, req.ExceptDeviceID)
+		devices, err = a.DB.RemoveAllDevices(ctx, local, domain, req.ExceptDeviceID)
 		for _, d := range devices {
 			deletedDeviceIDs = append(deletedDeviceIDs, d.ID)
 		}
 	} else {
-		err = a.DB.RemoveDevices(ctx, local, req.DeviceIDs)
+		err = a.DB.RemoveDevices(ctx, local, domain, req.DeviceIDs)
 	}
 	if err != nil {
 		return err
@@ -333,29 +335,35 @@ func (a *UserInternalAPI) PerformLastSeenUpdate(
 	req *api.PerformLastSeenUpdateRequest,
 	res *api.PerformLastSeenUpdateResponse,
 ) error {
-	localpart, _, err := gomatrixserverlib.SplitID('@', req.UserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', req.UserID)
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
-	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("server name %s is not local", domain)
+	}
+	if err := a.DB.UpdateDeviceLastSeen(ctx, localpart, domain, req.DeviceID, req.RemoteAddr, req.UserAgent); err != nil {
 		return fmt.Errorf("a.DeviceDB.UpdateDeviceLastSeen: %w", err)
 	}
 	return nil
 }
 
 func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.PerformDeviceUpdateRequest, res *api.PerformDeviceUpdateResponse) error {
-	localpart, _, err := gomatrixserverlib.SplitID('@', req.RequestingUserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', req.RequestingUserID)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return err
 	}
-	dev, err := a.DB.GetDeviceByID(ctx, localpart, req.DeviceID)
+	dev, err := a.DB.GetDeviceByID(ctx, localpart, domain, req.DeviceID)
 	if err == sql.ErrNoRows {
 		res.DeviceExists = false
 		return nil
 	} else if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
 		return err
+	}
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("server name %s is not local", domain)
 	}
 	res.DeviceExists = true
 
@@ -364,7 +372,7 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		return nil
 	}
 
-	err = a.DB.UpdateDevice(ctx, localpart, req.DeviceID, req.DisplayName)
+	err = a.DB.UpdateDevice(ctx, localpart, domain, req.DeviceID, req.DisplayName)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.UpdateDevice failed")
 		return err
@@ -455,7 +463,7 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 	if !a.Config.Matrix.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot query devices of remote users (server name %s)", domain)
 	}
-	devs, err := a.DB.GetDevicesByLocalpart(ctx, local)
+	devs, err := a.DB.GetDevicesByLocalpart(ctx, local, domain)
 	if err != nil {
 		return err
 	}
