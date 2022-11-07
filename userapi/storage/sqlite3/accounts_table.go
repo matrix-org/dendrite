@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,7 +36,7 @@ const accountsSchema = `
 CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL PRIMARY KEY,
-	server_name TEXT NOT NULL,
+    server_name TEXT NOT NULL,
     -- When this account was first created, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
     -- The password hash for this account. Can be NULL if this is a passwordless account.
@@ -89,6 +90,7 @@ func NewSQLiteAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("TABLE CREATED")
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations([]sqlutil.Migration{
 		{
@@ -106,6 +108,8 @@ func NewSQLiteAccountsTable(db *sql.DB, serverName gomatrixserverlib.ServerName)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("MIGRATIONS RUN")
+	defer fmt.Println("STATEMENTS PREPARED")
 	return s, sqlutil.StatementList{
 		{&s.insertAccountStmt, insertAccountSQL},
 		{&s.updatePasswordStmt, updatePasswordSQL},
