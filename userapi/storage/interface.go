@@ -114,10 +114,10 @@ type Pusher interface {
 }
 
 type ThreePID interface {
-	SaveThreePIDAssociation(ctx context.Context, threepid, localpart, medium string) (err error)
+	SaveThreePIDAssociation(ctx context.Context, threepid, localpart string, serverName gomatrixserverlib.ServerName, medium string) (err error)
 	RemoveThreePIDAssociation(ctx context.Context, threepid string, medium string) (err error)
-	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, err error)
-	GetThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
+	GetLocalpartForThreePID(ctx context.Context, threepid string, medium string) (localpart string, serverName gomatrixserverlib.ServerName, err error)
+	GetThreePIDsForLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (threepids []authtypes.ThreePID, err error)
 }
 
 type Notification interface {

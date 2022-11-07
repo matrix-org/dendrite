@@ -461,7 +461,7 @@ func Test_Pusher(t *testing.T) {
 
 func Test_ThreePID(t *testing.T) {
 	alice := test.NewUser(t)
-	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -469,15 +469,16 @@ func Test_ThreePID(t *testing.T) {
 		defer close()
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
-		err = db.SaveThreePIDAssociation(ctx, threePID, aliceLocalpart, medium)
+		err = db.SaveThreePIDAssociation(ctx, threePID, aliceLocalpart, aliceDomain, medium)
 		assert.NoError(t, err, "unable to save threepid association")
 
 		// get the stored threepid
-		gotLocalpart, err := db.GetLocalpartForThreePID(ctx, threePID, medium)
+		gotLocalpart, gotDomain, err := db.GetLocalpartForThreePID(ctx, threePID, medium)
 		assert.NoError(t, err, "unable to get localpart for threepid")
 		assert.Equal(t, aliceLocalpart, gotLocalpart)
+		assert.Equal(t, aliceDomain, gotDomain)
 
-		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
+		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get threepids for localpart")
 		assert.Equal(t, 1, len(threepids))
 		assert.Equal(t, authtypes.ThreePID{
@@ -490,7 +491,7 @@ func Test_ThreePID(t *testing.T) {
 		assert.NoError(t, err, "unexpected error")
 
 		// verify it was deleted
-		threepids, err = db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
+		threepids, err = db.GetThreePIDsForLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get threepids for localpart")
 		assert.Equal(t, 0, len(threepids))
 	})

@@ -288,10 +288,12 @@ var Err3PIDInUse = errors.New("this third-party identifier is already in use")
 // If the third-party identifier is already part of an association, returns Err3PIDInUse.
 // Returns an error if there was a problem talking to the database.
 func (d *Database) SaveThreePIDAssociation(
-	ctx context.Context, threepid, localpart, medium string,
+	ctx context.Context, threepid string,
+	localpart string, serverName gomatrixserverlib.ServerName,
+	medium string,
 ) (err error) {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		user, err := d.ThreePIDs.SelectLocalpartForThreePID(
+		user, domain, err := d.ThreePIDs.SelectLocalpartForThreePID(
 			ctx, txn, threepid, medium,
 		)
 		if err != nil {
@@ -302,7 +304,7 @@ func (d *Database) SaveThreePIDAssociation(
 			return Err3PIDInUse
 		}
 
-		return d.ThreePIDs.InsertThreePID(ctx, txn, threepid, medium, localpart)
+		return d.ThreePIDs.InsertThreePID(ctx, txn, threepid, medium, localpart, domain)
 	})
 }
 
@@ -325,7 +327,7 @@ func (d *Database) RemoveThreePIDAssociation(
 // Returns an error if there was a problem talking to the database.
 func (d *Database) GetLocalpartForThreePID(
 	ctx context.Context, threepid string, medium string,
-) (localpart string, err error) {
+) (localpart string, serverName gomatrixserverlib.ServerName, err error) {
 	return d.ThreePIDs.SelectLocalpartForThreePID(ctx, nil, threepid, medium)
 }
 
@@ -334,9 +336,10 @@ func (d *Database) GetLocalpartForThreePID(
 // If no association is known for this user, returns an empty slice.
 // Returns an error if there was an issue talking to the database.
 func (d *Database) GetThreePIDsForLocalpart(
-	ctx context.Context, localpart string,
+	ctx context.Context,
+	localpart string, serverName gomatrixserverlib.ServerName,
 ) (threepids []authtypes.ThreePID, err error) {
-	return d.ThreePIDs.SelectThreePIDsForLocalpart(ctx, localpart)
+	return d.ThreePIDs.SelectThreePIDsForLocalpart(ctx, localpart, serverName)
 }
 
 // CheckAccountAvailability checks if the username/localpart is already present

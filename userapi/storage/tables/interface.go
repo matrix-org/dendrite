@@ -92,9 +92,9 @@ type ProfileTable interface {
 }
 
 type ThreePIDTable interface {
-	SelectLocalpartForThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (localpart string, err error)
-	SelectThreePIDsForLocalpart(ctx context.Context, localpart string) (threepids []authtypes.ThreePID, err error)
-	InsertThreePID(ctx context.Context, txn *sql.Tx, threepid, medium, localpart string) (err error)
+	SelectLocalpartForThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (localpart string, serverName gomatrixserverlib.ServerName, err error)
+	SelectThreePIDsForLocalpart(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName) (threepids []authtypes.ThreePID, err error)
+	InsertThreePID(ctx context.Context, txn *sql.Tx, threepid, medium, localpart string, serverName gomatrixserverlib.ServerName) (err error)
 	DeleteThreePID(ctx context.Context, txn *sql.Tx, threepid string, medium string) (err error)
 }
 

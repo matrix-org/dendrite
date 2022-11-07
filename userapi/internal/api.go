@@ -928,16 +928,17 @@ func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUp
 }
 
 func (a *UserInternalAPI) QueryLocalpartForThreePID(ctx context.Context, req *api.QueryLocalpartForThreePIDRequest, res *api.QueryLocalpartForThreePIDResponse) error {
-	localpart, err := a.DB.GetLocalpartForThreePID(ctx, req.ThreePID, req.Medium)
+	localpart, domain, err := a.DB.GetLocalpartForThreePID(ctx, req.ThreePID, req.Medium)
 	if err != nil {
 		return err
 	}
 	res.Localpart = localpart
+	res.ServerName = domain
 	return nil
 }
 
 func (a *UserInternalAPI) QueryThreePIDsForLocalpart(ctx context.Context, req *api.QueryThreePIDsForLocalpartRequest, res *api.QueryThreePIDsForLocalpartResponse) error {
-	r, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart)
+	r, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart, req.ServerName)
 	if err != nil {
 		return err
 	}
@@ -950,7 +951,7 @@ func (a *UserInternalAPI) PerformForgetThreePID(ctx context.Context, req *api.Pe
 }
 
 func (a *UserInternalAPI) PerformSaveThreePIDAssociation(ctx context.Context, req *api.PerformSaveThreePIDAssociationRequest, res *struct{}) error {
-	return a.DB.SaveThreePIDAssociation(ctx, req.ThreePID, req.Localpart, req.Medium)
+	return a.DB.SaveThreePIDAssociation(ctx, req.ThreePID, req.Localpart, req.ServerName, req.Medium)
 }
 
 const pushRulesAccountDataType = "m.push_rules"

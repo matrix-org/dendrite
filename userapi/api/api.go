@@ -650,11 +650,13 @@ type QueryLocalpartForThreePIDRequest struct {
 }
 
 type QueryLocalpartForThreePIDResponse struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryThreePIDsForLocalpartRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryThreePIDsForLocalpartResponse struct {
@@ -664,5 +666,8 @@ type QueryThreePIDsForLocalpartResponse struct {
 type PerformForgetThreePIDRequest QueryLocalpartForThreePIDRequest
 
 type PerformSaveThreePIDAssociationRequest struct {
-	ThreePID, Localpart, Medium string
+	ThreePID   string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	Medium     string
 }
