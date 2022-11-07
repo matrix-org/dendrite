@@ -498,7 +498,7 @@ func Test_ThreePID(t *testing.T) {
 
 func Test_Notification(t *testing.T) {
 	alice := test.NewUser(t)
-	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
@@ -526,34 +526,34 @@ func Test_Notification(t *testing.T) {
 				RoomID: roomID,
 				TS:     gomatrixserverlib.AsTimestamp(ts),
 			}
-			err = db.InsertNotification(ctx, aliceLocalpart, eventID, uint64(i+1), nil, notification)
+			err = db.InsertNotification(ctx, aliceLocalpart, aliceDomain, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")
 		}
 
 		// get notifications
-		count, err := db.GetNotificationCount(ctx, aliceLocalpart, tables.AllNotifications)
+		count, err := db.GetNotificationCount(ctx, aliceLocalpart, aliceDomain, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notification count")
 		assert.Equal(t, int64(10), count)
-		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, 0, 15, tables.AllNotifications)
+		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, aliceDomain, 0, 15, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notifications")
 		assert.Equal(t, int64(10), count)
 		assert.Equal(t, 10, len(notifs))
 		// ... for a specific room
-		total, _, err := db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		total, _, err := db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(4), total)
 
 		// mark notification as read
-		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, room2.ID, 7, true)
+		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, aliceDomain, room2.ID, 7, true)
 		assert.NoError(t, err, "unable to set notifications read")
 		assert.True(t, affected)
 
 		// this should delete 2 notifications
-		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, room2.ID, 8)
+		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, aliceDomain, room2.ID, 8)
 		assert.NoError(t, err, "unable to set notifications read")
 		assert.True(t, affected)
 
-		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(2), total)
 
@@ -562,7 +562,7 @@ func Test_Notification(t *testing.T) {
 		assert.NoError(t, err)
 
 		// this should now return 0 notifications
-		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(0), total)
 	})

@@ -575,10 +575,11 @@ type QueryPushRulesResponse struct {
 }
 
 type QueryNotificationsRequest struct {
-	Localpart string `json:"localpart"` // Required.
-	From      string `json:"from,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
-	Only      string `json:"only,omitempty"`
+	Localpart  string                       `json:"localpart"`   // Required.
+	ServerName gomatrixserverlib.ServerName `json:"server_name"` // Required.
+	From       string                       `json:"from,omitempty"`
+	Limit      int                          `json:"limit,omitempty"`
+	Only       string                       `json:"only,omitempty"`
 }
 
 type QueryNotificationsResponse struct {

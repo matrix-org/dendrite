@@ -727,38 +727,38 @@ func (d *Database) GetLoginTokenDataByToken(ctx context.Context, token string) (
 	return d.LoginTokens.SelectLoginToken(ctx, token)
 }
 
-func (d *Database) InsertNotification(ctx context.Context, localpart, eventID string, pos uint64, tweaks map[string]interface{}, n *api.Notification) error {
+func (d *Database) InsertNotification(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, eventID string, pos uint64, tweaks map[string]interface{}, n *api.Notification) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Notifications.Insert(ctx, txn, localpart, eventID, pos, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
+		return d.Notifications.Insert(ctx, txn, localpart, serverName, eventID, pos, pushrules.BoolTweakOr(tweaks, pushrules.HighlightTweak, false), n)
 	})
 }
 
-func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart, roomID string, pos uint64) (affected bool, err error) {
+func (d *Database) DeleteNotificationsUpTo(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, roomID string, pos uint64) (affected bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		affected, err = d.Notifications.DeleteUpTo(ctx, txn, localpart, roomID, pos)
+		affected, err = d.Notifications.DeleteUpTo(ctx, txn, localpart, serverName, roomID, pos)
 		return err
 	})
 	return
 }
 
-func (d *Database) SetNotificationsRead(ctx context.Context, localpart, roomID string, pos uint64, b bool) (affected bool, err error) {
+func (d *Database) SetNotificationsRead(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, roomID string, pos uint64, b bool) (affected bool, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		affected, err = d.Notifications.UpdateRead(ctx, txn, localpart, roomID, pos, b)
+		affected, err = d.Notifications.UpdateRead(ctx, txn, localpart, serverName, roomID, pos, b)
 		return err
 	})
 	return
 }
 
-func (d *Database) GetNotifications(ctx context.Context, localpart string, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error) {
-	return d.Notifications.Select(ctx, nil, localpart, fromID, limit, filter)
+func (d *Database) GetNotifications(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, fromID int64, limit int, filter tables.NotificationFilter) ([]*api.Notification, int64, error) {
+	return d.Notifications.Select(ctx, nil, localpart, serverName, fromID, limit, filter)
 }
 
-func (d *Database) GetNotificationCount(ctx context.Context, localpart string, filter tables.NotificationFilter) (int64, error) {
-	return d.Notifications.SelectCount(ctx, nil, localpart, filter)
+func (d *Database) GetNotificationCount(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, filter tables.NotificationFilter) (int64, error) {
+	return d.Notifications.SelectCount(ctx, nil, localpart, serverName, filter)
 }
 
-func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart, roomID string) (total int64, highlight int64, _ error) {
-	return d.Notifications.SelectRoomCounts(ctx, nil, localpart, roomID)
+func (d *Database) GetRoomNotificationCounts(ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName, roomID string) (total int64, highlight int64, _ error) {
+	return d.Notifications.SelectRoomCounts(ctx, nil, localpart, serverName, roomID)
 }
 
 func (d *Database) DeleteOldNotifications(ctx context.Context) error {

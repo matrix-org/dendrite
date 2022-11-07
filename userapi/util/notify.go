@@ -27,7 +27,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 		return nil
 	}
 
-	userNumUnreadNotifs, err := db.GetNotificationCount(ctx, localpart, tables.AllNotifications)
+	userNumUnreadNotifs, err := db.GetNotificationCount(ctx, localpart, serverName, tables.AllNotifications)
 	if err != nil {
 		return err
 	}
