@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
 );
 
 -- Device IDs must be unique for a given user.
-CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_devices(localpart, device_id);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_device_localpart_id_idx ON userapi_devices(localpart, server_name, device_id);
 `
 
 const insertDeviceSQL = "" +

@@ -30,12 +30,13 @@ const profilesSchema = `
 -- Stores data about accounts profiles.
 CREATE TABLE IF NOT EXISTS userapi_profiles (
     -- The Matrix user ID localpart for this account
-    localpart TEXT NOT NULL PRIMARY KEY,
+    localpart TEXT NOT NULL,
 	server_name TEXT NOT NULL,
     -- The display name for this account
     display_name TEXT,
     -- The URL of the avatar for this account
-    avatar_url TEXT
+    avatar_url TEXT,
+	PRIMARY KEY (localpart, server_name)
 );
 `
 
@@ -135,6 +136,7 @@ func (s *profilesStatements) SetDisplayName(
 ) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{
 		Localpart:   localpart,
+		ServerName:  string(serverName),
 		DisplayName: displayName,
 	}
 	old, err := s.SelectProfileByLocalpart(ctx, localpart, serverName)

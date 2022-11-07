@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS userapi_threepids (
 	PRIMARY KEY(threepid, medium)
 );
 
-CREATE INDEX IF NOT EXISTS account_threepid_localpart ON userapi_threepids(localpart);
+CREATE INDEX IF NOT EXISTS account_threepid_localpart ON userapi_threepids(localpart, server_name);
 `
 
 const selectLocalpartForThreePIDSQL = "" +
-	"SELECT localpart FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
+	"SELECT localpart, server_name FROM userapi_threepids WHERE threepid = $1 AND medium = $2"
 
 const selectThreePIDsForLocalpartSQL = "" +
 	"SELECT threepid, medium FROM userapi_threepids WHERE localpart = $1 AND server_name = $2"

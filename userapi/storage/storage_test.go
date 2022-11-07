@@ -377,7 +377,10 @@ func Test_Profile(t *testing.T) {
 
 		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get profile by localpart")
-		wantProfile := &authtypes.Profile{Localpart: aliceLocalpart}
+		wantProfile := &authtypes.Profile{
+			Localpart:  aliceLocalpart,
+			ServerName: string(aliceDomain),
+		}
 		assert.Equal(t, wantProfile, gotProfile)
 
 		// set avatar & displayname

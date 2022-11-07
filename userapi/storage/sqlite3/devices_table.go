@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS userapi_devices (
     ip TEXT,
     user_agent TEXT,
 
-		UNIQUE (localpart, device_id)
+	UNIQUE (localpart, server_name, device_id)
 );
 `
 
@@ -186,7 +186,7 @@ func (s *devicesStatements) DeleteDevices(
 	params[0] = localpart
 	params[1] = serverName
 	for i, v := range devices {
-		params[i+1] = v
+		params[i+2] = v
 	}
 	_, err = stmt.ExecContext(ctx, params...)
 	return err

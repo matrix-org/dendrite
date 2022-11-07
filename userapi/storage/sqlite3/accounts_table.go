@@ -34,7 +34,7 @@ const accountsSchema = `
 -- Stores data about accounts.
 CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- The Matrix user ID localpart for this account
-    localpart TEXT NOT NULL PRIMARY KEY,
+    localpart TEXT NOT NULL,
     server_name TEXT NOT NULL,
     -- When this account was first created, as a unix timestamp (ms resolution).
     created_ts BIGINT NOT NULL,
@@ -45,9 +45,10 @@ CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- If the account is currently active
     is_deactivated BOOLEAN DEFAULT 0,
 	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
-	account_type INTEGER NOT NULL
+	account_type INTEGER NOT NULL,
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
+	PRIMARY KEY (localpart, server_name)
 );
 `
 
@@ -138,8 +139,8 @@ func (s *accountsStatements) InsertAccount(
 
 	return &api.Account{
 		Localpart:    localpart,
-		UserID:       userutil.MakeUserID(localpart, s.serverName),
-		ServerName:   s.serverName,
+		UserID:       userutil.MakeUserID(localpart, serverName),
+		ServerName:   serverName,
 		AppServiceID: appserviceID,
 		AccountType:  accountType,
 	}, nil
@@ -185,9 +186,7 @@ func (s *accountsStatements) SelectAccountByLocalpart(
 		acc.AppServiceID = appserviceIDPtr.String
 	}
 
-	acc.UserID = userutil.MakeUserID(localpart, s.serverName)
-	acc.ServerName = s.serverName
-
+	acc.UserID = userutil.MakeUserID(acc.Localpart, acc.ServerName)
 	return &acc, nil
 }
 

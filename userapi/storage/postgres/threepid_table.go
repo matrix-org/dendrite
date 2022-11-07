@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS userapi_threepids (
 	PRIMARY KEY(threepid, medium)
 );
 
-CREATE INDEX IF NOT EXISTS userapi_threepid_idx ON userapi_threepids(localpart);
+CREATE INDEX IF NOT EXISTS userapi_threepid_idx ON userapi_threepids(localpart, server_name);
 `
 
 const selectLocalpartForThreePIDSQL = "" +

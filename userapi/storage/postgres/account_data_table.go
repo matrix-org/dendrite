@@ -38,13 +38,13 @@ CREATE TABLE IF NOT EXISTS userapi_account_datas (
     -- The account data content
     content TEXT NOT NULL,
 
-    PRIMARY KEY(localpart, room_id, type)
+    PRIMARY KEY(localpart, server_name, room_id, type)
 );
 `
 
 const insertAccountDataSQL = `
 	INSERT INTO userapi_account_datas(localpart, server_name, room_id, type, content) VALUES($1, $2, $3, $4, $5)
-	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = EXCLUDED.content
+	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = EXCLUDED.content
 `
 
 const selectAccountDataSQL = "" +

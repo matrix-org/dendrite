@@ -293,7 +293,7 @@ func (d *Database) SaveThreePIDAssociation(
 	medium string,
 ) (err error) {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		user, domain, err := d.ThreePIDs.SelectLocalpartForThreePID(
+		user, _, err := d.ThreePIDs.SelectLocalpartForThreePID(
 			ctx, txn, threepid, medium,
 		)
 		if err != nil {
@@ -304,7 +304,7 @@ func (d *Database) SaveThreePIDAssociation(
 			return Err3PIDInUse
 		}
 
-		return d.ThreePIDs.InsertThreePID(ctx, txn, threepid, medium, localpart, domain)
+		return d.ThreePIDs.InsertThreePID(ctx, txn, threepid, medium, localpart, serverName)
 	})
 }
 
