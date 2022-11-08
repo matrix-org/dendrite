@@ -310,6 +310,7 @@ func getSenderDevice(
 	displayNameRes := &userapi.PerformUpdateDisplayNameResponse{}
 	if err = userAPI.SetDisplayName(ctx, &userapi.PerformUpdateDisplayNameRequest{
 		Localpart:   cfg.Matrix.ServerNotices.LocalPart,
+		ServerName:  cfg.Matrix.ServerName,
 		DisplayName: cfg.Matrix.ServerNotices.DisplayName,
 	}, displayNameRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
