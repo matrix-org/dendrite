@@ -114,17 +114,18 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 			WantMembership: "join",
 		}, &queryRes)
 		if err != nil {
-			log.WithError(err).Error("failed to calculate joined rooms for user")
+			log.WithError(err).Error("::: failed to calculate joined rooms for user")
 			return true
 		}
 
 		joined, err = t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
 		if err != nil {
-			log.WithError(err).Error("failed to get joined hosts")
+			log.WithError(err).Error("::: failed to get joined hosts")
 			return true
 		}
 
 		if len(joined) == 0 {
+			log.Debugf("::: no joined hosts, retrying (%d/%d)", i+1, maxRetries)
 			time.Sleep(retryDelay)
 			continue
 		}
@@ -132,6 +133,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 	// If we still have no joined hosts, discard the event.
 	if len(joined) == 0 {
+		log.Debugf("::: no joined hosts after retrying")
 		return true
 	}
 
