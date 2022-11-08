@@ -320,6 +320,7 @@ jobs:
 
           - label: SQLite native, full HTTP APIs
             api: full-http
+            cgo: 0
 
           - label: SQLite Cgo, full HTTP APIs
             api: full-http
@@ -327,10 +328,12 @@ jobs:
 
           - label: PostgreSQL
             postgres: Postgres
+            cgo: 0
 
           - label: PostgreSQL, full HTTP APIs
             postgres: Postgres
             api: full-http
+            cgo: 0
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
       # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
@@ -372,7 +375,7 @@ jobs:
             (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
       # Build initial Dendrite image
-      - run: docker build --build-arg=CGO=${{ matrix.cgo && 1 }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
         env:
           DOCKER_BUILDKIT: 1
@@ -386,7 +389,7 @@ jobs:
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }}
           API: ${{ matrix.api && 1 }}
-          CGO_ENABLED: ${{ matrix.cgo && 1 }}
+          CGO_ENABLED: ${{ matrix.cgo }}
         working-directory: complement
 
   integration-tests-done:
