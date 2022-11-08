@@ -206,7 +206,7 @@ func (d *Database) QueryPushRules(
 	// If we didn't find any default push rules then we should just generate some
 	// fresh ones.
 	if len(data) == 0 {
-		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, d.ServerName)
+		pushRuleSets := pushrules.DefaultAccountRuleSets(localpart, serverName)
 		prbs, err := json.Marshal(pushRuleSets)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal default push rules: %w", err)
