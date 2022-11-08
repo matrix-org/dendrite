@@ -33,7 +33,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const maxRetries = 3
+const maxRetries = 5
 const retryDelay = time.Second
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
@@ -105,7 +105,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	var joined []gomatrixserverlib.ServerName
-	// We're trying to get joined rooms for this user for 3 seconds (3 retries, 1s delay)
+	// We're trying to get joined rooms for this user for 5 seconds (5 retries, 1s delay)
 	// If we fail to get joined hosts, we discard the presence event.
 	for i := 0; i < maxRetries; i++ {
 		var queryRes roomserverAPI.QueryRoomsForUserResponse
