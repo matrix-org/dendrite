@@ -17,14 +17,6 @@ import (
 func UpServerNamesPopulate(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib.ServerName) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
-			"SELECT name FROM sqlite_schema WHERE type='table' AND name=%s;",
-			pq.QuoteIdentifier(table),
-		)
-		var c int
-		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 0 {
-			continue
-		}
-		q = fmt.Sprintf(
 			"UPDATE %s SET server_name = %s WHERE server_name = '';",
 			pq.QuoteIdentifier(table), pq.QuoteLiteral(string(serverName)),
 		)

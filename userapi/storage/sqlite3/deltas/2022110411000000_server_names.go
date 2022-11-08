@@ -28,7 +28,7 @@ var serverNamesTables = []string{
 func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib.ServerName) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
-			"SELECT name FROM sqlite_schema WHERE type='table' AND name=%s;",
+			"SELECT COUNT(name) FROM sqlite_schema WHERE type='table' AND name=%s;",
 			pq.QuoteIdentifier(table),
 		)
 		var c int
