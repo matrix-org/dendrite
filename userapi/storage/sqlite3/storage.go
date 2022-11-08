@@ -15,6 +15,8 @@
 package sqlite3
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -41,15 +43,13 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		Up:      deltas.UpRenameTables,
 		Down:    deltas.DownRenameTables,
 	})
-	/*
-		m.AddMigrations(sqlutil.Migration{
-			Version: "userapi: server names",
-			Up: func(ctx context.Context, txn *sql.Tx) error {
-				return deltas.UpServerNames(ctx, txn, serverName)
-			},
-			Down: deltas.DownServerNames,
-		})
-	*/
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: server names",
+		Up: func(ctx context.Context, txn *sql.Tx) error {
+			return deltas.UpServerNames(ctx, txn, serverName)
+		},
+		Down: deltas.DownServerNames,
+	})
 	if err = m.Up(base.Context()); err != nil {
 		return nil, err
 	}
@@ -101,12 +101,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	statsTable, err := NewSQLiteStatsTable(db, serverName)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
-	}
-
-	m = sqlutil.NewMigrator(db)
-
-	if err = m.Up(base.Context()); err != nil {
-		return nil, err
 	}
 
 	return &shared.Database{
