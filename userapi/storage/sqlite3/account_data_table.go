@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS userapi_account_datas (
 
 const insertAccountDataSQL = `
 	INSERT INTO userapi_account_datas(localpart, server_name, room_id, type, content) VALUES($1, $2, $3, $4, $5)
-	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = $4
+	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = $5
 `
 
 const selectAccountDataSQL = "" +
