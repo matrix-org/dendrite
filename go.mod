@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/blevesearch/bleve/v2 v2.3.4
 	github.com/codeclysm/extract v2.2.0+incompatible
-	github.com/dgraph-io/ristretto v0.1.1-0.20220403145359-8e850b710d6d
+	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/docker v20.10.19+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.14.0
