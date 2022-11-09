@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"time"
 
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
@@ -32,9 +31,6 @@ import (
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 )
-
-const maxRetries = 5
-const retryDelay = time.Second
 
 // OutputReceiptConsumer consumes events that originate in the clientapi.
 type OutputPresenceConsumer struct {
@@ -97,6 +93,16 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
+	var queryRes roomserverAPI.QueryRoomsForUserResponse
+	err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
+		UserID:         userID,
+		WantMembership: "join",
+	}, &queryRes)
+	if err != nil {
+		log.WithError(err).Error("failed to calculate joined rooms for user")
+		return true
+	}
+
 	presence := msg.Header.Get("presence")
 
 	ts, err := strconv.Atoi(msg.Header.Get("last_active_ts"))
@@ -104,36 +110,14 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
-	var joined []gomatrixserverlib.ServerName
-	// We're trying to get joined rooms for this user for 5 seconds (5 retries, 1s delay)
-	// If we fail to get joined hosts, we discard the presence event.
-	for i := 0; i < maxRetries; i++ {
-		var queryRes roomserverAPI.QueryRoomsForUserResponse
-		err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
-			UserID:         userID,
-			WantMembership: "join",
-		}, &queryRes)
-		if err != nil {
-			log.WithError(err).Error("::: failed to calculate joined rooms for user")
-			return true
-		}
-
-		joined, err = t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
-		if err != nil {
-			log.WithError(err).Error("::: failed to get joined hosts")
-			return true
-		}
-
-		if len(joined) == 0 {
-			log.Debugf("::: no joined hosts, retrying (%d/%d)", i+1, maxRetries)
-			time.Sleep(retryDelay)
-			continue
-		}
-		break
+	// send this presence to all servers who share rooms with this user.
+	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
+	if err != nil {
+		log.WithError(err).Error("failed to get joined hosts")
+		return true
 	}
-	// If we still have no joined hosts, discard the event.
+
 	if len(joined) == 0 {
-		log.Debugf("::: no joined hosts after retrying")
 		return true
 	}
 
