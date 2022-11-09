@@ -61,7 +61,7 @@ func (t *LoginTypePassword) LoginFromJSON(ctx context.Context, reqBytes []byte) 
 
 func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login, *util.JSONResponse) {
 	r := req.(*PasswordRequest)
-	username := strings.ToLower(r.Username())
+	username := r.Username()
 	if username == "" {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -84,7 +84,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if !t.Config.Matrix.IsLocalServerName(domain) {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
-			JSON: jsonerror.InvalidUsername(err.Error()),
+			JSON: jsonerror.InvalidUsername("The server name is not known."),
 		}
 	}
 	// Squash username to all lowercase letters
@@ -97,7 +97,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("unable to fetch account by password"),
+			JSON: jsonerror.Unknown("Unable to fetch account by password."),
 		}
 	}
 
@@ -110,7 +110,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		if err != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("unable to fetch account by password"),
+				JSON: jsonerror.Unknown("Unable to fetch account by password."),
 			}
 		}
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows

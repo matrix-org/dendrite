@@ -567,14 +567,14 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		AccountType:  api.AccountTypeAppService,
 	}
 
-	localpart, _, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Matrix)
 	if err != nil {
 		return nil, err
 	}
 
 	if localpart != "" { // AS is masquerading as another user
 		// Verify that the user is registered
-		account, err := a.DB.GetAccountByLocalpart(ctx, localpart, a.Cfg.Matrix.ServerName) // TODO: which server name here?
+		account, err := a.DB.GetAccountByLocalpart(ctx, localpart, domain)
 		// Verify that the account exists and either appServiceID matches or
 		// it belongs to the appservice user namespaces
 		if err == nil && (account.AppServiceID == appService.ID || appService.IsInterestedInUserID(appServiceUserID)) {
