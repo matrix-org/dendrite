@@ -255,7 +255,8 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		msg := nats.NewMsg(s.topicPresence)
 		msg.Header.Set(jetstream.UserID, ev.Sender)
 
-		presence, err := s.natsClient.RequestMsg(msg, time.Second*10)
+		var presence *nats.Msg
+		presence, err = s.natsClient.RequestMsg(msg, time.Second*10)
 		if err != nil {
 			log.WithError(err).Errorf("unable to get presence")
 			continue
@@ -266,7 +267,8 @@ func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []type
 		if e != "" {
 			continue
 		}
-		lastActive, err := strconv.Atoi(presence.Header.Get("last_active_ts"))
+		var lastActive int
+		lastActive, err = strconv.Atoi(presence.Header.Get("last_active_ts"))
 		if err != nil {
 			continue
 		}
