@@ -118,7 +118,7 @@ func NewInternalAPI(
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
 
-	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
@@ -132,7 +132,7 @@ func NewInternalAPI(
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, queues,
+		base.ProcessContext, cfg, js, nats, queues,
 		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
