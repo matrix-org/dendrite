@@ -22,10 +22,12 @@ var serverNamesTables = []string{
 
 // These tables have a PRIMARY KEY constraint which we need to drop so
 // that we can recreate a new unique index that contains the server name.
-var serverNamesDropPK = []string{
-	"userapi_accounts",
-	"userapi_account_datas",
-	"userapi_profiles",
+// If the new key doesn't exist (i.e. the database was created before the
+// table rename migration) we'll try to drop the old one instead.
+var serverNamesDropPK = map[string]string{
+	"userapi_accounts":      "account_accounts",
+	"userapi_account_datas": "account_data",
+	"userapi_profiles":      "account_profiles",
 }
 
 // I know what you're thinking: you're wondering "why doesn't this use $1
@@ -43,13 +45,19 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 			return fmt.Errorf("add server name to %q error: %w", table, err)
 		}
 	}
-	for _, table := range serverNamesDropPK {
+	for newTable, oldTable := range serverNamesDropPK {
 		q := fmt.Sprintf(
 			"ALTER TABLE IF EXISTS %s DROP CONSTRAINT %s;",
-			pq.QuoteIdentifier(table), pq.QuoteIdentifier(table+"_pkey"),
+			pq.QuoteIdentifier(newTable), pq.QuoteIdentifier(newTable+"_pkey"),
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("drop PK from %q error: %w", table, err)
+			q = fmt.Sprintf(
+				"ALTER TABLE IF EXISTS %s DROP CONSTRAINT %s;",
+				pq.QuoteIdentifier(oldTable), pq.QuoteIdentifier(oldTable+"_pkey"),
+			)
+			if _, err := tx.ExecContext(ctx, q); err != nil {
+				return fmt.Errorf("drop PK from %q / %q error: %w", newTable, oldTable, err)
+			}
 		}
 	}
 	return nil
