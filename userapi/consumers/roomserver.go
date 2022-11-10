@@ -2,10 +2,15 @@ package consumers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
@@ -23,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/userapi/producers"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	userAPITypes "github.com/matrix-org/dendrite/userapi/types"
 	"github.com/matrix-org/dendrite/userapi/util"
 )
 
@@ -36,6 +42,11 @@ type OutputRoomEventConsumer struct {
 	topic        string
 	pgClient     pushgateway.Client
 	syncProducer *producers.SyncAPI
+	msgCounts    map[gomatrixserverlib.ServerName]userAPITypes.MessageStats
+	roomCounts   map[gomatrixserverlib.ServerName]map[string]bool // map from serverName to map from rommID to "isEncrypted"
+	lastUpdate   time.Time
+	countsLock   sync.Mutex
+	serverName   gomatrixserverlib.ServerName
 }
 
 func NewOutputRoomEventConsumer(
@@ -57,6 +68,11 @@ func NewOutputRoomEventConsumer(
 		pgClient:     pgClient,
 		rsAPI:        rsAPI,
 		syncProducer: syncProducer,
+		msgCounts:    map[gomatrixserverlib.ServerName]userAPITypes.MessageStats{},
+		roomCounts:   map[gomatrixserverlib.ServerName]map[string]bool{},
+		lastUpdate:   time.Now(),
+		countsLock:   sync.Mutex{},
+		serverName:   cfg.Matrix.ServerName,
 	}
 }
 
@@ -72,19 +88,24 @@ func (s *OutputRoomEventConsumer) Start() error {
 
 func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) bool {
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
+	// Only handle events we care about
+	if rsapi.OutputType(msg.Header.Get(jetstream.RoomEventType)) != rsapi.OutputTypeNewRoomEvent {
+		return true
+	}
 	var output rsapi.OutputEvent
 	if err := json.Unmarshal(msg.Data, &output); err != nil {
 		// If the message was invalid, log it and move on to the next message in the stream
 		log.WithError(err).Errorf("roomserver output log: message parse failure")
 		return true
 	}
-	if output.Type != rsapi.OutputTypeNewRoomEvent {
-		return true
-	}
 	event := output.NewRoomEvent.Event
 	if event == nil {
 		log.Errorf("userapi consumer: expected event")
 		return true
+	}
+
+	if s.cfg.Matrix.ReportStats.Enabled {
+		go s.storeMessageStats(ctx, event.Type(), event.Sender(), event.RoomID())
 	}
 
 	log.WithFields(log.Fields{
@@ -106,13 +127,177 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	return true
 }
 
+func (s *OutputRoomEventConsumer) storeMessageStats(ctx context.Context, eventType, eventSender, roomID string) {
+	s.countsLock.Lock()
+	defer s.countsLock.Unlock()
+
+	// reset the roomCounts on a day change
+	if s.lastUpdate.Day() != time.Now().Day() {
+		s.roomCounts[s.serverName] = make(map[string]bool)
+		s.lastUpdate = time.Now()
+	}
+
+	_, sender, err := gomatrixserverlib.SplitID('@', eventSender)
+	if err != nil {
+		return
+	}
+	msgCount := s.msgCounts[s.serverName]
+	roomCount := s.roomCounts[s.serverName]
+	if roomCount == nil {
+		roomCount = make(map[string]bool)
+	}
+	switch eventType {
+	case "m.room.message":
+		roomCount[roomID] = false
+		msgCount.Messages++
+		if sender == s.serverName {
+			msgCount.SentMessages++
+		}
+	case "m.room.encrypted":
+		roomCount[roomID] = true
+		msgCount.MessagesE2EE++
+		if sender == s.serverName {
+			msgCount.SentMessagesE2EE++
+		}
+	default:
+		return
+	}
+	s.msgCounts[s.serverName] = msgCount
+	s.roomCounts[s.serverName] = roomCount
+
+	for serverName, stats := range s.msgCounts {
+		var normalRooms, encryptedRooms int64 = 0, 0
+		for _, isEncrypted := range s.roomCounts[s.serverName] {
+			if isEncrypted {
+				encryptedRooms++
+			} else {
+				normalRooms++
+			}
+		}
+		err := s.db.UpsertDailyRoomsMessages(ctx, serverName, stats, normalRooms, encryptedRooms)
+		if err != nil {
+			log.WithError(err).Errorf("failed to upsert daily messages")
+		}
+		// Clear stats if we successfully stored it
+		if err == nil {
+			stats.Messages = 0
+			stats.SentMessages = 0
+			stats.MessagesE2EE = 0
+			stats.SentMessagesE2EE = 0
+			s.msgCounts[serverName] = stats
+		}
+	}
+}
+
+func (s *OutputRoomEventConsumer) handleRoomUpgrade(ctx context.Context, oldRoomID, newRoomID string, localMembers []*localMembership, roomSize int) error {
+	for _, membership := range localMembers {
+		// Copy any existing push rules from old -> new room
+		if err := s.copyPushrules(ctx, oldRoomID, newRoomID, membership.Localpart); err != nil {
+			return err
+		}
+
+		// preserve m.direct room state
+		if err := s.updateMDirect(ctx, oldRoomID, newRoomID, membership.Localpart, roomSize); err != nil {
+			return err
+		}
+
+		// copy existing m.tag entries, if any
+		if err := s.copyTags(ctx, oldRoomID, newRoomID, membership.Localpart); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *OutputRoomEventConsumer) copyPushrules(ctx context.Context, oldRoomID, newRoomID string, localpart string) error {
+	pushRules, err := s.db.QueryPushRules(ctx, localpart)
+	if err != nil {
+		return fmt.Errorf("failed to query pushrules for user: %w", err)
+	}
+	if pushRules == nil {
+		return nil
+	}
+
+	for _, roomRule := range pushRules.Global.Room {
+		if roomRule.RuleID != oldRoomID {
+			continue
+		}
+		cpRool := *roomRule
+		cpRool.RuleID = newRoomID
+		pushRules.Global.Room = append(pushRules.Global.Room, &cpRool)
+		rules, err := json.Marshal(pushRules)
+		if err != nil {
+			return err
+		}
+		if err = s.db.SaveAccountData(ctx, localpart, "", "m.push_rules", rules); err != nil {
+			return fmt.Errorf("failed to update pushrules: %w", err)
+		}
+	}
+	return nil
+}
+
+// updateMDirect copies the "is_direct" flag from oldRoomID to newROomID
+func (s *OutputRoomEventConsumer) updateMDirect(ctx context.Context, oldRoomID, newRoomID, localpart string, roomSize int) error {
+	// this is most likely not a DM, so skip updating m.direct state
+	if roomSize > 2 {
+		return nil
+	}
+	// Get direct message state
+	directChatsRaw, err := s.db.GetAccountDataByType(ctx, localpart, "", "m.direct")
+	if err != nil {
+		return fmt.Errorf("failed to get m.direct from database: %w", err)
+	}
+	directChats := gjson.ParseBytes(directChatsRaw)
+	newDirectChats := make(map[string][]string)
+	// iterate over all userID -> roomIDs
+	directChats.ForEach(func(userID, roomIDs gjson.Result) bool {
+		var found bool
+		for _, roomID := range roomIDs.Array() {
+			newDirectChats[userID.Str] = append(newDirectChats[userID.Str], roomID.Str)
+			// add the new roomID to m.direct
+			if roomID.Str == oldRoomID {
+				found = true
+				newDirectChats[userID.Str] = append(newDirectChats[userID.Str], newRoomID)
+			}
+		}
+		// Only hit the database if we found the old room as a DM for this user
+		if found {
+			var data []byte
+			data, err = json.Marshal(newDirectChats)
+			if err != nil {
+				return true
+			}
+			if err = s.db.SaveAccountData(ctx, localpart, "", "m.direct", data); err != nil {
+				return true
+			}
+		}
+		return true
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update m.direct state")
+	}
+	return nil
+}
+
+func (s *OutputRoomEventConsumer) copyTags(ctx context.Context, oldRoomID, newRoomID, localpart string) error {
+	tag, err := s.db.GetAccountDataByType(ctx, localpart, oldRoomID, "m.tag")
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if tag == nil {
+		return nil
+	}
+	return s.db.SaveAccountData(ctx, localpart, newRoomID, "m.tag", tag)
+}
+
 func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gomatrixserverlib.HeaderedEvent, streamPos uint64) error {
 	members, roomSize, err := s.localRoomMembers(ctx, event.RoomID())
 	if err != nil {
 		return fmt.Errorf("s.localRoomMembers: %w", err)
 	}
 
-	if event.Type() == gomatrixserverlib.MRoomMember {
+	switch {
+	case event.Type() == gomatrixserverlib.MRoomMember:
 		cevent := gomatrixserverlib.HeaderedToClientEvent(event, gomatrixserverlib.FormatAll)
 		var member *localMembership
 		member, err = newLocalMembership(&cevent)
@@ -124,6 +309,15 @@ func (s *OutputRoomEventConsumer) processMessage(ctx context.Context, event *gom
 			// should also be pushed to the target user.
 			members = append(members, member)
 		}
+	case event.Type() == "m.room.tombstone" && event.StateKeyEquals(""):
+		// Handle room upgrades
+		oldRoomID := event.RoomID()
+		newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
+		if err = s.handleRoomUpgrade(ctx, oldRoomID, newRoomID, members, roomSize); err != nil {
+			// while inconvenient, this shouldn't stop us from sending push notifications
+			log.WithError(err).Errorf("UserAPI: failed to handle room upgrade for users")
+		}
+
 	}
 
 	// TODO: run in parallel with localRoomMembers.

@@ -367,7 +367,8 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	// hit /versions to check it is up
 	var lastErr error
 	for i := 0; i < 500; i++ {
-		res, err := http.Get(versionsURL)
+		var res *http.Response
+		res, err = http.Get(versionsURL)
 		if err != nil {
 			lastErr = fmt.Errorf("GET %s => error: %s", versionsURL, err)
 			time.Sleep(50 * time.Millisecond)
@@ -381,18 +382,22 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 		lastErr = nil
 		break
 	}
-	if lastErr != nil {
-		logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-		})
-		// ignore errors when cannot get logs, it's just for debugging anyways
-		if err == nil {
-			logbody, err := io.ReadAll(logs)
-			if err == nil {
-				log.Printf("Container logs:\n\n%s\n\n", string(logbody))
+	logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+	})
+	// ignore errors when cannot get logs, it's just for debugging anyways
+	if err == nil {
+		go func() {
+			for {
+				if body, err := io.ReadAll(logs); err == nil && len(body) > 0 {
+					log.Printf("%s: %s", version, string(body))
+				} else {
+					return
+				}
 			}
-		}
+		}()
 	}
 	return baseURL, containerID, lastErr
 }

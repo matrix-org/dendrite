@@ -239,16 +239,42 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("unable to get state before event: %w", err)
 	}
 
+	// If we only have one or less state entries, we can short circuit the below
+	// loop and avoid hitting the database
+	allStateEventNIDs := make(map[types.EventNID]types.StateEntry)
+	for _, eventID := range request.EventIDs {
+		stateEntry := stateEntries[eventID]
+		for _, s := range stateEntry {
+			allStateEventNIDs[s.EventNID] = s
+		}
+	}
+
+	var canShortCircuit bool
+	if len(allStateEventNIDs) <= 1 {
+		canShortCircuit = true
+	}
+
+	var memberships []types.Event
 	for _, eventID := range request.EventIDs {
 		stateEntry, ok := stateEntries[eventID]
-		if !ok {
+		if !ok || len(stateEntry) == 0 {
 			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
 			continue
 		}
-		memberships, err := helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+
+		// If we can short circuit, e.g. we only have 0 or 1 membership events, we only get the memberships
+		// once. If we have more than one membership event, we need to get the state for each state entry.
+		if canShortCircuit {
+			if len(memberships) == 0 {
+				memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+			}
+		} else {
+			memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+		}
 		if err != nil {
 			return fmt.Errorf("unable to get memberships at state: %w", err)
 		}
+
 		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
 
 		for i := range memberships {
@@ -453,7 +479,7 @@ func (r *Queryer) QueryMissingEvents(
 		return fmt.Errorf("missing RoomInfo for room %s", events[0].RoomID())
 	}
 
-	resultNIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
+	resultNIDs, redactEventIDs, err := helpers.ScanEventTree(ctx, r.DB, info, front, visited, request.Limit, request.ServerName)
 	if err != nil {
 		return err
 	}
@@ -470,7 +496,9 @@ func (r *Queryer) QueryMissingEvents(
 			if verr != nil {
 				return verr
 			}
-
+			if _, ok := redactEventIDs[event.EventID()]; ok {
+				event.Redact()
+			}
 			response.Events = append(response.Events, event.Headered(roomVersion))
 		}
 	}
@@ -700,7 +728,7 @@ func (r *Queryer) QueryPublishedRooms(
 		}
 		return err
 	}
-	rooms, err := r.DB.GetPublishedRooms(ctx)
+	rooms, err := r.DB.GetPublishedRooms(ctx, req.NetworkID, req.IncludeAllNetworks)
 	if err != nil {
 		return err
 	}
@@ -799,7 +827,7 @@ func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUser
 	}
 	roomIDs = roomIDs[:j]
 
-	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs)
+	users, err := r.DB.JoinedUsersSetInRooms(ctx, roomIDs, req.OtherUserIDs, req.LocalOnly)
 	if err != nil {
 		return err
 	}
@@ -872,7 +900,7 @@ func (r *Queryer) QueryRestrictedJoinAllowed(ctx context.Context, req *api.Query
 	// but we don't specify an authorised via user, since the event auth
 	// will allow the join anyway.
 	var pending bool
-	if pending, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
+	if pending, _, _, _, err = helpers.IsInvitePending(ctx, r.DB, req.RoomID, req.UserID); err != nil {
 		return fmt.Errorf("helpers.IsInvitePending: %w", err)
 	} else if pending {
 		res.Allowed = true

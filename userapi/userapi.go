@@ -76,12 +76,13 @@ func NewInternalAPI(
 	userAPI := &internal.UserInternalAPI{
 		DB:                   db,
 		SyncProducer:         syncProducer,
-		ServerName:           cfg.Matrix.ServerName,
+		Config:               cfg,
 		AppServices:          appServices,
 		KeyAPI:               keyAPI,
 		RSAPI:                rsAPI,
 		DisableTLSValidation: cfg.PushGatewayDisableTLSValidation,
 		PgClient:             pgClient,
+		Cfg:                  cfg,
 	}
 
 	receiptConsumer := consumers.NewOutputReceiptEventConsumer(

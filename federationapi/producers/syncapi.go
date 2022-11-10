@@ -25,6 +25,7 @@ import (
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
@@ -39,7 +40,7 @@ type SyncAPIProducer struct {
 	TopicDeviceListUpdate  string
 	TopicSigningKeyUpdate  string
 	JetStream              nats.JetStreamContext
-	ServerName             gomatrixserverlib.ServerName
+	Config                 *config.FederationAPI
 	UserAPI                userapi.UserInternalAPI
 }
 
@@ -77,7 +78,7 @@ func (p *SyncAPIProducer) SendToDevice(
 	// device. If the event isn't targeted locally then we can't expand the
 	// wildcard as we don't know about the remote devices, so instead we leave it
 	// as-is, so that the federation sender can send it on with the wildcard intact.
-	if domain == p.ServerName && deviceID == "*" {
+	if p.Config.Matrix.IsLocalServerName(domain) && deviceID == "*" {
 		var res userapi.QueryDevicesResponse
 		err = p.UserAPI.QueryDevices(context.TODO(), &userapi.QueryDevicesRequest{
 			UserID: userID,

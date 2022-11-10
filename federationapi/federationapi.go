@@ -69,7 +69,7 @@ func AddPublicRoutes(
 		TopicPresenceEvent:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		TopicDeviceListUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
 		TopicSigningKeyUpdate:  cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
-		ServerName:             cfg.Matrix.ServerName,
+		Config:                 cfg,
 		UserAPI:                userAPI,
 	}
 
@@ -107,7 +107,7 @@ func NewInternalAPI(
 ) api.FederationInternalAPI {
 	cfg := &base.Cfg.FederationAPI
 
-	federationDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.ServerName)
+	federationDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.IsLocalServerName)
 	if err != nil {
 		logrus.WithError(err).Panic("failed to connect to federation sender db")
 	}
@@ -116,17 +116,14 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := &statistics.Statistics{
-		DB:                     federationDB,
-		FailuresUntilBlacklist: cfg.FederationMaxRetries,
-	}
+	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
 
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
-		cfg.Matrix.ServerName, federation, rsAPI, stats,
+		cfg.Matrix.ServerName, federation, rsAPI, &stats,
 		&queue.SigningInfo{
 			KeyID:      cfg.Matrix.KeyID,
 			PrivateKey: cfg.Matrix.PrivateKey,
@@ -167,7 +164,7 @@ func NewInternalAPI(
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceConsumer(
-		base.ProcessContext, cfg, js, queues, federationDB,
+		base.ProcessContext, cfg, js, queues, federationDB, rsAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")
@@ -183,5 +180,5 @@ func NewInternalAPI(
 	}
 	time.AfterFunc(time.Minute, cleanExpiredEDUs)
 
-	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, stats, caches, queues, keyRing)
+	return internal.NewFederationInternalAPI(federationDB, cfg, rsAPI, federation, &stats, caches, queues, keyRing)
 }

@@ -54,8 +54,6 @@ import (
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 
 	"github.com/sirupsen/logrus"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -89,6 +87,7 @@ func main() {
 	if configFlagSet {
 		cfg = setup.ParseFlags(true)
 		sk = cfg.Global.PrivateKey
+		pk = sk.Public().(ed25519.PublicKey)
 	} else {
 		keyfile := filepath.Join(*instanceDir, *instanceName) + ".pem"
 		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
@@ -142,6 +141,9 @@ func main() {
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+		cfg.MediaAPI.BasePath = config.Path(*instanceDir)
+		cfg.SyncAPI.Fulltext.Enabled = true
+		cfg.SyncAPI.Fulltext.IndexPath = config.Path(*instanceDir)
 		if err := cfg.Derive(); err != nil {
 			panic(err)
 		}

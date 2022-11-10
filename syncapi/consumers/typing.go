@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
@@ -36,7 +37,7 @@ type OutputTypingEventConsumer struct {
 	durable   string
 	topic     string
 	eduCache  *caching.EDUCache
-	stream    types.StreamProvider
+	stream    streams.StreamProvider
 	notifier  *notifier.Notifier
 }
 
@@ -48,7 +49,7 @@ func NewOutputTypingEventConsumer(
 	js nats.JetStreamContext,
 	eduCache *caching.EDUCache,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputTypingEventConsumer {
 	return &OutputTypingEventConsumer{
 		ctx:       process.Context(),

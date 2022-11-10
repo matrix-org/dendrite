@@ -24,13 +24,17 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 
+	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
@@ -43,9 +47,10 @@ type OutputRoomEventConsumer struct {
 	durable      string
 	topic        string
 	db           storage.Database
-	pduStream    types.StreamProvider
-	inviteStream types.StreamProvider
+	pduStream    streams.StreamProvider
+	inviteStream streams.StreamProvider
 	notifier     *notifier.Notifier
+	fts          *fulltext.Search
 }
 
 // NewOutputRoomEventConsumer creates a new OutputRoomEventConsumer. Call Start() to begin consuming from room servers.
@@ -55,9 +60,10 @@ func NewOutputRoomEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	pduStream types.StreamProvider,
-	inviteStream types.StreamProvider,
+	pduStream streams.StreamProvider,
+	inviteStream streams.StreamProvider,
 	rsAPI api.SyncRoomserverAPI,
+	fts *fulltext.Search,
 ) *OutputRoomEventConsumer {
 	return &OutputRoomEventConsumer{
 		ctx:          process.Context(),
@@ -70,6 +76,7 @@ func NewOutputRoomEventConsumer(
 		pduStream:    pduStream,
 		inviteStream: inviteStream,
 		rsAPI:        rsAPI,
+		fts:          fts,
 	}
 }
 
@@ -141,6 +148,16 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
 	}
+
+	if err = s.db.RedactRelations(ctx, msg.RedactedBecause.RoomID(), msg.RedactedEventID); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":           msg.RedactedBecause.RoomID(),
+			"event_id":          msg.RedactedBecause.EventID(),
+			"redacted_event_id": msg.RedactedEventID,
+		}).WithError(err).Warn("Failed to redact relations")
+		return err
+	}
+
 	// fake a room event so we notify clients about the redaction, as if it were
 	// a normal event.
 	return s.onNewRoomEvent(ctx, api.OutputNewRoomEvent{
@@ -251,10 +268,24 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		}).Panicf("roomserver output log: write new event failure")
 		return nil
 	}
+	if err = s.writeFTS(ev, pduPos); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("failed to index fulltext element")
+	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		sentry.CaptureException(err)
+		return err
+	}
+
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
 		return err
 	}
 
@@ -293,6 +324,22 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 			log.ErrorKey: err,
 		}).Panicf("roomserver output log: write old event failure")
 		return nil
+	}
+
+	if err = s.writeFTS(ev, pduPos); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("failed to index fulltext element")
+	}
+
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":  ev.RoomID(),
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
 	}
 
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
@@ -381,6 +428,13 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 		return
 	}
 
+	// Only notify clients about retired invite events, if the user didn't accept the invite.
+	// The PDU stream will also receive an event about accepting the invitation, so there should
+	// be a "smooth" transition from invite -> join, and not invite -> leave -> join
+	if msg.Membership == gomatrixserverlib.Join {
+		return
+	}
+
 	// Notify any active sync requests that the invite has been retired.
 	s.inviteStream.Advance(pduPos)
 	s.notifier.OnNewInvite(types.StreamingToken{InvitePosition: pduPos}, msg.TargetUserID)
@@ -431,8 +485,15 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	}
 	stateKey := *event.StateKey()
 
-	prevEvent, err := s.db.GetStateEvent(
-		context.TODO(), event.RoomID(), event.Type(), stateKey,
+	snapshot, err := s.db.NewDatabaseSnapshot(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
+	prevEvent, err := snapshot.GetStateEvent(
+		s.ctx, event.RoomID(), event.Type(), stateKey,
 	)
 	if err != nil {
 		return event, err
@@ -449,5 +510,42 @@ func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.Head
 	}
 
 	event.Event, err = event.SetUnsigned(prev)
+	succeeded = true
 	return event, err
+}
+
+func (s *OutputRoomEventConsumer) writeFTS(ev *gomatrixserverlib.HeaderedEvent, pduPosition types.StreamPosition) error {
+	if !s.cfg.Fulltext.Enabled {
+		return nil
+	}
+	e := fulltext.IndexElement{
+		EventID:        ev.EventID(),
+		RoomID:         ev.RoomID(),
+		StreamPosition: int64(pduPosition),
+	}
+	e.SetContentType(ev.Type())
+
+	switch ev.Type() {
+	case "m.room.message":
+		e.Content = gjson.GetBytes(ev.Content(), "body").String()
+	case gomatrixserverlib.MRoomName:
+		e.Content = gjson.GetBytes(ev.Content(), "name").String()
+	case gomatrixserverlib.MRoomTopic:
+		e.Content = gjson.GetBytes(ev.Content(), "topic").String()
+	case gomatrixserverlib.MRoomRedaction:
+		log.Tracef("Redacting event: %s", ev.Redacts())
+		if err := s.fts.Delete(ev.Redacts()); err != nil {
+			return fmt.Errorf("failed to delete entry from fulltext index: %w", err)
+		}
+		return nil
+	default:
+		return nil
+	}
+	if e.Content != "" {
+		log.Tracef("Indexing element: %+v", e)
+		if err := s.fts.Index(e); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -46,14 +46,15 @@ import (
 type UserInternalAPI struct {
 	DB           storage.Database
 	SyncProducer *producers.SyncAPI
+	Config       *config.UserAPI
 
 	DisableTLSValidation bool
-	ServerName           gomatrixserverlib.ServerName
 	// AppServices is the list of all registered AS
 	AppServices []config.ApplicationService
 	KeyAPI      keyapi.UserKeyAPI
 	RSAPI       rsapi.UserRoomserverAPI
 	PgClient    pushgateway.Client
+	Cfg         *config.UserAPI
 }
 
 func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAccountDataRequest, res *api.InputAccountDataResponse) error {
@@ -61,8 +62,8 @@ func (a *UserInternalAPI) InputAccountData(ctx context.Context, req *api.InputAc
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot query profile of remote users: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot update account data of remote users (server name %s)", domain)
 	}
 	if req.DataType == "" {
 		return fmt.Errorf("data type must not be empty")
@@ -103,7 +104,7 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 		logrus.WithError(err).Error("UserInternalAPI.setFullyRead: SplitID failure")
 		return nil
 	}
-	if domain != a.ServerName {
+	if !a.Config.Matrix.IsLocalServerName(domain) {
 		return nil
 	}
 
@@ -130,7 +131,51 @@ func (a *UserInternalAPI) setFullyRead(ctx context.Context, req *api.InputAccoun
 	return nil
 }
 
+func postRegisterJoinRooms(cfg *config.UserAPI, acc *api.Account, rsAPI rsapi.UserRoomserverAPI) {
+	// POST register behaviour: check if the user is a normal user.
+	// If the user is a normal user, add user to room specified in the configuration "auto_join_rooms".
+	if acc.AccountType != api.AccountTypeAppService && acc.AppServiceID == "" {
+		for room := range cfg.AutoJoinRooms {
+			userID := userutil.MakeUserID(acc.Localpart, cfg.Matrix.ServerName)
+			err := addUserToRoom(context.Background(), rsAPI, cfg.AutoJoinRooms[room], acc.Localpart, userID)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"user_id": userID,
+					"room":    cfg.AutoJoinRooms[room],
+				}).WithError(err).Errorf("user failed to auto-join room")
+			}
+		}
+	}
+}
+
+// Add user to a room. This function currently working for auto_join_rooms config,
+// which can add a newly registered user to a specified room.
+func addUserToRoom(
+	ctx context.Context,
+	rsAPI rsapi.UserRoomserverAPI,
+	roomID string,
+	username string,
+	userID string,
+) error {
+	addGroupContent := make(map[string]interface{})
+	// This make sure the user's username can be displayed correctly.
+	// Because the newly-registered user doesn't have an avatar, the avatar_url is not needed.
+	addGroupContent["displayname"] = username
+	joinReq := rsapi.PerformJoinRequest{
+		RoomIDOrAlias: roomID,
+		UserID:        userID,
+		Content:       addGroupContent,
+	}
+	joinRes := rsapi.PerformJoinResponse{}
+	return rsAPI.PerformJoin(ctx, &joinReq, &joinRes)
+}
+
 func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.PerformAccountCreationRequest, res *api.PerformAccountCreationResponse) error {
+	serverName := req.ServerName
+	if serverName == "" {
+		serverName = a.Config.Matrix.ServerName
+	}
+	// XXXX: Use the server name here
 	acc, err := a.DB.CreateAccount(ctx, req.Localpart, req.Password, req.AppServiceID, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
@@ -148,8 +193,8 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		res.Account = &api.Account{
 			AppServiceID: req.AppServiceID,
 			Localpart:    req.Localpart,
-			ServerName:   a.ServerName,
-			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+			ServerName:   serverName,
+			UserID:       fmt.Sprintf("@%s:%s", req.Localpart, serverName),
 			AccountType:  req.AccountType,
 		}
 		return nil
@@ -170,9 +215,11 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 		return nil
 	}
 
-	if err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
+	if _, _, err = a.DB.SetDisplayName(ctx, req.Localpart, req.Localpart); err != nil {
 		return err
 	}
+
+	postRegisterJoinRooms(a.Cfg, acc, a.RSAPI)
 
 	res.AccountCreated = true
 	res.Account = acc
@@ -193,6 +240,12 @@ func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.Pe
 }
 
 func (a *UserInternalAPI) PerformDeviceCreation(ctx context.Context, req *api.PerformDeviceCreationRequest, res *api.PerformDeviceCreationResponse) error {
+	serverName := req.ServerName
+	if serverName == "" {
+		serverName = a.Config.Matrix.ServerName
+	}
+	_ = serverName
+	// XXXX: Use the server name here
 	util.GetLogger(ctx).WithFields(logrus.Fields{
 		"localpart":    req.Localpart,
 		"device_id":    req.DeviceID,
@@ -217,8 +270,8 @@ func (a *UserInternalAPI) PerformDeviceDeletion(ctx context.Context, req *api.Pe
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot PerformDeviceDeletion of remote users: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot PerformDeviceDeletion of remote users (server name %s)", domain)
 	}
 	deletedDeviceIDs := req.DeviceIDs
 	if len(req.DeviceIDs) == 0 {
@@ -350,8 +403,8 @@ func (a *UserInternalAPI) QueryProfile(ctx context.Context, req *api.QueryProfil
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot query profile of remote users: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot query profile of remote users (server name %s)", domain)
 	}
 	prof, err := a.DB.GetProfileByLocalpart(ctx, local)
 	if err != nil {
@@ -401,8 +454,8 @@ func (a *UserInternalAPI) QueryDevices(ctx context.Context, req *api.QueryDevice
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot query devices of remote users: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot query devices of remote users (server name %s)", domain)
 	}
 	devs, err := a.DB.GetDevicesByLocalpart(ctx, local)
 	if err != nil {
@@ -418,8 +471,8 @@ func (a *UserInternalAPI) QueryAccountData(ctx context.Context, req *api.QueryAc
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot query account data of remote users: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot query account data of remote users (server name %s)", domain)
 	}
 	if req.DataType != "" {
 		var data json.RawMessage
@@ -467,9 +520,12 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 		}
 		return err
 	}
-	localPart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localPart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		return err
+	}
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return nil
 	}
 	acc, err := a.DB.GetAccountByLocalpart(ctx, localPart)
 	if err != nil {
@@ -505,7 +561,7 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 		AccountType:  api.AccountTypeAppService,
 	}
 
-	localpart, err := userutil.ParseUsernameParam(appServiceUserID, &a.ServerName)
+	localpart, _, err := userutil.ParseUsernameParam(appServiceUserID, a.Config.Matrix)
 	if err != nil {
 		return nil, err
 	}
@@ -530,8 +586,16 @@ func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appSe
 
 // PerformAccountDeactivation deactivates the user's account, removing all ability for the user to login again.
 func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *api.PerformAccountDeactivationRequest, res *api.PerformAccountDeactivationResponse) error {
+	serverName := req.ServerName
+	if serverName == "" {
+		serverName = a.Config.Matrix.ServerName
+	}
+	if !a.Config.Matrix.IsLocalServerName(serverName) {
+		return fmt.Errorf("server name %q not locally configured", serverName)
+	}
+
 	evacuateReq := &rsapi.PerformAdminEvacuateUserRequest{
-		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),
 	}
 	evacuateRes := &rsapi.PerformAdminEvacuateUserResponse{}
 	if err := a.RSAPI.PerformAdminEvacuateUser(ctx, evacuateReq, evacuateRes); err != nil {
@@ -542,7 +606,7 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 	}
 
 	deviceReq := &api.PerformDeviceDeletionRequest{
-		UserID: fmt.Sprintf("@%s:%s", req.Localpart, a.ServerName),
+		UserID: fmt.Sprintf("@%s:%s", req.Localpart, serverName),
 	}
 	deviceRes := &api.PerformDeviceDeletionResponse{}
 	if err := a.PerformDeviceDeletion(ctx, deviceReq, deviceRes); err != nil {
@@ -796,11 +860,6 @@ func (a *UserInternalAPI) PerformPushRulesPut(
 	if err := a.InputAccountData(ctx, &userReq, &userRes); err != nil {
 		return err
 	}
-	if err := a.SyncProducer.SendAccountData(req.UserID, eventutil.AccountData{
-		Type: pushRulesAccountDataType,
-	}); err != nil {
-		util.GetLogger(ctx).WithError(err).Errorf("syncProducer.SendData failed")
-	}
 	return nil
 }
 
@@ -818,7 +877,10 @@ func (a *UserInternalAPI) QueryPushRules(ctx context.Context, req *api.QueryPush
 }
 
 func (a *UserInternalAPI) SetAvatarURL(ctx context.Context, req *api.PerformSetAvatarURLRequest, res *api.PerformSetAvatarURLResponse) error {
-	return a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	profile, changed, err := a.DB.SetAvatarURL(ctx, req.Localpart, req.AvatarURL)
+	res.Profile = profile
+	res.Changed = changed
+	return err
 }
 
 func (a *UserInternalAPI) QueryNumericLocalpart(ctx context.Context, res *api.QueryNumericLocalpartResponse) error {
@@ -843,6 +905,8 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 		return nil
 	case bcrypt.ErrMismatchedHashAndPassword: // user exists, but password doesn't match
 		return nil
+	case bcrypt.ErrHashTooShort: // user exists, but probably a passwordless account
+		return nil
 	default:
 		res.Exists = true
 		res.Account = acc
@@ -850,8 +914,11 @@ func (a *UserInternalAPI) QueryAccountByPassword(ctx context.Context, req *api.Q
 	}
 }
 
-func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, _ *struct{}) error {
-	return a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+func (a *UserInternalAPI) SetDisplayName(ctx context.Context, req *api.PerformUpdateDisplayNameRequest, res *api.PerformUpdateDisplayNameResponse) error {
+	profile, changed, err := a.DB.SetDisplayName(ctx, req.Localpart, req.DisplayName)
+	res.Profile = profile
+	res.Changed = changed
+	return err
 }
 
 func (a *UserInternalAPI) QueryLocalpartForThreePID(ctx context.Context, req *api.QueryLocalpartForThreePIDRequest, res *api.QueryLocalpartForThreePIDResponse) error {

@@ -24,23 +24,29 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write # To upload Trivy sarif files
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Get release tag
+        uses: actions/checkout@v3
+      - name: Get release tag & build flags
         if: github.event_name == 'release' # Only for GitHub releases
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
+          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
+          [ ${BRANCH} == "main" ] && BRANCH=""
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ env.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
       - name: Login to GitHub Containers
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -49,27 +55,41 @@ jobs:
       - name: Build main monolith image
         if: github.ref_name == 'main'
         id: docker_build_monolith
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          file: ./build/docker/Dockerfile.monolith
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
+          target: monolith
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
             ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-monolith:${{ github.ref_name }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
       - name: Build release monolith image
         if: github.event_name == 'release' # Only for GitHub releases
         id: docker_build_monolith_release
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          file: ./build/docker/Dockerfile.monolith
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
+          target: monolith
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
@@ -84,23 +104,29 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write # To upload Trivy sarif files
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Get release tag
+        uses: actions/checkout@v3
+      - name: Get release tag & build flags
         if: github.event_name == 'release' # Only for GitHub releases
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
+          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
+          [ ${BRANCH} == "main" ] && BRANCH=""
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ env.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
       - name: Login to GitHub Containers
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -109,27 +135,41 @@ jobs:
       - name: Build main polylith image
         if: github.ref_name == 'main'
         id: docker_build_polylith
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          file: ./build/docker/Dockerfile.polylith
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
+          target: polylith
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
             ${{ env.DOCKER_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
             ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-polylith:${{ github.ref_name }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
       - name: Build release polylith image
         if: github.event_name == 'release' # Only for GitHub releases
         id: docker_build_polylith_release
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
-          file: ./build/docker/Dockerfile.polylith
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
+          target: polylith
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
@@ -146,34 +186,40 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Get release tag
+        uses: actions/checkout@v3
+      - name: Get release tag & build flags
         if: github.event_name == 'release' # Only for GitHub releases
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
+          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
+          [ ${BRANCH} == "main" ] && BRANCH=""
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ env.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
       - name: Login to GitHub Containers
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build main pinecone demo image
+      - name: Build main Pinecone demo image
         if: github.ref_name == 'main'
         id: docker_build_demo_pinecone
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           file: ./build/docker/Dockerfile.demo-pinecone
           platforms: ${{ env.PLATFORMS }}
           push: true
@@ -181,19 +227,87 @@ jobs:
             ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-pinecone:${{ github.ref_name }}
             ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-pinecone:${{ github.ref_name }}
 
-      - name: Build release pinecone demo image
+      - name: Build release Pinecone demo image
         if: github.event_name == 'release' # Only for GitHub releases
         id: docker_build_demo_pinecone_release
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           context: .
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
           file: ./build/docker/Dockerfile.demo-pinecone
           platforms: ${{ env.PLATFORMS }}
           push: true
           tags: |
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-pinecone:latest
-            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-pinecone:${{ env.RELEASE_VERSION }}
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-pinecone:latest
-            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-pinecone:${{ env.RELEASE_VERSION }}
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}
+
+  demo-yggdrasil:
+    name: Yggdrasil demo image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Get release tag & build flags
+        if: github.event_name == 'release' # Only for GitHub releases
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
+          BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
+          [ ${BRANCH} == "main" ] && BRANCH=""
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ env.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Login to GitHub Containers
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build main Yggdrasil demo image
+        if: github.ref_name == 'main'
+        id: docker_build_demo_yggdrasil
+        uses: docker/build-push-action@v3
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
+          file: ./build/docker/Dockerfile.demo-yggdrasil
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:${{ github.ref_name }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:${{ github.ref_name }}
+
+      - name: Build release Yggdrasil demo image
+        if: github.event_name == 'release' # Only for GitHub releases
+        id: docker_build_demo_yggdrasil_release
+        uses: docker/build-push-action@v3
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          build-args: FLAGS=-X github.com/matrix-org/dendrite/internal.branch=${{ env.BRANCH }} -X github.com/matrix-org/dendrite/internal.build=${{ env.BUILD }}
+          file: ./build/docker/Dockerfile.demo-yggdrasil
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ${{ env.DOCKER_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:latest
+            ghcr.io/${{ env.GHCR_NAMESPACE }}/dendrite-demo-yggdrasil:${{ env.RELEASE_VERSION }}

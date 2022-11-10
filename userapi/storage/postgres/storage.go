@@ -23,6 +23,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/userapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/userapi/storage/shared"
 
 	// Import the postgres database driver.
@@ -33,6 +34,16 @@ import (
 func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, serverName gomatrixserverlib.ServerName, bcryptCost int, openIDTokenLifetimeMS int64, loginTokenLifetime time.Duration, serverNoticesLocalpart string) (*shared.Database, error) {
 	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter())
 	if err != nil {
+		return nil, err
+	}
+
+	m := sqlutil.NewMigrator(db)
+	m.AddMigrations(sqlutil.Migration{
+		Version: "userapi: rename tables",
+		Up:      deltas.UpRenameTables,
+		Down:    deltas.DownRenameTables,
+	})
+	if err = m.Up(base.Context()); err != nil {
 		return nil, err
 	}
 

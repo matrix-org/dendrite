@@ -22,6 +22,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	fedTypes "github.com/matrix-org/dendrite/federationapi/types"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
@@ -38,7 +39,8 @@ type OutputPresenceConsumer struct {
 	durable                 string
 	db                      storage.Database
 	queues                  *queue.OutgoingQueues
-	ServerName              gomatrixserverlib.ServerName
+	isLocalServerName       func(gomatrixserverlib.ServerName) bool
+	rsAPI                   roomserverAPI.FederationRoomserverAPI
 	topic                   string
 	outboundPresenceEnabled bool
 }
@@ -50,16 +52,18 @@ func NewOutputPresenceConsumer(
 	js nats.JetStreamContext,
 	queues *queue.OutgoingQueues,
 	store storage.Database,
+	rsAPI roomserverAPI.FederationRoomserverAPI,
 ) *OutputPresenceConsumer {
 	return &OutputPresenceConsumer{
 		ctx:                     process.Context(),
 		jetstream:               js,
 		queues:                  queues,
 		db:                      store,
-		ServerName:              cfg.Matrix.ServerName,
+		isLocalServerName:       cfg.Matrix.IsLocalServerName,
 		durable:                 cfg.Matrix.JetStream.Durable("FederationAPIPresenceConsumer"),
 		topic:                   cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		outboundPresenceEnabled: cfg.Matrix.Presence.EnableOutbound,
+		rsAPI:                   rsAPI,
 	}
 }
 
@@ -85,7 +89,17 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		log.WithError(err).WithField("user_id", userID).Error("failed to extract domain from receipt sender")
 		return true
 	}
-	if serverName != t.ServerName {
+	if !t.isLocalServerName(serverName) {
+		return true
+	}
+
+	var queryRes roomserverAPI.QueryRoomsForUserResponse
+	err = t.rsAPI.QueryRoomsForUser(t.ctx, &roomserverAPI.QueryRoomsForUserRequest{
+		UserID:         userID,
+		WantMembership: "join",
+	}, &queryRes)
+	if err != nil {
+		log.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
 	}
 
@@ -96,11 +110,13 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 		return true
 	}
 
-	joined, err := t.db.GetAllJoinedHosts(ctx)
+	// send this presence to all servers who share rooms with this user.
+	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
 		return true
 	}
+
 	if len(joined) == 0 {
 		return true
 	}
@@ -127,7 +143,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MPresence,
-		Origin: string(t.ServerName),
+		Origin: string(serverName),
 	}
 	if edu.Content, err = json.Marshal(content); err != nil {
 		log.WithError(err).Error("failed to marshal EDU JSON")
@@ -135,7 +151,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	log.Tracef("sending presence EDU to %d servers", len(joined))
-	if err = t.queues.SendEDU(edu, t.ServerName, joined); err != nil {
+	if err = t.queues.SendEDU(edu, serverName, joined); err != nil {
 		log.WithError(err).Error("failed to send EDU")
 		return false
 	}

@@ -101,6 +101,11 @@ func (s *OutputRoomEventConsumer) onMessage(
 	log.WithField("appservice", state.ID).Tracef("Appservice worker received %d message(s) from roomserver", len(msgs))
 	events := make([]*gomatrixserverlib.HeaderedEvent, 0, len(msgs))
 	for _, msg := range msgs {
+		// Only handle events we care about
+		receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
+		if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInviteEvent {
+			continue
+		}
 		// Parse out the event JSON
 		var output api.OutputEvent
 		if err := json.Unmarshal(msg.Data, &output); err != nil {

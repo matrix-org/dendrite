@@ -32,6 +32,12 @@ type ClientAPI struct {
 	// Boolean stating whether catpcha registration is enabled
 	// and required
 	RecaptchaEnabled bool `yaml:"enable_registration_captcha"`
+	// Recaptcha api.js Url, for compatible with hcaptcha.com, etc.
+	RecaptchaApiJsUrl string `yaml:"recaptcha_api_js_url"`
+	// Recaptcha div class for sitekey, for compatible with hcaptcha.com, etc.
+	RecaptchaSitekeyClass string `yaml:"recaptcha_sitekey_class"`
+	// Recaptcha form field, for compatible with hcaptcha.com, etc.
+	RecaptchaFormField string `yaml:"recaptcha_form_field"`
 	// This Home Server's ReCAPTCHA public key.
 	RecaptchaPublicKey string `yaml:"recaptcha_public_key"`
 	// This Home Server's ReCAPTCHA private key.
@@ -79,6 +85,18 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
 		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
 		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", c.RecaptchaSiteVerifyAPI)
+		if c.RecaptchaSiteVerifyAPI == "" {
+			c.RecaptchaSiteVerifyAPI = "https://www.google.com/recaptcha/api/siteverify"
+		}
+		if c.RecaptchaApiJsUrl == "" {
+			c.RecaptchaApiJsUrl = "https://www.google.com/recaptcha/api.js"
+		}
+		if c.RecaptchaFormField == "" {
+			c.RecaptchaFormField = "g-recaptcha"
+		}
+		if c.RecaptchaSitekeyClass == "" {
+			c.RecaptchaSitekeyClass = "g-recaptcha-response"
+		}
 	}
 	// Ensure there is any spam counter measure when enabling registration
 	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled {

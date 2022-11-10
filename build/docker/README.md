@@ -9,15 +9,20 @@ They can be found on Docker Hub:
 
 ## Dockerfiles
 
-The `Dockerfile` builds the base image which contains all of the Dendrite
-components. The `Dockerfile.component` file takes the given component, as
-specified with `--buildarg component=` from the base image and produce
-smaller component-specific images, which are substantially smaller and do
-not contain the Go toolchain etc.
+The `Dockerfile` is a multistage file which can build all four Dendrite
+images depending on the supplied `--target`. From the root of the Dendrite
+repository, run:
+
+```
+docker build . --target monolith -t matrixdotorg/dendrite-monolith
+docker build . --target polylith -t matrixdotorg/dendrite-monolith
+docker build . --target demo-pinecone -t matrixdotorg/dendrite-demo-pinecone
+docker build . --target demo-yggdrasil -t matrixdotorg/dendrite-demo-yggdrasil
+```
 
 ## Compose files
 
-There are three sample `docker-compose` files:
+There are two sample `docker-compose` files:
 
 - `docker-compose.monolith.yml` which runs a monolith Dendrite deployment
 - `docker-compose.polylith.yml` which runs a polylith Dendrite deployment

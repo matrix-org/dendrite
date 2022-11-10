@@ -29,13 +29,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/matrix-org/dendrite/userapi/types"
-
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/internal/pushrules"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
+	"github.com/matrix-org/dendrite/userapi/types"
 )
 
 // Database represents an account database
@@ -76,6 +75,9 @@ func (d *Database) GetAccountByPassword(
 	if err != nil {
 		return nil, err
 	}
+	if len(hash) == 0 && len(plaintextPassword) > 0 {
+		return nil, bcrypt.ErrHashTooShort
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plaintextPassword)); err != nil {
 		return nil, err
 	}
@@ -94,20 +96,24 @@ func (d *Database) GetProfileByLocalpart(
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetAvatarURL(
 	ctx context.Context, localpart string, avatarURL string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
+) (profile *authtypes.Profile, changed bool, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		profile, changed, err = d.Profiles.SetAvatarURL(ctx, txn, localpart, avatarURL)
+		return err
 	})
+	return
 }
 
 // SetDisplayName updates the display name of the profile associated with the given
 // localpart. Returns an error if something went wrong with the SQL query
 func (d *Database) SetDisplayName(
 	ctx context.Context, localpart string, displayName string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
+) (profile *authtypes.Profile, changed bool, err error) {
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		profile, changed, err = d.Profiles.SetDisplayName(ctx, txn, localpart, displayName)
+		return err
 	})
+	return
 }
 
 // SetPassword sets the account password to the given hash.
@@ -830,4 +836,16 @@ func (d *Database) RemovePushers(
 // UserStatistics populates types.UserStatistics, used in reports.
 func (d *Database) UserStatistics(ctx context.Context) (*types.UserStatistics, *types.DatabaseEngine, error) {
 	return d.Stats.UserStatistics(ctx, nil)
+}
+
+func (d *Database) UpsertDailyRoomsMessages(ctx context.Context, serverName gomatrixserverlib.ServerName, stats types.MessageStats, activeRooms, activeE2EERooms int64) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Stats.UpsertDailyStats(ctx, txn, serverName, stats, activeRooms, activeE2EERooms)
+	})
+}
+
+func (d *Database) DailyRoomsMessages(
+	ctx context.Context, serverName gomatrixserverlib.ServerName,
+) (stats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
+	return d.Stats.DailyRoomsMessages(ctx, nil, serverName)
 }

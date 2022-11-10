@@ -14,6 +14,9 @@ type Global struct {
 	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 
+	// The secondary server names, used for virtual hosting.
+	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"-"`
+
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
 
@@ -27,7 +30,7 @@ type Global struct {
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
 	// servers that ask for them to help verify old events.
-	OldVerifyKeys []OldVerifyKeys `yaml:"old_private_keys"`
+	OldVerifyKeys []*OldVerifyKeys `yaml:"old_private_keys"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
@@ -120,6 +123,18 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.Cache.Verify(configErrs, isMonolith)
 }
 
+func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool {
+	if c.ServerName == serverName {
+		return true
+	}
+	for _, secondaryName := range c.SecondaryServerNames {
+		if secondaryName == serverName {
+			return true
+		}
+	}
+	return false
+}
+
 type OldVerifyKeys struct {
 	// Path to the private key.
 	PrivateKeyPath Path `yaml:"private_key"`
@@ -127,8 +142,11 @@ type OldVerifyKeys struct {
 	// The private key itself.
 	PrivateKey ed25519.PrivateKey `yaml:"-"`
 
+	// The public key, in case only that part is known.
+	PublicKey gomatrixserverlib.Base64Bytes `yaml:"public_key"`
+
 	// The key ID of the private key.
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
+	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
 
 	// When the private key was designed as "expired", as a UNIX timestamp
 	// in millisecond precision.
@@ -167,7 +185,7 @@ type ServerNotices struct {
 	// The displayname to be used when sending notices
 	DisplayName string `yaml:"display_name"`
 	// The avatar of this user
-	AvatarURL string `yaml:"avatar"`
+	AvatarURL string `yaml:"avatar_url"`
 	// The roomname to be used when creating messages
 	RoomName string `yaml:"room_name"`
 }

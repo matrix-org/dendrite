@@ -29,8 +29,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
 
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -55,6 +56,8 @@ CREATE INDEX IF NOT EXISTS syncapi_output_room_events_type_idx ON syncapi_output
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_sender_idx ON syncapi_output_room_events (sender);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_room_id_idx ON syncapi_output_room_events (room_id);
 CREATE INDEX IF NOT EXISTS syncapi_output_room_events_exclude_from_sync_idx ON syncapi_output_room_events (exclude_from_sync);
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_add_state_ids_idx ON syncapi_output_room_events ((add_state_ids IS NOT NULL));
+CREATE INDEX IF NOT EXISTS syncapi_output_room_events_remove_state_ids_idx ON syncapi_output_room_events ((remove_state_ids IS NOT NULL));
 `
 
 const insertEventSQL = "" +
@@ -115,6 +118,8 @@ const selectContextAfterEventSQL = "" +
 
 // WHEN, ORDER BY and LIMIT are appended by prepareWithFilters
 
+const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE type IN ($1) AND id > $2 LIMIT $3 ORDER BY id ASC"
+
 type outputRoomEventsStatements struct {
 	db                           *sql.DB
 	streamIDStatements           *StreamIDStatements
@@ -125,6 +130,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt       *sql.Stmt
 	selectContextBeforeEventStmt *sql.Stmt
 	selectContextAfterEventStmt  *sql.Stmt
+	//selectSearchStmt             *sql.Stmt - prepared at runtime
 }
 
 func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Events, error) {
@@ -157,15 +163,16 @@ func NewSqliteEventsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Even
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		//{&s.selectSearchStmt, selectSearchSQL}, - prepared at runtime
 	}.Prepare(db)
 }
 
-func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+func (s *outputRoomEventsStatements) UpdateEventJSON(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent) error {
 	headeredJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	_, err = s.updateEventJSONStmt.ExecContext(ctx, headeredJSON, event.EventID())
+	_, err = sqlutil.TxStmt(txn, s.updateEventJSONStmt).ExecContext(ctx, headeredJSON, event.EventID())
 	return err
 }
 
@@ -183,21 +190,36 @@ func (s *outputRoomEventsStatements) SelectStateInRange(
 	for _, roomID := range roomIDs {
 		inputParams = append(inputParams, roomID)
 	}
-	stmt, params, err := prepareWithFilters(
-		s.db, txn, stmtSQL, inputParams,
-		stateFilter.Senders, stateFilter.NotSenders,
-		stateFilter.Types, stateFilter.NotTypes,
-		nil, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderAsc,
+	var (
+		stmt   *sql.Stmt
+		params []any
+		err    error
 	)
+	if stateFilter != nil {
+		stmt, params, err = prepareWithFilters(
+			s.db, txn, stmtSQL, inputParams,
+			stateFilter.Senders, stateFilter.NotSenders,
+			stateFilter.Types, stateFilter.NotTypes,
+			nil, stateFilter.ContainsURL, 0, FilterOrderAsc,
+		)
+	} else {
+		stmt, params, err = prepareWithFilters(
+			s.db, txn, stmtSQL, inputParams,
+			nil, nil,
+			nil, nil,
+			nil, nil, int(r.High()-r.Low()), FilterOrderAsc,
+		)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectStateInRange: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close() // nolint: errcheck
+	defer internal.CloseAndLogIfError(ctx, rows, "selectStateInRange: rows.close() failed")
 	// Fetch all the state change events for all rooms between the two positions then loop each event and:
 	//  - Keep a cache of the event by ID (99% of state change events are for the event itself)
 	//  - For each room ID, build up an array of event IDs which represents cumulative adds/removes
@@ -263,6 +285,7 @@ func (s *outputRoomEventsStatements) SelectMaxEventID(
 ) (id int64, err error) {
 	var nullableID sql.NullInt64
 	stmt := sqlutil.TxStmt(txn, s.selectMaxEventIDStmt)
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectMaxEventID: stmt.close() failed")
 	err = stmt.QueryRowContext(ctx).Scan(&nullableID)
 	if nullableID.Valid {
 		id = nullableID.Int64
@@ -317,6 +340,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 		return 0, err
 	}
 	insertStmt := sqlutil.TxStmt(txn, s.insertEventStmt)
+	defer internal.CloseAndLogIfError(ctx, insertStmt, "InsertEvent: stmt.close() failed")
 	_, err = insertStmt.ExecContext(
 		ctx,
 		streamPos,
@@ -361,6 +385,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	if err != nil {
 		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectRecentEvents: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -409,6 +434,8 @@ func (s *outputRoomEventsStatements) SelectEarlyEvents(
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectEarlyEvents: stmt.close() failed")
+
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
@@ -450,6 +477,8 @@ func (s *outputRoomEventsStatements) SelectEvents(
 	if err != nil {
 		return nil, err
 	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectEvents: stmt.close() failed")
+
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
 		return nil, err
@@ -552,6 +581,10 @@ func (s *outputRoomEventsStatements) SelectContextBeforeEvent(
 		filter.Types, filter.NotTypes,
 		nil, filter.ContainsURL, filter.Limit, FilterOrderDesc,
 	)
+	if err != nil {
+		return
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectContextBeforeEvent: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -590,6 +623,10 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 		filter.Types, filter.NotTypes,
 		nil, filter.ContainsURL, filter.Limit, FilterOrderAsc,
 	)
+	if err != nil {
+		return
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "SelectContextAfterEvent: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -627,4 +664,41 @@ func unmarshalStateIDs(addIDsJSON, delIDsJSON string) (addIDs []string, delIDs [
 		}
 	}
 	return
+}
+
+func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	params := make([]interface{}, len(types))
+	for i := range types {
+		params[i] = types[i]
+	}
+	params = append(params, afterID)
+	params = append(params, limit)
+	selectSQL := strings.Replace(selectSearchSQL, "($1)", sqlutil.QueryVariadic(len(types)), 1)
+
+	stmt, err := s.db.Prepare(selectSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "selectEvents: stmt.close() failed")
+	rows, err := sqlutil.TxStmt(txn, stmt).QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+
+	var eventID string
+	var id int64
+	result := make(map[int64]gomatrixserverlib.HeaderedEvent)
+	for rows.Next() {
+		var ev gomatrixserverlib.HeaderedEvent
+		var eventBytes []byte
+		if err = rows.Scan(&id, &eventID, &eventBytes); err != nil {
+			return nil, err
+		}
+		if err = ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+		result[id] = ev
+	}
+	return result, rows.Err()
 }
