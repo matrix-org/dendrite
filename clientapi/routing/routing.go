@@ -263,13 +263,13 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 
-			isAllowed, _ := authorization.IsAllowed(authz.AuthorizationArgs{
+			isAllowed, err := authorization.IsAllowed(authz.AuthorizationArgs{
 				RoomId:     vars["roomIDOrAlias"],
 				UserId:     device.UserID,
 				Permission: authz.PermissionRead,
 			})
 
-			if !isAllowed {
+			if !isAllowed || err != nil {
 				return util.JSONResponse{
 					Code: http.StatusUnauthorized,
 					JSON: jsonerror.Forbidden("Unauthorised"),

@@ -2,6 +2,7 @@ package zion
 
 import (
 	_ "embed"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/matrix-org/dendrite/authorization"
@@ -17,6 +18,9 @@ var localhostJson []byte
 
 //go:embed contracts/zion_goerli/space-manager.json
 var goerliJson []byte
+
+var ErrSpaceDisabled = errors.New("space disabled")
+var ErrChannelDisabled = errors.New("channel disabled")
 
 type ZionAuthorization struct {
 	store                 StoreAPI
@@ -95,14 +99,58 @@ func (za *ZionAuthorization) IsAllowed(args authorization.AuthorizationArgs) (bo
 
 	switch za.chainId {
 	case 1337, 31337:
+		// Check if space / channel is disabled.
+		disabled, err := za.isSpaceChannelDisabledLocalhost(roomInfo)
+		if disabled {
+			return false, ErrSpaceDisabled
+		} else if err != nil {
+			return false, err
+		}
 		return za.isAllowedLocalhost(roomInfo, userIdentifier.AccountAddress, args.Permission)
 	case 5:
+		// Check if space / channel is disabled.
+		disabled, err := za.isSpaceChannelDisabledGoerli(roomInfo)
+		if disabled {
+			return false, ErrChannelDisabled
+		} else if err != nil {
+			return false, err
+		}
 		return za.isAllowedGoerli(roomInfo, userIdentifier.AccountAddress, args.Permission)
 	default:
 		log.Errorf("Unsupported chain id: %d", userIdentifier.ChainId)
 	}
 
 	return false, nil
+}
+
+func (za *ZionAuthorization) isSpaceChannelDisabledLocalhost(roomInfo RoomInfo) (bool, error) {
+	if za.spaceManagerLocalhost == nil {
+		return false, errors.New("error fetching space manager contract")
+	}
+	switch roomInfo.ChannelNetworkId {
+	case "":
+		spInfo, err := za.spaceManagerLocalhost.GetSpaceInfoBySpaceId(nil, roomInfo.SpaceNetworkId)
+		return spInfo.Disabled, err
+	default:
+		chInfo, err := za.spaceManagerLocalhost.GetChannelInfoByChannelId(nil, roomInfo.SpaceNetworkId, roomInfo.ChannelNetworkId)
+		return chInfo.Disabled, err
+	}
+
+}
+
+func (za *ZionAuthorization) isSpaceChannelDisabledGoerli(roomInfo RoomInfo) (bool, error) {
+	if za.spaceManagerGoerli == nil {
+		return false, errors.New("error fetching space manager contract")
+	}
+	switch roomInfo.ChannelNetworkId {
+	case "":
+		spInfo, err := za.spaceManagerGoerli.GetSpaceInfoBySpaceId(nil, roomInfo.SpaceNetworkId)
+		return spInfo.Disabled, err
+	default:
+		chInfo, err := za.spaceManagerGoerli.GetChannelInfoByChannelId(nil, roomInfo.SpaceNetworkId, roomInfo.ChannelNetworkId)
+		return chInfo.Disabled, err
+	}
+
 }
 
 func (za *ZionAuthorization) isAllowedLocalhost(
