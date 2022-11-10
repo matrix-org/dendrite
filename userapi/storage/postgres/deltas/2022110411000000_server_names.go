@@ -45,19 +45,25 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 			return fmt.Errorf("add server name to %q error: %w", table, err)
 		}
 	}
+	// Commit at this point, because it's possible that altering indices will
+	// fail and force us to roll back.
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("can't commit after column addition: %w", err)
+	}
 	for newTable, oldTable := range serverNamesDropPK {
 		q := fmt.Sprintf(
-			"ALTER TABLE IF EXISTS %s DROP CONSTRAINT %s;",
+			"ALTER TABLE IF EXISTS %s DROP CONSTRAINT IF EXISTS %s;",
 			pq.QuoteIdentifier(newTable), pq.QuoteIdentifier(newTable+"_pkey"),
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
-			q = fmt.Sprintf(
-				"ALTER TABLE IF EXISTS %s DROP CONSTRAINT %s;",
-				pq.QuoteIdentifier(oldTable), pq.QuoteIdentifier(oldTable+"_pkey"),
-			)
-			if _, err := tx.ExecContext(ctx, q); err != nil {
-				return fmt.Errorf("drop PK from %q / %q error: %w", newTable, oldTable, err)
-			}
+			return fmt.Errorf("drop PK from %q error: %w", newTable, err)
+		}
+		q = fmt.Sprintf(
+			"ALTER TABLE IF EXISTS %s DROP CONSTRAINT IF EXISTS %s;",
+			pq.QuoteIdentifier(oldTable), pq.QuoteIdentifier(oldTable+"_pkey"),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("drop PK from %q error: %w", oldTable, err)
 		}
 	}
 	return nil
