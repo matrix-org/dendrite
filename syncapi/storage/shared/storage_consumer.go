@@ -340,7 +340,7 @@ func (d *Database) updateRoomState(
 			}
 		}
 
-		if strings.HasPrefix(event.Type(), "connect.mrd") {
+		if strings.HasPrefix(event.Type(), "connect.multiroom") {
 			err := d.UpdateMultiRoomVisibility(ctx, event)
 			if err != nil {
 				logrus.WithError(err).WithField("event_id", event.EventID()).Error("failed to update multi room visibility")
