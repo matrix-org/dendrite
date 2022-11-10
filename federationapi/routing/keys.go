@@ -176,7 +176,7 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 	}
 
 	keys.Raw, err = gomatrixserverlib.SignJSON(
-		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, toSign,
+		string(serverName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, toSign,
 	)
 	if err != nil {
 		return nil, err
