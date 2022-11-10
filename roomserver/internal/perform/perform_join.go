@@ -271,6 +271,24 @@ func (r *Joiner) performJoinRoomByID(
 		}
 	}
 
+	// If a guest is trying to join a room, check that the room has a m.room.guest_access event
+	if req.IsGuest {
+		guestAccess := "forbidden"
+		guestAccessEvent, err := r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
+		if err == nil && guestAccessEvent != nil {
+			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
+		}
+
+		// Servers MUST only allow guest users to join rooms if the m.room.guest_access state event
+		// is present on the room and has the guest_access value can_join.
+		if guestAccess != "can_join" {
+			return "", "", &rsAPI.PerformError{
+				Code: rsAPI.PerformErrorNotAllowed,
+				Msg:  fmt.Sprintf("Guest access is forbidden"),
+			}
+		}
+	}
+
 	// If we should do a forced federated join then do that.
 	var joinedVia gomatrixserverlib.ServerName
 	if forceFederatedJoin {

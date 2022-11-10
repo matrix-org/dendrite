@@ -762,3 +762,4 @@ AS and main public room lists are separate
 /upgrade preserves direct room state
 local user has tags copied to the new room
 remote user has tags copied to the new room
+Guest users denied access over federation if guest access prohibited
