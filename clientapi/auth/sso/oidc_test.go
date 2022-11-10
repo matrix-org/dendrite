@@ -26,10 +26,10 @@ func TestOIDCIdentityProviderAuthorizationURL(t *testing.T) {
 	defer s.Close()
 
 	idp := newOIDCIdentityProvider(&config.IdentityProvider{
-		OAuth2: config.OAuth2{
-			ClientID: "aclientid",
-		},
 		OIDC: config.OIDC{
+			OAuth2: config.OAuth2{
+				ClientID: "aclientid",
+			},
 			DiscoveryURL: s.URL + "/discovery",
 		},
 	}, s.Client())
@@ -97,10 +97,10 @@ func TestOIDCIdentityProviderProcessCallback(t *testing.T) {
 
 			sURL = s.URL
 			idp := newOIDCIdentityProvider(&config.IdentityProvider{
-				OAuth2: config.OAuth2{
-					ClientID: "aclientid",
-				},
 				OIDC: config.OIDC{
+					OAuth2: config.OAuth2{
+						ClientID: "aclientid",
+					},
 					DiscoveryURL: sURL + "/discovery",
 				},
 			}, s.Client())

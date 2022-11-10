@@ -31,8 +31,9 @@ import (
 )
 
 type oauth2IdentityProvider struct {
-	cfg *config.IdentityProvider
-	hc  *http.Client
+	cfg       *config.IdentityProvider
+	oauth2Cfg *config.OAuth2
+	hc        *http.Client
 
 	authorizationURL string
 	accessTokenURL   string
@@ -48,7 +49,7 @@ type oauth2IdentityProvider struct {
 
 func (p *oauth2IdentityProvider) AuthorizationURL(ctx context.Context, callbackURL, nonce string) (string, error) {
 	u, err := resolveURL(p.authorizationURL, url.Values{
-		"client_id":     []string{p.cfg.OAuth2.ClientID},
+		"client_id":     []string{p.oauth2Cfg.ClientID},
 		"response_type": []string{"code"},
 		"redirect_uri":  []string{callbackURL},
 		"scope":         []string{strings.Join(p.scopes, " ")},
@@ -121,8 +122,8 @@ func (p *oauth2IdentityProvider) getAccessToken(ctx context.Context, callbackURL
 		"grant_type":    []string{"authorization_code"},
 		"code":          []string{code},
 		"redirect_uri":  []string{callbackURL},
-		"client_id":     []string{p.cfg.OAuth2.ClientID},
-		"client_secret": []string{p.cfg.OAuth2.ClientSecret},
+		"client_id":     []string{p.oauth2Cfg.ClientID},
+		"client_secret": []string{p.oauth2Cfg.ClientSecret},
 	}
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, p.accessTokenURL, strings.NewReader(body.Encode()))
 	if err != nil {

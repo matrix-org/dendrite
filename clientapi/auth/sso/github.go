@@ -22,8 +22,9 @@ import (
 
 func newGitHubIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) identityProvider {
 	return &oauth2IdentityProvider{
-		cfg: cfg,
-		hc:  hc,
+		cfg:       cfg,
+		oauth2Cfg: &cfg.OAuth2,
+		hc:        hc,
 
 		authorizationURL: "https://github.com/login/oauth/authorize",
 		accessTokenURL:   "https://github.com/login/oauth/access_token",

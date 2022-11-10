@@ -50,8 +50,9 @@ type oidcIdentityProvider struct {
 func newOIDCIdentityProvider(cfg *config.IdentityProvider, hc *http.Client) *oidcIdentityProvider {
 	return &oidcIdentityProvider{
 		oauth2IdentityProvider: &oauth2IdentityProvider{
-			cfg: cfg,
-			hc:  hc,
+			cfg:       cfg,
+			oauth2Cfg: &cfg.OIDC.OAuth2,
+			hc:        hc,
 
 			scopes:              []string{"openid", "profile", "email"},
 			responseMimeType:    "application/json",

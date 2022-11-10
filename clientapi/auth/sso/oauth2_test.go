@@ -25,6 +25,7 @@ func TestOAuth2IdentityProviderAuthorizationURL(t *testing.T) {
 
 		authorizationURL: "https://oauth2.example.com/authorize",
 	}
+	idp.oauth2Cfg = &idp.cfg.OAuth2
 
 	got, err := idp.AuthorizationURL(ctx, "https://matrix.example.com/continue", "anonce")
 	if err != nil {
@@ -98,6 +99,7 @@ func TestOAuth2IdentityProviderProcessCallback(t *testing.T) {
 				displayNamePath:     "name",
 				suggestedUserIDPath: "preferred_user",
 			}
+			idp.oauth2Cfg = &idp.cfg.OAuth2
 
 			got, err := idp.ProcessCallback(ctx, callbackURL, "anonce", tst.Query)
 			if err != nil {
@@ -145,6 +147,7 @@ func TestOAuth2IdentityProviderGetAccessToken(t *testing.T) {
 
 		accessTokenURL: s.URL + "/token",
 	}
+	idp.oauth2Cfg = &idp.cfg.OAuth2
 
 	got, err := idp.getAccessToken(ctx, callbackURL, "acode")
 	if err != nil {
@@ -198,6 +201,7 @@ func TestOAuth2IdentityProviderGetUserInfo(t *testing.T) {
 		displayNamePath:     "name",
 		suggestedUserIDPath: "preferred_user",
 	}
+	idp.oauth2Cfg = &idp.cfg.OAuth2
 
 	gotSub, gotName, gotSuggestedUser, err := idp.getUserInfo(ctx, "atoken")
 	if err != nil {

@@ -20,10 +20,10 @@ func TestNewAuthenticator(t *testing.T) {
 			},
 			{
 				Type: config.SSOTypeOIDC,
-				OAuth2: config.OAuth2{
-					ClientID: "aclientid",
-				},
 				OIDC: config.OIDC{
+					OAuth2: config.OAuth2{
+						ClientID: "aclientid",
+					},
 					DiscoveryURL: "http://oidc.example.com/discovery",
 				},
 			},
