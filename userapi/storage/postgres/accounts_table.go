@@ -46,11 +46,12 @@ CREATE TABLE IF NOT EXISTS userapi_accounts (
     -- If the account is currently active
     is_deactivated BOOLEAN DEFAULT FALSE,
 	-- The account_type (user = 1, guest = 2, admin = 3, appservice = 4)
-	account_type SMALLINT NOT NULL,
+	account_type SMALLINT NOT NULL
     -- TODO:
     -- upgraded_ts, devices, any email reset stuff?
-	PRIMARY KEY (localpart, server_name)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_accounts_idx ON userapi_accounts(localpart, server_name);
 `
 
 const insertAccountSQL = "" +

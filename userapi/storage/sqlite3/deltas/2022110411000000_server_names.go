@@ -20,6 +20,14 @@ var serverNamesTables = []string{
 	"userapi_threepids",
 }
 
+// These tables have a PRIMARY KEY constraint which we need to drop so
+// that we can recreate a new unique index that contains the server name.
+var serverNamesDropPK = []string{
+	"userapi_accounts",
+	"userapi_account_datas",
+	"userapi_profiles",
+}
+
 // I know what you're thinking: you're wondering "why doesn't this use $1
 // and pass variadic parameters to ExecContext?" — the answer is because
 // PostgreSQL doesn't expect the table name to be specified as a substituted
@@ -41,6 +49,23 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("add server name to %q error: %w", table, err)
+		}
+	}
+	for _, table := range serverNamesDropPK {
+		q := fmt.Sprintf(
+			"SELECT COUNT(name) FROM sqlite_schema WHERE type='table' AND name=%s;",
+			pq.QuoteIdentifier(table),
+		)
+		var c int
+		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 0 {
+			continue
+		}
+		q = fmt.Sprintf(
+			"ALTER TABLE %s DROP PRIMARY KEY;",
+			pq.QuoteIdentifier(table),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("drop PK from %q error: %w", table, err)
 		}
 	}
 	return nil

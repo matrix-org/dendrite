@@ -36,10 +36,10 @@ CREATE TABLE IF NOT EXISTS userapi_account_datas (
     -- The account data type
     type TEXT NOT NULL,
     -- The account data content
-    content TEXT NOT NULL,
-
-    PRIMARY KEY(localpart, server_name, room_id, type)
+    content TEXT NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_account_datas_idx ON userapi_account_datas(localpart, server_name, room_id, type);
 `
 
 const insertAccountDataSQL = `

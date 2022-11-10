@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS userapi_profiles (
     -- The display name for this account
     display_name TEXT,
     -- The URL of the avatar for this account
-    avatar_url TEXT,
-	PRIMARY KEY (localpart, server_name)
+    avatar_url TEXT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_profiles_idx ON userapi_profiles(localpart, server_name);
 `
 
 const insertProfileSQL = "" +
