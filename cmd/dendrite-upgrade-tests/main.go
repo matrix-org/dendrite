@@ -367,7 +367,8 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	// hit /versions to check it is up
 	var lastErr error
 	for i := 0; i < 500; i++ {
-		res, err := http.Get(versionsURL)
+		var res *http.Response
+		res, err = http.Get(versionsURL)
 		if err != nil {
 			lastErr = fmt.Errorf("GET %s => error: %s", versionsURL, err)
 			time.Sleep(50 * time.Millisecond)
