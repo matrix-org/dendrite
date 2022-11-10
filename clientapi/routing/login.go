@@ -100,6 +100,7 @@ func completeAuth(
 		DeviceID:          login.DeviceID,
 		AccessToken:       token,
 		Localpart:         localpart,
+		ServerName:        serverName,
 		IPAddr:            ipAddr,
 		UserAgent:         userAgent,
 	}, &performRes)
