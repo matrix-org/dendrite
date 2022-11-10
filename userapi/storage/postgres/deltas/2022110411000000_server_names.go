@@ -51,14 +51,14 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 			pq.QuoteIdentifier(newTable), pq.QuoteIdentifier(newTable+"_pkey"),
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("drop PK from %q error: %w", newTable, err)
+			return fmt.Errorf("drop new PK from %q error: %w", newTable, err)
 		}
 		q = fmt.Sprintf(
 			"ALTER TABLE IF EXISTS %s DROP CONSTRAINT IF EXISTS %s;",
-			pq.QuoteIdentifier(oldTable), pq.QuoteIdentifier(oldTable+"_pkey"),
+			pq.QuoteIdentifier(newTable), pq.QuoteIdentifier(oldTable+"_pkey"),
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("drop PK from %q error: %w", oldTable, err)
+			return fmt.Errorf("drop old PK from %q error: %w", newTable, err)
 		}
 	}
 	return nil
