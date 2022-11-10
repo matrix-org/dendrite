@@ -122,7 +122,7 @@ jobs:
           key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go${{ matrix.go }}-test-
-      - run: go test -json -v -covermode=atomic -coverprofile=coverage.txt ./... 2>&1 | gotestfmt
+      - run: go test -json -v -covermode=atomic -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
