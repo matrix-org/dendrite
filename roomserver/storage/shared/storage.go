@@ -110,6 +110,19 @@ func (d *Database) eventStateKeyNIDs(
 	for eventStateKey, nid := range nids {
 		result[eventStateKey] = nid
 	}
+	// We received some nids, but are still missing some, work out which and create them
+	if len(eventStateKeys) < len(result) {
+		for _, eventStateKey := range eventStateKeys {
+			if _, ok := result[eventStateKey]; ok {
+				continue
+			}
+			nid, err := d.assignStateKeyNID(ctx, txn, eventStateKey)
+			if err != nil {
+				return result, err
+			}
+			result[eventStateKey] = nid
+		}
+	}
 	return result, nil
 }
 
@@ -1243,7 +1256,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 
 	}
 
-	eventStateKeyNIDMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, eventStateKeys)
+	eventStateKeyNIDMap, err := d.eventStateKeyNIDs(ctx, nil, eventStateKeys)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to map state key nids: %w", err)
 	}
@@ -1309,7 +1322,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	if err != nil {
 		return nil, err
 	}
-	userNIDsMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, userIDs)
+	userNIDsMap, err := d.eventStateKeyNIDs(ctx, nil, userIDs)
 	if err != nil {
 		return nil, err
 	}
