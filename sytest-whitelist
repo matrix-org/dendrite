@@ -763,3 +763,5 @@ AS and main public room lists are separate
 local user has tags copied to the new room
 remote user has tags copied to the new room
 Guest users denied access over federation if guest access prohibited
+Guest users are kicked from guest_access rooms on revocation of guest_access
+Guest users are kicked from guest_access rooms on revocation of guest_access over federation
