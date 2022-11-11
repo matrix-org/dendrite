@@ -27,6 +27,11 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
+type transactionEntry struct {
+	transaction gomatrixserverlib.Transaction
+	userID      []gomatrixserverlib.UserID
+}
+
 type Database struct {
 	DB                       *sql.DB
 	IsLocalServerName        func(gomatrixserverlib.ServerName) bool
@@ -42,6 +47,7 @@ type Database struct {
 	NotaryServerKeysJSON     tables.FederationNotaryServerKeysJSON
 	NotaryServerKeysMetadata tables.FederationNotaryServerKeysMetadata
 	ServerSigningKeys        tables.FederationServerSigningKeys
+	transactionDB            map[Receipt]transactionEntry
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -256,4 +262,43 @@ func (d *Database) GetNotaryKeys(
 		return err
 	})
 	return sks, err
+}
+
+func (d *Database) AssociateAsyncTransactionWithDestinations(
+	ctx context.Context,
+	destinations map[gomatrixserverlib.UserID]struct{},
+	receipt *Receipt,
+) error {
+	if transaction, ok := d.transactionDB[*receipt]; ok {
+		for k := range destinations {
+			transaction.userID = append(transaction.userID, k)
+		}
+		d.transactionDB[*receipt] = transaction
+	} else {
+		return fmt.Errorf("No transactions exist with that NID")
+	}
+
+	return nil
+}
+
+func (d *Database) GetAsyncTransaction(
+	ctx context.Context,
+	userID gomatrixserverlib.UserID,
+) (gomatrixserverlib.Transaction, error) {
+	return gomatrixserverlib.Transaction{}, nil
+}
+
+func (d *Database) GetAsyncTransactionCount(
+	ctx context.Context,
+	userID gomatrixserverlib.UserID,
+) (int64, error) {
+	count := int64(0)
+	for _, transaction := range d.transactionDB {
+		for _, user := range transaction.userID {
+			if user == userID {
+				count++
+			}
+		}
+	}
+	return count, nil
 }
