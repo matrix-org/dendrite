@@ -16,6 +16,7 @@ package perform
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -276,7 +277,10 @@ func (r *Joiner) performJoinRoomByID(
 		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
 		guestAccess := "forbidden"
 		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
-		if err == nil && guestAccessEvent != nil {
+		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
+			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
+		}
+		if guestAccessEvent != nil {
 			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
 		}
 
