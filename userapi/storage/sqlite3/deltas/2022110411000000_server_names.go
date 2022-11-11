@@ -45,15 +45,21 @@ var serverNamesDropIndex = []string{
 func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib.ServerName) error {
 	for _, table := range serverNamesTables {
 		q := fmt.Sprintf(
-			"SELECT COUNT(*) FROM pragma_table_info(%s) WHERE name='server_name'",
+			"SELECT COUNT(name) FROM sqlite_schema WHERE type='table' AND name=%s;",
 			pq.QuoteIdentifier(table),
 		)
 		var c int
+		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 0 {
+			continue
+		}
+		q = fmt.Sprintf(
+			"SELECT COUNT(*) FROM pragma_table_info(%s) WHERE name='server_name'",
+			pq.QuoteIdentifier(table),
+		)
 		if err := tx.QueryRowContext(ctx, q).Scan(&c); err != nil || c == 1 {
 			logrus.Infof("Table %s already has column, skipping", table)
 			continue
 		}
-		logrus.Infof("Table %s add column", table)
 		if c == 0 {
 			q = fmt.Sprintf(
 				"ALTER TABLE %s ADD COLUMN server_name TEXT NOT NULL DEFAULT '';",
