@@ -22,9 +22,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/tidwall/gjson"
-	"time"
 
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"

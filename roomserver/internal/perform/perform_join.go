@@ -273,8 +273,9 @@ func (r *Joiner) performJoinRoomByID(
 
 	// If a guest is trying to join a room, check that the room has a m.room.guest_access event
 	if req.IsGuest {
+		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
 		guestAccess := "forbidden"
-		guestAccessEvent, err := r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
+		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
 		if err == nil && guestAccessEvent != nil {
 			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
 		}
@@ -284,7 +285,7 @@ func (r *Joiner) performJoinRoomByID(
 		if guestAccess != "can_join" {
 			return "", "", &rsAPI.PerformError{
 				Code: rsAPI.PerformErrorNotAllowed,
-				Msg:  fmt.Sprintf("Guest access is forbidden"),
+				Msg:  "Guest access is forbidden",
 			}
 		}
 	}
