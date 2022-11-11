@@ -30,6 +30,13 @@ var serverNamesDropPK = map[string]string{
 	"userapi_profiles":      "account_profiles",
 }
 
+// These indices are out of date so let's drop them. They will get recreated
+// automatically.
+var serverNamesDropIndex = []string{
+	"userapi_pusher_localpart_idx",
+	"userapi_pusher_app_id_pushkey_localpart_idx",
+}
+
 // I know what you're thinking: you're wondering "why doesn't this use $1
 // and pass variadic parameters to ExecContext?" — the answer is because
 // PostgreSQL doesn't expect the table name to be specified as a substituted
@@ -59,6 +66,15 @@ func UpServerNames(ctx context.Context, tx *sql.Tx, serverName gomatrixserverlib
 		)
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("drop old PK from %q error: %w", newTable, err)
+		}
+	}
+	for _, index := range serverNamesDropIndex {
+		q := fmt.Sprintf(
+			"DROP INDEX IF EXISTS %s;",
+			pq.QuoteIdentifier(index),
+		)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("drop index %q error: %w", index, err)
 		}
 	}
 	return nil
