@@ -50,6 +50,7 @@ type KeyserverUserAPI interface {
 
 type RoomserverUserAPI interface {
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
 // api functions required by the media api
@@ -653,4 +654,12 @@ type PerformForgetThreePIDRequest QueryLocalpartForThreePIDRequest
 
 type PerformSaveThreePIDAssociationRequest struct {
 	ThreePID, Localpart, Medium string
+}
+
+type QueryAccountByLocalpartRequest struct {
+	Localpart string
+}
+
+type QueryAccountByLocalpartResponse struct {
+	Account *Account
 }

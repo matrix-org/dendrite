@@ -60,6 +60,7 @@ const (
 	QueryAccountByPasswordPath     = "/userapi/queryAccountByPassword"
 	QueryLocalpartForThreePIDPath  = "/userapi/queryLocalpartForThreePID"
 	QueryThreePIDsForLocalpartPath = "/userapi/queryThreePIDsForLocalpart"
+	QueryAccountByLocalpartPath    = "/userapi/queryAccountType"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -437,5 +438,16 @@ func (h *httpUserInternalAPI) PerformSaveThreePIDAssociation(
 	return httputil.CallInternalRPCAPI(
 		"PerformSaveThreePIDAssociation", h.apiURL+PerformSaveThreePIDAssociationPath,
 		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpUserInternalAPI) QueryAccountByLocalpart(
+	ctx context.Context,
+	req *api.QueryAccountByLocalpartRequest,
+	res *api.QueryAccountByLocalpartResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryAccountByLocalpart", h.apiURL+QueryAccountByLocalpartPath,
+		h.httpClient, ctx, req, res,
 	)
 }
