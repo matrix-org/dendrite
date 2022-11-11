@@ -15,7 +15,7 @@ type Global struct {
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 
 	// The secondary server names, used for virtual hosting.
-	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"-"`
+	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"secondary_server_names"`
 
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`

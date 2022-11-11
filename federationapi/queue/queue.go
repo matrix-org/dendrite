@@ -46,7 +46,7 @@ type OutgoingQueues struct {
 	origin      gomatrixserverlib.ServerName
 	client      fedapi.FederationClient
 	statistics  *statistics.Statistics
-	signing     *SigningInfo
+	signing     map[gomatrixserverlib.ServerName]*SigningInfo
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
@@ -91,7 +91,7 @@ func NewOutgoingQueues(
 	client fedapi.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
-	signing *SigningInfo,
+	signing map[gomatrixserverlib.ServerName]*SigningInfo,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
@@ -199,11 +199,10 @@ func (oqs *OutgoingQueues) SendEvent(
 		log.Trace("Federation is disabled, not sending event")
 		return nil
 	}
-	if origin != oqs.origin {
-		// TODO: Support virtual hosting; gh issue #577.
+	if _, ok := oqs.signing[origin]; !ok {
 		return fmt.Errorf(
-			"sendevent: unexpected server to send as: got %q expected %q",
-			origin, oqs.origin,
+			"sendevent: unexpected server to send as %q",
+			origin,
 		)
 	}
 
@@ -214,7 +213,9 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
-	delete(destmap, oqs.signing.ServerName)
+	for local := range oqs.signing {
+		delete(destmap, local)
+	}
 
 	// Check if any of the destinations are prohibited by server ACLs.
 	for destination := range destmap {
@@ -288,11 +289,10 @@ func (oqs *OutgoingQueues) SendEDU(
 		log.Trace("Federation is disabled, not sending EDU")
 		return nil
 	}
-	if origin != oqs.origin {
-		// TODO: Support virtual hosting; gh issue #577.
+	if _, ok := oqs.signing[origin]; !ok {
 		return fmt.Errorf(
-			"sendevent: unexpected server to send as: got %q expected %q",
-			origin, oqs.origin,
+			"sendevent: unexpected server to send as %q",
+			origin,
 		)
 	}
 
@@ -303,7 +303,9 @@ func (oqs *OutgoingQueues) SendEDU(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
-	delete(destmap, oqs.signing.ServerName)
+	for local := range oqs.signing {
+		delete(destmap, local)
+	}
 
 	// There is absolutely no guarantee that the EDU will have a room_id
 	// field, as it is not required by the spec. However, if it *does*

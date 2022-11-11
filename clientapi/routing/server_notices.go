@@ -286,6 +286,7 @@ func getSenderDevice(
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeUser,
 		Localpart:   cfg.Matrix.ServerNotices.LocalPart,
+		ServerName:  cfg.Matrix.ServerName,
 		OnConflict:  userapi.ConflictUpdate,
 	}, &accRes)
 	if err != nil {
@@ -295,8 +296,9 @@ func getSenderDevice(
 	// Set the avatarurl for the user
 	avatarRes := &userapi.PerformSetAvatarURLResponse{}
 	if err = userAPI.SetAvatarURL(ctx, &userapi.PerformSetAvatarURLRequest{
-		Localpart: cfg.Matrix.ServerNotices.LocalPart,
-		AvatarURL: cfg.Matrix.ServerNotices.AvatarURL,
+		Localpart:  cfg.Matrix.ServerNotices.LocalPart,
+		ServerName: cfg.Matrix.ServerName,
+		AvatarURL:  cfg.Matrix.ServerNotices.AvatarURL,
 	}, avatarRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetAvatarURL failed")
 		return nil, err
@@ -308,6 +310,7 @@ func getSenderDevice(
 	displayNameRes := &userapi.PerformUpdateDisplayNameResponse{}
 	if err = userAPI.SetDisplayName(ctx, &userapi.PerformUpdateDisplayNameRequest{
 		Localpart:   cfg.Matrix.ServerNotices.LocalPart,
+		ServerName:  cfg.Matrix.ServerName,
 		DisplayName: cfg.Matrix.ServerNotices.DisplayName,
 	}, displayNameRes); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("userAPI.SetDisplayName failed")
@@ -353,6 +356,7 @@ func getSenderDevice(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		Localpart:          cfg.Matrix.ServerNotices.LocalPart,
+		ServerName:         cfg.Matrix.ServerName,
 		DeviceDisplayName:  &cfg.Matrix.ServerNotices.LocalPart,
 		AccessToken:        token,
 		NoDeviceListUpdate: true,
