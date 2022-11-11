@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -87,6 +89,7 @@ type Inputer struct {
 	workers             sync.Map // room ID -> *worker
 
 	Queryer *query.Queryer
+	UserAPI userapi.RoomserverUserAPI
 }
 
 // If a room consumer is inactive for a while then we will allow NATS
