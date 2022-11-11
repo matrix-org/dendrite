@@ -175,6 +175,9 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 	if serverName == "" {
 		serverName = a.Config.Matrix.ServerName
 	}
+	if !a.Config.Matrix.IsLocalServerName(serverName) {
+		return fmt.Errorf("server name %s is not local", serverName)
+	}
 	acc, err := a.DB.CreateAccount(ctx, req.Localpart, serverName, req.Password, req.AppServiceID, req.AccountType)
 	if err != nil {
 		if errors.Is(err, sqlutil.ErrUserExists) { // This account already exists
@@ -226,6 +229,9 @@ func (a *UserInternalAPI) PerformAccountCreation(ctx context.Context, req *api.P
 }
 
 func (a *UserInternalAPI) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
+	if !a.Config.Matrix.IsLocalServerName(req.ServerName) {
+		return fmt.Errorf("server name %s is not local", req.ServerName)
+	}
 	if err := a.DB.SetPassword(ctx, req.Localpart, req.ServerName, req.Password); err != nil {
 		return err
 	}
@@ -354,6 +360,9 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return err
 	}
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("server name %s is not local", domain)
+	}
 	dev, err := a.DB.GetDeviceByID(ctx, localpart, domain, req.DeviceID)
 	if err == sql.ErrNoRows {
 		res.DeviceExists = false
@@ -361,9 +370,6 @@ func (a *UserInternalAPI) PerformDeviceUpdate(ctx context.Context, req *api.Perf
 	} else if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("deviceDB.GetDeviceByID failed")
 		return err
-	}
-	if !a.Config.Matrix.IsLocalServerName(domain) {
-		return fmt.Errorf("server name %s is not local", domain)
 	}
 	res.DeviceExists = true
 
