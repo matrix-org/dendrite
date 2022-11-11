@@ -110,6 +110,19 @@ func (d *Database) eventStateKeyNIDs(
 	for eventStateKey, nid := range nids {
 		result[eventStateKey] = nid
 	}
+	// We received some nids, but are still missing some, work out which and create them
+	if len(eventStateKeys) < len(result) {
+		for _, eventStateKey := range eventStateKeys {
+			if _, ok := result[eventStateKey]; ok {
+				continue
+			}
+			nid, err := d.assignStateKeyNID(ctx, txn, eventStateKey)
+			if err != nil {
+				return result, err
+			}
+			result[eventStateKey] = nid
+		}
+	}
 	return result, nil
 }
 
