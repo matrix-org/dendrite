@@ -231,8 +231,10 @@ jobs:
             ${{ runner.os }}-go-upgrade
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade
+      - name: Test upgrade (PostgreSQL)
         run: ./dendrite-upgrade-tests --head .
+      - name: Test upgrade (SQLite)
+        run: ./dendrite-upgrade-tests --sqlite --head .
 
   # run database upgrade tests, skipping over one version
   upgrade_test_direct:
@@ -256,7 +258,9 @@ jobs:
             ${{ runner.os }}-go-upgrade
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade
+      - name: Test upgrade (PostgreSQL)
+        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
+      - name: Test upgrade (SQLite)
         run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
 
   # run Sytest in different variations
@@ -434,7 +438,7 @@ jobs:
     permissions:
       packages: write
       contents: read
-      security-events: write   # To upload Trivy sarif files
+      security-events: write # To upload Trivy sarif files
     if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
     needs: [integration-tests-done]
     uses: matrix-org/dendrite/.github/workflows/docker.yml@main
