@@ -53,10 +53,10 @@ func NewInternalAPI(
 		DB:        db,
 	}
 	ap := &internal.KeyInternalAPI{
-		DB:         db,
-		ThisServer: cfg.Matrix.ServerName,
-		FedClient:  fedClient,
-		Producer:   keyChangeProducer,
+		DB:        db,
+		Cfg:       cfg,
+		FedClient: fedClient,
+		Producer:  keyChangeProducer,
 	}
 	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
 	ap.Updater = updater
