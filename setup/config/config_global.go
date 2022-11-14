@@ -16,7 +16,7 @@ type Global struct {
 	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
 
 	// The secondary server names, used for virtual hosting.
-	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"secondary_server_names"`
+	VirtualHosts []*VirtualHost `yaml:"virtual_hosts"`
 
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
@@ -128,8 +128,8 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 	if c.ServerName == serverName {
 		return true
 	}
-	for _, secondaryName := range c.SecondaryServerNames {
-		if secondaryName == serverName {
+	for _, v := range c.VirtualHosts {
+		if v.ServerName == serverName {
 			return true
 		}
 	}
@@ -148,20 +148,47 @@ func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.
 }
 
 func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
-	identities := make([]*gomatrixserverlib.SigningIdentity, 0, len(c.SecondaryServerNames)+1)
+	identities := make([]*gomatrixserverlib.SigningIdentity, 0, len(c.VirtualHosts)+1)
 	identities = append(identities, &gomatrixserverlib.SigningIdentity{
 		ServerName: c.ServerName,
 		KeyID:      c.KeyID,
 		PrivateKey: c.PrivateKey,
 	})
-	for _, serverName := range c.SecondaryServerNames {
-		identities = append(identities, &gomatrixserverlib.SigningIdentity{
-			ServerName: serverName,
-			KeyID:      c.KeyID,
-			PrivateKey: c.PrivateKey,
-		})
+	for _, v := range c.VirtualHosts {
+		identities = append(identities, v.SigningIdentity())
 	}
 	return identities
+}
+
+type VirtualHost struct {
+	// The server name of the virtual host.
+	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+
+	// The key ID of the private key. If not specified, the default global key ID
+	// will be used instead.
+	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
+
+	// Path to the private key. If not specified, the default global private key
+	// will be used instead.
+	PrivateKeyPath Path `yaml:"private_key"`
+
+	// The private key itself.
+	PrivateKey ed25519.PrivateKey `yaml:"-"`
+
+	// How long a remote server can cache our server key for before requesting it again.
+	// Increasing this number will reduce the number of requests made by remote servers
+	// for our key, but increases the period a compromised key will be considered valid
+	// by remote servers.
+	// Defaults to 24 hours.
+	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+}
+
+func (v *VirtualHost) SigningIdentity() *gomatrixserverlib.SigningIdentity {
+	return &gomatrixserverlib.SigningIdentity{
+		ServerName: v.ServerName,
+		KeyID:      v.KeyID,
+		PrivateKey: v.PrivateKey,
+	}
 }
 
 type OldVerifyKeys struct {

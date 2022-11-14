@@ -350,8 +350,8 @@ func testSetup(failuresUntilBlacklist uint32, shouldTxSucceed bool, t *testing.T
 	}
 	rs := &stubFederationRoomServerAPI{}
 	stats := statistics.NewStatistics(db, failuresUntilBlacklist)
-	signingInfo := map[gomatrixserverlib.ServerName]*SigningInfo{
-		"localhost": {
+	signingInfo := []*gomatrixserverlib.SigningIdentity{
+		{
 			KeyID:      "ed21019:auto",
 			PrivateKey: test.PrivateKeyA,
 			ServerName: "localhost",

@@ -364,19 +364,7 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
-	identities := make([]*gomatrixserverlib.SigningIdentity, 0, 1+len(b.Cfg.Global.SecondaryServerNames))
-	identities = append(identities, &gomatrixserverlib.SigningIdentity{
-		ServerName: b.Cfg.Global.ServerName,
-		KeyID:      b.Cfg.Global.KeyID,
-		PrivateKey: b.Cfg.Global.PrivateKey,
-	})
-	for _, serverName := range b.Cfg.Global.SecondaryServerNames {
-		identities = append(identities, &gomatrixserverlib.SigningIdentity{
-			ServerName: serverName,
-			KeyID:      b.Cfg.Global.KeyID,      // TODO: Per-virtual host key
-			PrivateKey: b.Cfg.Global.PrivateKey, // TODO: Per-virtual host key
-		})
-	}
+	identities := b.Cfg.Global.SigningIdentities()
 	if b.Cfg.Global.DisableFederation {
 		return gomatrixserverlib.NewFederationClient(
 			identities, gomatrixserverlib.WithTransport(noOpHTTPTransport),

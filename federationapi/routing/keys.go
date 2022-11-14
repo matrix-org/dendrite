@@ -136,38 +136,56 @@ func ClaimOneTimeKeys(
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
 func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) util.JSONResponse {
-	keys, err := localKeys(cfg, serverName, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
+	keys, err := localKeys(cfg, serverName)
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
-func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 	if !cfg.Matrix.IsLocalServerName(serverName) {
 		return nil, fmt.Errorf("server name not known")
 	}
 
-	keys.ServerName = serverName
-	keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(validUntil)
-
-	publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
-
-	keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
-		cfg.Matrix.KeyID: {
-			Key: gomatrixserverlib.Base64Bytes(publicKey),
-		},
+	var virtualHost *config.VirtualHost
+	for _, v := range cfg.Matrix.VirtualHosts {
+		if v.ServerName != serverName {
+			continue
+		}
+		virtualHost = v
 	}
 
-	keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
-	for _, oldVerifyKey := range cfg.Matrix.OldVerifyKeys {
-		keys.OldVerifyKeys[oldVerifyKey.KeyID] = gomatrixserverlib.OldVerifyKey{
-			VerifyKey: gomatrixserverlib.VerifyKey{
-				Key: oldVerifyKey.PublicKey,
+	if virtualHost == nil {
+		publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
+		keys.ServerName = cfg.Matrix.ServerName
+		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
+		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
+			cfg.Matrix.KeyID: {
+				Key: gomatrixserverlib.Base64Bytes(publicKey),
 			},
-			ExpiredTS: oldVerifyKey.ExpiredAt,
 		}
+		keys.OldVerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.OldVerifyKey{}
+		for _, oldVerifyKey := range cfg.Matrix.OldVerifyKeys {
+			keys.OldVerifyKeys[oldVerifyKey.KeyID] = gomatrixserverlib.OldVerifyKey{
+				VerifyKey: gomatrixserverlib.VerifyKey{
+					Key: oldVerifyKey.PublicKey,
+				},
+				ExpiredTS: oldVerifyKey.ExpiredAt,
+			}
+		}
+	} else {
+		publicKey := virtualHost.PrivateKey.Public().(ed25519.PublicKey)
+		keys.ServerName = virtualHost.ServerName
+		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(virtualHost.KeyValidityPeriod))
+		keys.VerifyKeys = map[gomatrixserverlib.KeyID]gomatrixserverlib.VerifyKey{
+			virtualHost.KeyID: {
+				Key: gomatrixserverlib.Base64Bytes(publicKey),
+			},
+		}
+		// TODO: Virtual hosts probably want to be able to specify old signing
+		// keys too, just in case
 	}
 
 	toSign, err := json.Marshal(keys.ServerKeyFields)
@@ -213,7 +231,7 @@ func NotaryKeys(
 	for serverName, kidToCriteria := range req.ServerKeys {
 		var keyList []gomatrixserverlib.ServerKeys
 		if serverName == cfg.Matrix.ServerName {
-			if k, err := localKeys(cfg, serverName, time.Now().Add(cfg.Matrix.KeyValidityPeriod)); err == nil {
+			if k, err := localKeys(cfg, serverName); err == nil {
 				keyList = append(keyList, *k)
 			} else {
 				return util.ErrorResponse(err)
