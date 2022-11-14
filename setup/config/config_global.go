@@ -185,6 +185,9 @@ type VirtualHost struct {
 	// by remote servers.
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+
+	// Is registration enabled on this virtual host?
+	AllowRegistration bool `json:"allow_registration"`
 }
 
 func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
