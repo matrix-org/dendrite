@@ -365,7 +365,7 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 	if membership == gomatrixserverlib.Join {
 		// check it's a local join
 		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
-			return sp, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+			return sp, nil
 		}
 
 		// cancel any peeks for it
