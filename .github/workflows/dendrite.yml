@@ -26,22 +26,14 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.18
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-wasm-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-wasm
+          cache: true
 
       - name: Install Node
         uses: actions/setup-node@v2
         with:
           node-version: 14
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -109,19 +101,12 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
+          cache: true
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-test-
       - run: go test -json -v ./... 2>&1 | gotestfmt
         env:
           POSTGRES_HOST: localhost
@@ -146,17 +131,17 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
-      - name: Install dependencies x86
-        if: ${{ matrix.goarch == '386' }}
-        run: sudo apt update && sudo apt-get install -y gcc-multilib
       - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goarch }}-
+            key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-
+      - name: Install dependencies x86
+        if: ${{ matrix.goarch == '386' }}
+        run: sudo apt update && sudo apt-get install -y gcc-multilib
       - env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -180,16 +165,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
-      - name: Install dependencies
-        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
       - uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-${{ matrix.goos }}
+            key: ${{ runner.os }}-go${{ matrix.go }}${{ matrix.goos }}-${{ matrix.goarch }}-
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y gcc-mingw-w64-x86-64 # install required gcc
       - env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -221,14 +206,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: "1.18"
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-upgrade
+          cache: true
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade (PostgreSQL)
@@ -248,14 +226,7 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: "1.18"
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-upgrade-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-upgrade
+          cache: true
       - name: Build upgrade-tests
         run: go build ./cmd/dendrite-upgrade-tests
       - name: Test upgrade (PostgreSQL)
@@ -295,6 +266,8 @@ jobs:
       image: matrixdotorg/sytest-dendrite:latest
       volumes:
         - ${{ github.workspace }}:/src
+        - /root/.cache/go-build:/github/home/.cache/go-build
+        - /root/.cache/go-mod:/gopath/pkg/mod
       env:
         POSTGRES: ${{ matrix.postgres && 1}}
         API: ${{ matrix.api && 1 }}
@@ -302,6 +275,14 @@ jobs:
         CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            /gopath/pkg/mod
+          key: ${{ runner.os }}-go-sytest-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-sytest-
       - name: Run Sytest
         run: /bootstrap.sh dendrite
         working-directory: /src
@@ -336,12 +317,14 @@ jobs:
       matrix:
         include:
           - label: SQLite native
+            cgo: 0
 
           - label: SQLite Cgo
             cgo: 1
 
           - label: SQLite native, full HTTP APIs
             api: full-http
+            cgo: 0
 
           - label: SQLite Cgo, full HTTP APIs
             api: full-http
@@ -349,10 +332,12 @@ jobs:
 
           - label: PostgreSQL
             postgres: Postgres
+            cgo: 0
 
           - label: PostgreSQL, full HTTP APIs
             postgres: Postgres
             api: full-http
+            cgo: 0
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
       # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
@@ -360,14 +345,12 @@ jobs:
         run: |
           echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
           echo "~/go/bin" >> $GITHUB_PATH
-
       - name: "Install Complement Dependencies"
         # We don't need to install Go because it is included on the Ubuntu 20.04 image:
         # See https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md specifically GOROOT_1_17_X64
         run: |
           sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
           go get -v github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
-
       - name: Run actions/checkout@v3 for dendrite
         uses: actions/checkout@v3
         with:
@@ -393,12 +376,10 @@ jobs:
             if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
               continue
             fi
-
             (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
-
       # Build initial Dendrite image
-      - run: docker build -t complement-dendrite -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
+      - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
         working-directory: dendrite
         env:
           DOCKER_BUILDKIT: 1
@@ -410,9 +391,8 @@ jobs:
         shell: bash
         name: Run Complement Tests
         env:
-          COMPLEMENT_BASE_IMAGE: complement-dendrite:latest
+          COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }}
           API: ${{ matrix.api && 1 }}
-          CGO_ENABLED: ${{ matrix.cgo && 1 }}
         working-directory: complement
 
   integration-tests-done:
