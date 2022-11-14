@@ -147,7 +147,8 @@ func processInvite(
 		}
 	}
 
-	if _, domain, err := cfg.Matrix.SplitLocalID('@', *event.StateKey()); err != nil {
+	_, domain, err := cfg.Matrix.SplitLocalID('@', *event.StateKey())
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
@@ -189,7 +190,7 @@ func processInvite(
 
 	// Sign the event so that other servers will know that we have received the invite.
 	signedEvent := event.Sign(
-		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+		string(domain), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
 	// Add the invite event to the roomserver.
