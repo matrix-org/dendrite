@@ -65,8 +65,14 @@ func BuildEvent(
 		return nil, err
 	}
 
+	_, domain, err := cfg.SplitLocalID('@', builder.Sender)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Fix key ID and private key here
 	event, err := builder.Build(
-		evTime, cfg.ServerName, cfg.KeyID,
+		evTime, domain, cfg.KeyID,
 		cfg.PrivateKey, queryRes.RoomVersion,
 	)
 	if err != nil {
