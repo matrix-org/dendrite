@@ -42,6 +42,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		Version: "userapi: rename tables",
 		Up:      deltas.UpRenameTables,
 		Down:    deltas.DownRenameTables,
+	}, sqlutil.Migration{
+		Version: "userapi: unique pushers",
+		Up:      deltas.UpUniquePusher,
+		Down:    deltas.DownUniquePusher,
 	})
 	if err = m.Up(base.Context()); err != nil {
 		return nil, err
