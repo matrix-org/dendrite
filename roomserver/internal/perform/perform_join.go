@@ -196,7 +196,7 @@ func (r *Joiner) performJoinRoomByID(
 
 	// Prepare the template for the join event.
 	userID := req.UserID
-	_, userDomain, err := gomatrixserverlib.SplitID('@', userID)
+	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
 		return "", "", &rsAPI.PerformError{
 			Code: rsAPI.PerformErrorBadRequest,
@@ -282,7 +282,7 @@ func (r *Joiner) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, userDomain, &eb)
 
 	switch err {
 	case nil:
@@ -409,7 +409,9 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 }
 
 func buildEvent(
-	ctx context.Context, db storage.Database, cfg *config.Global, builder *gomatrixserverlib.EventBuilder,
+	ctx context.Context, db storage.Database, cfg *config.Global,
+	senderDomain gomatrixserverlib.ServerName,
+	builder *gomatrixserverlib.EventBuilder,
 ) (*gomatrixserverlib.HeaderedEvent, *rsAPI.QueryLatestEventsAndStateResponse, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -437,7 +439,12 @@ func buildEvent(
 		}
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
+	identity, err := cfg.SigningIdentityFor(senderDomain)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, cfg, identity, time.Now(), &eventsNeeded, &queryRes)
 	if err != nil {
 		return nil, nil, err
 	}

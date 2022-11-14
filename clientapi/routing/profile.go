@@ -284,7 +284,7 @@ func updateProfile(
 	}
 
 	events, err := buildMembershipEvents(
-		ctx, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
+		ctx, device, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -349,6 +349,7 @@ func getProfile(
 
 func buildMembershipEvents(
 	ctx context.Context,
+	device *userapi.Device,
 	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
 	evTime time.Time, rsAPI api.ClientRoomserverAPI,
@@ -380,7 +381,12 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		event, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
+		identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+		if err != nil {
+			return nil, err
+		}
+
+		event, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -595,8 +595,21 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 			Msg: fmt.Sprintf("Failed to set new %q event content: %s", builder.Type, err),
 		}
 	}
+	// Get the sender domain.
+	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', builder.Sender)
+	if serr != nil {
+		return nil, &api.PerformError{
+			Msg: fmt.Sprintf("Failed to split user ID %q: %s", builder.Sender, err),
+		}
+	}
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	if err != nil {
+		return nil, &api.PerformError{
+			Msg: fmt.Sprintf("Failed to get signing identity for %q: %s", senderDomain, err),
+		}
+	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &builder, r.Cfg.Matrix, evTime, r.URSAPI, &queryRes)
+	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &builder, r.Cfg.Matrix, identity, evTime, r.URSAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &api.PerformError{
 			Code: api.PerformErrorNoRoom,

@@ -146,9 +146,18 @@ func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.
 		return u, s, err
 	}
 	if !c.IsLocalServerName(s) {
-		return u, s, fmt.Errorf("server name not locally configured")
+		return u, s, fmt.Errorf("server name %q not known", s)
 	}
 	return u, s, nil
+}
+
+func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.SigningIdentity, error) {
+	for _, id := range c.SigningIdentities() {
+		if id.ServerName == serverName {
+			return id, nil
+		}
+	}
+	return nil, fmt.Errorf("no signing identity %q", serverName)
 }
 
 func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {

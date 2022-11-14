@@ -123,8 +123,13 @@ func SendRedaction(
 		return jsonerror.InternalServerError()
 	}
 
+	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+
 	var queryRes roomserverAPI.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(req.Context(), &builder, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,
