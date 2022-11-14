@@ -1023,13 +1023,17 @@ func RegisterAvailable(
 
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
+	domain := cfg.Matrix.ServerName
+	if u, l, err := cfg.Matrix.SplitLocalID('@', username); err == nil {
+		username, domain = u, l
+	}
 
-	if err := validateUsername(username, cfg.Matrix.ServerName); err != nil {
+	if err := validateUsername(username, domain); err != nil {
 		return *err
 	}
 
 	// Check if this username is reserved by an application service
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	userID := userutil.MakeUserID(username, domain)
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			return util.JSONResponse{
@@ -1041,7 +1045,8 @@ func RegisterAvailable(
 
 	res := &userapi.QueryAccountAvailabilityResponse{}
 	err := registerAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
-		Localpart: username,
+		Localpart:  username,
+		ServerName: domain,
 	}, res)
 	if err != nil {
 		return util.JSONResponse{

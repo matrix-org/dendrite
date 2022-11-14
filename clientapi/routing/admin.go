@@ -110,7 +110,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 			JSON: jsonerror.MissingArgument("Expecting user localpart."),
 		}
 	}
-	if l, s, err := gomatrixserverlib.SplitID('@', localpart); err == nil {
+	if l, s, err := cfg.Matrix.SplitLocalID('@', localpart); err == nil {
 		localpart, serverName = l, s
 	}
 	request := struct {
