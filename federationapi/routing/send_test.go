@@ -199,7 +199,7 @@ func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, fedClient txnFeder
 }
 
 func mustProcessTransaction(t *testing.T, txn *txnReq, pdusWithErrors []string) {
-	res, err := txn.processTransaction(context.Background(), "localhost")
+	res, err := txn.processTransaction(context.Background())
 	if err != nil {
 		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return

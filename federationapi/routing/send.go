@@ -164,7 +164,7 @@ func Send(
 
 	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
 
-	resp, jsonErr := t.processTransaction(httpReq.Context(), request.Destination())
+	resp, jsonErr := t.processTransaction(httpReq.Context())
 	if jsonErr != nil {
 		util.GetLogger(httpReq.Context()).WithField("jsonErr", jsonErr).Error("t.processTransaction failed")
 		return *jsonErr
@@ -206,7 +206,7 @@ type txnFederationClient interface {
 		roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
-func (t *txnReq) processTransaction(ctx context.Context, virtualHost gomatrixserverlib.ServerName) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
+func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
