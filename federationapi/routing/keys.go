@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -134,18 +135,21 @@ func ClaimOneTimeKeys(
 
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
-func LocalKeys(cfg *config.FederationAPI) util.JSONResponse {
-	keys, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
+func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) util.JSONResponse {
+	keys, err := localKeys(cfg, serverName, time.Now().Add(cfg.Matrix.KeyValidityPeriod))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
-func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
+func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName, validUntil time.Time) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
+	if !cfg.Matrix.IsLocalServerName(serverName) {
+		return nil, fmt.Errorf("server name not known")
+	}
 
-	keys.ServerName = cfg.Matrix.ServerName
+	keys.ServerName = serverName
 	keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(validUntil)
 
 	publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
@@ -172,7 +176,7 @@ func localKeys(cfg *config.FederationAPI, validUntil time.Time) (*gomatrixserver
 	}
 
 	keys.Raw, err = gomatrixserverlib.SignJSON(
-		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, toSign,
+		string(serverName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, toSign,
 	)
 	if err != nil {
 		return nil, err
@@ -186,6 +190,14 @@ func NotaryKeys(
 	fsAPI federationAPI.FederationInternalAPI,
 	req *gomatrixserverlib.PublicKeyNotaryLookupRequest,
 ) util.JSONResponse {
+	serverName := gomatrixserverlib.ServerName(httpReq.Host) // TODO: this is not ideal
+	if !cfg.Matrix.IsLocalServerName(serverName) {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Server name not known"),
+		}
+	}
+
 	if req == nil {
 		req = &gomatrixserverlib.PublicKeyNotaryLookupRequest{}
 		if reqErr := clienthttputil.UnmarshalJSONRequest(httpReq, &req); reqErr != nil {
@@ -201,7 +213,7 @@ func NotaryKeys(
 	for serverName, kidToCriteria := range req.ServerKeys {
 		var keyList []gomatrixserverlib.ServerKeys
 		if serverName == cfg.Matrix.ServerName {
-			if k, err := localKeys(cfg, time.Now().Add(cfg.Matrix.KeyValidityPeriod)); err == nil {
+			if k, err := localKeys(cfg, serverName, time.Now().Add(cfg.Matrix.KeyValidityPeriod)); err == nil {
 				keyList = append(keyList, *k)
 			} else {
 				return util.ErrorResponse(err)

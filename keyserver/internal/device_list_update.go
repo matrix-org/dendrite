@@ -49,7 +49,6 @@ var (
 	)
 )
 
-const defaultWaitTime = time.Minute
 const requestTimeout = time.Second * 30
 
 func init() {
@@ -495,7 +494,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			} else if e.Code >= 300 {
 				// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
 				// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
-				return time.Hour, err
+				return hourWaitTime, err
 			}
 		case net.Error:
 			// Use the default waitTime, if it's a timeout.
@@ -509,7 +508,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 			if e.Code >= 300 {
 				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
-				return time.Hour, err
+				return hourWaitTime, err
 			}
 		default:
 			// Something else failed

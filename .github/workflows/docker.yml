@@ -32,7 +32,7 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || "") >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
@@ -112,7 +112,7 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || "") >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
@@ -191,7 +191,7 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || "") >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
@@ -258,7 +258,7 @@ jobs:
         if: github.event_name == 'release' # Only for GitHub releases
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-          echo "BUILD=$(git rev-parse --short HEAD || "") >> $GITHUB_ENV
+          echo "BUILD=$(git rev-parse --short HEAD || \"\")" >> $GITHUB_ENV
           BRANCH=$(git symbolic-ref --short HEAD | tr -d \/)
           [ ${BRANCH} == "main" ] && BRANCH=""
           echo "BRANCH=${BRANCH}" >> $GITHUB_ENV

@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/blevesearch/bleve/v2 v2.3.4
 	github.com/codeclysm/extract v2.2.0+incompatible
-	github.com/dgraph-io/ristretto v0.1.1-0.20220403145359-8e850b710d6d
+	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/docker v20.10.19+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/getsentry/sentry-go v0.14.0
@@ -22,7 +22,7 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20221101165746-0e4a8bb6db7e
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20221109092408-715dc88e62e2
 	github.com/matrix-org/pinecone v0.0.0-20221103125849-37f2e9b9ba37
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.15

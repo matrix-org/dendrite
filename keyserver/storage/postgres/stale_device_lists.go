@@ -47,10 +47,10 @@ const upsertStaleDeviceListSQL = "" +
 	" DO UPDATE SET is_stale = $3, ts_added_secs = $4"
 
 const selectStaleDeviceListsWithDomainsSQL = "" +
-	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
+	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2 ORDER BY ts_added_secs DESC"
 
 const selectStaleDeviceListsSQL = "" +
-	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
+	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 ORDER BY ts_added_secs DESC"
 
 const deleteStaleDevicesSQL = "" +
 	"DELETE FROM keyserver_stale_device_lists WHERE user_id = ANY($1)"
@@ -81,7 +81,7 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, time.Now().Unix())
+	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, gomatrixserverlib.AsTimestamp(time.Now()))
 	return err
 }
 
