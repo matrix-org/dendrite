@@ -562,7 +562,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Build the leave event.
 		event, err := respMakeLeave.LeaveEvent.Build(
 			time.Now(),
-			r.cfg.Matrix.ServerName,
+			origin,
 			r.cfg.Matrix.KeyID,
 			r.cfg.Matrix.PrivateKey,
 			respMakeLeave.RoomVersion,
