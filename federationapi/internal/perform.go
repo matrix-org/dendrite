@@ -199,7 +199,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// Build the join event.
 	event, err := respMakeJoin.JoinEvent.Build(
 		time.Now(),
-		r.cfg.Matrix.ServerName,
+		origin,
 		r.cfg.Matrix.KeyID,
 		r.cfg.Matrix.PrivateKey,
 		respMakeJoin.RoomVersion,
