@@ -127,13 +127,12 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
-		ServerName: r.Cfg.Matrix.ServerName,
-		Cfg:        r.Cfg,
-		DB:         r.DB,
-		FSAPI:      r.fsAPI,
-		RSAPI:      r,
-		Inputer:    r.Inputer,
-		Queryer:    r.Queryer,
+		Cfg:     r.Cfg,
+		DB:      r.DB,
+		FSAPI:   r.fsAPI,
+		RSAPI:   r,
+		Inputer: r.Inputer,
+		Queryer: r.Queryer,
 	}
 	r.Peeker = &perform.Peeker{
 		ServerName: r.Cfg.Matrix.ServerName,

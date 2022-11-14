@@ -266,16 +266,17 @@ func (r *Inputer) processRoomEvent(
 		// processRoomEvent.
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
-				origin:     input.Origin,
-				inputer:    r,
-				db:         r.DB,
-				roomInfo:   roomInfo,
-				federation: r.FSAPI,
-				keys:       r.KeyRing,
-				roomsMu:    internal.NewMutexByRoom(),
-				servers:    serverRes.ServerNames,
-				hadEvents:  map[string]bool{},
-				haveEvents: map[string]*gomatrixserverlib.Event{},
+				origin:      input.Origin,
+				virtualHost: virtualHost,
+				inputer:     r,
+				db:          r.DB,
+				roomInfo:    roomInfo,
+				federation:  r.FSAPI,
+				keys:        r.KeyRing,
+				roomsMu:     internal.NewMutexByRoom(),
+				servers:     serverRes.ServerNames,
+				hadEvents:   map[string]bool{},
+				haveEvents:  map[string]*gomatrixserverlib.Event{},
 			}
 			var stateSnapshot *parsedRespState
 			if stateSnapshot, err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
