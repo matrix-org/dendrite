@@ -762,3 +762,5 @@ AS and main public room lists are separate
 /upgrade preserves direct room state
 local user has tags copied to the new room
 remote user has tags copied to the new room
+/upgrade moves remote aliases to the new room
+Local and remote users' homeservers remove a room from their public directory on upgrade

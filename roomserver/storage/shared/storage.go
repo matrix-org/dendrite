@@ -1408,6 +1408,36 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 	})
 }
 
+func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error {
+
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		// un-publish old room
+		if err := d.PublishedTable.UpsertRoomPublished(ctx, txn, oldRoomID, "", "", false); err != nil {
+			return fmt.Errorf("failed to unpublish room: %w", err)
+		}
+		// publish new room
+		if err := d.PublishedTable.UpsertRoomPublished(ctx, txn, newRoomID, "", "", true); err != nil {
+			return fmt.Errorf("failed to publish room: %w", err)
+		}
+
+		// Migrate any existing room aliases
+		aliases, err := d.RoomAliasesTable.SelectAliasesFromRoomID(ctx, txn, oldRoomID)
+		if err != nil {
+			return fmt.Errorf("failed to get room aliases: %w", err)
+		}
+
+		for _, alias := range aliases {
+			if err = d.RoomAliasesTable.DeleteRoomAlias(ctx, txn, alias); err != nil {
+				return fmt.Errorf("failed to remove room alias: %w", err)
+			}
+			if err = d.RoomAliasesTable.InsertRoomAlias(ctx, txn, alias, newRoomID, eventSender); err != nil {
+				return fmt.Errorf("failed to set room alias: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
 // FIXME TODO: Remove all this - horrible dupe with roomserver/state. Can't use the original impl because of circular loops
 // it should live in this package!
 

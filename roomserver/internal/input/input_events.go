@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
@@ -409,6 +411,13 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// Handle remote room upgrades, e.g. remove published room
+	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
+		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
+			return fmt.Errorf("failed to handle remote room upgrade: %w", err)
+		}
+	}
+
 	// processing this event resulted in an event (which may not be the one we're processing)
 	// being redacted. We are guaranteed to have both sides (the redaction/redacted event),
 	// so notify downstream components to redact this event - they should have it if they've
@@ -432,6 +441,13 @@ func (r *Inputer) processRoomEvent(
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
 	return nil
+}
+
+// handleRemoteRoomUpgrade updates published rooms and room aliases
+func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event *gomatrixserverlib.Event) error {
+	oldRoomID := event.RoomID()
+	newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
+	return r.DB.UpgradeRoom(ctx, oldRoomID, newRoomID, event.Sender())
 }
 
 // processStateBefore works out what the state is before the event and
