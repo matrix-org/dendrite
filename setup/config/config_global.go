@@ -115,6 +115,10 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
+	for _, v := range c.VirtualHosts {
+		v.Verify(configErrs)
+	}
+
 	c.JetStream.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
 	c.Sentry.Verify(configErrs, isMonolith)
@@ -181,6 +185,10 @@ type VirtualHost struct {
 	// by remote servers.
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+}
+
+func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "virtual_host.*.server_name", string(v.ServerName))
 }
 
 func (v *VirtualHost) SigningIdentity() *gomatrixserverlib.SigningIdentity {
