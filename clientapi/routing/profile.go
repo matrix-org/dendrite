@@ -298,7 +298,7 @@ func updateProfile(
 		return jsonerror.InternalServerError(), e
 	}
 
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, domain, domain, nil, true); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, true); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError(), err
 	}
@@ -321,7 +321,7 @@ func getProfile(
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
-		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
+		profile, fedErr := federation.LookupProfile(ctx, cfg.Matrix.ServerName, domain, userID, "")
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {

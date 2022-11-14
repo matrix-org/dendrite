@@ -371,6 +371,7 @@ func emit3PIDInviteEvent(
 		[]*gomatrixserverlib.HeaderedEvent{
 			event.Headered(queryRes.RoomVersion),
 		},
+		device.UserDomain(),
 		cfg.Matrix.ServerName,
 		cfg.Matrix.ServerName,
 		nil,

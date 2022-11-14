@@ -69,6 +69,7 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
+	virtualHost gomatrixserverlib.ServerName,
 	input *api.InputRoomEvent,
 ) error {
 	select {
@@ -200,7 +201,7 @@ func (r *Inputer) processRoomEvent(
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	if err = r.fetchAuthEvents(ctx, logger, roomInfo, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+	if err = r.fetchAuthEvents(ctx, logger, roomInfo, virtualHost, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
@@ -555,6 +556,7 @@ func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
 	logger *logrus.Entry,
 	roomInfo *types.RoomInfo,
+	virtualHost gomatrixserverlib.ServerName,
 	event *gomatrixserverlib.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
 	known map[string]*types.Event,
@@ -605,7 +607,7 @@ func (r *Inputer) fetchAuthEvents(
 		// Request the entire auth chain for the event in question. This should
 		// contain all of the auth events — including ones that we already know —
 		// so we'll need to filter through those in the next section.
-		res, err = r.FSAPI.GetEventAuth(ctx, serverName, event.RoomVersion, event.RoomID(), event.EventID())
+		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.RoomVersion, event.RoomID(), event.EventID())
 		if err != nil {
 			logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 			continue

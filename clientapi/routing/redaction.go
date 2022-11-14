@@ -132,7 +132,7 @@ func SendRedaction(
 		}
 	}
 	domain := device.UserDomain()
-	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, domain, domain, nil, false); err != nil {
+	if err = roomserverAPI.SendEvents(context.Background(), rsAPI, roomserverAPI.KindNew, []*gomatrixserverlib.HeaderedEvent{e}, device.UserDomain(), domain, domain, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Errorf("failed to SendEvents")
 		return jsonerror.InternalServerError()
 	}

@@ -186,6 +186,7 @@ func SendEvent(
 		[]*gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
+		device.UserDomain(),
 		domain,
 		domain,
 		txnAndSessionID,

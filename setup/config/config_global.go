@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -133,6 +134,34 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 		}
 	}
 	return false
+}
+
+func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.ServerName, error) {
+	u, s, err := gomatrixserverlib.SplitID(sigil, id)
+	if err != nil {
+		return u, s, err
+	}
+	if !c.IsLocalServerName(s) {
+		return u, s, fmt.Errorf("server name not locally configured")
+	}
+	return u, s, nil
+}
+
+func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
+	identities := make([]*gomatrixserverlib.SigningIdentity, 0, len(c.SecondaryServerNames)+1)
+	identities = append(identities, &gomatrixserverlib.SigningIdentity{
+		ServerName: c.ServerName,
+		KeyID:      c.KeyID,
+		PrivateKey: c.PrivateKey,
+	})
+	for _, serverName := range c.SecondaryServerNames {
+		identities = append(identities, &gomatrixserverlib.SigningIdentity{
+			ServerName: serverName,
+			KeyID:      c.KeyID,
+			PrivateKey: c.PrivateKey,
+		})
+	}
+	return identities
 }
 
 type OldVerifyKeys struct {

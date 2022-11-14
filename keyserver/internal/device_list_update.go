@@ -96,6 +96,7 @@ type DeviceListUpdater struct {
 	producer    KeyChangeProducer
 	fedClient   fedsenderapi.KeyserverFederationAPI
 	workerChans []chan gomatrixserverlib.ServerName
+	thisServer  gomatrixserverlib.ServerName
 
 	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
 	// block on or timeout via a select.
@@ -139,6 +140,7 @@ func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
+	thisServer gomatrixserverlib.ServerName,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
 		process:        process,
@@ -148,6 +150,7 @@ func NewDeviceListUpdater(
 		api:            api,
 		producer:       producer,
 		fedClient:      fedClient,
+		thisServer:     thisServer,
 		workerChans:    make([]chan gomatrixserverlib.ServerName, numWorkers),
 		userIDToChan:   make(map[string]chan bool),
 		userIDToChanMu: &sync.Mutex{},
@@ -436,7 +439,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		"user_id":     userID,
 	})
 
-	res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
+	res, err := u.fedClient.GetUserDevices(ctx, u.thisServer, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return time.Minute * 10, err

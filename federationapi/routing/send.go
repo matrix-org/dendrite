@@ -164,7 +164,7 @@ func Send(
 
 	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, request.Origin(), len(t.PDUs), len(t.EDUs))
 
-	resp, jsonErr := t.processTransaction(httpReq.Context())
+	resp, jsonErr := t.processTransaction(httpReq.Context(), request.Destination())
 	if jsonErr != nil {
 		util.GetLogger(httpReq.Context()).WithField("jsonErr", jsonErr).Error("t.processTransaction failed")
 		return *jsonErr
@@ -197,16 +197,16 @@ type txnReq struct {
 
 // A subset of FederationClient functionality that txn requires. Useful for testing.
 type txnFederationClient interface {
-	LookupState(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
+	LookupState(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
 		res gomatrixserverlib.RespState, err error,
 	)
-	LookupStateIDs(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error)
-	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
-	LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
+	LookupStateIDs(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error)
+	GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
+	LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
 		roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
-func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
+func (t *txnReq) processTransaction(ctx context.Context, virtualHost gomatrixserverlib.ServerName) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -287,6 +287,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			[]*gomatrixserverlib.HeaderedEvent{
 				event.Headered(roomVersion),
 			},
+			t.Destination,
 			t.Origin,
 			api.DoNotSendToOtherServers,
 			nil,

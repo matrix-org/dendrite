@@ -110,6 +110,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		ctx, rsAPI,
 		roomserverAPI.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
+		device.UserDomain(),
 		serverName,
 		serverName,
 		nil,

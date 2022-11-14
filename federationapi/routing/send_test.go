@@ -147,7 +147,7 @@ type txnFedClient struct {
 	getMissingEvents func(gomatrixserverlib.MissingEvents) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
-func (c *txnFedClient) LookupState(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
+func (c *txnFedClient) LookupState(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
 	res gomatrixserverlib.RespState, err error,
 ) {
 	fmt.Println("testFederationClient.LookupState", eventID)
@@ -159,7 +159,7 @@ func (c *txnFedClient) LookupState(ctx context.Context, s gomatrixserverlib.Serv
 	res = r
 	return
 }
-func (c *txnFedClient) LookupStateIDs(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error) {
+func (c *txnFedClient) LookupStateIDs(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error) {
 	fmt.Println("testFederationClient.LookupStateIDs", eventID)
 	r, ok := c.stateIDs[eventID]
 	if !ok {
@@ -169,7 +169,7 @@ func (c *txnFedClient) LookupStateIDs(ctx context.Context, s gomatrixserverlib.S
 	res = r
 	return
 }
-func (c *txnFedClient) GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error) {
+func (c *txnFedClient) GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error) {
 	fmt.Println("testFederationClient.GetEvent", eventID)
 	r, ok := c.getEvent[eventID]
 	if !ok {
@@ -179,7 +179,7 @@ func (c *txnFedClient) GetEvent(ctx context.Context, s gomatrixserverlib.ServerN
 	res = r
 	return
 }
-func (c *txnFedClient) LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
+func (c *txnFedClient) LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
 	roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error) {
 	return c.getMissingEvents(missing)
 }
@@ -199,7 +199,7 @@ func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, fedClient txnFeder
 }
 
 func mustProcessTransaction(t *testing.T, txn *txnReq, pdusWithErrors []string) {
-	res, err := txn.processTransaction(context.Background())
+	res, err := txn.processTransaction(context.Background(), "localhost")
 	if err != nil {
 		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return

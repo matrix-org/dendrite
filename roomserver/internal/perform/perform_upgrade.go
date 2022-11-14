@@ -60,7 +60,7 @@ func (r *Upgrader) performRoomUpgrade(
 ) (string, *api.PerformError) {
 	roomID := req.RoomID
 	userID := req.UserID
-	_, userDomain, err := gomatrixserverlib.SplitID('@', userID)
+	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
 		return "", &api.PerformError{
 			Code: api.PerformErrorNotAllowed,
@@ -558,7 +558,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 	}
-	if err = api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
+	if err = api.SendInputRoomEvents(ctx, r.URSAPI, userDomain, inputs, false); err != nil {
 		return &api.PerformError{
 			Msg: fmt.Sprintf("Failed to send new room %q to roomserver: %s", newRoomID, err),
 		}
@@ -686,7 +686,7 @@ func (r *Upgrader) sendHeaderedEvent(
 		Origin:       serverName,
 		SendAsServer: sendAsServer,
 	})
-	if err := api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
+	if err := api.SendInputRoomEvents(ctx, r.URSAPI, serverName, inputs, false); err != nil {
 		return &api.PerformError{
 			Msg: fmt.Sprintf("Failed to send new %q event to roomserver: %s", headeredEvent.Type(), err),
 		}

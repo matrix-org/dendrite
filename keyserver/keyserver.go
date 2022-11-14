@@ -58,7 +58,7 @@ func NewInternalAPI(
 		FedClient: fedClient,
 		Producer:  keyChangeProducer,
 	}
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, cfg.Matrix.ServerName) // 8 workers TODO: configurable
 	ap.Updater = updater
 	go func() {
 		if err := updater.Start(); err != nil {

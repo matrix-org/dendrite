@@ -146,7 +146,7 @@ func (a *KeyInternalAPI) claimRemoteKeys(
 			defer cancel()
 			defer wg.Done()
 
-			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, gomatrixserverlib.ServerName(domain), keysToClaim)
+			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, a.Cfg.Matrix.ServerName, gomatrixserverlib.ServerName(domain), keysToClaim)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -559,7 +559,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	if len(devKeys) == 0 {
 		return
 	}
-	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, gomatrixserverlib.ServerName(serverName), devKeys)
+	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, a.Cfg.Matrix.ServerName, gomatrixserverlib.ServerName(serverName), devKeys)
 	if err == nil {
 		resultCh <- &queryKeysResp
 		return

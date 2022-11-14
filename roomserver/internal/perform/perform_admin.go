@@ -273,7 +273,7 @@ func (r *Admin) PerformAdminDownloadState(
 
 	for _, fwdExtremity := range fwdExtremities {
 		var state gomatrixserverlib.RespState
-		state, err = r.Inputer.FSAPI.LookupState(ctx, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
