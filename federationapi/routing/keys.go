@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"time"
 
@@ -135,6 +136,9 @@ func ClaimOneTimeKeys(
 // LocalKeys returns the local keys for the server.
 // See https://matrix.org/docs/spec/server_server/unstable.html#publishing-keys
 func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) util.JSONResponse {
+	if h, _, err := net.SplitHostPort(string(serverName)); err == nil {
+		serverName = gomatrixserverlib.ServerName(h)
+	}
 	keys, err := localKeys(cfg, serverName)
 	if err != nil {
 		return util.MessageResponse(http.StatusNotFound, err.Error())
