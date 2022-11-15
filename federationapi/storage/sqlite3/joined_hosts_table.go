@@ -67,7 +67,7 @@ const selectJoinedHostsForRoomsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
 
 const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
-	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1) AND NOT EXISTS (" +
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts j WHERE room_id IN ($1) AND NOT EXISTS (" +
 	"  SELECT server_name FROM federationsender_blacklist WHERE j.server_name = server_name" +
 	");"
 
