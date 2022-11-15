@@ -16,7 +16,6 @@ package routing
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -138,17 +137,13 @@ func ClaimOneTimeKeys(
 func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) util.JSONResponse {
 	keys, err := localKeys(cfg, serverName)
 	if err != nil {
-		return util.ErrorResponse(err)
+		return util.MessageResponse(http.StatusNotFound, err.Error())
 	}
 	return util.JSONResponse{Code: http.StatusOK, JSON: keys}
 }
 
 func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
-	if !cfg.Matrix.IsLocalServerName(serverName) {
-		return nil, fmt.Errorf("server name not known")
-	}
-
 	var virtualHost *config.VirtualHost
 	for _, v := range cfg.Matrix.VirtualHosts {
 		if v.ServerName != serverName {
