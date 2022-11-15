@@ -198,8 +198,9 @@ func (h *httpFederationInternalAPI) QueryKeys(
 	return httputil.CallInternalProxyAPI[queryKeys, gomatrixserverlib.RespQueryKeys, *api.FederationClientError](
 		"QueryKeys", h.federationAPIURL+FederationAPIQueryKeysPath, h.httpClient,
 		ctx, &queryKeys{
-			S:    s,
-			Keys: keys,
+			S:      s,
+			Origin: origin,
+			Keys:   keys,
 		},
 	)
 }
