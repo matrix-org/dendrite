@@ -66,14 +66,20 @@ const selectAllJoinedHostsSQL = "" +
 const selectJoinedHostsForRoomsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id = ANY($1)"
 
+const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts j WHERE room_id = ANY('{!OGEhHVWSdvArJzumhm:matrix.org}') AND NOT EXISTS (" +
+	"  SELECT server_name FROM federationsender_blacklist WHERE j.server_name = server_name" +
+	");"
+
 type joinedHostsStatements struct {
-	db                            *sql.DB
-	insertJoinedHostsStmt         *sql.Stmt
-	deleteJoinedHostsStmt         *sql.Stmt
-	deleteJoinedHostsForRoomStmt  *sql.Stmt
-	selectJoinedHostsStmt         *sql.Stmt
-	selectAllJoinedHostsStmt      *sql.Stmt
-	selectJoinedHostsForRoomsStmt *sql.Stmt
+	db                                                *sql.DB
+	insertJoinedHostsStmt                             *sql.Stmt
+	deleteJoinedHostsStmt                             *sql.Stmt
+	deleteJoinedHostsForRoomStmt                      *sql.Stmt
+	selectJoinedHostsStmt                             *sql.Stmt
+	selectAllJoinedHostsStmt                          *sql.Stmt
+	selectJoinedHostsForRoomsStmt                     *sql.Stmt
+	selectJoinedHostsForRoomsExcludingBlacklistedStmt *sql.Stmt
 }
 
 func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
@@ -100,6 +106,9 @@ func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err erro
 		return
 	}
 	if s.selectJoinedHostsForRoomsStmt, err = s.db.Prepare(selectJoinedHostsForRoomsSQL); err != nil {
+		return
+	}
+	if s.selectJoinedHostsForRoomsExcludingBlacklistedStmt, err = s.db.Prepare(selectJoinedHostsForRoomsExcludingBlacklistedSQL); err != nil {
 		return
 	}
 	return
@@ -167,9 +176,13 @@ func (s *joinedHostsStatements) SelectAllJoinedHosts(
 }
 
 func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
-	ctx context.Context, roomIDs []string,
+	ctx context.Context, roomIDs []string, excludingBlacklisted bool,
 ) ([]gomatrixserverlib.ServerName, error) {
-	rows, err := s.selectJoinedHostsForRoomsStmt.QueryContext(ctx, pq.StringArray(roomIDs))
+	stmt := s.selectJoinedHostsForRoomsStmt
+	if excludingBlacklisted {
+		stmt = s.selectJoinedHostsForRoomsExcludingBlacklistedStmt
+	}
+	rows, err := stmt.QueryContext(ctx, pq.StringArray(roomIDs))
 	if err != nil {
 		return nil, err
 	}

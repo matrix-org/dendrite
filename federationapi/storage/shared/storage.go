@@ -117,8 +117,8 @@ func (d *Database) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.S
 	return d.FederationJoinedHosts.SelectAllJoinedHosts(ctx)
 }
 
-func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf bool) ([]gomatrixserverlib.ServerName, error) {
-	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs)
+func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf, excludeBlacklisted bool) ([]gomatrixserverlib.ServerName, error) {
+	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs, excludeBlacklisted)
 	if err != nil {
 		return nil, err
 	}
