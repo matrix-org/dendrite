@@ -198,8 +198,9 @@ type PerformInviteResponse struct {
 
 // QueryJoinedHostServerNamesInRoomRequest is a request to QueryJoinedHostServerNames
 type QueryJoinedHostServerNamesInRoomRequest struct {
-	RoomID      string `json:"room_id"`
-	ExcludeSelf bool   `json:"exclude_self"`
+	RoomID             string `json:"room_id"`
+	ExcludeSelf        bool   `json:"exclude_self"`
+	ExcludeBlacklisted bool   `json:"exclude_blacklisted"`
 }
 
 // QueryJoinedHostServerNamesInRoomResponse is a response to QueryJoinedHostServerNames
