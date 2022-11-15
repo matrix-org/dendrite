@@ -104,7 +104,7 @@ func TestMain(m *testing.M) {
 
 			// Create the federation client.
 			s.fedclient = gomatrixserverlib.NewFederationClient(
-				s.config.Matrix.ServerName, serverKeyID, testPriv,
+				s.config.Matrix.SigningIdentities(),
 				gomatrixserverlib.WithTransport(transport),
 			)
 

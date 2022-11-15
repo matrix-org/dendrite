@@ -120,17 +120,7 @@ func NewInternalAPI(
 
 	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
-	signingInfo := map[gomatrixserverlib.ServerName]*queue.SigningInfo{}
-	for _, serverName := range append(
-		[]gomatrixserverlib.ServerName{base.Cfg.Global.ServerName},
-		base.Cfg.Global.SecondaryServerNames...,
-	) {
-		signingInfo[serverName] = &queue.SigningInfo{
-			KeyID:      cfg.Matrix.KeyID,
-			PrivateKey: cfg.Matrix.PrivateKey,
-			ServerName: serverName,
-		}
-	}
+	signingInfo := base.Cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,

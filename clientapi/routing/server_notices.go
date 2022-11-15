@@ -231,6 +231,7 @@ func SendServerNotice(
 		[]*gomatrixserverlib.HeaderedEvent{
 			e.Headered(roomVersion),
 		},
+		device.UserDomain(),
 		cfgClient.Matrix.ServerName,
 		cfgClient.Matrix.ServerName,
 		txnAndSessionID,

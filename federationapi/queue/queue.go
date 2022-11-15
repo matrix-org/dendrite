@@ -15,7 +15,6 @@
 package queue
 
 import (
-	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -46,7 +45,7 @@ type OutgoingQueues struct {
 	origin      gomatrixserverlib.ServerName
 	client      fedapi.FederationClient
 	statistics  *statistics.Statistics
-	signing     map[gomatrixserverlib.ServerName]*SigningInfo
+	signing     map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
@@ -91,7 +90,7 @@ func NewOutgoingQueues(
 	client fedapi.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
-	signing map[gomatrixserverlib.ServerName]*SigningInfo,
+	signing []*gomatrixserverlib.SigningIdentity,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
@@ -101,8 +100,11 @@ func NewOutgoingQueues(
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
-		signing:    signing,
+		signing:    map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity{},
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
+	}
+	for _, identity := range signing {
+		queues.signing[identity.ServerName] = identity
 	}
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
@@ -133,14 +135,6 @@ func NewOutgoingQueues(
 		}
 	}
 	return queues
-}
-
-// TODO: Move this somewhere useful for other components as we often need to ferry these 3 variables
-// around together
-type SigningInfo struct {
-	ServerName gomatrixserverlib.ServerName
-	KeyID      gomatrixserverlib.KeyID
-	PrivateKey ed25519.PrivateKey
 }
 
 type queuedPDU struct {
