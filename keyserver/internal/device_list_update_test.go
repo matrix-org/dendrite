@@ -225,7 +225,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, "localhost")
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, "example.test")
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}

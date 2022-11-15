@@ -438,7 +438,6 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		"server_name": serverName,
 		"user_id":     userID,
 	})
-
 	res, err := u.fedClient.GetUserDevices(ctx, u.thisServer, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
