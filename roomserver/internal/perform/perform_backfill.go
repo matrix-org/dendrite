@@ -55,7 +55,7 @@ func (r *Backfiller) PerformBackfill(
 	// if we are requesting the backfill then we need to do a federation hit
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
 	//       which is what the syncapi does already.
-	if !r.IsLocalServerName(request.ServerName) {
+	if r.IsLocalServerName(request.ServerName) {
 		return r.backfillViaFederation(ctx, request, response)
 	}
 	// someone else is requesting the backfill, try to service their request.
@@ -120,8 +120,10 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	// Specifically the test "Outbound federation can backfill events"
 	events, err := gomatrixserverlib.RequestBackfill(
 		ctx, req.VirtualHost, requester,
-		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100)
+		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100,
+	)
 	if err != nil {
+		logrus.WithError(err).Errorf("gomatrixserverlib.RequestBackfill failed")
 		return err
 	}
 	logrus.WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))

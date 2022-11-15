@@ -87,10 +87,10 @@ func NewRoomserverAPI(
 		Durable:                base.Cfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
-			DB:         roomserverDB,
-			Cache:      base.Caches,
-			ServerName: base.Cfg.Global.ServerName,
-			ServerACLs: serverACLs,
+			DB:                roomserverDB,
+			Cache:             base.Caches,
+			IsLocalServerName: base.Cfg.Global.IsLocalServerName,
+			ServerACLs:        serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}

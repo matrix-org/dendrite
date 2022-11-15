@@ -124,7 +124,7 @@ func Backfill(
 	}
 
 	txn := gomatrixserverlib.Transaction{
-		Origin:         cfg.Matrix.ServerName,
+		Origin:         request.Destination(),
 		PDUs:           eventJSONs,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}
