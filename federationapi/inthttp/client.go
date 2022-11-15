@@ -163,6 +163,7 @@ func (h *httpFederationInternalAPI) GetUserDevices(
 		"GetUserDevices", h.federationAPIURL+FederationAPIGetUserDevicesPath, h.httpClient,
 		ctx, &getUserDevices{
 			S:      s,
+			Origin: origin,
 			UserID: userID,
 		},
 	)
@@ -181,6 +182,7 @@ func (h *httpFederationInternalAPI) ClaimKeys(
 		"ClaimKeys", h.federationAPIURL+FederationAPIClaimKeysPath, h.httpClient,
 		ctx, &claimKeys{
 			S:           s,
+			Origin:      origin,
 			OneTimeKeys: oneTimeKeys,
 		},
 	)
