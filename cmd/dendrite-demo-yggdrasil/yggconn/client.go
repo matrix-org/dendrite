@@ -55,8 +55,7 @@ func (n *Node) CreateFederationClient(
 		},
 	)
 	return gomatrixserverlib.NewFederationClient(
-		base.Cfg.Global.ServerName, base.Cfg.Global.KeyID,
-		base.Cfg.Global.PrivateKey,
+		base.Cfg.Global.SigningIdentities(),
 		gomatrixserverlib.WithTransport(tr),
 	)
 }

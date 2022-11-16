@@ -106,7 +106,7 @@ knownUsersLoop:
 				continue
 			}
 			// TODO: We should probably cache/store this
-			fedProfile, fedErr := federation.LookupProfile(ctx, serverName, userID, "")
+			fedProfile, fedErr := federation.LookupProfile(ctx, localServerName, serverName, userID, "")
 			if fedErr != nil {
 				if x, ok := fedErr.(gomatrix.HTTPError); ok {
 					if x.Code == http.StatusNotFound {

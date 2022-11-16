@@ -37,10 +37,10 @@ import (
 )
 
 type Queryer struct {
-	DB         storage.Database
-	Cache      caching.RoomServerCaches
-	ServerName gomatrixserverlib.ServerName
-	ServerACLs *acls.ServerACLs
+	DB                storage.Database
+	Cache             caching.RoomServerCaches
+	IsLocalServerName func(gomatrixserverlib.ServerName) bool
+	ServerACLs        *acls.ServerACLs
 }
 
 // QueryLatestEventsAndState implements api.RoomserverInternalAPI
@@ -392,7 +392,7 @@ func (r *Queryer) QueryServerJoinedToRoom(
 	}
 	response.RoomExists = true
 
-	if request.ServerName == r.ServerName || request.ServerName == "" {
+	if r.IsLocalServerName(request.ServerName) || request.ServerName == "" {
 		response.IsInRoom, err = r.DB.GetLocalServerInRoom(ctx, info.RoomNID)
 		if err != nil {
 			return fmt.Errorf("r.DB.GetLocalServerInRoom: %w", err)
