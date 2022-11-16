@@ -76,7 +76,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 10
+    timeout-minutes: 5
     name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
@@ -122,14 +122,12 @@ jobs:
           key: ${{ runner.os }}-go${{ matrix.go }}-test-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go${{ matrix.go }}-test-
-      - run: go test -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
+      - run: go test -json -v ./... 2>&1 | gotestfmt
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: dendrite
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
 
   # build Dendrite for linux with different architectures and go versions
   build:
