@@ -589,9 +589,9 @@ func (config *Dendrite) replaceWithEnvVariables() {
 	// If env variable is set, get the value from the env
 	// variable and replace it in each supported field.
 
-	err := godotenv.Load(".env")
+	err := godotenv.Load()
 	if err != nil {
-		logrus.Errorln("error loading .env file", err)
+		logrus.Warningln(err)
 	}
 
 	config.Global.ServerName = gomatrixserverlib.ServerName(
@@ -616,7 +616,7 @@ func (config *Dendrite) replaceWithEnvVariables() {
 			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz)
 
 		logrus.Infof(
-			"Supported Ethereum chain_id=%v, network_url=%v, enable_authz=%v",
+			"Loaded config for Ethereum chain_id=%v, network_url=%v, enable_authz=%v",
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID,
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl,
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz,

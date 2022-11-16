@@ -25,9 +25,9 @@ type EthereumAuthConfig struct {
 	Version           uint   `yaml:"version"`
 	NetworkUrl        string `yaml:"network_url"`  // Blockchain network provider URL
 	ConfigChainID     string `yaml:"chain_id"`     // Blockchain chain ID. Env variable can replace this property.
-	ConfigEnableAuthz string `yaml:"enable_authz"` // Enable / disable authorization during development. Will be removed when feature is done.
+	ConfigEnableAuthz string `yaml:"enable_authz"` // Enable / disable authorization during development. todo: remove this flag when feature is done.
 	chainID           int
-	enableAuthz       bool
+	enableAuthz       bool // todo: remove this flag when feature is done.
 }
 
 func (c *EthereumAuthConfig) GetChainID() int {
