@@ -125,7 +125,7 @@ func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string,
 	if excludeSelf {
 		for i, server := range servers {
 			if d.IsLocalServerName(server) {
-				copy(servers[:i], servers[i+1:])
+				copy(servers[i:], servers[i+1:])
 				servers = servers[:len(servers)-1]
 				break
 			}
