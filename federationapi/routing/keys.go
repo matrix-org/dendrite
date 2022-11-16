@@ -146,10 +146,10 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 	var keys gomatrixserverlib.ServerKeys
 	var virtualHost *config.VirtualHost
 	for _, v := range cfg.Matrix.VirtualHosts {
-		if v.ServerName != serverName {
-			continue
+		if v.ServerName == serverName {
+			virtualHost = v
+			break
 		}
-		virtualHost = v
 	}
 
 	if virtualHost == nil {
@@ -188,14 +188,15 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 		return nil, err
 	}
 
-	keys.Raw, err = gomatrixserverlib.SignJSON(
-		string(serverName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey, toSign,
-	)
+	identity, err := cfg.Matrix.SigningIdentityFor(serverName)
 	if err != nil {
 		return nil, err
 	}
 
-	return &keys, nil
+	keys.Raw, err = gomatrixserverlib.SignJSON(
+		string(identity.ServerName), identity.KeyID, identity.PrivateKey, toSign,
+	)
+	return &keys, err
 }
 
 func NotaryKeys(
