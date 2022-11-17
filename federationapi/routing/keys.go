@@ -159,12 +159,12 @@ loop:
 		}
 	}
 
-	identity, err := cfg.Matrix.SigningIdentityFor(serverName)
-	if err != nil {
-		identity, _ = cfg.Matrix.SigningIdentityFor(cfg.Matrix.ServerName)
-	}
-
-	if identity.ServerName == serverName {
+	var identity *gomatrixserverlib.SigningIdentity
+	var err error
+	if virtualHost == nil {
+		if identity, err = cfg.Matrix.SigningIdentityFor(cfg.Matrix.ServerName); err != nil {
+			return nil, err
+		}
 		publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = cfg.Matrix.ServerName
 		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
@@ -183,6 +183,9 @@ loop:
 			}
 		}
 	} else {
+		if identity, err = cfg.Matrix.SigningIdentityFor(virtualHost.ServerName); err != nil {
+			return nil, err
+		}
 		publicKey := virtualHost.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = virtualHost.ServerName
 		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(virtualHost.KeyValidityPeriod))
