@@ -434,30 +434,27 @@ func (m *DendriteMonolith) Start() {
 	go func(ch <-chan pineconeEvents.Event) {
 		eLog := logrus.WithField("pinecone", "events")
 
-		for {
-			select {
-			case event := <-ch:
-				switch e := event.(type) {
-				case pineconeEvents.PeerAdded:
-				case pineconeEvents.PeerRemoved:
-				case pineconeEvents.TreeParentUpdate:
-				case pineconeEvents.SnakeDescUpdate:
-				case pineconeEvents.TreeRootAnnUpdate:
-				case pineconeEvents.SnakeEntryAdded:
-				case pineconeEvents.SnakeEntryRemoved:
-				case pineconeEvents.BroadcastReceived:
-					eLog.Info("Broadcast received from: ", e.PeerID)
+		for event := range ch {
+			switch e := event.(type) {
+			case pineconeEvents.PeerAdded:
+			case pineconeEvents.PeerRemoved:
+			case pineconeEvents.TreeParentUpdate:
+			case pineconeEvents.SnakeDescUpdate:
+			case pineconeEvents.TreeRootAnnUpdate:
+			case pineconeEvents.SnakeEntryAdded:
+			case pineconeEvents.SnakeEntryRemoved:
+			case pineconeEvents.BroadcastReceived:
+				eLog.Info("Broadcast received from: ", e.PeerID)
 
-					req := &api.PerformWakeupServersRequest{
-						ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
-					}
-					res := &api.PerformWakeupServersResponse{}
-					if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
-						logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
-					}
-				case pineconeEvents.BandwidthReport:
-				default:
+				req := &api.PerformWakeupServersRequest{
+					ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
 				}
+				res := &api.PerformWakeupServersResponse{}
+				if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
+					logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+				}
+			case pineconeEvents.BandwidthReport:
+			default:
 			}
 		}
 	}(pineconeEventChannel)
