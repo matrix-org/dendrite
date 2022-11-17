@@ -110,6 +110,7 @@ func sendMembership(ctx context.Context, profileAPI userapi.ClientUserAPI, devic
 		ctx, rsAPI,
 		roomserverAPI.KindNew,
 		[]*gomatrixserverlib.HeaderedEvent{event.Event.Headered(roomVer)},
+		device.UserDomain(),
 		serverName,
 		serverName,
 		nil,
@@ -322,7 +323,12 @@ func buildMembershipEvent(
 		return nil, err
 	}
 
-	return eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
+	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	if err != nil {
+		return nil, err
+	}
+
+	return eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, nil)
 }
 
 // loadProfile lookups the profile of a given user from the database and returns

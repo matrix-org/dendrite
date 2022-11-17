@@ -15,12 +15,9 @@
 package inthttp
 
 import (
-	"net/http"
-
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/util"
 )
 
 // nolint: gocyclo
@@ -152,15 +149,9 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 		httputil.MakeInternalRPCAPI("UserAPIPerformSetAvatarURL", s.SetAvatarURL),
 	)
 
-	// TODO: Look at the shape of this
-	internalAPIMux.Handle(QueryNumericLocalpartPath,
-		httputil.MakeInternalAPI("UserAPIQueryNumericLocalpart", func(req *http.Request) util.JSONResponse {
-			response := api.QueryNumericLocalpartResponse{}
-			if err := s.QueryNumericLocalpart(req.Context(), &response); err != nil {
-				return util.ErrorResponse(err)
-			}
-			return util.JSONResponse{Code: http.StatusOK, JSON: &response}
-		}),
+	internalAPIMux.Handle(
+		QueryNumericLocalpartPath,
+		httputil.MakeInternalRPCAPI("UserAPIQueryNumericLocalpart", s.QueryNumericLocalpart),
 	)
 
 	internalAPIMux.Handle(

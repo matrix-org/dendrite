@@ -50,7 +50,7 @@ type destinationQueue struct {
 	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
-	signing            *SigningInfo
+	signing            map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
 	rsAPI              api.FederationRoomserverAPI
 	client             fedapi.FederationClient         // federation client
 	origin             gomatrixserverlib.ServerName    // origin of requests

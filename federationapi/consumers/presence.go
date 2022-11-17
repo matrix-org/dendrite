@@ -111,7 +111,7 @@ func (t *OutputPresenceConsumer) onMessage(ctx context.Context, msgs []*nats.Msg
 	}
 
 	// send this presence to all servers who share rooms with this user.
-	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
+	joined, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
 	if err != nil {
 		log.WithError(err).Error("failed to get joined hosts")
 		return true

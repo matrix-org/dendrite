@@ -30,12 +30,12 @@ import (
 
 // DeviceListUpdateConsumer consumes device list updates that came in over federation.
 type DeviceListUpdateConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	topic      string
-	updater    *internal.DeviceListUpdater
-	serverName gomatrixserverlib.ServerName
+	ctx               context.Context
+	jetstream         nats.JetStreamContext
+	durable           string
+	topic             string
+	updater           *internal.DeviceListUpdater
+	isLocalServerName func(gomatrixserverlib.ServerName) bool
 }
 
 // NewDeviceListUpdateConsumer creates a new DeviceListConsumer. Call Start() to begin consuming from key servers.
@@ -46,12 +46,12 @@ func NewDeviceListUpdateConsumer(
 	updater *internal.DeviceListUpdater,
 ) *DeviceListUpdateConsumer {
 	return &DeviceListUpdateConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		durable:    cfg.Matrix.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-		updater:    updater,
-		serverName: cfg.Matrix.ServerName,
+		ctx:               process.Context(),
+		jetstream:         js,
+		durable:           cfg.Matrix.JetStream.Prefixed("KeyServerInputDeviceListConsumer"),
+		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		updater:           updater,
+		isLocalServerName: cfg.Matrix.IsLocalServerName,
 	}
 }
 
@@ -75,7 +75,7 @@ func (t *DeviceListUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	origin := gomatrixserverlib.ServerName(msg.Header.Get("origin"))
 	if _, serverName, err := gomatrixserverlib.SplitID('@', m.UserID); err != nil {
 		return true
-	} else if serverName == t.serverName {
+	} else if t.isLocalServerName(serverName) {
 		return true
 	} else if serverName != origin {
 		return true
