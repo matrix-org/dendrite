@@ -16,7 +16,6 @@ package routing
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"time"
 
@@ -146,14 +145,26 @@ func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
 	var virtualHost *config.VirtualHost
+loop:
 	for _, v := range cfg.Matrix.VirtualHosts {
 		if v.ServerName == serverName {
 			virtualHost = v
-			break
+			break loop
+		}
+		for _, httpHost := range v.MatchHTTPHosts {
+			if httpHost == serverName {
+				virtualHost = v
+				break loop
+			}
 		}
 	}
 
-	if virtualHost == nil {
+	identity, err := cfg.Matrix.SigningIdentityFor(serverName)
+	if err != nil {
+		identity, _ = cfg.Matrix.SigningIdentityFor(cfg.Matrix.ServerName)
+	}
+
+	if identity.ServerName == serverName {
 		publicKey := cfg.Matrix.PrivateKey.Public().(ed25519.PublicKey)
 		keys.ServerName = cfg.Matrix.ServerName
 		keys.ValidUntilTS = gomatrixserverlib.AsTimestamp(time.Now().Add(cfg.Matrix.KeyValidityPeriod))
@@ -187,20 +198,6 @@ func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 	toSign, err := json.Marshal(keys.ServerKeyFields)
 	if err != nil {
 		return nil, err
-	}
-
-	identity, err := cfg.Matrix.SigningIdentityFor(serverName)
-	if err != nil {
-		// TODO: This is a bit of a hack because the Host header can contain a port
-		// number if it's specified in the well-known file. Try getting a signing
-		// identity without it to see if that helps.
-		var h string
-		if h, _, err = net.SplitHostPort(string(serverName)); err == nil {
-			identity, err = cfg.Matrix.SigningIdentityFor(gomatrixserverlib.ServerName(h))
-		}
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	keys.Raw, err = gomatrixserverlib.SignJSON(

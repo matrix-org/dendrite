@@ -195,6 +195,11 @@ type VirtualHost struct {
 	// Defaults to 24 hours.
 	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
 
+	// Match these HTTP Host headers on the `/key/v2/server` endpoint, this needs
+	// to match all delegated names, likely including the port number too if
+	// the well-known delegation includes that also.
+	MatchHTTPHosts []gomatrixserverlib.ServerName `yaml:"match_http_hosts"`
+
 	// Is registration enabled on this virtual host?
 	AllowRegistration bool `json:"allow_registration"`
 }
