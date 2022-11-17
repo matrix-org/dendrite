@@ -231,6 +231,21 @@ func loadConfig(
 		return nil, err
 	}
 
+	for _, v := range c.Global.VirtualHosts {
+		if v.KeyValidityPeriod == 0 {
+			v.KeyValidityPeriod = c.Global.KeyValidityPeriod
+		}
+		if v.PrivateKeyPath == "" {
+			v.KeyID = c.Global.KeyID
+			v.PrivateKey = c.Global.PrivateKey
+			continue
+		}
+		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
+		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, key := range c.Global.OldVerifyKeys {
 		switch {
 		case key.PrivateKeyPath != "":

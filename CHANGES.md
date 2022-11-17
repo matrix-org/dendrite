@@ -1,5 +1,56 @@
 # Changelog
 
+## Dendrite 0.10.7 (2022-11-04)
+
+### Features
+
+* Dendrite will now use a native SQLite port when building with `CGO_ENABLED=0`
+* A number of `thirdparty` endpoints have been added, improving support for appservices
+
+### Fixes
+
+* The `"state"` section of the `/sync` response is no longer limited, so state events should not be dropped unexpectedly
+* The deduplication of the `"timeline"` and `"state"` sections in `/sync` is now performed after applying history visibility, so state events should not be dropped unexpectedly
+* The `prev_batch` token returned by `/sync` is now calculated after applying history visibility, so that the pagination boundaries are correct
+* The room summary membership counts in `/sync` should now be calculated properly in more cases
+* A false membership leave event should no longer be sent down `/sync` as a result of retiring an accepted invite (contributed by [tak-hntlabs](https://github.com/tak-hntlabs))
+* Presence updates are now only sent to other servers for which the user shares rooms
+* A bug which could cause a panic when converting events into the `ClientEvent` format has been fixed
+
+## Dendrite 0.10.6 (2022-11-01)
+
+### Features
+
+* History visibility checks have been optimised, which should speed up response times on a variety of endpoints (including `/sync`, `/messages`, `/context` and others) and reduce database load
+* The built-in NATS Server has been updated to version 2.9.4
+* Some other minor dependencies have been updated
+
+### Fixes
+
+* A panic has been fixed in the sync API PDU stream which could cause requests to fail
+* The `/members` response now contains the `room_id` field, which may fix some E2EE problems with clients using the JS SDK (contributed by [ashkitten](https://github.com/ashkitten))
+* The auth difference calculation in state resolution v2 has been tweaked for clarity (and moved into gomatrixserverlib with the rest of the state resolution code)
+
+## Dendrite 0.10.5 (2022-10-31)
+
+### Features
+
+* It is now possible to use hCaptcha instead of reCAPTCHA for protecting registration
+* A new `auto_join_rooms` configuration option has been added for automatically joining new users to a set of rooms
+* A new `/_dendrite/admin/downloadState/{serverName}/{roomID}` endpoint has been added, which allows a server administrator to attempt to repair a room with broken room state by downloading a state snapshot from another federated server in the room
+
+### Fixes
+
+* Querying cross-signing keys for users should now be considerably faster
+* A bug in state resolution where some events were not correctly selected for third-party invites has been fixed
+* A bug in state resolution which could result in `not in room` event rejections has been fixed
+* When accepting a DM invite, it should now be possible to see messages that were sent before the invite was accepted
+* Claiming remote E2EE one-time keys has been refactored and should be more reliable now
+* Various fixes have been made to the `/members` endpoint, which may help with E2EE reliability and clients rendering memberships
+* A race condition in the federation API destination queues has been fixed when associating queued events with remote server destinations
+* A bug in the sync API where too many events were selected resulting in high CPU usage has been fixed
+* Configuring the avatar URL for the Server Notices user should work correctly now
+
 ## Dendrite 0.10.4 (2022-10-21)
 
 ### Features

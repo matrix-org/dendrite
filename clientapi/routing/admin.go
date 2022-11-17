@@ -102,12 +102,16 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
+	serverName := cfg.Matrix.ServerName
 	localpart, ok := vars["localpart"]
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("Expecting user localpart."),
 		}
+	}
+	if l, s, err := cfg.Matrix.SplitLocalID('@', localpart); err == nil {
+		localpart, serverName = l, s
 	}
 	request := struct {
 		Password string `json:"password"`
@@ -126,6 +130,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	}
 	updateReq := &userapi.PerformPasswordUpdateRequest{
 		Localpart:     localpart,
+		ServerName:    serverName,
 		Password:      request.Password,
 		LogoutDevices: true,
 	}
@@ -189,5 +194,45 @@ func AdminMarkAsStale(req *http.Request, cfg *config.ClientAPI, keyAPI api.Clien
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: struct{}{},
+	}
+}
+
+func AdminDownloadState(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+	if err != nil {
+		return util.ErrorResponse(err)
+	}
+	roomID, ok := vars["roomID"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting room ID."),
+		}
+	}
+	serverName, ok := vars["serverName"]
+	if !ok {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.MissingArgument("Expecting remote server name."),
+		}
+	}
+	res := &roomserverAPI.PerformAdminDownloadStateResponse{}
+	if err := rsAPI.PerformAdminDownloadState(
+		req.Context(),
+		&roomserverAPI.PerformAdminDownloadStateRequest{
+			UserID:     device.UserID,
+			RoomID:     roomID,
+			ServerName: gomatrixserverlib.ServerName(serverName),
+		},
+		res,
+	); err != nil {
+		return jsonerror.InternalAPIError(req.Context(), err)
+	}
+	if err := res.Error; err != nil {
+		return err.JSONResponse()
+	}
+	return util.JSONResponse{
+		Code: 200,
+		JSON: map[string]interface{}{},
 	}
 }

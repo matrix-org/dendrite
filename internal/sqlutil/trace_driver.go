@@ -21,7 +21,6 @@ import (
 	"database/sql"
 
 	"github.com/lib/pq"
-	sqlite "github.com/mattn/go-sqlite3"
 	"github.com/ngrok/sqlmw"
 )
 
@@ -31,6 +30,6 @@ func registerDrivers() {
 	}
 	// install the wrapped drivers
 	sql.Register("postgres-trace", sqlmw.Driver(&pq.Driver{}, new(traceInterceptor)))
-	sql.Register("sqlite3-trace", sqlmw.Driver(&sqlite.SQLiteDriver{}, new(traceInterceptor)))
+	sql.Register("sqlite3-trace", sqlmw.Driver(sqliteDriver(), new(traceInterceptor)))
 
 }

@@ -76,6 +76,13 @@ func GetMemberships(
 		}
 	}
 
+	if joinedOnly && !queryRes.IsInRoom {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
+		}
+	}
+
 	db, err := syncDB.NewDatabaseSnapshot(req.Context())
 	if err != nil {
 		return jsonerror.InternalServerError()
@@ -102,19 +109,15 @@ func GetMemberships(
 		return jsonerror.InternalServerError()
 	}
 
-	result, err := db.Events(req.Context(), eventIDs)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("db.Events failed")
+	qryRes := &api.QueryEventsByIDResponse{}
+	if err := rsAPI.QueryEventsByID(req.Context(), &api.QueryEventsByIDRequest{EventIDs: eventIDs}, qryRes); err != nil {
+		util.GetLogger(req.Context()).WithError(err).Error("rsAPI.QueryEventsByID failed")
 		return jsonerror.InternalServerError()
 	}
 
+	result := qryRes.Events
+
 	if joinedOnly {
-		if !queryRes.IsInRoom {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden("You aren't a member of the room and weren't previously a member of the room."),
-			}
-		}
 		var res getJoinedMembersResponse
 		res.Joined = make(map[string]joinedMember)
 		for _, ev := range result {
@@ -132,6 +135,6 @@ func GetMemberships(
 	}
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: getMembershipResponse{gomatrixserverlib.HeaderedToClientEvents(result, gomatrixserverlib.FormatSync)},
+		JSON: getMembershipResponse{gomatrixserverlib.HeaderedToClientEvents(result, gomatrixserverlib.FormatAll)},
 	}
 }

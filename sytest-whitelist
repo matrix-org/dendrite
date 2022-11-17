@@ -682,7 +682,6 @@ Presence changes are reported to local room members
 Presence changes are also reported to remote room members
 Presence changes to UNAVAILABLE are reported to local room members
 Presence changes to UNAVAILABLE are reported to remote room members
-New federated private chats get full presence information (SYN-115)
 /upgrade copies >100 power levels to the new room
 Room state after a rejected message event is the same as before
 Room state after a rejected state event is the same as before
@@ -699,7 +698,7 @@ We do send redundant membership state across incremental syncs if asked
 Rejecting invite over federation doesn't break incremental /sync
 Gapped incremental syncs include all state changes
 Old leaves are present in gapped incremental syncs
-Leaves are present in non-gapped incremental syncs
+#Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
 Presence can be set from sync
 /state returns M_NOT_FOUND for a rejected message event
@@ -758,3 +757,10 @@ Local device key changes appear in /keys/changes
 Can get rooms/{roomId}/members at a given point
 Can filter rooms/{roomId}/members
 Current state appears in timeline in private history with many messages after
+AS can publish rooms in their own list
+AS and main public room lists are separate
+/upgrade preserves direct room state
+local user has tags copied to the new room
+remote user has tags copied to the new room
+/upgrade moves remote aliases to the new room
+Local and remote users' homeservers remove a room from their public directory on upgrade
