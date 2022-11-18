@@ -39,7 +39,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -553,12 +552,9 @@ func Register(
 
 	var r registerRequest
 	host := gomatrixserverlib.ServerName(req.Host)
-	logrus.Infof("Getting virtual host for %q", host)
 	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
 		r.ServerName = v.ServerName
-		logrus.Infof("Found virtual host %q", host)
 	} else {
-		logrus.Infof("Using default %q", cfg.Matrix.ServerName)
 		r.ServerName = cfg.Matrix.ServerName
 	}
 	sessionID := gjson.GetBytes(reqBody, "auth.session").String()

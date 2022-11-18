@@ -208,10 +208,10 @@ type VirtualHost struct {
 	MatchHTTPHosts []gomatrixserverlib.ServerName `yaml:"match_http_hosts"`
 
 	// Is registration enabled on this virtual host?
-	AllowRegistration bool `json:"allow_registration"`
+	AllowRegistration bool `yaml:"allow_registration"`
 
 	// Is guest registration enabled on this virtual host?
-	AllowGuests bool `json:"allow_guests"`
+	AllowGuests bool `yaml:"allow_guests"`
 }
 
 func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
