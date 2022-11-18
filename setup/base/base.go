@@ -79,6 +79,7 @@ type BaseDendrite struct {
 	PublicKeyAPIMux        *mux.Router
 	PublicMediaAPIMux      *mux.Router
 	PublicWellKnownAPIMux  *mux.Router
+	PublicStaticMux        *mux.Router
 	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
@@ -250,6 +251,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
+		PublicStaticMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicStaticPath).Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
@@ -403,6 +405,7 @@ func (b *BaseDendrite) configureHTTPErrors() {
 	for _, router := range []*mux.Router{
 		b.PublicMediaAPIMux, b.DendriteAdminMux,
 		b.SynapseAdminMux, b.PublicWellKnownAPIMux,
+		b.PublicStaticMux,
 	} {
 		router.NotFoundHandler = notFoundCORSHandler
 		router.MethodNotAllowedHandler = notAllowedCORSHandler
@@ -458,14 +461,26 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	b.configureHTTPErrors()
 
+	//Redirect for Landing Page
+	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusSeeOther)
+	})
+
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
+	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":"hello world"}`))
+	})
+
 	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	})
+
 	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
 		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
 			w.WriteHeader(503)
@@ -504,6 +519,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.SynapseAdminMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
+	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.PublicStaticMux)
 
 	b.startupLock.Unlock()
 	if internalAddr != NoListener && internalAddr != externalAddr {
