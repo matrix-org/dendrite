@@ -650,7 +650,13 @@ func handleGuestRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
-	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
+	registrationEnabled := !cfg.RegistrationDisabled
+	guestsEnabled := !cfg.GuestsDisabled
+	if r.ServerName != cfg.Matrix.ServerName {
+		registrationEnabled, guestsEnabled = cfg.Matrix.VirtualHost(r.ServerName).RegistrationAllowed()
+	}
+
+	if !registrationEnabled || !guestsEnabled {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Guest registration is disabled"),
@@ -660,6 +666,7 @@ func handleGuestRegistration(
 	var res userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeGuest,
+		ServerName:  r.ServerName,
 	}, &res)
 	if err != nil {
 		return util.JSONResponse{
@@ -736,7 +743,11 @@ func handleRegistrationFlow(
 		)
 	}
 
-	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+	registrationEnabled := !cfg.RegistrationDisabled
+	if r.ServerName != cfg.Matrix.ServerName {
+		registrationEnabled, _ = cfg.Matrix.VirtualHost(r.ServerName).RegistrationAllowed()
+	}
+	if !registrationEnabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
 			JSON: jsonerror.Forbidden("Registration is disabled"),

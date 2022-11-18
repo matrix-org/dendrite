@@ -151,6 +151,15 @@ func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.
 	return u, s, nil
 }
 
+func (c *Global) VirtualHost(serverName gomatrixserverlib.ServerName) *VirtualHost {
+	for _, v := range c.VirtualHosts {
+		if v.ServerName == serverName {
+			return v
+		}
+	}
+	return nil
+}
+
 func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.SigningIdentity, error) {
 	for _, id := range c.SigningIdentities() {
 		if id.ServerName == serverName {
@@ -202,6 +211,9 @@ type VirtualHost struct {
 
 	// Is registration enabled on this virtual host?
 	AllowRegistration bool `json:"allow_registration"`
+
+	// Is guest registration enabled on this virtual host?
+	AllowGuests bool `json:"allow_guests"`
 }
 
 func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
@@ -214,6 +226,16 @@ func (v *VirtualHost) SigningIdentity() *gomatrixserverlib.SigningIdentity {
 		KeyID:      v.KeyID,
 		PrivateKey: v.PrivateKey,
 	}
+}
+
+// RegistrationAllowed returns two bools, the first states whether registration
+// is allowed for this virtual host and the second states whether guests are
+// allowed for this virtual host.
+func (v *VirtualHost) RegistrationAllowed() (bool, bool) {
+	if v == nil {
+		return false, false
+	}
+	return v.AllowRegistration, v.AllowGuests
 }
 
 type OldVerifyKeys struct {
