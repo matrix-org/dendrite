@@ -551,9 +551,10 @@ func Register(
 	}
 
 	var r registerRequest
-	r.ServerName = cfg.Matrix.ServerName
-	if v := cfg.Matrix.VirtualHostForHTTPHost(gomatrixserverlib.ServerName(req.Host)); v != nil {
+	if v := cfg.Matrix.VirtualHostForHTTPHost(gomatrixserverlib.ServerName(req.Header.Get("Host"))); v != nil {
 		r.ServerName = v.ServerName
+	} else {
+		r.ServerName = cfg.Matrix.ServerName
 	}
 	sessionID := gjson.GetBytes(reqBody, "auth.session").String()
 	if sessionID == "" {
