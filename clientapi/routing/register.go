@@ -566,6 +566,7 @@ func Register(
 		// Some of these might end up being overwritten if the
 		// values are specified again in the request body.
 		r.Username = data.Username
+		r.ServerName = data.ServerName
 		r.Password = data.Password
 		r.DeviceID = data.DeviceID
 		r.InitialDisplayName = data.InitialDisplayName
