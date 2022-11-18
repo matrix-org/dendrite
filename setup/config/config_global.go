@@ -14,7 +14,7 @@ import (
 type Global struct {
 	// Signing identity contains the server name, private key and key ID of
 	// the deployment.
-	gomatrixserverlib.SigningIdentity `yaml:"inline"`
+	gomatrixserverlib.SigningIdentity `yaml:",inline"`
 
 	// The secondary server names, used for virtual hosting.
 	VirtualHosts []*VirtualHost `yaml:"virtual_hosts"`
@@ -189,7 +189,7 @@ func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
 type VirtualHost struct {
 	// Signing identity contains the server name, private key and key ID of
 	// the virtual host.
-	gomatrixserverlib.SigningIdentity `yaml:"inline"`
+	gomatrixserverlib.SigningIdentity `yaml:",inline"`
 
 	// Path to the private key. If not specified, the default global private key
 	// will be used instead.
