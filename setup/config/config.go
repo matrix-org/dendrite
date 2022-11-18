@@ -235,7 +235,7 @@ func loadConfig(
 		if v.KeyValidityPeriod == 0 {
 			v.KeyValidityPeriod = c.Global.KeyValidityPeriod
 		}
-		if v.PrivateKeyPath == "" {
+		if v.PrivateKeyPath == "" || v.PrivateKey == nil || v.KeyID == "" {
 			v.KeyID = c.Global.KeyID
 			v.PrivateKey = c.Global.PrivateKey
 			continue

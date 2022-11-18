@@ -61,7 +61,9 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 
 	cfg := &config.UserAPI{
 		Matrix: &config.Global{
-			ServerName: serverName,
+			SigningIdentity: gomatrixserverlib.SigningIdentity{
+				ServerName: serverName,
+			},
 		},
 	}
 
