@@ -39,6 +39,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib/tokens"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
@@ -551,9 +552,13 @@ func Register(
 	}
 
 	var r registerRequest
-	if v := cfg.Matrix.VirtualHostForHTTPHost(gomatrixserverlib.ServerName(req.Header.Get("Host"))); v != nil {
+	host := gomatrixserverlib.ServerName(req.Header.Get("Host"))
+	logrus.Infof("Getting virtual host for %q", host)
+	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
 		r.ServerName = v.ServerName
+		logrus.Infof("Found virtual host %q", host)
 	} else {
+		logrus.Infof("Using default %q", cfg.Matrix.ServerName)
 		r.ServerName = cfg.Matrix.ServerName
 	}
 	sessionID := gjson.GetBytes(reqBody, "auth.session").String()
@@ -656,14 +661,16 @@ func handleGuestRegistration(
 ) util.JSONResponse {
 	registrationEnabled := !cfg.RegistrationDisabled
 	guestsEnabled := !cfg.GuestsDisabled
-	if r.ServerName != cfg.Matrix.ServerName {
-		registrationEnabled, guestsEnabled = cfg.Matrix.VirtualHost(r.ServerName).RegistrationAllowed()
+	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
+		registrationEnabled, guestsEnabled = v.RegistrationAllowed()
 	}
 
 	if !registrationEnabled || !guestsEnabled {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Guest registration is disabled"),
+			JSON: jsonerror.Forbidden(
+				fmt.Sprintf("Guest registration is disabled on %q", r.ServerName),
+			),
 		}
 	}
 
@@ -748,13 +755,15 @@ func handleRegistrationFlow(
 	}
 
 	registrationEnabled := !cfg.RegistrationDisabled
-	if r.ServerName != cfg.Matrix.ServerName {
-		registrationEnabled, _ = cfg.Matrix.VirtualHost(r.ServerName).RegistrationAllowed()
+	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
+		registrationEnabled, _ = v.RegistrationAllowed()
 	}
 	if !registrationEnabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Registration is disabled"),
+			JSON: jsonerror.Forbidden(
+				fmt.Sprintf("Registration is disabled on %q", r.ServerName),
+			),
 		}
 	}
 
