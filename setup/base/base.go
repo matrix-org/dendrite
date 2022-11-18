@@ -472,9 +472,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	}
 
 	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"message":"hello world"}`))
+		http.ServeFile(w, r, "static/index.html")
 	})
 
 	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
