@@ -551,6 +551,7 @@ func Register(
 	}
 
 	var r registerRequest
+	r.ServerName = cfg.Matrix.ServerName
 	if v := cfg.Matrix.VirtualHostForHTTPHost(gomatrixserverlib.ServerName(req.Host)); v != nil {
 		r.ServerName = v.ServerName
 	}
@@ -578,7 +579,6 @@ func Register(
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
 	}
-	r.ServerName = cfg.Matrix.ServerName
 	if l, d, err := cfg.Matrix.SplitLocalID('@', r.Username); err == nil {
 		r.Username, r.ServerName = l, d
 	}
