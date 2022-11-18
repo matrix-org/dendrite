@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -66,7 +67,9 @@ func TestLoginFromJSONReader(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
 				Matrix: &config.Global{
-					ServerName: serverName,
+					SigningIdentity: gomatrixserverlib.SigningIdentity{
+						ServerName: serverName,
+					},
 				},
 			}
 			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
@@ -144,7 +147,9 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
 				Matrix: &config.Global{
-					ServerName: serverName,
+					SigningIdentity: gomatrixserverlib.SigningIdentity{
+						ServerName: serverName,
+					},
 				},
 			}
 			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)

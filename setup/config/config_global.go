@@ -12,21 +12,15 @@ import (
 )
 
 type Global struct {
-	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+	// Signing identity contains the server name, private key and key ID of
+	// the deployment.
+	gomatrixserverlib.SigningIdentity
 
 	// The secondary server names, used for virtual hosting.
 	VirtualHosts []*VirtualHost `yaml:"virtual_hosts"`
 
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
-
-	// The private key which will be used to sign requests and events.
-	PrivateKey ed25519.PrivateKey `yaml:"-"`
-
-	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
-	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
 
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
@@ -160,6 +154,20 @@ func (c *Global) VirtualHost(serverName gomatrixserverlib.ServerName) *VirtualHo
 	return nil
 }
 
+func (c *Global) VirtualHostForHTTPHost(serverName gomatrixserverlib.ServerName) *VirtualHost {
+	for _, v := range c.VirtualHosts {
+		if v.ServerName == serverName {
+			return v
+		}
+		for _, h := range v.MatchHTTPHosts {
+			if h == serverName {
+				return v
+			}
+		}
+	}
+	return nil
+}
+
 func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.SigningIdentity, error) {
 	for _, id := range c.SigningIdentities() {
 		if id.ServerName == serverName {
@@ -171,31 +179,21 @@ func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*g
 
 func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
 	identities := make([]*gomatrixserverlib.SigningIdentity, 0, len(c.VirtualHosts)+1)
-	identities = append(identities, &gomatrixserverlib.SigningIdentity{
-		ServerName: c.ServerName,
-		KeyID:      c.KeyID,
-		PrivateKey: c.PrivateKey,
-	})
+	identities = append(identities, &c.SigningIdentity)
 	for _, v := range c.VirtualHosts {
-		identities = append(identities, v.SigningIdentity())
+		identities = append(identities, &v.SigningIdentity)
 	}
 	return identities
 }
 
 type VirtualHost struct {
-	// The server name of the virtual host.
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
-
-	// The key ID of the private key. If not specified, the default global key ID
-	// will be used instead.
-	KeyID gomatrixserverlib.KeyID `yaml:"key_id"`
+	// Signing identity contains the server name, private key and key ID of
+	// the virtual host.
+	gomatrixserverlib.SigningIdentity
 
 	// Path to the private key. If not specified, the default global private key
 	// will be used instead.
 	PrivateKeyPath Path `yaml:"private_key"`
-
-	// The private key itself.
-	PrivateKey ed25519.PrivateKey `yaml:"-"`
 
 	// How long a remote server can cache our server key for before requesting it again.
 	// Increasing this number will reduce the number of requests made by remote servers
@@ -218,14 +216,6 @@ type VirtualHost struct {
 
 func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
 	checkNotEmpty(configErrs, "virtual_host.*.server_name", string(v.ServerName))
-}
-
-func (v *VirtualHost) SigningIdentity() *gomatrixserverlib.SigningIdentity {
-	return &gomatrixserverlib.SigningIdentity{
-		ServerName: v.ServerName,
-		KeyID:      v.KeyID,
-		PrivateKey: v.PrivateKey,
-	}
 }
 
 // RegistrationAllowed returns two bools, the first states whether registration

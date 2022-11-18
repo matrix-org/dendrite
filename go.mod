@@ -109,8 +109,6 @@ require (
 	github.com/nats-io/jwt/v2 v2.3.0 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/ginkgo/v2 v2.3.0 // indirect
 	github.com/onsi/gomega v1.22.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect

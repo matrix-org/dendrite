@@ -144,24 +144,9 @@ func LocalKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerNam
 
 func localKeys(cfg *config.FederationAPI, serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.ServerKeys, error) {
 	var keys gomatrixserverlib.ServerKeys
-	var virtualHost *config.VirtualHost
-loop:
-	for _, v := range cfg.Matrix.VirtualHosts {
-		if v.ServerName == serverName {
-			virtualHost = v
-			break loop
-		}
-		for _, httpHost := range v.MatchHTTPHosts {
-			if httpHost == serverName {
-				virtualHost = v
-				break loop
-			}
-		}
-	}
-
 	var identity *gomatrixserverlib.SigningIdentity
 	var err error
-	if virtualHost == nil {
+	if virtualHost := cfg.Matrix.VirtualHostForHTTPHost(serverName); virtualHost == nil {
 		if identity, err = cfg.Matrix.SigningIdentityFor(cfg.Matrix.ServerName); err != nil {
 			return nil, err
 		}
