@@ -670,9 +670,23 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 	return nil
 }
 
+// PerformWakeupServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformWakeupServers(
+	ctx context.Context,
+	request *api.PerformWakeupServersRequest,
+	response *api.PerformWakeupServersResponse,
+) (err error) {
+	r.MarkServersAlive(request.ServerNames)
+	return nil
+}
+
 func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
 	for _, srv := range destinations {
-		_ = r.db.RemoveServerFromBlacklist(srv)
+		// Check the statistics cache for the blacklist status to prevent hitting
+		// the database unnecessarily.
+		if r.queues.IsServerBlacklisted(srv) {
+			_ = r.db.RemoveServerFromBlacklist(srv)
+		}
 		r.queues.RetryServer(srv)
 	}
 }

@@ -23,6 +23,7 @@ const (
 	FederationAPIPerformInviteRequestPath          = "/federationapi/performInviteRequest"
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
+	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -146,6 +147,18 @@ func (h *httpFederationInternalAPI) PerformBroadcastEDU(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformBroadcastEDU", h.federationAPIURL+FederationAPIPerformBroadcastEDUPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+// Handle an instruction to remove the respective servers from being blacklisted.
+func (h *httpFederationInternalAPI) PerformWakeupServers(
+	ctx context.Context,
+	request *api.PerformWakeupServersRequest,
+	response *api.PerformWakeupServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformWakeupServers", h.federationAPIURL+FederationAPIPerformWakeupServers,
 		h.httpClient, ctx, request, response,
 	)
 }
