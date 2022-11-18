@@ -552,7 +552,7 @@ func Register(
 	}
 
 	var r registerRequest
-	host := gomatrixserverlib.ServerName(req.Header.Get("Host"))
+	host := gomatrixserverlib.ServerName(req.Host)
 	logrus.Infof("Getting virtual host for %q", host)
 	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
 		r.ServerName = v.ServerName
