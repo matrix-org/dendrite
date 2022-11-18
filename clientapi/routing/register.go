@@ -848,8 +848,9 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
+		req.Context(), userAPI, r.Username, r.ServerName, "", appserviceID, req.RemoteAddr,
+		req.UserAgent(), r.Auth.Session, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+		userapi.AccountTypeAppService,
 	)
 }
 
@@ -867,8 +868,9 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
-			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
+			req.Context(), userAPI, r.Username, r.ServerName, r.Password, "", req.RemoteAddr,
+			req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+			userapi.AccountTypeUser,
 		)
 	}
 	sessions.addParams(sessionID, r)
@@ -890,7 +892,8 @@ func checkAndCompleteFlow(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.ClientUserAPI,
-	username, password, appserviceID, ipAddr, userAgent, sessionID string,
+	username string, serverName gomatrixserverlib.ServerName,
+	password, appserviceID, ipAddr, userAgent, sessionID string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 	accType userapi.AccountType,
@@ -912,6 +915,7 @@ func completeRegistration(
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AppServiceID: appserviceID,
 		Localpart:    username,
+		ServerName:   serverName,
 		Password:     password,
 		AccountType:  accType,
 		OnConflict:   userapi.ConflictAbort,
@@ -955,6 +959,7 @@ func completeRegistration(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		Localpart:         username,
+		ServerName:        serverName,
 		AccessToken:       token,
 		DeviceDisplayName: displayName,
 		DeviceID:          deviceID,
@@ -1049,6 +1054,10 @@ func RegisterAvailable(
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
 	domain := cfg.Matrix.ServerName
+	host := gomatrixserverlib.ServerName(req.Host)
+	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
+		domain = v.ServerName
+	}
 	if u, l, err := cfg.Matrix.SplitLocalID('@', username); err == nil {
 		username, domain = u, l
 	}
@@ -1138,5 +1147,5 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
 }
