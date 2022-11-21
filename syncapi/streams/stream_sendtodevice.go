@@ -5,6 +5,7 @@ import (
 
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
+	"github.com/sirupsen/logrus"
 )
 
 type SendToDeviceStreamProvider struct {
@@ -54,6 +55,12 @@ func (p *SendToDeviceStreamProvider) IncrementalSync(
 			continue
 		}
 		req.Response.ToDevice.Events = append(req.Response.ToDevice.Events, event.SendToDeviceEvent)
+		logrus.WithFields(logrus.Fields{
+			"to_device_id": req.Device.ID,
+			"to_user_id":   req.Device.UserID,
+			"from_user_id": event.Sender,
+			"type":         event.Type,
+		}).Debug("to-device-message received")
 	}
 
 	return lastPos
