@@ -588,7 +588,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			isGappedIncremental := limited && incremental
 			// We want this users membership event, keep it in the list
 			stateKey := *event.StateKey()
-			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
+			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental || stateKey == device.UserID {
 				newStateEvents = append(newStateEvents, event)
 				if !stateFilter.IncludeRedundantMembers {
 					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
