@@ -51,6 +51,19 @@ type FederationQueueJSON interface {
 	SelectQueueJSON(ctx context.Context, txn *sql.Tx, jsonNIDs []int64) (map[int64][]byte, error)
 }
 
+type FederationQueueTransactions interface {
+	InsertQueueTransaction(ctx context.Context, txn *sql.Tx, transactionID gomatrixserverlib.TransactionID, serverName gomatrixserverlib.ServerName, nid int64) error
+	DeleteQueueTransactions(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, jsonNIDs []int64) error
+	SelectQueueTransactions(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, limit int) ([]int64, error)
+	SelectQueueTransactionCount(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (int64, error)
+}
+
+type FederationTransactionJSON interface {
+	InsertTransactionJSON(ctx context.Context, txn *sql.Tx, json string) (int64, error)
+	DeleteTransactionJSON(ctx context.Context, txn *sql.Tx, nids []int64) error
+	SelectTransactionJSON(ctx context.Context, txn *sql.Tx, jsonNIDs []int64) (map[int64][]byte, error)
+}
+
 type FederationJoinedHosts interface {
 	InsertJoinedHosts(ctx context.Context, txn *sql.Tx, roomID, eventID string, serverName gomatrixserverlib.ServerName) error
 	DeleteJoinedHosts(ctx context.Context, txn *sql.Tx, eventIDs []string) error
