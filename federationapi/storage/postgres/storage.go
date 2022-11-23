@@ -54,7 +54,15 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
+	queueTransactions, err := NewPostgresQueueTransactionsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	queueJSON, err := NewPostgresQueueJSONTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	transactionJSON, err := NewPostgresTransactionJSONTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -95,20 +103,22 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                       d.db,
-		IsLocalServerName:        isLocalServerName,
-		Cache:                    cache,
-		Writer:                   d.writer,
-		FederationJoinedHosts:    joinedHosts,
-		FederationQueuePDUs:      queuePDUs,
-		FederationQueueEDUs:      queueEDUs,
-		FederationQueueJSON:      queueJSON,
-		FederationBlacklist:      blacklist,
-		FederationInboundPeeks:   inboundPeeks,
-		FederationOutboundPeeks:  outboundPeeks,
-		NotaryServerKeysJSON:     notaryJSON,
-		NotaryServerKeysMetadata: notaryMetadata,
-		ServerSigningKeys:        serverSigningKeys,
+		DB:                          d.db,
+		IsLocalServerName:           isLocalServerName,
+		Cache:                       cache,
+		Writer:                      d.writer,
+		FederationJoinedHosts:       joinedHosts,
+		FederationQueuePDUs:         queuePDUs,
+		FederationQueueEDUs:         queueEDUs,
+		FederationQueueJSON:         queueJSON,
+		FederationQueueTransactions: queueTransactions,
+		FederationTransactionJSON:   transactionJSON,
+		FederationBlacklist:         blacklist,
+		FederationInboundPeeks:      inboundPeeks,
+		FederationOutboundPeeks:     outboundPeeks,
+		NotaryServerKeysJSON:        notaryJSON,
+		NotaryServerKeysMetadata:    notaryMetadata,
+		ServerSigningKeys:           serverSigningKeys,
 	}
 	return &d, nil
 }

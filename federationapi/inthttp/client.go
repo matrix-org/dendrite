@@ -23,6 +23,7 @@ const (
 	FederationAPIPerformInviteRequestPath          = "/federationapi/performInviteRequest"
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
+	FederationAPIPerformStoreAsyncPath             = "/federationapi/performStoreAsync"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -146,6 +147,17 @@ func (h *httpFederationInternalAPI) PerformBroadcastEDU(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformBroadcastEDU", h.federationAPIURL+FederationAPIPerformBroadcastEDUPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) PerformStoreAsync(
+	ctx context.Context,
+	request *api.PerformStoreAsyncRequest,
+	response *api.PerformStoreAsyncResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformStoreAsync", h.federationAPIURL+FederationAPIPerformStoreAsyncPath,
 		h.httpClient, ctx, request, response,
 	)
 }

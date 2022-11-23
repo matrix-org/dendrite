@@ -30,6 +30,12 @@ type FederationInternalAPI interface {
 		request *PerformBroadcastEDURequest,
 		response *PerformBroadcastEDUResponse,
 	) error
+
+	PerformStoreAsync(
+		ctx context.Context,
+		request *PerformStoreAsyncRequest,
+		response *PerformStoreAsyncResponse,
+	) error
 }
 
 type ClientFederationAPI interface {
@@ -211,6 +217,14 @@ type PerformBroadcastEDURequest struct {
 }
 
 type PerformBroadcastEDUResponse struct {
+}
+
+type PerformStoreAsyncRequest struct {
+	Txn    gomatrixserverlib.Transaction `json:"transaction"`
+	UserID gomatrixserverlib.UserID      `json:"user_id"`
+}
+
+type PerformStoreAsyncResponse struct {
 }
 
 type InputPublicKeysRequest struct {

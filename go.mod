@@ -143,4 +143,4 @@ require (
 
 go 1.18
 
-replace github.com/matrix-org/gomatrixserverlib => ../../gomatrixserverlib/mailbox
+replace github.com/matrix-org/gomatrixserverlib => github.com/matrix-org/gomatrixserverlib v0.0.0-20221110204444-22af9cae40c5

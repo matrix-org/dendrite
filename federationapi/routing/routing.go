@@ -133,6 +133,23 @@ func Setup(
 		},
 	)).Methods(http.MethodPut, http.MethodOptions)
 
+	v1fedmux.Handle("/forward_async/{txnID}/{userID}", MakeFedAPI(
+		"federation_forward_async", "", cfg.Matrix.IsLocalServerName, keys, wakeup,
+		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
+			if err != nil {
+				return util.JSONResponse{
+					Code: http.StatusBadRequest,
+					JSON: jsonerror.InvalidUsername("Username was invalid"),
+				}
+			}
+			return ForwardAsync(
+				httpReq, request, fsAPI, gomatrixserverlib.TransactionID(vars["txnID"]),
+				*userID,
+			)
+		},
+	)).Methods(http.MethodPut, http.MethodOptions)
+
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {

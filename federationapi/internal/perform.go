@@ -648,6 +648,27 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 	return nil
 }
 
+// PerformStoreAsync implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformStoreAsync(
+	ctx context.Context,
+	request *api.PerformStoreAsyncRequest,
+	response *api.PerformStoreAsyncResponse,
+) error {
+	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
+	if err != nil {
+		return err
+	}
+	err = r.db.AssociateAsyncTransactionWithDestinations(
+		ctx,
+		map[gomatrixserverlib.UserID]struct{}{
+			request.UserID: {},
+		},
+		request.Txn.TransactionID,
+		receipt)
+
+	return err
+}
+
 func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
 	for _, srv := range destinations {
 		_ = r.db.RemoveServerFromBlacklist(srv)

@@ -1,11 +1,5 @@
 // Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
+// Copyright 2019-2020 The Matrix.org Foundation C.I.C. // // Licensed under the Apache License, Version 2.0 (the "License"); // you may not use this file except in compliance with the License. // You may obtain a copy of the License at // //     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,6 +51,14 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
+	queueTransactions, err := NewSQLiteQueueTransactionsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	transactionJSON, err := NewSQLiteTransactionJSONTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	blacklist, err := NewSQLiteBlacklistTable(d.db)
 	if err != nil {
 		return nil, err
@@ -94,20 +96,22 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                       d.db,
-		IsLocalServerName:        isLocalServerName,
-		Cache:                    cache,
-		Writer:                   d.writer,
-		FederationJoinedHosts:    joinedHosts,
-		FederationQueuePDUs:      queuePDUs,
-		FederationQueueEDUs:      queueEDUs,
-		FederationQueueJSON:      queueJSON,
-		FederationBlacklist:      blacklist,
-		FederationOutboundPeeks:  outboundPeeks,
-		FederationInboundPeeks:   inboundPeeks,
-		NotaryServerKeysJSON:     notaryKeys,
-		NotaryServerKeysMetadata: notaryKeysMetadata,
-		ServerSigningKeys:        serverSigningKeys,
+		DB:                          d.db,
+		IsLocalServerName:           isLocalServerName,
+		Cache:                       cache,
+		Writer:                      d.writer,
+		FederationJoinedHosts:       joinedHosts,
+		FederationQueuePDUs:         queuePDUs,
+		FederationQueueEDUs:         queueEDUs,
+		FederationQueueJSON:         queueJSON,
+		FederationQueueTransactions: queueTransactions,
+		FederationTransactionJSON:   transactionJSON,
+		FederationBlacklist:         blacklist,
+		FederationOutboundPeeks:     outboundPeeks,
+		FederationInboundPeeks:      inboundPeeks,
+		NotaryServerKeysJSON:        notaryKeys,
+		NotaryServerKeysMetadata:    notaryKeysMetadata,
+		ServerSigningKeys:           serverSigningKeys,
 	}
 	return &d, nil
 }
