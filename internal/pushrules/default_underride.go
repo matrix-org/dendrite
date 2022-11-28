@@ -35,11 +35,6 @@ var (
 				Tweak: SoundTweak,
 				Value: "ring",
 			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
 		},
 	}
 	mRuleEncryptedRoomOneToOneDefinition = Rule{
@@ -64,11 +59,6 @@ var (
 				Tweak: SoundTweak,
 				Value: "default",
 			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
 		},
 	}
 	mRuleRoomOneToOneDefinition = Rule{
@@ -90,13 +80,8 @@ var (
 			{Kind: NotifyAction},
 			{
 				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
+				Tweak: SoundTweak,
+				Value: "default",
 			},
 		},
 	}
@@ -113,11 +98,6 @@ var (
 		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
 		},
 	}
 	mRuleEncryptedDefinition = Rule{
@@ -133,11 +113,6 @@ var (
 		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
 		},
 	}
 )

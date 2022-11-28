@@ -22,6 +22,7 @@ const (
 	MRuleTombstone           = ".m.rule.tombstone"
 	MRuleRoomNotif           = ".m.rule.roomnotif"
 	MRuleReaction            = ".m.rule.reaction"
+	MRuleRoomACLs            = ".m.rule.room.server_acl"
 )
 
 var (
@@ -73,7 +74,6 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: true,
 			},
 		},
 	}
@@ -98,9 +98,26 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: true,
 			},
 		},
+	}
+	mRuleACLsDefinition = Rule{
+		RuleID:  MRuleRoomACLs,
+		Default: true,
+		Enabled: true,
+		Conditions: []*Condition{
+			{
+				Kind:    EventMatchCondition,
+				Key:     "type",
+				Pattern: "m.room.server_acl",
+			},
+			{
+				Kind:    EventMatchCondition,
+				Key:     "state_key",
+				Pattern: "",
+			},
+		},
+		Actions: []*Action{},
 	}
 	mRuleRoomNotifDefinition = Rule{
 		RuleID:  MRuleRoomNotif,
@@ -122,7 +139,6 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: true,
 			},
 		},
 	}
@@ -171,11 +187,6 @@ func mRuleInviteForMeDefinition(userID string) *Rule {
 				Kind:  SetTweakAction,
 				Tweak: SoundTweak,
 				Value: "default",
-			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
 			},
 		},
 	}
