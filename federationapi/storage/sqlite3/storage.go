@@ -41,6 +41,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
+	blacklist, err := NewSQLiteBlacklistTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -54,10 +58,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 	queueJSON, err := NewSQLiteQueueJSONTable(d.db)
-	if err != nil {
-		return nil, err
-	}
-	blacklist, err := NewSQLiteBlacklistTable(d.db)
 	if err != nil {
 		return nil, err
 	}

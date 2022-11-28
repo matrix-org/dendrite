@@ -133,7 +133,13 @@ func (t *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 func newFedClient(tripper func(*http.Request) (*http.Response, error)) *gomatrixserverlib.FederationClient {
 	_, pkey, _ := ed25519.GenerateKey(nil)
 	fedClient := gomatrixserverlib.NewFederationClient(
-		gomatrixserverlib.ServerName("example.test"), gomatrixserverlib.KeyID("ed25519:test"), pkey,
+		[]*gomatrixserverlib.SigningIdentity{
+			{
+				ServerName: gomatrixserverlib.ServerName("example.test"),
+				KeyID:      gomatrixserverlib.KeyID("ed25519:test"),
+				PrivateKey: pkey,
+			},
+		},
 	)
 	fedClient.Client = *gomatrixserverlib.NewClient(
 		gomatrixserverlib.WithTransport(&roundTripper{tripper}),
@@ -151,7 +157,7 @@ func TestUpdateHavePrevID(t *testing.T) {
 	}
 	ap := &mockDeviceListUpdaterAPI{}
 	producer := &mockKeyChangeProducer{}
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1, nil)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, nil, 1, nil, "localhost")
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		DeviceDisplayName: "Foo Bar",
 		Deleted:           false,
@@ -223,7 +229,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 			`)),
 		}, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, nil)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 2, nil, "example.test")
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}
@@ -292,7 +298,7 @@ func TestDebounce(t *testing.T) {
 		close(incomingFedReq)
 		return <-fedCh, nil
 	})
-	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1, nil)
+	updater := NewDeviceListUpdater(process.NewProcessContext(), db, ap, producer, fedClient, 1, nil, "localhost")
 	if err := updater.Start(); err != nil {
 		t.Fatalf("failed to start updater: %s", err)
 	}

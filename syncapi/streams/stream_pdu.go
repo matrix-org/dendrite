@@ -264,6 +264,9 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	// Work out what the highest stream position is for all of the events in this
 	// room that were returned.
 	latestPosition := r.To
+	if r.Backwards {
+		latestPosition = r.From
+	}
 	updateLatestPosition := func(mostRecentEventID string) {
 		var pos types.StreamPosition
 		if _, pos, err = snapshot.PositionInTopology(ctx, mostRecentEventID); err == nil {
@@ -585,7 +588,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			isGappedIncremental := limited && incremental
 			// We want this users membership event, keep it in the list
 			stateKey := *event.StateKey()
-			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
+			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental || stateKey == device.UserID {
 				newStateEvents = append(newStateEvents, event)
 				if !stateFilter.IncludeRedundantMembers {
 					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())
