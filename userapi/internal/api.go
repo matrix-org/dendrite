@@ -549,7 +549,7 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 }
 
 func (a *UserInternalAPI) QueryAccountByLocalpart(ctx context.Context, req *api.QueryAccountByLocalpartRequest, res *api.QueryAccountByLocalpartResponse) (err error) {
-	res.Account, err = a.DB.GetAccountByLocalpart(ctx, req.Localpart)
+	res.Account, err = a.DB.GetAccountByLocalpart(ctx, req.Localpart, req.ServerName)
 	return
 }
 

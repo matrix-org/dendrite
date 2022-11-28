@@ -674,7 +674,8 @@ type PerformSaveThreePIDAssociationRequest struct {
 }
 
 type QueryAccountByLocalpartRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryAccountByLocalpartResponse struct {

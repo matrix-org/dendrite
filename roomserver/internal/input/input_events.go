@@ -775,7 +775,10 @@ func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event
 		}
 
 		accountRes := &userAPI.QueryAccountByLocalpartResponse{}
-		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{Localpart: localpart}, accountRes); err != nil {
+		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{
+			Localpart:  localpart,
+			ServerName: senderDomain,
+		}, accountRes); err != nil {
 			return err
 		}
 		if accountRes.Account == nil {
