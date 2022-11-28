@@ -104,7 +104,7 @@ func TestMain(m *testing.M) {
 
 			// Create the federation client.
 			s.fedclient = gomatrixserverlib.NewFederationClient(
-				s.config.Matrix.ServerName, serverKeyID, testPriv,
+				s.config.Matrix.SigningIdentities(),
 				gomatrixserverlib.WithTransport(transport),
 			)
 
@@ -137,7 +137,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	}
 
 	// Get the keys and JSON-ify them.
-	keys := routing.LocalKeys(s.config)
+	keys := routing.LocalKeys(s.config, gomatrixserverlib.ServerName(req.Host))
 	body, err := json.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err

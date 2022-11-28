@@ -120,15 +120,13 @@ func NewInternalAPI(
 
 	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
+	signingInfo := base.Cfg.Global.SigningIdentities()
+
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, rsAPI, &stats,
-		&queue.SigningInfo{
-			KeyID:      cfg.Matrix.KeyID,
-			PrivateKey: cfg.Matrix.PrivateKey,
-			ServerName: cfg.Matrix.ServerName,
-		},
+		signingInfo,
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(

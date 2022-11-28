@@ -528,6 +528,7 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 		BackwardsExtremities: backwardsExtremities,
 		Limit:                limit,
 		ServerName:           r.cfg.Matrix.ServerName,
+		VirtualHost:          r.device.UserDomain(),
 	}, &res)
 	if err != nil {
 		return nil, fmt.Errorf("PerformBackfill failed: %w", err)

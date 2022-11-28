@@ -61,7 +61,9 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 
 	cfg := &config.UserAPI{
 		Matrix: &config.Global{
-			ServerName: serverName,
+			SigningIdentity: gomatrixserverlib.SigningIdentity{
+				ServerName: serverName,
+			},
 		},
 	}
 
@@ -80,14 +82,14 @@ func TestQueryProfile(t *testing.T) {
 	// only one DBType, since userapi.AddInternalRoutes complains about multiple prometheus counters added
 	userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
 	defer close()
-	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", api.AccountTypeUser)
+	_, err := accountDB.CreateAccount(context.TODO(), "alice", serverName, "foobar", "", api.AccountTypeUser)
 	if err != nil {
 		t.Fatalf("failed to make account: %s", err)
 	}
-	if _, _, err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
+	if _, _, err := accountDB.SetAvatarURL(context.TODO(), "alice", serverName, aliceAvatarURL); err != nil {
 		t.Fatalf("failed to set avatar url: %s", err)
 	}
-	if _, _, err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
+	if _, _, err := accountDB.SetDisplayName(context.TODO(), "alice", serverName, aliceDisplayName); err != nil {
 		t.Fatalf("failed to set display name: %s", err)
 	}
 
@@ -164,7 +166,7 @@ func TestPasswordlessLoginFails(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
 		defer close()
-		_, err := accountDB.CreateAccount(ctx, "auser", "", "", api.AccountTypeAppService)
+		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
 		}
@@ -190,7 +192,7 @@ func TestLoginToken(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
 			defer close()
-			_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", api.AccountTypeUser)
+			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
 			if err != nil {
 				t.Fatalf("failed to make account: %s", err)
 			}

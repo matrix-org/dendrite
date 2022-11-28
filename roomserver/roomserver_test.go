@@ -44,7 +44,7 @@ func Test_SharedUsers(t *testing.T) {
 		// SetFederationAPI starts the room event input consumer
 		rsAPI.SetFederationAPI(nil, nil)
 		// Create the room
-		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", nil, false); err != nil {
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
 		}
 

@@ -77,7 +77,7 @@ func DirectoryRoom(
 		// If we don't know it locally, do a federation query.
 		// But don't send the query to ourselves.
 		if !cfg.Matrix.IsLocalServerName(domain) {
-			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), domain, roomAlias)
+			fedRes, fedErr := federation.LookupRoomAlias(req.Context(), cfg.Matrix.ServerName, domain, roomAlias)
 			if fedErr != nil {
 				// TODO: Return 502 if the remote server errored.
 				// TODO: Return 504 if the remote server timed out.

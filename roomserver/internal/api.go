@@ -87,10 +87,10 @@ func NewRoomserverAPI(
 		Durable:                base.Cfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
-			DB:         roomserverDB,
-			Cache:      base.Caches,
-			ServerName: base.Cfg.Global.ServerName,
-			ServerACLs: serverACLs,
+			DB:                roomserverDB,
+			Cache:             base.Caches,
+			IsLocalServerName: base.Cfg.Global.IsLocalServerName,
+			ServerACLs:        serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}
@@ -104,6 +104,12 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(r.Cfg.Matrix.ServerName)
+	// If federation is enabled, but we don't have a signing key, bail.
+	if err != nil && !r.Cfg.Matrix.DisableFederation {
+		logrus.Panic(err)
+	}
+
 	r.Inputer = &input.Inputer{
 		Cfg:                 &r.Base.Cfg.RoomServer,
 		Base:                r.Base,
@@ -115,6 +121,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		NATSClient:          r.NATSClient,
 		Durable:             nats.Durable(r.Durable),
 		ServerName:          r.Cfg.Matrix.ServerName,
+		SigningIdentity:     identity,
 		FSAPI:               fsAPI,
 		KeyRing:             keyRing,
 		ACLs:                r.ServerACLs,
@@ -127,13 +134,12 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
-		ServerName: r.Cfg.Matrix.ServerName,
-		Cfg:        r.Cfg,
-		DB:         r.DB,
-		FSAPI:      r.fsAPI,
-		RSAPI:      r,
-		Inputer:    r.Inputer,
-		Queryer:    r.Queryer,
+		Cfg:     r.Cfg,
+		DB:      r.DB,
+		FSAPI:   r.fsAPI,
+		RSAPI:   r,
+		Inputer: r.Inputer,
+		Queryer: r.Queryer,
 	}
 	r.Peeker = &perform.Peeker{
 		ServerName: r.Cfg.Matrix.ServerName,
@@ -163,10 +169,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB: r.DB,
 	}
 	r.Backfiller = &perform.Backfiller{
-		ServerName: r.ServerName,
-		DB:         r.DB,
-		FSAPI:      r.fsAPI,
-		KeyRing:    r.KeyRing,
+		IsLocalServerName: r.Cfg.Matrix.IsLocalServerName,
+		DB:                r.DB,
+		FSAPI:             r.fsAPI,
+		KeyRing:           r.KeyRing,
 		// Perspective servers are trusted to not lie about server keys, so we will also
 		// prefer these servers when backfilling (assuming they are in the room) rather
 		// than trying random servers

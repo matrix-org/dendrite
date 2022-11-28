@@ -356,11 +356,12 @@ func (h *httpUserInternalAPI) SetAvatarURL(
 
 func (h *httpUserInternalAPI) QueryNumericLocalpart(
 	ctx context.Context,
+	request *api.QueryNumericLocalpartRequest,
 	response *api.QueryNumericLocalpartResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryNumericLocalpart", h.apiURL+QueryNumericLocalpartPath,
-		h.httpClient, ctx, &struct{}{}, response,
+		h.httpClient, ctx, request, response,
 	)
 }
 

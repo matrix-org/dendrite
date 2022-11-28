@@ -156,8 +156,8 @@ func (t *UserInternalAPITrace) SetAvatarURL(ctx context.Context, req *PerformSet
 	return err
 }
 
-func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error {
-	err := t.Impl.QueryNumericLocalpart(ctx, res)
+func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error {
+	err := t.Impl.QueryNumericLocalpart(ctx, req, res)
 	util.GetLogger(ctx).Infof("QueryNumericLocalpart req= res=%+v", js(res))
 	return err
 }

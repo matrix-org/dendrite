@@ -79,7 +79,7 @@ type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
 	UserLoginAPI
-	QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error
+	QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
@@ -336,9 +336,10 @@ type PerformAccountCreationResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformPasswordUpdateRequest struct {
-	Localpart     string // Required: The localpart for this account.
-	Password      string // Required: The new password to set.
-	LogoutDevices bool   // Optional: Whether to log out all user devices.
+	Localpart     string                       // Required: The localpart for this account.
+	ServerName    gomatrixserverlib.ServerName // Required: The domain for this account.
+	Password      string                       // Required: The new password to set.
+	LogoutDevices bool                         // Optional: Whether to log out all user devices.
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
@@ -519,7 +520,8 @@ const (
 )
 
 type QueryPushersRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryPushersResponse struct {
@@ -527,14 +529,16 @@ type QueryPushersResponse struct {
 }
 
 type PerformPusherSetRequest struct {
-	Pusher    // Anonymous field because that's how clientapi unmarshals it.
-	Localpart string
-	Append    bool `json:"append"`
+	Pusher     // Anonymous field because that's how clientapi unmarshals it.
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	Append     bool `json:"append"`
 }
 
 type PerformPusherDeletionRequest struct {
-	Localpart string
-	SessionID int64
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	SessionID  int64
 }
 
 // Pusher represents a push notification subscriber
@@ -572,10 +576,11 @@ type QueryPushRulesResponse struct {
 }
 
 type QueryNotificationsRequest struct {
-	Localpart string `json:"localpart"` // Required.
-	From      string `json:"from,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
-	Only      string `json:"only,omitempty"`
+	Localpart  string                       `json:"localpart"`   // Required.
+	ServerName gomatrixserverlib.ServerName `json:"server_name"` // Required.
+	From       string                       `json:"from,omitempty"`
+	Limit      int                          `json:"limit,omitempty"`
+	Only       string                       `json:"only,omitempty"`
 }
 
 type QueryNotificationsResponse struct {
@@ -602,12 +607,17 @@ type PerformSetAvatarURLResponse struct {
 	Changed bool               `json:"changed"`
 }
 
+type QueryNumericLocalpartRequest struct {
+	ServerName gomatrixserverlib.ServerName
+}
+
 type QueryNumericLocalpartResponse struct {
 	ID int64
 }
 
 type QueryAccountAvailabilityRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryAccountAvailabilityResponse struct {
@@ -615,7 +625,9 @@ type QueryAccountAvailabilityResponse struct {
 }
 
 type QueryAccountByPasswordRequest struct {
-	Localpart, PlaintextPassword string
+	Localpart         string
+	ServerName        gomatrixserverlib.ServerName
+	PlaintextPassword string
 }
 
 type QueryAccountByPasswordResponse struct {
@@ -639,11 +651,13 @@ type QueryLocalpartForThreePIDRequest struct {
 }
 
 type QueryLocalpartForThreePIDResponse struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryThreePIDsForLocalpartRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryThreePIDsForLocalpartResponse struct {
@@ -653,7 +667,10 @@ type QueryThreePIDsForLocalpartResponse struct {
 type PerformForgetThreePIDRequest QueryLocalpartForThreePIDRequest
 
 type PerformSaveThreePIDAssociationRequest struct {
-	ThreePID, Localpart, Medium string
+	ThreePID   string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	Medium     string
 }
 
 type QueryAccountByLocalpartRequest struct {

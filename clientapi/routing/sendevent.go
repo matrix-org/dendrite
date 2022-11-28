@@ -186,6 +186,7 @@ func SendEvent(
 		[]*gomatrixserverlib.HeaderedEvent{
 			e.Headered(verRes.RoomVersion),
 		},
+		device.UserDomain(),
 		domain,
 		domain,
 		txnAndSessionID,
@@ -275,8 +276,14 @@ func generateSendEvent(
 		return nil, &resErr
 	}
 
+	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	if err != nil {
+		resErr := jsonerror.InternalServerError()
+		return nil, &resErr
+	}
+
 	var queryRes api.QueryLatestEventsAndStateResponse
-	e, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, &queryRes)
+	e, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &util.JSONResponse{
 			Code: http.StatusNotFound,
