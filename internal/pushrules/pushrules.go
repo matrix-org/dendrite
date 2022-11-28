@@ -69,7 +69,3 @@ const (
 	SenderKind    Kind = "sender"
 	UnderrideKind Kind = "underride"
 )
-
-func pointer(s string) *string {
-	return &s
-}
