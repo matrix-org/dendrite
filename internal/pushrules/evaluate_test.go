@@ -79,8 +79,8 @@ func TestRuleMatches(t *testing.T) {
 		{"underrideConditionMatch", UnderrideKind, Rule{Enabled: true}, `{}`, true},
 		{"underrideConditionNoMatch", UnderrideKind, Rule{Enabled: true, Conditions: []*Condition{{}}}, `{}`, false},
 
-		{"contentMatch", ContentKind, Rule{Enabled: true, Pattern: "b"}, `{"content":{"body":"abc"}}`, true},
-		{"contentNoMatch", ContentKind, Rule{Enabled: true, Pattern: "d"}, `{"content":{"body":"abc"}}`, false},
+		{"contentMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("b")}, `{"content":{"body":"abc"}}`, true},
+		{"contentNoMatch", ContentKind, Rule{Enabled: true, Pattern: pointer("d")}, `{"content":{"body":"abc"}}`, false},
 
 		{"roomMatch", RoomKind, Rule{Enabled: true, RuleID: "!room@example.com"}, `{"room_id":"!room@example.com"}`, true},
 		{"roomNoMatch", RoomKind, Rule{Enabled: true, RuleID: "!room@example.com"}, `{"room_id":"!otherroom@example.com"}`, false},
@@ -110,6 +110,7 @@ func TestConditionMatches(t *testing.T) {
 	}{
 		{"empty", Condition{}, `{}`, false},
 		{"empty", Condition{Kind: "unknownstring"}, `{}`, false},
+		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content", Pattern: pointer("")}, `{"content":{}}`, true},
 
 		// Neither of these should match because `content` is not a full string match,
 		// and `content.body` is not a string value.

@@ -21,7 +21,7 @@ func TestDefaultRules(t *testing.T) {
 		// Default override rules
 		{
 			name:       ".m.rule.master",
-			inputBytes: []byte(`{"rule_id":".m.rule.master","default":true,"enabled":false,"conditions":[],"actions":["dont_notify"]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.master","default":true,"enabled":false,"actions":["dont_notify"]}`),
 			want:       mRuleMasterDefinition,
 		},
 		{
@@ -31,12 +31,12 @@ func TestDefaultRules(t *testing.T) {
 		},
 		{
 			name:       ".m.rule.invite_for_me",
-			inputBytes: []byte(`{"rule_id":".m.rule.invite_for_me","default":true,"enabled":true,"conditions":[{"key":"type","kind":"event_match","pattern":"m.room.member"},{"key":"content.membership","kind":"event_match","pattern":"invite"},{"key":"state_key","kind":"event_match","pattern":"@test:localhost"}],"actions":["notify",{"set_tweak":"sound","value":"default"}]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.invite_for_me","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"type","pattern":"m.room.member"},{"kind":"event_match","key":"content.membership","pattern":"invite"},{"kind":"event_match","key":"state_key","pattern":"@test:localhost"}],"actions":["notify",{"set_tweak":"sound","value":"default"}]}`),
 			want:       *mRuleInviteForMeDefinition("@test:localhost"),
 		},
 		{
 			name:       ".m.rule.member_event",
-			inputBytes: []byte(`{"rule_id":".m.rule.member_event","default":true,"enabled":true,"conditions":[{"key":"type","kind":"event_match","pattern":"m.room.member"}],"actions":["dont_notify"]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.member_event","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"type","pattern":"m.room.member"}],"actions":["dont_notify"]}`),
 			want:       mRuleMemberEventDefinition,
 		},
 		{
@@ -62,13 +62,13 @@ func TestDefaultRules(t *testing.T) {
 		// Default content rules
 		{
 			name:       ".m.rule.contains_user_name",
-			inputBytes: []byte(`{"rule_id":".m.rule.contains_user_name","default":true,"enabled":true,"pattern":"myLocalUser","actions":["notify",{"set_tweak":"sound","value":"default"},{"set_tweak":"highlight"}]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.contains_user_name","default":true,"enabled":true,"actions":["notify",{"set_tweak":"sound","value":"default"},{"set_tweak":"highlight"}],"pattern":"myLocalUser"}`),
 			want:       *mRuleContainsUserNameDefinition("myLocalUser"),
 		},
 		// default underride rules
 		{
 			name:       ".m.rule.call",
-			inputBytes: []byte(`{"rule_id":".m.rule.call","default":true,"enabled":true,"conditions":[{"key":"type","kind":"event_match","pattern":"m.call.invite"}],"actions":["notify",{"set_tweak":"sound","value":"ring"}]}`),
+			inputBytes: []byte(`{"rule_id":".m.rule.call","default":true,"enabled":true,"conditions":[{"kind":"event_match","key":"type","pattern":"m.call.invite"}],"actions":["notify",{"set_tweak":"sound","value":"ring"}]}`),
 			want:       mRuleCallDefinition,
 		},
 		{
@@ -96,9 +96,15 @@ func TestDefaultRules(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := Rule{}
+			// unmarshal predefined push rules
 			err := json.Unmarshal(tc.inputBytes, &r)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.want, r)
+
+			// and reverse it to check we get the expected result
+			got, err := json.Marshal(r)
+			assert.NoError(t, err)
+			assert.Equal(t, string(got), string(tc.inputBytes))
 		})
 
 	}

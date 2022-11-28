@@ -15,7 +15,7 @@ func mRuleContainsUserNameDefinition(localpart string) *Rule {
 		RuleID:  MRuleContainsUserName,
 		Default: true,
 		Enabled: true,
-		Pattern: localpart,
+		Pattern: &localpart,
 		Actions: []*Action{
 			{Kind: NotifyAction},
 			{

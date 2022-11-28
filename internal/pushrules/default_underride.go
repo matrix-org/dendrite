@@ -25,7 +25,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.call.invite",
+				Pattern: pointer("m.call.invite"),
 			},
 		},
 		Actions: []*Action{
@@ -49,7 +49,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.encrypted",
+				Pattern: pointer("m.room.encrypted"),
 			},
 		},
 		Actions: []*Action{
@@ -73,7 +73,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.message",
+				Pattern: pointer("m.room.message"),
 			},
 		},
 		Actions: []*Action{
@@ -93,7 +93,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.message",
+				Pattern: pointer("m.room.message"),
 			},
 		},
 		Actions: []*Action{
@@ -108,7 +108,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.encrypted",
+				Pattern: pointer("m.room.encrypted"),
 			},
 		},
 		Actions: []*Action{
