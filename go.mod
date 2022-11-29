@@ -22,9 +22,9 @@ require (
 	github.com/matrix-org/dugong v0.0.0-20210921133753-66e6b1c67e2e
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20220926102614-ceba4d9f7530
-	github.com/matrix-org/gomatrixserverlib v0.0.0-20221101165746-0e4a8bb6db7e
+	github.com/matrix-org/gomatrixserverlib v0.0.0-20221124190327-27837f0b74cc
 	github.com/matrix-org/pinecone v0.0.0-20221103125849-37f2e9b9ba37
-	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
+	github.com/matrix-org/util v0.0.0-20221111132719-399730281e66
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/nats-io/nats-server/v2 v2.9.4
 	github.com/nats-io/nats.go v1.19.0
@@ -37,17 +37,17 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
-	github.com/tidwall/gjson v1.14.3
+	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible
 	github.com/yggdrasil-network/yggdrasil-go v0.4.6
 	go.uber.org/atomic v1.10.0
-	golang.org/x/crypto v0.1.0
+	golang.org/x/crypto v0.3.0
 	golang.org/x/image v0.1.0
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
-	golang.org/x/net v0.1.0
-	golang.org/x/term v0.1.0
+	golang.org/x/net v0.2.0
+	golang.org/x/term v0.2.0
 	gopkg.in/h2non/bimg.v1 v1.1.9
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.4.0
@@ -119,11 +119,11 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20220927061507-ef77025ab5aa // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	golang.org/x/exp v0.0.0-20221031165847-c99f073a8326 // indirect
 	golang.org/x/mod v0.6.0 // indirect
-	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
 	golang.org/x/tools v0.2.0 // indirect
@@ -143,4 +143,4 @@ require (
 
 go 1.18
 
-replace github.com/matrix-org/gomatrixserverlib => github.com/matrix-org/gomatrixserverlib v0.0.0-20221110204444-22af9cae40c5
+// replace github.com/matrix-org/gomatrixserverlib => ../../gomatrixserverlib/mailbox

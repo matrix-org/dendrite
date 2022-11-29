@@ -349,7 +349,10 @@ func testSetup(failuresUntilBlacklist uint32, shouldTxSucceed bool, t *testing.T
 		txCount:         *atomic.NewUint32(0),
 	}
 	rs := &stubFederationRoomServerAPI{}
-	stats := statistics.NewStatistics(db, failuresUntilBlacklist)
+
+	failuresUntilAssumedOffline := failuresUntilBlacklist + 1
+	stats := statistics.NewStatistics(
+		db, failuresUntilBlacklist, failuresUntilAssumedOffline)
 	signingInfo := &SigningInfo{
 		KeyID:      "ed21019:auto",
 		PrivateKey: test.PrivateKeyA,

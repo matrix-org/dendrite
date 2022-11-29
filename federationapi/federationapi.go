@@ -116,7 +116,10 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
+	stats := statistics.NewStatistics(
+		federationDB,
+		cfg.FederationMaxRetries+1,
+		cfg.FederationRetriesUntilAssumedOffline+1)
 
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 

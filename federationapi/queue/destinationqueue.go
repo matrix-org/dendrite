@@ -386,6 +386,7 @@ func (oq *destinationQueue) nextTransaction(
 	// Try to send the transaction to the destination server.
 	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
+
 	_, err := oq.client.SendTransaction(ctx, t)
 	switch errResponse := err.(type) {
 	case nil:

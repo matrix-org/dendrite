@@ -7,7 +7,7 @@ import (
 )
 
 func TestBackoff(t *testing.T) {
-	stats := NewStatistics(nil, 7)
+	stats := NewStatistics(nil, 7, 2)
 	server := ServerStatistics{
 		statistics: &stats,
 		serverName: "test.com",
@@ -31,9 +31,8 @@ func TestBackoff(t *testing.T) {
 		// side effects since a backoff is already in progress. If it does
 		// then we'll fail.
 		until, blacklisted := server.Failure()
-
-		// Get the duration.
-		_, blacklist := server.BackoffInfo()
+		blacklist := server.Blacklisted()
+		assumedOffline := server.AssumedOffline()
 		duration := time.Until(until)
 
 		// Unset the backoff, or otherwise our next call will think that
@@ -41,12 +40,18 @@ func TestBackoff(t *testing.T) {
 		server.cancel()
 		server.backoffStarted.Store(false)
 
+		if i >= stats.FailuresUntilAssumedOffline {
+			if !assumedOffline {
+				t.Fatalf("Backoff %d should have resulted in assuming the destination was offline but didn't", i)
+			}
+		}
+
 		// Check if we should be blacklisted by now.
 		if i >= stats.FailuresUntilBlacklist {
 			if !blacklist {
 				t.Fatalf("Backoff %d should have resulted in blacklist but didn't", i)
 			} else if blacklist != blacklisted {
-				t.Fatalf("BackoffInfo and Failure returned different blacklist values")
+				t.Fatalf("Blacklisted and Failure returned different blacklist values")
 			} else {
 				t.Logf("Backoff %d is blacklisted as expected", i)
 				continue

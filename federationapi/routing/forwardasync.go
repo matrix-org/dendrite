@@ -46,7 +46,7 @@ func ForwardAsync(
 	t.TransactionID = txnID
 	t.Destination = userID.Domain()
 
-	util.GetLogger(httpReq.Context()).Debugf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
+	util.GetLogger(httpReq.Context()).Warnf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
 	req := api.PerformStoreAsyncRequest{
 		Txn:    t,

@@ -28,13 +28,23 @@ type Statistics struct {
 	// just blacklist the host altogether? The backoff is exponential,
 	// so the max time here to attempt is 2**failures seconds.
 	FailuresUntilBlacklist uint32
+
+	// How many times should we tolerate consecutive failures before we
+	// mark the destination as offline. At this point we should attempt
+	// to send messages to the user's async mailservers if we know them.
+	FailuresUntilAssumedOffline uint32
 }
 
-func NewStatistics(db storage.Database, failuresUntilBlacklist uint32) Statistics {
+func NewStatistics(
+	db storage.Database,
+	failuresUntilBlacklist uint32,
+	failuresUntilAssumedOffline uint32,
+) Statistics {
 	return Statistics{
-		DB:                     db,
-		FailuresUntilBlacklist: failuresUntilBlacklist,
-		backoffTimers:          make(map[gomatrixserverlib.ServerName]*time.Timer),
+		DB:                          db,
+		FailuresUntilBlacklist:      failuresUntilBlacklist,
+		FailuresUntilAssumedOffline: failuresUntilAssumedOffline,
+		backoffTimers:               make(map[gomatrixserverlib.ServerName]*time.Timer),
 	}
 }
 
@@ -78,6 +88,7 @@ type ServerStatistics struct {
 	statistics      *Statistics                  //
 	serverName      gomatrixserverlib.ServerName //
 	blacklisted     atomic.Bool                  // is the node blacklisted
+	assumedOffline  atomic.Bool                  // is the node assumed to be offline
 	backoffStarted  atomic.Bool                  // is the backoff started
 	backoffUntil    atomic.Value                 // time.Time until this backoff interval ends
 	backoffCount    atomic.Uint32                // number of times BackoffDuration has been called
@@ -144,7 +155,13 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	// start a goroutine which will wait out the backoff and
 	// unset the backoffStarted flag when done.
 	if s.backoffStarted.CompareAndSwap(false, true) {
-		if s.backoffCount.Inc() >= s.statistics.FailuresUntilBlacklist {
+		backoffCount := s.backoffCount.Inc()
+
+		if backoffCount >= s.statistics.FailuresUntilAssumedOffline {
+			s.assumedOffline.CompareAndSwap(false, true)
+		}
+
+		if backoffCount >= s.statistics.FailuresUntilBlacklist {
 			s.blacklisted.Store(true)
 			if s.statistics.DB != nil {
 				if err := s.statistics.DB.AddServerToBlacklist(s.serverName); err != nil {
@@ -196,19 +213,25 @@ func (s *ServerStatistics) backoffFinished() {
 }
 
 // BackoffInfo returns information about the current or previous backoff.
-// Returns the last backoffUntil time and whether the server is currently blacklisted or not.
-func (s *ServerStatistics) BackoffInfo() (*time.Time, bool) {
+// Returns the last backoffUntil time.
+func (s *ServerStatistics) BackoffInfo() *time.Time {
 	until, ok := s.backoffUntil.Load().(time.Time)
 	if ok {
-		return &until, s.blacklisted.Load()
+		return &until
 	}
-	return nil, s.blacklisted.Load()
+	return nil
 }
 
 // Blacklisted returns true if the server is blacklisted and false
 // otherwise.
 func (s *ServerStatistics) Blacklisted() bool {
 	return s.blacklisted.Load()
+}
+
+// AssumedOffline returns true if the server is assumed offline and false
+// otherwise.
+func (s *ServerStatistics) AssumedOffline() bool {
+	return s.assumedOffline.Load()
 }
 
 // RemoveBlacklist removes the blacklisted status from the server.
