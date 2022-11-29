@@ -65,8 +65,9 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 	if !found {
 		s.mutex.Lock()
 		server = &ServerStatistics{
-			statistics: s,
-			serverName: serverName,
+			statistics:       s,
+			serverName:       serverName,
+			knownMailservers: []gomatrixserverlib.ServerName{},
 		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
@@ -85,16 +86,17 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 // many times we failed etc. It also manages the backoff time and black-
 // listing a remote host if it remains uncooperative.
 type ServerStatistics struct {
-	statistics      *Statistics                  //
-	serverName      gomatrixserverlib.ServerName //
-	blacklisted     atomic.Bool                  // is the node blacklisted
-	assumedOffline  atomic.Bool                  // is the node assumed to be offline
-	backoffStarted  atomic.Bool                  // is the backoff started
-	backoffUntil    atomic.Value                 // time.Time until this backoff interval ends
-	backoffCount    atomic.Uint32                // number of times BackoffDuration has been called
-	successCounter  atomic.Uint32                // how many times have we succeeded?
-	backoffNotifier func()                       // notifies destination queue when backoff completes
-	notifierMutex   sync.Mutex
+	statistics       *Statistics                  //
+	serverName       gomatrixserverlib.ServerName //
+	blacklisted      atomic.Bool                  // is the node blacklisted
+	assumedOffline   atomic.Bool                  // is the node assumed to be offline
+	backoffStarted   atomic.Bool                  // is the backoff started
+	backoffUntil     atomic.Value                 // time.Time until this backoff interval ends
+	backoffCount     atomic.Uint32                // number of times BackoffDuration has been called
+	successCounter   atomic.Uint32                // how many times have we succeeded?
+	backoffNotifier  func()                       // notifies destination queue when backoff completes
+	notifierMutex    sync.Mutex
+	knownMailservers []gomatrixserverlib.ServerName
 }
 
 const maxJitterMultiplier = 1.4
@@ -244,4 +246,8 @@ func (s *ServerStatistics) RemoveBlacklist() {
 // usually useful in constructing transaction IDs.
 func (s *ServerStatistics) SuccessCount() uint32 {
 	return s.successCounter.Load()
+}
+
+func (s *ServerStatistics) KnownMailservers() []gomatrixserverlib.ServerName {
+	return s.knownMailservers
 }

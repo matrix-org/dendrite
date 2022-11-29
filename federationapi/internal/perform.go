@@ -24,6 +24,11 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	request *api.PerformDirectoryLookupRequest,
 	response *api.PerformDirectoryLookupResponse,
 ) (err error) {
+	stats := r.statistics.ForServer(request.ServerName)
+	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	}
+
 	dir, err := r.federation.LookupRoomAlias(
 		ctx,
 		request.ServerName,
@@ -143,6 +148,11 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	supportedVersions []gomatrixserverlib.RoomVersion,
 	unsigned map[string]interface{},
 ) error {
+	stats := r.statistics.ForServer(serverName)
+	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	}
+
 	// Try to perform a make_join using the information supplied in the
 	// request.
 	respMakeJoin, err := r.federation.MakeJoin(
@@ -398,6 +408,11 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
+	stats := r.statistics.ForServer(serverName)
+	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	}
+
 	// create a unique ID for this peek.
 	// for now we just use the room ID again. In future, if we ever
 	// support concurrent peeks to the same room with different filters
@@ -501,6 +516,11 @@ func (r *FederationInternalAPI) PerformLeave(
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-leave send-leave dance.
 	for _, serverName := range request.ServerNames {
+		stats := r.statistics.ForServer(serverName)
+		if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
+			continue
+		}
+
 		// Try to perform a make_leave using the information supplied in the
 		// request.
 		respMakeLeave, err := r.federation.MakeLeave(
@@ -592,6 +612,11 @@ func (r *FederationInternalAPI) PerformInvite(
 	_, destination, err := gomatrixserverlib.SplitID('@', *request.Event.StateKey())
 	if err != nil {
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+	}
+
+	stats := r.statistics.ForServer(destination)
+	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
 	}
 
 	logrus.WithFields(logrus.Fields{
