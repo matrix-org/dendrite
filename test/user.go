@@ -47,7 +47,7 @@ var (
 
 type User struct {
 	ID          string
-	accountType api.AccountType
+	AccountType api.AccountType
 	// key ID and private key of the server who has this user, if known.
 	keyID   gomatrixserverlib.KeyID
 	privKey ed25519.PrivateKey
@@ -66,7 +66,7 @@ func WithSigningServer(srvName gomatrixserverlib.ServerName, keyID gomatrixserve
 
 func WithAccountType(accountType api.AccountType) UserOpt {
 	return func(u *User) {
-		u.accountType = accountType
+		u.AccountType = accountType
 	}
 }
 
