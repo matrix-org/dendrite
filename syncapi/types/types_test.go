@@ -116,14 +116,14 @@ func TestJoinResponse_MarshalJSON(t *testing.T) {
 			want: []byte("{}"),
 		},
 		{
-			name: "unread notifactions are removed, if everything else is empty",
+			name: "unread notifications are removed, if everything else is empty",
 			fields: fields{
 				UnreadNotifications: &UnreadNotifications{},
 			},
 			want: []byte("{}"),
 		},
 		{
-			name: "unread notifactions are is NOT removed, if state is set",
+			name: "unread notifications are NOT removed, if state is set",
 			fields: fields{
 				State:               &ClientEvents{Events: []gomatrixserverlib.ClientEvent{{Content: []byte("{}")}}},
 				UnreadNotifications: &UnreadNotifications{NotificationCount: 1},
