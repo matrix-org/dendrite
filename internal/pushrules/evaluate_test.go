@@ -111,7 +111,10 @@ func TestConditionMatches(t *testing.T) {
 		{"empty", Condition{}, `{}`, false},
 		{"empty", Condition{Kind: "unknownstring"}, `{}`, false},
 
-		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content"}, `{"content":{}}`, true},
+		// Neither of these should match because `content` is not a full string match,
+		// and `content.body` is not a string value.
+		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content"}, `{"content":{}}`, false},
+		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content.body", Is: "3"}, `{"content":{"body": 3}}`, false},
 
 		{"displayNameNoMatch", Condition{Kind: ContainsDisplayNameCondition}, `{"content":{"body":"something without displayname"}}`, false},
 		{"displayNameMatch", Condition{Kind: ContainsDisplayNameCondition}, `{"content":{"body":"hello Dear User, how are you?"}}`, true},
@@ -137,7 +140,7 @@ func TestConditionMatches(t *testing.T) {
 				t.Fatalf("conditionMatches failed: %v", err)
 			}
 			if got != tst.Want {
-				t.Errorf("conditionMatches: got %v, want %v", got, tst.Want)
+				t.Errorf("conditionMatches: got %v, want %v on %s", got, tst.Want, tst.Name)
 			}
 		})
 	}
@@ -161,9 +164,7 @@ func TestPatternMatches(t *testing.T) {
 	}{
 		{"empty", "", "", `{}`, false},
 
-		// Note that an empty pattern contains no wildcard characters,
-		// which implicitly means "*".
-		{"patternEmpty", "content", "", `{"content":{}}`, true},
+		{"patternEmpty", "content", "", `{"content":{}}`, false},
 
 		{"literal", "content.creator", "acreator", `{"content":{"creator":"acreator"}}`, true},
 		{"substring", "content.creator", "reat", `{"content":{"creator":"acreator"}}`, true},
@@ -178,7 +179,7 @@ func TestPatternMatches(t *testing.T) {
 				t.Fatalf("patternMatches failed: %v", err)
 			}
 			if got != tst.Want {
-				t.Errorf("patternMatches: got %v, want %v", got, tst.Want)
+				t.Errorf("patternMatches: got %v, want %v on %s", got, tst.Want, tst.Name)
 			}
 		})
 	}

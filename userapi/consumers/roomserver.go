@@ -641,7 +641,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 	if rule == nil {
 		// SPEC: If no rules match an event, the homeserver MUST NOT
 		// notify the Push Gateway for that event.
-		return nil, err
+		return nil, nil
 	}
 
 	log.WithFields(log.Fields{
