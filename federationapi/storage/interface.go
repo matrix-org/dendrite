@@ -62,6 +62,12 @@ type Database interface {
 	RemoveAllServersFromBlacklist() error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 
+	// these don't have contexts passed in as we want things to happen regardless of the request context
+	SetServerAssumedOffline(serverName gomatrixserverlib.ServerName) error
+	RemoveServerAssumedOffline(serverName gomatrixserverlib.ServerName) error
+	RemoveAllServersAssumedOffline() error
+	IsServerAssumedOffline(serverName gomatrixserverlib.ServerName) (bool, error)
+
 	AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error
 	GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
 	RemoveMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error

@@ -168,6 +168,11 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 
 		if backoffCount >= s.statistics.FailuresUntilAssumedOffline {
 			s.assumedOffline.CompareAndSwap(false, true)
+			if s.statistics.DB != nil {
+				if err := s.statistics.DB.SetServerAssumedOffline(s.serverName); err != nil {
+					logrus.WithError(err).Errorf("Failed to set %q as assumed offline", s.serverName)
+				}
+			}
 		}
 
 		if backoffCount >= s.statistics.FailuresUntilBlacklist {

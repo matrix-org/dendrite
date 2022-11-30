@@ -38,6 +38,7 @@ type Database struct {
 	FederationQueueJSON         tables.FederationQueueJSON
 	FederationJoinedHosts       tables.FederationJoinedHosts
 	FederationBlacklist         tables.FederationBlacklist
+	FederationAssumedOffline    tables.FederationAssumedOffline
 	FederationMailservers       tables.FederationMailservers
 	FederationOutboundPeeks     tables.FederationOutboundPeeks
 	FederationInboundPeeks      tables.FederationInboundPeeks
@@ -176,6 +177,28 @@ func (d *Database) RemoveAllServersFromBlacklist() error {
 
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	return d.FederationBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
+}
+
+func (d *Database) SetServerAssumedOffline(serverName gomatrixserverlib.ServerName) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationAssumedOffline.InsertAssumedOffline(context.TODO(), txn, serverName)
+	})
+}
+
+func (d *Database) RemoveServerAssumedOffline(serverName gomatrixserverlib.ServerName) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationAssumedOffline.DeleteAssumedOffline(context.TODO(), txn, serverName)
+	})
+}
+
+func (d *Database) RemoveAllServersAssumedOffline() error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationAssumedOffline.DeleteAllAssumedOffline(context.TODO(), txn)
+	})
+}
+
+func (d *Database) IsServerAssumedOffline(serverName gomatrixserverlib.ServerName) (bool, error) {
+	return d.FederationAssumedOffline.SelectAssumedOffline(context.TODO(), nil, serverName)
 }
 
 func (d *Database) AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {

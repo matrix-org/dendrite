@@ -81,6 +81,13 @@ type FederationBlacklist interface {
 	DeleteAllBlacklist(ctx context.Context, txn *sql.Tx) error
 }
 
+type FederationAssumedOffline interface {
+	InsertAssumedOffline(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
+	SelectAssumedOffline(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) (bool, error)
+	DeleteAssumedOffline(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) error
+	DeleteAllAssumedOffline(ctx context.Context, txn *sql.Tx) error
+}
+
 type FederationMailservers interface {
 	InsertMailservers(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error
 	SelectMailservers(ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
