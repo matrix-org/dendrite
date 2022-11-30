@@ -70,6 +70,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
+	mailservers, err := NewPostgresMailserversTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	inboundPeeks, err := NewPostgresInboundPeeksTable(d.db)
 	if err != nil {
 		return nil, err
@@ -114,6 +118,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationQueueTransactions: queueTransactions,
 		FederationTransactionJSON:   transactionJSON,
 		FederationBlacklist:         blacklist,
+		FederationMailservers:       mailservers,
 		FederationInboundPeeks:      inboundPeeks,
 		FederationOutboundPeeks:     outboundPeeks,
 		NotaryServerKeysJSON:        notaryJSON,

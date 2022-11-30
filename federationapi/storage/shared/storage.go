@@ -38,6 +38,7 @@ type Database struct {
 	FederationQueueJSON         tables.FederationQueueJSON
 	FederationJoinedHosts       tables.FederationJoinedHosts
 	FederationBlacklist         tables.FederationBlacklist
+	FederationMailservers       tables.FederationMailservers
 	FederationOutboundPeeks     tables.FederationOutboundPeeks
 	FederationInboundPeeks      tables.FederationInboundPeeks
 	NotaryServerKeysJSON        tables.FederationNotaryServerKeysJSON
@@ -175,6 +176,28 @@ func (d *Database) RemoveAllServersFromBlacklist() error {
 
 func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
 	return d.FederationBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
+}
+
+func (d *Database) AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationMailservers.InsertMailservers(context.TODO(), txn, serverName, mailservers)
+	})
+}
+
+func (d *Database) GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
+	return d.FederationMailservers.SelectMailservers(context.TODO(), nil, serverName)
+}
+
+func (d *Database) RemoveMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationMailservers.DeleteMailservers(context.TODO(), txn, serverName, mailservers)
+	})
+}
+
+func (d *Database) RemoveAllMailserversForServer(serverName gomatrixserverlib.ServerName) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.FederationMailservers.DeleteAllMailservers(context.TODO(), txn, serverName)
+	})
 }
 
 func (d *Database) AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {

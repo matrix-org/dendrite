@@ -63,6 +63,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
+	mailservers, err := NewSQLiteMailserversTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	outboundPeeks, err := NewSQLiteOutboundPeeksTable(d.db)
 	if err != nil {
 		return nil, err
@@ -107,6 +111,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationQueueTransactions: queueTransactions,
 		FederationTransactionJSON:   transactionJSON,
 		FederationBlacklist:         blacklist,
+		FederationMailservers:       mailservers,
 		FederationOutboundPeeks:     outboundPeeks,
 		FederationInboundPeeks:      inboundPeeks,
 		NotaryServerKeysJSON:        notaryKeys,
