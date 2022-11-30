@@ -392,8 +392,17 @@ func (oq *destinationQueue) nextTransaction(
 	if oq.statistics.AssumedOffline() && len(mailservers) > 0 {
 		// TODO : how to pass through actual userID here?!?!?!?!
 		userID, _ := gomatrixserverlib.NewUserID("@:"+string(oq.origin), false)
+		anySuccess := false
 		for _, mailserver := range mailservers {
-			_, _ = oq.client.SendAsyncTransaction(ctx, *userID, t, mailserver)
+			_, asyncErr := oq.client.SendAsyncTransaction(ctx, *userID, t, mailserver)
+			if asyncErr != nil {
+				err = asyncErr
+			} else {
+				anySuccess = true
+			}
+		}
+		if anySuccess {
+			err = nil
 		}
 	} else {
 		_, err = oq.client.SendTransaction(ctx, t)
