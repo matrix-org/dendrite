@@ -86,15 +86,15 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-unit-race-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go${{ matrix.go }}-unit-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-unit-race-
+            ${{ runner.os }}-go${{ matrix.go }}-unit-
       - name: Set up gotestfmt
         uses: gotesttools/gotestfmt-action@v2
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -race -short -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
+      - run: go test -short -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
