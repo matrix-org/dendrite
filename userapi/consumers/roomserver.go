@@ -385,7 +385,6 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 	req := &rsapi.QueryMembershipsForRoomRequest{
 		RoomID:     roomID,
 		JoinedOnly: true,
-		LocalOnly:  true,
 	}
 	var res rsapi.QueryMembershipsForRoomResponse
 
@@ -396,8 +395,23 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 	}
 
 	var members []*localMembership
-	var ntotal int
 	for _, event := range res.JoinEvents {
+		// Filter out invalid join events
+		if event.StateKey == nil {
+			continue
+		}
+		if *event.StateKey == "" {
+			continue
+		}
+		_, serverName, err := gomatrixserverlib.SplitID('@', *event.StateKey)
+		if err != nil {
+			log.WithError(err).Error("failed to get servername from statekey")
+			continue
+		}
+		// Only get memberships for our server
+		if serverName != s.serverName {
+			continue
+		}
 		member, err := newLocalMembership(&event)
 		if err != nil {
 			log.WithError(err).Errorf("Parsing MemberContent")
@@ -410,11 +424,10 @@ func (s *OutputRoomEventConsumer) localRoomMembers(ctx context.Context, roomID s
 			continue
 		}
 
-		ntotal++
 		members = append(members, member)
 	}
 
-	return members, ntotal, nil
+	return members, len(res.JoinEvents), nil
 }
 
 // roomName returns the name in the event (if type==m.room.name), or
@@ -641,7 +654,7 @@ func (s *OutputRoomEventConsumer) evaluatePushRules(ctx context.Context, event *
 	if rule == nil {
 		// SPEC: If no rules match an event, the homeserver MUST NOT
 		// notify the Push Gateway for that event.
-		return nil, err
+		return nil, nil
 	}
 
 	log.WithFields(log.Fields{
