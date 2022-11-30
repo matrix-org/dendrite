@@ -68,7 +68,7 @@ jobs:
 
   # run go test with different go versions
   test:
-    timeout-minutes: 5
+    timeout-minutes: 10
     name: Unit tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     strategy:
