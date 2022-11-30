@@ -312,7 +312,6 @@ jobs:
       image: matrixdotorg/sytest-dendrite:latest
       volumes:
         - ${{ github.workspace }}:/src
-        - ${{ github.workspace }}/sytest:/sytest
         - /root/.cache/go-build:/github/home/.cache/go-build
         - /root/.cache/go-mod:/gopath/pkg/mod
       env:
@@ -322,12 +321,6 @@ jobs:
         CGO_ENABLED: ${{ matrix.cgo && 1 }}
     steps:
       - uses: actions/checkout@v3
-      - name: Checkout matrix-org/sytest:dendrite
-        uses: actions/checkout@v3
-        with:
-          path: sytest
-          repository: matrix-org/sytest
-          ref: dendrite
       - uses: actions/cache@v3
         with:
           path: |
