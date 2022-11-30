@@ -97,6 +97,8 @@ jobs:
       - run: go test -race -short -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        with:
+          flags: unittests
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -235,6 +237,8 @@ jobs:
           POSTGRES_DB: dendrite
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
+        with:
+          flags: integration
 
   # run database upgrade tests
   upgrade_test:
