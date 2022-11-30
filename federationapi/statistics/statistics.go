@@ -77,6 +77,13 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 		} else {
 			server.blacklisted.Store(blacklisted)
 		}
+
+		knownMailservers, err := s.DB.GetMailserversForServer(serverName)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to get mailserver list for %q", serverName)
+		} else {
+			server.knownMailservers = knownMailservers
+		}
 	}
 	return server
 }

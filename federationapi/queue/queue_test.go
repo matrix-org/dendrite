@@ -301,6 +301,10 @@ func (d *fakeDatabase) IsServerBlacklisted(serverName gomatrixserverlib.ServerNa
 	return isBlacklisted, nil
 }
 
+func (d *fakeDatabase) GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
+	return []gomatrixserverlib.ServerName{}, nil
+}
+
 type stubFederationRoomServerAPI struct {
 	rsapi.FederationRoomserverAPI
 }
