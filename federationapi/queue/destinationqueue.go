@@ -387,7 +387,17 @@ func (oq *destinationQueue) nextTransaction(
 	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
 
-	_, err := oq.client.SendTransaction(ctx, t)
+	var err error
+	mailservers := oq.statistics.KnownMailservers()
+	if oq.statistics.AssumedOffline() && len(mailservers) > 0 {
+		// TODO : how to pass through actual userID here?!?!?!?!
+		userID, _ := gomatrixserverlib.NewUserID("@:"+string(oq.origin), false)
+		for _, mailserver := range mailservers {
+			_, _ = oq.client.SendAsyncTransaction(ctx, *userID, t, mailserver)
+		}
+	} else {
+		_, err = oq.client.SendTransaction(ctx, t)
+	}
 	switch errResponse := err.(type) {
 	case nil:
 		// Clean up the transaction in the database.
