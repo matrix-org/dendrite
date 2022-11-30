@@ -255,6 +255,8 @@ func (s *ServerStatistics) SuccessCount() uint32 {
 	return s.successCounter.Load()
 }
 
+// KnownMailservers returns the list of mailservers associated with this
+// server.
 func (s *ServerStatistics) KnownMailservers() []gomatrixserverlib.ServerName {
 	return s.knownMailservers
 }
