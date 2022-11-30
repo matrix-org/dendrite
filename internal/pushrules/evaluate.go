@@ -145,6 +145,11 @@ func conditionMatches(cond *Condition, event *gomatrixserverlib.Event, ec Evalua
 }
 
 func patternMatches(key, pattern string, event *gomatrixserverlib.Event) (bool, error) {
+	// It doesn't make sense for an empty pattern to match anything.
+	if pattern == "" {
+		return false, nil
+	}
+
 	re, err := globToRegexp(pattern)
 	if err != nil {
 		return false, err
