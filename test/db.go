@@ -169,6 +169,9 @@ func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, clo
 
 // Creates subtests with each known DBType
 func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	dbs := map[string]DBType{
 		"postgres": DBTypePostgres,
 		"sqlite":   DBTypeSQLite,

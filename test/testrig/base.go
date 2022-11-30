@@ -30,6 +30,9 @@ import (
 )
 
 func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, func()) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	var cfg config.Dendrite
 	cfg.Defaults(config.DefaultOpts{
 		Generate:   false,
