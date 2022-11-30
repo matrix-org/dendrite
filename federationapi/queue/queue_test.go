@@ -1135,3 +1135,36 @@ func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 }
+
+func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
+	t.Parallel()
+	failuresUntilBlacklist := uint32(7)
+	failuresUntilAssumedOffline := uint32(2)
+	destination := gomatrixserverlib.ServerName("remotehost")
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, t, test.DBTypeSQLite, false)
+	defer close()
+	defer func() {
+		pc.ShutdownDendrite()
+		<-pc.WaitForShutdown()
+	}()
+
+	ev := mustCreateEDU(t)
+	err := queues.SendEDU(ev, "localhost", []gomatrixserverlib.ServerName{destination})
+	assert.NoError(t, err)
+
+	check := func(log poll.LogT) poll.Result {
+		if fc.txCount.Load() == failuresUntilAssumedOffline {
+			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+			assert.NoError(t, dbErr)
+			if len(data) == 1 {
+				if val, _ := db.IsServerAssumedOffline(destination); val {
+					return poll.Success()
+				}
+				return poll.Continue("waiting for server to be assumed offline")
+			}
+			return poll.Continue("waiting for event to be added to database. Currently present EDU: %d", len(data))
+		}
+		return poll.Continue("waiting for more send attempts before checking database. Currently %d", fc.txCount.Load())
+	}
+	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
+}
