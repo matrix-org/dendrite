@@ -13,7 +13,6 @@ jobs:
   # run Sytest in different variations
   sytest:
     timeout-minutes: 60
-    needs: initial-tests-done
     name: "Sytest (${{ matrix.label }})"
     runs-on: ubuntu-latest
     strategy:

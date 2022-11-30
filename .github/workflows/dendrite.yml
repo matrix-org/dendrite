@@ -87,7 +87,7 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -short -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
+      - run: go test -short -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
 
@@ -174,6 +174,7 @@ jobs:
   # run go test with different go versions
   integration:
     timeout-minutes: 20
+    needs: initial-tests-done
     name: Integration tests (Go ${{ matrix.go }})
     runs-on: ubuntu-latest
     # Service containers to run with `container-job`
