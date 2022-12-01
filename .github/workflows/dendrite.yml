@@ -74,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -94,11 +94,7 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -short -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          flags: unittests
+      - run: go test -short -json -v | gotestfmt
 
   # build Dendrite for linux with different architectures and go versions
   build:
@@ -209,7 +205,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -238,7 +234,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          flags: integration
+          flags: unittests
 
   # run database upgrade tests
   upgrade_test:
