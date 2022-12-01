@@ -94,7 +94,7 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -short -json -v | gotestfmt
+      - run: go test -short -json -v ./... | gotestfmt
 
   # build Dendrite for linux with different architectures and go versions
   build:
