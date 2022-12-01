@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/docker/docker/pkg/stdcopy"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/codeclysm/extract"
@@ -61,6 +64,7 @@ COPY . .
 RUN go build ./cmd/dendrite-monolith-server
 RUN go build ./cmd/generate-keys
 RUN go build ./cmd/generate-config
+RUN go build ./cmd/create-account
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
@@ -104,6 +108,7 @@ COPY . .
 RUN go build ./cmd/dendrite-monolith-server
 RUN go build ./cmd/generate-keys
 RUN go build ./cmd/generate-config
+RUN go build ./cmd/create-account
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
@@ -458,7 +463,84 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 	if err = runTests(csAPIURL, v); err != nil {
 		return fmt.Errorf("failed to run tests on version %s: %s", v, err)
 	}
+
+	// test that create-account is working
+	createUser := strings.ToLower("createaccountuser-" + v)
+	log.Printf("Creating account %s with create-account\n", createUser)
+	respID, err := dockerClient.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
+		AttachStderr: true,
+		AttachStdout: true,
+		Cmd: []string{
+			"/build/create-account",
+			"-username", createUser,
+			"-password", "someRandomPassword",
+		},
+	})
+	resp, err := InspectExecResp(context.Background(), dockerClient, respID.ID)
+	if err != nil {
+		log.Fatalf("failed to inspect exec: %s", err)
+	}
+	if !strings.Contains(resp.StdErr, "AccessToken") || resp.ExitCode != 0 {
+		log.Fatalf("Failed to create-account: %s", resp.StdErr)
+	}
 	return nil
+}
+
+type ExecResult struct {
+	StdOut   string
+	StdErr   string
+	ExitCode int
+}
+
+// https://github.com/moby/moby/blob/8e610b2b55bfd1bfa9436ab110d311f5e8a74dcb/integration/internal/container/exec.go#L38
+func InspectExecResp(ctx context.Context, dockerClient *client.Client, id string) (ExecResult, error) {
+	var execResult ExecResult
+
+	resp, err := dockerClient.ContainerExecAttach(ctx, id, types.ExecStartCheck{})
+	if err != nil {
+		return execResult, err
+	}
+	defer resp.Close()
+
+	// read the output
+	var outBuf, errBuf bytes.Buffer
+	outputDone := make(chan error)
+
+	go func() {
+		// StdCopy demultiplexes the stream into two buffers
+		_, err = stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader)
+		outputDone <- err
+	}()
+
+	select {
+	case err := <-outputDone:
+		if err != nil {
+			return execResult, err
+		}
+		break
+
+	case <-ctx.Done():
+		return execResult, ctx.Err()
+	}
+
+	stdout, err := ioutil.ReadAll(&outBuf)
+	if err != nil {
+		return execResult, err
+	}
+	stderr, err := ioutil.ReadAll(&errBuf)
+	if err != nil {
+		return execResult, err
+	}
+
+	res, err := dockerClient.ContainerExecInspect(ctx, id)
+	if err != nil {
+		return execResult, err
+	}
+
+	execResult.ExitCode = res.ExitCode
+	execResult.StdOut = string(stdout)
+	execResult.StdErr = string(stderr)
+	return execResult, nil
 }
 
 func verifyTests(dockerClient *client.Client, volumeName string, versions []string, branchToImageID map[string]string) error {
