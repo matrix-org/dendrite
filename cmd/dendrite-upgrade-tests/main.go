@@ -513,7 +513,7 @@ func InspectExecResp(ctx context.Context, dockerClient *client.Client, id string
 	}()
 
 	select {
-	case err := <-outputDone:
+	case err = <-outputDone:
 		if err != nil {
 			return execResult, err
 		}
