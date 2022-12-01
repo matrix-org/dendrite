@@ -65,10 +65,7 @@ func createRemoteDB(t *testing.T, dbName, user, connStr string) {
 		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
 	if err = db.Ping(); err != nil {
-		// If we're unable to reach the database, it's unlikely that a postgres server is
-		// available for testing. Set Required to false to skip the test instead of failing it.
-		Required = false
-		t.Logf("Note: tests require a postgres install accessible to the current user")
+
 		fatalError(t, "failed to open postgres conn with connstr=%s : %s", connStr, err)
 	}
 	_, err = db.Exec(fmt.Sprintf(`CREATE DATABASE %s;`, dbName))
