@@ -140,7 +140,12 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return nil
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, time.Now(), &eventsNeeded, latestRes)
+		identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+		if err != nil {
+			continue
+		}
+
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
@@ -277,6 +282,15 @@ func (r *Admin) PerformAdminDownloadState(
 	req *api.PerformAdminDownloadStateRequest,
 	res *api.PerformAdminDownloadStateResponse,
 ) error {
+	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', req.UserID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.Cfg.Matrix.SplitLocalID: %s", err),
+		}
+		return nil
+	}
+
 	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
 		res.Error = &api.PerformError{
@@ -308,7 +322,7 @@ func (r *Admin) PerformAdminDownloadState(
 
 	for _, fwdExtremity := range fwdExtremities {
 		var state gomatrixserverlib.RespState
-		state, err = r.Inputer.FSAPI.LookupState(ctx, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
@@ -366,7 +380,12 @@ func (r *Admin) PerformAdminDownloadState(
 		Depth:        depth,
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, time.Now(), &eventsNeeded, queryRes)
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	if err != nil {
+		return err
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
 	if err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,

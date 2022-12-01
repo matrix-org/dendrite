@@ -58,7 +58,7 @@ type FederationJoinedHosts interface {
 	SelectJoinedHostsWithTx(ctx context.Context, txn *sql.Tx, roomID string) ([]types.JoinedHost, error)
 	SelectJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	SelectAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
-	SelectJoinedHostsForRooms(ctx context.Context, roomIDs []string) ([]gomatrixserverlib.ServerName, error)
+	SelectJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludingBlacklisted bool) ([]gomatrixserverlib.ServerName, error)
 	PurgeJoinedHosts(ctx context.Context, txn *sql.Tx, roomID string) error
 }
 

@@ -134,12 +134,16 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
+	serverName := cfg.Matrix.ServerName
 	localpart, ok := vars["localpart"]
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.MissingArgument("Expecting user localpart."),
 		}
+	}
+	if l, s, err := cfg.Matrix.SplitLocalID('@', localpart); err == nil {
+		localpart, serverName = l, s
 	}
 	request := struct {
 		Password string `json:"password"`
@@ -158,6 +162,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	}
 	updateReq := &userapi.PerformPasswordUpdateRequest{
 		Localpart:     localpart,
+		ServerName:    serverName,
 		Password:      request.Password,
 		LogoutDevices: true,
 	}

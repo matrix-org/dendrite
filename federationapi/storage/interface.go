@@ -32,7 +32,7 @@ type Database interface {
 	GetJoinedHosts(ctx context.Context, roomID string) ([]types.JoinedHost, error)
 	GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	// GetJoinedHostsForRooms returns the complete set of servers in the rooms given.
-	GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf bool) ([]gomatrixserverlib.ServerName, error)
+	GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf, excludeBlacklisted bool) ([]gomatrixserverlib.ServerName, error)
 
 	StoreJSON(ctx context.Context, js string) (*shared.Receipt, error)
 

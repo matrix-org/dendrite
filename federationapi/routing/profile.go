@@ -22,7 +22,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -42,16 +41,9 @@ func GetProfile(
 		}
 	}
 
-	_, domain, err := gomatrixserverlib.SplitID('@', userID)
+	_, domain, err := cfg.Matrix.SplitLocalID('@', userID)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument(fmt.Sprintf("Format of user ID %q is invalid", userID)),
-		}
-	}
-
-	if domain != cfg.Matrix.ServerName {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("Domain %q does not match this server", domain)),

@@ -148,6 +148,8 @@ type PerformBackfillRequest struct {
 	Limit int `json:"limit"`
 	// The server interested in the events.
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	// Which virtual host are we doing this for?
+	VirtualHost gomatrixserverlib.ServerName `json:"virtual_host"`
 }
 
 // PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.

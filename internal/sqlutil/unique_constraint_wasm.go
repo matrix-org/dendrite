@@ -17,15 +17,16 @@
 
 package sqlutil
 
-import "github.com/mattn/go-sqlite3"
+import (
+	"modernc.org/sqlite"
+	lib "modernc.org/sqlite/lib"
+)
 
 // IsUniqueConstraintViolationErr returns true if the error is an unique_violation error
 func IsUniqueConstraintViolationErr(err error) bool {
 	switch e := err.(type) {
-	case *sqlite3.Error:
-		return e.Code == sqlite3.ErrConstraint
-	case sqlite3.Error:
-		return e.Code == sqlite3.ErrConstraint
+	case *sqlite.Error:
+		return e.Code() == lib.SQLITE_CONSTRAINT
 	}
 	return false
 }
