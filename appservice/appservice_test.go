@@ -139,12 +139,11 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		apiURL, cancel := test.ListenAndServe(t, router, false)
 		defer cancel()
 
-		var err error
-		asAPI, err = inthttp.NewAppserviceClient(apiURL, &http.Client{})
+		asHTTPApi, err := inthttp.NewAppserviceClient(apiURL, &http.Client{})
 		if err != nil {
 			t.Fatalf("failed to create HTTP client: %s", err)
 		}
-		runCases(t, asAPI)
+		runCases(t, asHTTPApi)
 	})
 
 	t.Run("Monolith", func(t *testing.T) {
