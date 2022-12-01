@@ -1,4 +1,4 @@
-package appservice
+package appservice_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/inthttp"
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -76,7 +77,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		}
 	}))
 
-	// only one DBType, since userapi.AddInternalRoutes complains about multiple prometheus counters added
+	// only one DBType, since appservice.AddInternalRoutes complains about multiple prometheus counters added
 	base, closeBase := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer closeBase()
 
@@ -99,7 +100,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	// Create required internal APIs
 	rsAPI := roomserver.NewInternalAPI(base)
 	usrAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, nil, rsAPI, nil)
-	asAPI := NewInternalAPI(base, usrAPI, rsAPI)
+	asAPI := appservice.NewInternalAPI(base, usrAPI, rsAPI)
 
 	// The test cases to run
 	runCases := func(t *testing.T, testAPI api.AppServiceInternalAPI) {
@@ -134,7 +135,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	// Finally execute the tests
 	t.Run("HTTP API", func(t *testing.T) {
 		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-		AddInternalRoutes(router, asAPI)
+		appservice.AddInternalRoutes(router, asAPI)
 		apiURL, cancel := test.ListenAndServe(t, router, false)
 		defer cancel()
 
