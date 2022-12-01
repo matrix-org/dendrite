@@ -43,8 +43,8 @@ import (
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
-	inthttp.AddRoutes(intAPI, router)
+func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(intAPI, router, enableMetrics)
 }
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
