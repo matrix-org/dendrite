@@ -150,6 +150,7 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	m.processContext = base.ProcessContext
 	defer base.Close() // nolint: errcheck
 

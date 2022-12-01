@@ -155,6 +155,7 @@ func main() {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	pineconeEventChannel := make(chan pineconeEvents.Event)
@@ -248,6 +249,8 @@ func main() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	httpRouter.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := wsUpgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -270,8 +273,6 @@ func main() {
 	pMux.PathPrefix(users.PublicURL).HandlerFunc(userProvider.FederatedUserProfiles)
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
-	pMux.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
-	pMux.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 
 	pHTTP := pQUIC.Protocol("matrix").HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, pMux)

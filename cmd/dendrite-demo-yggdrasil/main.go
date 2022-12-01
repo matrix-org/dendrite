@@ -144,6 +144,7 @@ func main() {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	ygg, err := yggconn.Setup(sk, *instanceName, ".", *instancePeer, *instanceListen)

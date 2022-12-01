@@ -336,6 +336,7 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
