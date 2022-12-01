@@ -102,7 +102,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	asAPI := NewInternalAPI(base, usrAPI, rsAPI)
 
 	// The test cases to run
-	runCases := func(t *testing.T, testAPI api.AppServiceInternalAPI, http bool) {
+	runCases := func(t *testing.T, testAPI api.AppServiceInternalAPI) {
 		t.Run("UserIDExists", func(t *testing.T) {
 			testUserIDExists(t, testAPI, "@as-testing:test", true)
 			testUserIDExists(t, testAPI, "@as1-testing:test", false)
@@ -138,15 +138,16 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		apiURL, cancel := test.ListenAndServe(t, router, false)
 		defer cancel()
 
-		asAPI, err := inthttp.NewAppserviceClient(apiURL, &http.Client{})
+		var err error
+		asAPI, err = inthttp.NewAppserviceClient(apiURL, &http.Client{})
 		if err != nil {
 			t.Fatalf("failed to create HTTP client: %s", err)
 		}
-		runCases(t, asAPI, true)
+		runCases(t, asAPI)
 	})
 
 	t.Run("Monolith", func(t *testing.T) {
-		runCases(t, asAPI, false)
+		runCases(t, asAPI)
 	})
 
 }
