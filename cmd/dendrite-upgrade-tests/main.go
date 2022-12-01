@@ -493,8 +493,10 @@ func testCreateAccount(dockerClient *client.Client, v string, containerID string
 	}
 	defer response.Close()
 
-	data, _ := ioutil.ReadAll(response.Reader)
-	fmt.Println(string(data))
+	data, err := ioutil.ReadAll(response.Reader)
+	if err != nil {
+		return err
+	}
 
 	if !bytes.Contains(data, []byte("AccessToken")) {
 		return fmt.Errorf("failed to create-account: %s", string(data))
