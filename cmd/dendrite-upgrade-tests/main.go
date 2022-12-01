@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/pkg/stdcopy"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/codeclysm/extract"
 	"github.com/docker/docker/api/types"
@@ -464,9 +462,18 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 		return fmt.Errorf("failed to run tests on version %s: %s", v, err)
 	}
 
-	// test that create-account is working
+	err = testCreateAccount(dockerClient, v, containerID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// test that create-account is working
+func testCreateAccount(dockerClient *client.Client, v string, containerID string) error {
 	createUser := strings.ToLower("createaccountuser-" + v)
-	log.Printf("Creating account %s with create-account\n", createUser)
+	log.Printf("%s: Creating account %s with create-account\n", v, createUser)
+
 	respID, err := dockerClient.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
@@ -479,71 +486,20 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 	if err != nil {
 		return fmt.Errorf("failed to ContainerExecCreate: %w", err)
 	}
-	resp, err := InspectExecResp(context.Background(), dockerClient, respID.ID)
+
+	response, err := dockerClient.ContainerExecAttach(context.Background(), respID.ID, types.ExecStartCheck{})
 	if err != nil {
-		return fmt.Errorf("failed to InspectExecResp: %w", err)
+		return fmt.Errorf("failed to attach to container: %w", err)
 	}
-	if !strings.Contains(resp.StdErr, "AccessToken") || resp.ExitCode != 0 {
-		return fmt.Errorf("failed to create-account (exit code %d): %s", resp.ExitCode, resp.StdErr)
+	defer response.Close()
+
+	data, _ := ioutil.ReadAll(response.Reader)
+	fmt.Println(string(data))
+
+	if !bytes.Contains(data, []byte("AccessToken")) {
+		return fmt.Errorf("failed to create-account: %s", string(data))
 	}
 	return nil
-}
-
-type ExecResult struct {
-	StdOut   string
-	StdErr   string
-	ExitCode int
-}
-
-// https://github.com/moby/moby/blob/8e610b2b55bfd1bfa9436ab110d311f5e8a74dcb/integration/internal/container/exec.go#L38
-func InspectExecResp(ctx context.Context, dockerClient *client.Client, id string) (ExecResult, error) {
-	var execResult ExecResult
-
-	resp, err := dockerClient.ContainerExecAttach(ctx, id, types.ExecStartCheck{})
-	if err != nil {
-		return execResult, err
-	}
-	defer resp.Close()
-
-	// read the output
-	var outBuf, errBuf bytes.Buffer
-	outputDone := make(chan error)
-
-	go func() {
-		// StdCopy demultiplexes the stream into two buffers
-		_, err = stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader)
-		outputDone <- err
-	}()
-
-	select {
-	case err = <-outputDone:
-		if err != nil {
-			return execResult, err
-		}
-		break
-
-	case <-ctx.Done():
-		return execResult, ctx.Err()
-	}
-
-	stdout, err := ioutil.ReadAll(&outBuf)
-	if err != nil {
-		return execResult, err
-	}
-	stderr, err := ioutil.ReadAll(&errBuf)
-	if err != nil {
-		return execResult, err
-	}
-
-	res, err := dockerClient.ContainerExecInspect(ctx, id)
-	if err != nil {
-		return execResult, err
-	}
-
-	execResult.ExitCode = res.ExitCode
-	execResult.StdOut = string(stdout)
-	execResult.StdErr = string(stderr)
-	return execResult, nil
 }
 
 func verifyTests(dockerClient *client.Client, volumeName string, versions []string, branchToImageID map[string]string) error {

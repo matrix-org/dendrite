@@ -102,6 +102,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - uses: actions/cache@v3
+        # manually set up caches, as they otherwise clash with different steps using setup-go with cache=true
         with:
           path: |
             ~/.cache/go-build
@@ -114,7 +115,7 @@ jobs:
         with:
           # Optional: pass GITHUB_TOKEN to avoid rate limiting.
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: go test -json -v ./... | gotestfmt
+      - run: go test -json -v ./... 2>&1 | gotestfmt
         env:
           POSTGRES_HOST: localhost
           POSTGRES_USER: postgres
