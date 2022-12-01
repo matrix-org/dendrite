@@ -14,7 +14,7 @@ func TestBackoff(t *testing.T) {
 	}
 
 	// Start by checking that counting successes works.
-	server.Success()
+	server.Success(false)
 	if successes := server.SuccessCount(); successes != 1 {
 		t.Fatalf("Expected success count 1, got %d", successes)
 	}

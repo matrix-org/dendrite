@@ -138,13 +138,19 @@ func (s *ServerStatistics) AssignBackoffNotifier(notifier func()) {
 // attempt, which increases the sent counter and resets the idle and
 // failure counters. If a host was blacklisted at this point then
 // we will unblacklist it.
-func (s *ServerStatistics) Success() {
+// `async` specifies whether the success was to the actual destination
+// or one of their mailservers.
+func (s *ServerStatistics) Success(async bool) {
 	s.cancel()
 	s.backoffCount.Store(0)
-	s.successCounter.Inc()
-	if s.statistics.DB != nil {
-		if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
-			logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+	// NOTE : Sending to the final destination vs. a mailserver has
+	// slightly different semantics.
+	if !async {
+		s.successCounter.Inc()
+		if s.statistics.DB != nil {
+			if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
+				logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
+			}
 		}
 	}
 }
@@ -264,4 +270,32 @@ func (s *ServerStatistics) SuccessCount() uint32 {
 // server.
 func (s *ServerStatistics) KnownMailservers() []gomatrixserverlib.ServerName {
 	return s.knownMailservers
+}
+
+func (s *ServerStatistics) AddMailservers(mailservers []gomatrixserverlib.ServerName) {
+	seenSet := make(map[gomatrixserverlib.ServerName]bool)
+	uniqueList := []gomatrixserverlib.ServerName{}
+	for _, srv := range mailservers {
+		if seenSet[srv] {
+			continue
+		}
+		seenSet[srv] = true
+		uniqueList = append(uniqueList, srv)
+	}
+
+	err := s.statistics.DB.AddMailserversForServer(s.serverName, uniqueList)
+	if err == nil {
+
+		for _, newServer := range uniqueList {
+			alreadyKnown := false
+			for _, srv := range s.knownMailservers {
+				if srv == newServer {
+					alreadyKnown = true
+				}
+			}
+			if !alreadyKnown {
+				s.knownMailservers = append(s.knownMailservers, newServer)
+			}
+		}
+	}
 }

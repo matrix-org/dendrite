@@ -350,7 +350,7 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		terr := oq.nextTransaction(toSendPDUs, toSendEDUs)
+		terr, asyncSuccess := oq.nextTransaction(toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			_, blacklisted := oq.statistics.Failure()
@@ -367,18 +367,19 @@ func (oq *destinationQueue) backgroundSend() {
 				return
 			}
 		} else {
-			oq.handleTransactionSuccess(pduCount, eduCount)
+			oq.handleTransactionSuccess(pduCount, eduCount, asyncSuccess)
 		}
 	}
 }
 
 // nextTransaction creates a new transaction from the pending event
 // queue and sends it.
-// Returns an error if the transaction wasn't sent.
+// Returns an error if the transaction wasn't sent. And whether the success
+// was to an async mailserver or not.
 func (oq *destinationQueue) nextTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) error {
+) (err error, asyncSuccess bool) {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
@@ -387,21 +388,22 @@ func (oq *destinationQueue) nextTransaction(
 	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
 
-	var err error
 	mailservers := oq.statistics.KnownMailservers()
 	if oq.statistics.AssumedOffline() && len(mailservers) > 0 {
 		// TODO : how to pass through actual userID here?!?!?!?!
-		userID, _ := gomatrixserverlib.NewUserID("@:"+string(oq.origin), false)
-		anySuccess := false
+		userID, err := gomatrixserverlib.NewUserID("@user:"+string(oq.origin), false)
+		if err != nil {
+			return err, false
+		}
 		for _, mailserver := range mailservers {
 			_, asyncErr := oq.client.SendAsyncTransaction(ctx, *userID, t, mailserver)
 			if asyncErr != nil {
 				err = asyncErr
 			} else {
-				anySuccess = true
+				asyncSuccess = true
 			}
 		}
-		if anySuccess {
+		if asyncSuccess {
 			err = nil
 		}
 	} else {
@@ -426,7 +428,7 @@ func (oq *destinationQueue) nextTransaction(
 		oq.transactionIDMutex.Lock()
 		oq.transactionID = ""
 		oq.transactionIDMutex.Unlock()
-		return nil
+		return nil, asyncSuccess
 	case gomatrix.HTTPError:
 		// Report that we failed to send the transaction and we
 		// will retry again, subject to backoff.
@@ -436,13 +438,13 @@ func (oq *destinationQueue) nextTransaction(
 		// to a 400-ish error
 		code := errResponse.Code
 		logrus.Debug("Transaction failed with HTTP", code)
-		return err
+		return err, false
 	default:
 		logrus.WithFields(logrus.Fields{
 			"destination":   oq.destination,
 			logrus.ErrorKey: err,
 		}).Debugf("Failed to send transaction %q", t.TransactionID)
-		return err
+		return err, false
 	}
 }
 
@@ -529,10 +531,10 @@ func (oq *destinationQueue) blacklistDestination() {
 
 // handleTransactionSuccess updates the cached event queues as well as the success and
 // backoff information for this server.
-func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int) {
+func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int, asyncSuccess bool) {
 	// If we successfully sent the transaction then clear out
 	// the pending events and EDUs, and wipe our transaction ID.
-	oq.statistics.Success()
+	oq.statistics.Success(asyncSuccess)
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 

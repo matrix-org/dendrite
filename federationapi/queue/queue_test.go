@@ -75,6 +75,7 @@ func createDatabase() storage.Database {
 		pendingEDUs:        make(map[*shared.Receipt]*gomatrixserverlib.EDU),
 		associatedPDUs:     make(map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}),
 		associatedEDUs:     make(map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}),
+		mailservers:        make(map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName),
 	}
 }
 
@@ -89,6 +90,7 @@ type fakeDatabase struct {
 	pendingEDUs        map[*shared.Receipt]*gomatrixserverlib.EDU
 	associatedPDUs     map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}
 	associatedEDUs     map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}
+	mailservers        map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName
 }
 
 var nidMutex sync.Mutex
@@ -340,7 +342,36 @@ func (d *fakeDatabase) IsServerAssumedOffline(serverName gomatrixserverlib.Serve
 }
 
 func (d *fakeDatabase) GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
-	return []gomatrixserverlib.ServerName{}, nil
+	d.dbMutex.Lock()
+	defer d.dbMutex.Unlock()
+
+	knownMailservers := []gomatrixserverlib.ServerName{}
+	if mailservers, ok := d.mailservers[serverName]; ok {
+		knownMailservers = mailservers
+	}
+
+	return knownMailservers, nil
+}
+
+func (d *fakeDatabase) AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {
+	d.dbMutex.Lock()
+	defer d.dbMutex.Unlock()
+
+	if knownMailservers, ok := d.mailservers[serverName]; ok {
+		for _, mailserver := range mailservers {
+			alreadyKnown := false
+			for _, knownMailserver := range knownMailservers {
+				if mailserver == knownMailserver {
+					alreadyKnown = true
+				}
+			}
+			if !alreadyKnown {
+				d.mailservers[serverName] = append(d.mailservers[serverName], mailserver)
+			}
+		}
+	}
+
+	return nil
 }
 
 type stubFederationRoomServerAPI struct {
@@ -354,8 +385,10 @@ func (r *stubFederationRoomServerAPI) QueryServerBannedFromRoom(ctx context.Cont
 
 type stubFederationClient struct {
 	api.FederationClient
-	shouldTxSucceed bool
-	txCount         atomic.Uint32
+	shouldTxSucceed      bool
+	shouldTxAsyncSucceed bool
+	txCount              atomic.Uint32
+	txAsyncCount         atomic.Uint32
 }
 
 func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error) {
@@ -366,6 +399,16 @@ func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixse
 
 	f.txCount.Add(1)
 	return gomatrixserverlib.RespSend{}, result
+}
+
+func (f *stubFederationClient) SendAsyncTransaction(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error) {
+	var result error
+	if !f.shouldTxAsyncSucceed {
+		result = fmt.Errorf("async transaction failed")
+	}
+
+	f.txAsyncCount.Add(1)
+	return gomatrixserverlib.EmptyResp{}, result
 }
 
 func mustCreatePDU(t *testing.T) *gomatrixserverlib.HeaderedEvent {
@@ -383,12 +426,14 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 	return &gomatrixserverlib.EDU{Type: gomatrixserverlib.MTyping}
 }
 
-func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
+func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxAsyncSucceed bool, t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
 	db, processContext, close := mustCreateFederationDatabase(t, dbType, realDatabase)
 
 	fc := &stubFederationClient{
-		shouldTxSucceed: shouldTxSucceed,
-		txCount:         *atomic.NewUint32(0),
+		shouldTxSucceed:      shouldTxSucceed,
+		shouldTxAsyncSucceed: shouldTxAsyncSucceed,
+		txCount:              *atomic.NewUint32(0),
+		txAsyncCount:         *atomic.NewUint32(0),
 	}
 	rs := &stubFederationRoomServerAPI{}
 
@@ -408,7 +453,7 @@ func TestSendPDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -437,7 +482,7 @@ func TestSendEDUOnSuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -466,7 +511,7 @@ func TestSendPDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -496,7 +541,7 @@ func TestSendEDUOnFailStoredInDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -526,7 +571,7 @@ func TestSendPDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -577,7 +622,7 @@ func TestSendEDUAgainDoesntInterruptBackoff(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -628,7 +673,7 @@ func TestSendPDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -660,7 +705,7 @@ func TestSendEDUMultipleFailuresBlacklisted(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -692,7 +737,7 @@ func TestSendPDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -726,7 +771,7 @@ func TestSendEDUBlacklistedWithPriorExternalFailure(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(2)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -760,7 +805,7 @@ func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -811,7 +856,7 @@ func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(1)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -865,7 +910,7 @@ func TestSendPDUBatches(t *testing.T) {
 
 	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 	// db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, true, t, dbType, true)
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -909,7 +954,7 @@ func TestSendEDUBatches(t *testing.T) {
 
 	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 	// db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, true, t, dbType, true)
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -953,7 +998,7 @@ func TestSendPDUAndEDUBatches(t *testing.T) {
 
 	// test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 	// db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, true, t, dbType, true)
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -1004,7 +1049,7 @@ func TestExternalFailureBackoffDoesntStartQueue(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, true, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -1042,7 +1087,7 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 	destination := gomatrixserverlib.ServerName("remotehost")
 	destinations := map[gomatrixserverlib.ServerName]struct{}{destination: {}}
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, t, dbType, true)
+		db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilBlacklist+1, false, false, t, dbType, true)
 		// NOTE : These defers aren't called if go test is killed so the dbs may not get cleaned up.
 		defer close()
 		defer func() {
@@ -1108,7 +1153,7 @@ func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -1141,7 +1186,7 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 	failuresUntilBlacklist := uint32(7)
 	failuresUntilAssumedOffline := uint32(2)
 	destination := gomatrixserverlib.ServerName("remotehost")
-	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, t, test.DBTypeSQLite, false)
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, false, t, test.DBTypeSQLite, false)
 	defer close()
 	defer func() {
 		pc.ShutdownDendrite()
@@ -1167,4 +1212,82 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 		return poll.Continue("waiting for more send attempts before checking database. Currently %d", fc.txCount.Load())
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
+}
+
+func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
+	t.Parallel()
+	failuresUntilBlacklist := uint32(16)
+	failuresUntilAssumedOffline := uint32(1)
+	destination := gomatrixserverlib.ServerName("remotehost")
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, test.DBTypeSQLite, false)
+	defer close()
+	defer func() {
+		pc.ShutdownDendrite()
+		<-pc.WaitForShutdown()
+	}()
+
+	mailservers := []gomatrixserverlib.ServerName{"mailserver"}
+	queues.statistics.ForServer(destination).AddMailservers(mailservers)
+
+	ev := mustCreatePDU(t)
+	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
+	assert.NoError(t, err)
+
+	check := func(log poll.LogT) poll.Result {
+		if fc.txCount.Load() == 1 {
+			if fc.txAsyncCount.Load() == 1 {
+				data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
+				assert.NoError(t, dbErr)
+				if len(data) == 0 {
+					return poll.Success()
+				}
+				return poll.Continue("waiting for event to be removed from database. Currently present PDU: %d", len(data))
+			}
+			return poll.Continue("waiting for more async send attempts before checking database. Currently %d", fc.txAsyncCount.Load())
+		}
+		return poll.Continue("waiting for more send attempts before checking database. Currently %d", fc.txCount.Load())
+	}
+	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
+
+	assumedOffline, _ := db.IsServerAssumedOffline(destination)
+	assert.Equal(t, assumedOffline, true)
+}
+
+func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
+	t.Parallel()
+	failuresUntilBlacklist := uint32(16)
+	failuresUntilAssumedOffline := uint32(1)
+	destination := gomatrixserverlib.ServerName("remotehost")
+	db, fc, queues, pc, close := testSetup(failuresUntilBlacklist, failuresUntilAssumedOffline, false, true, t, test.DBTypeSQLite, false)
+	defer close()
+	defer func() {
+		pc.ShutdownDendrite()
+		<-pc.WaitForShutdown()
+	}()
+
+	mailservers := []gomatrixserverlib.ServerName{"mailserver"}
+	queues.statistics.ForServer(destination).AddMailservers(mailservers)
+
+	ev := mustCreateEDU(t)
+	err := queues.SendEDU(ev, "localhost", []gomatrixserverlib.ServerName{destination})
+	assert.NoError(t, err)
+
+	check := func(log poll.LogT) poll.Result {
+		if fc.txCount.Load() == 1 {
+			if fc.txAsyncCount.Load() == 1 {
+				data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
+				assert.NoError(t, dbErr)
+				if len(data) == 0 {
+					return poll.Success()
+				}
+				return poll.Continue("waiting for event to be removed from database. Currently present EDU: %d", len(data))
+			}
+			return poll.Continue("waiting for more async send attempts before checking database. Currently %d", fc.txAsyncCount.Load())
+		}
+		return poll.Continue("waiting for more send attempts before checking database. Currently %d", fc.txCount.Load())
+	}
+	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
+
+	assumedOffline, _ := db.IsServerAssumedOffline(destination)
+	assert.Equal(t, assumedOffline, true)
 }
