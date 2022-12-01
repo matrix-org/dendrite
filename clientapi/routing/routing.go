@@ -42,7 +42,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	zion "github.com/matrix-org/dendrite/zion"
 )
 
 var ReleaseVersion string
@@ -77,8 +76,7 @@ func Setup(
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, userAPI, cfg)
-	clientAuthz := zion.ClientRoomserverStruct{ClientRoomserverAPI: rsAPI}
-	authorization := clientApiAuthz.NewRoomserverAuthorization(cfg, clientAuthz)
+	authorization := clientApiAuthz.NewRoomserverAuthorization(cfg, rsAPI)
 
 	unstableFeatures := map[string]bool{
 		"org.matrix.e2e_cross_signing": true,

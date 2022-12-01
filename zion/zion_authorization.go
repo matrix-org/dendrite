@@ -23,46 +23,22 @@ var ErrSpaceDisabled = errors.New("space disabled")
 var ErrChannelDisabled = errors.New("channel disabled")
 
 type ZionAuthorization struct {
-	store                 StoreAPI
+	chainId               int
 	spaceManagerLocalhost *zion_localhost.ZionSpaceManagerLocalhost
 	spaceManagerGoerli    *zion_goerli.ZionSpaceManagerGoerli
-	chainId               int
-}
-type ClientRoomserverStruct struct {
-	roomserver.ClientRoomserverAPI
+	store                 Store
 }
 
-type SyncRoomserverStruct struct {
-	roomserver.SyncRoomserverAPI
-}
-
-type RoomserverStoreAPI interface {
-	roomserver.QueryLatestEventsAndStateAPI
-	NewRoomserverStore() StoreAPI
-}
-
-func (c ClientRoomserverStruct) NewRoomserverStore() StoreAPI {
-	return &ClientRoomserverStore{
-		rsAPI: c,
-	}
-}
-
-func (c SyncRoomserverStruct) NewRoomserverStore() StoreAPI {
-	return &SyncRoomserverStore{
-		rsAPI: c,
-	}
-}
-
-func NewZionAuthorization(cfg *config.ClientAPI, rsAPI RoomserverStoreAPI) (authorization.Authorization, error) {
+func NewZionAuthorization(cfg *config.ClientAPI, roomQueryAPI roomserver.QueryEventsAPI) (authorization.Authorization, error) {
 	if cfg.PublicKeyAuthentication.Ethereum.NetworkUrl == "" {
 		log.Errorf("No blockchain network url specified in config\n")
 		return nil, nil
 	}
 
-	var auth ZionAuthorization
-
-	auth.chainId = cfg.PublicKeyAuthentication.Ethereum.GetChainID()
-	auth.store = rsAPI.NewRoomserverStore()
+	auth := ZionAuthorization{
+		store:   NewStore(roomQueryAPI),
+		chainId: cfg.PublicKeyAuthentication.Ethereum.GetChainID(),
+	}
 
 	switch auth.chainId {
 	case 1337, 31337:
@@ -106,7 +82,8 @@ func (za *ZionAuthorization) IsAllowed(args authorization.AuthorizationArgs) (bo
 		} else if err != nil {
 			return false, err
 		}
-		return za.isAllowedLocalhost(roomInfo, userIdentifier.AccountAddress, args.Permission)
+		isAllowed, err := za.isAllowedLocalhost(roomInfo, userIdentifier.AccountAddress, args.Permission)
+		return isAllowed, err
 	case 5:
 		// Check if space / channel is disabled.
 		disabled, err := za.isSpaceChannelDisabledGoerli(roomInfo)

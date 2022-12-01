@@ -52,8 +52,7 @@ func Setup(
 	lazyLoadCache caching.LazyLoadCache,
 	fts *fulltext.Search,
 ) {
-	syncAuthz := zion.SyncRoomserverStruct{SyncRoomserverAPI: rsAPI}
-	authorization := clientApiAuthz.NewRoomserverAuthorization(clientCfg, syncAuthz)
+	authorization := clientApiAuthz.NewRoomserverAuthorization(clientCfg, crsAPI)
 	v1unstablemux := csMux.PathPrefix("/{apiversion:(?:v1|unstable)}/").Subrouter()
 	v3mux := csMux.PathPrefix("/{apiversion:(?:r0|v3)}/").Subrouter()
 
