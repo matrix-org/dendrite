@@ -476,12 +476,15 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 			"-password", "someRandomPassword",
 		},
 	})
+	if err != nil {
+		return fmt.Errorf("failed to ContainerExecCreate: %w", err)
+	}
 	resp, err := InspectExecResp(context.Background(), dockerClient, respID.ID)
 	if err != nil {
-		log.Fatalf("failed to inspect exec: %s", err)
+		return fmt.Errorf("failed to InspectExecResp: %w", err)
 	}
 	if !strings.Contains(resp.StdErr, "AccessToken") || resp.ExitCode != 0 {
-		log.Fatalf("Failed to create-account: %s", resp.StdErr)
+		return fmt.Errorf("failed to create-account (exit code %d): %s", resp.ExitCode, resp.StdErr)
 	}
 	return nil
 }
