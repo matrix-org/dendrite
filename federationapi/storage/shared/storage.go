@@ -349,27 +349,52 @@ func (d *Database) AssociateAsyncTransactionWithDestinations(
 	return nil
 }
 
+func (d *Database) CleanAsyncTransactions(
+	ctx context.Context,
+	userID gomatrixserverlib.UserID,
+	receipts []*Receipt,
+) error {
+	println(len(receipts))
+	nids := make([]int64, len(receipts))
+	for i, receipt := range receipts {
+		nids[i] = receipt.nid
+	}
+	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		err := d.FederationQueueTransactions.DeleteQueueTransactions(ctx, txn, userID.Domain(), nids)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("d.insertQueueTransaction: %w", err)
+	}
+
+	return nil
+}
+
 func (d *Database) GetAsyncTransaction(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
-) (*gomatrixserverlib.Transaction, error) {
+) (*gomatrixserverlib.Transaction, *Receipt, error) {
 	nids, err := d.FederationQueueTransactions.SelectQueueTransactions(ctx, nil, userID.Domain(), 1)
 	if err != nil {
-		return nil, fmt.Errorf("d.SelectQueueTransaction: %w", err)
+		return nil, nil, fmt.Errorf("d.SelectQueueTransaction: %w", err)
+	}
+	if len(nids) == 0 {
+		return nil, nil, nil
 	}
 
-	txn, err := d.FederationTransactionJSON.SelectTransactionJSON(ctx, nil, nids)
+	txns, err := d.FederationTransactionJSON.SelectTransactionJSON(ctx, nil, nids)
 	if err != nil {
-		return nil, fmt.Errorf("d.SelectTransactionJSON: %w", err)
+		return nil, nil, fmt.Errorf("d.SelectTransactionJSON: %w", err)
 	}
 
 	transaction := &gomatrixserverlib.Transaction{}
-	err = json.Unmarshal(txn[nids[0]], transaction)
+	err = json.Unmarshal(txns[nids[0]], transaction)
 	if err != nil {
-		return nil, fmt.Errorf("Unmarshall transaction: %w", err)
+		return nil, nil, fmt.Errorf("Unmarshall transaction: %w", err)
 	}
 
-	return transaction, nil
+	receipt := NewReceipt(nids[0])
+	return transaction, &receipt, nil
 }
 
 func (d *Database) GetAsyncTransactionCount(

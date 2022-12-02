@@ -14,6 +14,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
@@ -700,6 +701,30 @@ func (r *FederationInternalAPI) QueryAsyncTransactions(
 	request *api.QueryAsyncTransactionsRequest,
 	response *api.QueryAsyncTransactionsResponse,
 ) error {
+	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	// TODO : Shouldn't be deleting unless the transaction was successfully returned...
+	// TODO : Should delete transaction json from table if no more associations
+	if transaction != nil && receipt != nil {
+		err = r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{receipt})
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO : These db calls should happen at the same time right?
+	count, err := r.db.GetAsyncTransactionCount(ctx, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	response.RemainingCount = uint32(count)
+	if transaction != nil {
+		response.Txn = *transaction
+	}
 	return nil
 }
 

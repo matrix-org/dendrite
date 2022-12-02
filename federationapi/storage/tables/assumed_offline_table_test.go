@@ -62,7 +62,7 @@ func TestShouldInsertAssumedOfflineServer(t *testing.T) {
 			t.Fatalf("Failed retrieving server: %s", err.Error())
 		}
 
-		assert.Equal(t, isOffline, true)
+		assert.Equal(t, true, isOffline)
 	})
 }
 
@@ -85,7 +85,7 @@ func TestShouldDeleteCorrectAssumedOfflineServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
-		assert.Equal(t, isOffline, true)
+		assert.Equal(t, true, isOffline)
 
 		err = db.Table.DeleteAssumedOffline(ctx, nil, server1)
 		if err != nil {
@@ -96,13 +96,13 @@ func TestShouldDeleteCorrectAssumedOfflineServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
-		assert.Equal(t, isOffline, false)
+		assert.Equal(t, false, isOffline)
 
 		isOffline2, err := db.Table.SelectAssumedOffline(ctx, nil, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
-		assert.Equal(t, isOffline2, true)
+		assert.Equal(t, true, isOffline2)
 	})
 }
 
@@ -125,13 +125,13 @@ func TestShouldDeleteAllAssumedOfflineServers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
-		assert.Equal(t, isOffline, true)
+		assert.Equal(t, true, isOffline)
 		isOffline2, err := db.Table.SelectAssumedOffline(ctx, nil, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
 
-		assert.Equal(t, isOffline2, true)
+		assert.Equal(t, true, isOffline2)
 
 		err = db.Table.DeleteAllAssumedOffline(ctx, nil)
 		if err != nil {
@@ -142,11 +142,11 @@ func TestShouldDeleteAllAssumedOfflineServers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
-		assert.Equal(t, isOffline, false)
+		assert.Equal(t, false, isOffline)
 		isOffline2, err = db.Table.SelectAssumedOffline(ctx, nil, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving server status: %s", err.Error())
 		}
-		assert.Equal(t, isOffline2, false)
+		assert.Equal(t, false, isOffline2)
 	})
 }

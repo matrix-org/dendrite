@@ -16,6 +16,7 @@ type AsyncEventsResponse struct {
 // GetAsyncEvents implements /_matrix/federation/v1/async_events/{userID}
 func GetAsyncEvents(
 	httpReq *http.Request,
+	fedReq *gomatrixserverlib.FederationRequest,
 	fedAPI api.FederationInternalAPI,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
@@ -30,7 +31,7 @@ func GetAsyncEvents(
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: AsyncEventsResponse{
-			Transaction: gomatrixserverlib.Transaction{},
+			Transaction: response.Txn,
 			Remaining:   response.RemainingCount,
 		},
 	}

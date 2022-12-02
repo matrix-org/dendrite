@@ -112,7 +112,7 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 			t.Fatalf("Failed retrieving transaction: %s", err.Error())
 		}
 
-		assert.Equal(t, len(storedJSON), 1)
+		assert.Equal(t, 1, len(storedJSON))
 
 		var storedTx gomatrixserverlib.Transaction
 		json.Unmarshal(storedJSON[1], &storedTx)
@@ -156,6 +156,6 @@ func TestShouldDeleteTransaction(t *testing.T) {
 			t.Fatalf("Failed retrieving transaction: %s", err.Error())
 		}
 
-		assert.Equal(t, len(storedJSON), 0)
+		assert.Equal(t, 0, len(storedJSON))
 	})
 }

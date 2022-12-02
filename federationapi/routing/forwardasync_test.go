@@ -65,8 +65,10 @@ func (d *testDatabase) SelectQueueTransactions(ctx context.Context, txn *sql.Tx,
 	if limit > len(d.associations[serverName]) {
 		resultCount = len(d.associations[serverName])
 	}
-	for i := 0; i < resultCount; i++ {
-		results = append(results, d.associations[serverName][i])
+	if resultCount > 0 {
+		for i := 0; i < resultCount; i++ {
+			results = append(results, d.associations[serverName][i])
+		}
 	}
 
 	return results, nil
@@ -174,7 +176,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 
 	response := routing.ForwardAsync(
 		httpReq, &request, fedAPI, inputTransaction.TransactionID, *userID)
-	transaction, err := db.GetAsyncTransaction(context.TODO(), *userID)
+	transaction, _, err := db.GetAsyncTransaction(context.TODO(), *userID)
 	if err != nil {
 		t.Fatalf("Failed retrieving transaction: %s", err.Error())
 	}

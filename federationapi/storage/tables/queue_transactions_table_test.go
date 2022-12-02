@@ -85,8 +85,8 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 			t.Fatalf("Failed retrieving transaction: %s", err.Error())
 		}
 
-		assert.Equal(t, retrievedNids[0], nid)
-		assert.Equal(t, len(retrievedNids), 1)
+		assert.Equal(t, nid, retrievedNids[0])
+		assert.Equal(t, 1, len(retrievedNids))
 	})
 }
 
@@ -117,7 +117,7 @@ func TestShouldDeleteQueueTransaction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed retrieving transaction count: %s", err.Error())
 		}
-		assert.Equal(t, count, int64(0))
+		assert.Equal(t, int64(0), count)
 	})
 }
 
@@ -160,12 +160,12 @@ func TestShouldDeleteOnlySpecifiedQueueTransaction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed retrieving transaction count: %s", err.Error())
 		}
-		assert.Equal(t, count, int64(1))
+		assert.Equal(t, int64(1), count)
 
 		count, err = db.Table.SelectQueueTransactionCount(ctx, nil, serverName2)
 		if err != nil {
 			t.Fatalf("Failed retrieving transaction count: %s", err.Error())
 		}
-		assert.Equal(t, count, int64(1))
+		assert.Equal(t, int64(1), count)
 	})
 }

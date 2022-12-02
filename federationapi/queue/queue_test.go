@@ -1250,7 +1250,7 @@ func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	assumedOffline, _ := db.IsServerAssumedOffline(destination)
-	assert.Equal(t, assumedOffline, true)
+	assert.Equal(t, true, assumedOffline)
 }
 
 func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
@@ -1289,5 +1289,5 @@ func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	assumedOffline, _ := db.IsServerAssumedOffline(destination)
-	assert.Equal(t, assumedOffline, true)
+	assert.Equal(t, true, assumedOffline)
 }
