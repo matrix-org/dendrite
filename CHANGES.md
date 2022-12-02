@@ -1,5 +1,45 @@
 # Changelog
 
+## Dendrite 0.10.8 (2022-11-29)
+
+### Features
+
+* The built-in NATS Server has been updated to version 2.9.8
+* A number of under-the-hood changes have been merged for future virtual hosting support in Dendrite (running multiple domain names on the same Dendrite deployment)
+
+### Fixes
+
+* Event auth handling of invites has been refactored, which should fix some edge cases being handled incorrectly
+* Fix a bug when returning an empty protocol list, which could cause Element to display "The homeserver may be too old to support third party networks" when opening the public room directory
+* The sync API will no longer filter out the user's own membership when using lazy-loading
+* Dendrite will now correctly detect JetStream consumers being deleted, stopping the consumer goroutine as needed
+* A panic in the federation API where the server list could go out of bounds has been fixed
+* Blacklisted servers will now be excluded when querying joined servers, which improves CPU usage and performs less unnecessary outbound requests
+* A database writer will now be used to assign state key NIDs when requesting NIDs that may not exist yet
+* Dendrite will now correctly move local aliases for an upgraded room when the room is upgraded remotely
+* Dendrite will now correctly move account data for an upgraded room when the room is upgraded remotely
+* Missing state key NIDs will now be allocated on request rather than returning an error
+* Guest access is now correctly denied on a number of endpoints
+* Presence information will now be correctly sent for new private chats
+* A number of unspecced fields have been removed from outbound `/send` transactions
+
+## Dendrite 0.10.7 (2022-11-04)
+
+### Features
+
+* Dendrite will now use a native SQLite port when building with `CGO_ENABLED=0`
+* A number of `thirdparty` endpoints have been added, improving support for appservices
+
+### Fixes
+
+* The `"state"` section of the `/sync` response is no longer limited, so state events should not be dropped unexpectedly
+* The deduplication of the `"timeline"` and `"state"` sections in `/sync` is now performed after applying history visibility, so state events should not be dropped unexpectedly
+* The `prev_batch` token returned by `/sync` is now calculated after applying history visibility, so that the pagination boundaries are correct
+* The room summary membership counts in `/sync` should now be calculated properly in more cases
+* A false membership leave event should no longer be sent down `/sync` as a result of retiring an accepted invite (contributed by [tak-hntlabs](https://github.com/tak-hntlabs))
+* Presence updates are now only sent to other servers for which the user shares rooms
+* A bug which could cause a panic when converting events into the `ClientEvent` format has been fixed
+
 ## Dendrite 0.10.6 (2022-11-01)
 
 ### Features

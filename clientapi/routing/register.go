@@ -211,9 +211,10 @@ var (
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
 	// registration parameters
-	Password string `json:"password"`
-	Username string `json:"username"`
-	Admin    bool   `json:"admin"`
+	Password   string                       `json:"password"`
+	Username   string                       `json:"username"`
+	ServerName gomatrixserverlib.ServerName `json:"-"`
+	Admin      bool                         `json:"admin"`
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
@@ -550,6 +551,12 @@ func Register(
 	}
 
 	var r registerRequest
+	host := gomatrixserverlib.ServerName(req.Host)
+	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
+		r.ServerName = v.ServerName
+	} else {
+		r.ServerName = cfg.Matrix.ServerName
+	}
 	sessionID := gjson.GetBytes(reqBody, "auth.session").String()
 	if sessionID == "" {
 		// Generate a new, random session ID
@@ -559,6 +566,7 @@ func Register(
 		// Some of these might end up being overwritten if the
 		// values are specified again in the request body.
 		r.Username = data.Username
+		r.ServerName = data.ServerName
 		r.Password = data.Password
 		r.DeviceID = data.DeviceID
 		r.InitialDisplayName = data.InitialDisplayName
@@ -570,10 +578,12 @@ func Register(
 				JSON: response,
 			}
 		}
-
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
+	}
+	if l, d, err := cfg.Matrix.SplitLocalID('@', r.Username); err == nil {
+		r.Username, r.ServerName = l, d
 	}
 	if req.URL.Query().Get("kind") == "guest" {
 		return handleGuestRegistration(req, r, cfg, userAPI)
@@ -588,12 +598,15 @@ func Register(
 	}
 	// Auto generate a numeric username if r.Username is empty
 	if r.Username == "" {
-		res := &userapi.QueryNumericLocalpartResponse{}
-		if err := userAPI.QueryNumericLocalpart(req.Context(), res); err != nil {
+		nreq := &userapi.QueryNumericLocalpartRequest{
+			ServerName: r.ServerName,
+		}
+		nres := &userapi.QueryNumericLocalpartResponse{}
+		if err := userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return jsonerror.InternalServerError()
 		}
-		r.Username = strconv.FormatInt(res.ID, 10)
+		r.Username = strconv.FormatInt(nres.ID, 10)
 	}
 
 	// Is this an appservice registration? It will be if the access
@@ -606,7 +619,7 @@ func Register(
 	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
 		// Spec-compliant case (the access_token is specified and the login type
 		// is correctly set, so it's an appservice registration)
-		if resErr := validateApplicationServiceUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
+		if resErr := validateApplicationServiceUsername(r.Username, r.ServerName); resErr != nil {
 			return *resErr
 		}
 	case accessTokenErr == nil:
@@ -619,7 +632,7 @@ func Register(
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
-		if resErr := validateUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
+		if resErr := validateUsername(r.Username, r.ServerName); resErr != nil {
 			return *resErr
 		}
 	}
@@ -643,16 +656,25 @@ func handleGuestRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
-	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
+	registrationEnabled := !cfg.RegistrationDisabled
+	guestsEnabled := !cfg.GuestsDisabled
+	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
+		registrationEnabled, guestsEnabled = v.RegistrationAllowed()
+	}
+
+	if !registrationEnabled || !guestsEnabled {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Guest registration is disabled"),
+			JSON: jsonerror.Forbidden(
+				fmt.Sprintf("Guest registration is disabled on %q", r.ServerName),
+			),
 		}
 	}
 
 	var res userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeGuest,
+		ServerName:  r.ServerName,
 	}, &res)
 	if err != nil {
 		return util.JSONResponse{
@@ -676,6 +698,7 @@ func handleGuestRegistration(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(req.Context(), &userapi.PerformDeviceCreationRequest{
 		Localpart:         res.Account.Localpart,
+		ServerName:        res.Account.ServerName,
 		DeviceDisplayName: r.InitialDisplayName,
 		AccessToken:       token,
 		IPAddr:            req.RemoteAddr,
@@ -728,10 +751,16 @@ func handleRegistrationFlow(
 		)
 	}
 
-	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+	registrationEnabled := !cfg.RegistrationDisabled
+	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
+		registrationEnabled, _ = v.RegistrationAllowed()
+	}
+	if !registrationEnabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden("Registration is disabled"),
+			JSON: jsonerror.Forbidden(
+				fmt.Sprintf("Registration is disabled on %q", r.ServerName),
+			),
 		}
 	}
 
@@ -819,8 +848,9 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
-		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
+		req.Context(), userAPI, r.Username, r.ServerName, "", appserviceID, req.RemoteAddr,
+		req.UserAgent(), r.Auth.Session, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+		userapi.AccountTypeAppService,
 	)
 }
 
@@ -838,8 +868,9 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
-			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
+			req.Context(), userAPI, r.Username, r.ServerName, r.Password, "", req.RemoteAddr,
+			req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
+			userapi.AccountTypeUser,
 		)
 	}
 	sessions.addParams(sessionID, r)
@@ -861,7 +892,8 @@ func checkAndCompleteFlow(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.ClientUserAPI,
-	username, password, appserviceID, ipAddr, userAgent, sessionID string,
+	username string, serverName gomatrixserverlib.ServerName,
+	password, appserviceID, ipAddr, userAgent, sessionID string,
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 	accType userapi.AccountType,
@@ -883,6 +915,7 @@ func completeRegistration(
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AppServiceID: appserviceID,
 		Localpart:    username,
+		ServerName:   serverName,
 		Password:     password,
 		AccountType:  accType,
 		OnConflict:   userapi.ConflictAbort,
@@ -926,6 +959,7 @@ func completeRegistration(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		Localpart:         username,
+		ServerName:        serverName,
 		AccessToken:       token,
 		DeviceDisplayName: displayName,
 		DeviceID:          deviceID,
@@ -1019,13 +1053,31 @@ func RegisterAvailable(
 
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
+	domain := cfg.Matrix.ServerName
+	host := gomatrixserverlib.ServerName(req.Host)
+	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
+		domain = v.ServerName
+	}
+	if u, l, err := cfg.Matrix.SplitLocalID('@', username); err == nil {
+		username, domain = u, l
+	}
+	for _, v := range cfg.Matrix.VirtualHosts {
+		if v.ServerName == domain && !v.AllowRegistration {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden(
+					fmt.Sprintf("Registration is not allowed on %q", string(v.ServerName)),
+				),
+			}
+		}
+	}
 
-	if err := validateUsername(username, cfg.Matrix.ServerName); err != nil {
+	if err := validateUsername(username, domain); err != nil {
 		return *err
 	}
 
 	// Check if this username is reserved by an application service
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
+	userID := userutil.MakeUserID(username, domain)
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			return util.JSONResponse{
@@ -1037,7 +1089,8 @@ func RegisterAvailable(
 
 	res := &userapi.QueryAccountAvailabilityResponse{}
 	err := registerAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
-		Localpart: username,
+		Localpart:  username,
+		ServerName: domain,
 	}, res)
 	if err != nil {
 		return util.JSONResponse{
@@ -1094,5 +1147,5 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
 }

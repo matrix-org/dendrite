@@ -54,6 +54,11 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	)
 
 	internalAPIMux.Handle(
+		FederationAPIPerformWakeupServers,
+		httputil.MakeInternalRPCAPI("FederationAPIPerformWakeupServers", intAPI.PerformWakeupServers),
+	)
+
+	internalAPIMux.Handle(
 		FederationAPIPerformJoinRequestPath,
 		httputil.MakeInternalRPCAPI(
 			"FederationAPIPerformJoinRequest",
@@ -69,7 +74,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIGetUserDevices",
 			func(ctx context.Context, req *getUserDevices) (*gomatrixserverlib.RespUserDevices, error) {
-				res, err := intAPI.GetUserDevices(ctx, req.S, req.UserID)
+				res, err := intAPI.GetUserDevices(ctx, req.Origin, req.S, req.UserID)
 				return &res, federationClientError(err)
 			},
 		),
@@ -80,7 +85,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIClaimKeys",
 			func(ctx context.Context, req *claimKeys) (*gomatrixserverlib.RespClaimKeys, error) {
-				res, err := intAPI.ClaimKeys(ctx, req.S, req.OneTimeKeys)
+				res, err := intAPI.ClaimKeys(ctx, req.Origin, req.S, req.OneTimeKeys)
 				return &res, federationClientError(err)
 			},
 		),
@@ -91,7 +96,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIQueryKeys",
 			func(ctx context.Context, req *queryKeys) (*gomatrixserverlib.RespQueryKeys, error) {
-				res, err := intAPI.QueryKeys(ctx, req.S, req.Keys)
+				res, err := intAPI.QueryKeys(ctx, req.Origin, req.S, req.Keys)
 				return &res, federationClientError(err)
 			},
 		),
@@ -102,7 +107,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIBackfill",
 			func(ctx context.Context, req *backfill) (*gomatrixserverlib.Transaction, error) {
-				res, err := intAPI.Backfill(ctx, req.S, req.RoomID, req.Limit, req.EventIDs)
+				res, err := intAPI.Backfill(ctx, req.Origin, req.S, req.RoomID, req.Limit, req.EventIDs)
 				return &res, federationClientError(err)
 			},
 		),
@@ -113,7 +118,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPILookupState",
 			func(ctx context.Context, req *lookupState) (*gomatrixserverlib.RespState, error) {
-				res, err := intAPI.LookupState(ctx, req.S, req.RoomID, req.EventID, req.RoomVersion)
+				res, err := intAPI.LookupState(ctx, req.Origin, req.S, req.RoomID, req.EventID, req.RoomVersion)
 				return &res, federationClientError(err)
 			},
 		),
@@ -124,7 +129,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPILookupStateIDs",
 			func(ctx context.Context, req *lookupStateIDs) (*gomatrixserverlib.RespStateIDs, error) {
-				res, err := intAPI.LookupStateIDs(ctx, req.S, req.RoomID, req.EventID)
+				res, err := intAPI.LookupStateIDs(ctx, req.Origin, req.S, req.RoomID, req.EventID)
 				return &res, federationClientError(err)
 			},
 		),
@@ -135,7 +140,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPILookupMissingEvents",
 			func(ctx context.Context, req *lookupMissingEvents) (*gomatrixserverlib.RespMissingEvents, error) {
-				res, err := intAPI.LookupMissingEvents(ctx, req.S, req.RoomID, req.Missing, req.RoomVersion)
+				res, err := intAPI.LookupMissingEvents(ctx, req.Origin, req.S, req.RoomID, req.Missing, req.RoomVersion)
 				return &res, federationClientError(err)
 			},
 		),
@@ -146,7 +151,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIGetEvent",
 			func(ctx context.Context, req *getEvent) (*gomatrixserverlib.Transaction, error) {
-				res, err := intAPI.GetEvent(ctx, req.S, req.EventID)
+				res, err := intAPI.GetEvent(ctx, req.Origin, req.S, req.EventID)
 				return &res, federationClientError(err)
 			},
 		),
@@ -157,7 +162,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIGetEventAuth",
 			func(ctx context.Context, req *getEventAuth) (*gomatrixserverlib.RespEventAuth, error) {
-				res, err := intAPI.GetEventAuth(ctx, req.S, req.RoomVersion, req.RoomID, req.EventID)
+				res, err := intAPI.GetEventAuth(ctx, req.Origin, req.S, req.RoomVersion, req.RoomID, req.EventID)
 				return &res, federationClientError(err)
 			},
 		),
@@ -184,7 +189,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIMSC2836EventRelationships",
 			func(ctx context.Context, req *eventRelationships) (*gomatrixserverlib.MSC2836EventRelationshipsResponse, error) {
-				res, err := intAPI.MSC2836EventRelationships(ctx, req.S, req.Req, req.RoomVer)
+				res, err := intAPI.MSC2836EventRelationships(ctx, req.Origin, req.S, req.Req, req.RoomVer)
 				return &res, federationClientError(err)
 			},
 		),
@@ -195,7 +200,7 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 		httputil.MakeInternalProxyAPI(
 			"FederationAPIMSC2946SpacesSummary",
 			func(ctx context.Context, req *spacesReq) (*gomatrixserverlib.MSC2946SpacesResponse, error) {
-				res, err := intAPI.MSC2946Spaces(ctx, req.S, req.RoomID, req.SuggestedOnly)
+				res, err := intAPI.MSC2946Spaces(ctx, req.Origin, req.S, req.RoomID, req.SuggestedOnly)
 				return &res, federationClientError(err)
 			},
 		),

@@ -14,6 +14,7 @@ func UpLastSeenTSIP(ctx context.Context, tx *sql.Tx) error {
         session_id INTEGER,
         device_id TEXT ,
         localpart TEXT ,
+		server_name TEXT NOT NULL,
         created_ts BIGINT,
         display_name TEXT,
         last_seen_ts BIGINT,

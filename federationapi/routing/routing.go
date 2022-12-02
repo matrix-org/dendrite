@@ -74,7 +74,7 @@ func Setup(
 	}
 
 	localKeys := httputil.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return LocalKeys(cfg)
+		return LocalKeys(cfg, gomatrixserverlib.ServerName(req.Host))
 	})
 
 	notaryKeys := httputil.MakeExternalAPI("notarykeys", func(req *http.Request) util.JSONResponse {

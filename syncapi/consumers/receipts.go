@@ -34,14 +34,13 @@ import (
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
 type OutputReceiptEventConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	topic      string
-	db         storage.Database
-	stream     streams.StreamProvider
-	notifier   *notifier.Notifier
-	serverName gomatrixserverlib.ServerName
+	ctx       context.Context
+	jetstream nats.JetStreamContext
+	durable   string
+	topic     string
+	db        storage.Database
+	stream    streams.StreamProvider
+	notifier  *notifier.Notifier
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -55,14 +54,13 @@ func NewOutputReceiptEventConsumer(
 	stream streams.StreamProvider,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
-		db:         store,
-		notifier:   notifier,
-		stream:     stream,
-		serverName: cfg.Matrix.ServerName,
+		ctx:       process.Context(),
+		jetstream: js,
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
+		db:        store,
+		notifier:  notifier,
+		stream:    stream,
 	}
 }
 

@@ -75,7 +75,20 @@ comment. Please avoid doing this if you can.
 We also have unit tests which we run via:
 
 ```bash
-go test --race ./...
+DENDRITE_TEST_SKIP_NODB=1 go test --race ./...
+```
+
+This only runs SQLite database tests. If you wish to execute Postgres tests as well, you'll either need to 
+have Postgres installed locally (`createdb` will be used) or have a remote/containerized Postgres instance
+available.
+
+To configure the connection to a remote Postgres, you can use the following enviroment variables:
+
+```bash
+POSTGRES_USER=postgres
+POSTGERS_PASSWORD=yourPostgresPassword
+POSTGRES_HOST=localhost
+POSTGRES_DB=postgres # the superuser database to use
 ```
 
 In general, we like submissions that come with tests. Anything that proves that the

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -11,21 +12,15 @@ import (
 )
 
 type Global struct {
-	// The name of the server. This is usually the domain name, e.g 'matrix.org', 'localhost'.
-	ServerName gomatrixserverlib.ServerName `yaml:"server_name"`
+	// Signing identity contains the server name, private key and key ID of
+	// the deployment.
+	gomatrixserverlib.SigningIdentity `yaml:",inline"`
 
 	// The secondary server names, used for virtual hosting.
-	SecondaryServerNames []gomatrixserverlib.ServerName `yaml:"-"`
+	VirtualHosts []*VirtualHost `yaml:"-"`
 
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
-
-	// The private key which will be used to sign requests and events.
-	PrivateKey ed25519.PrivateKey `yaml:"-"`
-
-	// An arbitrary string used to uniquely identify the PrivateKey. Must start with the
-	// prefix "ed25519:".
-	KeyID gomatrixserverlib.KeyID `yaml:"-"`
 
 	// Information about old private keys that used to be used to sign requests and
 	// events on this domain. They will not be used but will be advertised to other
@@ -114,6 +109,10 @@ func (c *Global) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	checkNotEmpty(configErrs, "global.server_name", string(c.ServerName))
 	checkNotEmpty(configErrs, "global.private_key", string(c.PrivateKeyPath))
 
+	for _, v := range c.VirtualHosts {
+		v.Verify(configErrs)
+	}
+
 	c.JetStream.Verify(configErrs, isMonolith)
 	c.Metrics.Verify(configErrs, isMonolith)
 	c.Sentry.Verify(configErrs, isMonolith)
@@ -127,12 +126,106 @@ func (c *Global) IsLocalServerName(serverName gomatrixserverlib.ServerName) bool
 	if c.ServerName == serverName {
 		return true
 	}
-	for _, secondaryName := range c.SecondaryServerNames {
-		if secondaryName == serverName {
+	for _, v := range c.VirtualHosts {
+		if v.ServerName == serverName {
 			return true
 		}
 	}
 	return false
+}
+
+func (c *Global) SplitLocalID(sigil byte, id string) (string, gomatrixserverlib.ServerName, error) {
+	u, s, err := gomatrixserverlib.SplitID(sigil, id)
+	if err != nil {
+		return u, s, err
+	}
+	if !c.IsLocalServerName(s) {
+		return u, s, fmt.Errorf("server name %q not known", s)
+	}
+	return u, s, nil
+}
+
+func (c *Global) VirtualHost(serverName gomatrixserverlib.ServerName) *VirtualHost {
+	for _, v := range c.VirtualHosts {
+		if v.ServerName == serverName {
+			return v
+		}
+	}
+	return nil
+}
+
+func (c *Global) VirtualHostForHTTPHost(serverName gomatrixserverlib.ServerName) *VirtualHost {
+	for _, v := range c.VirtualHosts {
+		if v.ServerName == serverName {
+			return v
+		}
+		for _, h := range v.MatchHTTPHosts {
+			if h == serverName {
+				return v
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*gomatrixserverlib.SigningIdentity, error) {
+	for _, id := range c.SigningIdentities() {
+		if id.ServerName == serverName {
+			return id, nil
+		}
+	}
+	return nil, fmt.Errorf("no signing identity %q", serverName)
+}
+
+func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {
+	identities := make([]*gomatrixserverlib.SigningIdentity, 0, len(c.VirtualHosts)+1)
+	identities = append(identities, &c.SigningIdentity)
+	for _, v := range c.VirtualHosts {
+		identities = append(identities, &v.SigningIdentity)
+	}
+	return identities
+}
+
+type VirtualHost struct {
+	// Signing identity contains the server name, private key and key ID of
+	// the virtual host.
+	gomatrixserverlib.SigningIdentity `yaml:",inline"`
+
+	// Path to the private key. If not specified, the default global private key
+	// will be used instead.
+	PrivateKeyPath Path `yaml:"private_key"`
+
+	// How long a remote server can cache our server key for before requesting it again.
+	// Increasing this number will reduce the number of requests made by remote servers
+	// for our key, but increases the period a compromised key will be considered valid
+	// by remote servers.
+	// Defaults to 24 hours.
+	KeyValidityPeriod time.Duration `yaml:"key_validity_period"`
+
+	// Match these HTTP Host headers on the `/key/v2/server` endpoint, this needs
+	// to match all delegated names, likely including the port number too if
+	// the well-known delegation includes that also.
+	MatchHTTPHosts []gomatrixserverlib.ServerName `yaml:"match_http_hosts"`
+
+	// Is registration enabled on this virtual host?
+	AllowRegistration bool `yaml:"allow_registration"`
+
+	// Is guest registration enabled on this virtual host?
+	AllowGuests bool `yaml:"allow_guests"`
+}
+
+func (v *VirtualHost) Verify(configErrs *ConfigErrors) {
+	checkNotEmpty(configErrs, "virtual_host.*.server_name", string(v.ServerName))
+}
+
+// RegistrationAllowed returns two bools, the first states whether registration
+// is allowed for this virtual host and the second states whether guests are
+// allowed for this virtual host.
+func (v *VirtualHost) RegistrationAllowed() (bool, bool) {
+	if v == nil {
+		return false, false
+	}
+	return v.AllowRegistration, v.AllowGuests
 }
 
 type OldVerifyKeys struct {

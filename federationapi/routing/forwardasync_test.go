@@ -123,7 +123,7 @@ func createFederationRequest(userID gomatrixserverlib.UserID) (gomatrixserverlib
 	txn := createTransaction()
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
 	path := federationPathPrefixV1 + "/forward_async/" + string(txn.TransactionID) + "/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("PUT", txn.Destination, path)
+	request := gomatrixserverlib.NewFederationRequest("PUT", txn.Origin, txn.Destination, path)
 	request.SetContent(txn)
 
 	return txn, request

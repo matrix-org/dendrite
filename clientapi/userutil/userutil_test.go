@@ -30,7 +30,9 @@ var (
 // TestGoodUserID checks that correct localpart is returned for a valid user ID.
 func TestGoodUserID(t *testing.T) {
 	cfg := &config.Global{
-		ServerName: serverName,
+		SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: serverName,
+		},
 	}
 
 	lp, _, err := ParseUsernameParam(goodUserID, cfg)
@@ -47,7 +49,9 @@ func TestGoodUserID(t *testing.T) {
 // TestWithLocalpartOnly checks that localpart is returned when usernameParam contains only localpart.
 func TestWithLocalpartOnly(t *testing.T) {
 	cfg := &config.Global{
-		ServerName: serverName,
+		SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: serverName,
+		},
 	}
 
 	lp, _, err := ParseUsernameParam(localpart, cfg)
@@ -64,7 +68,9 @@ func TestWithLocalpartOnly(t *testing.T) {
 // TestIncorrectDomain checks for error when there's server name mismatch.
 func TestIncorrectDomain(t *testing.T) {
 	cfg := &config.Global{
-		ServerName: invalidServerName,
+		SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: invalidServerName,
+		},
 	}
 
 	_, _, err := ParseUsernameParam(goodUserID, cfg)
@@ -77,7 +83,9 @@ func TestIncorrectDomain(t *testing.T) {
 // TestBadUserID checks that ParseUsernameParam fails for invalid user ID
 func TestBadUserID(t *testing.T) {
 	cfg := &config.Global{
-		ServerName: serverName,
+		SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: serverName,
+		},
 	}
 
 	_, _, err := ParseUsernameParam(badUserID, cfg)

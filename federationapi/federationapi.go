@@ -121,21 +121,19 @@ func NewInternalAPI(
 		cfg.FederationMaxRetries+1,
 		cfg.FederationRetriesUntilAssumedOffline+1)
 
-	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+
+	signingInfo := base.Cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, rsAPI, &stats,
-		&queue.SigningInfo{
-			KeyID:      cfg.Matrix.KeyID,
-			PrivateKey: cfg.Matrix.PrivateKey,
-			ServerName: cfg.Matrix.ServerName,
-		},
+		signingInfo,
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, queues,
+		base.ProcessContext, cfg, js, nats, queues,
 		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
