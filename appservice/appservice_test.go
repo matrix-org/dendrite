@@ -39,8 +39,8 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.Path, "location"):
-
-			if r.URL.Path[len(r.URL.Path)-3:] == existingProtocol {
+			// Check if we've got an existing protocol, if so, return a proper response.
+			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantLocationResponse); err != nil {
 					t.Fatalf("failed to encode response: %s", err)
 				}
@@ -51,7 +51,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			}
 			return
 		case strings.Contains(r.URL.Path, "user"):
-			if r.URL.Path[len(r.URL.Path)-3:] == existingProtocol {
+			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantUserResponse); err != nil {
 					t.Fatalf("failed to encode response: %s", err)
 				}
@@ -62,7 +62,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 			}
 			return
 		case strings.Contains(r.URL.Path, "protocol"):
-			if r.URL.Path[len(r.URL.Path)-3:] == existingProtocol {
+			if r.URL.Path[len(r.URL.Path)-len(existingProtocol):] == existingProtocol {
 				if err := json.NewEncoder(w).Encode(wantProtocolResponse); err != nil {
 					t.Fatalf("failed to encode response: %s", err)
 				}
@@ -77,6 +77,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		}
 	}))
 
+	// TODO: use test.WithAllDatabases
 	// only one DBType, since appservice.AddInternalRoutes complains about multiple prometheus counters added
 	base, closeBase := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer closeBase()
