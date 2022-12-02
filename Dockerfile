@@ -21,7 +21,9 @@ RUN --mount=target=. \
     GOARCH="$TARGETARCH" \
     GOOS="linux" \
     CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
-    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
+    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/... && \
+    go test -c -cover -covermode=atomic -o /out/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server && \
+    cp build/scripts/complement-cmd.sh /out/
 
 #
 # The dendrite base image
@@ -73,6 +75,8 @@ RUN apk add --no-cache sqlite openssl ca-certificates
 COPY --from=build /out/generate-config /usr/bin/generate-config
 COPY --from=build /out/generate-keys /usr/bin/generate-keys
 COPY --from=build /out/dendrite-monolith-server /usr/bin/dendrite-monolith-server
+COPY --from=build /out/dendrite-monolith-server-cover /usr/bin/dendrite-monolith-server-cover
+COPY --from=build /out/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /dendrite
 RUN /usr/bin/generate-keys --private-key matrix_key.pem && \
@@ -82,6 +86,7 @@ RUN /usr/bin/generate-keys --private-key matrix_key.pem && \
 
 ENV SERVER_NAME=localhost
 ENV API=0
+ENV COVER=0
 EXPOSE 8008 8448
 
 # At runtime, generate TLS cert based on the CA now mounted at /ca
@@ -89,4 +94,4 @@ EXPOSE 8008 8448
 CMD /usr/bin/generate-keys --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /ca/ca.crt --tls-authority-key /ca/ca.key && \
     /usr/bin/generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
     cp /ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
-    /usr/bin/dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+    exec /complement-cmd.sh
