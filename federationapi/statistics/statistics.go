@@ -260,6 +260,11 @@ func (s *ServerStatistics) RemoveBlacklist() {
 	s.backoffCount.Store(0)
 }
 
+// RemoveAssumedOffline removes the assumed offline status from the server.
+func (s *ServerStatistics) RemoveAssumedOffline() {
+	s.assumedOffline.Store(false)
+}
+
 // SuccessCount returns the number of successful requests. This is
 // usually useful in constructing transaction IDs.
 func (s *ServerStatistics) SuccessCount() uint32 {

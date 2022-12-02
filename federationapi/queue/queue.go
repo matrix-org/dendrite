@@ -388,6 +388,7 @@ func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 
 	serverStatistics := oqs.statistics.ForServer(srv)
 	forceWakeup := serverStatistics.Blacklisted()
+	serverStatistics.RemoveAssumedOffline()
 	serverStatistics.RemoveBlacklist()
 	serverStatistics.ClearBackoff()
 

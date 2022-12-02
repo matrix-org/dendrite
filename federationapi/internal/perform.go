@@ -762,8 +762,11 @@ func (r *FederationInternalAPI) PerformWakeupServers(
 
 func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
 	for _, srv := range destinations {
-		// Check the statistics cache for the blacklist status to prevent hitting
+		// Check the statistics cache for the blacklist & assumed offline status to prevent hitting
 		// the database unnecessarily.
+		if r.statistics.ForServer(srv).AssumedOffline() {
+			_ = r.db.RemoveServerAssumedOffline(srv)
+		}
 		if r.queues.IsServerBlacklisted(srv) {
 			_ = r.db.RemoveServerFromBlacklist(srv)
 		}
