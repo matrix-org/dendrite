@@ -49,6 +49,11 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	)
 
 	internalAPIMux.Handle(
+		FederationAPIQueryAsyncTransactionsPath,
+		httputil.MakeInternalRPCAPI("FederationAPIQueryAsyncTransactions", intAPI.QueryAsyncTransactions),
+	)
+
+	internalAPIMux.Handle(
 		FederationAPIPerformJoinRequestPath,
 		httputil.MakeInternalRPCAPI(
 			"FederationAPIPerformJoinRequest",

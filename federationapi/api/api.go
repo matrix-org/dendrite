@@ -36,6 +36,11 @@ type FederationInternalAPI interface {
 		request *PerformStoreAsyncRequest,
 		response *PerformStoreAsyncResponse,
 	) error
+	QueryAsyncTransactions(
+		ctx context.Context,
+		request *QueryAsyncTransactionsRequest,
+		response *QueryAsyncTransactionsResponse,
+	) error
 }
 
 type ClientFederationAPI interface {
@@ -226,6 +231,15 @@ type PerformStoreAsyncRequest struct {
 }
 
 type PerformStoreAsyncResponse struct {
+}
+
+type QueryAsyncTransactionsRequest struct {
+	UserID gomatrixserverlib.UserID `json:"user_id"`
+}
+
+type QueryAsyncTransactionsResponse struct {
+	Txn            gomatrixserverlib.Transaction `json:"transaction"`
+	RemainingCount uint32                        `json:"remaining"`
 }
 
 type InputPublicKeysRequest struct {

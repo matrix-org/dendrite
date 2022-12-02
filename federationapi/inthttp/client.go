@@ -24,6 +24,7 @@ const (
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 	FederationAPIPerformStoreAsyncPath             = "/federationapi/performStoreAsync"
+	FederationAPIQueryAsyncTransactionsPath        = "/federationapi/queryAsyncTransactions"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -158,6 +159,17 @@ func (h *httpFederationInternalAPI) PerformStoreAsync(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformStoreAsync", h.federationAPIURL+FederationAPIPerformStoreAsyncPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) QueryAsyncTransactions(
+	ctx context.Context,
+	request *api.QueryAsyncTransactionsRequest,
+	response *api.QueryAsyncTransactionsResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryAsyncTransactions", h.federationAPIURL+FederationAPIQueryAsyncTransactionsPath,
 		h.httpClient, ctx, request, response,
 	)
 }

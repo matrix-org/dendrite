@@ -694,6 +694,15 @@ func (r *FederationInternalAPI) PerformStoreAsync(
 	return err
 }
 
+// QueryAsyncTransactions implements api.FederationInternalAPI
+func (r *FederationInternalAPI) QueryAsyncTransactions(
+	ctx context.Context,
+	request *api.QueryAsyncTransactionsRequest,
+	response *api.QueryAsyncTransactionsResponse,
+) error {
+	return nil
+}
+
 func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
 	for _, srv := range destinations {
 		_ = r.db.RemoveServerFromBlacklist(srv)
