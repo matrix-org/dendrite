@@ -1,0 +1,13 @@
+flag_management:
+  default_rules:
+    carryforward: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: 75%
+        threshold: 0%
+        base: auto
+        flags:
+          - unittests
