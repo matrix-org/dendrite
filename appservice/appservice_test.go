@@ -108,7 +108,7 @@ func TestAppserviceInternalAPI(t *testing.T) {
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		base, closeBase := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
+		base, closeBase := testrig.CreateBaseDendrite(t, dbType)
 		defer closeBase()
 
 		// Create a dummy application service
