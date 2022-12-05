@@ -11,6 +11,7 @@ import (
 )
 
 // ForwardAsync implements /_matrix/federation/v1/forward_async/{txnID}/{userID}
+// This endpoint can be extracted into a separate mailserver service.
 func ForwardAsync(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
