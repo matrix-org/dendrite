@@ -19,17 +19,17 @@ concurrency:
 
 jobs:
   pr-metadata:
-    uses: matrix-org/dendrite/.github/workflows/helm-pr-metadata.yaml@main
+    uses: S7evinK/dendrite/.github/workflows/helm-pr-metadata.yaml@main
 
   pre-commit-check:
-    uses: matrix-org/dendrite/.github/workflows/helm-pre-commit-check.yaml@main
+    uses: S7evinK/dendrite/.github/workflows/helm-pre-commit-check.yaml@main
     needs:
       - pr-metadata
     with:
       modifiedFiles: ${{ needs.pr-metadata.outputs.addedOrModifiedFiles }}
 
   charts-changelog:
-    uses: matrix-org/dendrite/.github/workflows/helm-charts-changelog.yaml@main
+    uses: S7evinK/dendrite/.github/workflows/helm-charts-changelog.yaml@main
     needs:
       - pr-metadata
       - pre-commit-check
@@ -38,7 +38,7 @@ jobs:
       modifiedCharts: ${{ needs.pr-metadata.outputs.addedOrModifiedCharts }}
 
   charts-lint:
-    uses: matrix-org/dendrite/.github/workflows/helm-charts-lint.yaml@main
+    uses: S7evinK/dendrite/.github/workflows/helm-charts-lint.yaml@main
     needs:
       - pr-metadata
       - charts-changelog
@@ -47,7 +47,7 @@ jobs:
       chartChangesDetected: ${{ needs.pr-metadata.outputs.addedOrModified }}
 
   charts-test:
-    uses: matrix-org/dendrite/.github/workflows/helm-charts-test.yaml@main
+    uses: S7evinK/dendrite/.github/workflows/helm-charts-test.yaml@main
     needs:
       - pr-metadata
       - charts-changelog
