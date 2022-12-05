@@ -27,7 +27,7 @@ func UserAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 		base.PushGatewayHTTPClient(),
 	)
 
-	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
+	userapi.AddInternalRoutes(base.InternalAPIMux, userAPI, base.EnableMetrics)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.UserAPI.InternalAPI.Listen, // internal listener

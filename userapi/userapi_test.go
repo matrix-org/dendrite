@@ -144,7 +144,7 @@ func TestQueryProfile(t *testing.T) {
 
 	t.Run("HTTP API", func(t *testing.T) {
 		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-		userapi.AddInternalRoutes(router, userAPI)
+		userapi.AddInternalRoutes(router, userAPI, false)
 		apiURL, cancel := test.ListenAndServe(t, router, false)
 		defer cancel()
 		httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
