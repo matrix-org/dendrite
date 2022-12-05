@@ -306,7 +306,7 @@ Alternative server names do not cause a routing loop
 Events whose auth_events are in the wrong room do not mess up the room state
 Inbound federation can return events
 Inbound federation can return missing events for world_readable visibility
-Inbound federation can return missing events for invite visibility
+Inbound federation can return missing events for invited visibility
 Inbound federation can get public room list
 PUT /rooms/:room_id/redact/:event_id/:txn_id as power user redacts message
 PUT /rooms/:room_id/redact/:event_id/:txn_id as original message sender redacts message
@@ -682,7 +682,6 @@ Presence changes are reported to local room members
 Presence changes are also reported to remote room members
 Presence changes to UNAVAILABLE are reported to local room members
 Presence changes to UNAVAILABLE are reported to remote room members
-New federated private chats get full presence information (SYN-115)
 /upgrade copies >100 power levels to the new room
 Room state after a rejected message event is the same as before
 Room state after a rejected state event is the same as before
@@ -699,7 +698,7 @@ We do send redundant membership state across incremental syncs if asked
 Rejecting invite over federation doesn't break incremental /sync
 Gapped incremental syncs include all state changes
 Old leaves are present in gapped incremental syncs
-Leaves are present in non-gapped incremental syncs
+#Leaves are present in non-gapped incremental syncs
 Members from the gap are included in gappy incr LL sync
 Presence can be set from sync
 /state returns M_NOT_FOUND for a rejected message event
@@ -743,3 +742,25 @@ User joining then leaving public room appears and dissappears from directory
 User in remote room doesn't appear in user directory after server left room
 User in shared private room does appear in user directory until leave
 Existing members see new member's presence
+Inbound federation can return missing events for joined visibility
+outliers whose auth_events are in a different room are correctly rejected
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
+Newly joined room has correct timeline in incremental sync
+When user joins a room the state is included in the next sync
+When user joins a room the state is included in a gapped sync
+Messages that notify from another user increment notification_count
+Messages that highlight from another user increment unread highlight count
+Notifications can be viewed with GET /notifications
+Can get rooms/{roomId}/messages for a departed room (SPEC-216)
+Local device key changes appear in /keys/changes
+Can get rooms/{roomId}/members at a given point
+Can filter rooms/{roomId}/members
+Current state appears in timeline in private history with many messages after
+AS can publish rooms in their own list
+AS and main public room lists are separate
+/upgrade preserves direct room state
+local user has tags copied to the new room
+remote user has tags copied to the new room
+/upgrade moves remote aliases to the new room
+Local and remote users' homeservers remove a room from their public directory on upgrade

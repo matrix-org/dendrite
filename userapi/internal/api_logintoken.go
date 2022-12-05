@@ -31,8 +31,8 @@ func (a *UserInternalAPI) PerformLoginTokenCreation(ctx context.Context, req *ap
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot create a login token for a remote user: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot create a login token for a remote user (server name %s)", domain)
 	}
 	tokenMeta, err := a.DB.CreateLoginToken(ctx, &req.Data)
 	if err != nil {
@@ -63,10 +63,10 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	if err != nil {
 		return err
 	}
-	if domain != a.ServerName {
-		return fmt.Errorf("cannot return a login token for a remote user: got %s want %s", domain, a.ServerName)
+	if !a.Config.Matrix.IsLocalServerName(domain) {
+		return fmt.Errorf("cannot return a login token for a remote user (server name %s)", domain)
 	}
-	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart); err != nil {
+	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
 		res.Data = nil
 		if err == sql.ErrNoRows {
 			return nil

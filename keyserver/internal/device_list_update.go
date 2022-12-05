@@ -47,7 +47,6 @@ var (
 	)
 )
 
-const defaultWaitTime = time.Minute
 const requestTimeout = time.Second * 30
 
 func init() {
@@ -97,6 +96,7 @@ type DeviceListUpdater struct {
 	producer    KeyChangeProducer
 	fedClient   fedsenderapi.KeyserverFederationAPI
 	workerChans []chan gomatrixserverlib.ServerName
+	thisServer  gomatrixserverlib.ServerName
 
 	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
 	// block on or timeout via a select.
@@ -140,6 +140,7 @@ func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
+	thisServer gomatrixserverlib.ServerName,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
 		process:        process,
@@ -149,6 +150,7 @@ func NewDeviceListUpdater(
 		api:            api,
 		producer:       producer,
 		fedClient:      fedClient,
+		thisServer:     thisServer,
 		workerChans:    make([]chan gomatrixserverlib.ServerName, numWorkers),
 		userIDToChan:   make(map[string]chan bool),
 		userIDToChanMu: &sync.Mutex{},
@@ -436,8 +438,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		"server_name": serverName,
 		"user_id":     userID,
 	})
-
-	res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
+	res, err := u.fedClient.GetUserDevices(ctx, u.thisServer, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return time.Minute * 10, err
@@ -454,7 +455,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			} else if e.Code >= 300 {
 				// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
 				// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
-				return time.Hour, err
+				return hourWaitTime, err
 			}
 		case net.Error:
 			// Use the default waitTime, if it's a timeout.
@@ -468,7 +469,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 			if e.Code >= 300 {
 				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
-				return time.Hour, err
+				return hourWaitTime, err
 			}
 		default:
 			// Something else failed

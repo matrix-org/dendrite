@@ -177,9 +177,12 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 	defer regResp.Body.Close() // nolint: errcheck
 	if regResp.StatusCode < 200 || regResp.StatusCode >= 300 {
 		body, _ = io.ReadAll(regResp.Body)
-		return "", fmt.Errorf(gjson.GetBytes(body, "error").Str)
+		return "", fmt.Errorf("got HTTP %d error from server: %s", regResp.StatusCode, string(body))
 	}
-	r, _ := io.ReadAll(regResp.Body)
+	r, err := io.ReadAll(regResp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body (HTTP %d): %w", regResp.StatusCode, err)
+	}
 
 	return gjson.GetBytes(r, "access_token").Str, nil
 }

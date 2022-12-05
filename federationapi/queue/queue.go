@@ -15,7 +15,6 @@
 package queue
 
 import (
-	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -24,6 +23,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -45,7 +45,7 @@ type OutgoingQueues struct {
 	origin      gomatrixserverlib.ServerName
 	client      fedapi.FederationClient
 	statistics  *statistics.Statistics
-	signing     *SigningInfo
+	signing     map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
@@ -90,7 +90,7 @@ func NewOutgoingQueues(
 	client fedapi.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
-	signing *SigningInfo,
+	signing []*gomatrixserverlib.SigningIdentity,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
@@ -100,8 +100,11 @@ func NewOutgoingQueues(
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
-		signing:    signing,
+		signing:    map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity{},
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
+	}
+	for _, identity := range signing {
+		queues.signing[identity.ServerName] = identity
 	}
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
@@ -134,14 +137,6 @@ func NewOutgoingQueues(
 	return queues
 }
 
-// TODO: Move this somewhere useful for other components as we often need to ferry these 3 variables
-// around together
-type SigningInfo struct {
-	ServerName gomatrixserverlib.ServerName
-	KeyID      gomatrixserverlib.KeyID
-	PrivateKey ed25519.PrivateKey
-}
-
 type queuedPDU struct {
 	receipt *shared.Receipt
 	pdu     *gomatrixserverlib.HeaderedEvent
@@ -162,23 +157,25 @@ func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *d
 	if !ok || oq == nil {
 		destinationQueueTotal.Inc()
 		oq = &destinationQueue{
-			queues:           oqs,
-			db:               oqs.db,
-			process:          oqs.process,
-			rsAPI:            oqs.rsAPI,
-			origin:           oqs.origin,
-			destination:      destination,
-			client:           oqs.client,
-			statistics:       oqs.statistics.ForServer(destination),
-			notify:           make(chan struct{}, 1),
-			interruptBackoff: make(chan bool),
-			signing:          oqs.signing,
+			queues:      oqs,
+			db:          oqs.db,
+			process:     oqs.process,
+			rsAPI:       oqs.rsAPI,
+			origin:      oqs.origin,
+			destination: destination,
+			client:      oqs.client,
+			statistics:  oqs.statistics.ForServer(destination),
+			notify:      make(chan struct{}, 1),
+			signing:     oqs.signing,
 		}
+		oq.statistics.AssignBackoffNotifier(oq.handleBackoffNotifier)
 		oqs.queues[destination] = oq
 	}
 	return oq
 }
 
+// clearQueue removes the queue for the provided destination from the
+// set of destination queues.
 func (oqs *OutgoingQueues) clearQueue(oq *destinationQueue) {
 	oqs.queuesMutex.Lock()
 	defer oqs.queuesMutex.Unlock()
@@ -196,11 +193,10 @@ func (oqs *OutgoingQueues) SendEvent(
 		log.Trace("Federation is disabled, not sending event")
 		return nil
 	}
-	if origin != oqs.origin {
-		// TODO: Support virtual hosting; gh issue #577.
+	if _, ok := oqs.signing[origin]; !ok {
 		return fmt.Errorf(
-			"sendevent: unexpected server to send as: got %q expected %q",
-			origin, oqs.origin,
+			"sendevent: unexpected server to send as %q",
+			origin,
 		)
 	}
 
@@ -211,7 +207,9 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
-	delete(destmap, oqs.signing.ServerName)
+	for local := range oqs.signing {
+		delete(destmap, local)
+	}
 
 	// Check if any of the destinations are prohibited by server ACLs.
 	for destination := range destmap {
@@ -244,10 +242,33 @@ func (oqs *OutgoingQueues) SendEvent(
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
+	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
 		if queue := oqs.getQueue(destination); queue != nil {
-			queue.sendEvent(ev, nid)
+			destQueues = append(destQueues, queue)
+		} else {
+			delete(destmap, destination)
 		}
+	}
+
+	// Create a database entry that associates the given PDU NID with
+	// this destinations queue. We'll then be able to retrieve the PDU
+	// later.
+	if err := oqs.db.AssociatePDUWithDestinations(
+		oqs.process.Context(),
+		destmap,
+		nid, // NIDs from federationapi_queue_json table
+	); err != nil {
+		logrus.WithError(err).Errorf("failed to associate PDUs %q with destinations", nid)
+		return err
+	}
+
+	// NOTE : PDUs should be associated with destinations before sending
+	// them, otherwise this is technically a race.
+	// If the send completes before they are associated then they won't
+	// get properly cleaned up in the database.
+	for _, queue := range destQueues {
+		queue.sendEvent(ev, nid)
 	}
 
 	return nil
@@ -262,11 +283,10 @@ func (oqs *OutgoingQueues) SendEDU(
 		log.Trace("Federation is disabled, not sending EDU")
 		return nil
 	}
-	if origin != oqs.origin {
-		// TODO: Support virtual hosting; gh issue #577.
+	if _, ok := oqs.signing[origin]; !ok {
 		return fmt.Errorf(
-			"sendevent: unexpected server to send as: got %q expected %q",
-			origin, oqs.origin,
+			"sendevent: unexpected server to send as %q",
+			origin,
 		)
 	}
 
@@ -277,7 +297,9 @@ func (oqs *OutgoingQueues) SendEDU(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
-	delete(destmap, oqs.signing.ServerName)
+	for local := range oqs.signing {
+		delete(destmap, local)
+	}
 
 	// There is absolutely no guarantee that the EDU will have a room_id
 	// field, as it is not required by the spec. However, if it *does*
@@ -318,13 +340,44 @@ func (oqs *OutgoingQueues) SendEDU(
 		return fmt.Errorf("sendevent: oqs.db.StoreJSON: %w", err)
 	}
 
+	destQueues := make([]*destinationQueue, 0, len(destmap))
 	for destination := range destmap {
 		if queue := oqs.getQueue(destination); queue != nil {
-			queue.sendEDU(e, nid)
+			destQueues = append(destQueues, queue)
+		} else {
+			delete(destmap, destination)
 		}
 	}
 
+	// Create a database entry that associates the given PDU NID with
+	// these destination queues. We'll then be able to retrieve the PDU
+	// later.
+	if err := oqs.db.AssociateEDUWithDestinations(
+		oqs.process.Context(),
+		destmap, // the destination server names
+		nid,     // NIDs from federationapi_queue_json table
+		e.Type,
+		nil, // this will use the default expireEDUTypes map
+	); err != nil {
+		logrus.WithError(err).Errorf("failed to associate EDU with destinations")
+		return err
+	}
+
+	// NOTE : EDUs should be associated with destinations before sending
+	// them, otherwise this is technically a race.
+	// If the send completes before they are associated then they won't
+	// get properly cleaned up in the database.
+	for _, queue := range destQueues {
+		queue.sendEDU(e, nid)
+	}
+
 	return nil
+}
+
+// IsServerBlacklisted returns whether or not the provided server is currently
+// blacklisted.
+func (oqs *OutgoingQueues) IsServerBlacklisted(srv gomatrixserverlib.ServerName) bool {
+	return oqs.statistics.ForServer(srv).Blacklisted()
 }
 
 // RetryServer attempts to resend events to the given server if we had given up.
@@ -332,7 +385,13 @@ func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	if oqs.disabled {
 		return
 	}
+
+	serverStatistics := oqs.statistics.ForServer(srv)
+	forceWakeup := serverStatistics.Blacklisted()
+	serverStatistics.RemoveBlacklist()
+	serverStatistics.ClearBackoff()
+
 	if queue := oqs.getQueue(srv); queue != nil {
-		queue.wakeQueueIfNeeded()
+		queue.wakeQueueIfEventsPending(forceWakeup)
 	}
 }

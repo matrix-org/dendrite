@@ -30,6 +30,7 @@ type eventMods struct {
 	unsigned       interface{}
 	keyID          gomatrixserverlib.KeyID
 	privKey        ed25519.PrivateKey
+	authEvents     []string
 }
 
 type eventModifier func(e *eventMods)
@@ -49,6 +50,12 @@ func WithStateKey(skey string) eventModifier {
 func WithUnsigned(unsigned interface{}) eventModifier {
 	return func(e *eventMods) {
 		e.unsigned = unsigned
+	}
+}
+
+func WithAuthIDs(evs []string) eventModifier {
+	return func(e *eventMods) {
+		e.authEvents = evs
 	}
 }
 

@@ -28,12 +28,13 @@ RUN mkdir /dendrite
 
 # Utilise Docker caching when downloading dependencies, this stops us needlessly
 # downloading dependencies every time.
+ARG CGO
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o /dendrite ./cmd/generate-config && \
-    go build -o /dendrite ./cmd/generate-keys && \
-    go build -o /dendrite ./cmd/dendrite-monolith-server
+    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
+    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
+    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/dendrite-monolith-server
 
 WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem
