@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -47,6 +48,7 @@ type Notifier struct {
 	lastCleanUpTime time.Time
 	// This map is reused to prevent allocations and GC pressure in SharedUsers.
 	_sharedUserMap map[string]struct{}
+	_wakeupUserMap map[string]struct{}
 }
 
 // NewNotifier creates a new notifier set to the given sync position.
@@ -60,6 +62,7 @@ func NewNotifier() *Notifier {
 		lock:                   &sync.RWMutex{},
 		lastCleanUpTime:        time.Now(),
 		_sharedUserMap:         map[string]struct{}{},
+		_wakeupUserMap:         map[string]struct{}{},
 	}
 }
 
@@ -318,18 +321,27 @@ func (n *Notifier) GetListener(req types.SyncRequest) UserDeviceStreamListener {
 func (n *Notifier) Load(ctx context.Context, db storage.Database) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	roomToUsers, err := db.AllJoinedUsersInRooms(ctx)
+
+	snapshot, err := db.NewDatabaseSnapshot(ctx)
+	if err != nil {
+		return err
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
+	roomToUsers, err := snapshot.AllJoinedUsersInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
-	roomToPeekingDevices, err := db.AllPeekingDevicesInRooms(ctx)
+	roomToPeekingDevices, err := snapshot.AllPeekingDevicesInRooms(ctx)
 	if err != nil {
 		return err
 	}
 	n.setPeekingDevices(roomToPeekingDevices)
 
+	succeeded = true
 	return nil
 }
 
@@ -338,12 +350,20 @@ func (n *Notifier) LoadRooms(ctx context.Context, db storage.Database, roomIDs [
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	roomToUsers, err := db.AllJoinedUsersInRoom(ctx, roomIDs)
+	snapshot, err := db.NewDatabaseSnapshot(ctx)
+	if err != nil {
+		return err
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
+	roomToUsers, err := snapshot.AllJoinedUsersInRoom(ctx, roomIDs)
 	if err != nil {
 		return err
 	}
 	n.setUsersJoinedToRooms(roomToUsers)
 
+	succeeded = true
 	return nil
 }
 
@@ -390,12 +410,16 @@ func (n *Notifier) setPeekingDevices(roomIDToPeekingDevices map[string][]types.P
 // specified user IDs, and also the specified peekingDevices
 func (n *Notifier) _wakeupUsers(userIDs []string, peekingDevices []types.PeekingDevice, newPos types.StreamingToken) {
 	for _, userID := range userIDs {
+		n._wakeupUserMap[userID] = struct{}{}
+	}
+	for userID := range n._wakeupUserMap {
 		for _, stream := range n._fetchUserStreams(userID) {
 			if stream == nil {
 				continue
 			}
 			stream.Broadcast(newPos) // wake up all goroutines Wait()ing on this stream
 		}
+		delete(n._wakeupUserMap, userID)
 	}
 
 	for _, peekingDevice := range peekingDevices {

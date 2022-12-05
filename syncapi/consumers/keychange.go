@@ -26,23 +26,22 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
 // OutputKeyChangeEventConsumer consumes events that originated in the key server.
 type OutputKeyChangeEventConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	topic      string
-	db         storage.Database
-	notifier   *notifier.Notifier
-	stream     types.StreamProvider
-	serverName gomatrixserverlib.ServerName // our server name
-	rsAPI      roomserverAPI.SyncRoomserverAPI
+	ctx       context.Context
+	jetstream nats.JetStreamContext
+	durable   string
+	topic     string
+	db        storage.Database
+	notifier  *notifier.Notifier
+	stream    streams.StreamProvider
+	rsAPI     roomserverAPI.SyncRoomserverAPI
 }
 
 // NewOutputKeyChangeEventConsumer creates a new OutputKeyChangeEventConsumer.
@@ -55,18 +54,17 @@ func NewOutputKeyChangeEventConsumer(
 	rsAPI roomserverAPI.SyncRoomserverAPI,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputKeyChangeEventConsumer {
 	s := &OutputKeyChangeEventConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIKeyChangeConsumer"),
-		topic:      topic,
-		db:         store,
-		serverName: cfg.Matrix.ServerName,
-		rsAPI:      rsAPI,
-		notifier:   notifier,
-		stream:     stream,
+		ctx:       process.Context(),
+		jetstream: js,
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIKeyChangeConsumer"),
+		topic:     topic,
+		db:        store,
+		rsAPI:     rsAPI,
+		notifier:  notifier,
+		stream:    stream,
 	}
 
 	return s
@@ -110,7 +108,8 @@ func (s *OutputKeyChangeEventConsumer) onDeviceKeyMessage(m api.DeviceMessage, d
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
 	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID: output.UserID,
+		UserID:    output.UserID,
+		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
 		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")
@@ -134,7 +133,8 @@ func (s *OutputKeyChangeEventConsumer) onCrossSigningMessage(m api.DeviceMessage
 	// work out who we need to notify about the new key
 	var queryRes roomserverAPI.QuerySharedUsersResponse
 	err := s.rsAPI.QuerySharedUsers(s.ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID: output.UserID,
+		UserID:    output.UserID,
+		LocalOnly: true,
 	}, &queryRes)
 	if err != nil {
 		logrus.WithError(err).Error("syncapi: failed to QuerySharedUsers for key change event from key server")

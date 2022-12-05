@@ -1,0 +1,75 @@
+name: Scheduled
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # every day at midnight
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # run Sytest in different variations
+  sytest:
+    timeout-minutes: 60
+    name: "Sytest (${{ matrix.label }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: SQLite
+
+          - label: SQLite, full HTTP APIs
+            api: full-http
+
+          - label: PostgreSQL
+            postgres: postgres
+
+          - label: PostgreSQL, full HTTP APIs
+            postgres: postgres
+            api: full-http
+    container:
+      image: matrixdotorg/sytest-dendrite:latest
+      volumes:
+        - ${{ github.workspace }}:/src
+        - /root/.cache/go-build:/github/home/.cache/go-build
+        - /root/.cache/go-mod:/gopath/pkg/mod
+      env:
+        POSTGRES: ${{ matrix.postgres && 1}}
+        API: ${{ matrix.api && 1 }}
+        SYTEST_BRANCH: ${{ github.head_ref }}
+        RACE_DETECTION: 1
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            /gopath/pkg/mod
+          key: ${{ runner.os }}-go-sytest-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-sytest-
+      - name: Run Sytest
+        run: /bootstrap.sh dendrite
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+      - name: Sytest List Maintenance
+        if: ${{ always() }}
+        run: /src/show-expected-fail-tests.sh /logs/results.tap /src/sytest-whitelist /src/sytest-blacklist
+        continue-on-error: true # not fatal
+      - name: Are We Synapse Yet?
+        if: ${{ always() }}
+        run: /src/are-we-synapse-yet.py /logs/results.tap -v
+        continue-on-error: true # not fatal
+      - name: Upload Sytest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*

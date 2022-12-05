@@ -31,8 +31,7 @@ const recaptchaTemplate = `
 <title>Authentication</title>
 <meta name='viewport' content='width=device-width, initial-scale=1,
     user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<script src="https://www.google.com/recaptcha/api.js"
-    async defer></script>
+<script src="{{.apiJsUrl}}" async defer></script>
 <script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
 <script>
 function captchaDone() {
@@ -51,8 +50,8 @@ function captchaDone() {
         Please verify that you're not a robot.
         </p>
 		<input type="hidden" name="session" value="{{.session}}" />
-        <div class="g-recaptcha"
-            data-sitekey="{{.siteKey}}"
+        <div class="{{.sitekeyClass}}"
+            data-sitekey="{{.sitekey}}"
             data-callback="captchaDone">
         </div>
         <noscript>
@@ -114,9 +113,12 @@ func AuthFallback(
 
 	serveRecaptcha := func() {
 		data := map[string]string{
-			"myUrl":   req.URL.String(),
-			"session": sessionID,
-			"siteKey": cfg.RecaptchaPublicKey,
+			"myUrl":        req.URL.String(),
+			"session":      sessionID,
+			"apiJsUrl":     cfg.RecaptchaApiJsUrl,
+			"sitekey":      cfg.RecaptchaPublicKey,
+			"sitekeyClass": cfg.RecaptchaSitekeyClass,
+			"formField":    cfg.RecaptchaFormField,
 		}
 		serveTemplate(w, recaptchaTemplate, data)
 	}
@@ -155,7 +157,7 @@ func AuthFallback(
 				return &res
 			}
 
-			response := req.Form.Get("g-recaptcha-response")
+			response := req.Form.Get(cfg.RecaptchaFormField)
 			if err := validateRecaptcha(cfg, response, clientIP); err != nil {
 				util.GetLogger(req.Context()).Error(err)
 				return err

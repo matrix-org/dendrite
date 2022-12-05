@@ -137,21 +137,17 @@ func (s *deviceKeysStatements) SelectBatchDeviceKeys(ctx context.Context, userID
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectBatchDeviceKeysStmt: rows.close() failed")
 	var result []api.DeviceMessage
+	var displayName sql.NullString
 	for rows.Next() {
 		dk := api.DeviceMessage{
-			Type:       api.TypeDeviceKeyUpdate,
-			DeviceKeys: &api.DeviceKeys{},
+			Type: api.TypeDeviceKeyUpdate,
+			DeviceKeys: &api.DeviceKeys{
+				UserID: userID,
+			},
 		}
-		dk.Type = api.TypeDeviceKeyUpdate
-		dk.UserID = userID
-		var keyJSON string
-		var streamID int64
-		var displayName sql.NullString
-		if err := rows.Scan(&dk.DeviceID, &keyJSON, &streamID, &displayName); err != nil {
+		if err := rows.Scan(&dk.DeviceID, &dk.KeyJSON, &dk.StreamID, &displayName); err != nil {
 			return nil, err
 		}
-		dk.KeyJSON = []byte(keyJSON)
-		dk.StreamID = streamID
 		if displayName.Valid {
 			dk.DisplayName = displayName.String
 		}

@@ -91,8 +91,7 @@ const selectCurrentStateSQL = "" +
 	" AND ( $4::text[] IS NULL OR     type LIKE ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(type LIKE ANY($5)) )" +
 	" AND ( $6::bool IS NULL   OR     contains_url = $6  )" +
-	" AND (event_id = ANY($7)) IS NOT TRUE" +
-	" LIMIT $8"
+	" AND (event_id = ANY($7)) IS NOT TRUE"
 
 const selectJoinedUsersSQL = "" +
 	"SELECT room_id, state_key FROM syncapi_current_room_state WHERE type = 'm.room.member' AND membership = 'join'"
@@ -104,12 +103,7 @@ const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	// TODO: The session_id and transaction_id blanks are here because
-	// the rowsToStreamEvents expects there to be exactly seven columns. We need to
-	// figure out if these really need to be in the DB, and if so, we need a
-	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, history_visibility" +
-	" FROM syncapi_current_room_state WHERE event_id = ANY($1)"
+	"SELECT event_id, added_at, headered_event_json, history_visibility FROM syncapi_current_room_state WHERE event_id = ANY($1)"
 
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id = ANY(" +
@@ -295,7 +289,6 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		pq.StringArray(filterConvertTypeWildcardToSQL(stateFilter.NotTypes)),
 		stateFilter.ContainsURL,
 		pq.StringArray(excludeEventIDs),
-		stateFilter.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -365,7 +358,36 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
-	return rowsToStreamEvents(rows)
+	return currentRoomStateRowsToStreamEvents(rows)
+}
+
+func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
+	var events []types.StreamEvent
+	for rows.Next() {
+		var (
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			historyVisibility gomatrixserverlib.HistoryVisibility
+		)
+		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &historyVisibility); err != nil {
+			return nil, err
+		}
+		// TODO: Handle redacted events
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+
+		ev.Visibility = historyVisibility
+
+		events = append(events, types.StreamEvent{
+			HeaderedEvent:  &ev,
+			StreamPosition: streamPos,
+		})
+	}
+
+	return events, nil
 }
 
 func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {

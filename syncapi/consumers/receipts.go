@@ -28,19 +28,19 @@ import (
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/dendrite/syncapi/storage"
+	"github.com/matrix-org/dendrite/syncapi/streams"
 	"github.com/matrix-org/dendrite/syncapi/types"
 )
 
 // OutputReceiptEventConsumer consumes events that originated in the EDU server.
 type OutputReceiptEventConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	topic      string
-	db         storage.Database
-	stream     types.StreamProvider
-	notifier   *notifier.Notifier
-	serverName gomatrixserverlib.ServerName
+	ctx       context.Context
+	jetstream nats.JetStreamContext
+	durable   string
+	topic     string
+	db        storage.Database
+	stream    streams.StreamProvider
+	notifier  *notifier.Notifier
 }
 
 // NewOutputReceiptEventConsumer creates a new OutputReceiptEventConsumer.
@@ -51,17 +51,16 @@ func NewOutputReceiptEventConsumer(
 	js nats.JetStreamContext,
 	store storage.Database,
 	notifier *notifier.Notifier,
-	stream types.StreamProvider,
+	stream streams.StreamProvider,
 ) *OutputReceiptEventConsumer {
 	return &OutputReceiptEventConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-		durable:    cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
-		db:         store,
-		notifier:   notifier,
-		stream:     stream,
-		serverName: cfg.Matrix.ServerName,
+		ctx:       process.Context(),
+		jetstream: js,
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		durable:   cfg.Matrix.JetStream.Durable("SyncAPIReceiptConsumer"),
+		db:        store,
+		notifier:  notifier,
+		stream:    stream,
 	}
 }
 

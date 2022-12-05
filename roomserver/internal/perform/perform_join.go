@@ -22,6 +22,10 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
@@ -32,16 +36,13 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup/config"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 type Joiner struct {
-	ServerName gomatrixserverlib.ServerName
-	Cfg        *config.RoomServer
-	FSAPI      fsAPI.RoomserverFederationAPI
-	RSAPI      rsAPI.RoomserverInternalAPI
-	DB         storage.Database
+	Cfg   *config.RoomServer
+	FSAPI fsAPI.RoomserverFederationAPI
+	RSAPI rsAPI.RoomserverInternalAPI
+	DB    storage.Database
 
 	Inputer *input.Inputer
 	Queryer *query.Queryer
@@ -90,7 +91,7 @@ func (r *Joiner) performJoin(
 			Msg:  fmt.Sprintf("Supplied user ID %q in incorrect format", req.UserID),
 		}
 	}
-	if domain != r.Cfg.Matrix.ServerName {
+	if !r.Cfg.Matrix.IsLocalServerName(domain) {
 		return "", "", &rsAPI.PerformError{
 			Code: rsAPI.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("User %q does not belong to this homeserver", req.UserID),
@@ -122,7 +123,7 @@ func (r *Joiner) performJoinRoomByAlias(
 	// Check if this alias matches our own server configuration. If it
 	// doesn't then we'll need to try a federated join.
 	var roomID string
-	if domain != r.Cfg.Matrix.ServerName {
+	if !r.Cfg.Matrix.IsLocalServerName(domain) {
 		// The alias isn't owned by us, so we will need to try joining using
 		// a remote server.
 		dirReq := fsAPI.PerformDirectoryLookupRequest{
@@ -170,7 +171,7 @@ func (r *Joiner) performJoinRoomByID(
 	// The original client request ?server_name=... may include this HS so filter that out so we
 	// don't attempt to make_join with ourselves
 	for i := 0; i < len(req.ServerNames); i++ {
-		if req.ServerNames[i] == r.Cfg.Matrix.ServerName {
+		if r.Cfg.Matrix.IsLocalServerName(req.ServerNames[i]) {
 			// delete this entry
 			req.ServerNames = append(req.ServerNames[:i], req.ServerNames[i+1:]...)
 			i--
@@ -189,12 +190,19 @@ func (r *Joiner) performJoinRoomByID(
 	// If the server name in the room ID isn't ours then it's a
 	// possible candidate for finding the room via federation. Add
 	// it to the list of servers to try.
-	if domain != r.Cfg.Matrix.ServerName {
+	if !r.Cfg.Matrix.IsLocalServerName(domain) {
 		req.ServerNames = append(req.ServerNames, domain)
 	}
 
 	// Prepare the template for the join event.
 	userID := req.UserID
+	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
+	if err != nil {
+		return "", "", &rsAPI.PerformError{
+			Code: rsAPI.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("User ID %q is invalid: %s", userID, err),
+		}
+	}
 	eb := gomatrixserverlib.EventBuilder{
 		Type:     gomatrixserverlib.MRoomMember,
 		Sender:   userID,
@@ -236,8 +244,8 @@ func (r *Joiner) performJoinRoomByID(
 
 	// Force a federated join if we're dealing with a pending invite
 	// and we aren't in the room.
-	isInvitePending, inviteSender, _, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
-	if err == nil && isInvitePending {
+	isInvitePending, inviteSender, _, inviteEvent, err := helpers.IsInvitePending(ctx, r.DB, req.RoomIDOrAlias, req.UserID)
+	if err == nil && !serverInRoom && isInvitePending {
 		_, inviterDomain, ierr := gomatrixserverlib.SplitID('@', inviteSender)
 		if ierr != nil {
 			return "", "", fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
@@ -245,9 +253,20 @@ func (r *Joiner) performJoinRoomByID(
 
 		// If we were invited by someone from another server then we can
 		// assume they are in the room so we can join via them.
-		if inviterDomain != r.Cfg.Matrix.ServerName {
+		if !r.Cfg.Matrix.IsLocalServerName(inviterDomain) {
 			req.ServerNames = append(req.ServerNames, inviterDomain)
 			forceFederatedJoin = true
+			memberEvent := gjson.Parse(string(inviteEvent.JSON()))
+			// only set unsigned if we've got a content.membership, which we _should_
+			if memberEvent.Get("content.membership").Exists() {
+				req.Unsigned = map[string]interface{}{
+					"prev_sender": memberEvent.Get("sender").Str,
+					"prev_content": map[string]interface{}{
+						"is_direct":  memberEvent.Get("content.is_direct").Bool(),
+						"membership": memberEvent.Get("content.membership").Str,
+					},
+				}
+			}
 		}
 	}
 
@@ -263,7 +282,7 @@ func (r *Joiner) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, userDomain, &eb)
 
 	switch err {
 	case nil:
@@ -287,7 +306,7 @@ func (r *Joiner) performJoinRoomByID(
 					{
 						Kind:         rsAPI.KindNew,
 						Event:        event.Headered(buildRes.RoomVersion),
-						SendAsServer: string(r.Cfg.Matrix.ServerName),
+						SendAsServer: string(userDomain),
 					},
 				},
 			}
@@ -310,7 +329,7 @@ func (r *Joiner) performJoinRoomByID(
 		// The room doesn't exist locally. If the room ID looks like it should
 		// be ours then this probably means that we've nuked our database at
 		// some point.
-		if domain == r.Cfg.Matrix.ServerName {
+		if r.Cfg.Matrix.IsLocalServerName(domain) {
 			// If there are no more server names to try then give up here.
 			// Otherwise we'll try a federated join as normal, since it's quite
 			// possible that the room still exists on other servers.
@@ -335,7 +354,7 @@ func (r *Joiner) performJoinRoomByID(
 	// it will have been overwritten with a room ID by performJoinRoomByAlias.
 	// We should now include this in the response so that the CS API can
 	// return the right room ID.
-	return req.RoomIDOrAlias, r.Cfg.Matrix.ServerName, nil
+	return req.RoomIDOrAlias, userDomain, nil
 }
 
 func (r *Joiner) performFederatedJoinRoomByID(
@@ -348,6 +367,7 @@ func (r *Joiner) performFederatedJoinRoomByID(
 		UserID:      req.UserID,        // the user ID joining the room
 		ServerNames: req.ServerNames,   // the server to try joining with
 		Content:     req.Content,       // the membership event content
+		Unsigned:    req.Unsigned,      // the unsigned event content, if any
 	}
 	fedRes := fsAPI.PerformJoinResponse{}
 	r.FSAPI.PerformJoin(ctx, &fedReq, &fedRes)
@@ -389,7 +409,9 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 }
 
 func buildEvent(
-	ctx context.Context, db storage.Database, cfg *config.Global, builder *gomatrixserverlib.EventBuilder,
+	ctx context.Context, db storage.Database, cfg *config.Global,
+	senderDomain gomatrixserverlib.ServerName,
+	builder *gomatrixserverlib.EventBuilder,
 ) (*gomatrixserverlib.HeaderedEvent, *rsAPI.QueryLatestEventsAndStateResponse, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -417,7 +439,12 @@ func buildEvent(
 		}
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
+	identity, err := cfg.SigningIdentityFor(senderDomain)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, cfg, identity, time.Now(), &eventsNeeded, &queryRes)
 	if err != nil {
 		return nil, nil, err
 	}

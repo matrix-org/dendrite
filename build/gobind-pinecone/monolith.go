@@ -30,6 +30,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
@@ -38,6 +40,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -56,6 +59,7 @@ import (
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
+	pineconeEvents "github.com/matrix-org/pinecone/router/events"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
 
@@ -66,6 +70,7 @@ const (
 	PeerTypeRemote    = pineconeRouter.PeerTypeRemote
 	PeerTypeMulticast = pineconeRouter.PeerTypeMulticast
 	PeerTypeBluetooth = pineconeRouter.PeerTypeBluetooth
+	PeerTypeBonjour   = pineconeRouter.PeerTypeBonjour
 )
 
 type DendriteMonolith struct {
@@ -82,6 +87,10 @@ type DendriteMonolith struct {
 	userAPI           userapiAPI.UserInternalAPI
 }
 
+func (m *DendriteMonolith) PublicKey() string {
+	return m.PineconeRouter.PublicKey().String()
+}
+
 func (m *DendriteMonolith) BaseURL() string {
 	return fmt.Sprintf("http://%s", m.listener.Addr().String())
 }
@@ -92,6 +101,48 @@ func (m *DendriteMonolith) PeerCount(peertype int) int {
 
 func (m *DendriteMonolith) SessionCount() int {
 	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
+}
+
+type InterfaceInfo struct {
+	Name         string
+	Index        int
+	Mtu          int
+	Up           bool
+	Broadcast    bool
+	Loopback     bool
+	PointToPoint bool
+	Multicast    bool
+	Addrs        string
+}
+
+type InterfaceRetriever interface {
+	CacheCurrentInterfaces() int
+	GetCachedInterface(index int) *InterfaceInfo
+}
+
+func (m *DendriteMonolith) RegisterNetworkCallback(intfCallback InterfaceRetriever) {
+	callback := func() []pineconeMulticast.InterfaceInfo {
+		count := intfCallback.CacheCurrentInterfaces()
+		intfs := []pineconeMulticast.InterfaceInfo{}
+		for i := 0; i < count; i++ {
+			iface := intfCallback.GetCachedInterface(i)
+			if iface != nil {
+				intfs = append(intfs, pineconeMulticast.InterfaceInfo{
+					Name:         iface.Name,
+					Index:        iface.Index,
+					Mtu:          iface.Mtu,
+					Up:           iface.Up,
+					Broadcast:    iface.Broadcast,
+					Loopback:     iface.Loopback,
+					PointToPoint: iface.PointToPoint,
+					Multicast:    iface.Multicast,
+					Addrs:        iface.Addrs,
+				})
+			}
+		}
+		return intfs
+	}
+	m.PineconeMulticast.RegisterNetworkCallback(callback)
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -105,7 +156,9 @@ func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	m.PineconeManager.RemovePeers()
-	m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	for _, uri := range strings.Split(uri, ",") {
+		m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+	}
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -134,32 +187,21 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) 
 	go func() {
 		conduit.portMutex.Lock()
 		defer conduit.portMutex.Unlock()
-	loop:
-		for i := 1; i <= 10; i++ {
-			logrus.Errorf("Attempting authenticated connect (attempt %d)", i)
-			var err error
-			conduit.port, err = m.PineconeRouter.Connect(
-				l,
-				pineconeRouter.ConnectionZone(zone),
-				pineconeRouter.ConnectionPeerType(peertype),
-			)
-			switch err {
-			case io.ErrClosedPipe:
-				logrus.Errorf("Authenticated connect failed due to closed pipe (attempt %d)", i)
-				return
-			case io.EOF:
-				logrus.Errorf("Authenticated connect failed due to EOF (attempt %d)", i)
-				break loop
-			case nil:
-				logrus.Errorf("Authenticated connect succeeded, connected to port %d (attempt %d)", conduit.port, i)
-				return
-			default:
-				logrus.WithError(err).Errorf("Authenticated connect failed (attempt %d)", i)
-				time.Sleep(time.Second)
-			}
+
+		logrus.Errorf("Attempting authenticated connect")
+		var err error
+		if conduit.port, err = m.PineconeRouter.Connect(
+			l,
+			pineconeRouter.ConnectionZone(zone),
+			pineconeRouter.ConnectionPeerType(peertype),
+		); err != nil {
+			logrus.Errorf("Authenticated connect failed: %s", err)
+			_ = l.Close()
+			_ = r.Close()
+			_ = conduit.Close()
+			return
 		}
-		_ = l.Close()
-		_ = r.Close()
+		logrus.Infof("Authenticated connect succeeded (port %d)", conduit.port)
 	}()
 	return conduit, nil
 }
@@ -255,7 +297,12 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
+	pineconeEventChannel := make(chan pineconeEvents.Event)
 	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
+	m.PineconeRouter.EnableHopLimiting()
+	m.PineconeRouter.EnableWakeupBroadcasts()
+	m.PineconeRouter.Subscribe(pineconeEventChannel)
+
 	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
 	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter, nil)
@@ -269,24 +316,27 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
-	cfg.Global.JetStream.InMemory = true
-	cfg.Global.JetStream.StoragePath = config.Path(fmt.Sprintf("%s/%s", m.StorageDirectory, prefix))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-account.db", m.StorageDirectory, prefix))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/dendrite-p2p-mediaapi.db", m.StorageDirectory))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-syncapi.db", m.StorageDirectory, prefix))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-roomserver.db", m.StorageDirectory, prefix))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-keyserver.db", m.StorageDirectory, prefix))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s/%s-federationsender.db", m.StorageDirectory, prefix))
-	cfg.MediaAPI.BasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
-	cfg.MediaAPI.AbsBasePath = config.Path(fmt.Sprintf("%s/media", m.CacheDirectory))
+	cfg.Global.JetStream.InMemory = false
+	cfg.Global.JetStream.StoragePath = config.Path(filepath.Join(m.CacheDirectory, prefix))
+	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(m.StorageDirectory, prefix)))
+	cfg.MediaAPI.BasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
+	cfg.MediaAPI.AbsBasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+	cfg.SyncAPI.Fulltext.Enabled = true
+	cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(m.CacheDirectory, "search"))
 	if err = cfg.Derive(); err != nil {
 		panic(err)
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
@@ -333,6 +383,8 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	httpRouter.HandleFunc("/pinecone", m.PineconeRouter.ManholeHandler)
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()
@@ -381,6 +433,34 @@ func (m *DendriteMonolith) Start() {
 			m.logger.Fatal(err)
 		}
 	}()
+
+	go func(ch <-chan pineconeEvents.Event) {
+		eLog := logrus.WithField("pinecone", "events")
+
+		for event := range ch {
+			switch e := event.(type) {
+			case pineconeEvents.PeerAdded:
+			case pineconeEvents.PeerRemoved:
+			case pineconeEvents.TreeParentUpdate:
+			case pineconeEvents.SnakeDescUpdate:
+			case pineconeEvents.TreeRootAnnUpdate:
+			case pineconeEvents.SnakeEntryAdded:
+			case pineconeEvents.SnakeEntryRemoved:
+			case pineconeEvents.BroadcastReceived:
+				eLog.Info("Broadcast received from: ", e.PeerID)
+
+				req := &api.PerformWakeupServersRequest{
+					ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
+				}
+				res := &api.PerformWakeupServersResponse{}
+				if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
+					logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+				}
+			case pineconeEvents.BandwidthReport:
+			default:
+			}
+		}
+	}(pineconeEventChannel)
 }
 
 func (m *DendriteMonolith) Stop() {
@@ -395,6 +475,7 @@ func (m *DendriteMonolith) Stop() {
 const MaxFrameSize = types.MaxFrameSize
 
 type Conduit struct {
+	closed    atomic.Bool
 	conn      net.Conn
 	port      types.SwitchPortID
 	portMutex sync.Mutex
@@ -407,10 +488,16 @@ func (c *Conduit) Port() int {
 }
 
 func (c *Conduit) Read(b []byte) (int, error) {
+	if c.closed.Load() {
+		return 0, io.EOF
+	}
 	return c.conn.Read(b)
 }
 
 func (c *Conduit) ReadCopy() ([]byte, error) {
+	if c.closed.Load() {
+		return nil, io.EOF
+	}
 	var buf [65535 * 2]byte
 	n, err := c.conn.Read(buf[:])
 	if err != nil {
@@ -420,9 +507,16 @@ func (c *Conduit) ReadCopy() ([]byte, error) {
 }
 
 func (c *Conduit) Write(b []byte) (int, error) {
+	if c.closed.Load() {
+		return 0, io.EOF
+	}
 	return c.conn.Write(b)
 }
 
 func (c *Conduit) Close() error {
+	if c.closed.Load() {
+		return io.ErrClosedPipe
+	}
+	c.closed.Store(true)
 	return c.conn.Close()
 }

@@ -27,7 +27,7 @@ import (
 
 const keyBackupVersionTableSchema = `
 -- the metadata for each generation of encrypted e2e session backups
-CREATE TABLE IF NOT EXISTS account_e2e_room_keys_versions (
+CREATE TABLE IF NOT EXISTS userapi_key_backup_versions (
     user_id TEXT NOT NULL,
 	-- this means no 2 users will ever have the same version of e2e session backups which strictly
 	-- isn't necessary, but this is easy to do rather than SELECT MAX(version)+1.
@@ -38,26 +38,26 @@ CREATE TABLE IF NOT EXISTS account_e2e_room_keys_versions (
     deleted INTEGER DEFAULT 0 NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS account_e2e_room_keys_versions_idx ON account_e2e_room_keys_versions(user_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_key_backup_versions_idx ON userapi_key_backup_versions(user_id, version);
 `
 
 const insertKeyBackupSQL = "" +
-	"INSERT INTO account_e2e_room_keys_versions(user_id, algorithm, auth_data, etag) VALUES ($1, $2, $3, $4) RETURNING version"
+	"INSERT INTO userapi_key_backup_versions(user_id, algorithm, auth_data, etag) VALUES ($1, $2, $3, $4) RETURNING version"
 
 const updateKeyBackupAuthDataSQL = "" +
-	"UPDATE account_e2e_room_keys_versions SET auth_data = $1 WHERE user_id = $2 AND version = $3"
+	"UPDATE userapi_key_backup_versions SET auth_data = $1 WHERE user_id = $2 AND version = $3"
 
 const updateKeyBackupETagSQL = "" +
-	"UPDATE account_e2e_room_keys_versions SET etag = $1 WHERE user_id = $2 AND version = $3"
+	"UPDATE userapi_key_backup_versions SET etag = $1 WHERE user_id = $2 AND version = $3"
 
 const deleteKeyBackupSQL = "" +
-	"UPDATE account_e2e_room_keys_versions SET deleted=1 WHERE user_id = $1 AND version = $2"
+	"UPDATE userapi_key_backup_versions SET deleted=1 WHERE user_id = $1 AND version = $2"
 
 const selectKeyBackupSQL = "" +
-	"SELECT algorithm, auth_data, etag, deleted FROM account_e2e_room_keys_versions WHERE user_id = $1 AND version = $2"
+	"SELECT algorithm, auth_data, etag, deleted FROM userapi_key_backup_versions WHERE user_id = $1 AND version = $2"
 
 const selectLatestVersionSQL = "" +
-	"SELECT MAX(version) FROM account_e2e_room_keys_versions WHERE user_id = $1"
+	"SELECT MAX(version) FROM userapi_key_backup_versions WHERE user_id = $1"
 
 type keyBackupVersionStatements struct {
 	insertKeyBackupStmt         *sql.Stmt

@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
-	"github.com/matrix-org/dendrite/federationapi/consumers"
-	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/version"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/consumers"
+	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/roomserver/version"
 )
 
 // PerformLeaveRequest implements api.FederationInternalAPI
@@ -25,6 +26,7 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 ) (err error) {
 	dir, err := r.federation.LookupRoomAlias(
 		ctx,
+		r.cfg.Matrix.ServerName,
 		request.ServerName,
 		request.RoomAlias,
 	)
@@ -76,7 +78,7 @@ func (r *FederationInternalAPI) PerformJoin(
 	seenSet := make(map[gomatrixserverlib.ServerName]bool)
 	var uniqueList []gomatrixserverlib.ServerName
 	for _, srv := range request.ServerNames {
-		if seenSet[srv] || srv == r.cfg.Matrix.ServerName {
+		if seenSet[srv] || r.cfg.Matrix.IsLocalServerName(srv) {
 			continue
 		}
 		seenSet[srv] = true
@@ -95,6 +97,7 @@ func (r *FederationInternalAPI) PerformJoin(
 			request.Content,
 			serverName,
 			supportedVersions,
+			request.Unsigned,
 		); err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"server_name": serverName,
@@ -139,11 +142,18 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	content map[string]interface{},
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
+	unsigned map[string]interface{},
 ) error {
+	_, origin, err := r.cfg.Matrix.SplitLocalID('@', userID)
+	if err != nil {
+		return err
+	}
+
 	// Try to perform a make_join using the information supplied in the
 	// request.
 	respMakeJoin, err := r.federation.MakeJoin(
 		ctx,
+		origin,
 		serverName,
 		roomID,
 		userID,
@@ -189,7 +199,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// Build the join event.
 	event, err := respMakeJoin.JoinEvent.Build(
 		time.Now(),
-		r.cfg.Matrix.ServerName,
+		origin,
 		r.cfg.Matrix.KeyID,
 		r.cfg.Matrix.PrivateKey,
 		respMakeJoin.RoomVersion,
@@ -201,6 +211,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// Try to perform a send_join using the newly built event.
 	respSendJoin, err := r.federation.SendJoin(
 		context.Background(),
+		origin,
 		serverName,
 		event,
 	)
@@ -243,7 +254,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		respMakeJoin.RoomVersion,
 		r.keyRing,
 		event,
-		federatedAuthProvider(ctx, r.federation, r.keyRing, serverName),
+		federatedAuthProvider(ctx, r.federation, r.keyRing, origin, serverName),
 	)
 	if err != nil {
 		return fmt.Errorf("respSendJoin.Check: %w", err)
@@ -259,7 +270,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	if err != nil {
 		return fmt.Errorf("JoinedHostsFromEvents: failed to get joined hosts: %s", err)
 	}
-	logrus.WithField("hosts", joinedHosts).WithField("room", roomID).Info("Joined federated room with hosts")
+	logrus.WithField("room", roomID).Infof("Joined federated room with %d hosts", len(joinedHosts))
 	if _, err = r.db.UpdateRoom(context.Background(), roomID, joinedHosts, nil, true); err != nil {
 		return fmt.Errorf("UpdatedRoom: failed to update room with joined hosts: %s", err)
 	}
@@ -267,9 +278,18 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	// If we successfully performed a send_join above then the other
 	// server now thinks we're a part of the room. Send the newly
 	// returned state to the roomserver to update our local view.
+	if unsigned != nil {
+		event, err = event.SetUnsigned(unsigned)
+		if err != nil {
+			// non-fatal, log and continue
+			logrus.WithError(err).Errorf("Failed to set unsigned content")
+		}
+	}
+
 	if err = roomserverAPI.SendEventWithState(
 		context.Background(),
 		r.rsAPI,
+		origin,
 		roomserverAPI.KindNew,
 		respState,
 		event.Headered(respMakeJoin.RoomVersion),
@@ -416,6 +436,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	// request.
 	respPeek, err := r.federation.Peek(
 		ctx,
+		r.cfg.Matrix.ServerName,
 		serverName,
 		roomID,
 		peekID,
@@ -442,7 +463,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 
 	// authenticate the state returned (check its auth events etc)
 	// the equivalent of CheckSendJoinResponse()
-	authEvents, _, err := respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, serverName))
+	authEvents, _, err := respState.Check(ctx, respPeek.RoomVersion, r.keyRing, federatedAuthProvider(ctx, r.federation, r.keyRing, r.cfg.Matrix.ServerName, serverName))
 	if err != nil {
 		return fmt.Errorf("error checking state returned from peeking: %w", err)
 	}
@@ -464,7 +485,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	// logrus.Warnf("got respPeek %#v", respPeek)
 	// Send the newly returned state to the roomserver to update our local view.
 	if err = roomserverAPI.SendEventWithState(
-		ctx, r.rsAPI,
+		ctx, r.rsAPI, r.cfg.Matrix.ServerName,
 		roomserverAPI.KindNew,
 		&respState,
 		respPeek.LatestEvent.Headered(respPeek.RoomVersion),
@@ -484,6 +505,11 @@ func (r *FederationInternalAPI) PerformLeave(
 	request *api.PerformLeaveRequest,
 	response *api.PerformLeaveResponse,
 ) (err error) {
+	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.UserID)
+	if err != nil {
+		return err
+	}
+
 	// Deduplicate the server names we were provided.
 	util.SortAndUnique(request.ServerNames)
 
@@ -494,6 +520,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// request.
 		respMakeLeave, err := r.federation.MakeLeave(
 			ctx,
+			origin,
 			serverName,
 			request.RoomID,
 			request.UserID,
@@ -535,7 +562,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Build the leave event.
 		event, err := respMakeLeave.LeaveEvent.Build(
 			time.Now(),
-			r.cfg.Matrix.ServerName,
+			origin,
 			r.cfg.Matrix.KeyID,
 			r.cfg.Matrix.PrivateKey,
 			respMakeLeave.RoomVersion,
@@ -548,6 +575,7 @@ func (r *FederationInternalAPI) PerformLeave(
 		// Try to perform a send_leave using the newly built event.
 		err = r.federation.SendLeave(
 			ctx,
+			origin,
 			serverName,
 			event,
 		)
@@ -574,6 +602,11 @@ func (r *FederationInternalAPI) PerformInvite(
 	request *api.PerformInviteRequest,
 	response *api.PerformInviteResponse,
 ) (err error) {
+	_, origin, err := r.cfg.Matrix.SplitLocalID('@', request.Event.Sender())
+	if err != nil {
+		return err
+	}
+
 	if request.Event.StateKey() == nil {
 		return errors.New("invite must be a state event")
 	}
@@ -596,7 +629,7 @@ func (r *FederationInternalAPI) PerformInvite(
 		return fmt.Errorf("gomatrixserverlib.NewInviteV2Request: %w", err)
 	}
 
-	inviteRes, err := r.federation.SendInviteV2(ctx, destination, inviteReq)
+	inviteRes, err := r.federation.SendInviteV2(ctx, origin, destination, inviteReq)
 	if err != nil {
 		return fmt.Errorf("r.federation.SendInviteV2: failed to send invite: %w", err)
 	}
@@ -637,9 +670,23 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 	return nil
 }
 
+// PerformWakeupServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformWakeupServers(
+	ctx context.Context,
+	request *api.PerformWakeupServersRequest,
+	response *api.PerformWakeupServersResponse,
+) (err error) {
+	r.MarkServersAlive(request.ServerNames)
+	return nil
+}
+
 func (r *FederationInternalAPI) MarkServersAlive(destinations []gomatrixserverlib.ServerName) {
 	for _, srv := range destinations {
-		_ = r.db.RemoveServerFromBlacklist(srv)
+		// Check the statistics cache for the blacklist status to prevent hitting
+		// the database unnecessarily.
+		if r.queues.IsServerBlacklisted(srv) {
+			_ = r.db.RemoveServerFromBlacklist(srv)
+		}
 		r.queues.RetryServer(srv)
 	}
 }
@@ -697,7 +744,7 @@ func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder
 // FederatedAuthProvider is an auth chain provider which fetches events from the server provided
 func federatedAuthProvider(
 	ctx context.Context, federation api.FederationClient,
-	keyRing gomatrixserverlib.JSONVerifier, server gomatrixserverlib.ServerName,
+	keyRing gomatrixserverlib.JSONVerifier, origin, server gomatrixserverlib.ServerName,
 ) gomatrixserverlib.AuthChainProvider {
 	// A list of events that we have retried, if they were not included in
 	// the auth events supplied in the send_join.
@@ -727,7 +774,7 @@ func federatedAuthProvider(
 
 			// Try to retrieve the event from the server that sent us the send
 			// join response.
-			tx, txerr := federation.GetEvent(ctx, server, eventID)
+			tx, txerr := federation.GetEvent(ctx, origin, server, eventID)
 			if txerr != nil {
 				return nil, fmt.Errorf("missingAuth r.federation.GetEvent: %w", txerr)
 			}

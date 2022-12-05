@@ -19,8 +19,17 @@ package input
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/tidwall/gjson"
+
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -31,11 +40,6 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 // TODO: Does this value make sense?
@@ -65,6 +69,7 @@ var processRoomEventDuration = prometheus.NewHistogramVec(
 // nolint:gocyclo
 func (r *Inputer) processRoomEvent(
 	ctx context.Context,
+	virtualHost gomatrixserverlib.ServerName,
 	input *api.InputRoomEvent,
 ) error {
 	select {
@@ -160,8 +165,9 @@ func (r *Inputer) processRoomEvent(
 
 	if missingAuth || missingPrev {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
-			RoomID:      event.RoomID(),
-			ExcludeSelf: true,
+			RoomID:             event.RoomID(),
+			ExcludeSelf:        true,
+			ExcludeBlacklisted: true,
 		}
 		if err = r.FSAPI.QueryJoinedHostServerNamesInRoom(ctx, serverReq, serverRes); err != nil {
 			return fmt.Errorf("r.FSAPI.QueryJoinedHostServerNamesInRoom: %w", err)
@@ -173,12 +179,15 @@ func (r *Inputer) processRoomEvent(
 		for _, server := range serverRes.ServerNames {
 			servers[server] = struct{}{}
 		}
+		// Don't try to talk to ourselves.
+		delete(servers, r.Cfg.Matrix.ServerName)
+		// Now build up the list of servers.
 		serverRes.ServerNames = serverRes.ServerNames[:0]
-		if input.Origin != "" {
+		if input.Origin != "" && input.Origin != r.Cfg.Matrix.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, input.Origin)
 			delete(servers, input.Origin)
 		}
-		if senderDomain != input.Origin {
+		if senderDomain != input.Origin && senderDomain != r.Cfg.Matrix.ServerName {
 			serverRes.ServerNames = append(serverRes.ServerNames, senderDomain)
 			delete(servers, senderDomain)
 		}
@@ -193,7 +202,7 @@ func (r *Inputer) processRoomEvent(
 	isRejected := false
 	authEvents := gomatrixserverlib.NewAuthEvents(nil)
 	knownEvents := map[string]*types.Event{}
-	if err = r.fetchAuthEvents(ctx, logger, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+	if err = r.fetchAuthEvents(ctx, logger, roomInfo, virtualHost, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
 		return fmt.Errorf("r.fetchAuthEvents: %w", err)
 	}
 
@@ -258,16 +267,17 @@ func (r *Inputer) processRoomEvent(
 		// processRoomEvent.
 		if len(serverRes.ServerNames) > 0 {
 			missingState := missingStateReq{
-				origin:     input.Origin,
-				inputer:    r,
-				db:         r.DB,
-				roomInfo:   roomInfo,
-				federation: r.FSAPI,
-				keys:       r.KeyRing,
-				roomsMu:    internal.NewMutexByRoom(),
-				servers:    serverRes.ServerNames,
-				hadEvents:  map[string]bool{},
-				haveEvents: map[string]*gomatrixserverlib.Event{},
+				origin:      input.Origin,
+				virtualHost: virtualHost,
+				inputer:     r,
+				db:          r.DB,
+				roomInfo:    roomInfo,
+				federation:  r.FSAPI,
+				keys:        r.KeyRing,
+				roomsMu:     internal.NewMutexByRoom(),
+				servers:     serverRes.ServerNames,
+				hadEvents:   map[string]bool{},
+				haveEvents:  map[string]*gomatrixserverlib.Event{},
 			}
 			var stateSnapshot *parsedRespState
 			if stateSnapshot, err = missingState.processEventWithMissingState(ctx, event, headered.RoomVersion); err != nil {
@@ -333,7 +343,7 @@ func (r *Inputer) processRoomEvent(
 	// doesn't have any associated state to store and we don't need to
 	// notify anyone about it.
 	if input.Kind == api.KindOutlier {
-		logger.Debug("Stored outlier")
+		logger.WithField("rejected", isRejected).Debug("Stored outlier")
 		hooks.Run(hooks.KindNewEventPersisted, headered)
 		return nil
 	}
@@ -404,6 +414,13 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// Handle remote room upgrades, e.g. remove published room
+	if event.Type() == "m.room.tombstone" && event.StateKeyEquals("") && !r.Cfg.Matrix.IsLocalServerName(senderDomain) {
+		if err = r.handleRemoteRoomUpgrade(ctx, event); err != nil {
+			return fmt.Errorf("failed to handle remote room upgrade: %w", err)
+		}
+	}
+
 	// processing this event resulted in an event (which may not be the one we're processing)
 	// being redacted. We are guaranteed to have both sides (the redaction/redacted event),
 	// so notify downstream components to redact this event - they should have it if they've
@@ -427,6 +444,13 @@ func (r *Inputer) processRoomEvent(
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
 	return nil
+}
+
+// handleRemoteRoomUpgrade updates published rooms and room aliases
+func (r *Inputer) handleRemoteRoomUpgrade(ctx context.Context, event *gomatrixserverlib.Event) error {
+	oldRoomID := event.RoomID()
+	newRoomID := gjson.GetBytes(event.Content(), "replacement_room").Str
+	return r.DB.UpgradeRoom(ctx, oldRoomID, newRoomID, event.Sender())
 }
 
 // processStateBefore works out what the state is before the event and
@@ -533,6 +557,8 @@ func (r *Inputer) processStateBefore(
 func (r *Inputer) fetchAuthEvents(
 	ctx context.Context,
 	logger *logrus.Entry,
+	roomInfo *types.RoomInfo,
+	virtualHost gomatrixserverlib.ServerName,
 	event *gomatrixserverlib.HeaderedEvent,
 	auth *gomatrixserverlib.AuthEvents,
 	known map[string]*types.Event,
@@ -554,9 +580,19 @@ func (r *Inputer) fetchAuthEvents(
 			continue
 		}
 		ev := authEvents[0]
+
+		isRejected := false
+		if roomInfo != nil {
+			isRejected, err = r.DB.IsEventRejected(ctx, roomInfo.RoomNID, ev.EventID())
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("r.DB.IsEventRejected failed: %w", err)
+			}
+		}
 		known[authEventID] = &ev // don't take the pointer of the iterated event
-		if err = auth.AddEvent(ev.Event); err != nil {
-			return fmt.Errorf("auth.AddEvent: %w", err)
+		if !isRejected {
+			if err = auth.AddEvent(ev.Event); err != nil {
+				return fmt.Errorf("auth.AddEvent: %w", err)
+			}
 		}
 	}
 
@@ -573,7 +609,7 @@ func (r *Inputer) fetchAuthEvents(
 		// Request the entire auth chain for the event in question. This should
 		// contain all of the auth events — including ones that we already know —
 		// so we'll need to filter through those in the next section.
-		res, err = r.FSAPI.GetEventAuth(ctx, serverName, event.RoomVersion, event.RoomID(), event.EventID())
+		res, err = r.FSAPI.GetEventAuth(ctx, virtualHost, serverName, event.RoomVersion, event.RoomID(), event.EventID())
 		if err != nil {
 			logger.WithError(err).Warnf("Failed to get event auth from federation for %q: %s", event.EventID(), err)
 			continue

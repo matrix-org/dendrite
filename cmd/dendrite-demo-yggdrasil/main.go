@@ -48,8 +48,6 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/sirupsen/logrus"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -134,6 +132,9 @@ func main() {
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+		cfg.MediaAPI.BasePath = config.Path(*instanceDir)
+		cfg.SyncAPI.Fulltext.Enabled = true
+		cfg.SyncAPI.Fulltext.IndexPath = config.Path(*instanceDir)
 		if err := cfg.Derive(); err != nil {
 			panic(err)
 		}
@@ -143,6 +144,7 @@ func main() {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	ygg, err := yggconn.Setup(sk, *instanceName, ".", *instancePeer, *instanceListen)
@@ -197,6 +199,8 @@ func main() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	embed.Embed(httpRouter, *instancePort, "Yggdrasil Demo")
 
 	yggRouter := mux.NewRouter().SkipClean(true).UseEncodedPath()

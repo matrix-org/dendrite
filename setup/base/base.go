@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -363,10 +364,10 @@ func (b *BaseDendrite) CreateClient() *gomatrixserverlib.Client {
 // CreateFederationClient creates a new federation client. Should only be called
 // once per component.
 func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationClient {
+	identities := b.Cfg.Global.SigningIdentities()
 	if b.Cfg.Global.DisableFederation {
 		return gomatrixserverlib.NewFederationClient(
-			b.Cfg.Global.ServerName, b.Cfg.Global.KeyID, b.Cfg.Global.PrivateKey,
-			gomatrixserverlib.WithTransport(noOpHTTPTransport),
+			identities, gomatrixserverlib.WithTransport(noOpHTTPTransport),
 		)
 	}
 	opts := []gomatrixserverlib.ClientOption{
@@ -378,8 +379,7 @@ func (b *BaseDendrite) CreateFederationClient() *gomatrixserverlib.FederationCli
 		opts = append(opts, gomatrixserverlib.WithDNSCache(b.DNSCache))
 	}
 	client := gomatrixserverlib.NewFederationClient(
-		b.Cfg.Global.ServerName, b.Cfg.Global.KeyID,
-		b.Cfg.Global.PrivateKey, opts...,
+		identities, opts...,
 	)
 	client.SetUserAgent(fmt.Sprintf("Dendrite/%s", internal.VersionString()))
 	return client
@@ -411,6 +411,24 @@ func (b *BaseDendrite) configureHTTPErrors() {
 	// Special case so that we don't upset clients on the CS API.
 	b.PublicClientAPIMux.NotFoundHandler = http.HandlerFunc(clientNotFoundHandler)
 	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
+}
+
+func (b *BaseDendrite) ConfigureAdminEndpoints() {
+	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
+			w.WriteHeader(503)
+			_ = json.NewEncoder(w).Encode(struct {
+				Warnings []string `json:"warnings"`
+			}{
+				Warnings: reasons,
+			})
+			return
+		}
+		w.WriteHeader(200)
+	})
 }
 
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
@@ -463,16 +481,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
-	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
-		if b.ProcessContext.IsDegraded() {
-			w.WriteHeader(503)
-			return
-		}
-		w.WriteHeader(200)
-	})
+	b.ConfigureAdminEndpoints()
 
 	var clientHandler http.Handler
 	clientHandler = b.PublicClientAPIMux

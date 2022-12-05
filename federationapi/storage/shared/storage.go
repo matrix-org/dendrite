@@ -29,7 +29,7 @@ import (
 
 type Database struct {
 	DB                       *sql.DB
-	ServerName               gomatrixserverlib.ServerName
+	IsLocalServerName        func(gomatrixserverlib.ServerName) bool
 	Cache                    caching.FederationCache
 	Writer                   sqlutil.Writer
 	FederationQueuePDUs      tables.FederationQueuePDUs
@@ -52,6 +52,10 @@ type Receipt struct {
 	nid int64
 }
 
+func NewReceipt(nid int64) Receipt {
+	return Receipt{nid: nid}
+}
+
 func (r *Receipt) String() string {
 	return fmt.Sprintf("%d", r.nid)
 }
@@ -70,27 +74,27 @@ func (d *Database) UpdateRoom(
 ) (joinedHosts []types.JoinedHost, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		if purgeRoomFirst {
-			// If the event is a create event then we'll delete all of the existing
-			// data for the room. The only reason that a create event would be replayed
-			// to us in this way is if we're about to receive the entire room state.
 			if err = d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 				return fmt.Errorf("d.FederationJoinedHosts.DeleteJoinedHosts: %w", err)
 			}
-		}
-
-		joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID)
-		if err != nil {
-			return err
-		}
-
-		for _, add := range addHosts {
-			err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName)
-			if err != nil {
+			for _, add := range addHosts {
+				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
+					return err
+				}
+				joinedHosts = append(joinedHosts, add)
+			}
+		} else {
+			if joinedHosts, err = d.FederationJoinedHosts.SelectJoinedHostsWithTx(ctx, txn, roomID); err != nil {
 				return err
 			}
-		}
-		if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
-			return err
+			for _, add := range addHosts {
+				if err = d.FederationJoinedHosts.InsertJoinedHosts(ctx, txn, roomID, add.MemberEventID, add.ServerName); err != nil {
+					return err
+				}
+			}
+			if err = d.FederationJoinedHosts.DeleteJoinedHosts(ctx, txn, removeHosts); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -113,15 +117,17 @@ func (d *Database) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.S
 	return d.FederationJoinedHosts.SelectAllJoinedHosts(ctx)
 }
 
-func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf bool) ([]gomatrixserverlib.ServerName, error) {
-	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs)
+func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf, excludeBlacklisted bool) ([]gomatrixserverlib.ServerName, error) {
+	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs, excludeBlacklisted)
 	if err != nil {
 		return nil, err
 	}
 	if excludeSelf {
 		for i, server := range servers {
-			if server == d.ServerName {
-				servers = append(servers[:i], servers[i+1:]...)
+			if d.IsLocalServerName(server) {
+				copy(servers[i:], servers[i+1:])
+				servers = servers[:len(servers)-1]
+				break
 			}
 		}
 	}

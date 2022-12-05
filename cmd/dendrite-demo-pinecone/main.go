@@ -37,6 +37,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -51,11 +52,10 @@ import (
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
+	pineconeEvents "github.com/matrix-org/pinecone/router/events"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 
 	"github.com/sirupsen/logrus"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -89,6 +89,7 @@ func main() {
 	if configFlagSet {
 		cfg = setup.ParseFlags(true)
 		sk = cfg.Global.PrivateKey
+		pk = sk.Public().(ed25519.PublicKey)
 	} else {
 		keyfile := filepath.Join(*instanceDir, *instanceName) + ".pem"
 		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
@@ -142,6 +143,9 @@ func main() {
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
+		cfg.MediaAPI.BasePath = config.Path(*instanceDir)
+		cfg.SyncAPI.Fulltext.Enabled = true
+		cfg.SyncAPI.Fulltext.IndexPath = config.Path(*instanceDir)
 		if err := cfg.Derive(); err != nil {
 			panic(err)
 		}
@@ -151,9 +155,15 @@ func main() {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
+	pineconeEventChannel := make(chan pineconeEvents.Event)
 	pRouter := pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
+	pRouter.EnableHopLimiting()
+	pRouter.EnableWakeupBroadcasts()
+	pRouter.Subscribe(pineconeEventChannel)
+
 	pQUIC := pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), pRouter, []string{"matrix"})
 	pMulticast := pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), pRouter)
 	pManager := pineconeConnections.NewConnectionManager(pRouter, nil)
@@ -239,6 +249,8 @@ func main() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	httpRouter.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := wsUpgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -290,6 +302,34 @@ func main() {
 		logrus.Info("Listening on ", httpBindAddr)
 		logrus.Fatal(http.ListenAndServe(httpBindAddr, httpRouter))
 	}()
+
+	go func(ch <-chan pineconeEvents.Event) {
+		eLog := logrus.WithField("pinecone", "events")
+
+		for event := range ch {
+			switch e := event.(type) {
+			case pineconeEvents.PeerAdded:
+			case pineconeEvents.PeerRemoved:
+			case pineconeEvents.TreeParentUpdate:
+			case pineconeEvents.SnakeDescUpdate:
+			case pineconeEvents.TreeRootAnnUpdate:
+			case pineconeEvents.SnakeEntryAdded:
+			case pineconeEvents.SnakeEntryRemoved:
+			case pineconeEvents.BroadcastReceived:
+				eLog.Info("Broadcast received from: ", e.PeerID)
+
+				req := &api.PerformWakeupServersRequest{
+					ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
+				}
+				res := &api.PerformWakeupServersResponse{}
+				if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
+					logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+				}
+			case pineconeEvents.BandwidthReport:
+			default:
+			}
+		}
+	}(pineconeEventChannel)
 
 	base.WaitForShutdown()
 }

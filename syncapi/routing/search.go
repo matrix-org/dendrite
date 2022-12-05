@@ -31,6 +31,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/fulltext"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
@@ -61,8 +62,15 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		searchReq.SearchCategories.RoomEvents.Filter.Limit = 5
 	}
 
+	snapshot, err := syncDB.NewDatabaseSnapshot(req.Context())
+	if err != nil {
+		return jsonerror.InternalServerError()
+	}
+	var succeeded bool
+	defer sqlutil.EndTransactionWithCheck(snapshot, &succeeded, &err)
+
 	// only search rooms the user is actually joined to
-	joinedRooms, err := syncDB.RoomIDsWithMembership(ctx, device.UserID, "join")
+	joinedRooms, err := snapshot.RoomIDsWithMembership(ctx, device.UserID, "join")
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
@@ -161,12 +169,12 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	stateForRooms := make(map[string][]gomatrixserverlib.ClientEvent)
 	for _, event := range evs {
-		eventsBefore, eventsAfter, err := contextEvents(ctx, syncDB, event, roomFilter, searchReq)
+		eventsBefore, eventsAfter, err := contextEvents(ctx, snapshot, event, roomFilter, searchReq)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get context events")
 			return jsonerror.InternalServerError()
 		}
-		startToken, endToken, err := getStartEnd(ctx, syncDB, eventsBefore, eventsAfter)
+		startToken, endToken, err := getStartEnd(ctx, snapshot, eventsBefore, eventsAfter)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get start/end")
 			return jsonerror.InternalServerError()
@@ -176,7 +184,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		for _, ev := range append(eventsBefore, eventsAfter...) {
 			profile, ok := knownUsersProfiles[event.Sender()]
 			if !ok {
-				stateEvent, err := syncDB.GetStateEvent(ctx, ev.RoomID(), gomatrixserverlib.MRoomMember, ev.Sender())
+				stateEvent, err := snapshot.GetStateEvent(ctx, ev.RoomID(), gomatrixserverlib.MRoomMember, ev.Sender())
 				if err != nil {
 					logrus.WithError(err).WithField("user_id", event.Sender()).Warn("failed to query userprofile")
 					continue
@@ -209,7 +217,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 		groups[event.RoomID()] = roomGroup
 		if _, ok := stateForRooms[event.RoomID()]; searchReq.SearchCategories.RoomEvents.IncludeState && !ok {
 			stateFilter := gomatrixserverlib.DefaultStateFilter()
-			state, err := syncDB.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
+			state, err := snapshot.CurrentState(ctx, event.RoomID(), &stateFilter, nil)
 			if err != nil {
 				logrus.WithError(err).Error("unable to get current state")
 				return jsonerror.InternalServerError()
@@ -243,6 +251,7 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 
 	logrus.Debugf("Full search request took %v", time.Since(start))
 
+	succeeded = true
 	return util.JSONResponse{
 		Code: http.StatusOK,
 		JSON: res,
@@ -252,24 +261,24 @@ func Search(req *http.Request, device *api.Device, syncDB storage.Database, fts 
 // contextEvents returns the events around a given eventID
 func contextEvents(
 	ctx context.Context,
-	syncDB storage.Database,
+	snapshot storage.DatabaseTransaction,
 	event *gomatrixserverlib.HeaderedEvent,
 	roomFilter *gomatrixserverlib.RoomEventFilter,
 	searchReq SearchRequest,
 ) ([]*gomatrixserverlib.HeaderedEvent, []*gomatrixserverlib.HeaderedEvent, error) {
-	id, _, err := syncDB.SelectContextEvent(ctx, event.RoomID(), event.EventID())
+	id, _, err := snapshot.SelectContextEvent(ctx, event.RoomID(), event.EventID())
 	if err != nil {
 		logrus.WithError(err).Error("failed to query context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.BeforeLimit
-	eventsBefore, err := syncDB.SelectContextBeforeEvent(ctx, id, event.RoomID(), roomFilter)
+	eventsBefore, err := snapshot.SelectContextBeforeEvent(ctx, id, event.RoomID(), roomFilter)
 	if err != nil {
 		logrus.WithError(err).Error("failed to query before context event")
 		return nil, nil, err
 	}
 	roomFilter.Limit = searchReq.SearchCategories.RoomEvents.EventContext.AfterLimit
-	_, eventsAfter, err := syncDB.SelectContextAfterEvent(ctx, id, event.RoomID(), roomFilter)
+	_, eventsAfter, err := snapshot.SelectContextAfterEvent(ctx, id, event.RoomID(), roomFilter)
 	if err != nil {
 		logrus.WithError(err).Error("failed to query after context event")
 		return nil, nil, err
@@ -285,7 +294,7 @@ type SearchRequest struct {
 				BeforeLimit    int  `json:"before_limit,omitempty"`
 				IncludeProfile bool `json:"include_profile,omitempty"`
 			} `json:"event_context"`
-			Filter    gomatrixserverlib.StateFilter `json:"filter"`
+			Filter    gomatrixserverlib.RoomEventFilter `json:"filter"`
 			Groupings struct {
 				GroupBy []struct {
 					Key string `json:"key"`

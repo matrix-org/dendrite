@@ -156,8 +156,8 @@ func (t *UserInternalAPITrace) SetAvatarURL(ctx context.Context, req *PerformSet
 	return err
 }
 
-func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error {
-	err := t.Impl.QueryNumericLocalpart(ctx, res)
+func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error {
+	err := t.Impl.QueryNumericLocalpart(ctx, req, res)
 	util.GetLogger(ctx).Infof("QueryNumericLocalpart req= res=%+v", js(res))
 	return err
 }
@@ -168,7 +168,7 @@ func (t *UserInternalAPITrace) QueryAccountAvailability(ctx context.Context, req
 	return err
 }
 
-func (t *UserInternalAPITrace) SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error {
+func (t *UserInternalAPITrace) SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *PerformUpdateDisplayNameResponse) error {
 	err := t.Impl.SetDisplayName(ctx, req, res)
 	util.GetLogger(ctx).Infof("SetDisplayName req=%+v res=%+v", js(req), js(res))
 	return err

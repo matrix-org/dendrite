@@ -33,16 +33,17 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/producers"
 	"github.com/matrix-org/dendrite/keyserver/storage"
+	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 type KeyInternalAPI struct {
-	DB         storage.Database
-	ThisServer gomatrixserverlib.ServerName
-	FedClient  fedsenderapi.KeyserverFederationAPI
-	UserAPI    userapi.KeyserverUserAPI
-	Producer   *producers.KeyChange
-	Updater    *DeviceListUpdater
+	DB        storage.Database
+	Cfg       *config.KeyServer
+	FedClient fedsenderapi.KeyserverFederationAPI
+	UserAPI   userapi.KeyserverUserAPI
+	Producer  *producers.KeyChange
+	Updater   *DeviceListUpdater
 }
 
 func (a *KeyInternalAPI) SetUserAPI(i userapi.KeyserverUserAPI) {
@@ -70,6 +71,11 @@ func (a *KeyInternalAPI) PerformUploadKeys(ctx context.Context, req *api.Perform
 	if len(req.OneTimeKeys) > 0 {
 		a.uploadOneTimeKeys(ctx, req, res)
 	}
+	otks, err := a.DB.OneTimeKeysCount(ctx, req.UserID, req.DeviceID)
+	if err != nil {
+		return err
+	}
+	res.OneTimeKeyCounts = []api.OneTimeKeysCount{*otks}
 	return nil
 }
 
@@ -90,8 +96,11 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 		nested[userID] = val
 		domainToDeviceKeys[string(serverName)] = nested
 	}
-	// claim local keys
-	if local, ok := domainToDeviceKeys[string(a.ThisServer)]; ok {
+	for domain, local := range domainToDeviceKeys {
+		if !a.Cfg.Matrix.IsLocalServerName(gomatrixserverlib.ServerName(domain)) {
+			continue
+		}
+		// claim local keys
 		keys, err := a.DB.ClaimKeys(ctx, local)
 		if err != nil {
 			res.Error = &api.KeyError{
@@ -112,7 +121,7 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 				res.OneTimeKeys[key.UserID][key.DeviceID][keyID] = keyJSON
 			}
 		}
-		delete(domainToDeviceKeys, string(a.ThisServer))
+		delete(domainToDeviceKeys, domain)
 	}
 	if len(domainToDeviceKeys) > 0 {
 		a.claimRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys)
@@ -123,58 +132,49 @@ func (a *KeyInternalAPI) PerformClaimKeys(ctx context.Context, req *api.PerformC
 func (a *KeyInternalAPI) claimRemoteKeys(
 	ctx context.Context, timeout time.Duration, res *api.PerformClaimKeysResponse, domainToDeviceKeys map[string]map[string]map[string]string,
 ) {
-	resultCh := make(chan *gomatrixserverlib.RespClaimKeys, len(domainToDeviceKeys))
-	// allows us to wait until all federation servers have been poked
-	var wg sync.WaitGroup
-	wg.Add(len(domainToDeviceKeys))
-	// mutex for failures
-	var failMu sync.Mutex
-	util.GetLogger(ctx).WithField("num_servers", len(domainToDeviceKeys)).Info("Claiming remote keys from servers")
+	var wg sync.WaitGroup // Wait for fan-out goroutines to finish
+	var mu sync.Mutex     // Protects the response struct
+	var claimed int       // Number of keys claimed in total
+	var failures int      // Number of servers we failed to ask
 
-	// fan out
+	util.GetLogger(ctx).Infof("Claiming remote keys from %d server(s)", len(domainToDeviceKeys))
+	wg.Add(len(domainToDeviceKeys))
+
 	for d, k := range domainToDeviceKeys {
 		go func(domain string, keysToClaim map[string]map[string]string) {
-			defer wg.Done()
 			fedCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
-			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, gomatrixserverlib.ServerName(domain), keysToClaim)
+			defer wg.Done()
+
+			claimKeyRes, err := a.FedClient.ClaimKeys(fedCtx, a.Cfg.Matrix.ServerName, gomatrixserverlib.ServerName(domain), keysToClaim)
+
+			mu.Lock()
+			defer mu.Unlock()
+
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).WithField("server", domain).Error("ClaimKeys failed")
-				failMu.Lock()
 				res.Failures[domain] = map[string]interface{}{
 					"message": err.Error(),
 				}
-				failMu.Unlock()
+				failures++
 				return
 			}
-			resultCh <- &claimKeyRes
+
+			for userID, deviceIDToKeys := range claimKeyRes.OneTimeKeys {
+				res.OneTimeKeys[userID] = make(map[string]map[string]json.RawMessage)
+				for deviceID, keys := range deviceIDToKeys {
+					res.OneTimeKeys[userID][deviceID] = keys
+					claimed += len(keys)
+				}
+			}
 		}(d, k)
 	}
 
-	// Close the result channel when the goroutines have quit so the for .. range exits
-	go func() {
-		wg.Wait()
-		close(resultCh)
-	}()
-
-	keysClaimed := 0
-	for result := range resultCh {
-		for userID, nest := range result.OneTimeKeys {
-			res.OneTimeKeys[userID] = make(map[string]map[string]json.RawMessage)
-			for deviceID, nest2 := range nest {
-				res.OneTimeKeys[userID][deviceID] = make(map[string]json.RawMessage)
-				for keyIDWithAlgo, otk := range nest2 {
-					keyJSON, err := json.Marshal(otk)
-					if err != nil {
-						continue
-					}
-					res.OneTimeKeys[userID][deviceID][keyIDWithAlgo] = keyJSON
-					keysClaimed++
-				}
-			}
-		}
-	}
-	util.GetLogger(ctx).WithField("num_keys", keysClaimed).Info("Claimed remote keys")
+	wg.Wait()
+	util.GetLogger(ctx).WithFields(logrus.Fields{
+		"num_keys":     claimed,
+		"num_failures": failures,
+	}).Infof("Claimed remote keys from %d server(s)", len(domainToDeviceKeys))
 }
 
 func (a *KeyInternalAPI) PerformDeleteKeys(ctx context.Context, req *api.PerformDeleteKeysRequest, res *api.PerformDeleteKeysResponse) error {
@@ -207,15 +207,13 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 		return nil
 	}
 	maxStreamID := int64(0)
+	// remove deleted devices
+	var result []api.DeviceMessage
 	for _, m := range msgs {
 		if m.StreamID > maxStreamID {
 			maxStreamID = m.StreamID
 		}
-	}
-	// remove deleted devices
-	var result []api.DeviceMessage
-	for _, m := range msgs {
-		if m.KeyJSON == nil {
+		if m.KeyJSON == nil || len(m.KeyJSON) == 0 {
 			continue
 		}
 		result = append(result, m)
@@ -228,26 +226,31 @@ func (a *KeyInternalAPI) QueryDeviceMessages(ctx context.Context, req *api.Query
 // PerformMarkAsStaleIfNeeded marks the users device list as stale, if the given deviceID is not present
 // in our database.
 func (a *KeyInternalAPI) PerformMarkAsStaleIfNeeded(ctx context.Context, req *api.PerformMarkAsStaleRequest, res *struct{}) error {
-	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{req.DeviceID}, true)
+	knownDevices, err := a.DB.DeviceKeysForUser(ctx, req.UserID, []string{}, true)
 	if err != nil {
 		return err
 	}
 	if len(knownDevices) == 0 {
-		return a.Updater.ManualUpdate(ctx, req.Domain, req.UserID)
+		return nil // fmt.Errorf("unknown user %s", req.UserID)
 	}
-	return nil
+
+	for i := range knownDevices {
+		if knownDevices[i].DeviceID == req.DeviceID {
+			return nil // we already know about this device
+		}
+	}
+
+	return a.Updater.ManualUpdate(ctx, req.Domain, req.UserID)
 }
 
 // nolint:gocyclo
 func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysRequest, res *api.QueryKeysResponse) error {
+	var respMu sync.Mutex
 	res.DeviceKeys = make(map[string]map[string]json.RawMessage)
 	res.MasterKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.SelfSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.UserSigningKeys = make(map[string]gomatrixserverlib.CrossSigningKey)
 	res.Failures = make(map[string]interface{})
-
-	// get cross-signing keys from the database
-	a.crossSigningKeysFromDatabase(ctx, req, res)
 
 	// make a map from domain to device keys
 	domainToDeviceKeys := make(map[string]map[string][]string)
@@ -259,7 +262,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 		}
 		domain := string(serverName)
 		// query local devices
-		if serverName == a.ThisServer {
+		if a.Cfg.Matrix.IsLocalServerName(serverName) {
 			deviceKeys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 			if err != nil {
 				res.Error = &api.KeyError{
@@ -319,11 +322,15 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 	}
 
 	// attempt to satisfy key queries from the local database first as we should get device updates pushed to us
-	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, domainToDeviceKeys)
+	domainToDeviceKeys = a.remoteKeysFromDatabase(ctx, res, &respMu, domainToDeviceKeys)
 	if len(domainToDeviceKeys) > 0 || len(domainToCrossSigningKeys) > 0 {
 		// perform key queries for remote devices
 		a.queryRemoteKeys(ctx, req.Timeout, res, domainToDeviceKeys, domainToCrossSigningKeys)
 	}
+
+	// Now that we've done the potentially expensive work of asking the federation,
+	// try filling the cross-signing keys from the database that we know about.
+	a.crossSigningKeysFromDatabase(ctx, req, res)
 
 	// Finally, append signatures that we know about
 	// TODO: This is horrible because we need to round-trip the signature from
@@ -397,7 +404,7 @@ func (a *KeyInternalAPI) QueryKeys(ctx context.Context, req *api.QueryKeysReques
 }
 
 func (a *KeyInternalAPI) remoteKeysFromDatabase(
-	ctx context.Context, res *api.QueryKeysResponse, domainToDeviceKeys map[string]map[string][]string,
+	ctx context.Context, res *api.QueryKeysResponse, respMu *sync.Mutex, domainToDeviceKeys map[string]map[string][]string,
 ) map[string]map[string][]string {
 	fetchRemote := make(map[string]map[string][]string)
 	for domain, userToDeviceMap := range domainToDeviceKeys {
@@ -405,7 +412,7 @@ func (a *KeyInternalAPI) remoteKeysFromDatabase(
 			// we can't safely return keys from the db when all devices are requested as we don't
 			// know if one has just been added.
 			if len(deviceIDs) > 0 {
-				err := a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, deviceIDs)
+				err := a.populateResponseWithDeviceKeysFromDatabase(ctx, res, respMu, userID, deviceIDs)
 				if err == nil {
 					continue
 				}
@@ -434,13 +441,13 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 	domains := map[string]struct{}{}
 	for domain := range domainToDeviceKeys {
-		if domain == string(a.ThisServer) {
+		if a.Cfg.Matrix.IsLocalServerName(gomatrixserverlib.ServerName(domain)) {
 			continue
 		}
 		domains[domain] = struct{}{}
 	}
 	for domain := range domainToCrossSigningKeys {
-		if domain == string(a.ThisServer) {
+		if a.Cfg.Matrix.IsLocalServerName(gomatrixserverlib.ServerName(domain)) {
 			continue
 		}
 		domains[domain] = struct{}{}
@@ -461,7 +468,9 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 		close(resultCh)
 	}()
 
-	for result := range resultCh {
+	processResult := func(result *gomatrixserverlib.RespQueryKeys) {
+		respMu.Lock()
+		defer respMu.Unlock()
 		for userID, nest := range result.DeviceKeys {
 			res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 			for deviceID, deviceKey := range nest {
@@ -483,6 +492,10 @@ func (a *KeyInternalAPI) queryRemoteKeys(
 
 		// TODO: do we want to persist these somewhere now
 		// that we have fetched them?
+	}
+
+	for result := range resultCh {
+		processResult(result)
 	}
 }
 
@@ -531,9 +544,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 		}
 		// refresh entries from DB: unlike remoteKeysFromDatabase we know we previously had no device info for this
 		// user so the fact that we're populating all devices here isn't a problem so long as we have devices.
-		respMu.Lock()
-		err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, nil)
-		respMu.Unlock()
+		err = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, respMu, userID, nil)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				logrus.ErrorKey: err,
@@ -548,7 +559,7 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	if len(devKeys) == 0 {
 		return
 	}
-	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, gomatrixserverlib.ServerName(serverName), devKeys)
+	queryKeysResp, err := a.FedClient.QueryKeys(fedCtx, a.Cfg.Matrix.ServerName, gomatrixserverlib.ServerName(serverName), devKeys)
 	if err == nil {
 		resultCh <- &queryKeysResp
 		return
@@ -557,25 +568,26 @@ func (a *KeyInternalAPI) queryRemoteKeysOnServer(
 	res.Failures[serverName] = map[string]interface{}{
 		"message": err.Error(),
 	}
+	respMu.Unlock()
 
 	// last ditch, use the cache only. This is good for when clients hit /keys/query and the remote server
 	// is down, better to return something than nothing at all. Clients can know about the failure by
 	// inspecting the failures map though so they can know it's a cached response.
 	for userID, dkeys := range devKeys {
 		// drop the error as it's already a failure at this point
-		_ = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, userID, dkeys)
+		_ = a.populateResponseWithDeviceKeysFromDatabase(ctx, res, respMu, userID, dkeys)
 	}
 
 	// Sytest expects no failures, if we still could retrieve keys, e.g. from local cache
+	respMu.Lock()
 	if len(res.DeviceKeys) > 0 {
 		delete(res.Failures, serverName)
 	}
 	respMu.Unlock()
-
 }
 
 func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
-	ctx context.Context, res *api.QueryKeysResponse, userID string, deviceIDs []string,
+	ctx context.Context, res *api.QueryKeysResponse, respMu *sync.Mutex, userID string, deviceIDs []string,
 ) error {
 	keys, err := a.DB.DeviceKeysForUser(ctx, userID, deviceIDs, false)
 	// if we can't query the db or there are fewer keys than requested, fetch from remote.
@@ -588,9 +600,11 @@ func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
 	if len(deviceIDs) == 0 && len(keys) == 0 {
 		return fmt.Errorf("DeviceKeysForUser %s returned no keys but wanted all keys, falling back to remote", userID)
 	}
+	respMu.Lock()
 	if res.DeviceKeys[userID] == nil {
 		res.DeviceKeys[userID] = make(map[string]json.RawMessage)
 	}
+	respMu.Unlock()
 
 	for _, key := range keys {
 		if len(key.KeyJSON) == 0 {
@@ -600,7 +614,9 @@ func (a *KeyInternalAPI) populateResponseWithDeviceKeysFromDatabase(
 		key.KeyJSON, _ = sjson.SetBytes(key.KeyJSON, "unsigned", struct {
 			DisplayName string `json:"device_display_name,omitempty"`
 		}{key.DisplayName})
+		respMu.Lock()
 		res.DeviceKeys[userID][key.DeviceID] = key.KeyJSON
+		respMu.Unlock()
 	}
 	return nil
 }
@@ -677,7 +693,7 @@ func (a *KeyInternalAPI) uploadLocalDeviceKeys(ctx context.Context, req *api.Per
 			if err != nil {
 				continue // ignore invalid users
 			}
-			if serverName != a.ThisServer {
+			if !a.Cfg.Matrix.IsLocalServerName(serverName) {
 				continue // ignore remote users
 			}
 			if len(key.KeyJSON) == 0 {

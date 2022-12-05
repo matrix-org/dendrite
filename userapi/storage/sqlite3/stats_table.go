@@ -44,9 +44,38 @@ CREATE INDEX IF NOT EXISTS userapi_daily_visits_timestamp_idx ON userapi_daily_v
 CREATE INDEX IF NOT EXISTS userapi_daily_visits_localpart_timestamp_idx ON userapi_daily_visits(localpart, timestamp);
 `
 
+const messagesDailySchema = `
+CREATE TABLE IF NOT EXISTS userapi_daily_stats (
+	timestamp BIGINT NOT NULL,
+	server_name TEXT NOT NULL,
+	messages BIGINT NOT NULL,
+	sent_messages BIGINT NOT NULL,
+	e2ee_messages BIGINT NOT NULL,
+	sent_e2ee_messages BIGINT NOT NULL,
+	active_rooms BIGINT NOT NULL,
+	active_e2ee_rooms BIGINT NOT NULL,
+	CONSTRAINT daily_stats_unique UNIQUE (timestamp, server_name)
+);
+`
+
+const upsertDailyMessagesSQL = `
+	INSERT INTO userapi_daily_stats (timestamp, server_name, messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (timestamp, server_name)
+	DO UPDATE SET
+	    messages=messages+excluded.messages, sent_messages=sent_messages+excluded.sent_messages,
+	    e2ee_messages=e2ee_messages+excluded.e2ee_messages, sent_e2ee_messages=sent_e2ee_messages+excluded.sent_e2ee_messages,
+	    active_rooms=MAX($7, active_rooms), active_e2ee_rooms=MAX($8, active_e2ee_rooms)
+`
+
+const selectDailyMessagesSQL = `
+	SELECT messages, sent_messages, e2ee_messages, sent_e2ee_messages, active_rooms, active_e2ee_rooms
+	FROM userapi_daily_stats
+	WHERE server_name = $1 AND timestamp = $2;
+`
+
 const countUsersLastSeenAfterSQL = "" +
 	"SELECT COUNT(*) FROM (" +
-	" SELECT localpart FROM device_devices WHERE last_seen_ts > $1 " +
+	" SELECT localpart FROM userapi_devices WHERE last_seen_ts > $1 " +
 	" GROUP BY localpart" +
 	" ) u"
 
@@ -63,7 +92,7 @@ R30Users counts the number of 30 day retained users, defined as:
 const countR30UsersSQL = `
 SELECT platform, COUNT(*) FROM (
 	SELECT users.localpart, platform, users.created_ts, MAX(uip.last_seen_ts)
-	FROM account_accounts users
+	FROM userapi_accounts users
 	INNER JOIN
 	(SELECT 
 		localpart, last_seen_ts,
@@ -76,7 +105,7 @@ SELECT platform, COUNT(*) FROM (
         	ELSE 'unknown'
 		END
     	AS platform
-		FROM device_devices
+		FROM userapi_devices
 	) uip
 	ON users.localpart = uip.localpart
 	AND users.account_type <> 4
@@ -126,7 +155,7 @@ GROUP BY client_type
 `
 
 const countUserByAccountTypeSQL = `
-SELECT COUNT(*) FROM account_accounts WHERE account_type IN ($1)
+SELECT COUNT(*) FROM userapi_accounts WHERE account_type IN ($1)
 `
 
 // $1 = Guest AccountType
@@ -139,7 +168,7 @@ SELECT user_type, COUNT(*) AS count FROM (
         WHEN account_type = $4 AND appservice_id IS NULL THEN 'guest'
 		WHEN account_type IN ($5) AND appservice_id IS NOT NULL THEN 'bridged'
 	END AS user_type
-    FROM account_accounts
+    FROM userapi_accounts
     WHERE created_ts > $8
 ) AS t GROUP BY user_type
 `
@@ -148,14 +177,14 @@ SELECT user_type, COUNT(*) AS count FROM (
 const updateUserDailyVisitsSQL = `
 INSERT INTO userapi_daily_visits(localpart, device_id, timestamp, user_agent)
 	SELECT u.localpart, u.device_id, $1, MAX(u.user_agent)
-	FROM device_devices AS u
+	FROM userapi_devices AS u
 	LEFT JOIN (
 		SELECT localpart, device_id, timestamp FROM userapi_daily_visits
 		WHERE timestamp = $1
 	) udv
 	ON u.localpart = udv.localpart AND u.device_id = udv.device_id
-	INNER JOIN device_devices d ON d.localpart = u.localpart
-	INNER JOIN account_accounts a ON a.localpart = u.localpart
+	INNER JOIN userapi_devices d ON d.localpart = u.localpart
+	INNER JOIN userapi_accounts a ON a.localpart = u.localpart
 	WHERE $2 <= d.last_seen_ts AND d.last_seen_ts < $3
 	AND a.account_type in (1, 3)
 	GROUP BY u.localpart, u.device_id
@@ -176,6 +205,8 @@ type statsStatements struct {
 	countUserByAccountTypeStmt    *sql.Stmt
 	countRegisteredUserByTypeStmt *sql.Stmt
 	dbEngineVersionStmt           *sql.Stmt
+	upsertMessagesStmt            *sql.Stmt
+	selectDailyMessagesStmt       *sql.Stmt
 }
 
 func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (tables.StatsTable, error) {
@@ -189,6 +220,10 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 	if err != nil {
 		return nil, err
 	}
+	_, err = db.Exec(messagesDailySchema)
+	if err != nil {
+		return nil, err
+	}
 	go s.startTimers()
 	return s, sqlutil.StatementList{
 		{&s.countUsersLastSeenAfterStmt, countUsersLastSeenAfterSQL},
@@ -198,6 +233,8 @@ func NewSQLiteStatsTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (t
 		{&s.countUserByAccountTypeStmt, countUserByAccountTypeSQL},
 		{&s.countRegisteredUserByTypeStmt, countRegisteredUserByTypeSQL},
 		{&s.dbEngineVersionStmt, queryDBEngineVersion},
+		{&s.upsertMessagesStmt, upsertDailyMessagesSQL},
+		{&s.selectDailyMessagesStmt, selectDailyMessagesSQL},
 	}.Prepare(db)
 }
 
@@ -450,4 +487,35 @@ func (s *statsStatements) UpdateUserDailyVisits(
 		s.lastUpdate = time.Now()
 	}
 	return err
+}
+
+func (s *statsStatements) UpsertDailyStats(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName, stats types.MessageStats,
+	activeRooms, activeE2EERooms int64,
+) error {
+	stmt := sqlutil.TxStmt(txn, s.upsertMessagesStmt)
+	timestamp := time.Now().Truncate(time.Hour * 24)
+	_, err := stmt.ExecContext(ctx,
+		gomatrixserverlib.AsTimestamp(timestamp),
+		serverName,
+		stats.Messages, stats.SentMessages, stats.MessagesE2EE, stats.SentMessagesE2EE,
+		activeRooms, activeE2EERooms,
+	)
+	return err
+}
+
+func (s *statsStatements) DailyRoomsMessages(
+	ctx context.Context, txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
+) (msgStats types.MessageStats, activeRooms, activeE2EERooms int64, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectDailyMessagesStmt)
+	timestamp := time.Now().Truncate(time.Hour * 24)
+
+	err = stmt.QueryRowContext(ctx, serverName, gomatrixserverlib.AsTimestamp(timestamp)).
+		Scan(&msgStats.Messages, &msgStats.SentMessages, &msgStats.MessagesE2EE, &msgStats.SentMessagesE2EE, &activeRooms, &activeE2EERooms)
+	if err != nil && err != sql.ErrNoRows {
+		return msgStats, 0, 0, err
+	}
+	return msgStats, activeRooms, activeE2EERooms, nil
 }

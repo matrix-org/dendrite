@@ -88,12 +88,7 @@ const selectStateEventSQL = "" +
 	"SELECT headered_event_json FROM syncapi_current_room_state WHERE room_id = $1 AND type = $2 AND state_key = $3"
 
 const selectEventsWithEventIDsSQL = "" +
-	// TODO: The session_id and transaction_id blanks are here because
-	// the rowsToStreamEvents expects there to be exactly seven columns. We need to
-	// figure out if these really need to be in the DB, and if so, we need a
-	// better permanent fix for this. - neilalexander, 2 Jan 2020
-	"SELECT event_id, added_at, headered_event_json, 0 AS session_id, false AS exclude_from_sync, '' AS transaction_id, history_visibility" +
-	" FROM syncapi_current_room_state WHERE event_id IN ($1)"
+	"SELECT event_id, added_at, headered_event_json, history_visibility FROM syncapi_current_room_state WHERE event_id IN ($1)"
 
 const selectSharedUsersSQL = "" +
 	"SELECT state_key FROM syncapi_current_room_state WHERE room_id IN(" +
@@ -282,7 +277,8 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		},
 		stateFilter.Senders, stateFilter.NotSenders,
 		stateFilter.Types, stateFilter.NotTypes,
-		excludeEventIDs, stateFilter.ContainsURL, stateFilter.Limit, FilterOrderNone,
+		excludeEventIDs, stateFilter.ContainsURL, 0,
+		FilterOrderNone,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
@@ -367,12 +363,18 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 	for start < len(eventIDs) {
 		n := minOfInts(len(eventIDs)-start, 999)
 		query := strings.Replace(selectEventsWithEventIDsSQL, "($1)", sqlutil.QueryVariadic(n), 1)
-		rows, err := txn.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		var rows *sql.Rows
+		var err error
+		if txn == nil {
+			rows, err = s.db.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		} else {
+			rows, err = txn.QueryContext(ctx, query, iEventIDs[start:start+n]...)
+		}
 		if err != nil {
 			return nil, err
 		}
 		start = start + n
-		events, err := rowsToStreamEvents(rows)
+		events, err := currentRoomStateRowsToStreamEvents(rows)
 		internal.CloseAndLogIfError(ctx, rows, "selectEventsWithEventIDs: rows.close() failed")
 		if err != nil {
 			return nil, err
@@ -380,6 +382,35 @@ func (s *currentRoomStateStatements) SelectEventsWithEventIDs(
 		res = append(res, events...)
 	}
 	return res, nil
+}
+
+func currentRoomStateRowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
+	var events []types.StreamEvent
+	for rows.Next() {
+		var (
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			historyVisibility gomatrixserverlib.HistoryVisibility
+		)
+		if err := rows.Scan(&eventID, &streamPos, &eventBytes, &historyVisibility); err != nil {
+			return nil, err
+		}
+		// TODO: Handle redacted events
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+
+		ev.Visibility = historyVisibility
+
+		events = append(events, types.StreamEvent{
+			HeaderedEvent:  &ev,
+			StreamPosition: streamPos,
+		})
+	}
+
+	return events, nil
 }
 
 func rowsToEvents(rows *sql.Rows) ([]*gomatrixserverlib.HeaderedEvent, error) {
