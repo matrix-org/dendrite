@@ -2,12 +2,20 @@ name: Dendrite
 
 on:
   push:
+    paths-ignore:
+      - 'charts/**' # ignore helm chart changes
     branches:
       - main
   pull_request:
+    paths-ignore:
+      - 'charts/**' # ignore helm chart changes
   release:
+    paths-ignore:
+      - 'charts/**' # ignore helm chart changes
     types: [published]
   workflow_dispatch:
+    paths-ignore:
+      - 'charts/**' # ignore helm chart changes
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

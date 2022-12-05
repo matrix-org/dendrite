@@ -1,0 +1,21 @@
+name: "Pre-commit consistency check"
+
+on:
+  workflow_call:
+    inputs:
+      modifiedFiles:
+        required: true
+        type: string
+
+jobs:
+  pre-commit-check:
+    name: Run pre-commit checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Run against changes
+        uses: pre-commit/action@v3.0.0
+        with:
+          extra_args: --files ${{ inputs.modifiedFiles }}

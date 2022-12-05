@@ -4,6 +4,8 @@ name: "Docker"
 
 on:
   release: # A GitHub release was published
+    paths-ignore:
+      - 'charts/**' # ignore helm chart changes
     types: [published]
   workflow_dispatch: # A build was manually requested
   workflow_call: # Another pipeline called us

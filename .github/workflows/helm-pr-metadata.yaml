@@ -1,0 +1,60 @@
+name: "Pull Request: Get metadata"
+
+on:
+  workflow_call:
+    outputs:
+      isRenovatePR:
+        description: "Is the PR coming from Renovate?"
+        value: ${{ jobs.pr-metadata.outputs.isRenovatePR }}
+      isFork:
+        description: "Is the PR coming from a forked repo?"
+        value: ${{ jobs.pr-metadata.outputs.isFork }}
+      addedOrModified:
+        description: "Does the PR contain any changes?"
+        value: ${{ jobs.pr-changes.outputs.addedOrModified }}
+      addedOrModifiedFiles:
+        description: "A list of the files changed in this PR"
+        value: ${{ jobs.pr-changes.outputs.addedOrModifiedFiles }}
+      addedOrModifiedCharts:
+        description: "A list of the charts changed in this PR"
+        value: ${{ jobs.pr-changes.outputs.addedOrModifiedCharts }}
+
+jobs:
+  pr-metadata:
+    name: Collect PR metadata
+    runs-on: ubuntu-latest
+    outputs:
+      isRenovatePR: ${{ startsWith(steps.branch-name.outputs.current_branch, 'renovate/') }}
+      isFork: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+    steps:
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v5.4
+
+      - name: Save PR data to file
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          echo $PR_NUMBER > pr_number.txt
+
+      - name: Store pr data in artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: pr_metadata
+          path: ./pr_number.txt
+          retention-days: 5
+
+  pr-changes:
+    name: Collect PR changes
+    runs-on: ubuntu-latest
+    outputs:
+      addedOrModified: ${{ steps.collect-changes.outputs.changesDetected }}
+      addedOrModifiedFiles: ${{ steps.collect-changes.outputs.addedOrModifiedFiles }}
+      addedOrModifiedCharts: ${{ steps.collect-changes.outputs.addedOrModifiedCharts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Collect changes
+        id: collect-changes
+        uses: ./.github/actions/collect-changes

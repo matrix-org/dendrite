@@ -1,0 +1,45 @@
+name: "Collect changes"
+description: "Collects and stores changed files/charts"
+
+outputs:
+  changesDetected:
+    description: "Whether or not changes to charts have been detected"
+    value: ${{ steps.filter.outputs.addedOrModified }}
+  addedOrModifiedFiles:
+    description: "A list of the files changed"
+    value: ${{ steps.filter.outputs.addedOrModified_files }}
+  addedOrModifiedCharts:
+    description: "A list of the charts changed"
+    value: ${{ steps.filter-charts.outputs.addedOrModified }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Collect changed files
+      uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        list-files: shell
+        filters: |
+          addedOrModified:
+            - added|modified: 'charts/*/**'
+
+    - name: Collect changed charts
+      if: |
+        steps.filter.outputs.addedOrModified == 'true'
+      id: filter-charts
+      shell: bash
+      run: |
+        CHARTS=()
+        PATHS=(${{ steps.filter.outputs.addedOrModified_files }})
+        # Get only the chart paths
+        for CHARTPATH in "${PATHS[@]}"
+        do
+          IFS='/' read -r -a path_parts <<< "${CHARTPATH}"
+          CHARTS+=("${path_parts[1]}/${path_parts[2]}")
+        done
+
+        # Remove duplicates
+        CHARTS=( `printf "%s\n" "${CHARTS[@]}" | sort -u` )
+        # Set output to changed charts
+        printf "::set-output name=addedOrModified::%s\n" "${CHARTS[*]}"

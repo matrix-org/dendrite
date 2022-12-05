@@ -1,0 +1,56 @@
+name: "Pull Request: Validate"
+
+on:
+  pull_request:
+    paths:
+      - 'charts/**' # only execute if we have helm chart changes
+    branches:
+      - main
+    types:
+      - opened
+      - edited
+      - reopened
+      - ready_for_review
+      - synchronize
+
+concurrency:
+  group: ${{ github.head_ref }}-pr-validate
+  cancel-in-progress: true
+
+jobs:
+  pr-metadata:
+    uses: matrix-org/dendrite/.github/workflows/helm-pr-metadata.yaml@main
+
+  pre-commit-check:
+    uses: matrix-org/dendrite/.github/workflows/helm-pre-commit-check.yaml@main
+    needs:
+      - pr-metadata
+    with:
+      modifiedFiles: ${{ needs.pr-metadata.outputs.addedOrModifiedFiles }}
+
+  charts-changelog:
+    uses: matrix-org/dendrite/.github/workflows/helm-charts-changelog.yaml@main
+    needs:
+      - pr-metadata
+      - pre-commit-check
+    with:
+      isRenovatePR: ${{ needs.pr-metadata.outputs.isRenovatePR }}
+      modifiedCharts: ${{ needs.pr-metadata.outputs.addedOrModifiedCharts }}
+
+  charts-lint:
+    uses: matrix-org/dendrite/.github/workflows/helm-charts-lint.yaml@main
+    needs:
+      - pr-metadata
+      - charts-changelog
+    with:
+      checkoutCommit: ${{ needs.charts-changelog.outputs.commitHash }}
+      chartChangesDetected: ${{ needs.pr-metadata.outputs.addedOrModified }}
+
+  charts-test:
+    uses: matrix-org/dendrite/.github/workflows/helm-charts-test.yaml@main
+    needs:
+      - pr-metadata
+      - charts-changelog
+    with:
+      checkoutCommit: ${{ needs.charts-changelog.outputs.commitHash }}
+      chartChangesDetected: ${{ needs.pr-metadata.outputs.addedOrModified }}

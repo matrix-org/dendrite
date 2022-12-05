@@ -1,0 +1,54 @@
+name: "Charts: Lint"
+
+on:
+  workflow_call:
+    inputs:
+      checkoutCommit:
+        required: true
+        type: string
+      chartChangesDetected:
+        required: true
+        type: string
+
+jobs:
+  lint:
+    name: Lint charts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.checkoutCommit }}
+
+      - name: Install Kubernetes tools
+        uses: yokawasa/action-setup-kube-tools@v0.8.2
+        with:
+          setup-tools: |
+            helmv3
+          helm: "3.8.0"
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.3.0
+
+      - name: Collect changes
+        id: list-changed
+        if: inputs.chartChangesDetected == 'true'
+        run: |
+          EXCLUDED=$(yq eval -o=json '.excluded-charts // []' .github/ct-lint.yaml)
+          CHARTS=$(ct list-changed --config .github/ct-lint.yaml)
+          CHARTS_JSON=$(echo "${CHARTS}" | jq -R -s -c 'split("\n")[:-1]')
+          OUTPUT_JSON=$(echo "{\"excluded\": ${EXCLUDED}, \"all\": ${CHARTS_JSON}}" | jq -c '.all-.excluded')
+          echo ::set-output name=charts::${OUTPUT_JSON}
+          if [[ $(echo ${OUTPUT_JSON} | jq -c '. | length') -gt 0 ]]; then
+            echo "::set-output name=detected::true"
+          fi
+
+      - name: Run chart-testing (lint)
+        id: lint
+        if: steps.list-changed.outputs.detected == 'true'
+        run: ct lint --config .github/ct-lint.yaml

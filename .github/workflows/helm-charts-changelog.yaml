@@ -1,0 +1,81 @@
+name: "Charts: Update README"
+
+on:
+  workflow_call:
+    inputs:
+      modifiedCharts:
+        required: true
+        type: string
+      isRenovatePR:
+        required: true
+        type: string
+    outputs:
+      commitHash:
+        description: "The most recent commit hash at the end of this workflow"
+        value: ${{ jobs.generate-changelog.outputs.commitHash }}
+
+jobs:
+  validate-changelog:
+    name: Validate changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check changelog annotations
+        if: inputs.isRenovatePR != 'true'
+        run: |
+          CHARTS=(${{ inputs.modifiedCharts }})
+          for i in "${CHARTS[@]}"
+          do
+              IFS='/' read -r -a chart_parts <<< "$i"
+              ./.github/scripts/check-releasenotes.sh "charts/${chart_parts[0]}/${chart_parts[1]}"
+              echo ""
+          done
+
+  generate-changelog:
+    name: Generate changelog annotations
+    runs-on: ubuntu-latest
+    needs:
+      - validate-changelog
+    outputs:
+      commitHash: ${{ steps.save-commit-hash.outputs.commit_hash }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Annotate Charts.yaml for Renovate PR's
+        if: inputs.isRenovatePR == 'true'
+        env:
+          CHECK_BRANCH: "origin/${{ github.event.repository.default_branch }}"
+        run: |
+          pip install -r ./.github/scripts/requirements.txt
+          ./.github/scripts/renovate-releasenotes.py --check-branch "$CHECK_BRANCH" ${{ inputs.modifiedCharts }}
+
+      - name: Create commit
+        id: create-commit
+        if: inputs.isRenovatePR == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          file_pattern: charts/**/
+          commit_message: "chore: Auto-update chart metadata"
+          commit_user_name: ${{ github.actor }}
+          commit_user_email: ${{ github.actor }}@users.noreply.github.com
+
+      - name: Save commit hash
+        id: save-commit-hash
+        run: |
+          if [ "${{ steps.create-commit.outputs.changes_detected || 'unknown' }}" == "true" ]; then
+            echo '::set-output name=commit_hash::${{ steps.create-commit.outputs.commit_hash }}'
+          else
+            echo "::set-output name=commit_hash::${GITHUB_SHA}"
+          fi

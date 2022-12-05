@@ -1,0 +1,134 @@
+name: "Charts: Test"
+
+on:
+  workflow_call:
+    inputs:
+      checkoutCommit:
+        required: true
+        type: string
+      chartChangesDetected:
+        required: true
+        type: string
+
+jobs:
+  unit-test:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.checkoutCommit }}
+
+      - name: Install Kubernetes tools
+        uses: yokawasa/action-setup-kube-tools@v0.8.2
+        with:
+          setup-tools: |
+            helmv3
+          helm: "3.8.0"
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+
+      - name: Install dependencies
+        env:
+          RUBYJQ_USE_SYSTEM_LIBRARIES: 1
+        run: |
+          sudo apt-get update
+          sudo apt-get install libjq-dev
+          bundle install
+
+      - name: Run tests
+        run: |
+          bundle exec m -r ./test/
+
+  generate-install-matrix:
+    name: Generate matrix for install
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: |
+        {
+          "chart": ${{ steps.list-changed.outputs.charts }}
+        }
+      detected: ${{ steps.list-changed.outputs.detected }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.checkoutCommit }}
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.3.0
+
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        if: inputs.chartChangesDetected == 'true'
+        run: |
+          EXCLUDED=$(yq eval -o=json '.excluded-charts // []' .github/ct-install.yaml)
+          CHARTS=$(ct list-changed --config .github/ct-install.yaml)
+          CHARTS_JSON=$(echo "${CHARTS}" | jq -R -s -c 'split("\n")[:-1]')
+          OUTPUT_JSON=$(echo "{\"excluded\": ${EXCLUDED}, \"all\": ${CHARTS_JSON}}" | jq -c '.all-.excluded')
+          echo ::set-output name=charts::${OUTPUT_JSON}
+          if [[ $(echo ${OUTPUT_JSON} | jq -c '. | length') -gt 0 ]]; then
+            echo "::set-output name=detected::true"
+          fi
+
+  install-charts:
+    needs:
+      - generate-install-matrix
+    if: needs.generate-install-matrix.outputs.detected == 'true'
+    name: Install charts
+    strategy:
+      matrix: ${{ fromJson(needs.generate-install-matrix.outputs.matrix) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.checkoutCommit }}
+
+      - name: Install Kubernetes tools
+        uses: yokawasa/action-setup-kube-tools@v0.8.2
+        with:
+          setup-tools: |
+            helmv3
+          helm: "3.6.3"
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.3.0
+
+      - name: Create k3d cluster
+        uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: v1.19
+
+      - name: Remove node taints
+        run: |
+          kubectl taint --all=true nodes node.cloudprovider.kubernetes.io/uninitialized- || true
+
+      - name: Run chart-testing (install)
+        run: ct install --config .github/ct-install.yaml --charts ${{ matrix.chart }}
+
+  # Summarize matrix https://github.community/t/status-check-for-a-matrix-jobs/127354/7
+  install_success:
+    needs:
+      - generate-install-matrix
+      - install-charts
+    if: |
+      always()
+    name: Install successful
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check install matrix status
+        if: ${{ (needs.generate-install-matrix.outputs.detected == 'true') && (needs.install-charts.result != 'success') }}
+        run: exit 1
