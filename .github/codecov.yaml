@@ -6,7 +6,7 @@ coverage:
   status:
     project:
       default:
-        target: auto # Don't allow coverage to drop
+        target: auto
         threshold: 0%
         base: auto
         flags:
