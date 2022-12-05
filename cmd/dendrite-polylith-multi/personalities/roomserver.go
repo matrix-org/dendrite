@@ -26,7 +26,7 @@ func RoomServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	rsAPI := roomserver.NewInternalAPI(base)
 	rsAPI.SetFederationAPI(fsAPI, fsAPI.KeyRing())
 	rsAPI.SetAppserviceAPI(asAPI)
-	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI)
+	roomserver.AddInternalRoutes(base.InternalAPIMux, rsAPI, base.EnableMetrics)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.RoomServer.InternalAPI.Listen, // internal listener
