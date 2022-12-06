@@ -1,0 +1,25 @@
+{{ define "chart.dbCreation" }}
+## Manual database creation
+
+(You can skip this, if you're deploying the PostgreSQL dependency)
+
+You'll need to create the following databases before starting Dendrite (see [install.md](https://github.com/matrix-org/dendrite/blob/master/docs/INSTALL.md#configuration)):
+
+```postgres
+create database dendrite_federationapi;
+create database dendrite_mediaapi;
+create database dendrite_roomserver;
+create database dendrite_userapi_accounts;
+create database dendrite_keyserver;
+create database dendrite_syncapi;
+```
+
+or
+
+```bash
+for i in mediaapi syncapi roomserver federationapi keyserver userapi_accounts; do
+    sudo -u postgres createdb -O dendrite dendrite_$i
+done
+```
+
+{{ end }}

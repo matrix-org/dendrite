@@ -1,3 +1,5 @@
+remote: origin
+target-branch: main
 chart-repos:
   - bitnami=https://charts.bitnami.com/bitnami
 chart-dirs:

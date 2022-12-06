@@ -32,15 +32,13 @@ configuration:
     create: true
     # -- Use an existing secret
     existingSecret: ""
-    
   key_validity_period: 168h0m0s
-
 
   database:
     # -- Default database host
-    host:  ""
+    host: ""
     # -- Default database user
-    user:  ""
+    user: ""
     # -- Default database password
     password: ""
 
@@ -86,7 +84,7 @@ configuration:
     turn_username: ""
     # -- The TURN password
     turn_password: ""
-  
+
   rate_limiting:
     # -- Enable rate limiting
     enabled: true
@@ -172,7 +170,7 @@ clientapi:
 
     # -- enable reCAPTCHA registration
     enable_registration_captcha: false
-    # -- reCAPTCHA public key 
+    # -- reCAPTCHA public key
     recaptcha_public_key: ""
     # -- reCAPTCHA private key
     recaptcha_private_key: ""
@@ -206,13 +204,6 @@ mediaapi:
   - width: 640
     height: 480
     method: scale
-  #resources:
-  #  requests:
-  #    cpu: "160m"
-  #    memory: "128Mi"
-  #  limits:
-  #    cpu: "480m"
-  #    memory: "512Mi"
 
 syncapi:
   # -- This option controls which HTTP header to inspect to find the real remote IP
@@ -255,7 +246,7 @@ postgresql:
 ingress:
   # -- Create an ingress for a monolith deployment
   enabled: false
-  
+
   annotations: {}
   hosts: []
   tls: []

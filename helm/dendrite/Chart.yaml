@@ -1,4 +1,4 @@
-apiVersion: v1
+apiVersion: v2
 name: dendrite
 version: "0.10.8"
 appVersion: "0.10.8"
