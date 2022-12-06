@@ -12,6 +12,7 @@ on:
 
 jobs:
   lint:
+    name: Lint Helm chart
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.list-changed.outputs.changed }}
@@ -36,14 +37,14 @@ jobs:
           fi
 
       - name: Run lint
-        run: ct lint --config helm/ct.yaml --target-branch ${{ github.event.repository.default_branch }}
+        run: ct lint --config helm/ct.yaml
 
   # only bother to run if lint step reports a change to the helm chart
   install:
     needs:
       - lint
     if: ${{ needs.lint.outputs.changed == 'true' }}
-    name: Install charts
+    name: Install Helm charts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

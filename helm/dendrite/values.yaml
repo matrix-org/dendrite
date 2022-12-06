@@ -6,7 +6,7 @@ image:
 
 configuration:
   # -- Servername for this Dendrite deployment
-  servername: ""
+  server_name: ""
 
   # -- The server name to delegate server-server communications to, with optional port
   # e.g. localhost:443
@@ -151,13 +151,13 @@ persistence:
   storageClass: local-path
   jetstream:
     existingClaim: ""
-    capacity: "5Gi"
+    capacity: "1Gi"
   media:
     existingClaim: ""
-    capacity: "10Gi"
+    capacity: "1Gi"
   search:
     existingClaim: ""
-    capacity: "5Gi"
+    capacity: "1Gi"
 
 clientapi:
   registration:

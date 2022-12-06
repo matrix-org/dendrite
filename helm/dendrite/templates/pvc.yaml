@@ -1,27 +1,11 @@
 {{ if not .Values.persistence.media.existingClaim }}
 ---
 apiVersion: v1
-kind: PersistentVolume
-metadata:
-  annotations:
-    helm.sh/resource-policy: keep
-  name: dendrite-media
-spec:
-  capacity:
-    storage: {{ .Values.persistence.media.capacity }}
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: {{ .Values.persistence.storageClass }}
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: dendrite-media-pvc
-  labels:
-    app: dendrite
+  name: {{ .Release.Name }}-media-pvc
 spec:
   accessModes:
     - ReadWriteOnce
@@ -33,27 +17,11 @@ spec:
 {{ if not .Values.persistence.jetstream.existingClaim }}
 ---
 apiVersion: v1
-kind: PersistentVolume
-metadata:
-  annotations:
-    helm.sh/resource-policy: keep
-  name: dendrite-jetstream
-spec:
-  capacity:
-    storage: {{ .Values.persistence.jetstream.capacity }}
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: {{ .Values.persistence.storageClass }}
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: dendrite-jetstream-pvc
-  labels:
-    app: dendrite
+  name: {{ .Release.Name }}-jetstream-pvc
 spec:
   accessModes:
     - ReadWriteOnce
@@ -65,27 +33,11 @@ spec:
 {{ if not .Values.persistence.search.existingClaim }}
 ---
 apiVersion: v1
-kind: PersistentVolume
-metadata:
-  annotations:
-    helm.sh/resource-policy: keep
-  name: dendrite-search
-spec:
-  capacity:
-    storage: {{ .Values.persistence.search.capacity }}
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: {{ .Values.persistence.storageClass }}
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: dendrite-search-pvc
-  labels:
-    app: dendrite
+  name: {{ .Release.Name }}-search-pvc
 spec:
   accessModes:
     - ReadWriteOnce

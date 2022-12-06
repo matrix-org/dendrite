@@ -1,6 +1,0 @@
-postgresql:
-  enabled: true
-
-configuration:
-  signing_key:
-    create: true

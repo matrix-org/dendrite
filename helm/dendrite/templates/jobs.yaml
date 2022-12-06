@@ -1,6 +1,6 @@
 {{ if and .Values.configuration.signing_key.create (not .Values.configuration.signing_key.existingSecret ) }}
-{{ $name := "dendrite-signing-key" }}
-{{ $secretName := "dendrite-signing-key" }}
+{{ $name := (print .Release.Name "-signing-key") }}
+{{ $secretName := (print .Release.Name "-signing-key") }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -50,7 +50,7 @@ spec:
   template:
     spec:
       restartPolicy: "Never"
-      serviceAccount: dendrite-signing-key
+      serviceAccount: {{ $name }}
       containers:
       - name: upload-key
         image: bitnami/kubectl
