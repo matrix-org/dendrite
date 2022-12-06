@@ -384,7 +384,11 @@ func (d *Database) GetAsyncTransaction(
 		return nil, nil, nil
 	}
 
-	txns, err := d.FederationTransactionJSON.SelectTransactionJSON(ctx, nil, nids)
+	txns := map[int64][]byte{}
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		txns, err = d.FederationTransactionJSON.SelectTransactionJSON(ctx, txn, nids)
+		return err
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.SelectTransactionJSON: %w", err)
 	}
