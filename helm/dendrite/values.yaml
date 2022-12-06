@@ -1,0 +1,261 @@
+image:
+  # -- Docker repository/image to use
+  name: "ghcr.io/matrix-org/dendrite-monolith:v0.10.8"
+  # -- Kubernetes pullPolicy
+  pullPolicy: IfNotPresent
+
+configuration:
+  # -- Servername for this Dendrite deployment
+  servername: ""
+
+  # -- The server name to delegate server-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_server_name: ""
+
+  # -- The server name to delegate client-server communications to, with optional port
+  # e.g. localhost:443
+  well_known_client_name:
+
+  # -- Lists of domains that the server will trust as identity servers to verify third
+  # party identifiers such as phone numbers and email addresses.
+  trusted_third_party_id_servers:
+    - matrix.org
+    - vector.im
+
+  # -- Disable federation. Dendrite will not be able to make any outbound HTTP requests
+  # to other servers and the federation API will not be exposed.
+  disable_federation: false
+
+  # signing key to use
+  signing_key:
+    # -- Create a new signing key, if not exists
+    create: true
+    # -- Use an existing secret
+    existingSecret: ""
+    
+  key_validity_period: 168h0m0s
+
+
+  database:
+    # -- Default database host
+    host:  ""
+    # -- Default database user
+    user:  ""
+    # -- Default database password
+    password: ""
+
+    # -- Default database maximum open connections
+    max_open_conns: 100
+    # -- Default database maximum idle connections
+    max_idle_conns: 2
+    # -- Default database maximum lifetime
+    conn_max_lifetime: -1
+
+  cache:
+    # -- The estimated maximum size for the global cache in bytes, or in terabytes,
+    # gigabytes, megabytes or kilobytes when the appropriate 'tb', 'gb', 'mb' or
+    # 'kb' suffix is specified. Note that this is not a hard limit, nor is it a
+    # memory limit for the entire process. A cache that is too small may ultimately
+    # provide little or no benefit.
+    max_size_estimated: 1gb
+    # -- The maximum amount of time that a cache entry can live for in memory before
+    # it will be evicted and/or refreshed from the database. Lower values result in
+    # easier admission of new cache entries but may also increase database load in
+    # comparison to higher values, so adjust conservatively. Higher values may make
+    # it harder for new items to make it into the cache, e.g. if new rooms suddenly
+    # become popular.
+    max_age: 1h
+
+  # prometheus metrics
+  metrics:
+    # -- Whether or not Prometheus metrics are enabled.
+    enabled: false
+    # HTTP basic authentication to protect access to monitoring.
+    basic_auth:
+      # -- HTTP basic authentication username
+      user: "metrics"
+      # -- HTTP basic authentication password
+      password: metrics
+
+  # TURN server information that this homeserver should send to clients.
+  turn:
+    turn_user_lifetime: ""
+    turn_uris: []
+    turn_shared_secret: ""
+    # -- The TURN username
+    turn_username: ""
+    # -- The TURN password
+    turn_password: ""
+  
+  rate_limiting:
+    # -- Enable rate limiting
+    enabled: true
+    # -- After how many requests a rate limit should be activated
+    threshold: 5
+    # -- Cooloff time in milliseconds
+    cooloff_ms: 500
+
+  dns_cache:
+    # -- Whether or not the DNS cache is enabled.
+    enabled: false
+    # -- Maximum number of entries to hold in the DNS cache
+    cache_size: 256
+    # -- Duration for how long DNS cache items should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more)
+    cache_lifetime: "10m"
+
+  # -- Default logging configuration
+  # @default -- [default dendrite config values](https://github.com/matrix-org/dendrite/blob/master/dendrite-config.yaml)
+  logging:
+    - type: std
+      level: info
+
+  # -- Default tracing configuration
+  # @default -- disabled
+  tracing:
+    enabled: false
+    jaeger:
+      serviceName: ""
+      disabled: false
+      rpc_metrics: false
+      tags: []
+      sampler: null
+      reporter: null
+      headers: null
+      baggage_restrictions: null
+      throttler: null
+
+  profiling:
+    # -- Enable pprof
+    enabled: false
+    # -- pprof port, if enabled
+    port: 65432
+
+  # -- Configuration for experimental MSC's. (Valid values are: msc2836 and msc2946)
+  mscs: []
+    # A list of enabled MSC's
+    # Currently valid values are:
+    # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
+    # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
+
+# -- Default resource requests/limits.
+# This can be set individually for each component, see mediaapi
+# @default -- sets some sane default values
+resources:
+  requests:
+    cpu: "80m"
+    memory: "64Mi"
+
+  limits:
+    cpu: "240m"
+    memory: "256Mi"
+
+persistence:
+  storageClass: local-path
+  jetstream:
+    existingClaim: ""
+    capacity: "5Gi"
+  media:
+    existingClaim: ""
+    capacity: "10Gi"
+  search:
+    existingClaim: ""
+    capacity: "5Gi"
+
+clientapi:
+  registration:
+    # -- Disable registration
+    disabled: true
+
+    # -- If set, allows registration by anyone who knows the shared secret, regardless of
+    # whether registration is otherwise disabled.
+    shared_secret: ""
+
+    # -- enable reCAPTCHA registration
+    enable_registration_captcha: false
+    # -- reCAPTCHA public key 
+    recaptcha_public_key: ""
+    # -- reCAPTCHA private key
+    recaptcha_private_key: ""
+    # -- reCAPTCHA bypass secret
+    recaptcha_bypass_secret: ""
+    recaptcha_siteverify_api: ""
+
+federationapi:
+  send_max_retries: 16
+  # -- Disable TLS validation
+  disable_tls_validation: false
+  prefer_direct_fetch: false
+
+
+mediaapi:
+  # -- The max file size for uploaded media files
+  max_file_size_bytes: "10485760"
+  # Whether to dynamically generate thumbnails if needed.
+  dynamic_thumbnails: false
+  # -- The maximum number of simultaneous thumbnail generators to run.
+  max_thumbnail_generators: 10
+  # -- A list of thumbnail sizes to be generated for media content.
+  # @default -- [default dendrite config values](https://github.com/matrix-org/dendrite/blob/master/dendrite-config.yaml)
+  thumbnail_sizes:
+  - width: 32
+    height: 32
+    method: crop
+  - width: 96
+    height: 96
+    method: crop
+  - width: 640
+    height: 480
+    method: scale
+  #resources:
+  #  requests:
+  #    cpu: "160m"
+  #    memory: "128Mi"
+  #  limits:
+  #    cpu: "480m"
+  #    memory: "512Mi"
+
+syncapi:
+  # -- This option controls which HTTP header to inspect to find the real remote IP
+  # address of the client. This is likely required if Dendrite is running behind
+  # a reverse proxy server.
+  real_ip_header: X-Real-IP
+  # -- Configuration for the full-text search engine.
+  search:
+    # -- Whether or not search is enabled.
+    enabled: false
+    # -- The language most likely to be used on the server - used when indexing, to
+    # ensure the returned results match expectations. A full list of possible languages
+    # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    language: "en"
+
+postgresql:
+  # -- Enable and configure postgres as the database for dendrite.
+  # @default -- See value.yaml
+  enabled: false
+  image:
+    repository: bitnami/postgresql
+    tag: "14.4.0"
+  auth:
+    username: dendrite
+    password: changeme
+    database: dendrite
+
+  initdbScripts:
+    # -- Create databases when first creating a PostgreSQL Server
+    # @default -- creates the required databases
+    create_db.sh: |
+      #!/bin/sh
+      for db in userapi_accounts userapi_devices mediaapi syncapi roomserver keyserver federationapi mscs; do
+          createdb -U dendrite -O dendrite dendrite_$db
+      done
+
+  persistence:
+    enabled: false
+
+ingress:
+  # -- Create an ingress for a monolith deployment
+  enabled: false
+  
+  annotations: {}
+  hosts: []
+  tls: []

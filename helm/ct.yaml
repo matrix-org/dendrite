@@ -1,0 +1,5 @@
+chart-repos:
+  - bitnami=https://charts.bitnami.com/bitnami
+chart-dirs:
+  - helm
+validate-maintainers: false

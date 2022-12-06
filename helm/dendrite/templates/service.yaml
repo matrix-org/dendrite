@@ -1,0 +1,18 @@
+{{ template "validate.config" . }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: dendrite
+  labels:
+    app: {{ $.Chart.Name }}
+spec:
+  selector:
+    app: {{ $.Chart.Name }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8008
+      targetPort: 8008

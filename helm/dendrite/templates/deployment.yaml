@@ -1,0 +1,64 @@
+{{ template "validate.config" . }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Chart.Name }}
+  labels:
+    app: {{ $.Chart.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $.Chart.Name }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ $.Chart.Name }}
+    spec:
+      volumes:
+      - name: {{ $.Chart.Name }}-conf-vol
+        secret:
+          secretName: {{ $.Chart.Name }}-conf
+      - name: {{ $.Chart.Name }}-signing-key
+        secret:
+          secretName: {{ default "dendrite-signing-key" $.Values.configuration.signing_key.existingSecret | quote }}
+      {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
+      - name: {{ $.Chart.Name }}-appservices
+        secret:
+          secretName: {{ $.Chart.Name }}-appservices-conf
+      {{- end }}
+      - name: dendrite-jetstream
+        persistentVolumeClaim:
+          claimName: {{ default "dendrite-jetstream-pvc" $.Values.persistence.jetstream.existingClaim | quote }}
+      - name: dendrite-media
+        persistentVolumeClaim:
+          claimName: {{ default "dendrite-media-pvc" $.Values.persistence.media.existingClaim | quote }}
+      - name: dendrite-search
+        persistentVolumeClaim:
+          claimName: {{ default "dendrite-serach-pvc" $.Values.persistence.search.existingClaim | quote }}
+      containers:
+      - name: {{ $.Chart.Name }}
+        {{- include "image.name" $.Values.image | nindent 8 }}
+        args:
+          - '--config'
+          - '/etc/dendrite/dendrite.yaml'
+        resources:
+        {{- toYaml $.Values.resources | nindent 10 }}
+        volumeMounts:
+        - mountPath: /etc/dendrite/
+          name: {{ $.Chart.Name }}-conf-vol
+        - mountPath: /etc/dendrite/secrets/
+          name: {{ $.Chart.Name }}-signing-key
+        {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
+        - mountPath: /etc/dendrite/appservices
+          name: {{ $.Chart.Name }}-appservices
+          readOnly: true
+        {{ end }}
+        - mountPath: /data/media_store
+          name: dendrite-media
+        - mountPath: /data/jetstream
+          name: dendrite-jetstream
+        - mountPath: /data/search
+          name: dendrite-search

@@ -1,0 +1,19 @@
+apiVersion: v1
+name: dendrite
+version: "0.10.8"
+appVersion: "0.10.8"
+description: Dendrite Matrix Homeserver
+type: application
+keywords:
+  - matrix
+  - chat
+  - homeserver
+  - dendrite
+home: https://github.com/matrix-org/dendrite
+sources:
+  - https://github.com/matrix-org/dendrite
+dependencies:
+- name: postgresql
+  version: 11.6.21
+  repository: https://charts.bitnami.com/bitnami
+  condition: postgresql.enabled
