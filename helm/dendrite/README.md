@@ -39,7 +39,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 ## Source Code
 
 * <https://github.com/matrix-org/dendrite>
+## Requirements
 
+| Repository | Name | Version |
+|------------|------|---------|
+| https://charts.bitnami.com/bitnami | postgresql | 11.6.21 |
 ## Values
 
 | Key | Type | Default | Description |
@@ -48,7 +52,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | clientapi.registration.enable_registration_captcha | bool | `false` | enable reCAPTCHA registration |
 | clientapi.registration.recaptcha_bypass_secret | string | `""` | reCAPTCHA bypass secret |
 | clientapi.registration.recaptcha_private_key | string | `""` | reCAPTCHA private key |
-| clientapi.registration.recaptcha_public_key | string | `""` | reCAPTCHA public key  |
+| clientapi.registration.recaptcha_public_key | string | `""` | reCAPTCHA public key |
 | clientapi.registration.recaptcha_siteverify_api | string | `""` |  |
 | clientapi.registration.shared_secret | string | `""` | If set, allows registration by anyone who knows the shared secret, regardless of whether registration is otherwise disabled. |
 | configuration.cache.max_age | string | `"1h"` | The maximum amount of time that a cache entry can live for in memory before it will be evicted and/or refreshed from the database. Lower values result in easier admission of new cache entries but may also increase database load in comparison to higher values, so adjust conservatively. Higher values may make it harder for new items to make it into the cache, e.g. if new rooms suddenly become popular. |
@@ -74,7 +78,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | configuration.rate_limiting.cooloff_ms | int | `500` | Cooloff time in milliseconds |
 | configuration.rate_limiting.enabled | bool | `true` | Enable rate limiting |
 | configuration.rate_limiting.threshold | int | `5` | After how many requests a rate limit should be activated |
-| configuration.servername | string | `""` | Servername for this Dendrite deployment |
+| configuration.server_name | string | `""` | Servername for this Dendrite deployment |
 | configuration.signing_key.create | bool | `true` | Create a new signing key, if not exists |
 | configuration.signing_key.existingSecret | string | `""` | Use an existing secret |
 | configuration.tracing | object | disabled | Default tracing configuration |
@@ -99,11 +103,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | mediaapi.max_file_size_bytes | string | `"10485760"` | The max file size for uploaded media files |
 | mediaapi.max_thumbnail_generators | int | `10` | The maximum number of simultaneous thumbnail generators to run. |
 | mediaapi.thumbnail_sizes | list | [default dendrite config values](https://github.com/matrix-org/dendrite/blob/master/dendrite-config.yaml) | A list of thumbnail sizes to be generated for media content. |
-| persistence.jetstream.capacity | string | `"5Gi"` |  |
+| persistence.jetstream.capacity | string | `"1Gi"` |  |
 | persistence.jetstream.existingClaim | string | `""` |  |
-| persistence.media.capacity | string | `"10Gi"` |  |
+| persistence.media.capacity | string | `"1Gi"` |  |
 | persistence.media.existingClaim | string | `""` |  |
-| persistence.search.capacity | string | `"5Gi"` |  |
+| persistence.search.capacity | string | `"1Gi"` |  |
 | persistence.search.existingClaim | string | `""` |  |
 | persistence.storageClass | string | `"local-path"` |  |
 | postgresql.auth.database | string | `"dendrite"` |  |
@@ -112,7 +116,6 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | postgresql.enabled | bool | See value.yaml | Enable and configure postgres as the database for dendrite. |
 | postgresql.image.repository | string | `"bitnami/postgresql"` |  |
 | postgresql.image.tag | string | `"14.4.0"` |  |
-| postgresql.initdbScripts."create_db.sh" | string | creates the required databases | Create databases when first creating a PostgreSQL Server |
 | postgresql.persistence.enabled | bool | `false` |  |
 | resources | object | sets some sane default values | Default resource requests/limits. This can be set individually for each component, see mediaapi |
 | syncapi.real_ip_header | string | `"X-Real-IP"` | This option controls which HTTP header to inspect to find the real remote IP address of the client. This is likely required if Dendrite is running behind a reverse proxy server. |
