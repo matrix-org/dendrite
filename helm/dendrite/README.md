@@ -7,9 +7,7 @@ Status: **NOT PRODUCTION READY**
 
 ## About
 
-This is a first try for a Helm Chart for the [Matrix](https://matrix.org) Homeserver [Dendrite](https://github.com/matrix-org/dendrite)
-
-This chart creates a polylith, where every component is in its own deployment and requires a Postgres server aswell as a NATS JetStream server.
+This chart creates a monolith deployment, including an optionally enabled PostgreSQL dependency to connect to.
 
 ## Manual database creation
 
@@ -58,7 +56,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | configuration.database.conn_max_lifetime | int | `-1` | Default database maximum lifetime |
 | configuration.database.host | string | `""` | Default database host |
 | configuration.database.max_idle_conns | int | `2` | Default database maximum idle connections |
-| configuration.database.max_open_conns | int | `100` | Default database maximum open connections |
+| configuration.database.max_open_conns | int | `90` | Default database maximum open connections |
 | configuration.database.password | string | `""` | Default database password |
 | configuration.database.user | string | `""` | Default database user |
 | configuration.disable_federation | bool | `false` | Disable federation. Dendrite will not be able to make any outbound HTTP requests to other servers and the federation API will not be exposed. |
