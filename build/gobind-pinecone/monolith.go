@@ -67,24 +67,27 @@ import (
 )
 
 const (
-	PeerTypeRemote    = pineconeRouter.PeerTypeRemote
-	PeerTypeMulticast = pineconeRouter.PeerTypeMulticast
-	PeerTypeBluetooth = pineconeRouter.PeerTypeBluetooth
-	PeerTypeBonjour   = pineconeRouter.PeerTypeBonjour
+	PeerTypeRemote          = pineconeRouter.PeerTypeRemote
+	PeerTypeMulticast       = pineconeRouter.PeerTypeMulticast
+	PeerTypeBluetooth       = pineconeRouter.PeerTypeBluetooth
+	PeerTypeBonjour         = pineconeRouter.PeerTypeBonjour
+	mailserverRetryInterval = time.Second * 30
 )
 
 type DendriteMonolith struct {
-	logger            logrus.Logger
-	PineconeRouter    *pineconeRouter.Router
-	PineconeMulticast *pineconeMulticast.Multicast
-	PineconeQUIC      *pineconeSessions.Sessions
-	PineconeManager   *pineconeConnections.ConnectionManager
-	StorageDirectory  string
-	CacheDirectory    string
-	listener          net.Listener
-	httpServer        *http.Server
-	processContext    *process.ProcessContext
-	userAPI           userapiAPI.UserInternalAPI
+	logger             logrus.Logger
+	PineconeRouter     *pineconeRouter.Router
+	PineconeMulticast  *pineconeMulticast.Multicast
+	PineconeQUIC       *pineconeSessions.Sessions
+	PineconeManager    *pineconeConnections.ConnectionManager
+	StorageDirectory   string
+	CacheDirectory     string
+	listener           net.Listener
+	httpServer         *http.Server
+	processContext     *process.ProcessContext
+	userAPI            userapiAPI.UserInternalAPI
+	federationAPI      api.FederationInternalAPI
+	mailserversQueried map[gomatrixserverlib.ServerName]bool
 }
 
 func (m *DendriteMonolith) PublicKey() string {
@@ -346,11 +349,11 @@ func (m *DendriteMonolith) Start() {
 
 	rsAPI := roomserver.NewInternalAPI(base)
 
-	fsAPI := federationapi.NewInternalAPI(
+	m.federationAPI = federationapi.NewInternalAPI(
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, m.federationAPI)
 	m.userAPI = userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(m.userAPI)
 
@@ -358,10 +361,10 @@ func (m *DendriteMonolith) Start() {
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
-	rsAPI.SetFederationAPI(fsAPI, keyRing)
+	rsAPI.SetFederationAPI(m.federationAPI, keyRing)
 
 	userProvider := users.NewPineconeUserProvider(m.PineconeRouter, m.PineconeQUIC, m.userAPI, federation)
-	roomProvider := rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, fsAPI, federation)
+	roomProvider := rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, m.federationAPI, federation)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -370,7 +373,7 @@ func (m *DendriteMonolith) Start() {
 		KeyRing:   keyRing,
 
 		AppserviceAPI:            asAPI,
-		FederationAPI:            fsAPI,
+		FederationAPI:            m.federationAPI,
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  m.userAPI,
 		KeyAPI:                   keyAPI,
@@ -436,31 +439,91 @@ func (m *DendriteMonolith) Start() {
 
 	go func(ch <-chan pineconeEvents.Event) {
 		eLog := logrus.WithField("pinecone", "events")
+		mailserverSyncRunning := atomic.NewBool(false)
+		stopMailserverSync := make(chan bool)
+
+		// Setup mailserver info
+		request := api.QueryMailserversRequest{Server: gomatrixserverlib.ServerName(m.PublicKey())}
+		response := api.QueryMailserversResponse{}
+		err := m.federationAPI.QueryMailservers(m.processContext.Context(), &request, &response)
+		if err != nil {
+			// TODO
+		}
+		m.mailserversQueried = make(map[gomatrixserverlib.ServerName]bool)
+		for _, server := range response.Mailservers {
+			m.mailserversQueried[server] = false
+		}
 
 		for event := range ch {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
+				if !mailserverSyncRunning.Load() {
+					go m.syncMailservers(stopMailserverSync, *mailserverSyncRunning)
+				}
 			case pineconeEvents.PeerRemoved:
+				if mailserverSyncRunning.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
+					stopMailserverSync <- true
+				}
 			case pineconeEvents.TreeParentUpdate:
 			case pineconeEvents.SnakeDescUpdate:
 			case pineconeEvents.TreeRootAnnUpdate:
 			case pineconeEvents.SnakeEntryAdded:
 			case pineconeEvents.SnakeEntryRemoved:
 			case pineconeEvents.BroadcastReceived:
-				eLog.Info("Broadcast received from: ", e.PeerID)
+				// eLog.Info("Broadcast received from: ", e.PeerID)
 
 				req := &api.PerformWakeupServersRequest{
 					ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
 				}
 				res := &api.PerformWakeupServersResponse{}
-				if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
-					logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+				if err := m.federationAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
+					eLog.WithError(err).Error("Failed to wakeup destination", e.PeerID)
 				}
 			case pineconeEvents.BandwidthReport:
 			default:
 			}
 		}
 	}(pineconeEventChannel)
+}
+
+func (m *DendriteMonolith) syncMailservers(stop <-chan bool, running atomic.Bool) {
+	defer running.Store(false)
+
+	t := time.NewTimer(mailserverRetryInterval)
+	for {
+		mailserversToQuery := []gomatrixserverlib.ServerName{}
+		for server, complete := range m.mailserversQueried {
+			if !complete {
+				mailserversToQuery = append(mailserversToQuery, server)
+			}
+		}
+		if len(mailserversToQuery) == 0 {
+			// All mailservers have been synced.
+			return
+		}
+		m.queryMailservers(mailserversToQuery)
+		t.Reset(mailserverRetryInterval)
+
+		select {
+		case <-stop:
+			if !t.Stop() {
+				<-t.C
+			}
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (m *DendriteMonolith) queryMailservers(mailservers []gomatrixserverlib.ServerName) {
+	for _, server := range mailservers {
+		request := api.PerformMailserverSyncRequest{Mailserver: server}
+		response := api.PerformMailserverSyncResponse{}
+		err := m.federationAPI.PerformMailserverSync(m.processContext.Context(), &request, &response)
+		if err == nil {
+			m.mailserversQueried[server] = true
+		}
+	}
 }
 
 func (m *DendriteMonolith) Stop() {

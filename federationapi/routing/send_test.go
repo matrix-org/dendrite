@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/test"
@@ -184,22 +185,30 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, origin, s gomatr
 	return c.getMissingEvents(missing)
 }
 
-func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, fedClient txnFederationClient, pdus []json.RawMessage) *txnReq {
-	t := &txnReq{
-		rsAPI:      rsAPI,
-		keys:       &test.NopJSONVerifier{},
-		federation: fedClient,
-		roomsMu:    internal.NewMutexByRoom(),
-	}
+func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, pdus []json.RawMessage) *fedInternal.TxnReq {
+	t := fedInternal.NewTxnReq(
+		rsAPI,
+		nil,
+		"",
+		&test.NopJSONVerifier{},
+		internal.NewMutexByRoom(),
+		nil,
+		nil,
+		false,
+		pdus,
+		nil,
+		testOrigin,
+		gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano())),
+		testDestination)
 	t.PDUs = pdus
 	t.Origin = testOrigin
 	t.TransactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
 	t.Destination = testDestination
-	return t
+	return &t
 }
 
-func mustProcessTransaction(t *testing.T, txn *txnReq, pdusWithErrors []string) {
-	res, err := txn.processTransaction(context.Background())
+func mustProcessTransaction(t *testing.T, txn *fedInternal.TxnReq, pdusWithErrors []string) {
+	res, err := txn.ProcessTransaction(context.Background())
 	if err != nil {
 		t.Errorf("txn.processTransaction returned an error: %v", err)
 		return
@@ -262,7 +271,7 @@ func TestBasicTransaction(t *testing.T) {
 	pdus := []json.RawMessage{
 		testData[len(testData)-1], // a message event
 	}
-	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
+	txn := mustCreateTransaction(rsAPI, pdus)
 	mustProcessTransaction(t, txn, nil)
 	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
@@ -274,7 +283,7 @@ func TestTransactionFailAuthChecks(t *testing.T) {
 	pdus := []json.RawMessage{
 		testData[len(testData)-1], // a message event
 	}
-	txn := mustCreateTransaction(rsAPI, &txnFedClient{}, pdus)
+	txn := mustCreateTransaction(rsAPI, pdus)
 	mustProcessTransaction(t, txn, []string{})
 	// expect message to be sent to the roomserver
 	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})

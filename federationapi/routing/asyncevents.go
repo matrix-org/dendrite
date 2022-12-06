@@ -6,6 +6,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 type AsyncEventsResponse struct {
@@ -21,6 +22,7 @@ func GetAsyncEvents(
 	fedAPI api.FederationInternalAPI,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
+	logrus.Infof("Handling async_events for %v", userID)
 	var response api.QueryAsyncTransactionsResponse
 	err := fedAPI.QueryAsyncTransactions(httpReq.Context(), &api.QueryAsyncTransactionsRequest{UserID: userID}, &response)
 	if err != nil {

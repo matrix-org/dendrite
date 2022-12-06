@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
+	"github.com/matrix-org/dendrite/internal"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
@@ -696,60 +697,6 @@ func (r *FederationInternalAPI) PerformBroadcastEDU(
 	return nil
 }
 
-// PerformStoreAsync implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformStoreAsync(
-	ctx context.Context,
-	request *api.PerformStoreAsyncRequest,
-	response *api.PerformStoreAsyncResponse,
-) error {
-	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
-	if err != nil {
-		return err
-	}
-	err = r.db.AssociateAsyncTransactionWithDestinations(
-		ctx,
-		map[gomatrixserverlib.UserID]struct{}{
-			request.UserID: {},
-		},
-		request.Txn.TransactionID,
-		receipt)
-
-	return err
-}
-
-// QueryAsyncTransactions implements api.FederationInternalAPI
-func (r *FederationInternalAPI) QueryAsyncTransactions(
-	ctx context.Context,
-	request *api.QueryAsyncTransactionsRequest,
-	response *api.QueryAsyncTransactionsResponse,
-) error {
-	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
-	if err != nil {
-		return err
-	}
-
-	// TODO : Shouldn't be deleting unless the transaction was successfully returned...
-	// TODO : Should delete transaction json from table if no more associations
-	if transaction != nil && receipt != nil {
-		err = r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{receipt})
-		if err != nil {
-			return err
-		}
-	}
-
-	// TODO : These db calls should happen at the same time right?
-	count, err := r.db.GetAsyncTransactionCount(ctx, request.UserID)
-	if err != nil {
-		return err
-	}
-
-	response.RemainingCount = uint32(count)
-	if transaction != nil {
-		response.Txn = *transaction
-	}
-	return nil
-}
-
 // PerformWakeupServers implements api.FederationInternalAPI
 func (r *FederationInternalAPI) PerformWakeupServers(
 	ctx context.Context,
@@ -884,4 +831,142 @@ func federatedAuthProvider(
 		}
 		return returning, nil
 	}
+}
+
+// QueryMailservers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) QueryMailservers(
+	ctx context.Context,
+	request *api.QueryMailserversRequest,
+	response *api.QueryMailserversResponse,
+) error {
+	logrus.Infof("Getting mailservers for: %s", request.Server)
+	mailservers, err := r.db.GetMailserversForServer(request.Server)
+	if err != nil {
+		return err
+	}
+
+	response.Mailservers = mailservers
+	return nil
+}
+
+// PerformMailserverSync implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformMailserverSync(
+	ctx context.Context,
+	request *api.PerformMailserverSyncRequest,
+	response *api.PerformMailserverSyncResponse,
+) error {
+	userID, err := gomatrixserverlib.NewUserID("@user:"+string(r.cfg.Matrix.ServerName), false)
+	if err != nil {
+		return err
+	}
+
+	asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.Mailserver)
+	if err != nil {
+		logrus.Errorf("GetAsyncEvents: %s", err.Error())
+		return err
+	}
+	r.processTransaction(&asyncResponse.Transaction)
+
+	for asyncResponse.Remaining > 0 {
+		asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.Mailserver)
+		if err != nil {
+			logrus.Errorf("GetAsyncEvents: %s", err.Error())
+			return err
+		}
+		r.processTransaction(&asyncResponse.Transaction)
+	}
+
+	return nil
+}
+
+func (r *FederationInternalAPI) processTransaction(txn *gomatrixserverlib.Transaction) {
+	logrus.Warn("Processing transaction from mailserver")
+	mu := internal.NewMutexByRoom()
+	// js, _ := base.NATS.Prepare(base.ProcessContext, &r.cfg.Matrix.JetStream)
+	// producer := &producers.SyncAPIProducer{
+	// 	JetStream:              js,
+	// 	TopicReceiptEvent:      r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+	// 	TopicSendToDeviceEvent: r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+	// 	TopicTypingEvent:       r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+	// 	TopicPresenceEvent:     r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+	// 	TopicDeviceListUpdate:  r.cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+	// 	TopicSigningKeyUpdate:  r.cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+	// 	Config:                 r.cfg,
+	// 	UserAPI:                r.userAPI,
+	// }
+	t := NewTxnReq(
+		r.rsAPI,
+		nil,
+		r.cfg.Matrix.ServerName,
+		r.keyRing,
+		mu,
+		nil,
+		nil, // TODO : assign producer to process EDUs
+		r.cfg.Matrix.Presence.EnableInbound,
+		txn.PDUs,
+		txn.EDUs,
+		txn.Origin,
+		txn.TransactionID,
+		txn.Destination)
+
+	t.ProcessTransaction(context.TODO())
+}
+
+// PerformStoreAsync implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformStoreAsync(
+	ctx context.Context,
+	request *api.PerformStoreAsyncRequest,
+	response *api.PerformStoreAsyncResponse,
+) error {
+	logrus.Warnf("Storing transaction for %v", request.UserID)
+	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
+	if err != nil {
+		return err
+	}
+	err = r.db.AssociateAsyncTransactionWithDestinations(
+		ctx,
+		map[gomatrixserverlib.UserID]struct{}{
+			request.UserID: {},
+		},
+		request.Txn.TransactionID,
+		receipt)
+
+	return err
+}
+
+// QueryAsyncTransactions implements api.FederationInternalAPI
+func (r *FederationInternalAPI) QueryAsyncTransactions(
+	ctx context.Context,
+	request *api.QueryAsyncTransactionsRequest,
+	response *api.QueryAsyncTransactionsResponse,
+) error {
+	logrus.Warnf("Obtaining transaction for %v", request.UserID)
+	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	// TODO : Shouldn't be deleting unless the transaction was successfully returned...
+	// TODO : Should delete transaction json from table if no more associations
+	if transaction != nil && receipt != nil {
+		err = r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{receipt})
+		if err != nil {
+			return err
+		}
+
+		// TODO : Clean async transactions json
+	}
+
+	// TODO : These db calls should happen at the same time right?
+	count, err := r.db.GetAsyncTransactionCount(ctx, request.UserID)
+	if err != nil {
+		return err
+	}
+
+	response.RemainingCount = uint32(count)
+	if transaction != nil {
+		response.Txn = *transaction
+		logrus.Warnf("Obtained transaction: %v", transaction.TransactionID)
+	}
+	return nil
 }

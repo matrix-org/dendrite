@@ -36,6 +36,18 @@ type FederationInternalAPI interface {
 		request *PerformWakeupServersRequest,
 		response *PerformWakeupServersResponse,
 	) error
+
+	// Mailserver sync api used in the pinecone demos.
+	QueryMailservers(
+		ctx context.Context,
+		request *QueryMailserversRequest,
+		response *QueryMailserversResponse,
+	) error
+	PerformMailserverSync(
+		ctx context.Context,
+		request *PerformMailserverSyncRequest,
+		response *PerformMailserverSyncResponse,
+	) error
 }
 
 type MailserverAPI interface {
@@ -239,6 +251,36 @@ type PerformBroadcastEDURequest struct {
 type PerformBroadcastEDUResponse struct {
 }
 
+type PerformWakeupServersRequest struct {
+	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
+}
+
+type PerformWakeupServersResponse struct {
+}
+
+type InputPublicKeysRequest struct {
+	Keys map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
+}
+
+type InputPublicKeysResponse struct {
+}
+
+type QueryMailserversRequest struct {
+	Server gomatrixserverlib.ServerName
+}
+
+type QueryMailserversResponse struct {
+	Mailservers []gomatrixserverlib.ServerName
+}
+
+type PerformMailserverSyncRequest struct {
+	Mailserver gomatrixserverlib.ServerName
+}
+
+type PerformMailserverSyncResponse struct {
+	SyncComplete bool
+}
+
 type PerformStoreAsyncRequest struct {
 	Txn    gomatrixserverlib.Transaction `json:"transaction"`
 	UserID gomatrixserverlib.UserID      `json:"user_id"`
@@ -254,18 +296,4 @@ type QueryAsyncTransactionsRequest struct {
 type QueryAsyncTransactionsResponse struct {
 	Txn            gomatrixserverlib.Transaction `json:"transaction"`
 	RemainingCount uint32                        `json:"remaining"`
-}
-
-type PerformWakeupServersRequest struct {
-	ServerNames []gomatrixserverlib.ServerName `json:"server_names"`
-}
-
-type PerformWakeupServersResponse struct {
-}
-
-type InputPublicKeysRequest struct {
-	Keys map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult `json:"keys"`
-}
-
-type InputPublicKeysResponse struct {
 }

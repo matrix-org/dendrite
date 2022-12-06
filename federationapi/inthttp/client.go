@@ -23,9 +23,12 @@ const (
 	FederationAPIPerformInviteRequestPath          = "/federationapi/performInviteRequest"
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
-	FederationAPIPerformStoreAsyncPath             = "/federationapi/performStoreAsync"
-	FederationAPIQueryAsyncTransactionsPath        = "/federationapi/queryAsyncTransactions"
 	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
+	FederationAPIQueryMailservers                  = "/federationapi/queryMailservers"
+	FederationAPIPerformMailserverSync             = "/federationapi/performMailserverSync"
+
+	FederationAPIPerformStoreAsyncPath      = "/federationapi/performStoreAsync"
+	FederationAPIQueryAsyncTransactionsPath = "/federationapi/queryAsyncTransactions"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -149,28 +152,6 @@ func (h *httpFederationInternalAPI) PerformBroadcastEDU(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformBroadcastEDU", h.federationAPIURL+FederationAPIPerformBroadcastEDUPath,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpFederationInternalAPI) PerformStoreAsync(
-	ctx context.Context,
-	request *api.PerformStoreAsyncRequest,
-	response *api.PerformStoreAsyncResponse,
-) error {
-	return httputil.CallInternalRPCAPI(
-		"PerformStoreAsync", h.federationAPIURL+FederationAPIPerformStoreAsyncPath,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpFederationInternalAPI) QueryAsyncTransactions(
-	ctx context.Context,
-	request *api.QueryAsyncTransactionsRequest,
-	response *api.QueryAsyncTransactionsResponse,
-) error {
-	return httputil.CallInternalRPCAPI(
-		"QueryAsyncTransactions", h.federationAPIURL+FederationAPIQueryAsyncTransactionsPath,
 		h.httpClient, ctx, request, response,
 	)
 }
@@ -531,6 +512,51 @@ func (h *httpFederationInternalAPI) QueryPublicKeys(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryPublicKeys", h.federationAPIURL+FederationAPIQueryPublicKeyPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) QueryMailservers(
+	ctx context.Context,
+	request *api.QueryMailserversRequest,
+	response *api.QueryMailserversResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryMailservers", h.federationAPIURL+FederationAPIQueryMailservers,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+// PerformMailserverSync implements api.FederationInternalAPI
+func (h *httpFederationInternalAPI) PerformMailserverSync(
+	ctx context.Context,
+	request *api.PerformMailserverSyncRequest,
+	response *api.PerformMailserverSyncResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformMailserverSync", h.federationAPIURL+FederationAPIPerformMailserverSync,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) PerformStoreAsync(
+	ctx context.Context,
+	request *api.PerformStoreAsyncRequest,
+	response *api.PerformStoreAsyncResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformStoreAsync", h.federationAPIURL+FederationAPIPerformStoreAsyncPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) QueryAsyncTransactions(
+	ctx context.Context,
+	request *api.QueryAsyncTransactionsRequest,
+	response *api.QueryAsyncTransactionsResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryAsyncTransactions", h.federationAPIURL+FederationAPIQueryAsyncTransactionsPath,
 		h.httpClient, ctx, request, response,
 	)
 }

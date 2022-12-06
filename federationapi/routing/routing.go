@@ -62,7 +62,7 @@ func Setup(
 	producer *producers.SyncAPIProducer,
 ) {
 	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal,
+		fedInternal.PDUCountTotal, fedInternal.EDUCountTotal,
 	)
 
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()

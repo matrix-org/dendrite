@@ -411,8 +411,9 @@ func (oq *destinationQueue) nextTransaction(
 
 	mailservers := oq.statistics.KnownMailservers()
 	if oq.statistics.AssumedOffline() && len(mailservers) > 0 {
+		logrus.Infof("Sending to mailservers: %v", mailservers)
 		// TODO : how to pass through actual userID here?!?!?!?!
-		userID, userErr := gomatrixserverlib.NewUserID("@user:"+string(oq.origin), false)
+		userID, userErr := gomatrixserverlib.NewUserID("@user:"+string(oq.destination), false)
 		if userErr != nil {
 			return userErr, false
 		}

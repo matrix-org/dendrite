@@ -48,6 +48,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
+	"go.uber.org/atomic"
 
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
@@ -65,6 +66,8 @@ var (
 	instanceListen = flag.String("listen", ":0", "the port Pinecone peers can connect to")
 	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
 )
+
+const mailserverRetryInterval = time.Second * 30
 
 // nolint:gocyclo
 func main() {
@@ -305,25 +308,41 @@ func main() {
 
 	go func(ch <-chan pineconeEvents.Event) {
 		eLog := logrus.WithField("pinecone", "events")
+		mailserverSyncRunning := atomic.NewBool(false)
+		stopMailserverSync := make(chan bool)
+
+		m := MailserverRetriever{
+			Context:            context.Background(),
+			ServerName:         gomatrixserverlib.ServerName(pRouter.PublicKey().String()),
+			FederationAPI:      fsAPI,
+			MailserversQueried: make(map[gomatrixserverlib.ServerName]bool),
+		}
+		m.InitializeMailservers(eLog)
 
 		for event := range ch {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
+				if !mailserverSyncRunning.Load() {
+					go m.syncMailservers(stopMailserverSync, *mailserverSyncRunning)
+				}
 			case pineconeEvents.PeerRemoved:
+				if mailserverSyncRunning.Load() && pRouter.PeerCount(-1) == 0 {
+					stopMailserverSync <- true
+				}
 			case pineconeEvents.TreeParentUpdate:
 			case pineconeEvents.SnakeDescUpdate:
 			case pineconeEvents.TreeRootAnnUpdate:
 			case pineconeEvents.SnakeEntryAdded:
 			case pineconeEvents.SnakeEntryRemoved:
 			case pineconeEvents.BroadcastReceived:
-				eLog.Info("Broadcast received from: ", e.PeerID)
+				// eLog.Info("Broadcast received from: ", e.PeerID)
 
 				req := &api.PerformWakeupServersRequest{
 					ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
 				}
 				res := &api.PerformWakeupServersResponse{}
 				if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
-					logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+					eLog.WithError(err).Error("Failed to wakeup destination", e.PeerID)
 				}
 			case pineconeEvents.BandwidthReport:
 			default:
@@ -332,4 +351,68 @@ func main() {
 	}(pineconeEventChannel)
 
 	base.WaitForShutdown()
+}
+
+type MailserverRetriever struct {
+	Context            context.Context
+	ServerName         gomatrixserverlib.ServerName
+	FederationAPI      api.FederationInternalAPI
+	MailserversQueried map[gomatrixserverlib.ServerName]bool
+}
+
+func (m *MailserverRetriever) InitializeMailservers(eLog *logrus.Entry) {
+	request := api.QueryMailserversRequest{Server: gomatrixserverlib.ServerName(m.ServerName)}
+	response := api.QueryMailserversResponse{}
+	err := m.FederationAPI.QueryMailservers(m.Context, &request, &response)
+	if err != nil {
+		// TODO
+	}
+	for _, server := range response.Mailservers {
+		m.MailserversQueried[server] = false
+	}
+
+	eLog.Infof("Registered mailservers: %v", response.Mailservers)
+}
+
+func (m *MailserverRetriever) syncMailservers(stop <-chan bool, running atomic.Bool) {
+	defer running.Store(false)
+
+	t := time.NewTimer(mailserverRetryInterval)
+	for {
+		mailserversToQuery := []gomatrixserverlib.ServerName{}
+		for server, complete := range m.MailserversQueried {
+			if !complete {
+				mailserversToQuery = append(mailserversToQuery, server)
+			}
+		}
+		if len(mailserversToQuery) == 0 {
+			// All mailservers have been synced.
+			return
+		}
+		m.queryMailservers(mailserversToQuery)
+		t.Reset(mailserverRetryInterval)
+
+		select {
+		case <-stop:
+			if !t.Stop() {
+				<-t.C
+			}
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (m *MailserverRetriever) queryMailservers(mailservers []gomatrixserverlib.ServerName) {
+	logrus.Info("querying mailservers for async_events")
+	for _, server := range mailservers {
+		request := api.PerformMailserverSyncRequest{Mailserver: server}
+		response := api.PerformMailserverSyncResponse{}
+		err := m.FederationAPI.PerformMailserverSync(m.Context, &request, &response)
+		if err == nil {
+			m.MailserversQueried[server] = true
+		} else {
+			logrus.Errorf("Failed querying mailserver: %s", err.Error())
+		}
+	}
 }
