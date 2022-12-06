@@ -231,15 +231,6 @@ postgresql:
     password: changeme
     database: dendrite
 
-  initdbScripts:
-    # -- Create databases when first creating a PostgreSQL Server
-    # @default -- creates the required databases
-    create_db.sh: |
-      #!/bin/sh
-      for db in userapi_accounts userapi_devices mediaapi syncapi roomserver keyserver federationapi mscs; do
-          createdb -U dendrite -O dendrite dendrite_$db
-      done
-
   persistence:
     enabled: false
 
