@@ -63,9 +63,7 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 	}
 
 	// start initial run after 5min
-	time.AfterFunc(time.Minute*5, func() {
-		p.collect()
-	})
+	time.AfterFunc(time.Minute*5, p.collect)
 
 	// run every 3 hours
 	ticker := time.NewTicker(time.Hour * 3)
