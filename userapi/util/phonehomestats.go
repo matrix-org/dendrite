@@ -63,7 +63,9 @@ func StartPhoneHomeCollector(startTime time.Time, cfg *config.Dendrite, statsDB 
 	}
 
 	// start initial run after 5min
-	time.AfterFunc(time.Minute*5, p.collect)
+	time.AfterFunc(time.Minute*5, func() {
+		p.collect()
+	})
 
 	// run every 3 hours
 	ticker := time.NewTicker(time.Hour * 3)
@@ -97,12 +99,10 @@ func (p *phoneHomeStats) collect() {
 
 	// configuration information
 	p.stats["federation_disabled"] = p.cfg.Global.DisableFederation
-	p.stats["nats_embedded"] = true
-	p.stats["nats_in_memory"] = p.cfg.Global.JetStream.InMemory
-	if len(p.cfg.Global.JetStream.Addresses) > 0 {
-		p.stats["nats_embedded"] = false
-		p.stats["nats_in_memory"] = false // probably
-	}
+	natsEmbedded := len(p.cfg.Global.JetStream.Addresses) == 0
+	p.stats["nats_embedded"] = natsEmbedded
+	p.stats["nats_in_memory"] = p.cfg.Global.JetStream.InMemory && natsEmbedded
+
 	if len(p.cfg.Logging) > 0 {
 		p.stats["log_level"] = p.cfg.Logging[0].Level
 	} else {
