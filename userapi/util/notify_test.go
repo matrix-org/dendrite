@@ -48,6 +48,7 @@ func TestNotifyUserCountsAsync(t *testing.T) {
 		connStr, close := test.PrepareDBConnectionString(t, dbType)
 		defer close()
 		base, _, _ := testrig.Base(nil)
+		defer base.Close()
 		db, err := storage.NewUserAPIDatabase(base, &config.DatabaseOptions{
 			ConnectionString: config.DataSource(connStr),
 		}, "test", bcrypt.MinCost, 0, 0, "")
