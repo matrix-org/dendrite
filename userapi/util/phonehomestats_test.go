@@ -47,7 +47,7 @@ func TestCollect(t *testing.T) {
 			}
 			version, ok := data["version"]
 			if !ok {
-				t.Errorf("missing database_engine in JSON request: %+v", data)
+				t.Errorf("missing version in JSON request: %+v", data)
 			}
 			if version != internal.VersionString() {
 				t.Errorf("unexpected version: %q, expected %q", version, internal.VersionString())
@@ -77,7 +77,7 @@ func TestCollect(t *testing.T) {
 
 		select {
 		case <-time.After(time.Second * 5):
-			t.Errorf("timed out waitigf for response")
+			t.Error("timed out waiting for response")
 		case <-receivedRequest:
 		}
 	})
