@@ -60,7 +60,7 @@ func TestCollect(t *testing.T) {
 			}
 			close(receivedRequest)
 		}))
-		defer srv.Client()
+		defer srv.Close()
 
 		b.Cfg.Global.ReportStats.Endpoint = srv.URL
 		stats := phoneHomeStats{
