@@ -32,8 +32,8 @@ import (
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
-	inthttp.AddRoutes(router, intAPI)
+func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(router, intAPI, enableMetrics)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
@@ -53,12 +53,12 @@ func NewInternalAPI(
 		DB:        db,
 	}
 	ap := &internal.KeyInternalAPI{
-		DB:         db,
-		ThisServer: cfg.Matrix.ServerName,
-		FedClient:  fedClient,
-		Producer:   keyChangeProducer,
+		DB:        db,
+		Cfg:       cfg,
+		FedClient: fedClient,
+		Producer:  keyChangeProducer,
 	}
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, cfg.Matrix.ServerName) // 8 workers TODO: configurable
 	ap.Updater = updater
 	go func() {
 		if err := updater.Start(); err != nil {

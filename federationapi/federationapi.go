@@ -43,8 +43,8 @@ import (
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
-	inthttp.AddRoutes(intAPI, router)
+func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(intAPI, router, enableMetrics)
 }
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
@@ -118,21 +118,19 @@ func NewInternalAPI(
 
 	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
 
-	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+
+	signingInfo := base.Cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, rsAPI, &stats,
-		&queue.SigningInfo{
-			KeyID:      cfg.Matrix.KeyID,
-			PrivateKey: cfg.Matrix.PrivateKey,
-			ServerName: cfg.Matrix.ServerName,
-		},
+		signingInfo,
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, queues,
+		base.ProcessContext, cfg, js, nats, queues,
 		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {
@@ -164,7 +162,7 @@ func NewInternalAPI(
 	}
 
 	presenceConsumer := consumers.NewOutputPresenceConsumer(
-		base.ProcessContext, cfg, js, queues, federationDB,
+		base.ProcessContext, cfg, js, queues, federationDB, rsAPI,
 	)
 	if err = presenceConsumer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start presence consumer")

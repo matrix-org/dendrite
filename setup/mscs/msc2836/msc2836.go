@@ -397,7 +397,7 @@ func (rc *reqCtx) includeChildren(db Database, parentID string, limit int, recen
 		serversToQuery := rc.getServersForEventID(parentID)
 		var result *MSC2836EventRelationshipsResponse
 		for _, srv := range serversToQuery {
-			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+			res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
 				EventID:     parentID,
 				Direction:   "down",
 				Limit:       100,
@@ -484,7 +484,7 @@ func walkThread(
 
 // MSC2836EventRelationships performs an /event_relationships request to a remote server
 func (rc *reqCtx) MSC2836EventRelationships(eventID string, srv gomatrixserverlib.ServerName, ver gomatrixserverlib.RoomVersion) (*MSC2836EventRelationshipsResponse, error) {
-	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
+	res, err := rc.fsAPI.MSC2836EventRelationships(rc.ctx, rc.serverName, srv, gomatrixserverlib.MSC2836EventRelationshipsRequest{
 		EventID:     eventID,
 		DepthFirst:  rc.req.DepthFirst,
 		Direction:   rc.req.Direction,
@@ -665,7 +665,7 @@ func (rc *reqCtx) injectResponseToRoomserver(res *MSC2836EventRelationshipsRespo
 		})
 	}
 	// we've got the data by this point so use a background context
-	err := roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, ires, false)
+	err := roomserver.SendInputRoomEvents(context.Background(), rc.rsAPI, rc.serverName, ires, false)
 	if err != nil {
 		util.GetLogger(rc.ctx).WithError(err).Error("failed to inject MSC2836EventRelationshipsResponse into the roomserver")
 	}

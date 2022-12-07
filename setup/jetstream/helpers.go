@@ -2,6 +2,7 @@ package jetstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
@@ -72,6 +73,9 @@ func JetStreamConsumer(
 						// just timed out and we should try again.
 						continue
 					}
+				} else if errors.Is(err, nats.ErrConsumerDeleted) {
+					// The consumer was deleted so stop.
+					return
 				} else {
 					// Something else went wrong, so we'll panic.
 					sentry.CaptureException(err)

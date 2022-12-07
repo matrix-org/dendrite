@@ -259,7 +259,7 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 // oldest event in the room's topology.
 func (d *DatabaseTransaction) GetBackwardTopologyPos(
 	ctx context.Context,
-	events []types.StreamEvent,
+	events []*gomatrixserverlib.HeaderedEvent,
 ) (types.TopologyToken, error) {
 	zeroToken := types.TopologyToken{}
 	if len(events) == 0 {
