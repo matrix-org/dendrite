@@ -20,10 +20,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const presenceSchema = `
@@ -135,7 +136,8 @@ func (p *presenceStatements) UpsertPresence(
 	return
 }
 
-// GetPresenceForUsers returns the current presence of a user.
+// GetPresenceForUsers returns the current presence for a list of users.
+// If the user doesn't have a presence status yet, it is omitted from the response.
 func (p *presenceStatements) GetPresenceForUsers(
 	ctx context.Context, txn *sql.Tx,
 	userIDs []string,

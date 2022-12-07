@@ -17,6 +17,7 @@ package streams
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -72,6 +73,7 @@ func (p *PresenceStreamProvider) IncrementalSync(
 
 	getPresenceForUsers, err := p.getNeededUsersFromRequest(ctx, req, presences)
 	if err != nil {
+		req.Log.WithError(err).Error("getNeededUsersFromRequest failed")
 		return from
 	}
 
@@ -167,8 +169,7 @@ func (p *PresenceStreamProvider) getNeededUsersFromRequest(ctx context.Context, 
 
 	// TODO: Check if this is working better than before.
 	if err := p.notifier.LoadRooms(ctx, p.DB, newlyJoined); err != nil {
-		req.Log.WithError(err).Error("unable to refresh notifier lists")
-		return getPresenceForUsers, err
+		return getPresenceForUsers, fmt.Errorf("unable to refresh notifier lists: %w", err)
 	}
 	for _, roomID := range newlyJoined {
 		roomUsers := p.notifier.JoinedUsers(roomID)

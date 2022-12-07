@@ -186,7 +186,7 @@ type Database interface {
 }
 
 type Presence interface {
-	GetPresences(ctx context.Context, userID []string) ([]*types.PresenceInternal, error)
+	GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error)
 	UpdatePresence(ctx context.Context, userID string, presence types.Presence, statusMsg *string, lastActiveTS gomatrixserverlib.Timestamp, fromSync bool) (types.StreamPosition, error)
 }
 
