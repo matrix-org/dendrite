@@ -232,7 +232,7 @@ func (s *OutputRoomEventConsumer) processMessage(ore api.OutputNewRoomEvent, rew
 }
 
 func (s *OutputRoomEventConsumer) sendPresence(roomID string, addedJoined []types.JoinedHost) {
-	joined := make([]gomatrixserverlib.ServerName, len(addedJoined))
+	joined := make([]gomatrixserverlib.ServerName, 0, len(addedJoined))
 	for _, added := range addedJoined {
 		joined = append(joined, added.ServerName)
 	}
