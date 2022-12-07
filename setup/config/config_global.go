@@ -17,7 +17,7 @@ type Global struct {
 	gomatrixserverlib.SigningIdentity `yaml:",inline"`
 
 	// The secondary server names, used for virtual hosting.
-	VirtualHosts []*VirtualHost `yaml:"virtual_hosts"`
+	VirtualHosts []*VirtualHost `yaml:"-"`
 
 	// Path to the private key which will be used to sign requests and events.
 	PrivateKeyPath Path `yaml:"private_key"`
