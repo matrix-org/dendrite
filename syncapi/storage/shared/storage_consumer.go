@@ -57,31 +57,23 @@ type Database struct {
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
-	return d.NewDatabaseTransaction(ctx)
-
-	/*
-		TODO: Repeatable read is probably the right thing to do here,
-		but it seems to cause some problems with the invite tests, so
-		need to investigate that further.
-
-		txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
-			// Set the isolation level so that we see a snapshot of the database.
-			// In PostgreSQL repeatable read transactions will see a snapshot taken
-			// at the first query, and since the transaction is read-only it can't
-			// run into any serialisation errors.
-			// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
-			Isolation: sql.LevelRepeatableRead,
-			ReadOnly:  true,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &DatabaseTransaction{
-			Database: d,
-			ctx:      ctx,
-			txn:      txn,
-		}, nil
-	*/
+	txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
+		// Set the isolation level so that we see a snapshot of the database.
+		// In PostgreSQL repeatable read transactions will see a snapshot taken
+		// at the first query, and since the transaction is read-only it can't
+		// run into any serialisation errors.
+		// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
+		Isolation: sql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &DatabaseTransaction{
+		Database: d,
+		ctx:      ctx,
+		txn:      txn,
+	}, nil
 }
 
 func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransaction, error) {
@@ -572,8 +564,8 @@ func (d *Database) UpdatePresence(ctx context.Context, userID string, presence t
 	return pos, err
 }
 
-func (d *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
-	return d.Presence.GetPresenceForUser(ctx, nil, userID)
+func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
 }
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
