@@ -17,12 +17,14 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const presenceSchema = `
@@ -62,9 +64,9 @@ const upsertPresenceFromSyncSQL = "" +
 	" RETURNING id"
 
 const selectPresenceForUserSQL = "" +
-	"SELECT presence, status_msg, last_active_ts" +
+	"SELECT user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
-	" WHERE user_id = $1 LIMIT 1"
+	" WHERE user_id IN ($1)"
 
 const selectMaxPresenceSQL = "" +
 	"SELECT COALESCE(MAX(id), 0) FROM syncapi_presence"
@@ -134,20 +136,38 @@ func (p *presenceStatements) UpsertPresence(
 	return
 }
 
-// GetPresenceForUser returns the current presence of a user.
-func (p *presenceStatements) GetPresenceForUser(
+// GetPresenceForUsers returns the current presence for a list of users.
+// If the user doesn't have a presence status yet, it is omitted from the response.
+func (p *presenceStatements) GetPresenceForUsers(
 	ctx context.Context, txn *sql.Tx,
-	userID string,
-) (*types.PresenceInternal, error) {
-	result := &types.PresenceInternal{
-		UserID: userID,
+	userIDs []string,
+) ([]*types.PresenceInternal, error) {
+	qry := strings.Replace(selectPresenceForUserSQL, "($1)", sqlutil.QueryVariadic(len(userIDs)), 1)
+	prepStmt, err := p.db.Prepare(qry)
+	if err != nil {
+		return nil, err
 	}
-	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
-	err := stmt.QueryRowContext(ctx, userID).Scan(&result.Presence, &result.ClientFields.StatusMsg, &result.LastActiveTS)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	defer internal.CloseAndLogIfError(ctx, prepStmt, "GetPresenceForUsers: stmt.close() failed")
+
+	params := make([]interface{}, len(userIDs))
+	for i := range userIDs {
+		params[i] = userIDs[i]
 	}
-	result.ClientFields.Presence = result.Presence.String()
+
+	rows, err := sqlutil.TxStmt(txn, prepStmt).QueryContext(ctx, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceForUsers: rows.close() failed")
+	result := make([]*types.PresenceInternal, 0, len(userIDs))
+	for rows.Next() {
+		presence := &types.PresenceInternal{}
+		if err = rows.Scan(&presence.UserID, &presence.Presence, &presence.ClientFields.StatusMsg, &presence.LastActiveTS); err != nil {
+			return nil, err
+		}
+		presence.ClientFields.Presence = presence.Presence.String()
+		result = append(result, presence)
+	}
 	return result, err
 }
 
