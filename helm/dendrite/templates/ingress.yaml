@@ -1,28 +1,36 @@
 {{- if .Values.ingress.enabled -}}
-{{ $component := "monolith" }}
-{{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- $fullName := include "dendrite.fullname" . -}}
+  {{- $svcPort := .Values.service.port -}}
+  {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
   {{- end }}
-{{- end }}
-{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+  {{- end }}
+  {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1
-{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+  {{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1beta1
-{{- else -}}
+  {{- else -}}
 apiVersion: extensions/v1beta1
-{{- end }}
+  {{- end }}
 kind: Ingress
 metadata:
-  namespace: {{ $.Release.Namespace }}
-  name: {{ $component }}
+  name: {{ $fullName }}
   labels:
-    app: {{ $.Chart.Name }}
-    component: {{ $component }}
-  {{- with .Values.ingress.annotations }}
+    {{- include "dendrite.labels" . | nindent 4 }}
   annotations:
+    {{- if eq .Values.ingress.annotateFor "nginx" }}
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$http_authorization"
+    nginx.org/proxy-connect-timeout: 60s
+    nginx.org/proxy-read-timeout: 60s
+    {{- else if eq .Values.ingress.annotateFor "openshift" }}
+    route.openshift.io/termination: edge
+    haproxy.router.openshift.io/balance: source
+    haproxy.router.openshift.io/timeout: 60000ms
+    {{- end}}
+    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className }}
@@ -38,25 +46,19 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: {{ .Values.ingress.hostName | quote }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
-            pathType: {{ .pathType }}
-            {{- end }}
+          - path: /
+            pathType: ImplementationSpecific
             backend:
               {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
               service:
-                name: {{ $component }}
+                name: {{ $fullName }}
                 port:
-                  number: 8008
+                  number: {{ $svcPort }}
               {{- else }}
-              serviceName: {{ $component }}
-              servicePort: 8008
+              serviceName: {{ $fullName }}
+              servicePort: {{ $svcPort }}
               {{- end }}
-          {{- end }}
-    {{- end }}
-{{- end }}
+  {{- end }}

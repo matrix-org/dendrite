@@ -10,12 +10,12 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: {{ $.Chart.Name }}
+      {{- include "dendrite.selectorLabels" . | nindent 6 }}
   replicas: 1
   template:
     metadata:
       labels:
-        app: {{ $.Chart.Name }}
+        {{- include "dendrite.selectorLabels" . | nindent 8 }}
     spec:
       volumes:
       - name: {{ .Release.Name }}-conf-vol
@@ -44,6 +44,10 @@ spec:
         args:
           - '--config'
           - '/etc/dendrite/dendrite.yaml'
+        ports:
+          - name: http
+            containerPort: 8008
+            protocol: TCP
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}
         volumeMounts:
@@ -62,3 +66,27 @@ spec:
           name: {{ .Release.Name }}-jetstream
         - mountPath: /data/search
           name: {{ .Release.Name }}-search
+        livenessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+          httpGet:
+            path: /_dendrite/monitor/health
+            port: http
+        readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+          httpGet:
+            path: /_dendrite/monitor/health
+            port: http
+        startupProbe:
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+          httpGet:
+            path: /_dendrite/monitor/up
+            port: http

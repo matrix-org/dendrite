@@ -145,7 +145,7 @@ resources:
     memory: "4096Mi"
 
 persistence:
-  storageClass: local-path
+  storageClass: ""
   jetstream:
     # -- Use an existing volume claim for jetstream
     existingClaim: ""
@@ -237,7 +237,15 @@ postgresql:
 ingress:
   # -- Create an ingress for a monolith deployment
   enabled: false
-
-  annotations: {}
   hosts: []
+  className: ""
+  hostName: ""
+  annotateFor: ""  # one of 'openshift' or 'nginx'
+  # -- Extra, custom annotations
+  annotations: {}
+
   tls: []
+
+service:
+  type: ClusterIP
+  port: 80

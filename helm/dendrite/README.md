@@ -88,8 +88,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | federationapi.send_max_retries | int | `16` |  |
 | image.name | string | `"ghcr.io/matrix-org/dendrite-monolith:v0.10.8"` | Docker repository/image to use |
 | image.pullPolicy | string | `"IfNotPresent"` | Kubernetes pullPolicy |
-| ingress.annotations | object | `{}` |  |
+| ingress.annotateFor | string | `""` |  |
+| ingress.annotations | object | `{}` | Extra, custom annotations |
+| ingress.className | string | `""` |  |
 | ingress.enabled | bool | `false` | Create an ingress for a monolith deployment |
+| ingress.hostName | string | `""` |  |
 | ingress.hosts | list | `[]` |  |
 | ingress.tls | list | `[]` |  |
 | mediaapi.dynamic_thumbnails | bool | `false` |  |
@@ -102,7 +105,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | persistence.media.existingClaim | string | `""` | Use an existing volume claim for media files |
 | persistence.search.capacity | string | `"1Gi"` |  |
 | persistence.search.existingClaim | string | `""` | Use an existing volume claim for the fulltext search index |
-| persistence.storageClass | string | `"local-path"` |  |
+| persistence.storageClass | string | `""` |  |
 | postgresql.auth.database | string | `"dendrite"` |  |
 | postgresql.auth.password | string | `"changeme"` |  |
 | postgresql.auth.username | string | `"dendrite"` |  |
@@ -111,6 +114,8 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | postgresql.image.tag | string | `"14.4.0"` |  |
 | postgresql.persistence.enabled | bool | `false` |  |
 | resources | object | sets some sane default values | Default resource requests/limits. |
+| service.port | int | `80` |  |
+| service.type | string | `"ClusterIP"` |  |
 | syncapi.real_ip_header | string | `"X-Real-IP"` | This option controls which HTTP header to inspect to find the real remote IP address of the client. This is likely required if Dendrite is running behind a reverse proxy server. |
 | syncapi.search | object | `{"enabled":false,"language":"en"}` | Configuration for the full-text search engine. |
 | syncapi.search.enabled | bool | `false` | Whether or not search is enabled. |
