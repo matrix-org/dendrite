@@ -355,11 +355,12 @@ func (h *httpUserInternalAPI) SetAvatarURL(
 
 func (h *httpUserInternalAPI) QueryNumericLocalpart(
 	ctx context.Context,
+	request *api.QueryNumericLocalpartRequest,
 	response *api.QueryNumericLocalpartResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryNumericLocalpart", h.apiURL+QueryNumericLocalpartPath,
-		h.httpClient, ctx, &struct{}{}, response,
+		h.httpClient, ctx, request, response,
 	)
 }
 
@@ -388,7 +389,7 @@ func (h *httpUserInternalAPI) QueryAccountByPassword(
 func (h *httpUserInternalAPI) SetDisplayName(
 	ctx context.Context,
 	request *api.PerformUpdateDisplayNameRequest,
-	response *struct{},
+	response *api.PerformUpdateDisplayNameResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"SetDisplayName", h.apiURL+PerformSetDisplayNamePath,

@@ -3,6 +3,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/api"
@@ -13,21 +14,22 @@ import (
 
 const openIDTokenSchema = `
 -- Stores data about accounts.
-CREATE TABLE IF NOT EXISTS open_id_tokens (
+CREATE TABLE IF NOT EXISTS userapi_openid_tokens (
 	-- The value of the token issued to a user
 	token TEXT NOT NULL PRIMARY KEY,
     -- The Matrix user ID for this account
 	localpart TEXT NOT NULL,
+	server_name TEXT NOT NULL,
 	-- When the token expires, as a unix timestamp (ms resolution).
 	token_expires_at_ms BIGINT NOT NULL
 );
 `
 
 const insertOpenIDTokenSQL = "" +
-	"INSERT INTO open_id_tokens(token, localpart, token_expires_at_ms) VALUES ($1, $2, $3)"
+	"INSERT INTO userapi_openid_tokens(token, localpart, server_name, token_expires_at_ms) VALUES ($1, $2, $3, $4)"
 
 const selectOpenIDTokenSQL = "" +
-	"SELECT localpart, token_expires_at_ms FROM open_id_tokens WHERE token = $1"
+	"SELECT localpart, server_name, token_expires_at_ms FROM userapi_openid_tokens WHERE token = $1"
 
 type openIDTokenStatements struct {
 	db              *sql.DB
@@ -56,11 +58,11 @@ func NewSQLiteOpenIDTable(db *sql.DB, serverName gomatrixserverlib.ServerName) (
 func (s *openIDTokenStatements) InsertOpenIDToken(
 	ctx context.Context,
 	txn *sql.Tx,
-	token, localpart string,
+	token, localpart string, serverName gomatrixserverlib.ServerName,
 	expiresAtMS int64,
 ) (err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertTokenStmt)
-	_, err = stmt.ExecContext(ctx, token, localpart, expiresAtMS)
+	_, err = stmt.ExecContext(ctx, token, localpart, serverName, expiresAtMS)
 	return
 }
 
@@ -71,10 +73,13 @@ func (s *openIDTokenStatements) SelectOpenIDTokenAtrributes(
 	token string,
 ) (*api.OpenIDTokenAttributes, error) {
 	var openIDTokenAttrs api.OpenIDTokenAttributes
+	var localpart string
+	var serverName gomatrixserverlib.ServerName
 	err := s.selectTokenStmt.QueryRowContext(ctx, token).Scan(
-		&openIDTokenAttrs.UserID,
+		&localpart, &serverName,
 		&openIDTokenAttrs.ExpiresAtMS,
 	)
+	openIDTokenAttrs.UserID = fmt.Sprintf("@%s:%s", localpart, serverName)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.WithError(err).Error("Unable to retrieve token from the db")

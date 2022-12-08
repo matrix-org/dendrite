@@ -19,10 +19,12 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/lib/pq"
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const presenceSchema = `
@@ -63,9 +65,9 @@ const upsertPresenceFromSyncSQL = "" +
 	" RETURNING id"
 
 const selectPresenceForUserSQL = "" +
-	"SELECT presence, status_msg, last_active_ts" +
+	"SELECT user_id, presence, status_msg, last_active_ts" +
 	" FROM syncapi_presence" +
-	" WHERE user_id = $1 LIMIT 1"
+	" WHERE user_id = ANY($1)"
 
 const selectMaxPresenceSQL = "" +
 	"SELECT COALESCE(MAX(id), 0) FROM syncapi_presence"
@@ -119,20 +121,28 @@ func (p *presenceStatements) UpsertPresence(
 	return
 }
 
-// GetPresenceForUser returns the current presence of a user.
-func (p *presenceStatements) GetPresenceForUser(
+// GetPresenceForUsers returns the current presence for a list of users.
+// If the user doesn't have a presence status yet, it is omitted from the response.
+func (p *presenceStatements) GetPresenceForUsers(
 	ctx context.Context, txn *sql.Tx,
-	userID string,
-) (*types.PresenceInternal, error) {
-	result := &types.PresenceInternal{
-		UserID: userID,
-	}
+	userIDs []string,
+) ([]*types.PresenceInternal, error) {
+	result := make([]*types.PresenceInternal, 0, len(userIDs))
 	stmt := sqlutil.TxStmt(txn, p.selectPresenceForUsersStmt)
-	err := stmt.QueryRowContext(ctx, userID).Scan(&result.Presence, &result.ClientFields.StatusMsg, &result.LastActiveTS)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	rows, err := stmt.QueryContext(ctx, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
 	}
-	result.ClientFields.Presence = result.Presence.String()
+	defer internal.CloseAndLogIfError(ctx, rows, "GetPresenceForUsers: rows.close() failed")
+
+	for rows.Next() {
+		presence := &types.PresenceInternal{}
+		if err = rows.Scan(&presence.UserID, &presence.Presence, &presence.ClientFields.StatusMsg, &presence.LastActiveTS); err != nil {
+			return nil, err
+		}
+		presence.ClientFields.Presence = presence.Presence.String()
+		result = append(result, presence)
+	}
 	return result, err
 }
 

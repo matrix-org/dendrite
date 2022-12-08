@@ -13,6 +13,9 @@ import (
 const (
 	AppServiceRoomAliasExistsPath = "/appservice/RoomAliasExists"
 	AppServiceUserIDExistsPath    = "/appservice/UserIDExists"
+	AppServiceLocationsPath       = "/appservice/locations"
+	AppServiceUserPath            = "/appservice/users"
+	AppServiceProtocolsPath       = "/appservice/protocols"
 )
 
 // httpAppServiceQueryAPI contains the URL to an appservice query API and a
@@ -55,6 +58,27 @@ func (h *httpAppServiceQueryAPI) UserIDExists(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"UserIDExists", h.appserviceURL+AppServiceUserIDExistsPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpAppServiceQueryAPI) Locations(ctx context.Context, request *api.LocationRequest, response *api.LocationResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"ASLocation", h.appserviceURL+AppServiceLocationsPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpAppServiceQueryAPI) User(ctx context.Context, request *api.UserRequest, response *api.UserResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"ASUser", h.appserviceURL+AppServiceUserPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpAppServiceQueryAPI) Protocols(ctx context.Context, request *api.ProtocolRequest, response *api.ProtocolResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"ASProtocols", h.appserviceURL+AppServiceProtocolsPath,
 		h.httpClient, ctx, request, response,
 	)
 }

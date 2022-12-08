@@ -169,9 +169,21 @@ func createRoom(
 	asAPI appserviceAPI.AppServiceInternalAPI,
 	evTime time.Time,
 ) util.JSONResponse {
+	_, userDomain, err := gomatrixserverlib.SplitID('@', device.UserID)
+	if err != nil {
+		util.GetLogger(ctx).WithError(err).Error("gomatrixserverlib.SplitID failed")
+		return jsonerror.InternalServerError()
+	}
+	if !cfg.Matrix.IsLocalServerName(userDomain) {
+		return util.JSONResponse{
+			Code: http.StatusForbidden,
+			JSON: jsonerror.Forbidden(fmt.Sprintf("User domain %q not configured locally", userDomain)),
+		}
+	}
+
 	// TODO (#267): Check room ID doesn't clash with an existing one, and we
 	//              probably shouldn't be using pseudo-random strings, maybe GUIDs?
-	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), cfg.Matrix.ServerName)
+	roomID := fmt.Sprintf("!%s:%s", util.RandomString(16), userDomain)
 
 	logger := util.GetLogger(ctx)
 	userID := device.UserID
@@ -314,7 +326,7 @@ func createRoom(
 
 	var roomAlias string
 	if r.RoomAliasName != "" {
-		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, cfg.Matrix.ServerName)
+		roomAlias = fmt.Sprintf("#%s:%s", r.RoomAliasName, userDomain)
 		// check it's free TODO: This races but is better than nothing
 		hasAliasReq := roomserverAPI.GetRoomIDForAliasRequest{
 			Alias:              roomAlias,
@@ -436,7 +448,7 @@ func createRoom(
 			builder.PrevEvents = []gomatrixserverlib.EventReference{builtEvents[i-1].EventReference()}
 		}
 		var ev *gomatrixserverlib.Event
-		ev, err = buildEvent(&builder, &authEvents, cfg, evTime, roomVersion)
+		ev, err = buildEvent(&builder, userDomain, &authEvents, cfg, evTime, roomVersion)
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("buildEvent failed")
 			return jsonerror.InternalServerError()
@@ -461,11 +473,11 @@ func createRoom(
 		inputs = append(inputs, roomserverAPI.InputRoomEvent{
 			Kind:         roomserverAPI.KindNew,
 			Event:        event,
-			Origin:       cfg.Matrix.ServerName,
+			Origin:       userDomain,
 			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
-	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, inputs, false); err != nil {
+	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, device.UserDomain(), inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -548,7 +560,7 @@ func createRoom(
 				Event:           event,
 				InviteRoomState: inviteStrippedState,
 				RoomVersion:     event.RoomVersion,
-				SendAsServer:    string(cfg.Matrix.ServerName),
+				SendAsServer:    string(userDomain),
 			}, &inviteRes); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("PerformInvite failed")
 				return util.JSONResponse{
@@ -591,6 +603,7 @@ func createRoom(
 // buildEvent fills out auth_events for the builder then builds the event
 func buildEvent(
 	builder *gomatrixserverlib.EventBuilder,
+	serverName gomatrixserverlib.ServerName,
 	provider gomatrixserverlib.AuthEventProvider,
 	cfg *config.ClientAPI,
 	evTime time.Time,
@@ -606,7 +619,7 @@ func buildEvent(
 	}
 	builder.AuthEvents = refs
 	event, err := builder.Build(
-		evTime, cfg.Matrix.ServerName, cfg.Matrix.KeyID,
+		evTime, serverName, cfg.Matrix.KeyID,
 		cfg.Matrix.PrivateKey, roomVersion,
 	)
 	if err != nil {

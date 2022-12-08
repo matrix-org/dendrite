@@ -25,7 +25,7 @@ func KeyServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	intAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	intAPI.SetUserAPI(base.UserAPIClient())
 
-	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
+	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI, base.EnableMetrics)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.KeyServer.InternalAPI.Listen, // internal listener

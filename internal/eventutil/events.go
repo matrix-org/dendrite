@@ -38,7 +38,8 @@ var ErrRoomNoExists = errors.New("room does not exist")
 // Returns an error if something else went wrong
 func QueryAndBuildEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg *config.Global, evTime time.Time,
+	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
+	identity *gomatrixserverlib.SigningIdentity, evTime time.Time,
 	rsAPI api.QueryLatestEventsAndStateAPI, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
 	if queryRes == nil {
@@ -50,24 +51,24 @@ func QueryAndBuildEvent(
 		// This can pass through a ErrRoomNoExists to the caller
 		return nil, err
 	}
-	return BuildEvent(ctx, builder, cfg, evTime, eventsNeeded, queryRes)
+	return BuildEvent(ctx, builder, cfg, identity, evTime, eventsNeeded, queryRes)
 }
 
 // BuildEvent builds a Matrix event from the builder and QueryLatestEventsAndStateResponse
 // provided.
 func BuildEvent(
 	ctx context.Context,
-	builder *gomatrixserverlib.EventBuilder, cfg *config.Global, evTime time.Time,
+	builder *gomatrixserverlib.EventBuilder, cfg *config.Global,
+	identity *gomatrixserverlib.SigningIdentity, evTime time.Time,
 	eventsNeeded *gomatrixserverlib.StateNeeded, queryRes *api.QueryLatestEventsAndStateResponse,
 ) (*gomatrixserverlib.HeaderedEvent, error) {
-	err := addPrevEventsToEvent(builder, eventsNeeded, queryRes)
-	if err != nil {
+	if err := addPrevEventsToEvent(builder, eventsNeeded, queryRes); err != nil {
 		return nil, err
 	}
 
 	event, err := builder.Build(
-		evTime, cfg.ServerName, cfg.KeyID,
-		cfg.PrivateKey, queryRes.RoomVersion,
+		evTime, identity.ServerName, identity.KeyID,
+		identity.PrivateKey, queryRes.RoomVersion,
 	)
 	if err != nil {
 		return nil, err

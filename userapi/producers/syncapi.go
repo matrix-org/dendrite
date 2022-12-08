@@ -61,12 +61,12 @@ func (p *SyncAPI) SendAccountData(userID string, data eventutil.AccountData) err
 // GetAndSendNotificationData reads the database and sends data about unread
 // notifications to the Sync API server.
 func (p *SyncAPI) GetAndSendNotificationData(ctx context.Context, userID, roomID string) error {
-	localpart, _, err := gomatrixserverlib.SplitID('@', userID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return err
 	}
 
-	ntotal, nhighlight, err := p.db.GetRoomNotificationCounts(ctx, localpart, roomID)
+	ntotal, nhighlight, err := p.db.GetRoomNotificationCounts(ctx, localpart, domain, roomID)
 	if err != nil {
 		return err
 	}

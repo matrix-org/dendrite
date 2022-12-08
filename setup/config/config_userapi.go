@@ -19,6 +19,10 @@ type UserAPI struct {
 	// The Account database stores the login details and account information
 	// for local users. It is accessed by the UserAPI.
 	AccountDatabase DatabaseOptions `yaml:"account_database,omitempty"`
+
+	// Users who register on this homeserver will automatically
+	// be joined to the rooms listed under this option.
+	AutoJoinRooms []string `yaml:"auto_join_rooms"`
 }
 
 const DefaultOpenIDTokenLifetimeMS = 3600000 // 60 minutes

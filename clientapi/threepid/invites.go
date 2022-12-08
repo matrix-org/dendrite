@@ -215,7 +215,7 @@ func queryIDServerStoreInvite(
 	}
 
 	var profile *authtypes.Profile
-	if serverName == cfg.Matrix.ServerName {
+	if cfg.Matrix.IsLocalServerName(serverName) {
 		res := &userapi.QueryProfileResponse{}
 		err = userAPI.QueryProfile(ctx, &userapi.QueryProfileRequest{UserID: device.UserID}, res)
 		if err != nil {
@@ -359,8 +359,13 @@ func emit3PIDInviteEvent(
 		return err
 	}
 
+	identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
+	if err != nil {
+		return err
+	}
+
 	queryRes := api.QueryLatestEventsAndStateResponse{}
-	event, err := eventutil.QueryAndBuildEvent(ctx, builder, cfg.Matrix, evTime, rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(ctx, builder, cfg.Matrix, identity, evTime, rsAPI, &queryRes)
 	if err != nil {
 		return err
 	}
@@ -371,6 +376,7 @@ func emit3PIDInviteEvent(
 		[]*gomatrixserverlib.HeaderedEvent{
 			event.Headered(queryRes.RoomVersion),
 		},
+		device.UserDomain(),
 		cfg.Matrix.ServerName,
 		cfg.Matrix.ServerName,
 		nil,

@@ -18,10 +18,13 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/gomatrixserverlib"
 
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
@@ -34,8 +37,8 @@ import (
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
-func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI) {
-	inthttp.AddRoutes(queryAPI, router)
+func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(queryAPI, router, enableMetrics)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
@@ -58,8 +61,10 @@ func NewInternalAPI(
 	// Create appserivce query API with an HTTP client that will be used for all
 	// outbound and inbound requests (inbound only for the internal API)
 	appserviceQueryAPI := &query.AppServiceQueryAPI{
-		HTTPClient: client,
-		Cfg:        &base.Cfg.AppServiceAPI,
+		HTTPClient:    client,
+		Cfg:           &base.Cfg.AppServiceAPI,
+		ProtocolCache: map[string]appserviceAPI.ASProtocolResponse{},
+		CacheMu:       sync.Mutex{},
 	}
 
 	if len(base.Cfg.Derived.ApplicationServices) == 0 {
@@ -71,7 +76,7 @@ func NewInternalAPI(
 	// events to be sent out.
 	for _, appservice := range base.Cfg.Derived.ApplicationServices {
 		// Create bot account for this AS if it doesn't already exist
-		if err := generateAppServiceAccount(userAPI, appservice); err != nil {
+		if err := generateAppServiceAccount(userAPI, appservice, base.Cfg.Global.ServerName); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"appservice": appservice.ID,
 			}).WithError(err).Panicf("failed to generate bot account for appservice")
@@ -98,11 +103,13 @@ func NewInternalAPI(
 func generateAppServiceAccount(
 	userAPI userapi.AppserviceUserAPI,
 	as config.ApplicationService,
+	serverName gomatrixserverlib.ServerName,
 ) error {
 	var accRes userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(context.Background(), &userapi.PerformAccountCreationRequest{
 		AccountType:  userapi.AccountTypeAppService,
 		Localpart:    as.SenderLocalpart,
+		ServerName:   serverName,
 		AppServiceID: as.ID,
 		OnConflict:   userapi.ConflictUpdate,
 	}, &accRes)
@@ -112,6 +119,7 @@ func generateAppServiceAccount(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(context.Background(), &userapi.PerformDeviceCreationRequest{
 		Localpart:          as.SenderLocalpart,
+		ServerName:         serverName,
 		AccessToken:        as.ASToken,
 		DeviceID:           &as.SenderLocalpart,
 		DeviceDisplayName:  &as.SenderLocalpart,

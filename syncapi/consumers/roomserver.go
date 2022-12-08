@@ -364,11 +364,7 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == gomatrixserverlib.Join {
 		// check it's a local join
-		_, domain, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
-		if err != nil {
-			return sp, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-		}
-		if domain != s.cfg.Matrix.ServerName {
+		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
 			return sp, nil
 		}
 
@@ -390,9 +386,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if msg.Event.StateKey() == nil {
 		return
 	}
-	if _, serverName, err := gomatrixserverlib.SplitID('@', *msg.Event.StateKey()); err != nil {
-		return
-	} else if serverName != s.cfg.Matrix.ServerName {
+	if _, _, err := s.cfg.Matrix.SplitLocalID('@', *msg.Event.StateKey()); err != nil {
 		return
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
@@ -425,6 +419,13 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
 		}).Errorf("roomserver output log: remove invite failure")
+		return
+	}
+
+	// Only notify clients about retired invite events, if the user didn't accept the invite.
+	// The PDU stream will also receive an event about accepting the invitation, so there should
+	// be a "smooth" transition from invite -> join, and not invite -> leave -> join
+	if msg.Membership == gomatrixserverlib.Join {
 		return
 	}
 

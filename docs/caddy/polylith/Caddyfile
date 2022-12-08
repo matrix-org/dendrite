@@ -74,7 +74,7 @@ matrix.example.com {
  # Change the end of each reverse_proxy line to the correct
  # address for your various services.
  @sync_api {
-  path_regexp /_matrix/client/.*?/(sync|user/.*?/filter/?.*|keys/changes|rooms/.*?/(messages|context/.*?|relations/.*?|event/.*?))$
+  path_regexp /_matrix/client/.*?/(sync|user/.*?/filter/?.*|keys/changes|rooms/.*?/(messages|.*?_?members|context/.*?|relations/.*?|event/.*?))$
  }
  reverse_proxy @sync_api sync_api:8073
 

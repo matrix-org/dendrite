@@ -11,22 +11,27 @@ import (
 // kind and a tweaks map. Returns a nil map if it would have been
 // empty.
 func ActionsToTweaks(as []*Action) (ActionKind, map[string]interface{}, error) {
-	kind := UnknownAction
-	tweaks := map[string]interface{}{}
+	var kind ActionKind
+	var tweaks map[string]interface{}
 
 	for _, a := range as {
-		if a.Kind == SetTweakAction {
-			tweaks[string(a.Tweak)] = a.Value
-			continue
-		}
-		if kind != UnknownAction {
-			return UnknownAction, nil, fmt.Errorf("got multiple primary actions: already had %q, got %s", kind, a.Kind)
-		}
-		kind = a.Kind
-	}
+		switch a.Kind {
+		case DontNotifyAction:
+			// Don't bother processing any further
+			return DontNotifyAction, nil, nil
 
-	if len(tweaks) == 0 {
-		tweaks = nil
+		case SetTweakAction:
+			if tweaks == nil {
+				tweaks = map[string]interface{}{}
+			}
+			tweaks[string(a.Tweak)] = a.Value
+
+		default:
+			if kind != UnknownAction {
+				return UnknownAction, nil, fmt.Errorf("got multiple primary actions: already had %q, got %s", kind, a.Kind)
+			}
+			kind = a.Kind
+		}
 	}
 
 	return kind, tweaks, nil

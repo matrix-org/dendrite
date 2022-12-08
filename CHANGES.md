@@ -1,5 +1,97 @@
 # Changelog
 
+## Dendrite 0.10.8 (2022-11-29)
+
+### Features
+
+* The built-in NATS Server has been updated to version 2.9.8
+* A number of under-the-hood changes have been merged for future virtual hosting support in Dendrite (running multiple domain names on the same Dendrite deployment)
+
+### Fixes
+
+* Event auth handling of invites has been refactored, which should fix some edge cases being handled incorrectly
+* Fix a bug when returning an empty protocol list, which could cause Element to display "The homeserver may be too old to support third party networks" when opening the public room directory
+* The sync API will no longer filter out the user's own membership when using lazy-loading
+* Dendrite will now correctly detect JetStream consumers being deleted, stopping the consumer goroutine as needed
+* A panic in the federation API where the server list could go out of bounds has been fixed
+* Blacklisted servers will now be excluded when querying joined servers, which improves CPU usage and performs less unnecessary outbound requests
+* A database writer will now be used to assign state key NIDs when requesting NIDs that may not exist yet
+* Dendrite will now correctly move local aliases for an upgraded room when the room is upgraded remotely
+* Dendrite will now correctly move account data for an upgraded room when the room is upgraded remotely
+* Missing state key NIDs will now be allocated on request rather than returning an error
+* Guest access is now correctly denied on a number of endpoints
+* Presence information will now be correctly sent for new private chats
+* A number of unspecced fields have been removed from outbound `/send` transactions
+
+## Dendrite 0.10.7 (2022-11-04)
+
+### Features
+
+* Dendrite will now use a native SQLite port when building with `CGO_ENABLED=0`
+* A number of `thirdparty` endpoints have been added, improving support for appservices
+
+### Fixes
+
+* The `"state"` section of the `/sync` response is no longer limited, so state events should not be dropped unexpectedly
+* The deduplication of the `"timeline"` and `"state"` sections in `/sync` is now performed after applying history visibility, so state events should not be dropped unexpectedly
+* The `prev_batch` token returned by `/sync` is now calculated after applying history visibility, so that the pagination boundaries are correct
+* The room summary membership counts in `/sync` should now be calculated properly in more cases
+* A false membership leave event should no longer be sent down `/sync` as a result of retiring an accepted invite (contributed by [tak-hntlabs](https://github.com/tak-hntlabs))
+* Presence updates are now only sent to other servers for which the user shares rooms
+* A bug which could cause a panic when converting events into the `ClientEvent` format has been fixed
+
+## Dendrite 0.10.6 (2022-11-01)
+
+### Features
+
+* History visibility checks have been optimised, which should speed up response times on a variety of endpoints (including `/sync`, `/messages`, `/context` and others) and reduce database load
+* The built-in NATS Server has been updated to version 2.9.4
+* Some other minor dependencies have been updated
+
+### Fixes
+
+* A panic has been fixed in the sync API PDU stream which could cause requests to fail
+* The `/members` response now contains the `room_id` field, which may fix some E2EE problems with clients using the JS SDK (contributed by [ashkitten](https://github.com/ashkitten))
+* The auth difference calculation in state resolution v2 has been tweaked for clarity (and moved into gomatrixserverlib with the rest of the state resolution code)
+
+## Dendrite 0.10.5 (2022-10-31)
+
+### Features
+
+* It is now possible to use hCaptcha instead of reCAPTCHA for protecting registration
+* A new `auto_join_rooms` configuration option has been added for automatically joining new users to a set of rooms
+* A new `/_dendrite/admin/downloadState/{serverName}/{roomID}` endpoint has been added, which allows a server administrator to attempt to repair a room with broken room state by downloading a state snapshot from another federated server in the room
+
+### Fixes
+
+* Querying cross-signing keys for users should now be considerably faster
+* A bug in state resolution where some events were not correctly selected for third-party invites has been fixed
+* A bug in state resolution which could result in `not in room` event rejections has been fixed
+* When accepting a DM invite, it should now be possible to see messages that were sent before the invite was accepted
+* Claiming remote E2EE one-time keys has been refactored and should be more reliable now
+* Various fixes have been made to the `/members` endpoint, which may help with E2EE reliability and clients rendering memberships
+* A race condition in the federation API destination queues has been fixed when associating queued events with remote server destinations
+* A bug in the sync API where too many events were selected resulting in high CPU usage has been fixed
+* Configuring the avatar URL for the Server Notices user should work correctly now
+
+## Dendrite 0.10.4 (2022-10-21)
+
+### Features
+
+* Various tables belonging to the user API will be renamed so that they are namespaced with the `userapi_` prefix
+  * Note that, after upgrading to this version, you should not revert to an older version of Dendrite as the database changes **will not** be reverted automatically
+* The backoff and retry behaviour in the federation API has been refactored and improved
+
+### Fixes
+
+* Private read receipt support is now advertised in the client `/versions` endpoint
+* Private read receipts will now clear notification counts properly
+* A bug where a false `leave` membership transition was inserted into the timeline after accepting an invite has been fixed
+* Some panics caused by concurrent map writes in the key server have been fixed
+* The sync API now calculates membership transitions from state deltas more accurately
+* Transaction IDs are now scoped to endpoints, which should fix some bugs where transaction ID reuse could cause nonsensical cached responses from some endpoints
+* The length of the `type`, `sender`, `state_key` and `room_id` fields in events are now verified by number of bytes rather than codepoints after a spec clarification, reverting a change made in Dendrite 0.9.6
+
 ## Dendrite 0.10.3 (2022-10-14)
 
 ### Features

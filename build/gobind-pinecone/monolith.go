@@ -40,6 +40,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
@@ -58,6 +59,7 @@ import (
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
+	pineconeEvents "github.com/matrix-org/pinecone/router/events"
 	pineconeSessions "github.com/matrix-org/pinecone/sessions"
 	"github.com/matrix-org/pinecone/types"
 
@@ -101,18 +103,46 @@ func (m *DendriteMonolith) SessionCount() int {
 	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
 }
 
-func (m *DendriteMonolith) RegisterNetworkInterface(name string, index int, mtu int, up bool, broadcast bool, loopback bool, pointToPoint bool, multicast bool, addrs string) {
-	m.PineconeMulticast.RegisterInterface(pineconeMulticast.InterfaceInfo{
-		Name:         name,
-		Index:        index,
-		Mtu:          mtu,
-		Up:           up,
-		Broadcast:    broadcast,
-		Loopback:     loopback,
-		PointToPoint: pointToPoint,
-		Multicast:    multicast,
-		Addrs:        addrs,
-	})
+type InterfaceInfo struct {
+	Name         string
+	Index        int
+	Mtu          int
+	Up           bool
+	Broadcast    bool
+	Loopback     bool
+	PointToPoint bool
+	Multicast    bool
+	Addrs        string
+}
+
+type InterfaceRetriever interface {
+	CacheCurrentInterfaces() int
+	GetCachedInterface(index int) *InterfaceInfo
+}
+
+func (m *DendriteMonolith) RegisterNetworkCallback(intfCallback InterfaceRetriever) {
+	callback := func() []pineconeMulticast.InterfaceInfo {
+		count := intfCallback.CacheCurrentInterfaces()
+		intfs := []pineconeMulticast.InterfaceInfo{}
+		for i := 0; i < count; i++ {
+			iface := intfCallback.GetCachedInterface(i)
+			if iface != nil {
+				intfs = append(intfs, pineconeMulticast.InterfaceInfo{
+					Name:         iface.Name,
+					Index:        iface.Index,
+					Mtu:          iface.Mtu,
+					Up:           iface.Up,
+					Broadcast:    iface.Broadcast,
+					Loopback:     iface.Loopback,
+					PointToPoint: iface.PointToPoint,
+					Multicast:    iface.Multicast,
+					Addrs:        iface.Addrs,
+				})
+			}
+		}
+		return intfs
+	}
+	m.PineconeMulticast.RegisterNetworkCallback(callback)
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
@@ -267,7 +297,12 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
+	pineconeEventChannel := make(chan pineconeEvents.Event)
 	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
+	m.PineconeRouter.EnableHopLimiting()
+	m.PineconeRouter.EnableWakeupBroadcasts()
+	m.PineconeRouter.Subscribe(pineconeEventChannel)
+
 	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
 	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
 	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter, nil)
@@ -301,6 +336,7 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
@@ -347,6 +383,8 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	httpRouter.HandleFunc("/pinecone", m.PineconeRouter.ManholeHandler)
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()
@@ -395,6 +433,34 @@ func (m *DendriteMonolith) Start() {
 			m.logger.Fatal(err)
 		}
 	}()
+
+	go func(ch <-chan pineconeEvents.Event) {
+		eLog := logrus.WithField("pinecone", "events")
+
+		for event := range ch {
+			switch e := event.(type) {
+			case pineconeEvents.PeerAdded:
+			case pineconeEvents.PeerRemoved:
+			case pineconeEvents.TreeParentUpdate:
+			case pineconeEvents.SnakeDescUpdate:
+			case pineconeEvents.TreeRootAnnUpdate:
+			case pineconeEvents.SnakeEntryAdded:
+			case pineconeEvents.SnakeEntryRemoved:
+			case pineconeEvents.BroadcastReceived:
+				eLog.Info("Broadcast received from: ", e.PeerID)
+
+				req := &api.PerformWakeupServersRequest{
+					ServerNames: []gomatrixserverlib.ServerName{gomatrixserverlib.ServerName(e.PeerID)},
+				}
+				res := &api.PerformWakeupServersResponse{}
+				if err := fsAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
+					logrus.WithError(err).Error("Failed to wakeup destination", e.PeerID)
+				}
+			case pineconeEvents.BandwidthReport:
+			default:
+			}
+		}
+	}(pineconeEventChannel)
 }
 
 func (m *DendriteMonolith) Stop() {
