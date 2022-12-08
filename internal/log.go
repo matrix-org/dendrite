@@ -33,6 +33,11 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
+// logrus is using a global variable when we're using `logrus.AddHook`
+// this unfortunately results in us adding the same hook multiple times.
+// This map ensures we only ever add one level hook.
+var stdLevelLogAdded = make(map[logrus.Level]bool)
+
 type utcFormatter struct {
 	logrus.Formatter
 }
