@@ -89,7 +89,7 @@ configuration:
     # -- Enable rate limiting
     enabled: true
     # -- After how many requests a rate limit should be activated
-    threshold: 5
+    threshold: 20
     # -- Cooloff time in milliseconds
     cooloff_ms: 500
 
@@ -136,26 +136,26 @@ configuration:
     # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
 # -- Default resource requests/limits.
-# This can be set individually for each component, see mediaapi
 # @default -- sets some sane default values
 resources:
   requests:
-    cpu: "80m"
-    memory: "64Mi"
+    memory: "512Mi"
 
   limits:
-    cpu: "240m"
-    memory: "256Mi"
+    memory: "4096Mi"
 
 persistence:
   storageClass: local-path
   jetstream:
+    # -- Use an existing volume claim for jetstream
     existingClaim: ""
     capacity: "1Gi"
   media:
+    # -- Use an existing volume claim for media files
     existingClaim: ""
     capacity: "1Gi"
   search:
+    # -- Use an existing volume claim for the fulltext search index
     existingClaim: ""
     capacity: "1Gi"
 

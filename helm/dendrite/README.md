@@ -13,23 +13,16 @@ This chart creates a monolith deployment, including an optionally enabled Postgr
 
 (You can skip this, if you're deploying the PostgreSQL dependency)
 
-You'll need to create the following databases before starting Dendrite (see [install.md](https://github.com/matrix-org/dendrite/blob/master/docs/INSTALL.md#configuration)):
+You'll need to create the following database before starting Dendrite (see [installation](https://matrix-org.github.io/dendrite/installation/database#single-database-creation)):
 
 ```postgres
-create database dendrite_federationapi;
-create database dendrite_mediaapi;
-create database dendrite_roomserver;
-create database dendrite_userapi_accounts;
-create database dendrite_keyserver;
-create database dendrite_syncapi;
+create database dendrite
 ```
 
 or
 
 ```bash
-for i in mediaapi syncapi roomserver federationapi keyserver userapi_accounts; do
-    sudo -u postgres createdb -O dendrite dendrite_$i
-done
+sudo -u postgres createdb -O dendrite -E UTF-8 dendrite
 ```
 
 ## Usage with appservices
@@ -77,7 +70,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | configuration.profiling.port | int | `65432` | pprof port, if enabled |
 | configuration.rate_limiting.cooloff_ms | int | `500` | Cooloff time in milliseconds |
 | configuration.rate_limiting.enabled | bool | `true` | Enable rate limiting |
-| configuration.rate_limiting.threshold | int | `5` | After how many requests a rate limit should be activated |
+| configuration.rate_limiting.threshold | int | `20` | After how many requests a rate limit should be activated |
 | configuration.server_name | string | `""` | Servername for this Dendrite deployment |
 | configuration.signing_key.create | bool | `true` | Create a new signing key, if not exists |
 | configuration.signing_key.existingSecret | string | `""` | Use an existing secret |
@@ -104,11 +97,11 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | mediaapi.max_thumbnail_generators | int | `10` | The maximum number of simultaneous thumbnail generators to run. |
 | mediaapi.thumbnail_sizes | list | [default dendrite config values](https://github.com/matrix-org/dendrite/blob/master/dendrite-config.yaml) | A list of thumbnail sizes to be generated for media content. |
 | persistence.jetstream.capacity | string | `"1Gi"` |  |
-| persistence.jetstream.existingClaim | string | `""` |  |
+| persistence.jetstream.existingClaim | string | `""` | Use an existing volume claim for jetstream |
 | persistence.media.capacity | string | `"1Gi"` |  |
-| persistence.media.existingClaim | string | `""` |  |
+| persistence.media.existingClaim | string | `""` | Use an existing volume claim for media files |
 | persistence.search.capacity | string | `"1Gi"` |  |
-| persistence.search.existingClaim | string | `""` |  |
+| persistence.search.existingClaim | string | `""` | Use an existing volume claim for the fulltext search index |
 | persistence.storageClass | string | `"local-path"` |  |
 | postgresql.auth.database | string | `"dendrite"` |  |
 | postgresql.auth.password | string | `"changeme"` |  |
@@ -117,7 +110,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | postgresql.image.repository | string | `"bitnami/postgresql"` |  |
 | postgresql.image.tag | string | `"14.4.0"` |  |
 | postgresql.persistence.enabled | bool | `false` |  |
-| resources | object | sets some sane default values | Default resource requests/limits. This can be set individually for each component, see mediaapi |
+| resources | object | sets some sane default values | Default resource requests/limits. |
 | syncapi.real_ip_header | string | `"X-Real-IP"` | This option controls which HTTP header to inspect to find the real remote IP address of the client. This is likely required if Dendrite is running behind a reverse proxy server. |
 | syncapi.search | object | `{"enabled":false,"language":"en"}` | Configuration for the full-text search engine. |
 | syncapi.search.enabled | bool | `false` | Whether or not search is enabled. |

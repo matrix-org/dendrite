@@ -3,23 +3,16 @@
 
 (You can skip this, if you're deploying the PostgreSQL dependency)
 
-You'll need to create the following databases before starting Dendrite (see [install.md](https://github.com/matrix-org/dendrite/blob/master/docs/INSTALL.md#configuration)):
+You'll need to create the following database before starting Dendrite (see [installation](https://matrix-org.github.io/dendrite/installation/database#single-database-creation)):
 
 ```postgres
-create database dendrite_federationapi;
-create database dendrite_mediaapi;
-create database dendrite_roomserver;
-create database dendrite_userapi_accounts;
-create database dendrite_keyserver;
-create database dendrite_syncapi;
+create database dendrite
 ```
 
 or
 
 ```bash
-for i in mediaapi syncapi roomserver federationapi keyserver userapi_accounts; do
-    sudo -u postgres createdb -O dendrite dendrite_$i
-done
+sudo -u postgres createdb -O dendrite -E UTF-8 dendrite
 ```
 
 {{ end }}

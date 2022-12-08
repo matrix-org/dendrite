@@ -1,0 +1,9 @@
+---
+postgresql:
+  enabled: true
+
+configuration:
+  server_name: "localhost"
+
+ingress:
+  enabled: true
