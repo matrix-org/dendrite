@@ -133,6 +133,9 @@ func Test_QueryLeftUsers(t *testing.T) {
 		})
 		t.Run("Monolith", func(t *testing.T) {
 			testCase(rsAPI)
+			// also test tracing
+			traceAPI := &api.RoomserverInternalAPITrace{Impl: rsAPI}
+			testCase(traceAPI)
 		})
 
 	})
