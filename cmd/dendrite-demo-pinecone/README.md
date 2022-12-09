@@ -24,3 +24,40 @@ Then point your favourite Matrix client to  the homeserver URL`http://localhost:
 If your peering connection is operational then you should see a `Connected TCP:` line in the log output. If not then try a different peer.
 
 Once logged in, you should be able to open the room directory or join a room by its ID.
+
+## Store & Forward Relays
+
+To test out the store & forward relay functionality, you need a minimum of 3 instances. 
+One instance will act as the relay, and the other two instances will be the users trying to communicate.
+Then you can send messages between the two nodes and watch as the relay is used if the receiving node is offline.
+
+### Launching the Nodes
+
+Relay Server:
+```
+go run cmd/dendrite-demo-pinecone/main.go -dir relay/ -listen "[::]:49000"
+```
+
+Node 1:
+```
+go run cmd/dendrite-demo-pinecone/main.go -dir node-1/ -peer "[::]:49000" -port 8008
+```
+
+Node 2:
+```
+go run cmd/dendrite-demo-pinecone/main.go -dir node-2/ -peer "[::]:49000" -port 8009
+```
+
+### Database Setup
+
+At the moment, the database must be manually configured.
+For both `Node 1` and `Node 2` add the following entries to their respective `relay_server` table in the federationapi database:
+```
+server_name: {node_1_public_key}, relay_server_name: {relay_public_key}
+server_name: {node_2_public_key}, relay_server_name: {relay_public_key}
+```
+
+### Testing
+
+Now you can run two separate instances of element and connect them to `Node 1` and `Node 2`.
+You can shutdown one of the nodes and continue sending messages. If you wait long enough, the message will be sent to the relay server. (you can see this in the log output of the relay server) 
