@@ -108,7 +108,7 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 	cfg.Global.JetStream.InMemory = true
 	cfg.SyncAPI.Fulltext.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	base := base.NewBaseDendrite(cfg, "Tests")
+	base := base.NewBaseDendrite(cfg, "Tests", base.DisableMetrics)
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
 }

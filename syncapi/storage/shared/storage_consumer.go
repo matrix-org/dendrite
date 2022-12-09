@@ -564,8 +564,8 @@ func (d *Database) UpdatePresence(ctx context.Context, userID string, presence t
 	return pos, err
 }
 
-func (d *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
-	return d.Presence.GetPresenceForUser(ctx, nil, userID)
+func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
 }
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
