@@ -57,7 +57,7 @@ to do so for future contributions.
 
 ## Getting up and running
 
-See the [Installation](installation) section for information on how to build an
+See the [Installation](../installation) section for information on how to build an
 instance of Dendrite. You will likely need this in order to test your changes.
 
 ## Code style
