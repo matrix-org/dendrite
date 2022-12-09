@@ -1365,7 +1365,9 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	return result, nil
 }
 
+// GetLeftUsers calculates users we (the server) don't share a room with anymore.
 func (d *Database) GetLeftUsers(ctx context.Context, userIDs []string) ([]string, error) {
+	// Get the userNID for all users with a stale device list
 	stateKeyNIDMap, err := d.EventStateKeyNIDs(ctx, userIDs)
 	if err != nil {
 		return nil, err
@@ -1373,20 +1375,25 @@ func (d *Database) GetLeftUsers(ctx context.Context, userIDs []string) ([]string
 
 	userNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDMap))
 	userNIDtoUserID := make(map[types.EventStateKeyNID]string, len(stateKeyNIDMap))
+	// Create a map from userNID -> userID
 	for userID, nid := range stateKeyNIDMap {
 		userNIDs = append(userNIDs, nid)
 		userNIDtoUserID[nid] = userID
 	}
 
+	// Get all users whose membership is still join, knock or invite.
 	stillJoinedUsersNIDs, err := d.MembershipTable.SelectJoinedUsers(ctx, nil, userNIDs)
 	if err != nil {
 		return nil, err
 	}
 
+	// Remove joined users from the "user with stale devices" list, which contains left AND joined users
 	for _, joinedUser := range stillJoinedUsersNIDs {
 		delete(userNIDtoUserID, joinedUser)
 	}
 
+	// The users still in our userNIDtoUserID map are the users we don't share a room with anymore,
+	// and the return value we are looking for.
 	leftUsers := make([]string, 0, len(userNIDtoUserID))
 	for _, userID := range userNIDtoUserID {
 		leftUsers = append(leftUsers, userID)

@@ -165,10 +165,6 @@ func NewDeviceListUpdater(
 
 // Start the device list updater, which will try to refresh any stale device lists.
 func (u *DeviceListUpdater) Start() error {
-	if err := u.cleanUp(); err != nil {
-		return fmt.Errorf("failed to cleanup stale device lists: %w", err)
-	}
-
 	for i := 0; i < len(u.workerChans); i++ {
 		// Allocate a small buffer per channel.
 		// If the buffer limit is reached, backpressure will cause the processing of EDUs
@@ -197,10 +193,7 @@ func (u *DeviceListUpdater) Start() error {
 }
 
 // cleanUp removes stale device entries for users we don't share a room with anymore
-func (u *DeviceListUpdater) cleanUp() error {
-	if u.rsAPI == nil {
-		return nil
-	}
+func (u *DeviceListUpdater) CleanUp() error {
 	staleUsers, err := u.db.StaleDeviceLists(u.process.Context(), []gomatrixserverlib.ServerName{})
 	if err != nil {
 		return err
@@ -211,7 +204,7 @@ func (u *DeviceListUpdater) cleanUp() error {
 	// In polylith mode, the roomserver api might not be up yet, so we try again
 	res := rsapi.QueryLeftUsersResponse{}
 	for i := 0; i <= maxRetries; i++ {
-		if err = u.rsAPI.QueryLeftUsers(u.process.Context(), &rsapi.QueryLeftUsersRequest{UserIDs: staleUsers}, &res); err != nil {
+		if err = u.rsAPI.QueryLeftUsers(u.process.Context(), &rsapi.QueryLeftUsersRequest{StaleDeviceListUsers: staleUsers}, &res); err != nil {
 			if i == maxRetries {
 				return err
 			}
@@ -219,11 +212,11 @@ func (u *DeviceListUpdater) cleanUp() error {
 			time.Sleep(time.Second * 3)
 		}
 	}
-	if len(res.UserIDs) == 0 {
+	if len(res.LeftUsers) == 0 {
 		return nil
 	}
-	logrus.Debugf("Deleting %d stale device list entries", len(res.UserIDs))
-	return u.db.DeleteStaleDeviceLists(u.process.Context(), res.UserIDs)
+	logrus.Debugf("Deleting %d stale device list entries", len(res.LeftUsers))
+	return u.db.DeleteStaleDeviceLists(u.process.Context(), res.LeftUsers)
 }
 
 func (u *DeviceListUpdater) mutex(userID string) *sync.Mutex {

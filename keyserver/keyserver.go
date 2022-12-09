@@ -16,8 +16,9 @@ package keyserver
 
 import (
 	"github.com/gorilla/mux"
-	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/sirupsen/logrus"
+
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
@@ -63,6 +64,12 @@ func NewInternalAPI(
 	}
 	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
 	ap.Updater = updater
+
+	// Remove users which we don't share a room with anymore
+	if err := updater.CleanUp(); err != nil {
+		logrus.WithError(err).Error("failed to cleanup stale device lists")
+	}
+
 	go func() {
 		if err := updater.Start(); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")

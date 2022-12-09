@@ -807,7 +807,7 @@ func (r *Queryer) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkS
 
 func (r *Queryer) QueryLeftUsers(ctx context.Context, req *api.QueryLeftUsersRequest, res *api.QueryLeftUsersResponse) error {
 	var err error
-	res.UserIDs, err = r.DB.GetLeftUsers(ctx, req.UserIDs)
+	res.LeftUsers, err = r.DB.GetLeftUsers(ctx, req.StaleDeviceListUsers)
 	return err
 }
 

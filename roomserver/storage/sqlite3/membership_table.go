@@ -21,12 +21,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const membershipSchema = `
@@ -445,7 +446,7 @@ func (s *membershipStatements) SelectJoinedUsers(
 	if err != nil {
 		return nil, err
 	}
-
+	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedUsers: rows.close() failed")
 	var targetNID types.EventStateKeyNID
 	for rows.Next() {
 		if err = rows.Scan(&targetNID); err != nil {
