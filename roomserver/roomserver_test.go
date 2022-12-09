@@ -4,18 +4,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
+	t.Helper()
 	base, close := testrig.CreateBaseDendrite(t, dbType)
-	db, err := storage.Open(base, &base.Cfg.KeyServer.Database, base.Caches)
+	db, err := storage.Open(base, &base.Cfg.RoomServer.Database, base.Caches)
 	if err != nil {
 		t.Fatalf("failed to create Database: %v", err)
 	}
