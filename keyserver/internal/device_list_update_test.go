@@ -248,7 +248,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 		UserID:            remoteUserID,
 	}
 	err := updater.Update(ctx, event)
-	updater.CleanUp()
+
 	if err != nil {
 		t.Fatalf("Update returned an error: %s", err)
 	}
