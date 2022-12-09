@@ -192,6 +192,6 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI, enableMetrics 
 
 	internalAPIMux.Handle(
 		QueryAccountByLocalpartPath,
-		httputil.MakeInternalRPCAPI("AccountByLocalpart", s.QueryAccountByLocalpart),
+		httputil.MakeInternalRPCAPI("AccountByLocalpart", enableMetrics, s.QueryAccountByLocalpart),
 	)
 }

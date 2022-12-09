@@ -10,11 +10,12 @@ import (
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 func TestUsers(t *testing.T) {

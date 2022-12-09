@@ -4,6 +4,10 @@ import (
 	"context"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -19,9 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -104,9 +105,8 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(r.Cfg.Matrix.ServerName)
-	// If federation is enabled, but we don't have a signing key, bail.
-	if err != nil && !r.Cfg.Matrix.DisableFederation {
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(r.ServerName)
+	if err != nil {
 		logrus.Panic(err)
 	}
 
@@ -120,7 +120,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		JetStream:           r.JetStream,
 		NATSClient:          r.NATSClient,
 		Durable:             nats.Durable(r.Durable),
-		ServerName:          r.Cfg.Matrix.ServerName,
+		ServerName:          r.ServerName,
 		SigningIdentity:     identity,
 		FSAPI:               fsAPI,
 		KeyRing:             keyRing,
@@ -142,7 +142,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Queryer: r.Queryer,
 	}
 	r.Peeker = &perform.Peeker{
-		ServerName: r.Cfg.Matrix.ServerName,
+		ServerName: r.ServerName,
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
@@ -153,7 +153,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Inputer: r.Inputer,
 	}
 	r.Unpeeker = &perform.Unpeeker{
-		ServerName: r.Cfg.Matrix.ServerName,
+		ServerName: r.ServerName,
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,

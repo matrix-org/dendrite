@@ -26,12 +26,13 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -442,8 +443,11 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	if err = r.kickGuests(ctx, event, roomInfo); err != nil {
-		logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
+	// If guest_access changed and is not can_join, kick all guest users.
+	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").String() != "can_join" {
+		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
+			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
+		}
 	}
 
 	// Everything was OK — the latest events updater didn't error and
@@ -738,12 +742,6 @@ func (r *Inputer) calculateAndSetState(
 
 // kickGuests kicks guests users from m.room.guest_access rooms, if guest access is now prohibited.
 func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event, roomInfo *types.RoomInfo) error {
-	if event.Type() != gomatrixserverlib.MRoomGuestAccess {
-		return nil
-	}
-	if gjson.GetBytes(event.Content(), "guest_access").String() == "can_join" {
-		return nil
-	}
 	membershipNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
 	if err != nil {
 		return err
