@@ -75,39 +75,64 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Bob can join the room as usual
-		joinResp := JoinRoomByIDOrAlias(req, bobDev, rsAPI, userAPI, crResp.RoomAlias)
-		if !joinResp.Is2xx() {
-			t.Fatalf("expected join to succeed, but didn't: %+v", joinResp)
+
+		testCases := []struct {
+			name        string
+			device      *uapi.Device
+			roomID      string
+			wantHTTP200 bool
+		}{
+			{
+				name:        "User can join successfully by alias",
+				device:      bobDev,
+				roomID:      crResp.RoomAlias,
+				wantHTTP200: true,
+			},
+			{
+				name:        "User can join successfully by roomID",
+				device:      bobDev,
+				roomID:      crResp.RoomID,
+				wantHTTP200: true,
+			},
+			{
+				name:   "join is forbidden if user is guest",
+				device: charlieDev,
+				roomID: crResp.RoomID,
+			},
+			{
+				name:   "room does not exist",
+				device: aliceDev,
+				roomID: "!doesnotexist:test",
+			},
+			{
+				name:   "user from different server",
+				device: &uapi.Device{UserID: "@wrong:server"},
+				roomID: crResp.RoomAlias,
+			},
+			{
+				name:   "user doesn't exist locally",
+				device: &uapi.Device{UserID: "@doesnotexist:test"},
+				roomID: crResp.RoomAlias,
+			},
+			{
+				name:   "invalid room ID",
+				device: aliceDev,
+				roomID: "invalidRoomID",
+			},
+			{
+				name:   "roomAlias does not exist",
+				device: aliceDev,
+				roomID: "#doesnotexist:test",
+			},
 		}
 
-		// Charlie is a guest, and guests are prohibited to join the room
-		joinResp = JoinRoomByIDOrAlias(req, charlieDev, rsAPI, userAPI, crResp.RoomID)
-		if joinResp.Is2xx() {
-			t.Fatalf("expected join to fail, but didn't: %+v", joinResp)
-		}
-
-		if joinResp.Code != http.StatusForbidden {
-			t.Fatalf("expected response code to be %d, got %d", http.StatusForbidden, joinResp.Code)
-		}
-
-		// Some invalid requests
-		// room doesn't exist
-		joinResp = JoinRoomByIDOrAlias(req, aliceDev, rsAPI, userAPI, "!doesnotexist:test")
-		if joinResp.Is2xx() {
-			t.Fatalf("expected join room to fail, but didn't: %+v", joinResp)
-		}
-
-		// user from different server
-		joinResp = JoinRoomByIDOrAlias(req, &uapi.Device{UserID: "@wrong:server"}, rsAPI, userAPI, crResp.RoomAlias)
-		if joinResp.Is2xx() {
-			t.Fatalf("expected join room to fail, but didn't: %+v", joinResp)
-		}
-
-		// user doesn't exist locally
-		joinResp = JoinRoomByIDOrAlias(req, &uapi.Device{UserID: "@doesnotexist:test"}, rsAPI, userAPI, crResp.RoomAlias)
-		if joinResp.Is2xx() {
-			t.Fatalf("expected join room to fail, but didn't: %+v", joinResp)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				joinResp := JoinRoomByIDOrAlias(req, tc.device, rsAPI, userAPI, tc.roomID)
+				if tc.wantHTTP200 && !joinResp.Is2xx() {
+					t.Fatalf("expected join room to succeed, but didn't: %+v", joinResp)
+				}
+			})
 		}
 	})
 }
