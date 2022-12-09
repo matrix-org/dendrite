@@ -40,7 +40,7 @@ go run cmd/dendrite-demo-pinecone/main.go -dir relay/ -listen "[::]:49000"
 
 Node 1:
 ```
-go run cmd/dendrite-demo-pinecone/main.go -dir node-1/ -peer "[::]:49000" -port 8008
+go run cmd/dendrite-demo-pinecone/main.go -dir node-1/ -peer "[::]:49000" -port 8007
 ```
 
 Node 2:
@@ -56,6 +56,8 @@ For both `Node 1` and `Node 2` add the following entries to their respective `re
 server_name: {node_1_public_key}, relay_server_name: {relay_public_key}
 server_name: {node_2_public_key}, relay_server_name: {relay_public_key}
 ```
+
+After editing the database you will need to relaunch the nodes for the changes to be picked up by dendrite.
 
 ### Testing
 
