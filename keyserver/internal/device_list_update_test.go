@@ -30,7 +30,12 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/keyserver/storage"
+	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
 )
 
 var (
@@ -243,6 +248,7 @@ func TestUpdateNoPrevID(t *testing.T) {
 		UserID:            remoteUserID,
 	}
 	err := updater.Update(ctx, event)
+	updater.CleanUp()
 	if err != nil {
 		t.Fatalf("Update returned an error: %s", err)
 	}
@@ -352,4 +358,74 @@ func TestDebounce(t *testing.T) {
 	if db.isStale(userID) {
 		t.Errorf("user %s is marked as stale", userID)
 	}
+}
+
+func mustCreateKeyserverDB(t *testing.T, dbType test.DBType) (storage.Database, func()) {
+	t.Helper()
+
+	base, _, _ := testrig.Base(nil)
+	connStr, clearDB := test.PrepareDBConnectionString(t, dbType)
+	db, err := storage.NewDatabase(base, &config.DatabaseOptions{ConnectionString: config.DataSource(connStr)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return db, clearDB
+}
+
+type mockKeyserverRoomserverAPI struct {
+	leftUsers []string
+}
+
+func (m *mockKeyserverRoomserverAPI) QueryLeftUsers(ctx context.Context, req *roomserver.QueryLeftUsersRequest, res *roomserver.QueryLeftUsersResponse) error {
+	res.LeftUsers = m.leftUsers
+	return nil
+}
+
+func TestDeviceListUpdater_CleanUp(t *testing.T) {
+	processCtx := process.NewProcessContext()
+
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+
+	// Bob is not joined to any of our rooms
+	rsAPI := &mockKeyserverRoomserverAPI{leftUsers: []string{bob.ID}}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, clearDB := mustCreateKeyserverDB(t, dbType)
+		defer clearDB()
+
+		// This should not get deleted
+		if err := db.MarkDeviceListStale(processCtx.Context(), alice.ID, true); err != nil {
+			t.Error(err)
+		}
+
+		// this one should get deleted
+		if err := db.MarkDeviceListStale(processCtx.Context(), bob.ID, true); err != nil {
+			t.Error(err)
+		}
+
+		updater := NewDeviceListUpdater(processCtx, db, nil,
+			nil, nil,
+			0, rsAPI, "test")
+		if err := updater.CleanUp(); err != nil {
+			t.Error(err)
+		}
+
+		// check that we still have Alice in our stale list
+		staleUsers, err := db.StaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		if err != nil {
+			t.Error(err)
+		}
+
+		// There should only be Alice
+		wantCount := 1
+		if count := len(staleUsers); count != wantCount {
+			t.Fatalf("expected there to be %d stale device lists, got %d", wantCount, count)
+		}
+
+		if staleUsers[0] != alice.ID {
+			t.Fatalf("unexpected stale device list user: %s, want %s", staleUsers[0], alice.ID)
+		}
+	})
 }

@@ -192,26 +192,18 @@ func (u *DeviceListUpdater) Start() error {
 	return nil
 }
 
-// cleanUp removes stale device entries for users we don't share a room with anymore
+// CleanUp removes stale device entries for users we don't share a room with anymore
 func (u *DeviceListUpdater) CleanUp() error {
 	staleUsers, err := u.db.StaleDeviceLists(u.process.Context(), []gomatrixserverlib.ServerName{})
 	if err != nil {
 		return err
 	}
 
-	maxRetries := 3
-
-	// In polylith mode, the roomserver api might not be up yet, so we try again
 	res := rsapi.QueryLeftUsersResponse{}
-	for i := 0; i <= maxRetries; i++ {
-		if err = u.rsAPI.QueryLeftUsers(u.process.Context(), &rsapi.QueryLeftUsersRequest{StaleDeviceListUsers: staleUsers}, &res); err != nil {
-			if i == maxRetries {
-				return err
-			}
-			logrus.WithError(err).Warnf("unable to query left users (try %d/%d)", i+1, maxRetries)
-			time.Sleep(time.Second * 3)
-		}
+	if err = u.rsAPI.QueryLeftUsers(u.process.Context(), &rsapi.QueryLeftUsersRequest{StaleDeviceListUsers: staleUsers}, &res); err != nil {
+		return err
 	}
+
 	if len(res.LeftUsers) == 0 {
 		return nil
 	}
