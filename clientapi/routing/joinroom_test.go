@@ -91,5 +91,23 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			t.Fatalf("expected response code to be %d, got %d", http.StatusForbidden, joinResp.Code)
 		}
 
+		// Some invalid requests
+		// room doesn't exist
+		joinResp = JoinRoomByIDOrAlias(req, aliceDev, rsAPI, userAPI, "!doesnotexist:test")
+		if joinResp.Is2xx() {
+			t.Fatalf("expected join room to fail, but didn't: %+v", joinResp)
+		}
+
+		// user from different server
+		joinResp = JoinRoomByIDOrAlias(req, &uapi.Device{UserID: "@wrong:server"}, rsAPI, userAPI, crResp.RoomAlias)
+		if joinResp.Is2xx() {
+			t.Fatalf("expected join room to fail, but didn't: %+v", joinResp)
+		}
+
+		// user doesn't exist locally
+		joinResp = JoinRoomByIDOrAlias(req, &uapi.Device{UserID: "@doesnotexist:test"}, rsAPI, userAPI, crResp.RoomAlias)
+		if joinResp.Is2xx() {
+			t.Fatalf("expected join room to fail, but didn't: %+v", joinResp)
+		}
 	})
 }
