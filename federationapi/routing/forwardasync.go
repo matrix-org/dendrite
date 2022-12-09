@@ -11,7 +11,7 @@ import (
 )
 
 // ForwardAsync implements /_matrix/federation/v1/forward_async/{txnID}/{userID}
-// This endpoint can be extracted into a separate mailserver service.
+// This endpoint can be extracted into a separate relay server service.
 func ForwardAsync(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
@@ -61,11 +61,6 @@ func ForwardAsync(
 			JSON: jsonerror.BadJSON("could not store the transaction for forwarding"),
 		}
 	}
-
-	// Naming:
-	// mailServer? assign mailserver for user?
-	// configure my mailserver
-	// Homeserver, idendity server, mailserver... why not?
 
 	return util.JSONResponse{Code: 200}
 }

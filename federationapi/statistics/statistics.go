@@ -31,7 +31,7 @@ type Statistics struct {
 
 	// How many times should we tolerate consecutive failures before we
 	// mark the destination as offline. At this point we should attempt
-	// to send messages to the user's async mailservers if we know them.
+	// to send messages to the user's async relay servers if we know them.
 	FailuresUntilAssumedOffline uint32
 }
 
@@ -65,9 +65,9 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 	if !found {
 		s.mutex.Lock()
 		server = &ServerStatistics{
-			statistics:       s,
-			serverName:       serverName,
-			knownMailservers: []gomatrixserverlib.ServerName{},
+			statistics:        s,
+			serverName:        serverName,
+			knownRelayServers: []gomatrixserverlib.ServerName{},
 		}
 		s.servers[serverName] = server
 		s.mutex.Unlock()
@@ -78,11 +78,11 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 			server.blacklisted.Store(blacklisted)
 		}
 
-		knownMailservers, err := s.DB.GetMailserversForServer(serverName)
+		knownRelayServers, err := s.DB.GetRelayServersForServer(serverName)
 		if err != nil {
-			logrus.WithError(err).Errorf("Failed to get mailserver list for %q", serverName)
+			logrus.WithError(err).Errorf("Failed to get relay server list for %q", serverName)
 		} else {
-			server.knownMailservers = knownMailservers
+			server.knownRelayServers = knownRelayServers
 		}
 	}
 	return server
@@ -93,17 +93,17 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 // many times we failed etc. It also manages the backoff time and black-
 // listing a remote host if it remains uncooperative.
 type ServerStatistics struct {
-	statistics       *Statistics                  //
-	serverName       gomatrixserverlib.ServerName //
-	blacklisted      atomic.Bool                  // is the node blacklisted
-	assumedOffline   atomic.Bool                  // is the node assumed to be offline
-	backoffStarted   atomic.Bool                  // is the backoff started
-	backoffUntil     atomic.Value                 // time.Time until this backoff interval ends
-	backoffCount     atomic.Uint32                // number of times BackoffDuration has been called
-	successCounter   atomic.Uint32                // how many times have we succeeded?
-	backoffNotifier  func()                       // notifies destination queue when backoff completes
-	notifierMutex    sync.Mutex
-	knownMailservers []gomatrixserverlib.ServerName
+	statistics        *Statistics                  //
+	serverName        gomatrixserverlib.ServerName //
+	blacklisted       atomic.Bool                  // is the node blacklisted
+	assumedOffline    atomic.Bool                  // is the node assumed to be offline
+	backoffStarted    atomic.Bool                  // is the backoff started
+	backoffUntil      atomic.Value                 // time.Time until this backoff interval ends
+	backoffCount      atomic.Uint32                // number of times BackoffDuration has been called
+	successCounter    atomic.Uint32                // how many times have we succeeded?
+	backoffNotifier   func()                       // notifies destination queue when backoff completes
+	notifierMutex     sync.Mutex
+	knownRelayServers []gomatrixserverlib.ServerName
 }
 
 const maxJitterMultiplier = 1.4
@@ -139,11 +139,11 @@ func (s *ServerStatistics) AssignBackoffNotifier(notifier func()) {
 // failure counters. If a host was blacklisted at this point then
 // we will unblacklist it.
 // `async` specifies whether the success was to the actual destination
-// or one of their mailservers.
+// or one of their relay servers.
 func (s *ServerStatistics) Success(async bool) {
 	s.cancel()
 	s.backoffCount.Store(0)
-	// NOTE : Sending to the final destination vs. a mailserver has
+	// NOTE : Sending to the final destination vs. a relay server has
 	// slightly different semantics.
 	if !async {
 		s.successCounter.Inc()
@@ -271,16 +271,16 @@ func (s *ServerStatistics) SuccessCount() uint32 {
 	return s.successCounter.Load()
 }
 
-// KnownMailservers returns the list of mailservers associated with this
+// KnownRelayServers returns the list of relay servers associated with this
 // server.
-func (s *ServerStatistics) KnownMailservers() []gomatrixserverlib.ServerName {
-	return s.knownMailservers
+func (s *ServerStatistics) KnownRelayServers() []gomatrixserverlib.ServerName {
+	return s.knownRelayServers
 }
 
-func (s *ServerStatistics) AddMailservers(mailservers []gomatrixserverlib.ServerName) {
+func (s *ServerStatistics) AddRelayServers(relayServers []gomatrixserverlib.ServerName) {
 	seenSet := make(map[gomatrixserverlib.ServerName]bool)
 	uniqueList := []gomatrixserverlib.ServerName{}
-	for _, srv := range mailservers {
+	for _, srv := range relayServers {
 		if seenSet[srv] {
 			continue
 		}
@@ -288,18 +288,18 @@ func (s *ServerStatistics) AddMailservers(mailservers []gomatrixserverlib.Server
 		uniqueList = append(uniqueList, srv)
 	}
 
-	err := s.statistics.DB.AddMailserversForServer(s.serverName, uniqueList)
+	err := s.statistics.DB.AddRelayServersForServer(s.serverName, uniqueList)
 	if err == nil {
 
 		for _, newServer := range uniqueList {
 			alreadyKnown := false
-			for _, srv := range s.knownMailservers {
+			for _, srv := range s.knownRelayServers {
 				if srv == newServer {
 					alreadyKnown = true
 				}
 			}
 			if !alreadyKnown {
-				s.knownMailservers = append(s.knownMailservers, newServer)
+				s.knownRelayServers = append(s.knownRelayServers, newServer)
 			}
 		}
 	}

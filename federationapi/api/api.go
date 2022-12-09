@@ -18,7 +18,7 @@ type FederationInternalAPI interface {
 	gomatrixserverlib.KeyDatabase
 	ClientFederationAPI
 	RoomserverFederationAPI
-	MailserverAPI
+	RelayServerAPI
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
@@ -37,20 +37,20 @@ type FederationInternalAPI interface {
 		response *PerformWakeupServersResponse,
 	) error
 
-	// Mailserver sync api used in the pinecone demos.
-	QueryMailservers(
+	// Relay Server sync api used in the pinecone demos.
+	QueryRelayServers(
 		ctx context.Context,
-		request *QueryMailserversRequest,
-		response *QueryMailserversResponse,
+		request *QueryRelayServersRequest,
+		response *QueryRelayServersResponse,
 	) error
-	PerformMailserverSync(
+	PerformRelayServerSync(
 		ctx context.Context,
-		request *PerformMailserverSyncRequest,
-		response *PerformMailserverSyncResponse,
+		request *PerformRelayServerSyncRequest,
+		response *PerformRelayServerSyncResponse,
 	) error
 }
 
-type MailserverAPI interface {
+type RelayServerAPI interface {
 	// Store async transactions for forwarding to the destination at a later time.
 	PerformStoreAsync(
 		ctx context.Context,
@@ -114,7 +114,7 @@ type FederationClient interface {
 	SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error)
 
 	SendAsyncTransaction(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error)
-	GetAsyncEvents(ctx context.Context, u gomatrixserverlib.UserID, mailserver gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetAsyncEvents, err error)
+	GetAsyncEvents(ctx context.Context, u gomatrixserverlib.UserID, relayServer gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetAsyncEvents, err error)
 
 	// Perform operations
 	LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res gomatrixserverlib.RespDirectory, err error)
@@ -265,19 +265,19 @@ type InputPublicKeysRequest struct {
 type InputPublicKeysResponse struct {
 }
 
-type QueryMailserversRequest struct {
+type QueryRelayServersRequest struct {
 	Server gomatrixserverlib.ServerName
 }
 
-type QueryMailserversResponse struct {
-	Mailservers []gomatrixserverlib.ServerName
+type QueryRelayServersResponse struct {
+	RelayServers []gomatrixserverlib.ServerName
 }
 
-type PerformMailserverSyncRequest struct {
-	Mailserver gomatrixserverlib.ServerName
+type PerformRelayServerSyncRequest struct {
+	RelayServer gomatrixserverlib.ServerName
 }
 
-type PerformMailserverSyncResponse struct {
+type PerformRelayServerSyncResponse struct {
 	SyncComplete bool
 }
 

@@ -27,8 +27,8 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	response *api.PerformDirectoryLookupResponse,
 ) (err error) {
 	stats := r.statistics.ForServer(request.ServerName)
-	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
 	}
 
 	dir, err := r.federation.LookupRoomAlias(
@@ -152,8 +152,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	unsigned map[string]interface{},
 ) error {
 	stats := r.statistics.ForServer(serverName)
-	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
 	}
 
 	_, origin, err := r.cfg.Matrix.SplitLocalID('@', userID)
@@ -420,8 +420,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
 	stats := r.statistics.ForServer(serverName)
-	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
 	}
 
 	// create a unique ID for this peek.
@@ -534,7 +534,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	// successfully completes the make-leave send-leave dance.
 	for _, serverName := range request.ServerNames {
 		stats := r.statistics.ForServer(serverName)
-		if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
+		if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
 			continue
 		}
 
@@ -639,8 +639,8 @@ func (r *FederationInternalAPI) PerformInvite(
 	}
 
 	stats := r.statistics.ForServer(destination)
-	if stats.AssumedOffline() && len(stats.KnownMailservers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known mailboxes")
+	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -833,34 +833,34 @@ func federatedAuthProvider(
 	}
 }
 
-// QueryMailservers implements api.FederationInternalAPI
-func (r *FederationInternalAPI) QueryMailservers(
+// QueryRelayServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) QueryRelayServers(
 	ctx context.Context,
-	request *api.QueryMailserversRequest,
-	response *api.QueryMailserversResponse,
+	request *api.QueryRelayServersRequest,
+	response *api.QueryRelayServersResponse,
 ) error {
-	logrus.Infof("Getting mailservers for: %s", request.Server)
-	mailservers, err := r.db.GetMailserversForServer(request.Server)
+	logrus.Infof("Getting relay servers for: %s", request.Server)
+	relayServers, err := r.db.GetRelayServersForServer(request.Server)
 	if err != nil {
 		return err
 	}
 
-	response.Mailservers = mailservers
+	response.RelayServers = relayServers
 	return nil
 }
 
-// PerformMailserverSync implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformMailserverSync(
+// PerformRelayServerSync implements api.FederationInternalAPI
+func (r *FederationInternalAPI) PerformRelayServerSync(
 	ctx context.Context,
-	request *api.PerformMailserverSyncRequest,
-	response *api.PerformMailserverSyncResponse,
+	request *api.PerformRelayServerSyncRequest,
+	response *api.PerformRelayServerSyncResponse,
 ) error {
 	userID, err := gomatrixserverlib.NewUserID("@user:"+string(r.cfg.Matrix.ServerName), false)
 	if err != nil {
 		return err
 	}
 
-	asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.Mailserver)
+	asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.RelayServer)
 	if err != nil {
 		logrus.Errorf("GetAsyncEvents: %s", err.Error())
 		return err
@@ -868,7 +868,7 @@ func (r *FederationInternalAPI) PerformMailserverSync(
 	r.processTransaction(&asyncResponse.Transaction)
 
 	for asyncResponse.Remaining > 0 {
-		asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.Mailserver)
+		asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.RelayServer)
 		if err != nil {
 			logrus.Errorf("GetAsyncEvents: %s", err.Error())
 			return err
@@ -880,7 +880,7 @@ func (r *FederationInternalAPI) PerformMailserverSync(
 }
 
 func (r *FederationInternalAPI) processTransaction(txn *gomatrixserverlib.Transaction) {
-	logrus.Warn("Processing transaction from mailserver")
+	logrus.Warn("Processing transaction from relay server")
 	mu := internal.NewMutexByRoom()
 	// js, _ := base.NATS.Prepare(base.ProcessContext, &r.cfg.Matrix.JetStream)
 	// producer := &producers.SyncAPIProducer{
@@ -948,6 +948,8 @@ func (r *FederationInternalAPI) QueryAsyncTransactions(
 
 	// TODO : Shouldn't be deleting unless the transaction was successfully returned...
 	// TODO : Should delete transaction json from table if no more associations
+	// Maybe track last received transaction, and send that as part of the request,
+	// then delete before getting the new events from the db.
 	if transaction != nil && receipt != nil {
 		err = r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{receipt})
 		if err != nil {

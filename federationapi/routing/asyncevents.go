@@ -15,7 +15,7 @@ type AsyncEventsResponse struct {
 }
 
 // GetAsyncEvents implements /_matrix/federation/v1/async_events/{userID}
-// This endpoint can be extracted into a separate mailserver service.
+// This endpoint can be extracted into a separate relay server service.
 func GetAsyncEvents(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,

@@ -21,7 +21,7 @@ type FederationAPI struct {
 	// How many consecutive failures that we should tolerate when sending federation
 	// requests to a specific server until we should assume they are offline. If we
 	// assume they are offline then we will attempt to send messages to their async
-	// mailserver if we know of one that is appropriate.
+	// relay server if we know of one that is appropriate.
 	FederationRetriesUntilAssumedOffline uint32 `yaml:"retries_until_assumed_offline"`
 
 	// FederationDisableTLSValidation disables the validation of X.509 TLS certs

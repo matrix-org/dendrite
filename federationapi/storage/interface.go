@@ -69,10 +69,10 @@ type Database interface {
 	RemoveAllServersAssumedOffline() error
 	IsServerAssumedOffline(serverName gomatrixserverlib.ServerName) (bool, error)
 
-	AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error
-	GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
-	RemoveMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error
-	RemoveAllMailserversForServer(serverName gomatrixserverlib.ServerName) error
+	AddRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+	GetRelayServersForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
+	RemoveRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+	RemoveAllRelayServersForServer(serverName gomatrixserverlib.ServerName) error
 
 	AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error
 	RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error

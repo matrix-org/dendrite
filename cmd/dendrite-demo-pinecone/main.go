@@ -67,7 +67,7 @@ var (
 	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
 )
 
-const mailserverRetryInterval = time.Second * 30
+const relayServerRetryInterval = time.Second * 30
 
 // nolint:gocyclo
 func main() {
@@ -308,26 +308,26 @@ func main() {
 
 	go func(ch <-chan pineconeEvents.Event) {
 		eLog := logrus.WithField("pinecone", "events")
-		mailserverSyncRunning := atomic.NewBool(false)
-		stopMailserverSync := make(chan bool)
+		relayServerSyncRunning := atomic.NewBool(false)
+		stopRelayServerSync := make(chan bool)
 
-		m := MailserverRetriever{
-			Context:            context.Background(),
-			ServerName:         gomatrixserverlib.ServerName(pRouter.PublicKey().String()),
-			FederationAPI:      fsAPI,
-			MailserversQueried: make(map[gomatrixserverlib.ServerName]bool),
+		m := RelayServerRetriever{
+			Context:             context.Background(),
+			ServerName:          gomatrixserverlib.ServerName(pRouter.PublicKey().String()),
+			FederationAPI:       fsAPI,
+			RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
 		}
-		m.InitializeMailservers(eLog)
+		m.InitializeRelayServers(eLog)
 
 		for event := range ch {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
-				if !mailserverSyncRunning.Load() {
-					go m.syncMailservers(stopMailserverSync, *mailserverSyncRunning)
+				if !relayServerSyncRunning.Load() {
+					go m.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
 				}
 			case pineconeEvents.PeerRemoved:
-				if mailserverSyncRunning.Load() && pRouter.PeerCount(-1) == 0 {
-					stopMailserverSync <- true
+				if relayServerSyncRunning.Load() && pRouter.PeerCount(-1) == 0 {
+					stopRelayServerSync <- true
 				}
 			case pineconeEvents.TreeParentUpdate:
 			case pineconeEvents.SnakeDescUpdate:
@@ -353,44 +353,44 @@ func main() {
 	base.WaitForShutdown()
 }
 
-type MailserverRetriever struct {
-	Context            context.Context
-	ServerName         gomatrixserverlib.ServerName
-	FederationAPI      api.FederationInternalAPI
-	MailserversQueried map[gomatrixserverlib.ServerName]bool
+type RelayServerRetriever struct {
+	Context             context.Context
+	ServerName          gomatrixserverlib.ServerName
+	FederationAPI       api.FederationInternalAPI
+	RelayServersQueried map[gomatrixserverlib.ServerName]bool
 }
 
-func (m *MailserverRetriever) InitializeMailservers(eLog *logrus.Entry) {
-	request := api.QueryMailserversRequest{Server: gomatrixserverlib.ServerName(m.ServerName)}
-	response := api.QueryMailserversResponse{}
-	err := m.FederationAPI.QueryMailservers(m.Context, &request, &response)
+func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
+	request := api.QueryRelayServersRequest{Server: gomatrixserverlib.ServerName(m.ServerName)}
+	response := api.QueryRelayServersResponse{}
+	err := m.FederationAPI.QueryRelayServers(m.Context, &request, &response)
 	if err != nil {
 		// TODO
 	}
-	for _, server := range response.Mailservers {
-		m.MailserversQueried[server] = false
+	for _, server := range response.RelayServers {
+		m.RelayServersQueried[server] = false
 	}
 
-	eLog.Infof("Registered mailservers: %v", response.Mailservers)
+	eLog.Infof("Registered relay servers: %v", response.RelayServers)
 }
 
-func (m *MailserverRetriever) syncMailservers(stop <-chan bool, running atomic.Bool) {
+func (m *RelayServerRetriever) syncRelayServers(stop <-chan bool, running atomic.Bool) {
 	defer running.Store(false)
 
-	t := time.NewTimer(mailserverRetryInterval)
+	t := time.NewTimer(relayServerRetryInterval)
 	for {
-		mailserversToQuery := []gomatrixserverlib.ServerName{}
-		for server, complete := range m.MailserversQueried {
+		relayServersToQuery := []gomatrixserverlib.ServerName{}
+		for server, complete := range m.RelayServersQueried {
 			if !complete {
-				mailserversToQuery = append(mailserversToQuery, server)
+				relayServersToQuery = append(relayServersToQuery, server)
 			}
 		}
-		if len(mailserversToQuery) == 0 {
-			// All mailservers have been synced.
+		if len(relayServersToQuery) == 0 {
+			// All relay servers have been synced.
 			return
 		}
-		m.queryMailservers(mailserversToQuery)
-		t.Reset(mailserverRetryInterval)
+		m.queryRelayServers(relayServersToQuery)
+		t.Reset(relayServerRetryInterval)
 
 		select {
 		case <-stop:
@@ -403,16 +403,16 @@ func (m *MailserverRetriever) syncMailservers(stop <-chan bool, running atomic.B
 	}
 }
 
-func (m *MailserverRetriever) queryMailservers(mailservers []gomatrixserverlib.ServerName) {
-	logrus.Info("querying mailservers for async_events")
-	for _, server := range mailservers {
-		request := api.PerformMailserverSyncRequest{Mailserver: server}
-		response := api.PerformMailserverSyncResponse{}
-		err := m.FederationAPI.PerformMailserverSync(m.Context, &request, &response)
+func (m *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
+	logrus.Info("querying relay servers for async_events")
+	for _, server := range relayServers {
+		request := api.PerformRelayServerSyncRequest{RelayServer: server}
+		response := api.PerformRelayServerSyncResponse{}
+		err := m.FederationAPI.PerformRelayServerSync(m.Context, &request, &response)
 		if err == nil {
-			m.MailserversQueried[server] = true
+			m.RelayServersQueried[server] = true
 		} else {
-			logrus.Errorf("Failed querying mailserver: %s", err.Error())
+			logrus.Errorf("Failed querying relay server: %s", err.Error())
 		}
 	}
 }

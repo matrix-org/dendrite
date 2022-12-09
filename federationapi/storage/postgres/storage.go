@@ -74,7 +74,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
-	mailservers, err := NewPostgresMailserversTable(d.db)
+	relayServers, err := NewPostgresRelayServersTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationTransactionJSON:   transactionJSON,
 		FederationBlacklist:         blacklist,
 		FederationAssumedOffline:    assumedOffline,
-		FederationMailservers:       mailservers,
+		FederationRelayServers:      relayServers,
 		FederationInboundPeeks:      inboundPeeks,
 		FederationOutboundPeeks:     outboundPeeks,
 		NotaryServerKeysJSON:        notaryJSON,

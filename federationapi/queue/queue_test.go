@@ -75,7 +75,7 @@ func createDatabase() storage.Database {
 		pendingEDUs:        make(map[*shared.Receipt]*gomatrixserverlib.EDU),
 		associatedPDUs:     make(map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}),
 		associatedEDUs:     make(map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}),
-		mailservers:        make(map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName),
+		relayServers:       make(map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName),
 	}
 }
 
@@ -90,7 +90,7 @@ type fakeDatabase struct {
 	pendingEDUs        map[*shared.Receipt]*gomatrixserverlib.EDU
 	associatedPDUs     map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}
 	associatedEDUs     map[gomatrixserverlib.ServerName]map[*shared.Receipt]struct{}
-	mailservers        map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName
+	relayServers       map[gomatrixserverlib.ServerName][]gomatrixserverlib.ServerName
 }
 
 var nidMutex sync.Mutex
@@ -341,32 +341,32 @@ func (d *fakeDatabase) IsServerAssumedOffline(serverName gomatrixserverlib.Serve
 	return assumedOffline, nil
 }
 
-func (d *fakeDatabase) GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
+func (d *fakeDatabase) GetRelayServersForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	knownMailservers := []gomatrixserverlib.ServerName{}
-	if mailservers, ok := d.mailservers[serverName]; ok {
-		knownMailservers = mailservers
+	knownRelayServers := []gomatrixserverlib.ServerName{}
+	if relayServers, ok := d.relayServers[serverName]; ok {
+		knownRelayServers = relayServers
 	}
 
-	return knownMailservers, nil
+	return knownRelayServers, nil
 }
 
-func (d *fakeDatabase) AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {
+func (d *fakeDatabase) AddRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	if knownMailservers, ok := d.mailservers[serverName]; ok {
-		for _, mailserver := range mailservers {
+	if knownRelayServers, ok := d.relayServers[serverName]; ok {
+		for _, relayServer := range relayServers {
 			alreadyKnown := false
-			for _, knownMailserver := range knownMailservers {
-				if mailserver == knownMailserver {
+			for _, knownRelayServer := range knownRelayServers {
+				if relayServer == knownRelayServer {
 					alreadyKnown = true
 				}
 			}
 			if !alreadyKnown {
-				d.mailservers[serverName] = append(d.mailservers[serverName], mailserver)
+				d.relayServers[serverName] = append(d.relayServers[serverName], relayServer)
 			}
 		}
 	}
@@ -1227,8 +1227,8 @@ func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 		<-pc.WaitForShutdown()
 	}()
 
-	mailservers := []gomatrixserverlib.ServerName{"mailserver"}
-	queues.statistics.ForServer(destination).AddMailservers(mailservers)
+	relayServers := []gomatrixserverlib.ServerName{"relayserver"}
+	queues.statistics.ForServer(destination).AddRelayServers(relayServers)
 
 	ev := mustCreatePDU(t)
 	err := queues.SendEvent(ev, "localhost", []gomatrixserverlib.ServerName{destination})
@@ -1266,8 +1266,8 @@ func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 		<-pc.WaitForShutdown()
 	}()
 
-	mailservers := []gomatrixserverlib.ServerName{"mailserver"}
-	queues.statistics.ForServer(destination).AddMailservers(mailservers)
+	relayServers := []gomatrixserverlib.ServerName{"relayserver"}
+	queues.statistics.ForServer(destination).AddRelayServers(relayServers)
 
 	ev := mustCreateEDU(t)
 	err := queues.SendEDU(ev, "localhost", []gomatrixserverlib.ServerName{destination})

@@ -39,7 +39,7 @@ type Database struct {
 	FederationJoinedHosts       tables.FederationJoinedHosts
 	FederationBlacklist         tables.FederationBlacklist
 	FederationAssumedOffline    tables.FederationAssumedOffline
-	FederationMailservers       tables.FederationMailservers
+	FederationRelayServers      tables.FederationRelayServers
 	FederationOutboundPeeks     tables.FederationOutboundPeeks
 	FederationInboundPeeks      tables.FederationInboundPeeks
 	NotaryServerKeysJSON        tables.FederationNotaryServerKeysJSON
@@ -203,25 +203,25 @@ func (d *Database) IsServerAssumedOffline(serverName gomatrixserverlib.ServerNam
 	return d.FederationAssumedOffline.SelectAssumedOffline(context.TODO(), nil, serverName)
 }
 
-func (d *Database) AddMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {
+func (d *Database) AddRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationMailservers.InsertMailservers(context.TODO(), txn, serverName, mailservers)
+		return d.FederationRelayServers.InsertRelayServers(context.TODO(), txn, serverName, relayServers)
 	})
 }
 
-func (d *Database) GetMailserversForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
-	return d.FederationMailservers.SelectMailservers(context.TODO(), nil, serverName)
+func (d *Database) GetRelayServersForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
+	return d.FederationRelayServers.SelectRelayServers(context.TODO(), nil, serverName)
 }
 
-func (d *Database) RemoveMailserversForServer(serverName gomatrixserverlib.ServerName, mailservers []gomatrixserverlib.ServerName) error {
+func (d *Database) RemoveRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationMailservers.DeleteMailservers(context.TODO(), txn, serverName, mailservers)
+		return d.FederationRelayServers.DeleteRelayServers(context.TODO(), txn, serverName, relayServers)
 	})
 }
 
-func (d *Database) RemoveAllMailserversForServer(serverName gomatrixserverlib.ServerName) error {
+func (d *Database) RemoveAllRelayServersForServer(serverName gomatrixserverlib.ServerName) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationMailservers.DeleteAllMailservers(context.TODO(), txn, serverName)
+		return d.FederationRelayServers.DeleteAllRelayServers(context.TODO(), txn, serverName)
 	})
 }
 

@@ -67,27 +67,27 @@ import (
 )
 
 const (
-	PeerTypeRemote          = pineconeRouter.PeerTypeRemote
-	PeerTypeMulticast       = pineconeRouter.PeerTypeMulticast
-	PeerTypeBluetooth       = pineconeRouter.PeerTypeBluetooth
-	PeerTypeBonjour         = pineconeRouter.PeerTypeBonjour
-	mailserverRetryInterval = time.Second * 30
+	PeerTypeRemote           = pineconeRouter.PeerTypeRemote
+	PeerTypeMulticast        = pineconeRouter.PeerTypeMulticast
+	PeerTypeBluetooth        = pineconeRouter.PeerTypeBluetooth
+	PeerTypeBonjour          = pineconeRouter.PeerTypeBonjour
+	relayServerRetryInterval = time.Second * 30
 )
 
 type DendriteMonolith struct {
-	logger             logrus.Logger
-	PineconeRouter     *pineconeRouter.Router
-	PineconeMulticast  *pineconeMulticast.Multicast
-	PineconeQUIC       *pineconeSessions.Sessions
-	PineconeManager    *pineconeConnections.ConnectionManager
-	StorageDirectory   string
-	CacheDirectory     string
-	listener           net.Listener
-	httpServer         *http.Server
-	processContext     *process.ProcessContext
-	userAPI            userapiAPI.UserInternalAPI
-	federationAPI      api.FederationInternalAPI
-	mailserversQueried map[gomatrixserverlib.ServerName]bool
+	logger              logrus.Logger
+	PineconeRouter      *pineconeRouter.Router
+	PineconeMulticast   *pineconeMulticast.Multicast
+	PineconeQUIC        *pineconeSessions.Sessions
+	PineconeManager     *pineconeConnections.ConnectionManager
+	StorageDirectory    string
+	CacheDirectory      string
+	listener            net.Listener
+	httpServer          *http.Server
+	processContext      *process.ProcessContext
+	userAPI             userapiAPI.UserInternalAPI
+	federationAPI       api.FederationInternalAPI
+	relayServersQueried map[gomatrixserverlib.ServerName]bool
 }
 
 func (m *DendriteMonolith) PublicKey() string {
@@ -439,30 +439,30 @@ func (m *DendriteMonolith) Start() {
 
 	go func(ch <-chan pineconeEvents.Event) {
 		eLog := logrus.WithField("pinecone", "events")
-		mailserverSyncRunning := atomic.NewBool(false)
-		stopMailserverSync := make(chan bool)
+		relayServerSyncRunning := atomic.NewBool(false)
+		stopRelayServerSync := make(chan bool)
 
-		// Setup mailserver info
-		request := api.QueryMailserversRequest{Server: gomatrixserverlib.ServerName(m.PublicKey())}
-		response := api.QueryMailserversResponse{}
-		err := m.federationAPI.QueryMailservers(m.processContext.Context(), &request, &response)
+		// Setup relay server info
+		request := api.QueryRelayServersRequest{Server: gomatrixserverlib.ServerName(m.PublicKey())}
+		response := api.QueryRelayServersResponse{}
+		err := m.federationAPI.QueryRelayServers(m.processContext.Context(), &request, &response)
 		if err != nil {
 			// TODO
 		}
-		m.mailserversQueried = make(map[gomatrixserverlib.ServerName]bool)
-		for _, server := range response.Mailservers {
-			m.mailserversQueried[server] = false
+		m.relayServersQueried = make(map[gomatrixserverlib.ServerName]bool)
+		for _, server := range response.RelayServers {
+			m.relayServersQueried[server] = false
 		}
 
 		for event := range ch {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
-				if !mailserverSyncRunning.Load() {
-					go m.syncMailservers(stopMailserverSync, *mailserverSyncRunning)
+				if !relayServerSyncRunning.Load() {
+					go m.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
 				}
 			case pineconeEvents.PeerRemoved:
-				if mailserverSyncRunning.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
-					stopMailserverSync <- true
+				if relayServerSyncRunning.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
+					stopRelayServerSync <- true
 				}
 			case pineconeEvents.TreeParentUpdate:
 			case pineconeEvents.SnakeDescUpdate:
@@ -486,23 +486,23 @@ func (m *DendriteMonolith) Start() {
 	}(pineconeEventChannel)
 }
 
-func (m *DendriteMonolith) syncMailservers(stop <-chan bool, running atomic.Bool) {
+func (m *DendriteMonolith) syncRelayServers(stop <-chan bool, running atomic.Bool) {
 	defer running.Store(false)
 
-	t := time.NewTimer(mailserverRetryInterval)
+	t := time.NewTimer(relayServerRetryInterval)
 	for {
-		mailserversToQuery := []gomatrixserverlib.ServerName{}
-		for server, complete := range m.mailserversQueried {
+		relayServersToQuery := []gomatrixserverlib.ServerName{}
+		for server, complete := range m.relayServersQueried {
 			if !complete {
-				mailserversToQuery = append(mailserversToQuery, server)
+				relayServersToQuery = append(relayServersToQuery, server)
 			}
 		}
-		if len(mailserversToQuery) == 0 {
-			// All mailservers have been synced.
+		if len(relayServersToQuery) == 0 {
+			// All relay servers have been synced.
 			return
 		}
-		m.queryMailservers(mailserversToQuery)
-		t.Reset(mailserverRetryInterval)
+		m.queryRelayServers(relayServersToQuery)
+		t.Reset(relayServerRetryInterval)
 
 		select {
 		case <-stop:
@@ -515,13 +515,13 @@ func (m *DendriteMonolith) syncMailservers(stop <-chan bool, running atomic.Bool
 	}
 }
 
-func (m *DendriteMonolith) queryMailservers(mailservers []gomatrixserverlib.ServerName) {
-	for _, server := range mailservers {
-		request := api.PerformMailserverSyncRequest{Mailserver: server}
-		response := api.PerformMailserverSyncResponse{}
-		err := m.federationAPI.PerformMailserverSync(m.processContext.Context(), &request, &response)
+func (m *DendriteMonolith) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
+	for _, server := range relayServers {
+		request := api.PerformRelayServerSyncRequest{RelayServer: server}
+		response := api.PerformRelayServerSyncResponse{}
+		err := m.federationAPI.PerformRelayServerSync(m.processContext.Context(), &request, &response)
 		if err == nil {
-			m.mailserversQueried[server] = true
+			m.relayServersQueried[server] = true
 		}
 	}
 }

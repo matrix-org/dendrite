@@ -67,7 +67,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
-	mailservers, err := NewSQLiteMailserversTable(d.db)
+	relayServers, err := NewSQLiteRelayServersTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationTransactionJSON:   transactionJSON,
 		FederationBlacklist:         blacklist,
 		FederationAssumedOffline:    assumedOffline,
-		FederationMailservers:       mailservers,
+		FederationRelayServers:      relayServers,
 		FederationOutboundPeeks:     outboundPeeks,
 		FederationInboundPeeks:      inboundPeeks,
 		NotaryServerKeysJSON:        notaryKeys,

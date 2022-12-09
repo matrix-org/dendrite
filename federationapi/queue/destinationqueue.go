@@ -396,7 +396,7 @@ func (oq *destinationQueue) backgroundSend() {
 // nextTransaction creates a new transaction from the pending event
 // queue and sends it.
 // Returns an error if the transaction wasn't sent. And whether the success
-// was to an async mailserver or not.
+// was to an async relay server or not.
 func (oq *destinationQueue) nextTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
@@ -409,16 +409,16 @@ func (oq *destinationQueue) nextTransaction(
 	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
 
-	mailservers := oq.statistics.KnownMailservers()
-	if oq.statistics.AssumedOffline() && len(mailservers) > 0 {
-		logrus.Infof("Sending to mailservers: %v", mailservers)
+	relayServers := oq.statistics.KnownRelayServers()
+	if oq.statistics.AssumedOffline() && len(relayServers) > 0 {
+		logrus.Infof("Sending to relay servers: %v", relayServers)
 		// TODO : how to pass through actual userID here?!?!?!?!
 		userID, userErr := gomatrixserverlib.NewUserID("@user:"+string(oq.destination), false)
 		if userErr != nil {
 			return userErr, false
 		}
-		for _, mailserver := range mailservers {
-			_, asyncErr := oq.client.SendAsyncTransaction(ctx, *userID, t, mailserver)
+		for _, relayServer := range relayServers {
+			_, asyncErr := oq.client.SendAsyncTransaction(ctx, *userID, t, relayServer)
 			if asyncErr != nil {
 				err = asyncErr
 			} else {

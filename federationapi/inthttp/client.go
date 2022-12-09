@@ -24,8 +24,8 @@ const (
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
-	FederationAPIQueryMailservers                  = "/federationapi/queryMailservers"
-	FederationAPIPerformMailserverSync             = "/federationapi/performMailserverSync"
+	FederationAPIQueryRelayServers                 = "/federationapi/queryRelayServers"
+	FederationAPIPerformRelayServerSync            = "/federationapi/performRelayServerSync"
 
 	FederationAPIPerformStoreAsyncPath      = "/federationapi/performStoreAsync"
 	FederationAPIQueryAsyncTransactionsPath = "/federationapi/queryAsyncTransactions"
@@ -516,25 +516,25 @@ func (h *httpFederationInternalAPI) QueryPublicKeys(
 	)
 }
 
-func (h *httpFederationInternalAPI) QueryMailservers(
+func (h *httpFederationInternalAPI) QueryRelayServers(
 	ctx context.Context,
-	request *api.QueryMailserversRequest,
-	response *api.QueryMailserversResponse,
+	request *api.QueryRelayServersRequest,
+	response *api.QueryRelayServersResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
-		"QueryMailservers", h.federationAPIURL+FederationAPIQueryMailservers,
+		"QueryRelayServers", h.federationAPIURL+FederationAPIQueryRelayServers,
 		h.httpClient, ctx, request, response,
 	)
 }
 
-// PerformMailserverSync implements api.FederationInternalAPI
-func (h *httpFederationInternalAPI) PerformMailserverSync(
+// PerformRelayServerSync implements api.FederationInternalAPI
+func (h *httpFederationInternalAPI) PerformRelayServerSync(
 	ctx context.Context,
-	request *api.PerformMailserverSyncRequest,
-	response *api.PerformMailserverSyncResponse,
+	request *api.PerformRelayServerSyncRequest,
+	response *api.PerformRelayServerSyncResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
-		"PerformMailserverSync", h.federationAPIURL+FederationAPIPerformMailserverSync,
+		"PerformRelayServerSync", h.federationAPIURL+FederationAPIPerformRelayServerSync,
 		h.httpClient, ctx, request, response,
 	)
 }
