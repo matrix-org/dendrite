@@ -57,7 +57,7 @@ to do so for future contributions.
 
 ## Getting up and running
 
-See the [Installation](installation.md) section for information on how to build an
+See the [Installation](../installation) section for information on how to build an
 instance of Dendrite. You will likely need this in order to test your changes.
 
 ## Code style
@@ -151,7 +151,7 @@ significant amount of CPU and RAM.
 
 Once the code builds, run [Sytest](https://github.com/matrix-org/sytest)
 according to the guide in
-[docs/sytest.md](https://github.com/matrix-org/dendrite/blob/main/docs/sytest.md#using-a-sytest-docker-image)
+[docs/development/sytest.md](https://github.com/matrix-org/dendrite/blob/main/docs/sytest.md#using-a-sytest-docker-image)
 so you can see whether something is being broken and whether there are newly
 passing tests.
 
