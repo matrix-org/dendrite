@@ -1,0 +1,94 @@
+package tables_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3"
+	"github.com/matrix-org/dendrite/setup/config"
+
+	"github.com/matrix-org/dendrite/keyserver/storage/postgres"
+	"github.com/matrix-org/dendrite/keyserver/storage/tables"
+	"github.com/matrix-org/dendrite/test"
+)
+
+func mustCreateTable(t *testing.T, dbType test.DBType) (tab tables.StaleDeviceLists, close func()) {
+	connStr, close := test.PrepareDBConnectionString(t, dbType)
+	db, err := sqlutil.Open(&config.DatabaseOptions{
+		ConnectionString: config.DataSource(connStr),
+	}, nil)
+	if err != nil {
+		t.Fatalf("failed to open database: %s", err)
+	}
+	switch dbType {
+	case test.DBTypePostgres:
+		tab, err = postgres.NewPostgresStaleDeviceListsTable(db)
+	case test.DBTypeSQLite:
+		tab, err = sqlite3.NewSqliteStaleDeviceListsTable(db)
+	}
+	if err != nil {
+		t.Fatalf("failed to create new table: %s", err)
+	}
+	return tab, close
+}
+
+func TestStaleDeviceLists(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	charlie := "@charlie:localhost"
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		tab, closeDB := mustCreateTable(t, dbType)
+		defer closeDB()
+
+		if err := tab.InsertStaleDeviceList(ctx, alice.ID, true); err != nil {
+			t.Fatalf("failed to insert stale device: %s", err)
+		}
+		if err := tab.InsertStaleDeviceList(ctx, bob.ID, true); err != nil {
+			t.Fatalf("failed to insert stale device: %s", err)
+		}
+		if err := tab.InsertStaleDeviceList(ctx, charlie, true); err != nil {
+			t.Fatalf("failed to insert stale device: %s", err)
+		}
+
+		// Query one server
+		wantStaleUsers := []string{alice.ID, bob.ID}
+		gotStaleUsers, err := tab.SelectUserIDsWithStaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		if err != nil {
+			t.Fatalf("failed to query stale device lists: %s", err)
+		}
+		if !test.UnsortedStringSliceEqual(wantStaleUsers, gotStaleUsers) {
+			t.Fatalf("expected stale users %v, got %v", wantStaleUsers, gotStaleUsers)
+		}
+
+		// Query all servers
+		wantStaleUsers = []string{alice.ID, bob.ID, charlie}
+		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []gomatrixserverlib.ServerName{})
+		if err != nil {
+			t.Fatalf("failed to query stale device lists: %s", err)
+		}
+		if !test.UnsortedStringSliceEqual(wantStaleUsers, gotStaleUsers) {
+			t.Fatalf("expected stale users %v, got %v", wantStaleUsers, gotStaleUsers)
+		}
+
+		// Delete stale devices
+		deleteUsers := []string{alice.ID, bob.ID}
+		if err = tab.DeleteStaleDeviceLists(ctx, nil, deleteUsers); err != nil {
+			t.Fatalf("failed to delete stale device lists: %s", err)
+		}
+
+		// Verify we don't get anything back after deleting
+		gotStaleUsers, err = tab.SelectUserIDsWithStaleDeviceLists(ctx, []gomatrixserverlib.ServerName{"test"})
+		if err != nil {
+			t.Fatalf("failed to query stale device lists: %s", err)
+		}
+
+		if gotCount := len(gotStaleUsers); gotCount > 0 {
+			t.Fatalf("expected no stale users, got %d", gotCount)
+		}
+	})
+}
