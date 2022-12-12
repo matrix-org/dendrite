@@ -180,13 +180,13 @@ func startup() {
 	base := base.NewBaseDendrite(cfg, "Monolith")
 	defer base.Close() // nolint: errcheck
 
+	rsAPI := roomserver.NewInternalAPI(base)
+
 	federation := conn.CreateFederationClient(base, pSessions)
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation, rsAPI)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-
-	rsAPI := roomserver.NewInternalAPI(base)
 
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)

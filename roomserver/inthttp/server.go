@@ -203,4 +203,9 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router, enableMe
 		RoomserverQueryMembershipAtEventPath,
 		httputil.MakeInternalRPCAPI("RoomserverQueryMembershipAtEventPath", enableMetrics, r.QueryMembershipAtEvent),
 	)
+
+	internalAPIMux.Handle(
+		RoomserverQueryLeftMembersPath,
+		httputil.MakeInternalRPCAPI("RoomserverQueryLeftMembersPath", enableMetrics, r.QueryLeftUsers),
+	)
 }
