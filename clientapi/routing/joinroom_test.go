@@ -29,7 +29,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		defer baseClose()
 
 		rsAPI := roomserver.NewInternalAPI(base)
-		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil)
+		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
 		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
 		asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 		rsAPI.SetFederationAPI(nil, nil) // creates the rs.Inputer etc
