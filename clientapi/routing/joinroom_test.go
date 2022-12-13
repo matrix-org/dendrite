@@ -53,7 +53,7 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 		bobDev := &uapi.Device{UserID: bob.ID}
 		charlieDev := &uapi.Device{UserID: charlie.ID, AccountType: uapi.AccountTypeGuest}
 
-		// create the room
+		// create a room with disabled guest access and invite Bob
 		resp := createRoom(ctx, createRoomRequest{
 			Name:          "testing",
 			IsDirect:      true,
@@ -65,6 +65,21 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 			GuestCanJoin:  false,
 		}, aliceDev, &base.Cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
 		crResp, ok := resp.JSON.(createRoomResponse)
+		if !ok {
+			t.Fatalf("response is not a createRoomResponse: %+v", resp)
+		}
+
+		// create a room with guest access enabled and invite Charlie
+		resp = createRoom(ctx, createRoomRequest{
+			Name:         "testing",
+			IsDirect:     true,
+			Topic:        "testing",
+			Visibility:   "public",
+			Preset:       presetPublicChat,
+			Invite:       []string{charlie.ID},
+			GuestCanJoin: true,
+		}, aliceDev, &base.Cfg.ClientAPI, userAPI, rsAPI, asAPI, time.Now())
+		crRespWithGuestAccess, ok := resp.JSON.(createRoomResponse)
 		if !ok {
 			t.Fatalf("response is not a createRoomResponse: %+v", resp)
 		}
@@ -123,6 +138,11 @@ func TestJoinRoomByIDOrAlias(t *testing.T) {
 				name:   "roomAlias does not exist",
 				device: aliceDev,
 				roomID: "#doesnotexist:test",
+			},
+			{
+				name:   "room with guest_access event",
+				device: charlieDev,
+				roomID: crRespWithGuestAccess.RoomID,
 			},
 		}
 
