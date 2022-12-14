@@ -26,7 +26,6 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
-	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
@@ -118,13 +117,12 @@ func Send(
 		}
 	}
 
-	t := fedInternal.NewTxnReq(
+	t := internal.NewTxnReq(
 		rsAPI,
 		keyAPI,
 		cfg.Matrix.ServerName,
 		keys,
 		mu,
-		servers,
 		producer,
 		cfg.Matrix.Presence.EnableInbound,
 		txnEvents.PDUs,

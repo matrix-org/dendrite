@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/test"
@@ -185,14 +184,13 @@ func (c *txnFedClient) LookupMissingEvents(ctx context.Context, origin, s gomatr
 	return c.getMissingEvents(missing)
 }
 
-func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, pdus []json.RawMessage) *fedInternal.TxnReq {
-	t := fedInternal.NewTxnReq(
+func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, pdus []json.RawMessage) *internal.TxnReq {
+	t := internal.NewTxnReq(
 		rsAPI,
 		nil,
 		"",
 		&test.NopJSONVerifier{},
 		internal.NewMutexByRoom(),
-		nil,
 		nil,
 		false,
 		pdus,
@@ -207,7 +205,7 @@ func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, pdus []json.RawMes
 	return &t
 }
 
-func mustProcessTransaction(t *testing.T, txn *fedInternal.TxnReq, pdusWithErrors []string) {
+func mustProcessTransaction(t *testing.T, txn *internal.TxnReq, pdusWithErrors []string) {
 	res, err := txn.ProcessTransaction(context.Background())
 	if err != nil {
 		t.Errorf("txn.processTransaction returned an error: %v", err)

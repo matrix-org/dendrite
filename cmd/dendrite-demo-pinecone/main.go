@@ -38,13 +38,16 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/relayapi"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -216,6 +219,11 @@ func main() {
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
+	// TODO : What if I had another dendrite function, where I just passed in the fed_client,
+	// rsAPI, userAPI, keyRing & any other info. Then that thing is what handles doing the
+	// async_events querying?
+	// ie. don't tie it into the federationInternalAPI & get rid of the associated mess.
+
 	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
@@ -311,11 +319,32 @@ func main() {
 		relayServerSyncRunning := atomic.NewBool(false)
 		stopRelayServerSync := make(chan bool)
 
+		js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.FederationAPI.Matrix.JetStream)
+		producer := &producers.SyncAPIProducer{
+			JetStream:              js,
+			TopicReceiptEvent:      base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+			TopicSendToDeviceEvent: base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+			TopicTypingEvent:       base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
+			TopicPresenceEvent:     base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+			TopicDeviceListUpdate:  base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+			TopicSigningKeyUpdate:  base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+			Config:                 &base.Cfg.FederationAPI,
+			UserAPI:                userAPI,
+		}
+
 		m := RelayServerRetriever{
 			Context:             context.Background(),
 			ServerName:          gomatrixserverlib.ServerName(pRouter.PublicKey().String()),
 			FederationAPI:       fsAPI,
 			RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
+			RelayAPI: relayapi.NewRelayAPI(
+				federation,
+				rsAPI,
+				keyRing,
+				producer,
+				cfg.Global.Presence.EnableInbound,
+				cfg.Global.ServerName,
+			),
 		}
 		m.InitializeRelayServers(eLog)
 
@@ -358,6 +387,7 @@ type RelayServerRetriever struct {
 	ServerName          gomatrixserverlib.ServerName
 	FederationAPI       api.FederationInternalAPI
 	RelayServersQueried map[gomatrixserverlib.ServerName]bool
+	RelayAPI            relayapi.RelayAPI
 }
 
 func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
@@ -406,11 +436,19 @@ func (m *RelayServerRetriever) syncRelayServers(stop <-chan bool, running atomic
 func (m *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
 	logrus.Info("querying relay servers for async_events")
 	for _, server := range relayServers {
-		request := api.PerformRelayServerSyncRequest{RelayServer: server}
-		response := api.PerformRelayServerSyncResponse{}
-		err := m.FederationAPI.PerformRelayServerSync(m.Context, &request, &response)
+		userID, err := gomatrixserverlib.NewUserID("@user:"+string(m.ServerName), false)
+		if err != nil {
+			return
+		}
+		err = m.RelayAPI.PerformRelayServerSync(*userID, server)
 		if err == nil {
 			m.RelayServersQueried[server] = true
+			// TODO : What happens if your relay receives new messages after this point?
+			// Should you continue to check with them, or should they try and contact you?
+			// They could send a "new_async_events" message your way maybe?
+			// Then you could mark them as needing to be queried again.
+			// What if you miss this message?
+			// Maybe you should try querying them again after a certain period of time as a backup?
 		} else {
 			logrus.Errorf("Failed querying relay server: %s", err.Error())
 		}

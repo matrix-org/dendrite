@@ -15,7 +15,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
 	"github.com/matrix-org/dendrite/federationapi/storage/shared"
-	"github.com/matrix-org/dendrite/internal"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
@@ -847,69 +846,6 @@ func (r *FederationInternalAPI) QueryRelayServers(
 
 	response.RelayServers = relayServers
 	return nil
-}
-
-// PerformRelayServerSync implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformRelayServerSync(
-	ctx context.Context,
-	request *api.PerformRelayServerSyncRequest,
-	response *api.PerformRelayServerSyncResponse,
-) error {
-	userID, err := gomatrixserverlib.NewUserID("@user:"+string(r.cfg.Matrix.ServerName), false)
-	if err != nil {
-		return err
-	}
-
-	asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.RelayServer)
-	if err != nil {
-		logrus.Errorf("GetAsyncEvents: %s", err.Error())
-		return err
-	}
-	r.processTransaction(&asyncResponse.Transaction)
-
-	for asyncResponse.Remaining > 0 {
-		asyncResponse, err := r.federation.GetAsyncEvents(ctx, *userID, request.RelayServer)
-		if err != nil {
-			logrus.Errorf("GetAsyncEvents: %s", err.Error())
-			return err
-		}
-		r.processTransaction(&asyncResponse.Transaction)
-	}
-
-	return nil
-}
-
-func (r *FederationInternalAPI) processTransaction(txn *gomatrixserverlib.Transaction) {
-	logrus.Warn("Processing transaction from relay server")
-	mu := internal.NewMutexByRoom()
-	// js, _ := base.NATS.Prepare(base.ProcessContext, &r.cfg.Matrix.JetStream)
-	// producer := &producers.SyncAPIProducer{
-	// 	JetStream:              js,
-	// 	TopicReceiptEvent:      r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-	// 	TopicSendToDeviceEvent: r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-	// 	TopicTypingEvent:       r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-	// 	TopicPresenceEvent:     r.cfg.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-	// 	TopicDeviceListUpdate:  r.cfg.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-	// 	TopicSigningKeyUpdate:  r.cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
-	// 	Config:                 r.cfg,
-	// 	UserAPI:                r.userAPI,
-	// }
-	t := NewTxnReq(
-		r.rsAPI,
-		nil,
-		r.cfg.Matrix.ServerName,
-		r.keyRing,
-		mu,
-		nil,
-		nil, // TODO : assign producer to process EDUs
-		r.cfg.Matrix.Presence.EnableInbound,
-		txn.PDUs,
-		txn.EDUs,
-		txn.Origin,
-		txn.TransactionID,
-		txn.Destination)
-
-	t.ProcessTransaction(context.TODO())
 }
 
 // PerformStoreAsync implements api.FederationInternalAPI

@@ -43,11 +43,6 @@ type FederationInternalAPI interface {
 		request *QueryRelayServersRequest,
 		response *QueryRelayServersResponse,
 	) error
-	PerformRelayServerSync(
-		ctx context.Context,
-		request *PerformRelayServerSyncRequest,
-		response *PerformRelayServerSyncResponse,
-	) error
 }
 
 type RelayServerAPI interface {
@@ -271,14 +266,6 @@ type QueryRelayServersRequest struct {
 
 type QueryRelayServersResponse struct {
 	RelayServers []gomatrixserverlib.ServerName
-}
-
-type PerformRelayServerSyncRequest struct {
-	RelayServer gomatrixserverlib.ServerName
-}
-
-type PerformRelayServerSyncResponse struct {
-	SyncComplete bool
 }
 
 type PerformStoreAsyncRequest struct {

@@ -22,10 +22,8 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/federationapi/types"
-	"github.com/matrix-org/dendrite/internal"
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	syncTypes "github.com/matrix-org/dendrite/syncapi/types"
@@ -61,8 +59,7 @@ type TxnReq struct {
 	keyAPI                 keyapi.FederationKeyAPI
 	ourServerName          gomatrixserverlib.ServerName
 	keys                   gomatrixserverlib.JSONVerifier
-	roomsMu                *internal.MutexByRoom
-	servers                federationAPI.ServersInRoomProvider
+	roomsMu                *MutexByRoom
 	producer               *producers.SyncAPIProducer
 	inboundPresenceEnabled bool
 }
@@ -72,8 +69,7 @@ func NewTxnReq(
 	keyAPI keyapi.FederationKeyAPI,
 	ourServerName gomatrixserverlib.ServerName,
 	keys gomatrixserverlib.JSONVerifier,
-	roomsMu *internal.MutexByRoom,
-	servers federationAPI.ServersInRoomProvider,
+	roomsMu *MutexByRoom,
 	producer *producers.SyncAPIProducer,
 	inboundPresenceEnabled bool,
 	pdus []json.RawMessage,
@@ -88,7 +84,6 @@ func NewTxnReq(
 		ourServerName:          ourServerName,
 		keys:                   keys,
 		roomsMu:                roomsMu,
-		servers:                servers,
 		producer:               producer,
 		inboundPresenceEnabled: inboundPresenceEnabled,
 	}

@@ -25,7 +25,6 @@ const (
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
 	FederationAPIQueryRelayServers                 = "/federationapi/queryRelayServers"
-	FederationAPIPerformRelayServerSync            = "/federationapi/performRelayServerSync"
 
 	FederationAPIPerformStoreAsyncPath      = "/federationapi/performStoreAsync"
 	FederationAPIQueryAsyncTransactionsPath = "/federationapi/queryAsyncTransactions"
@@ -523,18 +522,6 @@ func (h *httpFederationInternalAPI) QueryRelayServers(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryRelayServers", h.federationAPIURL+FederationAPIQueryRelayServers,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-// PerformRelayServerSync implements api.FederationInternalAPI
-func (h *httpFederationInternalAPI) PerformRelayServerSync(
-	ctx context.Context,
-	request *api.PerformRelayServerSyncRequest,
-	response *api.PerformRelayServerSyncResponse,
-) error {
-	return httputil.CallInternalRPCAPI(
-		"PerformRelayServerSync", h.federationAPIURL+FederationAPIPerformRelayServerSync,
 		h.httpClient, ctx, request, response,
 	)
 }
