@@ -49,7 +49,7 @@ type RelayServerAPI interface {
 
 type PerformRelayServerSyncRequest struct {
 	UserID      gomatrixserverlib.UserID     `json:"user_id"`
-	RelayServer gomatrixserverlib.ServerName `json:"relay_name"`
+	RelayServer gomatrixserverlib.ServerName `json:"relay_server"`
 }
 
 type PerformRelayServerSyncResponse struct {
@@ -72,10 +72,12 @@ type PerformStoreAsyncResponse struct {
 }
 
 type QueryAsyncTransactionsRequest struct {
-	UserID gomatrixserverlib.UserID `json:"user_id"`
+	UserID        gomatrixserverlib.UserID     `json:"user_id"`
+	PreviousEntry gomatrixserverlib.RelayEntry `json:"prev_entry,omitempty"`
 }
 
 type QueryAsyncTransactionsResponse struct {
-	Txn            gomatrixserverlib.Transaction `json:"transaction"`
-	RemainingCount uint32                        `json:"remaining"`
+	Txn           gomatrixserverlib.Transaction `json:"transaction"`
+	EntryID       int64                         `json:"entry_id"`
+	EntriesQueued bool                          `json:entries_queued`
 }

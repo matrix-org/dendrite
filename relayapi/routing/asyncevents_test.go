@@ -14,6 +14,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func createAsyncQuery(
+	userID gomatrixserverlib.UserID,
+	prevEntry gomatrixserverlib.RelayEntry,
+	relayServer gomatrixserverlib.ServerName,
+) gomatrixserverlib.FederationRequest {
+	var federationPathPrefixV1 = "/_matrix/federation/v1"
+	path := federationPathPrefixV1 + "/async_events/" + userID.Raw()
+	request := gomatrixserverlib.NewFederationRequest("GET", userID.Domain(), relayServer, path)
+	request.SetContent(prevEntry)
+
+	return request
+}
+
 func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 	testDB := storage.NewFakeRelayDatabase()
 	db := shared.Database{
@@ -37,12 +50,16 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
+	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1}, "relay")
+	response := routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, uint32(0), jsonResponse.Remaining)
-	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
+	assert.Equal(t, false, jsonResponse.EntriesQueued)
+	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
+
+	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
+	assert.Equal(t, count, int64(0))
 }
 
 func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
@@ -58,7 +75,6 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 		t.Fatalf("Invalid userID: %s", err.Error())
 	}
 	transaction := createTransaction()
-
 	receipt, err := db.StoreAsyncTransaction(context.Background(), transaction)
 	if err != nil {
 		t.Fatalf("Failed to store transaction: %s", err.Error())
@@ -78,12 +94,25 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
+	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1}, "relay")
+	response := routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, uint32(0), jsonResponse.Remaining)
-	assert.Equal(t, transaction, jsonResponse.Transaction)
+	assert.Equal(t, true, jsonResponse.EntriesQueued)
+	assert.Equal(t, transaction, jsonResponse.Txn)
+
+	// And once more to clear the queue
+	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
+	response = routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	jsonResponse = response.JSON.(routing.AsyncEventsResponse)
+	assert.Equal(t, false, jsonResponse.EntriesQueued)
+	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
+
+	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
+	assert.Equal(t, count, int64(0))
 }
 
 func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
@@ -135,17 +164,31 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
+	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1}, "relay")
+	response := routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, uint32(1), jsonResponse.Remaining)
-	assert.Equal(t, transaction, jsonResponse.Transaction)
+	assert.Equal(t, true, jsonResponse.EntriesQueued)
+	assert.Equal(t, transaction, jsonResponse.Txn)
 
-	response = routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
+	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
+	response = routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse = response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, uint32(0), jsonResponse.Remaining)
-	assert.Equal(t, transaction2, jsonResponse.Transaction)
+	assert.Equal(t, true, jsonResponse.EntriesQueued)
+	assert.Equal(t, transaction2, jsonResponse.Txn)
+
+	// And once more to clear the queue
+	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
+	response = routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	jsonResponse = response.JSON.(routing.AsyncEventsResponse)
+	assert.Equal(t, false, jsonResponse.EntriesQueued)
+	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
+
+	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
+	assert.Equal(t, count, int64(0))
 }

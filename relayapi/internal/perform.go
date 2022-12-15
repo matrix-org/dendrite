@@ -30,20 +30,25 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	request *api.PerformRelayServerSyncRequest,
 	response *api.PerformRelayServerSyncResponse,
 ) error {
-	asyncResponse, err := r.fedClient.GetAsyncEvents(ctx, request.UserID, request.RelayServer)
+	prevEntry := gomatrixserverlib.RelayEntry{EntryID: -1}
+	asyncResponse, err := r.fedClient.GetAsyncEvents(ctx, request.UserID, prevEntry, request.RelayServer)
 	if err != nil {
 		logrus.Errorf("GetAsyncEvents: %s", err.Error())
 		return err
 	}
-	r.processTransaction(&asyncResponse.Transaction)
+	r.processTransaction(&asyncResponse.Txn)
 
-	for asyncResponse.Remaining > 0 {
-		asyncResponse, err := r.fedClient.GetAsyncEvents(ctx, request.UserID, request.RelayServer)
+	for asyncResponse.EntriesQueued {
+		logrus.Info("Retrieving next entry from relay")
+		logrus.Infof("Previous entry: %v", prevEntry)
+		asyncResponse, err = r.fedClient.GetAsyncEvents(ctx, request.UserID, prevEntry, request.RelayServer)
+		prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
+		logrus.Infof("New previous entry: %v", prevEntry)
 		if err != nil {
 			logrus.Errorf("GetAsyncEvents: %s", err.Error())
 			return err
 		}
-		r.processTransaction(&asyncResponse.Transaction)
+		r.processTransaction(&asyncResponse.Txn)
 	}
 
 	return nil
@@ -58,6 +63,7 @@ func (r *RelayInternalAPI) PerformStoreAsync(
 	logrus.Warnf("Storing transaction for %v", request.UserID)
 	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
 	if err != nil {
+		logrus.Errorf("db.StoreAsyncTransaction: %s", err.Error())
 		return err
 	}
 	err = r.db.AssociateAsyncTransactionWithDestinations(
@@ -77,36 +83,37 @@ func (r *RelayInternalAPI) QueryAsyncTransactions(
 	request *api.QueryAsyncTransactionsRequest,
 	response *api.QueryAsyncTransactionsResponse,
 ) error {
-	logrus.Warnf("Obtaining transaction for %v", request.UserID)
-	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
-	if err != nil {
-		return err
-	}
-
-	// TODO : Shouldn't be deleting unless the transaction was successfully returned...
-	// TODO : Should delete transaction json from table if no more associations
-	// Maybe track last received transaction, and send that as part of the request,
-	// then delete before getting the new events from the db.
-	if transaction != nil && receipt != nil {
-		err = r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{receipt})
+	logrus.Infof("QueryAsyncTransactions for %s", request.UserID.Raw())
+	if request.PreviousEntry.EntryID >= 0 {
+		logrus.Infof("Cleaning previous entry (%v) from db for %s",
+			request.PreviousEntry.EntryID,
+			request.UserID.Raw(),
+		)
+		prevReceipt := shared.NewReceipt(request.PreviousEntry.EntryID)
+		err := r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{&prevReceipt})
 		if err != nil {
+			logrus.Errorf("db.CleanAsyncTransactions: %s", err.Error())
 			return err
 		}
-
-		// TODO : Clean async transactions json
 	}
 
-	// TODO : These db calls should happen at the same time right?
-	count, err := r.db.GetAsyncTransactionCount(ctx, request.UserID)
+	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
 	if err != nil {
+		logrus.Errorf("db.GetAsyncTransaction: %s", err.Error())
 		return err
 	}
 
-	response.RemainingCount = uint32(count)
-	if transaction != nil {
+	if transaction != nil && receipt != nil {
+		logrus.Infof("Obtained transaction (%v) for %s", transaction.TransactionID, request.UserID.Raw())
 		response.Txn = *transaction
-		logrus.Warnf("Obtained transaction: %v", transaction.TransactionID)
+		response.EntryID = receipt.GetNID()
+		response.EntriesQueued = true
+	} else {
+		logrus.Infof("No more entries in the queue for %s", request.UserID.Raw())
+		response.EntryID = -1
+		response.EntriesQueued = false
 	}
+
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // ForwardAsync implements /_matrix/federation/v1/forward_async/{txnID}/{userID}
@@ -25,12 +26,13 @@ func ForwardAsync(
 	}
 
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
-		println("The request body could not be decoded into valid JSON. " + err.Error())
+		logrus.Info("The request body could not be decoded into valid JSON. " + err.Error())
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
 		}
 	}
+
 	// Transactions are limited in size; they can have at most 50 PDUs and 100 EDUs.
 	// https://matrix.org/docs/spec/server_server/latest#transactions
 	if len(txnEvents.PDUs) > 50 || len(txnEvents.EDUs) > 100 {
