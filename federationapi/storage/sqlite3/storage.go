@@ -55,14 +55,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
-	queueTransactions, err := NewSQLiteQueueTransactionsTable(d.db)
-	if err != nil {
-		return nil, err
-	}
-	transactionJSON, err := NewSQLiteTransactionJSONTable(d.db)
-	if err != nil {
-		return nil, err
-	}
 	assumedOffline, err := NewSQLiteAssumedOfflineTable(d.db)
 	if err != nil {
 		return nil, err
@@ -104,24 +96,22 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 	d.Database = shared.Database{
-		DB:                          d.db,
-		IsLocalServerName:           isLocalServerName,
-		Cache:                       cache,
-		Writer:                      d.writer,
-		FederationJoinedHosts:       joinedHosts,
-		FederationQueuePDUs:         queuePDUs,
-		FederationQueueEDUs:         queueEDUs,
-		FederationQueueJSON:         queueJSON,
-		FederationQueueTransactions: queueTransactions,
-		FederationTransactionJSON:   transactionJSON,
-		FederationBlacklist:         blacklist,
-		FederationAssumedOffline:    assumedOffline,
-		FederationRelayServers:      relayServers,
-		FederationOutboundPeeks:     outboundPeeks,
-		FederationInboundPeeks:      inboundPeeks,
-		NotaryServerKeysJSON:        notaryKeys,
-		NotaryServerKeysMetadata:    notaryKeysMetadata,
-		ServerSigningKeys:           serverSigningKeys,
+		DB:                       d.db,
+		IsLocalServerName:        isLocalServerName,
+		Cache:                    cache,
+		Writer:                   d.writer,
+		FederationJoinedHosts:    joinedHosts,
+		FederationQueuePDUs:      queuePDUs,
+		FederationQueueEDUs:      queueEDUs,
+		FederationQueueJSON:      queueJSON,
+		FederationBlacklist:      blacklist,
+		FederationAssumedOffline: assumedOffline,
+		FederationRelayServers:   relayServers,
+		FederationOutboundPeeks:  outboundPeeks,
+		FederationInboundPeeks:   inboundPeeks,
+		NotaryServerKeysJSON:     notaryKeys,
+		NotaryServerKeysMetadata: notaryKeysMetadata,
+		ServerSigningKeys:        serverSigningKeys,
 	}
 	return &d, nil
 }

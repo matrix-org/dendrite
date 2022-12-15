@@ -62,6 +62,7 @@ type Dendrite struct {
 	RoomServer    RoomServer    `yaml:"room_server"`
 	SyncAPI       SyncAPI       `yaml:"sync_api"`
 	UserAPI       UserAPI       `yaml:"user_api"`
+	RelayAPI      RelayAPI      `yaml:"relay_api"`
 
 	MSCs MSCs `yaml:"mscs"`
 

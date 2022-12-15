@@ -5,21 +5,21 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/matrix-org/dendrite/federationapi/internal"
-	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/relayapi/internal"
+	"github.com/matrix-org/dendrite/relayapi/routing"
+	"github.com/matrix-org/dendrite/relayapi/storage"
+	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
-	testDB := createDatabase()
+	testDB := storage.NewFakeRelayDatabase()
 	db := shared.Database{
-		Writer:                      sqlutil.NewDummyWriter(),
-		FederationQueueTransactions: testDB,
-		FederationTransactionJSON:   testDB,
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
@@ -33,11 +33,11 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 		t.Fatalf("Failed to store transaction: %s", err.Error())
 	}
 
-	fedAPI := internal.NewFederationInternalAPI(
-		&db, &config.FederationAPI{}, nil, nil, nil, nil, nil, nil,
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.GetAsyncEvents(httpReq, nil, fedAPI, *userID)
+	response := routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
@@ -46,11 +46,11 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 }
 
 func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
-	testDB := createDatabase()
+	testDB := storage.NewFakeRelayDatabase()
 	db := shared.Database{
-		Writer:                      sqlutil.NewDummyWriter(),
-		FederationQueueTransactions: testDB,
-		FederationTransactionJSON:   testDB,
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
@@ -74,11 +74,11 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 		t.Fatalf("Failed to associate transaction with user: %s", err.Error())
 	}
 
-	fedAPI := internal.NewFederationInternalAPI(
-		&db, &config.FederationAPI{}, nil, nil, nil, nil, nil, nil,
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.GetAsyncEvents(httpReq, nil, fedAPI, *userID)
+	response := routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
@@ -87,11 +87,11 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 }
 
 func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
-	testDB := createDatabase()
+	testDB := storage.NewFakeRelayDatabase()
 	db := shared.Database{
-		Writer:                      sqlutil.NewDummyWriter(),
-		FederationQueueTransactions: testDB,
-		FederationTransactionJSON:   testDB,
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
@@ -131,18 +131,18 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		t.Fatalf("Failed to associate transaction with user: %s", err.Error())
 	}
 
-	fedAPI := internal.NewFederationInternalAPI(
-		&db, &config.FederationAPI{}, nil, nil, nil, nil, nil, nil,
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.GetAsyncEvents(httpReq, nil, fedAPI, *userID)
+	response := routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
 	assert.Equal(t, uint32(1), jsonResponse.Remaining)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
-	response = routing.GetAsyncEvents(httpReq, nil, fedAPI, *userID)
+	response = routing.GetAsyncEvents(httpReq, nil, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse = response.JSON.(routing.AsyncEventsResponse)

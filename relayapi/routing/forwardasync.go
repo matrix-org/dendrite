@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -15,7 +15,7 @@ import (
 func ForwardAsync(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
-	fedAPI api.FederationInternalAPI,
+	relayAPI api.RelayInternalAPI,
 	txnID gomatrixserverlib.TransactionID,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
@@ -54,7 +54,7 @@ func ForwardAsync(
 		UserID: userID,
 	}
 	res := api.PerformStoreAsyncResponse{}
-	err := fedAPI.PerformStoreAsync(httpReq.Context(), &req, &res)
+	err := relayAPI.PerformStoreAsync(httpReq.Context(), &req, &res)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

@@ -26,9 +26,6 @@ const (
 	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
 	FederationAPIQueryRelayServers                 = "/federationapi/queryRelayServers"
 
-	FederationAPIPerformStoreAsyncPath      = "/federationapi/performStoreAsync"
-	FederationAPIQueryAsyncTransactionsPath = "/federationapi/queryAsyncTransactions"
-
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
 	FederationAPIQueryKeysPath           = "/federationapi/client/queryKeys"
@@ -522,28 +519,6 @@ func (h *httpFederationInternalAPI) QueryRelayServers(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryRelayServers", h.federationAPIURL+FederationAPIQueryRelayServers,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpFederationInternalAPI) PerformStoreAsync(
-	ctx context.Context,
-	request *api.PerformStoreAsyncRequest,
-	response *api.PerformStoreAsyncResponse,
-) error {
-	return httputil.CallInternalRPCAPI(
-		"PerformStoreAsync", h.federationAPIURL+FederationAPIPerformStoreAsyncPath,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpFederationInternalAPI) QueryAsyncTransactions(
-	ctx context.Context,
-	request *api.QueryAsyncTransactionsRequest,
-	response *api.QueryAsyncTransactionsResponse,
-) error {
-	return httputil.CallInternalRPCAPI(
-		"QueryAsyncTransactions", h.federationAPIURL+FederationAPIQueryAsyncTransactionsPath,
 		h.httpClient, ctx, request, response,
 	)
 }

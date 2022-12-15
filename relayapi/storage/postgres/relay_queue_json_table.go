@@ -23,60 +23,60 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-const transactionJSONSchema = `
--- The federationsender_transaction_json table contains event contents that
+const relayQueueJSONSchema = `
+-- The relayapi_queue_json table contains event contents that
 -- we are storing for future forwarding. 
-CREATE TABLE IF NOT EXISTS federationsender_transaction_json (
+CREATE TABLE IF NOT EXISTS relayapi_queue_json (
 	-- The JSON NID. This allows cross-referencing to find the JSON blob.
 	json_nid BIGSERIAL,
 	-- The JSON body. Text so that we preserve UTF-8.
 	json_body TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federationsender_transaction_json_json_nid_idx
-    ON federationsender_transaction_json (json_nid);
+CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_json_json_nid_idx
+    ON relayapi_queue_json (json_nid);
 `
 
-const insertTransactionJSONSQL = "" +
-	"INSERT INTO federationsender_transaction_json (json_body)" +
+const insertQueueJSONSQL = "" +
+	"INSERT INTO relayapi_queue_json (json_body)" +
 	" VALUES ($1)" +
 	" RETURNING json_nid"
 
-const deleteTransactionJSONSQL = "" +
-	"DELETE FROM federationsender_transaction_json WHERE json_nid = ANY($1)"
+const deleteQueueJSONSQL = "" +
+	"DELETE FROM relayapi_queue_json WHERE json_nid = ANY($1)"
 
-const selectTransactionJSONSQL = "" +
-	"SELECT json_nid, json_body FROM federationsender_transaction_json" +
+const selectQueueJSONSQL = "" +
+	"SELECT json_nid, json_body FROM relayapi_queue_json" +
 	" WHERE json_nid = ANY($1)"
 
-type transactionJSONStatements struct {
+type relayQueueJSONStatements struct {
 	db             *sql.DB
 	insertJSONStmt *sql.Stmt
 	deleteJSONStmt *sql.Stmt
 	selectJSONStmt *sql.Stmt
 }
 
-func NewPostgresTransactionJSONTable(db *sql.DB) (s *transactionJSONStatements, err error) {
-	s = &transactionJSONStatements{
+func NewPostgresRelayQueueJSONTable(db *sql.DB) (s *relayQueueJSONStatements, err error) {
+	s = &relayQueueJSONStatements{
 		db: db,
 	}
-	_, err = s.db.Exec(transactionJSONSchema)
+	_, err = s.db.Exec(relayQueueJSONSchema)
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = s.db.Prepare(insertTransactionJSONSQL); err != nil {
+	if s.insertJSONStmt, err = s.db.Prepare(insertQueueJSONSQL); err != nil {
 		return
 	}
-	if s.deleteJSONStmt, err = s.db.Prepare(deleteTransactionJSONSQL); err != nil {
+	if s.deleteJSONStmt, err = s.db.Prepare(deleteQueueJSONSQL); err != nil {
 		return
 	}
-	if s.selectJSONStmt, err = s.db.Prepare(selectTransactionJSONSQL); err != nil {
+	if s.selectJSONStmt, err = s.db.Prepare(selectQueueJSONSQL); err != nil {
 		return
 	}
 	return
 }
 
-func (s *transactionJSONStatements) InsertTransactionJSON(
+func (s *relayQueueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
 ) (int64, error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
@@ -87,7 +87,7 @@ func (s *transactionJSONStatements) InsertTransactionJSON(
 	return lastid, nil
 }
 
-func (s *transactionJSONStatements) DeleteTransactionJSON(
+func (s *relayQueueJSONStatements) DeleteQueueJSON(
 	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
 	stmt := sqlutil.TxStmt(txn, s.deleteJSONStmt)
@@ -95,7 +95,7 @@ func (s *transactionJSONStatements) DeleteTransactionJSON(
 	return err
 }
 
-func (s *transactionJSONStatements) SelectTransactionJSON(
+func (s *relayQueueJSONStatements) SelectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
 	blobs := map[int64][]byte{}

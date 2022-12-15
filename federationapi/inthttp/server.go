@@ -44,16 +44,6 @@ func AddRoutes(intAPI api.FederationInternalAPI, internalAPIMux *mux.Router) {
 	)
 
 	internalAPIMux.Handle(
-		FederationAPIPerformStoreAsyncPath,
-		httputil.MakeInternalRPCAPI("FederationAPIPerformStoreAsync", intAPI.PerformStoreAsync),
-	)
-
-	internalAPIMux.Handle(
-		FederationAPIQueryAsyncTransactionsPath,
-		httputil.MakeInternalRPCAPI("FederationAPIQueryAsyncTransactions", intAPI.QueryAsyncTransactions),
-	)
-
-	internalAPIMux.Handle(
 		FederationAPIPerformWakeupServers,
 		httputil.MakeInternalRPCAPI("FederationAPIPerformWakeupServers", intAPI.PerformWakeupServers),
 	)

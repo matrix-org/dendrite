@@ -17,7 +17,6 @@ package shared
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -29,24 +28,22 @@ import (
 )
 
 type Database struct {
-	DB                          *sql.DB
-	IsLocalServerName           func(gomatrixserverlib.ServerName) bool
-	Cache                       caching.FederationCache
-	Writer                      sqlutil.Writer
-	FederationQueuePDUs         tables.FederationQueuePDUs
-	FederationQueueEDUs         tables.FederationQueueEDUs
-	FederationQueueJSON         tables.FederationQueueJSON
-	FederationJoinedHosts       tables.FederationJoinedHosts
-	FederationBlacklist         tables.FederationBlacklist
-	FederationAssumedOffline    tables.FederationAssumedOffline
-	FederationRelayServers      tables.FederationRelayServers
-	FederationOutboundPeeks     tables.FederationOutboundPeeks
-	FederationInboundPeeks      tables.FederationInboundPeeks
-	NotaryServerKeysJSON        tables.FederationNotaryServerKeysJSON
-	NotaryServerKeysMetadata    tables.FederationNotaryServerKeysMetadata
-	ServerSigningKeys           tables.FederationServerSigningKeys
-	FederationQueueTransactions tables.FederationQueueTransactions
-	FederationTransactionJSON   tables.FederationTransactionJSON
+	DB                       *sql.DB
+	IsLocalServerName        func(gomatrixserverlib.ServerName) bool
+	Cache                    caching.FederationCache
+	Writer                   sqlutil.Writer
+	FederationQueuePDUs      tables.FederationQueuePDUs
+	FederationQueueEDUs      tables.FederationQueueEDUs
+	FederationQueueJSON      tables.FederationQueueJSON
+	FederationJoinedHosts    tables.FederationJoinedHosts
+	FederationBlacklist      tables.FederationBlacklist
+	FederationAssumedOffline tables.FederationAssumedOffline
+	FederationRelayServers   tables.FederationRelayServers
+	FederationOutboundPeeks  tables.FederationOutboundPeeks
+	FederationInboundPeeks   tables.FederationInboundPeeks
+	NotaryServerKeysJSON     tables.FederationNotaryServerKeysJSON
+	NotaryServerKeysMetadata tables.FederationNotaryServerKeysMetadata
+	ServerSigningKeys        tables.FederationServerSigningKeys
 }
 
 // An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
@@ -59,6 +56,10 @@ type Receipt struct {
 
 func NewReceipt(nid int64) Receipt {
 	return Receipt{nid: nid}
+}
+
+func (r *Receipt) GetNID() int64 {
+	return r.nid
 }
 
 func (r *Receipt) String() string {
@@ -307,109 +308,4 @@ func (d *Database) GetNotaryKeys(
 		return err
 	})
 	return sks, err
-}
-
-func (d *Database) StoreAsyncTransaction(
-	ctx context.Context, txn gomatrixserverlib.Transaction,
-) (*Receipt, error) {
-	var err error
-	json, err := json.Marshal(txn)
-	if err != nil {
-		return nil, fmt.Errorf("d.JSONUnmarshall: %w", err)
-	}
-
-	var nid int64
-	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nid, err = d.FederationTransactionJSON.InsertTransactionJSON(ctx, txn, string(json))
-		return err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("d.insertTransactionJSON: %w", err)
-	}
-	return &Receipt{
-		nid: nid,
-	}, nil
-}
-
-func (d *Database) AssociateAsyncTransactionWithDestinations(
-	ctx context.Context,
-	destinations map[gomatrixserverlib.UserID]struct{},
-	transactionID gomatrixserverlib.TransactionID,
-	receipt *Receipt,
-) error {
-	for destination := range destinations {
-		err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-			err := d.FederationQueueTransactions.InsertQueueTransaction(
-				ctx, txn, transactionID, destination.Domain(), receipt.nid)
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("d.insertQueueTransaction: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (d *Database) CleanAsyncTransactions(
-	ctx context.Context,
-	userID gomatrixserverlib.UserID,
-	receipts []*Receipt,
-) error {
-	println(len(receipts))
-	nids := make([]int64, len(receipts))
-	for i, receipt := range receipts {
-		nids[i] = receipt.nid
-	}
-	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		err := d.FederationQueueTransactions.DeleteQueueTransactions(ctx, txn, userID.Domain(), nids)
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("d.insertQueueTransaction: %w", err)
-	}
-
-	return nil
-}
-
-func (d *Database) GetAsyncTransaction(
-	ctx context.Context,
-	userID gomatrixserverlib.UserID,
-) (*gomatrixserverlib.Transaction, *Receipt, error) {
-	nids, err := d.FederationQueueTransactions.SelectQueueTransactions(ctx, nil, userID.Domain(), 1)
-	if err != nil {
-		return nil, nil, fmt.Errorf("d.SelectQueueTransaction: %w", err)
-	}
-	if len(nids) == 0 {
-		return nil, nil, nil
-	}
-
-	txns := map[int64][]byte{}
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		txns, err = d.FederationTransactionJSON.SelectTransactionJSON(ctx, txn, nids)
-		return err
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("d.SelectTransactionJSON: %w", err)
-	}
-
-	transaction := &gomatrixserverlib.Transaction{}
-	err = json.Unmarshal(txns[nids[0]], transaction)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Unmarshall transaction: %w", err)
-	}
-
-	receipt := NewReceipt(nids[0])
-	return transaction, &receipt, nil
-}
-
-func (d *Database) GetAsyncTransactionCount(
-	ctx context.Context,
-	userID gomatrixserverlib.UserID,
-) (int64, error) {
-	count, err := d.FederationQueueTransactions.SelectQueueTransactionCount(ctx, nil, userID.Domain())
-	if err != nil {
-		return 0, fmt.Errorf("d.SelectQueueTransactionCount: %w", err)
-	}
-	return count, nil
 }

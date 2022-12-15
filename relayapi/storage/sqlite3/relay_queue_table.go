@@ -25,79 +25,79 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-const queueTransactionsSchema = `
-CREATE TABLE IF NOT EXISTS federationsender_queue_transactions (
+const relayQueueSchema = `
+CREATE TABLE IF NOT EXISTS relayapi_queue (
     -- The transaction ID that was generated before persisting the event.
 	transaction_id TEXT NOT NULL,
     -- The domain part of the user ID the m.room.member event is for.
 	server_name TEXT NOT NULL,
-	-- The JSON NID from the federationsender_queue_transactions_json table.
+	-- The JSON NID from the relayapi_queue_json table.
 	json_nid BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federationsender_queue_transactions_transaction_json_nid_idx
-    ON federationsender_queue_transactions (json_nid, server_name);
-CREATE INDEX IF NOT EXISTS federationsender_queue_transactions_json_nid_idx
-    ON federationsender_queue_transactions (json_nid);
-CREATE INDEX IF NOT EXISTS federationsender_queue_transactions_server_name_idx
-    ON federationsender_queue_transactions (server_name);
+CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_queue_json_nid_idx
+    ON relayapi_queue (json_nid, server_name);
+CREATE INDEX IF NOT EXISTS relayapi_queue_json_nid_idx
+    ON relayapi_queue (json_nid);
+CREATE INDEX IF NOT EXISTS relayapi_queue_server_name_idx
+    ON relayapi_queue (server_name);
 `
 
-const insertQueueTransactionSQL = "" +
-	"INSERT INTO federationsender_queue_transactions (transaction_id, server_name, json_nid)" +
+const insertQueueEntrySQL = "" +
+	"INSERT INTO relayapi_queue (transaction_id, server_name, json_nid)" +
 	" VALUES ($1, $2, $3)"
 
-const deleteQueueTransactionsSQL = "" +
-	"DELETE FROM federationsender_queue_transactions WHERE server_name = $1 AND json_nid IN ($2)"
+const deleteQueueEntriesSQL = "" +
+	"DELETE FROM relayapi_queue WHERE server_name = $1 AND json_nid IN ($2)"
 
-const selectQueueTransactionsSQL = "" +
-	"SELECT json_nid FROM federationsender_queue_transactions" +
+const selectQueueEntriesSQL = "" +
+	"SELECT json_nid FROM relayapi_queue" +
 	" WHERE server_name = $1" +
 	" LIMIT $2"
 
-const selectQueueTransactionsCountSQL = "" +
-	"SELECT COUNT(*) FROM federationsender_queue_transactions" +
+const selectQueueEntryCountSQL = "" +
+	"SELECT COUNT(*) FROM relayapi_queue" +
 	" WHERE server_name = $1"
 
-type queueTransactionsStatements struct {
-	db                               *sql.DB
-	insertQueueTransactionStmt       *sql.Stmt
-	selectQueueTransactionsStmt      *sql.Stmt
-	selectQueueTransactionsCountStmt *sql.Stmt
-	// deleteQueueTransactionsStmt *sql.Stmt - prepared at runtime due to variadic
+type relayQueueStatements struct {
+	db                        *sql.DB
+	insertQueueEntryStmt      *sql.Stmt
+	selectQueueEntriesStmt    *sql.Stmt
+	selectQueueEntryCountStmt *sql.Stmt
+	// deleteQueueEntriesStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func NewSQLiteQueueTransactionsTable(db *sql.DB) (s *queueTransactionsStatements, err error) {
-	s = &queueTransactionsStatements{
+func NewSQLiteRelayQueueTable(db *sql.DB) (s *relayQueueStatements, err error) {
+	s = &relayQueueStatements{
 		db: db,
 	}
-	_, err = db.Exec(queueTransactionsSchema)
+	_, err = db.Exec(relayQueueSchema)
 	if err != nil {
 		return
 	}
-	if s.insertQueueTransactionStmt, err = db.Prepare(insertQueueTransactionSQL); err != nil {
+	if s.insertQueueEntryStmt, err = db.Prepare(insertQueueEntrySQL); err != nil {
 		return
 	}
-	//if s.deleteQueueTransactionsStmt, err = db.Prepare(deleteQueueTransactionsSQL); err != nil {
+	//if s.deleteQueueEntriesStmt, err = db.Prepare(deleteQueueEntriesSQL); err != nil {
 	//	return
 	//}
-	if s.selectQueueTransactionsStmt, err = db.Prepare(selectQueueTransactionsSQL); err != nil {
+	if s.selectQueueEntriesStmt, err = db.Prepare(selectQueueEntriesSQL); err != nil {
 		return
 	}
-	if s.selectQueueTransactionsCountStmt, err = db.Prepare(selectQueueTransactionsCountSQL); err != nil {
+	if s.selectQueueEntryCountStmt, err = db.Prepare(selectQueueEntryCountSQL); err != nil {
 		return
 	}
 	return
 }
 
-func (s *queueTransactionsStatements) InsertQueueTransaction(
+func (s *relayQueueStatements) InsertQueueEntry(
 	ctx context.Context,
 	txn *sql.Tx,
 	transactionID gomatrixserverlib.TransactionID,
 	serverName gomatrixserverlib.ServerName,
 	nid int64,
 ) error {
-	stmt := sqlutil.TxStmt(txn, s.insertQueueTransactionStmt)
+	stmt := sqlutil.TxStmt(txn, s.insertQueueEntryStmt)
 	_, err := stmt.ExecContext(
 		ctx,
 		transactionID, // the transaction ID that we initially attempted
@@ -107,15 +107,15 @@ func (s *queueTransactionsStatements) InsertQueueTransaction(
 	return err
 }
 
-func (s *queueTransactionsStatements) DeleteQueueTransactions(
+func (s *relayQueueStatements) DeleteQueueEntries(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	jsonNIDs []int64,
 ) error {
-	deleteSQL := strings.Replace(deleteQueueTransactionsSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
+	deleteSQL := strings.Replace(deleteQueueEntriesSQL, "($2)", sqlutil.QueryVariadicOffset(len(jsonNIDs), 1), 1)
 	deleteStmt, err := txn.Prepare(deleteSQL)
 	if err != nil {
-		return fmt.Errorf("s.deleteQueueTransactionJSON s.db.Prepare: %w", err)
+		return fmt.Errorf("s.deleteQueueEntries s.db.Prepare: %w", err)
 	}
 
 	params := make([]interface{}, len(jsonNIDs)+1)
@@ -129,12 +129,12 @@ func (s *queueTransactionsStatements) DeleteQueueTransactions(
 	return err
 }
 
-func (s *queueTransactionsStatements) SelectQueueTransactions(
+func (s *relayQueueStatements) SelectQueueEntries(
 	ctx context.Context, txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) ([]int64, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectQueueTransactionsStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectQueueEntriesStmt)
 	rows, err := stmt.QueryContext(ctx, serverName, limit)
 	if err != nil {
 		return nil, err
@@ -152,11 +152,11 @@ func (s *queueTransactionsStatements) SelectQueueTransactions(
 	return result, rows.Err()
 }
 
-func (s *queueTransactionsStatements) SelectQueueTransactionCount(
+func (s *relayQueueStatements) SelectQueueEntryCount(
 	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
 ) (int64, error) {
 	var count int64
-	stmt := sqlutil.TxStmt(txn, s.selectQueueTransactionsCountStmt)
+	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)
 	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
 	if err == sql.ErrNoRows {
 		// It's acceptable for there to be no rows referencing a given

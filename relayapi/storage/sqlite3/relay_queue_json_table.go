@@ -24,53 +24,53 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
-const transactionJSONSchema = `
--- The federationsender_transaction_json table contains event contents that
+const relayQueueJSONSchema = `
+-- The relayapi_queue_json table contains event contents that
 -- we are storing for future forwarding. 
-CREATE TABLE IF NOT EXISTS federationsender_transaction_json (
+CREATE TABLE IF NOT EXISTS relayapi_queue_json (
 	-- The JSON NID. This allows cross-referencing to find the JSON blob.
 	json_nid INTEGER PRIMARY KEY AUTOINCREMENT,
 	-- The JSON body. Text so that we preserve UTF-8.
 	json_body TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS federationsender_transaction_json_json_nid_idx
-    ON federationsender_transaction_json (json_nid);
+CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_json_json_nid_idx
+    ON relayapi_queue_json (json_nid);
 `
 
-const insertTransactionJSONSQL = "" +
-	"INSERT INTO federationsender_transaction_json (json_body)" +
+const insertQueueJSONSQL = "" +
+	"INSERT INTO relayapi_queue_json (json_body)" +
 	" VALUES ($1)"
 
-const deleteTransactionJSONSQL = "" +
-	"DELETE FROM federationsender_transaction_json WHERE json_nid IN ($1)"
+const deleteQueueJSONSQL = "" +
+	"DELETE FROM relayapi_queue_json WHERE json_nid IN ($1)"
 
-const selectTransactionJSONSQL = "" +
-	"SELECT json_nid, json_body FROM federationsender_transaction_json" +
+const selectQueueJSONSQL = "" +
+	"SELECT json_nid, json_body FROM relayapi_queue_json" +
 	" WHERE json_nid IN ($1)"
 
-type transactionJSONStatements struct {
+type relayQueueJSONStatements struct {
 	db             *sql.DB
 	insertJSONStmt *sql.Stmt
 	//deleteJSONStmt *sql.Stmt - prepared at runtime due to variadic
 	//selectJSONStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
-func NewSQLiteTransactionJSONTable(db *sql.DB) (s *transactionJSONStatements, err error) {
-	s = &transactionJSONStatements{
+func NewSQLiteRelayQueueJSONTable(db *sql.DB) (s *relayQueueJSONStatements, err error) {
+	s = &relayQueueJSONStatements{
 		db: db,
 	}
-	_, err = db.Exec(transactionJSONSchema)
+	_, err = db.Exec(relayQueueJSONSchema)
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = db.Prepare(insertTransactionJSONSQL); err != nil {
+	if s.insertJSONStmt, err = db.Prepare(insertQueueJSONSQL); err != nil {
 		return
 	}
 	return
 }
 
-func (s *transactionJSONStatements) InsertTransactionJSON(
+func (s *relayQueueJSONStatements) InsertQueueJSON(
 	ctx context.Context, txn *sql.Tx, json string,
 ) (lastid int64, err error) {
 	stmt := sqlutil.TxStmt(txn, s.insertJSONStmt)
@@ -85,13 +85,13 @@ func (s *transactionJSONStatements) InsertTransactionJSON(
 	return
 }
 
-func (s *transactionJSONStatements) DeleteTransactionJSON(
+func (s *relayQueueJSONStatements) DeleteQueueJSON(
 	ctx context.Context, txn *sql.Tx, nids []int64,
 ) error {
-	deleteSQL := strings.Replace(deleteTransactionJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
+	deleteSQL := strings.Replace(deleteQueueJSONSQL, "($1)", sqlutil.QueryVariadic(len(nids)), 1)
 	deleteStmt, err := txn.Prepare(deleteSQL)
 	if err != nil {
-		return fmt.Errorf("s.deleteTransactionJSON s.db.Prepare: %w", err)
+		return fmt.Errorf("s.deleteQueueJSON s.db.Prepare: %w", err)
 	}
 
 	iNIDs := make([]interface{}, len(nids))
@@ -104,13 +104,13 @@ func (s *transactionJSONStatements) DeleteTransactionJSON(
 	return err
 }
 
-func (s *transactionJSONStatements) SelectTransactionJSON(
+func (s *relayQueueJSONStatements) SelectQueueJSON(
 	ctx context.Context, txn *sql.Tx, jsonNIDs []int64,
 ) (map[int64][]byte, error) {
-	selectSQL := strings.Replace(selectTransactionJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)
+	selectSQL := strings.Replace(selectQueueJSONSQL, "($1)", sqlutil.QueryVariadic(len(jsonNIDs)), 1)
 	selectStmt, err := txn.Prepare(selectSQL)
 	if err != nil {
-		return nil, fmt.Errorf("s.selectTransactionJSON s.db.Prepare: %w", err)
+		return nil, fmt.Errorf("s.selectQueueJSON s.db.Prepare: %w", err)
 	}
 
 	iNIDs := make([]interface{}, len(jsonNIDs))
@@ -122,14 +122,14 @@ func (s *transactionJSONStatements) SelectTransactionJSON(
 	stmt := sqlutil.TxStmt(txn, selectStmt)
 	rows, err := stmt.QueryContext(ctx, iNIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("s.selectTransactionJSON stmt.QueryContext: %w", err)
+		return nil, fmt.Errorf("s.selectQueueJSON stmt.QueryContext: %w", err)
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectJSON: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectQueueJSON: rows.close() failed")
 	for rows.Next() {
 		var nid int64
 		var blob []byte
 		if err = rows.Scan(&nid, &blob); err != nil {
-			return nil, fmt.Errorf("s.selectTransactionJSON rows.Scan: %w", err)
+			return nil, fmt.Errorf("s.selectQueueJSON rows.Scan: %w", err)
 		}
 		blobs[nid] = blob
 	}

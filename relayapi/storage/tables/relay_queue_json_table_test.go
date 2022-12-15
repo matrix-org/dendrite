@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/postgres"
-	"github.com/matrix-org/dendrite/federationapi/storage/sqlite3"
-	"github.com/matrix-org/dendrite/federationapi/storage/tables"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/relayapi/storage/postgres"
+	"github.com/matrix-org/dendrite/relayapi/storage/sqlite3"
+	"github.com/matrix-org/dendrite/relayapi/storage/tables"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -35,31 +35,31 @@ func mustCreateTransaction() gomatrixserverlib.Transaction {
 	return txn
 }
 
-type TransactionJSONDatabase struct {
+type RelayQueueJSONDatabase struct {
 	DB     *sql.DB
 	Writer sqlutil.Writer
-	Table  tables.FederationTransactionJSON
+	Table  tables.RelayQueueJSON
 }
 
-func mustCreateTransactionJSONTable(t *testing.T, dbType test.DBType) (database TransactionJSONDatabase, close func()) {
+func mustCreateQueueJSONTable(t *testing.T, dbType test.DBType) (database RelayQueueJSONDatabase, close func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
 	}, sqlutil.NewExclusiveWriter())
 	assert.NoError(t, err)
-	var tab tables.FederationTransactionJSON
+	var tab tables.RelayQueueJSON
 	switch dbType {
 	case test.DBTypePostgres:
-		tab, err = postgres.NewPostgresTransactionJSONTable(db)
+		tab, err = postgres.NewPostgresRelayQueueJSONTable(db)
 		assert.NoError(t, err)
 	case test.DBTypeSQLite:
-		tab, err = sqlite3.NewSQLiteTransactionJSONTable(db)
+		tab, err = sqlite3.NewSQLiteRelayQueueJSONTable(db)
 		assert.NoError(t, err)
 	}
 	assert.NoError(t, err)
 
-	database = TransactionJSONDatabase{
+	database = RelayQueueJSONDatabase{
 		DB:     db,
 		Writer: sqlutil.NewDummyWriter(),
 		Table:  tab,
@@ -70,7 +70,7 @@ func mustCreateTransactionJSONTable(t *testing.T, dbType test.DBType) (database 
 func TestShoudInsertTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateTransactionJSONTable(t, dbType)
+		db, close := mustCreateQueueJSONTable(t, dbType)
 		defer close()
 
 		transaction := mustCreateTransaction()
@@ -79,7 +79,7 @@ func TestShoudInsertTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		_, err = db.Table.InsertTransactionJSON(ctx, nil, string(tx))
+		_, err = db.Table.InsertQueueJSON(ctx, nil, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
@@ -89,7 +89,7 @@ func TestShoudInsertTransaction(t *testing.T) {
 func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateTransactionJSONTable(t, dbType)
+		db, close := mustCreateQueueJSONTable(t, dbType)
 		defer close()
 
 		transaction := mustCreateTransaction()
@@ -98,14 +98,14 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		nid, err := db.Table.InsertTransactionJSON(ctx, nil, string(tx))
+		nid, err := db.Table.InsertQueueJSON(ctx, nil, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		var storedJSON map[int64][]byte
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			storedJSON, err = db.Table.SelectTransactionJSON(ctx, txn, []int64{nid})
+			storedJSON, err = db.Table.SelectQueueJSON(ctx, txn, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -124,7 +124,7 @@ func TestShouldRetrieveInsertedTransaction(t *testing.T) {
 func TestShouldDeleteTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		db, close := mustCreateTransactionJSONTable(t, dbType)
+		db, close := mustCreateQueueJSONTable(t, dbType)
 		defer close()
 
 		transaction := mustCreateTransaction()
@@ -133,14 +133,14 @@ func TestShouldDeleteTransaction(t *testing.T) {
 			t.Fatalf("Invalid transaction: %s", err.Error())
 		}
 
-		nid, err := db.Table.InsertTransactionJSON(ctx, nil, string(tx))
+		nid, err := db.Table.InsertQueueJSON(ctx, nil, string(tx))
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
 
 		storedJSON := map[int64][]byte{}
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			err = db.Table.DeleteTransactionJSON(ctx, txn, []int64{nid})
+			err = db.Table.DeleteQueueJSON(ctx, txn, []int64{nid})
 			return err
 		})
 		if err != nil {
@@ -149,7 +149,7 @@ func TestShouldDeleteTransaction(t *testing.T) {
 
 		storedJSON = map[int64][]byte{}
 		_ = db.Writer.Do(db.DB, nil, func(txn *sql.Tx) error {
-			storedJSON, err = db.Table.SelectTransactionJSON(ctx, txn, []int64{nid})
+			storedJSON, err = db.Table.SelectQueueJSON(ctx, txn, []int64{nid})
 			return err
 		})
 		if err != nil {

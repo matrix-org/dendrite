@@ -15,79 +15,77 @@
 package relayapi
 
 import (
-	"context"
-
+	"github.com/gorilla/mux"
+	federationAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
-	"github.com/matrix-org/dendrite/internal"
+	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
+	"github.com/matrix-org/dendrite/relayapi/api"
+	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
+	"github.com/matrix-org/dendrite/relayapi/internal"
+	"github.com/matrix-org/dendrite/relayapi/inthttp"
+	"github.com/matrix-org/dendrite/relayapi/routing"
+	"github.com/matrix-org/dendrite/relayapi/storage"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/base"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
 
-type RelayAPI struct {
-	fedClient              *gomatrixserverlib.FederationClient
-	rsAPI                  rsAPI.RoomserverInternalAPI
-	keyRing                *gomatrixserverlib.KeyRing
-	producer               *producers.SyncAPIProducer
-	presenceEnabledInbound bool
-	serverName             gomatrixserverlib.ServerName
+// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
+// on the given input API.
+func AddInternalRoutes(router *mux.Router, intAPI api.RelayInternalAPI) {
+	inthttp.AddRoutes(intAPI, router)
 }
 
-func NewRelayAPI(
+// AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
+func AddPublicRoutes(
+	base *base.BaseDendrite,
+	userAPI userapi.UserInternalAPI,
+	fedClient *gomatrixserverlib.FederationClient,
+	keyRing gomatrixserverlib.JSONVerifier,
+	rsAPI rsAPI.FederationRoomserverAPI,
+	relayAPI relayAPI.RelayInternalAPI,
+	fedAPI federationAPI.FederationInternalAPI,
+	keyAPI keyserverAPI.FederationKeyAPI,
+) {
+	fedCfg := &base.Cfg.FederationAPI
+
+	relay, ok := relayAPI.(*internal.RelayInternalAPI)
+	if !ok {
+		panic("relayapi.AddPublicRoutes called with a RelayInternalAPI impl which was not " +
+			"RelayInternalAPI. This is a programming error.")
+	}
+
+	routing.Setup(
+		base.PublicFederationAPIMux,
+		fedCfg,
+		relay,
+		keyRing,
+	)
+}
+
+func NewRelayInternalAPI(
+	base *base.BaseDendrite,
 	fedClient *gomatrixserverlib.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
-	presenceEnabledInbound bool,
-	serverName gomatrixserverlib.ServerName,
-) RelayAPI {
-	return RelayAPI{
-		fedClient:              fedClient,
-		rsAPI:                  rsAPI,
-		keyRing:                keyRing,
-		producer:               producer,
-		presenceEnabledInbound: presenceEnabledInbound,
-		serverName:             serverName,
-	}
-}
+) internal.RelayInternalAPI {
+	cfg := &base.Cfg.RelayAPI
 
-// PerformRelayServerSync implements api.FederationInternalAPI
-func (r *RelayAPI) PerformRelayServerSync(userID gomatrixserverlib.UserID, relayServer gomatrixserverlib.ServerName) error {
-	asyncResponse, err := r.fedClient.GetAsyncEvents(context.Background(), userID, relayServer)
+	relayDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.IsLocalServerName)
 	if err != nil {
-		logrus.Errorf("GetAsyncEvents: %s", err.Error())
-		return err
-	}
-	r.processTransaction(&asyncResponse.Transaction)
-
-	for asyncResponse.Remaining > 0 {
-		asyncResponse, err := r.fedClient.GetAsyncEvents(context.Background(), userID, relayServer)
-		if err != nil {
-			logrus.Errorf("GetAsyncEvents: %s", err.Error())
-			return err
-		}
-		r.processTransaction(&asyncResponse.Transaction)
+		logrus.WithError(err).Panic("failed to connect to relay db")
 	}
 
-	return nil
-}
-
-func (r *RelayAPI) processTransaction(txn *gomatrixserverlib.Transaction) {
-	logrus.Warn("Processing transaction from relay server")
-	mu := internal.NewMutexByRoom()
-	t := internal.NewTxnReq(
-		r.rsAPI,
-		nil,
-		r.serverName,
-		r.keyRing,
-		mu,
-		r.producer,
-		r.presenceEnabledInbound,
-		txn.PDUs,
-		txn.EDUs,
-		txn.Origin,
-		txn.TransactionID,
-		txn.Destination)
-
-	t.ProcessTransaction(context.TODO())
+	return internal.NewRelayInternalAPI(
+		relayDB,
+		fedClient,
+		rsAPI,
+		keyRing,
+		producer,
+		base.Cfg.Global.Presence.EnableInbound,
+		base.Cfg.Global.ServerName,
+	)
 }

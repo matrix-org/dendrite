@@ -458,7 +458,7 @@ func (m *DendriteMonolith) Start() {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
 				if !relayServerSyncRunning.Load() {
-					go m.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
+					// go m.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
 				}
 			case pineconeEvents.PeerRemoved:
 				if relayServerSyncRunning.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
@@ -484,46 +484,6 @@ func (m *DendriteMonolith) Start() {
 			}
 		}
 	}(pineconeEventChannel)
-}
-
-func (m *DendriteMonolith) syncRelayServers(stop <-chan bool, running atomic.Bool) {
-	defer running.Store(false)
-
-	t := time.NewTimer(relayServerRetryInterval)
-	for {
-		relayServersToQuery := []gomatrixserverlib.ServerName{}
-		for server, complete := range m.relayServersQueried {
-			if !complete {
-				relayServersToQuery = append(relayServersToQuery, server)
-			}
-		}
-		if len(relayServersToQuery) == 0 {
-			// All relay servers have been synced.
-			return
-		}
-		m.queryRelayServers(relayServersToQuery)
-		t.Reset(relayServerRetryInterval)
-
-		select {
-		case <-stop:
-			if !t.Stop() {
-				<-t.C
-			}
-			return
-		case <-t.C:
-		}
-	}
-}
-
-func (m *DendriteMonolith) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
-	for _, server := range relayServers {
-		request := api.PerformRelayServerSyncRequest{RelayServer: server}
-		response := api.PerformRelayServerSyncResponse{}
-		err := m.federationAPI.PerformRelayServerSync(m.processContext.Context(), &request, &response)
-		if err == nil {
-			m.relayServersQueried[server] = true
-		}
-	}
 }
 
 func (m *DendriteMonolith) Stop() {

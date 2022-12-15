@@ -14,7 +14,6 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
@@ -845,66 +844,5 @@ func (r *FederationInternalAPI) QueryRelayServers(
 	}
 
 	response.RelayServers = relayServers
-	return nil
-}
-
-// PerformStoreAsync implements api.FederationInternalAPI
-func (r *FederationInternalAPI) PerformStoreAsync(
-	ctx context.Context,
-	request *api.PerformStoreAsyncRequest,
-	response *api.PerformStoreAsyncResponse,
-) error {
-	logrus.Warnf("Storing transaction for %v", request.UserID)
-	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
-	if err != nil {
-		return err
-	}
-	err = r.db.AssociateAsyncTransactionWithDestinations(
-		ctx,
-		map[gomatrixserverlib.UserID]struct{}{
-			request.UserID: {},
-		},
-		request.Txn.TransactionID,
-		receipt)
-
-	return err
-}
-
-// QueryAsyncTransactions implements api.FederationInternalAPI
-func (r *FederationInternalAPI) QueryAsyncTransactions(
-	ctx context.Context,
-	request *api.QueryAsyncTransactionsRequest,
-	response *api.QueryAsyncTransactionsResponse,
-) error {
-	logrus.Warnf("Obtaining transaction for %v", request.UserID)
-	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
-	if err != nil {
-		return err
-	}
-
-	// TODO : Shouldn't be deleting unless the transaction was successfully returned...
-	// TODO : Should delete transaction json from table if no more associations
-	// Maybe track last received transaction, and send that as part of the request,
-	// then delete before getting the new events from the db.
-	if transaction != nil && receipt != nil {
-		err = r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{receipt})
-		if err != nil {
-			return err
-		}
-
-		// TODO : Clean async transactions json
-	}
-
-	// TODO : These db calls should happen at the same time right?
-	count, err := r.db.GetAsyncTransactionCount(ctx, request.UserID)
-	if err != nil {
-		return err
-	}
-
-	response.RemainingCount = uint32(count)
-	if transaction != nil {
-		response.Txn = *transaction
-		logrus.Warnf("Obtained transaction: %v", transaction.TransactionID)
-	}
 	return nil
 }

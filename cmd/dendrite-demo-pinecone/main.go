@@ -43,6 +43,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/relayapi"
+	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -145,6 +146,7 @@ func main() {
 		cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationapi.db", filepath.Join(*instanceDir, *instanceName)))
+		cfg.RelayAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-relayapi.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 		cfg.MSCs.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mscs.db", filepath.Join(*instanceDir, *instanceName)))
 		cfg.ClientAPI.RegistrationDisabled = false
@@ -235,6 +237,20 @@ func main() {
 	userProvider := users.NewPineconeUserProvider(pRouter, pQUIC, userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(pRouter, pQUIC, fsAPI, federation)
 
+	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	producer := &producers.SyncAPIProducer{
+		JetStream:              js,
+		TopicReceiptEvent:      base.Cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       base.Cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     base.Cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  base.Cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  base.Cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		Config:                 &base.Cfg.FederationAPI,
+		UserAPI:                userAPI,
+	}
+	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer)
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		Client:    conn.CreateClient(base, pQUIC),
@@ -246,6 +262,7 @@ func main() {
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  userAPI,
 		KeyAPI:                   keyAPI,
+		RelayAPI:                 &relayAPI,
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
@@ -319,32 +336,12 @@ func main() {
 		relayServerSyncRunning := atomic.NewBool(false)
 		stopRelayServerSync := make(chan bool)
 
-		js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.FederationAPI.Matrix.JetStream)
-		producer := &producers.SyncAPIProducer{
-			JetStream:              js,
-			TopicReceiptEvent:      base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputReceiptEvent),
-			TopicSendToDeviceEvent: base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-			TopicTypingEvent:       base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputTypingEvent),
-			TopicPresenceEvent:     base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.OutputPresenceEvent),
-			TopicDeviceListUpdate:  base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
-			TopicSigningKeyUpdate:  base.Cfg.FederationAPI.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
-			Config:                 &base.Cfg.FederationAPI,
-			UserAPI:                userAPI,
-		}
-
 		m := RelayServerRetriever{
 			Context:             context.Background(),
 			ServerName:          gomatrixserverlib.ServerName(pRouter.PublicKey().String()),
 			FederationAPI:       fsAPI,
 			RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
-			RelayAPI: relayapi.NewRelayAPI(
-				federation,
-				rsAPI,
-				keyRing,
-				producer,
-				cfg.Global.Presence.EnableInbound,
-				cfg.Global.ServerName,
-			),
+			RelayAPI:            monolith.RelayAPI,
 		}
 		m.InitializeRelayServers(eLog)
 
@@ -387,7 +384,7 @@ type RelayServerRetriever struct {
 	ServerName          gomatrixserverlib.ServerName
 	FederationAPI       api.FederationInternalAPI
 	RelayServersQueried map[gomatrixserverlib.ServerName]bool
-	RelayAPI            relayapi.RelayAPI
+	RelayAPI            relayServerAPI.RelayInternalAPI
 }
 
 func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
@@ -440,7 +437,12 @@ func (m *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverli
 		if err != nil {
 			return
 		}
-		err = m.RelayAPI.PerformRelayServerSync(*userID, server)
+		request := relayServerAPI.PerformRelayServerSyncRequest{
+			UserID:      *userID,
+			RelayServer: server,
+		}
+		response := relayServerAPI.PerformRelayServerSyncResponse{}
+		err = m.RelayAPI.PerformRelayServerSync(context.Background(), &request, &response)
 		if err == nil {
 			m.RelayServersQueried[server] = true
 			// TODO : What happens if your relay receives new messages after this point?

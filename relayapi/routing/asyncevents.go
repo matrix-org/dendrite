@@ -3,7 +3,7 @@ package routing
 import (
 	"net/http"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
@@ -19,12 +19,12 @@ type AsyncEventsResponse struct {
 func GetAsyncEvents(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
-	fedAPI api.FederationInternalAPI,
+	relayAPI api.RelayInternalAPI,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
 	logrus.Infof("Handling async_events for %v", userID)
 	var response api.QueryAsyncTransactionsResponse
-	err := fedAPI.QueryAsyncTransactions(httpReq.Context(), &api.QueryAsyncTransactionsRequest{UserID: userID}, &response)
+	err := relayAPI.QueryAsyncTransactions(httpReq.Context(), &api.QueryAsyncTransactionsRequest{UserID: userID}, &response)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

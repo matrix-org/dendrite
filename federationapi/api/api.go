@@ -18,7 +18,6 @@ type FederationInternalAPI interface {
 	gomatrixserverlib.KeyDatabase
 	ClientFederationAPI
 	RoomserverFederationAPI
-	RelayServerAPI
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
@@ -42,22 +41,6 @@ type FederationInternalAPI interface {
 		ctx context.Context,
 		request *QueryRelayServersRequest,
 		response *QueryRelayServersResponse,
-	) error
-}
-
-type RelayServerAPI interface {
-	// Store async transactions for forwarding to the destination at a later time.
-	PerformStoreAsync(
-		ctx context.Context,
-		request *PerformStoreAsyncRequest,
-		response *PerformStoreAsyncResponse,
-	) error
-
-	// Obtain the oldest stored transaction for the specified userID.
-	QueryAsyncTransactions(
-		ctx context.Context,
-		request *QueryAsyncTransactionsRequest,
-		response *QueryAsyncTransactionsResponse,
 	) error
 }
 

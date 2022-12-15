@@ -51,12 +51,6 @@ type Database interface {
 	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 
-	StoreAsyncTransaction(ctx context.Context, txn gomatrixserverlib.Transaction) (*shared.Receipt, error)
-	AssociateAsyncTransactionWithDestinations(ctx context.Context, destinations map[gomatrixserverlib.UserID]struct{}, transactionID gomatrixserverlib.TransactionID, receipt *shared.Receipt) error
-	CleanAsyncTransactions(ctx context.Context, userID gomatrixserverlib.UserID, receipts []*shared.Receipt) error
-	GetAsyncTransaction(ctx context.Context, userID gomatrixserverlib.UserID) (*gomatrixserverlib.Transaction, *shared.Receipt, error)
-	GetAsyncTransactionCount(ctx context.Context, userID gomatrixserverlib.UserID) (int64, error)
-
 	// these don't have contexts passed in as we want things to happen regardless of the request context
 	AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error
 	RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error
