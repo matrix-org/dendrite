@@ -88,12 +88,21 @@ func (d *Database) CleanAsyncTransactions(
 	for i, receipt := range receipts {
 		nids[i] = receipt.GetNID()
 	}
+
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		err := d.RelayQueue.DeleteQueueEntries(ctx, txn, userID.Domain(), nids)
 		return err
 	})
 	if err != nil {
 		return fmt.Errorf("d.deleteQueueEntries: %w", err)
+	}
+
+	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		err := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("d.deleteQueueJSON: %w", err)
 	}
 
 	return nil
