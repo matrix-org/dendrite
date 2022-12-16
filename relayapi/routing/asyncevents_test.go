@@ -36,15 +36,12 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	if err != nil {
-		t.Fatalf("Invalid userID: %s", err.Error())
-	}
+	assert.Nil(t, err, "Invalid userID")
+
 	transaction := createTransaction()
 
 	_, err = db.StoreAsyncTransaction(context.Background(), transaction)
-	if err != nil {
-		t.Fatalf("Failed to store transaction: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -59,7 +56,7 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
-	assert.Equal(t, count, int64(0))
+	assert.Zero(t, count)
 }
 
 func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
@@ -71,14 +68,12 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	if err != nil {
-		t.Fatalf("Invalid userID: %s", err.Error())
-	}
+	assert.Nil(t, err, "Invalid userID")
+
 	transaction := createTransaction()
 	receipt, err := db.StoreAsyncTransaction(context.Background(), transaction)
-	if err != nil {
-		t.Fatalf("Failed to store transaction: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to store transaction")
+
 	err = db.AssociateAsyncTransactionWithDestinations(
 		context.Background(),
 		map[gomatrixserverlib.UserID]struct{}{
@@ -86,9 +81,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 		},
 		transaction.TransactionID,
 		receipt)
-	if err != nil {
-		t.Fatalf("Failed to associate transaction with user: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -99,7 +92,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, true, jsonResponse.EntriesQueued)
+	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Txn)
 
 	// And once more to clear the queue
@@ -108,11 +101,11 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse = response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, false, jsonResponse.EntriesQueued)
+	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
-	assert.Equal(t, count, int64(0))
+	assert.Zero(t, count)
 }
 
 func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
@@ -124,15 +117,12 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	if err != nil {
-		t.Fatalf("Invalid userID: %s", err.Error())
-	}
+	assert.Nil(t, err, "Invalid userID")
 
 	transaction := createTransaction()
 	receipt, err := db.StoreAsyncTransaction(context.Background(), transaction)
-	if err != nil {
-		t.Fatalf("Failed to store transaction: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to store transaction")
+
 	err = db.AssociateAsyncTransactionWithDestinations(
 		context.Background(),
 		map[gomatrixserverlib.UserID]struct{}{
@@ -140,15 +130,12 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		},
 		transaction.TransactionID,
 		receipt)
-	if err != nil {
-		t.Fatalf("Failed to associate transaction with user: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to associate transaction with user")
 
 	transaction2 := createTransaction()
 	receipt2, err := db.StoreAsyncTransaction(context.Background(), transaction2)
-	if err != nil {
-		t.Fatalf("Failed to store transaction: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to store transaction")
+
 	err = db.AssociateAsyncTransactionWithDestinations(
 		context.Background(),
 		map[gomatrixserverlib.UserID]struct{}{
@@ -156,9 +143,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		},
 		transaction2.TransactionID,
 		receipt2)
-	if err != nil {
-		t.Fatalf("Failed to associate transaction with user: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -169,7 +154,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse := response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, true, jsonResponse.EntriesQueued)
+	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Txn)
 
 	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
@@ -177,7 +162,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse = response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, true, jsonResponse.EntriesQueued)
+	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction2, jsonResponse.Txn)
 
 	// And once more to clear the queue
@@ -186,9 +171,9 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Code)
 
 	jsonResponse = response.JSON.(routing.AsyncEventsResponse)
-	assert.Equal(t, false, jsonResponse.EntriesQueued)
+	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
-	assert.Equal(t, count, int64(0))
+	assert.Zero(t, count)
 }

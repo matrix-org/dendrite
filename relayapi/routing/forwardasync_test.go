@@ -14,6 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/relayapi/storage"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -32,17 +33,22 @@ func createTransaction() gomatrixserverlib.Transaction {
 	return txn
 }
 
-func createFederationRequest(userID gomatrixserverlib.UserID) (gomatrixserverlib.Transaction, gomatrixserverlib.FederationRequest) {
-	txn := createTransaction()
+func createFederationRequest(
+	userID gomatrixserverlib.UserID,
+	txnID gomatrixserverlib.TransactionID,
+	origin gomatrixserverlib.ServerName,
+	destination gomatrixserverlib.ServerName,
+	content interface{},
+) gomatrixserverlib.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
-	path := federationPathPrefixV1 + "/forward_async/" + string(txn.TransactionID) + "/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("PUT", txn.Origin, txn.Destination, path)
-	request.SetContent(txn)
+	path := federationPathPrefixV1 + "/forward_async/" + string(txnID) + "/" + userID.Raw()
+	request := gomatrixserverlib.NewFederationRequest("PUT", origin, destination, path)
+	request.SetContent(content)
 
-	return txn, request
+	return request
 }
 
-func TestEmptyForwardReturnsOk(t *testing.T) {
+func TestForwardEmptyReturnsOk(t *testing.T) {
 	testDB := storage.NewFakeRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
@@ -51,10 +57,10 @@ func TestEmptyForwardReturnsOk(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	if err != nil {
-		t.Fatalf("Invalid userID: %s", err.Error())
-	}
-	_, request := createFederationRequest(*userID)
+	assert.Nil(t, err, "Invalid userID")
+
+	txn := createTransaction()
+	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, txn)
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -62,10 +68,104 @@ func TestEmptyForwardReturnsOk(t *testing.T) {
 
 	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
 
-	expected := 200
-	if response.Code != expected {
-		t.Fatalf("Expected: %v, Actual: %v", expected, response.Code)
+	assert.Equal(t, 200, response.Code)
+}
+
+func TestForwardBadJSONReturnsError(t *testing.T) {
+	testDB := storage.NewFakeRelayDatabase()
+	db := shared.Database{
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
 	}
+	httpReq := &http.Request{}
+	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	assert.Nil(t, err, "Invalid userID")
+
+	type BadData struct {
+		Field bool `json:"pdus"`
+	}
+	content := BadData{
+		Field: false,
+	}
+	txn := createTransaction()
+	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, content)
+
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
+	)
+
+	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+
+	assert.NotEqual(t, 200, response.Code)
+}
+
+func TestForwardTooManyPDUsReturnsError(t *testing.T) {
+	testDB := storage.NewFakeRelayDatabase()
+	db := shared.Database{
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
+	}
+	httpReq := &http.Request{}
+	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	assert.Nil(t, err, "Invalid userID")
+
+	type BadData struct {
+		Field []json.RawMessage `json:"pdus"`
+	}
+	content := BadData{
+		Field: []json.RawMessage{},
+	}
+	for i := 0; i < 51; i++ {
+		content.Field = append(content.Field, []byte{})
+	}
+	assert.Greater(t, len(content.Field), 50)
+
+	txn := createTransaction()
+	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, content)
+
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
+	)
+
+	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+
+	assert.NotEqual(t, 200, response.Code)
+}
+
+func TestForwardTooManyEDUsReturnsError(t *testing.T) {
+	testDB := storage.NewFakeRelayDatabase()
+	db := shared.Database{
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
+	}
+	httpReq := &http.Request{}
+	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	assert.Nil(t, err, "Invalid userID")
+
+	type BadData struct {
+		Field []gomatrixserverlib.EDU `json:"edus"`
+	}
+	content := BadData{
+		Field: []gomatrixserverlib.EDU{},
+	}
+	for i := 0; i < 101; i++ {
+		content.Field = append(content.Field, gomatrixserverlib.EDU{Type: gomatrixserverlib.MTyping})
+	}
+	assert.Greater(t, len(content.Field), 100)
+
+	txn := createTransaction()
+	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, content)
+
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
+	)
+
+	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+
+	assert.NotEqual(t, 200, response.Code)
 }
 
 func TestUniqueTransactionStoredInDatabase(t *testing.T) {
@@ -77,35 +177,24 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	if err != nil {
-		t.Fatalf("Invalid userID: %s", err.Error())
-	}
-	inputTransaction, request := createFederationRequest(*userID)
+	assert.Nil(t, err, "Invalid userID")
+
+	txn := createTransaction()
+	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, txn)
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
 	)
 
 	response := routing.ForwardAsync(
-		httpReq, &request, &relayAPI, inputTransaction.TransactionID, *userID)
+		httpReq, &request, &relayAPI, txn.TransactionID, *userID)
 	transaction, _, err := db.GetAsyncTransaction(context.TODO(), *userID)
-	if err != nil {
-		t.Fatalf("Failed retrieving transaction: %s", err.Error())
-	}
-	transactionCount, err := db.GetAsyncTransactionCount(context.TODO(), *userID)
-	if err != nil {
-		t.Fatalf("Failed retrieving transaction count: %s", err.Error())
-	}
+	assert.Nil(t, err, "Failed retrieving transaction")
 
-	expected := 200
-	if response.Code != expected {
-		t.Fatalf("Expected Return Code: %v, Actual: %v", expected, response.Code)
-	}
-	if transactionCount != 1 {
-		t.Fatalf("Expected count of 1, Actual: %d", transactionCount)
-	}
-	if transaction.TransactionID != inputTransaction.TransactionID {
-		t.Fatalf("Expected Transaction ID: %s, Actual: %s",
-			inputTransaction.TransactionID, transaction.TransactionID)
-	}
+	transactionCount, err := db.GetAsyncTransactionCount(context.TODO(), *userID)
+	assert.Nil(t, err, "Failed retrieving transaction count")
+
+	assert.Equal(t, 200, response.Code)
+	assert.Equal(t, int64(1), transactionCount)
+	assert.Equal(t, txn.TransactionID, transaction.TransactionID)
 }

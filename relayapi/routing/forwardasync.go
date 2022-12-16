@@ -26,10 +26,10 @@ func ForwardAsync(
 	}
 
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
-		logrus.Info("The request body could not be decoded into valid JSON. " + err.Error())
+		logrus.Info("The request body could not be decoded into valid JSON." + err.Error())
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON. " + err.Error()),
+			JSON: jsonerror.NotJSON("The request body could not be decoded into valid JSON." + err.Error()),
 		}
 	}
 
