@@ -29,6 +29,11 @@ import (
 	"github.com/matrix-org/util"
 )
 
+const (
+	ForwardAsyncRouteName = "ForwardAsync"
+	AsyncEventsRouteName  = "AsyncEvents"
+)
+
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeRelayAPI). We need to have this enabled
@@ -60,7 +65,7 @@ func Setup(
 				*userID,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions)
+	)).Methods(http.MethodPut, http.MethodOptions).Name(ForwardAsyncRouteName)
 
 	v1fedmux.Handle("/async_events/{userID}", MakeRelayAPI(
 		"relay_async_events", "", cfg.Matrix.IsLocalServerName, keys,
@@ -74,7 +79,7 @@ func Setup(
 			}
 			return GetAsyncEvents(httpReq, request, relayAPI, *userID)
 		},
-	)).Methods(http.MethodGet, http.MethodOptions)
+	)).Methods(http.MethodGet, http.MethodOptions).Name(AsyncEventsRouteName)
 }
 
 // MakeRelayAPI makes an http.Handler that checks matrix relay authentication.

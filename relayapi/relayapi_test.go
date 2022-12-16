@@ -29,13 +29,7 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
 
-		relayAPI := relayapi.NewRelayInternalAPI(
-			base,
-			nil,
-			nil,
-			nil,
-			nil,
-		)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 		assert.NotNil(t, relayAPI)
 	})
 }
@@ -51,13 +45,7 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 		defer close()
 
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(
-				base,
-				nil,
-				nil,
-				nil,
-				nil,
-			)
+			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 		})
 	})
 }
@@ -67,13 +55,7 @@ func TestCreateRelayInternalRoutes(t *testing.T) {
 	base.Cfg.RelayAPI.InternalAPI.Connect = config.HTTPAddress("http://localhost:8008")
 	defer close()
 
-	relayAPI := relayapi.NewRelayInternalAPI(
-		base,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
+	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	assert.NotNil(t, relayAPI)
 
 	relayapi.AddInternalRoutes(base.InternalAPIMux, &relayAPI)
@@ -85,24 +67,17 @@ func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 		defer close()
 
 		assert.Panics(t, func() {
-			relayapi.AddPublicRoutes(base, nil, nil, nil, nil, nil, nil, nil)
+			relayapi.AddPublicRoutes(base, nil, nil)
 		})
 	})
 }
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
-	base.Cfg.RelayAPI.InternalAPI.Connect = config.HTTPAddress("http://localhost:8008")
 	defer close()
 
-	relayAPI := relayapi.NewRelayInternalAPI(
-		base,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
+	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	assert.NotNil(t, relayAPI)
 
-	relayapi.AddPublicRoutes(base, nil, nil, nil, nil, &relayAPI, nil, nil)
+	relayapi.AddPublicRoutes(base, nil, &relayAPI)
 }

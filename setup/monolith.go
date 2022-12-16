@@ -75,8 +75,7 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI,
 	)
 
-	// TODO : relayapi.AddPublicRoutes
 	if m.RelayAPI != nil {
-		relayapi.AddPublicRoutes(base, m.UserAPI, m.FedClient, m.KeyRing, m.RoomserverAPI, m.RelayAPI, m.FederationAPI, m.KeyAPI)
+		relayapi.AddPublicRoutes(base, m.KeyRing, m.RelayAPI)
 	}
 }
