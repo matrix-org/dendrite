@@ -348,6 +348,7 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.SyncAPI.Defaults(opts)
 	c.UserAPI.Defaults(opts)
 	c.AppServiceAPI.Defaults(opts)
+	c.RelayAPI.Defaults(opts)
 	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
