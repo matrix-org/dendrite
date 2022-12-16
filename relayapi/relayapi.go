@@ -20,7 +20,6 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/relayapi/api"
-	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/relayapi/inthttp"
 	"github.com/matrix-org/dendrite/relayapi/routing"
@@ -45,7 +44,7 @@ func AddPublicRoutes(
 	fedClient *gomatrixserverlib.FederationClient,
 	keyRing gomatrixserverlib.JSONVerifier,
 	rsAPI rsAPI.FederationRoomserverAPI,
-	relayAPI relayAPI.RelayInternalAPI,
+	relayAPI api.RelayInternalAPI,
 	fedAPI federationAPI.FederationInternalAPI,
 	keyAPI keyserverAPI.FederationKeyAPI,
 ) {

@@ -15,6 +15,7 @@
 package internal
 
 import (
+	fedAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/relayapi/storage"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -23,7 +24,7 @@ import (
 
 type RelayInternalAPI struct {
 	db                     storage.Database
-	fedClient              *gomatrixserverlib.FederationClient
+	fedClient              fedAPI.FederationClient
 	rsAPI                  rsAPI.RoomserverInternalAPI
 	keyRing                *gomatrixserverlib.KeyRing
 	producer               *producers.SyncAPIProducer
@@ -33,7 +34,7 @@ type RelayInternalAPI struct {
 
 func NewRelayInternalAPI(
 	db storage.Database,
-	fedClient *gomatrixserverlib.FederationClient,
+	fedClient fedAPI.FederationClient,
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,

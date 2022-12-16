@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/relayapi"
-	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/stretchr/testify/assert"
@@ -27,11 +27,7 @@ import (
 func TestCreateNewRelayInternalAPI(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
-		base.Cfg.FederationAPI.PreferDirectFetch = true
-		base.Cfg.FederationAPI.KeyPerspectives = nil
 		defer close()
-		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
-		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
 
 		relayAPI := relayapi.NewRelayInternalAPI(
 			base,
@@ -42,4 +38,71 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 		)
 		assert.NotNil(t, relayAPI)
 	})
+}
+
+func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		if dbType == test.DBTypeSQLite {
+			base.Cfg.RelayAPI.Database.ConnectionString = "file:"
+		} else {
+			base.Cfg.RelayAPI.Database.ConnectionString = "test"
+		}
+		defer close()
+
+		assert.Panics(t, func() {
+			relayapi.NewRelayInternalAPI(
+				base,
+				nil,
+				nil,
+				nil,
+				nil,
+			)
+		})
+	})
+}
+
+func TestCreateRelayInternalRoutes(t *testing.T) {
+	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
+	base.Cfg.RelayAPI.InternalAPI.Connect = config.HTTPAddress("http://localhost:8008")
+	defer close()
+
+	relayAPI := relayapi.NewRelayInternalAPI(
+		base,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	assert.NotNil(t, relayAPI)
+
+	relayapi.AddInternalRoutes(base.InternalAPIMux, &relayAPI)
+}
+
+func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
+
+		assert.Panics(t, func() {
+			relayapi.AddPublicRoutes(base, nil, nil, nil, nil, nil, nil, nil)
+		})
+	})
+}
+
+func TestCreateRelayPublicRoutes(t *testing.T) {
+	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
+	base.Cfg.RelayAPI.InternalAPI.Connect = config.HTTPAddress("http://localhost:8008")
+	defer close()
+
+	relayAPI := relayapi.NewRelayInternalAPI(
+		base,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	assert.NotNil(t, relayAPI)
+
+	relayapi.AddPublicRoutes(base, nil, nil, nil, nil, &relayAPI, nil, nil)
 }
