@@ -79,5 +79,5 @@ type QueryAsyncTransactionsRequest struct {
 type QueryAsyncTransactionsResponse struct {
 	Txn           gomatrixserverlib.Transaction `json:"transaction"`
 	EntryID       int64                         `json:"entry_id"`
-	EntriesQueued bool                          `json:entries_queued`
+	EntriesQueued bool                          `json:"entries_queued"`
 }

@@ -17,11 +17,10 @@ import (
 func createAsyncQuery(
 	userID gomatrixserverlib.UserID,
 	prevEntry gomatrixserverlib.RelayEntry,
-	relayServer gomatrixserverlib.ServerName,
 ) gomatrixserverlib.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
 	path := federationPathPrefixV1 + "/async_events/" + userID.Raw()
-	request := gomatrixserverlib.NewFederationRequest("GET", userID.Domain(), relayServer, path)
+	request := gomatrixserverlib.NewFederationRequest("GET", userID.Domain(), "relay", path)
 	request.SetContent(prevEntry)
 
 	return request
@@ -47,7 +46,7 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1}, "relay")
+	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
 	response := routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -56,6 +55,7 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
+	assert.Nil(t, err)
 	assert.Zero(t, count)
 }
 
@@ -87,7 +87,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1}, "relay")
+	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
 	response := routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -96,7 +96,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	assert.Equal(t, transaction, jsonResponse.Txn)
 
 	// And once more to clear the queue
-	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
+	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID})
 	response = routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -105,6 +105,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
+	assert.Nil(t, err)
 	assert.Zero(t, count)
 }
 
@@ -149,7 +150,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1}, "relay")
+	request := createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
 	response := routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -157,7 +158,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Txn)
 
-	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
+	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID})
 	response = routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -166,7 +167,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.Equal(t, transaction2, jsonResponse.Txn)
 
 	// And once more to clear the queue
-	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID}, "relay")
+	request = createAsyncQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: jsonResponse.EntryID})
 	response = routing.GetAsyncEvents(httpReq, &request, &relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -175,5 +176,6 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
+	assert.Nil(t, err)
 	assert.Zero(t, count)
 }

@@ -98,8 +98,8 @@ func (d *Database) CleanAsyncTransactions(
 	}
 
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		err := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
-		return err
+		dbErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
+		return dbErr
 	})
 	if err != nil {
 		return fmt.Errorf("d.deleteQueueJSON: %w", err)
