@@ -35,12 +35,12 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
 
 	_, err = db.StoreAsyncTransaction(context.Background(), transaction)
-	assert.Nil(t, err, "Failed to store transaction")
+	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -55,7 +55,7 @@ func TestGetAsyncEmptyDatabaseReturnsNothing(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Zero(t, count)
 }
 
@@ -68,11 +68,11 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
 	receipt, err := db.StoreAsyncTransaction(context.Background(), transaction)
-	assert.Nil(t, err, "Failed to store transaction")
+	assert.NoError(t, err, "Failed to store transaction")
 
 	err = db.AssociateAsyncTransactionWithDestinations(
 		context.Background(),
@@ -81,7 +81,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 		},
 		transaction.TransactionID,
 		receipt)
-	assert.Nil(t, err, "Failed to associate transaction with user")
+	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -105,7 +105,7 @@ func TestGetAsyncReturnsSavedTransaction(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Zero(t, count)
 }
 
@@ -118,11 +118,11 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	transaction := createTransaction()
 	receipt, err := db.StoreAsyncTransaction(context.Background(), transaction)
-	assert.Nil(t, err, "Failed to store transaction")
+	assert.NoError(t, err, "Failed to store transaction")
 
 	err = db.AssociateAsyncTransactionWithDestinations(
 		context.Background(),
@@ -131,11 +131,11 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		},
 		transaction.TransactionID,
 		receipt)
-	assert.Nil(t, err, "Failed to associate transaction with user")
+	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	transaction2 := createTransaction()
 	receipt2, err := db.StoreAsyncTransaction(context.Background(), transaction2)
-	assert.Nil(t, err, "Failed to store transaction")
+	assert.NoError(t, err, "Failed to store transaction")
 
 	err = db.AssociateAsyncTransactionWithDestinations(
 		context.Background(),
@@ -144,7 +144,7 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 		},
 		transaction2.TransactionID,
 		receipt2)
-	assert.Nil(t, err, "Failed to associate transaction with user")
+	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
 		&db, nil, nil, nil, nil, false, "",
@@ -176,6 +176,6 @@ func TestGetAsyncReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Txn)
 
 	count, err := db.GetAsyncTransactionCount(context.Background(), *userID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Zero(t, count)
 }

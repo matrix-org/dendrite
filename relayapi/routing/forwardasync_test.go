@@ -57,7 +57,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	txn := createTransaction()
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, txn)
@@ -80,7 +80,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
 		Field bool `json:"pdus"`
@@ -109,7 +109,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
 		Field []json.RawMessage `json:"pdus"`
@@ -143,7 +143,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	type BadData struct {
 		Field []gomatrixserverlib.EDU `json:"edus"`
@@ -177,7 +177,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	}
 	httpReq := &http.Request{}
 	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
-	assert.Nil(t, err, "Invalid userID")
+	assert.NoError(t, err, "Invalid userID")
 
 	txn := createTransaction()
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, txn)
@@ -189,10 +189,10 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	response := routing.ForwardAsync(
 		httpReq, &request, &relayAPI, txn.TransactionID, *userID)
 	transaction, _, err := db.GetAsyncTransaction(context.TODO(), *userID)
-	assert.Nil(t, err, "Failed retrieving transaction")
+	assert.NoError(t, err, "Failed retrieving transaction")
 
 	transactionCount, err := db.GetAsyncTransactionCount(context.TODO(), *userID)
-	assert.Nil(t, err, "Failed retrieving transaction count")
+	assert.NoError(t, err, "Failed retrieving transaction count")
 
 	assert.Equal(t, 200, response.Code)
 	assert.Equal(t, int64(1), transactionCount)
