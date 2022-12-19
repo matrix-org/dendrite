@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	testOrigin      = gomatrixserverlib.ServerName("kaer.morhen")
-	testDestination = gomatrixserverlib.ServerName("white.orchard")
+	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
 )
 
 func createTransaction() gomatrixserverlib.Transaction {
@@ -62,7 +61,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.Equal(t, 200, response.Code)
 }
@@ -91,7 +90,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.NotEqual(t, 200, response.Code)
 }
@@ -125,7 +124,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.NotEqual(t, 200, response.Code)
 }
@@ -159,7 +158,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, &relayAPI, "1", *userID)
+	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.NotEqual(t, 200, response.Code)
 }
@@ -183,7 +182,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	)
 
 	response := routing.ForwardAsync(
-		httpReq, &request, &relayAPI, txn.TransactionID, *userID)
+		httpReq, &request, relayAPI, txn.TransactionID, *userID)
 	transaction, _, err := db.GetAsyncTransaction(context.TODO(), *userID)
 	assert.NoError(t, err, "Failed retrieving transaction")
 

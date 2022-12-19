@@ -257,7 +257,7 @@ func main() {
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  userAPI,
 		KeyAPI:                   keyAPI,
-		RelayAPI:                 &relayAPI,
+		RelayAPI:                 relayAPI,
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}

@@ -62,7 +62,7 @@ func NewRelayInternalAPI(
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
-) internal.RelayInternalAPI {
+) api.RelayInternalAPI {
 	cfg := &base.Cfg.RelayAPI
 
 	relayDB, err := storage.NewDatabase(base, &cfg.Database, base.Caches, base.Cfg.Global.IsLocalServerName)

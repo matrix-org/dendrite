@@ -1,5 +1,4 @@
-// Copyright 2022 The Matrix.org Foundation C.I.C.
-//
+// Copyright 2022 The Matrix.org Foundation C.I.C. //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -58,7 +57,7 @@ func TestCreateRelayInternalRoutes(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	assert.NotNil(t, relayAPI)
 
-	relayapi.AddInternalRoutes(base.InternalAPIMux, &relayAPI, false)
+	relayapi.AddInternalRoutes(base.InternalAPIMux, relayAPI, false)
 }
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
@@ -79,5 +78,5 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	assert.NotNil(t, relayAPI)
 
-	relayapi.AddPublicRoutes(base, nil, &relayAPI)
+	relayapi.AddPublicRoutes(base, nil, relayAPI)
 }

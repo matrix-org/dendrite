@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	testOrigin      = gomatrixserverlib.ServerName("kaer.morhen")
-	testDestination = gomatrixserverlib.ServerName("white.orchard")
+	testOrigin = gomatrixserverlib.ServerName("kaer.morhen")
 )
 
 func mustCreateTransaction() gomatrixserverlib.Transaction {

@@ -41,12 +41,16 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/relayapi"
+	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
@@ -329,6 +333,7 @@ func (m *DendriteMonolith) Start() {
 	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(m.StorageDirectory, prefix)))
 	cfg.MediaAPI.BasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
 	cfg.MediaAPI.AbsBasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
+	cfg.RelayAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-relayapi.db", filepath.Join(m.StorageDirectory, prefix)))
 	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
 	cfg.ClientAPI.RegistrationDisabled = false
 	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
@@ -366,6 +371,20 @@ func (m *DendriteMonolith) Start() {
 	userProvider := users.NewPineconeUserProvider(m.PineconeRouter, m.PineconeQUIC, m.userAPI, federation)
 	roomProvider := rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, m.federationAPI, federation)
 
+	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+	producer := &producers.SyncAPIProducer{
+		JetStream:              js,
+		TopicReceiptEvent:      base.Cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		TopicSendToDeviceEvent: base.Cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		TopicTypingEvent:       base.Cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		TopicPresenceEvent:     base.Cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		TopicDeviceListUpdate:  base.Cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		TopicSigningKeyUpdate:  base.Cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		Config:                 &base.Cfg.FederationAPI,
+		UserAPI:                m.userAPI,
+	}
+	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer)
+
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
 		Client:    conn.CreateClient(base, m.PineconeQUIC),
@@ -377,6 +396,7 @@ func (m *DendriteMonolith) Start() {
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  m.userAPI,
 		KeyAPI:                   keyAPI,
+		RelayAPI:                 relayAPI,
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}
@@ -442,23 +462,20 @@ func (m *DendriteMonolith) Start() {
 		relayServerSyncRunning := atomic.NewBool(false)
 		stopRelayServerSync := make(chan bool)
 
-		// Setup relay server info
-		request := api.QueryRelayServersRequest{Server: gomatrixserverlib.ServerName(m.PublicKey())}
-		response := api.QueryRelayServersResponse{}
-		err := m.federationAPI.QueryRelayServers(m.processContext.Context(), &request, &response)
-		if err != nil {
-			// TODO
+		relayRetriever := RelayServerRetriever{
+			Context:             context.Background(),
+			ServerName:          gomatrixserverlib.ServerName(m.PineconeRouter.PublicKey().String()),
+			FederationAPI:       m.federationAPI,
+			RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
+			RelayAPI:            monolith.RelayAPI,
 		}
-		m.relayServersQueried = make(map[gomatrixserverlib.ServerName]bool)
-		for _, server := range response.RelayServers {
-			m.relayServersQueried[server] = false
-		}
+		relayRetriever.InitializeRelayServers(eLog)
 
 		for event := range ch {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
 				if !relayServerSyncRunning.Load() {
-					// go m.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
+					go relayRetriever.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
 				}
 			case pineconeEvents.PeerRemoved:
 				if relayServerSyncRunning.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
@@ -493,6 +510,84 @@ func (m *DendriteMonolith) Stop() {
 	_ = m.PineconeQUIC.Close()
 	_ = m.PineconeRouter.Close()
 	m.processContext.WaitForComponentsToFinish()
+}
+
+type RelayServerRetriever struct {
+	Context             context.Context
+	ServerName          gomatrixserverlib.ServerName
+	FederationAPI       api.FederationInternalAPI
+	RelayServersQueried map[gomatrixserverlib.ServerName]bool
+	RelayAPI            relayServerAPI.RelayInternalAPI
+}
+
+func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
+	request := api.QueryRelayServersRequest{Server: gomatrixserverlib.ServerName(m.ServerName)}
+	response := api.QueryRelayServersResponse{}
+	err := m.FederationAPI.QueryRelayServers(m.Context, &request, &response)
+	if err != nil {
+		// TODO
+	}
+	for _, server := range response.RelayServers {
+		m.RelayServersQueried[server] = false
+	}
+
+	eLog.Infof("Registered relay servers: %v", response.RelayServers)
+}
+
+func (m *RelayServerRetriever) syncRelayServers(stop <-chan bool, running atomic.Bool) {
+	defer running.Store(false)
+
+	t := time.NewTimer(relayServerRetryInterval)
+	for {
+		relayServersToQuery := []gomatrixserverlib.ServerName{}
+		for server, complete := range m.RelayServersQueried {
+			if !complete {
+				relayServersToQuery = append(relayServersToQuery, server)
+			}
+		}
+		if len(relayServersToQuery) == 0 {
+			// All relay servers have been synced.
+			return
+		}
+		m.queryRelayServers(relayServersToQuery)
+		t.Reset(relayServerRetryInterval)
+
+		select {
+		case <-stop:
+			if !t.Stop() {
+				<-t.C
+			}
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (m *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
+	logrus.Info("querying relay servers for async_events")
+	for _, server := range relayServers {
+		userID, err := gomatrixserverlib.NewUserID("@user:"+string(m.ServerName), false)
+		if err != nil {
+			return
+		}
+		request := relayServerAPI.PerformRelayServerSyncRequest{
+			UserID:      *userID,
+			RelayServer: server,
+		}
+		response := relayServerAPI.PerformRelayServerSyncResponse{}
+		err = m.RelayAPI.PerformRelayServerSync(context.Background(), &request, &response)
+		if err == nil {
+			m.RelayServersQueried[server] = true
+			// TODO : What happens if your relay receives new messages after this point?
+			// Should you continue to check with them, or should they try and contact you?
+			// They could send a "new_async_events" message your way maybe?
+			// Then you could mark them as needing to be queried again.
+			// What if you miss this message?
+			// Maybe you should try querying them again after a certain period of time as a backup?
+		} else {
+			logrus.Errorf("Failed querying relay server: %s", err.Error())
+		}
+	}
 }
 
 const MaxFrameSize = types.MaxFrameSize

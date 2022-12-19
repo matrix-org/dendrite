@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-yggdrasil/signing"
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/relayapi"
+	"github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/relayapi/routing"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
@@ -53,7 +54,11 @@ func TestHandleForwardAsync(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	routing.Setup(fedMux, &cfg, &relayAPI, keyRing)
+	r, ok := relayAPI.(*internal.RelayInternalAPI)
+	if !ok {
+		panic("This is a programming error.")
+	}
+	routing.Setup(fedMux, &cfg, r, keyRing)
 
 	handler := fedMux.Get(routing.ForwardAsyncRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
@@ -95,7 +100,11 @@ func TestHandleForwardAsyncBadUserID(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	routing.Setup(fedMux, &cfg, &relayAPI, keyRing)
+	r, ok := relayAPI.(*internal.RelayInternalAPI)
+	if !ok {
+		panic("This is a programming error.")
+	}
+	routing.Setup(fedMux, &cfg, r, keyRing)
 
 	handler := fedMux.Get(routing.ForwardAsyncRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
@@ -137,7 +146,11 @@ func TestHandleAsyncEvents(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	routing.Setup(fedMux, &cfg, &relayAPI, keyRing)
+	r, ok := relayAPI.(*internal.RelayInternalAPI)
+	if !ok {
+		panic("This is a programming error.")
+	}
+	routing.Setup(fedMux, &cfg, r, keyRing)
 
 	handler := fedMux.Get(routing.AsyncEventsRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
@@ -179,7 +192,11 @@ func TestHandleAsyncEventsBadUserID(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
-	routing.Setup(fedMux, &cfg, &relayAPI, keyRing)
+	r, ok := relayAPI.(*internal.RelayInternalAPI)
+	if !ok {
+		panic("This is a programming error.")
+	}
+	routing.Setup(fedMux, &cfg, r, keyRing)
 
 	handler := fedMux.Get(routing.AsyncEventsRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)

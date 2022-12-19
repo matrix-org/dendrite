@@ -40,8 +40,8 @@ func NewRelayInternalAPI(
 	producer *producers.SyncAPIProducer,
 	presenceEnabledInbound bool,
 	serverName gomatrixserverlib.ServerName,
-) RelayInternalAPI {
-	return RelayInternalAPI{
+) *RelayInternalAPI {
+	return &RelayInternalAPI{
 		db:                     db,
 		fedClient:              fedClient,
 		rsAPI:                  rsAPI,
