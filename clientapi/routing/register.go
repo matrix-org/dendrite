@@ -323,7 +323,7 @@ func validatePassword(password string) *util.JSONResponse {
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
 		}
-	} else if len(password) > 0 && len(password) < minPasswordLength {
+	} else if len(password) < minPasswordLength {
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
