@@ -14,7 +14,7 @@ configuration:
 
   # -- The server name to delegate client-server communications to, with optional port
   # e.g. localhost:443
-  well_known_client_name:
+  well_known_client_name: ""
 
   # -- Lists of domains that the server will trust as identity servers to verify third
   # party identifiers such as phone numbers and email addresses.
@@ -77,7 +77,8 @@ configuration:
 
   # TURN server information that this homeserver should send to clients.
   turn:
-    turn_user_lifetime: ""
+    # -- Duration for how long users should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more)
+    turn_user_lifetime: "24h"
     turn_uris: []
     turn_shared_secret: ""
     # -- The TURN username
@@ -123,13 +124,16 @@ configuration:
       throttler: null
 
   profiling:
-    # -- Enable pprof
+    # -- Enable pprof. You will need to manually create a port forwarding to the deployment to access PPROF,
+    # as it will only listen on localhost and the defined port.
+    # e.g. `kubectl port-forward deployments/dendrite 65432:65432`
     enabled: false
     # -- pprof port, if enabled
     port: 65432
 
   # -- Configuration for experimental MSC's. (Valid values are: msc2836 and msc2946)
-  mscs: []
+  mscs:
+    - msc2946
     # A list of enabled MSC's
     # Currently valid values are:
     # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
@@ -161,8 +165,13 @@ persistence:
 
 clientapi:
   registration:
-    # -- Disable registration
-    disabled: true
+    # -- Prevents new users from being able to register on this homeserver, except when
+    # using the registration shared secret below.
+    registration_disabled: true
+
+    # Prevents new guest accounts from being created. Guest registration is also
+    # disabled implicitly by setting 'registration_disabled' above.
+    guests_disabled: true
 
     # -- If set, allows registration by anyone who knows the shared secret, regardless of
     # whether registration is otherwise disabled.
@@ -216,7 +225,7 @@ syncapi:
     enabled: false
     # -- The language most likely to be used on the server - used when indexing, to
     # ensure the returned results match expectations. A full list of possible languages
-    # can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
+    # can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46)
     language: "en"
 
 postgresql:

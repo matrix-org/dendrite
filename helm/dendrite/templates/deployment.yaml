@@ -48,6 +48,11 @@ spec:
           - name: http
             containerPort: 8008
             protocol: TCP
+        {{- if $.Values.configuration.profiling.enabled }}
+        env:
+          - name: PPROFLISTEN
+            value: "localhost:{{- $.Values.configuration.profiling.port -}}"
+        {{- end }}
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}
         volumeMounts:

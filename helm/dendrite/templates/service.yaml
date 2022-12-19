@@ -5,12 +5,12 @@ apiVersion: v1
 kind: Service
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: dendrite
+  name: {{ $.Chart.Name }}
   labels:
-    app: {{ $.Chart.Name }}
+    {{- include "dendrite.labels" . | nindent 4 }}
 spec:
   selector:
-    app: {{ $.Chart.Name }}
+    {{- include "dendrite.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
       protocol: TCP
