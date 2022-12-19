@@ -39,11 +39,9 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	r.processTransaction(&asyncResponse.Txn)
 
 	for asyncResponse.EntriesQueued {
-		logrus.Info("Retrieving next entry from relay")
-		logrus.Infof("Previous entry: %v", prevEntry)
+		logrus.Infof("Retrieving next entry from relay, previous: %v", prevEntry)
 		asyncResponse, err = r.fedClient.GetAsyncEvents(ctx, request.UserID, prevEntry, request.RelayServer)
 		prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
-		logrus.Infof("New previous entry: %v", prevEntry)
 		if err != nil {
 			logrus.Errorf("GetAsyncEvents: %s", err.Error())
 			return err
