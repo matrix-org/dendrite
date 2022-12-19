@@ -805,6 +805,12 @@ func (r *Queryer) QueryBulkStateContent(ctx context.Context, req *api.QueryBulkS
 	return nil
 }
 
+func (r *Queryer) QueryLeftUsers(ctx context.Context, req *api.QueryLeftUsersRequest, res *api.QueryLeftUsersResponse) error {
+	var err error
+	res.LeftUsers, err = r.DB.GetLeftUsers(ctx, req.StaleDeviceListUsers)
+	return err
+}
+
 func (r *Queryer) QuerySharedUsers(ctx context.Context, req *api.QuerySharedUsersRequest, res *api.QuerySharedUsersResponse) error {
 	roomIDs, err := r.DB.GetRoomsByMembership(ctx, req.UserID, "join")
 	if err != nil {
