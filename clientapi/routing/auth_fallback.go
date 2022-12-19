@@ -15,6 +15,7 @@
 package routing
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 
@@ -102,6 +103,22 @@ func AuthFallback(
 	w http.ResponseWriter, req *http.Request, authType string,
 	cfg *config.ClientAPI,
 ) *util.JSONResponse {
+	// We currently only support reCaptcha, so fail early if that's not requested
+	if authType == authtypes.LoginTypeRecaptcha {
+		if !cfg.RecaptchaEnabled {
+			return writeHTTPMessage(w, req,
+				"Recaptcha login is disabled on this Homeserver",
+				http.StatusBadRequest,
+			)
+		}
+	} else {
+		_ = writeHTTPMessage(w, req, fmt.Sprintf("Unknown authtype %q", authType), http.StatusNotImplemented)
+		return &util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound("Unknown auth stage type"),
+		}
+	}
+
 	sessionID := req.URL.Query().Get("session")
 
 	if sessionID == "" {
@@ -130,70 +147,35 @@ func AuthFallback(
 
 	if req.Method == http.MethodGet {
 		// Handle Recaptcha
-		if authType == authtypes.LoginTypeRecaptcha {
-			if err := checkRecaptchaEnabled(cfg, w, req); err != nil {
-				return err
-			}
-
-			serveRecaptcha()
-			return nil
-		}
-		return &util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Unknown auth stage type"),
-		}
+		serveRecaptcha()
+		return nil
 	} else if req.Method == http.MethodPost {
 		// Handle Recaptcha
-		if authType == authtypes.LoginTypeRecaptcha {
-			if err := checkRecaptchaEnabled(cfg, w, req); err != nil {
-				return err
-			}
-
-			clientIP := req.RemoteAddr
-			err := req.ParseForm()
-			if err != nil {
-				util.GetLogger(req.Context()).WithError(err).Error("req.ParseForm failed")
-				res := jsonerror.InternalServerError()
-				return &res
-			}
-
-			response := req.Form.Get(cfg.RecaptchaFormField)
-			if err := validateRecaptcha(cfg, response, clientIP); err != nil {
-				util.GetLogger(req.Context()).Error(err)
-				return err
-			}
-
-			// Success. Add recaptcha as a completed login flow
-			sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
-
-			serveSuccess()
-			return nil
+		clientIP := req.RemoteAddr
+		err := req.ParseForm()
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("req.ParseForm failed")
+			res := jsonerror.InternalServerError()
+			return &res
 		}
 
-		return &util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("Unknown auth stage type"),
+		response := req.Form.Get(cfg.RecaptchaFormField)
+		if err := validateRecaptcha(cfg, response, clientIP); err != nil {
+			util.GetLogger(req.Context()).Error(err)
+			return err
 		}
+
+		// Success. Add recaptcha as a completed login flow
+		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeRecaptcha)
+
+		serveSuccess()
+		return nil
 	}
+	_ = writeHTTPMessage(w, req, "Bad method", http.StatusMethodNotAllowed)
 	return &util.JSONResponse{
 		Code: http.StatusMethodNotAllowed,
 		JSON: jsonerror.NotFound("Bad method"),
 	}
-}
-
-// checkRecaptchaEnabled creates an error response if recaptcha is not usable on homeserver.
-func checkRecaptchaEnabled(
-	cfg *config.ClientAPI,
-	w http.ResponseWriter,
-	req *http.Request,
-) *util.JSONResponse {
-	if !cfg.RecaptchaEnabled {
-		return writeHTTPMessage(w, req,
-			"Recaptcha login is disabled on this Homeserver",
-			http.StatusBadRequest,
-		)
-	}
-	return nil
 }
 
 // writeHTTPMessage writes the given header and message to the HTTP response writer.
