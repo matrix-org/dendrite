@@ -140,50 +140,6 @@ func (t *testRoomserverAPI) QueryServerBannedFromRoom(
 	return nil
 }
 
-type txnFedClient struct {
-	state            map[string]gomatrixserverlib.RespState    // event_id to response
-	stateIDs         map[string]gomatrixserverlib.RespStateIDs // event_id to response
-	getEvent         map[string]gomatrixserverlib.Transaction  // event_id to response
-	getMissingEvents func(gomatrixserverlib.MissingEvents) (res gomatrixserverlib.RespMissingEvents, err error)
-}
-
-func (c *txnFedClient) LookupState(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
-	res gomatrixserverlib.RespState, err error,
-) {
-	fmt.Println("testFederationClient.LookupState", eventID)
-	r, ok := c.state[eventID]
-	if !ok {
-		err = fmt.Errorf("txnFedClient: no /state for event %s", eventID)
-		return
-	}
-	res = r
-	return
-}
-func (c *txnFedClient) LookupStateIDs(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error) {
-	fmt.Println("testFederationClient.LookupStateIDs", eventID)
-	r, ok := c.stateIDs[eventID]
-	if !ok {
-		err = fmt.Errorf("txnFedClient: no /state_ids for event %s", eventID)
-		return
-	}
-	res = r
-	return
-}
-func (c *txnFedClient) GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error) {
-	fmt.Println("testFederationClient.GetEvent", eventID)
-	r, ok := c.getEvent[eventID]
-	if !ok {
-		err = fmt.Errorf("txnFedClient: no /event for event ID %s", eventID)
-		return
-	}
-	res = r
-	return
-}
-func (c *txnFedClient) LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
-	roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error) {
-	return c.getMissingEvents(missing)
-}
-
 func mustCreateTransaction(rsAPI api.FederationRoomserverAPI, pdus []json.RawMessage) *internal.TxnReq {
 	t := internal.NewTxnReq(
 		rsAPI,
