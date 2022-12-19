@@ -351,13 +351,6 @@ func Test_validatePassword(t *testing.T) {
 		want     *util.JSONResponse
 	}{
 		{
-			name: "no password supplied",
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
-			},
-		},
-		{
 			name:     "password too short",
 			password: "shortpw",
 			want: &util.JSONResponse{
@@ -460,16 +453,6 @@ func Test_register(t *testing.T) {
 			wantResponse: util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
-			},
-		},
-		{
-			name:       "can't register without password",
-			username:   "helloworld",
-			password:   "",
-			forceEmpty: true,
-			wantResponse: util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
 			},
 		},
 	}

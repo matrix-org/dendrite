@@ -23,15 +23,13 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 type loginResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
+	UserID      string `json:"user_id"`
+	AccessToken string `json:"access_token"`
+	DeviceID    string `json:"device_id"`
 }
 
 type flows struct {
@@ -116,7 +114,6 @@ func completeAuth(
 		JSON: loginResponse{
 			UserID:      performRes.Device.UserID,
 			AccessToken: performRes.Device.AccessToken,
-			HomeServer:  serverName,
 			DeviceID:    performRes.Device.ID,
 		},
 	}
