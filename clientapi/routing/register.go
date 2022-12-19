@@ -263,10 +263,9 @@ func newUserInteractiveResponse(
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 type registerResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token,omitempty"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id,omitempty"`
+	UserID      string `json:"user_id"`
+	AccessToken string `json:"access_token,omitempty"`
+	DeviceID    string `json:"device_id,omitempty"`
 }
 
 // recaptchaResponse represents the HTTP response from a Google Recaptcha server
@@ -715,7 +714,6 @@ func handleGuestRegistration(
 		JSON: registerResponse{
 			UserID:      devRes.Device.UserID,
 			AccessToken: devRes.Device.AccessToken,
-			HomeServer:  res.Account.ServerName,
 			DeviceID:    devRes.Device.ID,
 		},
 	}
@@ -942,8 +940,7 @@ func completeRegistration(
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
-				UserID:     userutil.MakeUserID(username, accRes.Account.ServerName),
-				HomeServer: accRes.Account.ServerName,
+				UserID: userutil.MakeUserID(username, accRes.Account.ServerName),
 			},
 		}
 	}
@@ -976,7 +973,6 @@ func completeRegistration(
 	result := registerResponse{
 		UserID:      devRes.Device.UserID,
 		AccessToken: devRes.Device.AccessToken,
-		HomeServer:  accRes.Account.ServerName,
 		DeviceID:    devRes.Device.ID,
 	}
 	sessions.addCompletedRegistration(sessionID, result)

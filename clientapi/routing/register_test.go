@@ -15,8 +15,11 @@
 package routing
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"regexp"
 	"strings"
@@ -25,7 +28,12 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/test"
+	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -373,4 +381,233 @@ func Test_validatePassword(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_register(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		kind                 string
+		password             string
+		username             string
+		loginType            string
+		forceEmpty           bool
+		registrationDisabled bool
+		guestsDisabled       bool
+		wantResponse         util.JSONResponse
+	}{
+		{
+			name:           "disallow guests",
+			kind:           "guest",
+			guestsDisabled: true,
+			wantResponse: util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden(`Guest registration is disabled on "test"`),
+			},
+		},
+		{
+			name: "allow guests",
+			kind: "guest",
+		},
+		{
+			name:      "unknown login type",
+			loginType: "im.not.known",
+			wantResponse: util.JSONResponse{
+				Code: http.StatusNotImplemented,
+				JSON: jsonerror.Unknown("unknown/unimplemented auth type"),
+			},
+		},
+		{
+			name:                 "disabled registration",
+			registrationDisabled: true,
+			wantResponse: util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Forbidden(`Registration is disabled on "test"`),
+			},
+		},
+		{
+			name:       "successful registration, numeric ID",
+			username:   "",
+			password:   "someRandomPassword",
+			forceEmpty: true,
+		},
+		{
+			name:     "successful registration",
+			username: "success",
+		},
+		{
+			name:     "failing registration - user already exists",
+			username: "success",
+			wantResponse: util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
+			},
+		},
+		{
+			name:     "successful registration",
+			username: "LOWERCASED", // this is going to be lower-cased
+		},
+		{
+			name:     "invalid username",
+			username: "#totalyNotValid",
+			wantResponse: util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
+			},
+		},
+		{
+			name:     "numeric username is forbidden",
+			username: "1337",
+			wantResponse: util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
+			},
+		},
+		{
+			name:       "can't register without password",
+			username:   "helloworld",
+			password:   "",
+			forceEmpty: true,
+			wantResponse: util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
+		defer baseClose()
+
+		rsAPI := roomserver.NewInternalAPI(base)
+		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
+		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+		keyAPI.SetUserAPI(userAPI)
+
+		if err := base.Cfg.Derive(); err != nil {
+			t.Fatalf("failed to derive config: %s", err)
+		}
+
+		for _, tc := range testCases {
+			if tc.kind == "" {
+				tc.kind = "user"
+			}
+			if tc.password == "" && !tc.forceEmpty {
+				tc.password = "someRandomPassword"
+			}
+			if tc.username == "" && !tc.forceEmpty {
+				tc.username = "valid"
+			}
+			if tc.loginType == "" {
+				tc.loginType = "m.login.dummy"
+			}
+
+			reg := registerRequest{
+				Password: tc.password,
+				Username: tc.username,
+			}
+
+			body := &bytes.Buffer{}
+
+			base.Cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
+			base.Cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
+
+			err := json.NewEncoder(body).Encode(reg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/?kind=%s", tc.kind), body)
+
+			resp := Register(req, userAPI, &base.Cfg.ClientAPI)
+			t.Logf("Resp: %+v", resp)
+
+			// The first request should return a userInteractiveResponse
+			switch r := resp.JSON.(type) {
+			case userInteractiveResponse:
+				// Check that the flows are the ones we configured
+				if !reflect.DeepEqual(r.Flows, base.Cfg.Derived.Registration.Flows) {
+					t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, base.Cfg.Derived.Registration.Flows)
+				}
+			case *jsonerror.MatrixError:
+				if !reflect.DeepEqual(tc.wantResponse, resp) {
+					t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
+				}
+				continue
+			case registerResponse:
+				// this should only be possible on guest user registration, never for normal users
+				if tc.kind != "guest" {
+					t.Fatalf("got register response on first request: %+v", r)
+				}
+				// assert we've got a UserID, AccessToken and DeviceID
+				if r.UserID == "" {
+					t.Fatalf("missing userID in response")
+				}
+				if r.AccessToken == "" {
+					t.Fatalf("missing accessToken in response")
+				}
+				if r.DeviceID == "" {
+					t.Fatalf("missing deviceID in response")
+				}
+				continue
+			default:
+				t.Logf("Got response: %T", resp.JSON)
+			}
+
+			// If we reached this, we should have received a UIA response
+			uia, ok := resp.JSON.(userInteractiveResponse)
+			if !ok {
+				t.Fatalf("did not receive a userInteractiveResponse: %T", resp.JSON)
+			}
+			t.Logf("%+v", uia)
+
+			// Register the user
+			reg.Auth = authDict{
+				Type:    authtypes.LoginType(tc.loginType),
+				Session: uia.Session,
+			}
+			dummy := "dummy"
+			reg.DeviceID = &dummy
+			reg.InitialDisplayName = &dummy
+			reg.Type = authtypes.LoginType(tc.loginType)
+
+			err = json.NewEncoder(body).Encode(reg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req = httptest.NewRequest(http.MethodPost, "/", body)
+
+			resp = Register(req, userAPI, &base.Cfg.ClientAPI)
+
+			switch resp.JSON.(type) {
+			case *jsonerror.MatrixError:
+				if !reflect.DeepEqual(tc.wantResponse, resp) {
+					t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+				}
+				continue
+			}
+
+			rr, ok := resp.JSON.(registerResponse)
+			if !ok {
+				t.Fatalf("expected a registerresponse, got %T", resp.JSON)
+			}
+
+			// validate the response
+			if tc.forceEmpty {
+				// when not supplying a username, one will be generated. Given this _SHOULD_ be
+				// the second user, set the username accordingly
+				reg.Username = "2"
+			}
+			wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
+			if wantUserID != rr.UserID {
+				t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+			}
+			if rr.DeviceID != *reg.DeviceID {
+				t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
+			}
+			if rr.AccessToken == "" {
+				t.Fatalf("missing accessToken in response")
+			}
+		}
+	})
 }
