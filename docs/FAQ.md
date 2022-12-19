@@ -91,7 +91,7 @@ Please use PostgreSQL wherever possible, especially if you are planning to run a
 ## Dendrite is using a lot of CPU
 
 Generally speaking, you should expect to see some CPU spikes, particularly if you are joining or participating in large rooms. However, constant/sustained high CPU usage is not expected - if you are experiencing that, please join `#dendrite-dev:matrix.org` and let us know what you were doing when the
-CPU usage shot up, or file a GitHub issue. If you can take a [CPU profile](PROFILING.md) then that would
+CPU usage shot up, or file a GitHub issue. If you can take a [CPU profile](development/PROFILING.md) then that would
 be a huge help too, as that will help us to understand where the CPU time is going.
 
 ## Dendrite is using a lot of RAM
@@ -99,7 +99,7 @@ be a huge help too, as that will help us to understand where the CPU time is goi
 As above with CPU usage, some memory spikes are expected if Dendrite is doing particularly heavy work
 at a given instant. However, if it is using more RAM than you expect for a long time, that's probably
 not expected. Join `#dendrite-dev:matrix.org` and let us know what you were doing when the memory usage
-ballooned, or file a GitHub issue if you can. If you can take a [memory profile](PROFILING.md) then that
+ballooned, or file a GitHub issue if you can. If you can take a [memory profile](development/PROFILING.md) then that
 would be a huge help too, as that will help us to understand where the memory usage is happening.
 
 ## Dendrite is running out of PostgreSQL database connections

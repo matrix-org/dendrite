@@ -221,12 +221,7 @@ func main() {
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	// TODO : What if I had another dendrite function, where I just passed in the fed_client,
-	// rsAPI, userAPI, keyRing & any other info. Then that thing is what handles doing the
-	// async_events querying?
-	// ie. don't tie it into the federationInternalAPI & get rid of the associated mess.
-
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsComponent)
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 

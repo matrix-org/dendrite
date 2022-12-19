@@ -58,7 +58,7 @@ func TestCreateRelayInternalRoutes(t *testing.T) {
 	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
 	assert.NotNil(t, relayAPI)
 
-	relayapi.AddInternalRoutes(base.InternalAPIMux, &relayAPI)
+	relayapi.AddInternalRoutes(base.InternalAPIMux, &relayAPI, false)
 }
 
 func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {

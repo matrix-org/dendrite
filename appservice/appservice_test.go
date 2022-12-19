@@ -77,32 +77,6 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		}
 	}))
 
-	// TODO: use test.WithAllDatabases
-	// only one DBType, since appservice.AddInternalRoutes complains about multiple prometheus counters added
-	base, closeBase := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
-	defer closeBase()
-
-	// Create a dummy application service
-	base.Cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
-		{
-			ID:              "someID",
-			URL:             srv.URL,
-			ASToken:         "",
-			HSToken:         "",
-			SenderLocalpart: "senderLocalPart",
-			NamespaceMap: map[string][]config.ApplicationServiceNamespace{
-				"users":   {{RegexpObject: regexp.MustCompile("as-.*")}},
-				"aliases": {{RegexpObject: regexp.MustCompile("asroom-.*")}},
-			},
-			Protocols: []string{existingProtocol},
-		},
-	}
-
-	// Create required internal APIs
-	rsAPI := roomserver.NewInternalAPI(base)
-	usrAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, nil, rsAPI, nil)
-	asAPI := appservice.NewInternalAPI(base, usrAPI, rsAPI)
-
 	// The test cases to run
 	runCases := func(t *testing.T, testAPI api.AppServiceInternalAPI) {
 		t.Run("UserIDExists", func(t *testing.T) {
@@ -133,24 +107,49 @@ func TestAppserviceInternalAPI(t *testing.T) {
 		})
 	}
 
-	// Finally execute the tests
-	t.Run("HTTP API", func(t *testing.T) {
-		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-		appservice.AddInternalRoutes(router, asAPI)
-		apiURL, cancel := test.ListenAndServe(t, router, false)
-		defer cancel()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, closeBase := testrig.CreateBaseDendrite(t, dbType)
+		defer closeBase()
 
-		asHTTPApi, err := inthttp.NewAppserviceClient(apiURL, &http.Client{})
-		if err != nil {
-			t.Fatalf("failed to create HTTP client: %s", err)
+		// Create a dummy application service
+		base.Cfg.AppServiceAPI.Derived.ApplicationServices = []config.ApplicationService{
+			{
+				ID:              "someID",
+				URL:             srv.URL,
+				ASToken:         "",
+				HSToken:         "",
+				SenderLocalpart: "senderLocalPart",
+				NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+					"users":   {{RegexpObject: regexp.MustCompile("as-.*")}},
+					"aliases": {{RegexpObject: regexp.MustCompile("asroom-.*")}},
+				},
+				Protocols: []string{existingProtocol},
+			},
 		}
-		runCases(t, asHTTPApi)
-	})
 
-	t.Run("Monolith", func(t *testing.T) {
-		runCases(t, asAPI)
-	})
+		// Create required internal APIs
+		rsAPI := roomserver.NewInternalAPI(base)
+		usrAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, nil, rsAPI, nil)
+		asAPI := appservice.NewInternalAPI(base, usrAPI, rsAPI)
 
+		// Finally execute the tests
+		t.Run("HTTP API", func(t *testing.T) {
+			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
+			appservice.AddInternalRoutes(router, asAPI, base.EnableMetrics)
+			apiURL, cancel := test.ListenAndServe(t, router, false)
+			defer cancel()
+
+			asHTTPApi, err := inthttp.NewAppserviceClient(apiURL, &http.Client{})
+			if err != nil {
+				t.Fatalf("failed to create HTTP client: %s", err)
+			}
+			runCases(t, asHTTPApi)
+		})
+
+		t.Run("Monolith", func(t *testing.T) {
+			runCases(t, asAPI)
+		})
+	})
 }
 
 func testUserIDExists(t *testing.T, asAPI api.AppServiceInternalAPI, userID string, wantExists bool) {

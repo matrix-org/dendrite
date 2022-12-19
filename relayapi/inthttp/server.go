@@ -9,19 +9,19 @@ import (
 
 // AddRoutes adds the RelayInternalAPI handlers to the http.ServeMux.
 // nolint:gocyclo
-func AddRoutes(intAPI api.RelayInternalAPI, internalAPIMux *mux.Router) {
+func AddRoutes(intAPI api.RelayInternalAPI, internalAPIMux *mux.Router, enableMetrics bool) {
 	internalAPIMux.Handle(
 		RelayAPIPerformRelayServerSyncPath,
-		httputil.MakeInternalRPCAPI("RelayAPIPerformRelayServerSync", intAPI.PerformRelayServerSync),
+		httputil.MakeInternalRPCAPI("RelayAPIPerformRelayServerSync", enableMetrics, intAPI.PerformRelayServerSync),
 	)
 
 	internalAPIMux.Handle(
 		RelayAPIPerformStoreAsyncPath,
-		httputil.MakeInternalRPCAPI("RelayAPIPerformStoreAsync", intAPI.PerformStoreAsync),
+		httputil.MakeInternalRPCAPI("RelayAPIPerformStoreAsync", enableMetrics, intAPI.PerformStoreAsync),
 	)
 
 	internalAPIMux.Handle(
 		RelayAPIQueryAsyncTransactionsPath,
-		httputil.MakeInternalRPCAPI("RelayAPIQueryAsyncTransactions", intAPI.QueryAsyncTransactions),
+		httputil.MakeInternalRPCAPI("RelayAPIQueryAsyncTransactions", enableMetrics, intAPI.QueryAsyncTransactions),
 	)
 }

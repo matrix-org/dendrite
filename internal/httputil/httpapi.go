@@ -24,16 +24,17 @@ import (
 	"strings"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/dendrite/clientapi/auth"
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+
+	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 // BasicAuth is used for authorization on /metrics handlers
@@ -227,7 +228,7 @@ func MakeHTMLAPI(metricsName string, f func(http.ResponseWriter, *http.Request) 
 // This is used for APIs that are internal to dendrite.
 // If we are passed a tracing context in the request headers then we use that
 // as the parent of any tracing spans we create.
-func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse) http.Handler {
+func MakeInternalAPI(metricsName string, enableMetrics bool, f func(*http.Request) util.JSONResponse) http.Handler {
 	h := util.MakeJSONAPI(util.NewJSONRequestHandler(f))
 	withSpan := func(w http.ResponseWriter, req *http.Request) {
 		carrier := opentracing.HTTPHeadersCarrier(req.Header)
@@ -244,6 +245,10 @@ func MakeInternalAPI(metricsName string, f func(*http.Request) util.JSONResponse
 		defer span.Finish()
 		req = req.WithContext(opentracing.ContextWithSpan(req.Context(), span))
 		h.ServeHTTP(w, req)
+	}
+
+	if !enableMetrics {
+		return http.HandlerFunc(withSpan)
 	}
 
 	return promhttp.InstrumentHandlerCounter(
