@@ -66,11 +66,37 @@ func Test_AuthFallback(t *testing.T) {
 
 					base.Cfg.ClientAPI.RecaptchaSiteVerifyAPI = srv.URL
 
+					// check the result after sending the captcha
 					req = httptest.NewRequest(http.MethodPost, "/?session=1337", nil)
 					req.Form = url.Values{}
 					req.Form.Add(base.Cfg.ClientAPI.RecaptchaFormField, "someRandomValue")
 					rec = httptest.NewRecorder()
 					AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &base.Cfg.ClientAPI)
+					if recaptchaEnabled {
+						if !wantErr {
+							if rec.Code != http.StatusOK {
+								t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusOK)
+							}
+							if rec.Body.String() != successTemplate {
+								t.Fatalf("unexpected response: %s, want %s", rec.Body.String(), successTemplate)
+							}
+						} else {
+							if rec.Code != http.StatusUnauthorized {
+								t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusUnauthorized)
+							}
+							wantString := "Authentication"
+							if !strings.Contains(rec.Body.String(), wantString) {
+								t.Fatalf("expected response to contain '%s', but didn't: %s", wantString, rec.Body.String())
+							}
+						}
+					} else {
+						if rec.Code != http.StatusBadRequest {
+							t.Fatalf("unexpected response code: %d, want %d", rec.Code, http.StatusBadRequest)
+						}
+						if rec.Body.String() != "Recaptcha login is disabled on this Homeserver" {
+							t.Fatalf("unexpected response: %s, want %s", rec.Body.String(), "successTemplate")
+						}
+					}
 				})
 			}
 		}

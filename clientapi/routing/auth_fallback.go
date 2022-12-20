@@ -162,6 +162,8 @@ func AuthFallback(
 		response := req.Form.Get(cfg.RecaptchaFormField)
 		if err := validateRecaptcha(cfg, response, clientIP); err != nil {
 			util.GetLogger(req.Context()).Error(err)
+			w.WriteHeader(http.StatusUnauthorized)
+			serveRecaptcha() // serve the initial page again, instead of nothing
 			return err
 		}
 
