@@ -107,37 +107,39 @@ func TestConditionMatches(t *testing.T) {
 		Cond      Condition
 		EventJSON string
 		Want      bool
+		WantErr   bool
 	}{
-		{"empty", Condition{}, `{}`, false},
-		{"empty", Condition{Kind: "unknownstring"}, `{}`, false},
-		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content", Pattern: pointer("")}, `{"content":{}}`, true},
+		{"empty", Condition{}, `{}`, false, false},
+		{"empty", Condition{Kind: "unknownstring"}, `{}`, false, false},
 
 		// Neither of these should match because `content` is not a full string match,
 		// and `content.body` is not a string value.
-		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content"}, `{"content":{}}`, false},
-		{"eventBodyMatch", Condition{Kind: EventMatchCondition, Key: "content.body", Is: "3"}, `{"content":{"body": 3}}`, false},
+		{"eventMatch", Condition{Kind: EventMatchCondition, Key: "content", Pattern: pointer("")}, `{"content":{}}`, false, false},
+		{"eventBodyMatch", Condition{Kind: EventMatchCondition, Key: "content.body", Is: "3", Pattern: pointer("")}, `{"content":{"body": "3"}}`, false, false},
+		{"eventBodyMatch matches", Condition{Kind: EventMatchCondition, Key: "content.body", Pattern: pointer("world")}, `{"content":{"body": "hello world!"}}`, true, false},
+		{"EventMatch missing pattern", Condition{Kind: EventMatchCondition, Key: "content.body"}, `{"content":{"body": "hello world!"}}`, false, true},
 
-		{"displayNameNoMatch", Condition{Kind: ContainsDisplayNameCondition}, `{"content":{"body":"something without displayname"}}`, false},
-		{"displayNameMatch", Condition{Kind: ContainsDisplayNameCondition}, `{"content":{"body":"hello Dear User, how are you?"}}`, true},
+		{"displayNameNoMatch", Condition{Kind: ContainsDisplayNameCondition}, `{"content":{"body":"something without displayname"}}`, false, false},
+		{"displayNameMatch", Condition{Kind: ContainsDisplayNameCondition}, `{"content":{"body":"hello Dear User, how are you?"}}`, true, false},
 
-		{"roomMemberCountLessNoMatch", Condition{Kind: RoomMemberCountCondition, Is: "<2"}, `{}`, false},
-		{"roomMemberCountLessMatch", Condition{Kind: RoomMemberCountCondition, Is: "<3"}, `{}`, true},
-		{"roomMemberCountLessEqualNoMatch", Condition{Kind: RoomMemberCountCondition, Is: "<=1"}, `{}`, false},
-		{"roomMemberCountLessEqualMatch", Condition{Kind: RoomMemberCountCondition, Is: "<=2"}, `{}`, true},
-		{"roomMemberCountEqualNoMatch", Condition{Kind: RoomMemberCountCondition, Is: "==1"}, `{}`, false},
-		{"roomMemberCountEqualMatch", Condition{Kind: RoomMemberCountCondition, Is: "==2"}, `{}`, true},
-		{"roomMemberCountGreaterEqualNoMatch", Condition{Kind: RoomMemberCountCondition, Is: ">=3"}, `{}`, false},
-		{"roomMemberCountGreaterEqualMatch", Condition{Kind: RoomMemberCountCondition, Is: ">=2"}, `{}`, true},
-		{"roomMemberCountGreaterNoMatch", Condition{Kind: RoomMemberCountCondition, Is: ">2"}, `{}`, false},
-		{"roomMemberCountGreaterMatch", Condition{Kind: RoomMemberCountCondition, Is: ">1"}, `{}`, true},
+		{"roomMemberCountLessNoMatch", Condition{Kind: RoomMemberCountCondition, Is: "<2"}, `{}`, false, false},
+		{"roomMemberCountLessMatch", Condition{Kind: RoomMemberCountCondition, Is: "<3"}, `{}`, true, false},
+		{"roomMemberCountLessEqualNoMatch", Condition{Kind: RoomMemberCountCondition, Is: "<=1"}, `{}`, false, false},
+		{"roomMemberCountLessEqualMatch", Condition{Kind: RoomMemberCountCondition, Is: "<=2"}, `{}`, true, false},
+		{"roomMemberCountEqualNoMatch", Condition{Kind: RoomMemberCountCondition, Is: "==1"}, `{}`, false, false},
+		{"roomMemberCountEqualMatch", Condition{Kind: RoomMemberCountCondition, Is: "==2"}, `{}`, true, false},
+		{"roomMemberCountGreaterEqualNoMatch", Condition{Kind: RoomMemberCountCondition, Is: ">=3"}, `{}`, false, false},
+		{"roomMemberCountGreaterEqualMatch", Condition{Kind: RoomMemberCountCondition, Is: ">=2"}, `{}`, true, false},
+		{"roomMemberCountGreaterNoMatch", Condition{Kind: RoomMemberCountCondition, Is: ">2"}, `{}`, false, false},
+		{"roomMemberCountGreaterMatch", Condition{Kind: RoomMemberCountCondition, Is: ">1"}, `{}`, true, false},
 
-		{"senderNotificationPermissionMatch", Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, `{"sender":"@poweruser:example.com"}`, true},
-		{"senderNotificationPermissionNoMatch", Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, `{"sender":"@nobody:example.com"}`, false},
+		{"senderNotificationPermissionMatch", Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, `{"sender":"@poweruser:example.com"}`, true, false},
+		{"senderNotificationPermissionNoMatch", Condition{Kind: SenderNotificationPermissionCondition, Key: "powerlevel"}, `{"sender":"@nobody:example.com"}`, false, false},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			got, err := conditionMatches(&tst.Cond, mustEventFromJSON(t, tst.EventJSON), &fakeEvaluationContext{2})
-			if err != nil {
+			if err != nil && !tst.WantErr {
 				t.Fatalf("conditionMatches failed: %v", err)
 			}
 			if got != tst.Want {
