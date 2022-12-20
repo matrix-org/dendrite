@@ -361,7 +361,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI, &c.MSCs,
+		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs, isMonolith)
 	}
@@ -377,6 +377,7 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
+	c.RelayAPI.Matrix = &c.Global
 	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived
