@@ -18,6 +18,7 @@ package routing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -331,25 +332,25 @@ func validatePassword(password string) *util.JSONResponse {
 	return nil
 }
 
+var (
+	ErrInvalidCaptcha  = errors.New("invalid captcha response")
+	ErrMissingResponse = errors.New("captcha response is required")
+	ErrCaptchaDisabled = errors.New("captcha registration is disabled")
+)
+
 // validateRecaptcha returns an error response if the captcha response is invalid
 func validateRecaptcha(
 	cfg *config.ClientAPI,
 	response string,
 	clientip string,
-) *util.JSONResponse {
+) error {
 	ip, _, _ := net.SplitHostPort(clientip)
 	if !cfg.RecaptchaEnabled {
-		return &util.JSONResponse{
-			Code: http.StatusConflict,
-			JSON: jsonerror.Unknown("Captcha registration is disabled"),
-		}
+		return ErrCaptchaDisabled
 	}
 
 	if response == "" {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Captcha response is required"),
-		}
+		return ErrMissingResponse
 	}
 
 	// Make a POST request to Google's API to check the captcha response
@@ -362,10 +363,7 @@ func validateRecaptcha(
 	)
 
 	if err != nil {
-		return &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in requesting validation of captcha response"),
-		}
+		return err
 	}
 
 	// Close the request once we're finishing reading from it
@@ -375,25 +373,16 @@ func validateRecaptcha(
 	var r recaptchaResponse
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return &util.JSONResponse{
-			Code: http.StatusGatewayTimeout,
-			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
-		}
+		return err
 	}
 	err = json.Unmarshal(body, &r)
 	if err != nil {
-		return &util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
-		}
+		return err
 	}
 
 	// Check that we received a "success"
 	if !r.Success {
-		return &util.JSONResponse{
-			Code: http.StatusUnauthorized,
-			JSON: jsonerror.BadJSON("Invalid captcha response. Please try again."),
-		}
+		return ErrInvalidCaptcha
 	}
 	return nil
 }
@@ -777,9 +766,18 @@ func handleRegistrationFlow(
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
-		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
-		if resErr != nil {
-			return *resErr
+		err := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
+		switch err {
+		case ErrCaptchaDisabled:
+			return util.JSONResponse{Code: http.StatusForbidden, JSON: jsonerror.Unknown(err.Error())}
+		case ErrMissingResponse:
+			return util.JSONResponse{Code: http.StatusBadRequest, JSON: jsonerror.BadJSON(err.Error())}
+		case ErrInvalidCaptcha:
+			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: jsonerror.BadJSON(err.Error())}
+		case nil:
+		default:
+			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
+			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: jsonerror.InternalServerError()}
 		}
 
 		// Add Recaptcha to the list of completed registration stages

@@ -128,4 +128,22 @@ func Test_AuthFallback(t *testing.T) {
 			t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
 		}
 	})
+
+	t.Run("missing session parameter is handled correctly", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rec := httptest.NewRecorder()
+		AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &base.Cfg.ClientAPI)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("missing 'response' is handled correctly", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/?session=1337", nil)
+		rec := httptest.NewRecorder()
+		AuthFallback(rec, req, authtypes.LoginTypeRecaptcha, &base.Cfg.ClientAPI)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("unexpected http status: %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
 }
