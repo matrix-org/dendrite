@@ -7,6 +7,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/syncapi"
+	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/httputil"
@@ -160,9 +164,16 @@ func TestPurgeRoom(t *testing.T) {
 		base, db, close := mustCreateDatabase(t, dbType)
 		defer close()
 
+		fedClient := base.CreateFederationClient()
 		rsAPI := roomserver.NewInternalAPI(base)
-		// SetFederationAPI starts the room event input consumer
+		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fedClient, rsAPI)
+		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+
+		// this starts the JetStream consumers
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
+
 		// Create the room
 		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
 			t.Fatalf("failed to send events: %v", err)
@@ -237,6 +248,9 @@ func TestPurgeRoom(t *testing.T) {
 		if err = rsAPI.PerformAdminPurgeRoom(ctx, &api.PerformAdminPurgeRoomRequest{RoomID: room.ID}, purgeResp); err != nil {
 			t.Fatal(err)
 		}
+		// TODO: Find a better solution, e.g. "hook" into the JetStream stream.
+		//  Gives the SyncAPI and FederationAPI some time to delete their entries
+		time.Sleep(time.Millisecond * 100)
 
 		roomInfo, err = db.RoomInfo(ctx, room.ID)
 		if err != nil {

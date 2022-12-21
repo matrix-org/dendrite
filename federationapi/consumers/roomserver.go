@@ -91,8 +91,10 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	receivedType := api.OutputType(msg.Header.Get(jetstream.RoomEventType))
 
-	// Only handle events we care about
-	if receivedType != api.OutputTypeNewRoomEvent && receivedType != api.OutputTypeNewInboundPeek {
+	// Only handle events we care about, avoids unneeded unmarshalling
+	switch receivedType {
+	case api.OutputTypeNewRoomEvent, api.OutputTypeNewInboundPeek, api.OutputTypePurgeRoom:
+	default:
 		return true
 	}
 
