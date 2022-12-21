@@ -459,7 +459,6 @@ func (m *DendriteMonolith) Start() {
 
 	go func(ch <-chan pineconeEvents.Event) {
 		eLog := logrus.WithField("pinecone", "events")
-		relayServerSyncRunning := atomic.NewBool(false)
 		stopRelayServerSync := make(chan bool)
 
 		relayRetriever := RelayServerRetriever{
@@ -468,17 +467,18 @@ func (m *DendriteMonolith) Start() {
 			FederationAPI:       m.federationAPI,
 			RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
 			RelayAPI:            monolith.RelayAPI,
+			running:             *atomic.NewBool(false),
 		}
 		relayRetriever.InitializeRelayServers(eLog)
 
 		for event := range ch {
 			switch e := event.(type) {
 			case pineconeEvents.PeerAdded:
-				if !relayServerSyncRunning.Load() {
-					go relayRetriever.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
+				if !relayRetriever.running.Load() {
+					go relayRetriever.SyncRelayServers(stopRelayServerSync)
 				}
 			case pineconeEvents.PeerRemoved:
-				if relayServerSyncRunning.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
+				if relayRetriever.running.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
 					stopRelayServerSync <- true
 				}
 			case pineconeEvents.TreeParentUpdate:
@@ -515,9 +515,10 @@ func (m *DendriteMonolith) Stop() {
 type RelayServerRetriever struct {
 	Context             context.Context
 	ServerName          gomatrixserverlib.ServerName
-	FederationAPI       api.FederationInternalAPI
 	RelayServersQueried map[gomatrixserverlib.ServerName]bool
+	FederationAPI       api.FederationInternalAPI
 	RelayAPI            relayServerAPI.RelayInternalAPI
+	running             atomic.Bool
 }
 
 func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
@@ -534,8 +535,8 @@ func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
 	eLog.Infof("Registered relay servers: %v", response.RelayServers)
 }
 
-func (m *RelayServerRetriever) syncRelayServers(stop <-chan bool, running atomic.Bool) {
-	defer running.Store(false)
+func (m *RelayServerRetriever) SyncRelayServers(stop <-chan bool) {
+	defer m.running.Store(false)
 
 	t := time.NewTimer(relayServerRetryInterval)
 	for {
