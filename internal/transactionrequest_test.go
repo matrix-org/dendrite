@@ -19,7 +19,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/matrix-org/dendrite/federationapi/producers"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -59,8 +63,44 @@ func TestEmptyTransactionRequest(t *testing.T) {
 	assert.Zero(t, len(txnRes.PDUs))
 }
 
-func TestProcessTransactionRequestPDUs(t *testing.T) {
+func TestProcessTransactionRequestPDU(t *testing.T) {
 	txn := NewTxnReq(&FakeRsAPI{}, nil, "", nil, nil, nil, false, []json.RawMessage{testData[0]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+
+	assert.Nil(t, jsonRes)
+	assert.Zero(t, len(txnRes.PDUs))
+}
+
+func TestProcessTransactionRequestPDUs(t *testing.T) {
+	var err error
+	edu := gomatrixserverlib.EDU{Type: "m.typing"}
+	if edu.Content, err = json.Marshal(map[string]interface{}{
+		"room_id": "!roomid:kaer.morhen",
+		"user_id": "@userid:kaer.morhen",
+		"typing":  true,
+	}); err != nil {
+		t.Errorf("failed to marshal EDU JSON")
+	}
+
+	cfg := &config.Dendrite{}
+	cfg.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
+	nats := &jetstream.NATSInstance{}
+	js, _ := nats.Prepare(process.NewProcessContext(), &cfg.Global.JetStream)
+	producer := &producers.SyncAPIProducer{
+		JetStream:              js,
+		TopicReceiptEvent:      "OutputReceiptEvent",
+		TopicSendToDeviceEvent: "OutputSendToDeviceEvent",
+		TopicTypingEvent:       "OutputTypingEvent",
+		TopicPresenceEvent:     "OutputPresenceEvent",
+		TopicDeviceListUpdate:  "InputDeviceListUpdate",
+		TopicSigningKeyUpdate:  "InputSigningKeyUpdate",
+		Config:                 &cfg.FederationAPI,
+		UserAPI:                nil,
+	}
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "", nil, nil, producer, false, testData, []gomatrixserverlib.EDU{edu}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
