@@ -56,6 +56,7 @@ type KeyChanges interface {
 type StaleDeviceLists interface {
 	InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error
 	SelectUserIDsWithStaleDeviceLists(ctx context.Context, domains []gomatrixserverlib.ServerName) ([]string, error)
+	DeleteStaleDeviceLists(ctx context.Context, txn *sql.Tx, userIDs []string) error
 }
 
 type CrossSigningKeys interface {

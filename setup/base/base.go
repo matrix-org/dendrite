@@ -413,6 +413,24 @@ func (b *BaseDendrite) configureHTTPErrors() {
 	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
 }
 
+func (b *BaseDendrite) ConfigureAdminEndpoints() {
+	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
+			w.WriteHeader(503)
+			_ = json.NewEncoder(w).Encode(struct {
+				Warnings []string `json:"warnings"`
+			}{
+				Warnings: reasons,
+			})
+			return
+		}
+		w.WriteHeader(200)
+	})
+}
+
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
@@ -463,21 +481,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
-	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
-		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
-			w.WriteHeader(503)
-			_ = json.NewEncoder(w).Encode(struct {
-				Warnings []string `json:"warnings"`
-			}{
-				Warnings: reasons,
-			})
-			return
-		}
-		w.WriteHeader(200)
-	})
+	b.ConfigureAdminEndpoints()
 
 	var clientHandler http.Handler
 	clientHandler = b.PublicClientAPIMux

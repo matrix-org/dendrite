@@ -64,6 +64,7 @@ const (
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
 	RoomserverQueryMembershipAtEventPath       = "/roomserver/queryMembershipAtEvent"
+	RoomserverQueryLeftMembersPath             = "/roomserver/queryLeftMembers"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -562,6 +563,13 @@ func (h *httpRoomserverInternalAPI) PerformForget(
 func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, request *api.QueryMembershipAtEventRequest, response *api.QueryMembershipAtEventResponse) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryMembershiptAtEvent", h.roomserverURL+RoomserverQueryMembershipAtEventPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpRoomserverInternalAPI) QueryLeftUsers(ctx context.Context, request *api.QueryLeftUsersRequest, response *api.QueryLeftUsersResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"RoomserverQueryLeftMembers", h.roomserverURL+RoomserverQueryLeftMembersPath,
 		h.httpClient, ctx, request, response,
 	)
 }

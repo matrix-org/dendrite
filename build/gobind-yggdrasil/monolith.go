@@ -150,6 +150,7 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	m.processContext = base.ProcessContext
 	defer base.Close() // nolint: errcheck
 
@@ -164,7 +165,7 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, federation, rsAPI)
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
@@ -196,6 +197,8 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 
 	yggRouter := mux.NewRouter()
 	yggRouter.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)

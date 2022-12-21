@@ -336,6 +336,7 @@ func (m *DendriteMonolith) Start() {
 	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
@@ -349,7 +350,7 @@ func (m *DendriteMonolith) Start() {
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
 	m.userAPI = userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(m.userAPI)
 
@@ -382,6 +383,8 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	httpRouter.HandleFunc("/pinecone", m.PineconeRouter.ManholeHandler)
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()

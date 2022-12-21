@@ -17,6 +17,7 @@ type RoomserverInternalAPI interface {
 	ClientRoomserverAPI
 	UserRoomserverAPI
 	FederationRoomserverAPI
+	KeyserverRoomserverAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -199,4 +200,8 @@ type FederationRoomserverAPI interface {
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
+}
+
+type KeyserverRoomserverAPI interface {
+	QueryLeftUsers(ctx context.Context, req *QueryLeftUsersRequest, res *QueryLeftUsersResponse) error
 }

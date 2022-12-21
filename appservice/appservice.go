@@ -24,6 +24,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	appserviceAPI "github.com/matrix-org/dendrite/appservice/api"
 	"github.com/matrix-org/dendrite/appservice/consumers"
 	"github.com/matrix-org/dendrite/appservice/inthttp"
@@ -32,12 +34,11 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // AddInternalRoutes registers HTTP handlers for internal API calls
-func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI) {
-	inthttp.AddRoutes(queryAPI, router)
+func AddInternalRoutes(router *mux.Router, queryAPI appserviceAPI.AppServiceInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(queryAPI, router, enableMetrics)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers

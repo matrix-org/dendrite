@@ -155,6 +155,7 @@ func main() {
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 
 	base := base.NewBaseDendrite(cfg, "Monolith")
+	base.ConfigureAdminEndpoints()
 	defer base.Close() // nolint: errcheck
 
 	pineconeEventChannel := make(chan pineconeEvents.Event)
@@ -212,7 +213,7 @@ func main() {
 		base, federation, rsAPI, base.Caches, keyRing, true,
 	)
 
-	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsComponent)
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, nil, keyAPI, rsAPI, base.PushGatewayHTTPClient())
 	keyAPI.SetUserAPI(userAPI)
 
@@ -248,6 +249,8 @@ func main() {
 	httpRouter.PathPrefix(httputil.InternalPathPrefix).Handler(base.InternalAPIMux)
 	httpRouter.PathPrefix(httputil.PublicClientPathPrefix).Handler(base.PublicClientAPIMux)
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
+	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
+	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
 	httpRouter.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := wsUpgrader.Upgrade(w, r, nil)
 		if err != nil {
