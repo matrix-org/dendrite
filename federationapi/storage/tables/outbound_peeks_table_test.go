@@ -15,7 +15,7 @@ import (
 	"github.com/matrix-org/util"
 )
 
-func mustCreateDatabase(t *testing.T, dbType test.DBType) (tables.FederationOutboundPeeks, func()) {
+func mustCreateOutboundpeeksTable(t *testing.T, dbType test.DBType) (tables.FederationOutboundPeeks, func()) {
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{
 		ConnectionString: config.DataSource(connStr),
@@ -42,7 +42,7 @@ func TestOutboundPeeksTable(t *testing.T) {
 	room := test.NewRoom(t, alice)
 	_, serverName, _ := gomatrixserverlib.SplitID('@', alice.ID)
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		tab, closeDB := mustCreateDatabase(t, dbType)
+		tab, closeDB := mustCreateOutboundpeeksTable(t, dbType)
 		defer closeDB()
 
 		// Insert a peek
@@ -143,6 +143,5 @@ func TestOutboundPeeksTable(t *testing.T) {
 		if len(outboundPeeks) > 0 {
 			t.Fatal("got outbound peeks which should be deleted")
 		}
-
 	})
 }
