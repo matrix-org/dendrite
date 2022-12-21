@@ -150,32 +150,35 @@ func TestRelayRetrieverInitialization(t *testing.T) {
 	retriever := RelayServerRetriever{
 		Context:             context.Background(),
 		ServerName:          "server",
-		RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
+		relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
 		FederationAPI:       &FakeFedAPI{},
 		RelayAPI:            &FakeRelayAPI{},
 	}
 
 	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
-	assert.Equal(t, 2, len(retriever.RelayServersQueried))
+	relayServers := retriever.GetQueriedServerStatus()
+	assert.Equal(t, 2, len(relayServers))
 }
 
 func TestRelayRetrieverSync(t *testing.T) {
 	retriever := RelayServerRetriever{
 		Context:             context.Background(),
 		ServerName:          "server",
-		RelayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
+		relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
 		FederationAPI:       &FakeFedAPI{},
 		RelayAPI:            &FakeRelayAPI{},
 	}
 
 	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
-	assert.Equal(t, 2, len(retriever.RelayServersQueried))
+	relayServers := retriever.GetQueriedServerStatus()
+	assert.Equal(t, 2, len(relayServers))
 
 	stopRelayServerSync := make(chan bool)
 	go retriever.SyncRelayServers(stopRelayServerSync)
 
 	check := func(log poll.LogT) poll.Result {
-		for _, queried := range retriever.RelayServersQueried {
+		relayServers := retriever.GetQueriedServerStatus()
+		for _, queried := range relayServers {
 			if !queried {
 				return poll.Continue("waiting for all servers to be queried")
 			}
