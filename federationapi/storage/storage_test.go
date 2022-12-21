@@ -120,7 +120,7 @@ func TestOutboundPeeking(t *testing.T) {
 			t.Fatalf("unexpected outbound peek renewal interval: %d, want %d", outboundPeek1.RenewalInterval, renewalInterval)
 		}
 		// Renew the peek
-		if err := db.RenewOutboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
+		if err = db.RenewOutboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -143,7 +143,7 @@ func TestOutboundPeeking(t *testing.T) {
 		peekIDs := []string{peekID}
 		for i := 0; i < 5; i++ {
 			peekID = util.RandomString(8)
-			if err := db.AddOutboundPeek(ctx, serverName, room.ID, peekID, 1000); err != nil {
+			if err = db.AddOutboundPeek(ctx, serverName, room.ID, peekID, 1000); err != nil {
 				t.Fatal(err)
 			}
 			peekIDs = append(peekIDs, peekID)
@@ -202,7 +202,7 @@ func TestInboundPeeking(t *testing.T) {
 			t.Fatalf("unexpected inbound peek renewal interval: %d, want %d", inboundPeek1.RenewalInterval, renewalInterval)
 		}
 		// Renew the peek
-		if err := db.RenewInboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
+		if err = db.RenewInboundPeek(ctx, serverName, room.ID, peekID, 2000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -225,7 +225,7 @@ func TestInboundPeeking(t *testing.T) {
 		peekIDs := []string{peekID}
 		for i := 0; i < 5; i++ {
 			peekID = util.RandomString(8)
-			if err := db.AddInboundPeek(ctx, serverName, room.ID, peekID, 1000); err != nil {
+			if err = db.AddInboundPeek(ctx, serverName, room.ID, peekID, 1000); err != nil {
 				t.Fatal(err)
 			}
 			peekIDs = append(peekIDs, peekID)

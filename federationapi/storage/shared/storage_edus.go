@@ -162,15 +162,6 @@ func (d *Database) CleanEDUs(
 	})
 }
 
-// GetPendingEDUCount returns the number of EDUs waiting to be
-// sent for a given servername.
-func (d *Database) GetPendingEDUCount(
-	ctx context.Context,
-	serverName gomatrixserverlib.ServerName,
-) (int64, error) {
-	return d.FederationQueueEDUs.SelectQueueEDUCount(ctx, nil, serverName)
-}
-
 // GetPendingServerNames returns the server names that have EDUs
 // waiting to be sent.
 func (d *Database) GetPendingEDUServerNames(

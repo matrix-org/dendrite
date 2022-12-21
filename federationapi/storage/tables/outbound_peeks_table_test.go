@@ -73,7 +73,7 @@ func TestOutboundPeeksTable(t *testing.T) {
 		}
 
 		// Renew the peek
-		if err := tab.RenewOutboundPeek(ctx, nil, serverName, room.ID, peekID, 2000); err != nil {
+		if err = tab.RenewOutboundPeek(ctx, nil, serverName, room.ID, peekID, 2000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -93,7 +93,7 @@ func TestOutboundPeeksTable(t *testing.T) {
 		}
 
 		// delete the peek
-		if err := tab.DeleteOutboundPeek(ctx, nil, serverName, room.ID, peekID); err != nil {
+		if err = tab.DeleteOutboundPeek(ctx, nil, serverName, room.ID, peekID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -110,7 +110,7 @@ func TestOutboundPeeksTable(t *testing.T) {
 		var peekIDs []string
 		for i := 0; i < 5; i++ {
 			peekID = util.RandomString(8)
-			if err := tab.InsertOutboundPeek(ctx, nil, serverName, room.ID, peekID, 1000); err != nil {
+			if err = tab.InsertOutboundPeek(ctx, nil, serverName, room.ID, peekID, 1000); err != nil {
 				t.Fatal(err)
 			}
 			peekIDs = append(peekIDs, peekID)
@@ -131,7 +131,7 @@ func TestOutboundPeeksTable(t *testing.T) {
 		}
 
 		// And delete them again
-		if err := tab.DeleteOutboundPeeks(ctx, nil, room.ID); err != nil {
+		if err = tab.DeleteOutboundPeeks(ctx, nil, room.ID); err != nil {
 			t.Fatal(err)
 		}
 

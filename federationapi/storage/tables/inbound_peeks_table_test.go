@@ -73,7 +73,7 @@ func TestInboundPeeksTable(t *testing.T) {
 		}
 
 		// Renew the peek
-		if err := tab.RenewInboundPeek(ctx, nil, serverName, room.ID, peekID, 2000); err != nil {
+		if err = tab.RenewInboundPeek(ctx, nil, serverName, room.ID, peekID, 2000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -93,7 +93,7 @@ func TestInboundPeeksTable(t *testing.T) {
 		}
 
 		// delete the peek
-		if err := tab.DeleteInboundPeek(ctx, nil, serverName, room.ID, peekID); err != nil {
+		if err = tab.DeleteInboundPeek(ctx, nil, serverName, room.ID, peekID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -110,7 +110,7 @@ func TestInboundPeeksTable(t *testing.T) {
 		var peekIDs []string
 		for i := 0; i < 5; i++ {
 			peekID = util.RandomString(8)
-			if err := tab.InsertInboundPeek(ctx, nil, serverName, room.ID, peekID, 1000); err != nil {
+			if err = tab.InsertInboundPeek(ctx, nil, serverName, room.ID, peekID, 1000); err != nil {
 				t.Fatal(err)
 			}
 			peekIDs = append(peekIDs, peekID)
@@ -131,7 +131,7 @@ func TestInboundPeeksTable(t *testing.T) {
 		}
 
 		// And delete them again
-		if err := tab.DeleteInboundPeeks(ctx, nil, room.ID); err != nil {
+		if err = tab.DeleteInboundPeeks(ctx, nil, room.ID); err != nil {
 			t.Fatal(err)
 		}
 
