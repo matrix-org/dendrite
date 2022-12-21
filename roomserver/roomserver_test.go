@@ -140,3 +140,140 @@ func Test_QueryLeftUsers(t *testing.T) {
 
 	})
 }
+
+func TestPurgeRoom(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
+
+	// Invite Bob
+	inviteEvent := room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+		"membership": "invite",
+	}, test.WithStateKey(bob.ID))
+
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		if dbType == test.DBTypeSQLite {
+			t.Skip("purging rooms on SQLite is not yet implemented")
+		}
+		base, db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		rsAPI := roomserver.NewInternalAPI(base)
+		// SetFederationAPI starts the room event input consumer
+		rsAPI.SetFederationAPI(nil, nil)
+		// Create the room
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// some dummy entries to validate after purging
+		publishResp := &api.PerformPublishResponse{}
+		if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+			t.Fatal(err)
+		}
+		if publishResp.Error != nil {
+			t.Fatal(publishResp.Error)
+		}
+
+		isPublished, err := db.GetPublishedRoom(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !isPublished {
+			t.Fatalf("room should be published before purging")
+		}
+
+		aliasResp := &api.SetRoomAliasResponse{}
+		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", UserID: alice.ID}, aliasResp); err != nil {
+			t.Fatal(err)
+		}
+		// check the alias is actually there
+		aliasesResp := &api.GetAliasesForRoomIDResponse{}
+		if err = rsAPI.GetAliasesForRoomID(ctx, &api.GetAliasesForRoomIDRequest{RoomID: room.ID}, aliasesResp); err != nil {
+			t.Fatal(err)
+		}
+		wantAliases := 1
+		if gotAliases := len(aliasesResp.Aliases); gotAliases != wantAliases {
+			t.Fatalf("expected %d aliases, got %d", wantAliases, gotAliases)
+		}
+
+		// validate the room exists before purging
+		roomInfo, err := db.RoomInfo(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if roomInfo == nil {
+			t.Fatalf("room does not exist")
+		}
+		// remember the roomInfo before purging
+		existingRoomInfo := roomInfo
+
+		// validate there is an invite for bob
+		nids, err := db.EventStateKeyNIDs(ctx, []string{bob.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		bobNID, ok := nids[bob.ID]
+		if !ok {
+			t.Fatalf("%s does not exist", bob.ID)
+		}
+
+		_, inviteEventIDs, _, err := db.GetInvitesForUser(ctx, roomInfo.RoomNID, bobNID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantInviteCount := 1
+		if inviteCount := len(inviteEventIDs); inviteCount != wantInviteCount {
+			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+		}
+		if inviteEventIDs[0] != inviteEvent.EventID() {
+			t.Fatalf("expected invite event ID %s, got %s", inviteEvent.EventID(), inviteEventIDs[0])
+		}
+
+		// purge the room from the database
+		purgeResp := &api.PerformAdminPurgeRoomResponse{}
+		if err = rsAPI.PerformAdminPurgeRoom(ctx, &api.PerformAdminPurgeRoomRequest{RoomID: room.ID}, purgeResp); err != nil {
+			t.Fatal(err)
+		}
+
+		roomInfo, err = db.RoomInfo(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if roomInfo != nil {
+			t.Fatalf("room should not exist after purging: %+v", roomInfo)
+		}
+
+		// validation below
+
+		// There should be no invite left
+		_, inviteEventIDs, _, err = db.GetInvitesForUser(ctx, existingRoomInfo.RoomNID, bobNID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if inviteCount := len(inviteEventIDs); inviteCount > 0 {
+			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+		}
+
+		// aliases should be deleted
+		aliases, err := db.GetAliasesForRoomID(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if aliasCount := len(aliases); aliasCount > 0 {
+			t.Fatalf("expected there to be only %d invite events, got %d", 0, aliasCount)
+		}
+
+		// published room should be deleted
+		isPublished, err = db.GetPublishedRoom(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if isPublished {
+			t.Fatalf("room should not be published after purging")
+		}
+	})
+}

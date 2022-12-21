@@ -248,11 +248,13 @@ func (r *Admin) PerformAdminPurgeRoom(
 	req *api.PerformAdminPurgeRoomRequest,
 	res *api.PerformAdminPurgeRoomResponse,
 ) error {
+	// Validate we actually got a room ID and nothing else
 	if _, _, err := gomatrixserverlib.SplitID('!', req.RoomID); err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,
 			Msg:  fmt.Sprintf("Malformed room ID: %s", err),
 		}
+		return nil
 	}
 
 	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
@@ -263,9 +265,9 @@ func (r *Admin) PerformAdminPurgeRoom(
 			Msg:  err.Error(),
 		}
 		return nil
-	} else {
-		logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
 	}
+
+	logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
 
 	return r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
 		{
