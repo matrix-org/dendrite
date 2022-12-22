@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postgres
+package sqlite3
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 )
 
 const purgeEventJSONSQL = "" +
-	"DELETE FROM roomserver_event_json WHERE event_nid = ANY(" +
+	"DELETE FROM roomserver_event_json WHERE event_nid IN (" +
 	"	SELECT event_nid FROM roomserver_events WHERE room_nid = $1" +
 	")"
 
@@ -37,15 +37,15 @@ const purgeMembershipsSQL = "" +
 	"DELETE FROM roomserver_membership WHERE room_nid = $1"
 
 const purgePreviousEventsSQL = "" +
-	"DELETE FROM roomserver_previous_events WHERE event_nids && ANY(" +
-	"	SELECT ARRAY_AGG(event_nid) FROM roomserver_events WHERE room_nid = $1" +
+	"DELETE FROM roomserver_previous_events WHERE event_nids IN(" +
+	"	SELECT event_nid FROM roomserver_events WHERE room_nid = $1" +
 	")"
 
 const purgePublishedSQL = "" +
 	"DELETE FROM roomserver_published WHERE room_id = $1"
 
 const purgeRedactionsSQL = "" +
-	"DELETE FROM roomserver_redactions WHERE redaction_event_id = ANY(" +
+	"DELETE FROM roomserver_redactions WHERE redaction_event_id IN(" +
 	"	SELECT event_id FROM roomserver_events WHERE room_nid = $1" +
 	")"
 
@@ -54,11 +54,6 @@ const purgeRoomAliasesSQL = "" +
 
 const purgeRoomSQL = "" +
 	"DELETE FROM roomserver_rooms WHERE room_nid = $1"
-
-const purgeStateBlockEntriesSQL = "" +
-	"DELETE FROM roomserver_state_block WHERE state_block_nid = ANY(" +
-	"	SELECT DISTINCT UNNEST(state_block_nids) FROM roomserver_state_snapshots WHERE room_nid = $1" +
-	")"
 
 const purgeStateSnapshotEntriesSQL = "" +
 	"DELETE FROM roomserver_state_snapshots WHERE room_nid = $1"
@@ -73,13 +68,13 @@ type purgeStatements struct {
 	purgeRedactionStmt            *sql.Stmt
 	purgeRoomAliasesStmt          *sql.Stmt
 	purgeRoomStmt                 *sql.Stmt
-	purgeStateBlockEntriesStmt    *sql.Stmt
 	purgeStateSnapshotEntriesStmt *sql.Stmt
+	stateBlock                    *StateBlockStatements
+	stateSnapshot                 *StateSnapshotStatements
 }
 
-func PreparePurgeStatements(db *sql.DB) (*purgeStatements, error) {
-	s := &purgeStatements{}
-
+func PreparePurgeStatements(db *sql.DB, stateBlock *StateBlockStatements, stateSnapshot *StateSnapshotStatements) (*purgeStatements, error) {
+	s := &purgeStatements{stateBlock: stateBlock, stateSnapshot: stateSnapshot}
 	return s, sqlutil.StatementList{
 		{&s.purgeEventJSONStmt, purgeEventJSONSQL},
 		{&s.purgeEventsStmt, purgeEventsSQL},
@@ -90,7 +85,7 @@ func PreparePurgeStatements(db *sql.DB) (*purgeStatements, error) {
 		{&s.purgeRedactionStmt, purgeRedactionsSQL},
 		{&s.purgeRoomAliasesStmt, purgeRoomAliasesSQL},
 		{&s.purgeRoomStmt, purgeRoomSQL},
-		{&s.purgeStateBlockEntriesStmt, purgeStateBlockEntriesSQL},
+		//{&s.purgeStateBlockEntriesStmt, purgeStateBlockEntriesSQL},
 		{&s.purgeStateSnapshotEntriesStmt, purgeStateSnapshotEntriesSQL},
 	}.Prepare(db)
 }
@@ -161,8 +156,19 @@ func (s *purgeStatements) PurgeRoom(
 func (s *purgeStatements) PurgeStateBlocks(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeStateBlockEntriesStmt).ExecContext(ctx, roomNID)
-	return err
+	// Get all stateBlockNIDs
+	stateBlockNIDs, err := s.stateSnapshot.selectStateBlockNIDsForRoomNID(ctx, txn, roomNID)
+	if err != nil {
+		return err
+	}
+
+	params := make([]interface{}, len(stateBlockNIDs)+1)
+	for k, v := range stateBlockNIDs {
+		params[k] = v
+	}
+
+	query := "DELETE FROM roomserver_state_block WHERE state_block_nid IN($1)"
+	return sqlutil.RunLimitedVariablesExec(ctx, query, txn, params, sqlutil.SQLite3MaxVariables)
 }
 
 func (s *purgeStatements) PurgeStateSnapshots(

@@ -62,10 +62,14 @@ const bulkSelectStateBlockNIDsSQL = "" +
 	"SELECT state_snapshot_nid, state_block_nids FROM roomserver_state_snapshots" +
 	" WHERE state_snapshot_nid IN ($1) ORDER BY state_snapshot_nid ASC"
 
-type stateSnapshotStatements struct {
+const selectStateBlockNIDsForRoomNID = "" +
+	"SELECT state_block_nids FROM roomserver_state_snapshots WHERE room_nid = $1"
+
+type StateSnapshotStatements struct {
 	db                           *sql.DB
 	insertStateStmt              *sql.Stmt
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
+	selectStateBlockNIDsStmt     *sql.Stmt
 }
 
 func CreateStateSnapshotTable(db *sql.DB) error {
@@ -73,18 +77,19 @@ func CreateStateSnapshotTable(db *sql.DB) error {
 	return err
 }
 
-func PrepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
-	s := &stateSnapshotStatements{
+func PrepareStateSnapshotTable(db *sql.DB) (*StateSnapshotStatements, error) {
+	s := &StateSnapshotStatements{
 		db: db,
 	}
 
 	return s, sqlutil.StatementList{
 		{&s.insertStateStmt, insertStateSQL},
 		{&s.bulkSelectStateBlockNIDsStmt, bulkSelectStateBlockNIDsSQL},
+		{&s.selectStateBlockNIDsStmt, selectStateBlockNIDsForRoomNID},
 	}.Prepare(db)
 }
 
-func (s *stateSnapshotStatements) InsertState(
+func (s *StateSnapshotStatements) InsertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
 	if stateBlockNIDs == nil {
@@ -103,7 +108,7 @@ func (s *stateSnapshotStatements) InsertState(
 	return
 }
 
-func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
+func (s *StateSnapshotStatements) BulkSelectStateBlockNIDs(
 	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	nids := make([]interface{}, len(stateNIDs))
@@ -141,8 +146,34 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	return results, nil
 }
 
-func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
+func (s *StateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 	ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string,
 ) ([]types.EventNID, error) {
 	return nil, tables.OptimisationNotSupportedError
+}
+
+func (s *StateSnapshotStatements) selectStateBlockNIDsForRoomNID(
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+) ([]types.StateBlockNID, error) {
+	var res []types.StateBlockNID
+	rows, err := sqlutil.TxStmt(txn, s.selectStateBlockNIDsStmt).QueryContext(ctx, roomNID)
+	if err != nil {
+		return res, nil
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectStateBlockNIDsForRoomNID: rows.close() failed")
+
+	var stateBlockNIDs []types.StateBlockNID
+	var stateBlockNIDsJSON string
+	for rows.Next() {
+		if err = rows.Scan(&stateBlockNIDsJSON); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal([]byte(stateBlockNIDsJSON), &stateBlockNIDs); err != nil {
+			return nil, err
+		}
+
+		res = append(res, stateBlockNIDs...)
+	}
+
+	return res, rows.Err()
 }

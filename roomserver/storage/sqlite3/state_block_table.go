@@ -24,7 +24,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
@@ -57,7 +56,7 @@ const bulkSelectStateBlockEntriesSQL = "" +
 	"SELECT state_block_nid, event_nids" +
 	" FROM roomserver_state_block WHERE state_block_nid IN ($1) ORDER BY state_block_nid ASC"
 
-type stateBlockStatements struct {
+type StateBlockStatements struct {
 	db                              *sql.DB
 	insertStateDataStmt             *sql.Stmt
 	bulkSelectStateBlockEntriesStmt *sql.Stmt
@@ -68,8 +67,8 @@ func CreateStateBlockTable(db *sql.DB) error {
 	return err
 }
 
-func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
-	s := &stateBlockStatements{
+func PrepareStateBlockTable(db *sql.DB) (*StateBlockStatements, error) {
+	s := &StateBlockStatements{
 		db: db,
 	}
 
@@ -79,7 +78,7 @@ func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	}.Prepare(db)
 }
 
-func (s *stateBlockStatements) BulkInsertStateData(
+func (s *StateBlockStatements) BulkInsertStateData(
 	ctx context.Context, txn *sql.Tx,
 	entries types.StateEntries,
 ) (id types.StateBlockNID, err error) {
@@ -99,7 +98,7 @@ func (s *stateBlockStatements) BulkInsertStateData(
 	return
 }
 
-func (s *stateBlockStatements) BulkSelectStateBlockEntries(
+func (s *StateBlockStatements) BulkSelectStateBlockEntries(
 	ctx context.Context, txn *sql.Tx, stateBlockNIDs types.StateBlockNIDs,
 ) ([][]types.EventNID, error) {
 	intfs := make([]interface{}, len(stateBlockNIDs))

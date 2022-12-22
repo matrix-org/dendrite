@@ -241,9 +241,6 @@ func TestPurgeRoom(t *testing.T) {
 	ctx := context.Background()
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		if dbType == test.DBTypeSQLite {
-			t.Skip("purging rooms on SQLite is not yet implemented")
-		}
 		base, db, close := mustCreateDatabase(t, dbType)
 		defer close()
 
