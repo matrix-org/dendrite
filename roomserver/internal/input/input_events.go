@@ -444,7 +444,7 @@ func (r *Inputer) processRoomEvent(
 	}
 
 	// If guest_access changed and is not can_join, kick all guest users.
-	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").String() != "can_join" {
+	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
 		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
 			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
