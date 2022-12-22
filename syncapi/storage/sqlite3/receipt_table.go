@@ -88,19 +88,12 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Re
 		db:                 db,
 		streamIDStatements: streamID,
 	}
-	if r.upsertReceipt, err = db.Prepare(upsertReceipt); err != nil {
-		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
-	}
-	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
-		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
-	}
-	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
-		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
-	}
-	if r.purgeReceiptsStmt, err = db.Prepare(purgeReceiptsSQL); err != nil {
-		return nil, fmt.Errorf("unable to prepare purgeReceiptsStmt statement: %w", err)
-	}
-	return r, nil
+	return r, sqlutil.StatementList{
+		{&r.upsertReceipt, upsertReceipt},
+		{&r.selectRoomReceipts, selectRoomReceipts},
+		{&r.selectMaxReceiptID, selectMaxReceiptIDSQL},
+		{&r.purgeReceiptsStmt, purgeReceiptsSQL},
+	}.Prepare(db)
 }
 
 // UpsertReceipt creates new user receipts

@@ -334,7 +334,13 @@ func TestPurgeRoom(t *testing.T) {
 
 		// wait for all consumers to process the purge event
 		var sum = 1
+		timeout := time.Second * 5
+		deadline, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
 		for sum > 0 {
+			if deadline.Err() != nil {
+				t.Fatalf("test timed out after %s", timeout)
+			}
 			sum = 0
 			consumerCh := jsCtx.Consumers(base.Cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
 			for x := range consumerCh {

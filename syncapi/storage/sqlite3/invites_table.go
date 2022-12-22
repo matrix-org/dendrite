@@ -79,22 +79,13 @@ func NewSqliteInvitesTable(db *sql.DB, streamID *StreamIDStatements) (tables.Inv
 	if err != nil {
 		return nil, err
 	}
-	if s.insertInviteEventStmt, err = db.Prepare(insertInviteEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectInviteEventsInRangeStmt, err = db.Prepare(selectInviteEventsInRangeSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteInviteEventStmt, err = db.Prepare(deleteInviteEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxInviteIDStmt, err = db.Prepare(selectMaxInviteIDSQL); err != nil {
-		return nil, err
-	}
-	if s.purgeInvitesStmt, err = db.Prepare(purgeInvitesSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertInviteEventStmt, insertInviteEventSQL},
+		{&s.selectInviteEventsInRangeStmt, selectInviteEventsInRangeSQL},
+		{&s.deleteInviteEventStmt, deleteInviteEventSQL},
+		{&s.selectMaxInviteIDStmt, selectMaxInviteIDSQL},
+		{&s.purgeInvitesStmt, purgeInvitesSQL},
+	}.Prepare(db)
 }
 
 func (s *inviteEventsStatements) InsertInviteEvent(

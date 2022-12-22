@@ -87,28 +87,15 @@ func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
 	s := &peekStatements{
 		db: db,
 	}
-	if s.insertPeekStmt, err = db.Prepare(insertPeekSQL); err != nil {
-		return nil, err
-	}
-	if s.deletePeekStmt, err = db.Prepare(deletePeekSQL); err != nil {
-		return nil, err
-	}
-	if s.deletePeeksStmt, err = db.Prepare(deletePeeksSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPeeksInRangeStmt, err = db.Prepare(selectPeeksInRangeSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPeekingDevicesStmt, err = db.Prepare(selectPeekingDevicesSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxPeekIDStmt, err = db.Prepare(selectMaxPeekIDSQL); err != nil {
-		return nil, err
-	}
-	if s.purgePeeksStmt, err = db.Prepare(purgePeeksSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertPeekStmt, insertPeekSQL},
+		{&s.deletePeekStmt, deletePeekSQL},
+		{&s.deletePeeksStmt, deletePeeksSQL},
+		{&s.selectPeeksInRangeStmt, selectPeeksInRangeSQL},
+		{&s.selectPeekingDevicesStmt, selectPeekingDevicesSQL},
+		{&s.selectMaxPeekIDStmt, selectMaxPeekIDSQL},
+		{&s.purgePeeksStmt, purgePeeksSQL},
+	}.Prepare(db)
 }
 
 func (s *peekStatements) InsertPeek(

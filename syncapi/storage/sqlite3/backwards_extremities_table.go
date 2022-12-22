@@ -66,19 +66,12 @@ func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities
 	if err != nil {
 		return nil, err
 	}
-	if s.insertBackwardExtremityStmt, err = db.Prepare(insertBackwardExtremitySQL); err != nil {
-		return nil, err
-	}
-	if s.selectBackwardExtremitiesForRoomStmt, err = db.Prepare(selectBackwardExtremitiesForRoomSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteBackwardExtremityStmt, err = db.Prepare(deleteBackwardExtremitySQL); err != nil {
-		return nil, err
-	}
-	if s.purgeBackwardExtremitiesStmt, err = db.Prepare(purgeBackwardExtremitiesSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertBackwardExtremityStmt, insertBackwardExtremitySQL},
+		{&s.selectBackwardExtremitiesForRoomStmt, selectBackwardExtremitiesForRoomSQL},
+		{&s.deleteBackwardExtremityStmt, deleteBackwardExtremitySQL},
+		{&s.purgeBackwardExtremitiesStmt, purgeBackwardExtremitiesSQL},
+	}.Prepare(db)
 }
 
 func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(

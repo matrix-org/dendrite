@@ -160,10 +160,15 @@ func (s *purgeStatements) PurgeStateBlocks(
 	if err != nil {
 		return err
 	}
-
-	params := make([]interface{}, len(stateBlockNIDs)+1)
+	params := make([]interface{}, len(stateBlockNIDs))
+	seenNIDs := make(map[types.StateBlockNID]struct{}, len(stateBlockNIDs))
+	// dedupe NIDs
 	for k, v := range stateBlockNIDs {
+		if _, ok := seenNIDs[v]; ok {
+			continue
+		}
 		params[k] = v
+		seenNIDs[v] = struct{}{}
 	}
 
 	query := "DELETE FROM roomserver_state_block WHERE state_block_nid IN($1)"

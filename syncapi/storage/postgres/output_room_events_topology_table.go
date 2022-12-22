@@ -65,8 +65,8 @@ const selectPositionInTopologySQL = "" +
 	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE event_id = $1"
 
-	// Select the max topological position for the room, then sort by stream position and take the highest,
-	// returning both topological and stream positions.
+// Select the max topological position for the room, then sort by stream position and take the highest,
+// returning both topological and stream positions.
 const selectMaxPositionInTopologySQL = "" +
 	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE topological_position=(" +
@@ -99,31 +99,16 @@ func NewPostgresTopologyTable(db *sql.DB) (tables.Topology, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.insertEventInTopologyStmt, err = db.Prepare(insertEventInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventIDsInRangeASCStmt, err = db.Prepare(selectEventIDsInRangeASCSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventIDsInRangeDESCStmt, err = db.Prepare(selectEventIDsInRangeDESCSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectStreamToTopologicalPositionAscStmt, err = db.Prepare(selectStreamToTopologicalPositionAscSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStreamToTopologicalPositionDescStmt, err = db.Prepare(selectStreamToTopologicalPositionDescSQL); err != nil {
-		return nil, err
-	}
-	if s.purgeEventsTopologyStmt, err = db.Prepare(purgeEventsTopologySQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertEventInTopologyStmt, insertEventInTopologySQL},
+		{&s.selectEventIDsInRangeASCStmt, selectEventIDsInRangeASCSQL},
+		{&s.selectEventIDsInRangeDESCStmt, selectEventIDsInRangeDESCSQL},
+		{&s.selectPositionInTopologyStmt, selectPositionInTopologySQL},
+		{&s.selectMaxPositionInTopologyStmt, selectMaxPositionInTopologySQL},
+		{&s.selectStreamToTopologicalPositionAscStmt, selectStreamToTopologicalPositionAscSQL},
+		{&s.selectStreamToTopologicalPositionDescStmt, selectStreamToTopologicalPositionDescSQL},
+		{&s.purgeEventsTopologyStmt, purgeEventsTopologySQL},
+	}.Prepare(db)
 }
 
 // InsertEventInTopology inserts the given event in the room's topology, based
