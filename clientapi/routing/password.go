@@ -7,6 +7,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -81,7 +82,7 @@ func Password(
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	// Check the new password strength.
-	if resErr = validatePassword(r.NewPassword); resErr != nil {
+	if resErr = internal.ValidatePassword(r.NewPassword); resErr != nil {
 		return *resErr
 	}
 

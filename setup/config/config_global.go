@@ -174,7 +174,7 @@ func (c *Global) SigningIdentityFor(serverName gomatrixserverlib.ServerName) (*g
 			return id, nil
 		}
 	}
-	return nil, fmt.Errorf("no signing identity %q", serverName)
+	return nil, fmt.Errorf("no signing identity for %q", serverName)
 }
 
 func (c *Global) SigningIdentities() []*gomatrixserverlib.SigningIdentity {

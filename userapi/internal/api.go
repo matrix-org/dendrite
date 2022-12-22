@@ -548,6 +548,11 @@ func (a *UserInternalAPI) QueryAccessToken(ctx context.Context, req *api.QueryAc
 	return nil
 }
 
+func (a *UserInternalAPI) QueryAccountByLocalpart(ctx context.Context, req *api.QueryAccountByLocalpartRequest, res *api.QueryAccountByLocalpartResponse) (err error) {
+	res.Account, err = a.DB.GetAccountByLocalpart(ctx, req.Localpart, req.ServerName)
+	return
+}
+
 // Return the appservice 'device' or nil if the token is not an appservice. Returns an error if there was a problem
 // creating a 'device'.
 func (a *UserInternalAPI) queryAppServiceToken(ctx context.Context, token, appServiceUserID string) (*api.Device, error) {

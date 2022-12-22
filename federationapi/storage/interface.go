@@ -45,9 +45,6 @@ type Database interface {
 	CleanPDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error
 	CleanEDUs(ctx context.Context, serverName gomatrixserverlib.ServerName, receipts []*shared.Receipt) error
 
-	GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
-	GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error)
-
 	GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 	GetPendingEDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error)
 

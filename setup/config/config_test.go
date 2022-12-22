@@ -16,9 +16,11 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/matrix-org/gomatrixserverlib"
 	"gopkg.in/yaml.v2"
 )
 
@@ -313,5 +315,57 @@ func TestUnmarshalDataUnit(t *testing.T) {
 		} else if target.Got != expect {
 			t.Fatalf("expected value %d but got %d", expect, target.Got)
 		}
+	}
+}
+
+func Test_SigningIdentityFor(t *testing.T) {
+	tests := []struct {
+		name         string
+		virtualHosts []*VirtualHost
+		serverName   gomatrixserverlib.ServerName
+		want         *gomatrixserverlib.SigningIdentity
+		wantErr      bool
+	}{
+		{
+			name:    "no virtual hosts defined",
+			wantErr: true,
+		},
+		{
+			name:       "no identity found",
+			serverName: gomatrixserverlib.ServerName("doesnotexist"),
+			wantErr:    true,
+		},
+		{
+			name:       "found identity",
+			serverName: gomatrixserverlib.ServerName("main"),
+			want:       &gomatrixserverlib.SigningIdentity{ServerName: "main"},
+		},
+		{
+			name:       "identity found on virtual hosts",
+			serverName: gomatrixserverlib.ServerName("vh2"),
+			virtualHosts: []*VirtualHost{
+				{SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh1"}},
+				{SigningIdentity: gomatrixserverlib.SigningIdentity{ServerName: "vh2"}},
+			},
+			want: &gomatrixserverlib.SigningIdentity{ServerName: "vh2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Global{
+				VirtualHosts: tt.virtualHosts,
+				SigningIdentity: gomatrixserverlib.SigningIdentity{
+					ServerName: "main",
+				},
+			}
+			got, err := c.SigningIdentityFor(tt.serverName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SigningIdentityFor() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SigningIdentityFor() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

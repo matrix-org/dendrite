@@ -50,6 +50,7 @@ type KeyserverUserAPI interface {
 
 type RoomserverUserAPI interface {
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
 // api functions required by the media api
@@ -670,4 +671,13 @@ type PerformSaveThreePIDAssociationRequest struct {
 	Localpart  string
 	ServerName gomatrixserverlib.ServerName
 	Medium     string
+}
+
+type QueryAccountByLocalpartRequest struct {
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+}
+
+type QueryAccountByLocalpartResponse struct {
+	Account *Account
 }
