@@ -19,6 +19,7 @@ package input
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -30,6 +31,8 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
@@ -440,6 +443,13 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
+	// If guest_access changed and is not can_join, kick all guest users.
+	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
+		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
+			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
+		}
+	}
+
 	// Everything was OK — the latest events updater didn't error and
 	// we've sent output events. Finally, generate a hook call.
 	hooks.Run(hooks.KindNewEventPersisted, headered)
@@ -728,4 +738,99 @@ func (r *Inputer) calculateAndSetState(
 	}
 	succeeded = true
 	return nil
+}
+
+// kickGuests kicks guests users from m.room.guest_access rooms, if guest access is now prohibited.
+func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event, roomInfo *types.RoomInfo) error {
+	membershipNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
+	if err != nil {
+		return err
+	}
+
+	memberEvents, err := r.DB.Events(ctx, membershipNIDs)
+	if err != nil {
+		return err
+	}
+
+	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
+	latestReq := &api.QueryLatestEventsAndStateRequest{
+		RoomID: event.RoomID(),
+	}
+	latestRes := &api.QueryLatestEventsAndStateResponse{}
+	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
+		return err
+	}
+
+	prevEvents := latestRes.LatestEvents
+	for _, memberEvent := range memberEvents {
+		if memberEvent.StateKey() == nil {
+			continue
+		}
+
+		localpart, senderDomain, err := gomatrixserverlib.SplitID('@', *memberEvent.StateKey())
+		if err != nil {
+			continue
+		}
+
+		accountRes := &userAPI.QueryAccountByLocalpartResponse{}
+		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{
+			Localpart:  localpart,
+			ServerName: senderDomain,
+		}, accountRes); err != nil {
+			return err
+		}
+		if accountRes.Account == nil {
+			continue
+		}
+
+		if accountRes.Account.AccountType != userAPI.AccountTypeGuest {
+			continue
+		}
+
+		var memberContent gomatrixserverlib.MemberContent
+		if err = json.Unmarshal(memberEvent.Content(), &memberContent); err != nil {
+			return err
+		}
+		memberContent.Membership = gomatrixserverlib.Leave
+
+		stateKey := *memberEvent.StateKey()
+		fledglingEvent := &gomatrixserverlib.EventBuilder{
+			RoomID:     event.RoomID(),
+			Type:       gomatrixserverlib.MRoomMember,
+			StateKey:   &stateKey,
+			Sender:     stateKey,
+			PrevEvents: prevEvents,
+		}
+
+		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
+			return err
+		}
+
+		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		if err != nil {
+			return err
+		}
+
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, r.SigningIdentity, time.Now(), &eventsNeeded, latestRes)
+		if err != nil {
+			return err
+		}
+
+		inputEvents = append(inputEvents, api.InputRoomEvent{
+			Kind:         api.KindNew,
+			Event:        event,
+			Origin:       senderDomain,
+			SendAsServer: string(senderDomain),
+		})
+		prevEvents = []gomatrixserverlib.EventReference{
+			event.EventReference(),
+		}
+	}
+
+	inputReq := &api.InputRoomEventsRequest{
+		InputRoomEvents: inputEvents,
+		Asynchronous:    true, // Needs to be async, as we otherwise create a deadlock
+	}
+	inputRes := &api.InputRoomEventsResponse{}
+	return r.InputRoomEvents(ctx, inputReq, inputRes)
 }

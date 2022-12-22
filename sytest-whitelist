@@ -764,3 +764,6 @@ local user has tags copied to the new room
 remote user has tags copied to the new room
 /upgrade moves remote aliases to the new room
 Local and remote users' homeservers remove a room from their public directory on upgrade
+Guest users denied access over federation if guest access prohibited
+Guest users are kicked from guest_access rooms on revocation of guest_access
+Guest users are kicked from guest_access rooms on revocation of guest_access over federation
