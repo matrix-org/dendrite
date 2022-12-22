@@ -64,16 +64,12 @@ func NewPostgresRelayQueueJSONTable(db *sql.DB) (s *relayQueueJSONStatements, er
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = s.db.Prepare(insertQueueJSONSQL); err != nil {
-		return
-	}
-	if s.deleteJSONStmt, err = s.db.Prepare(deleteQueueJSONSQL); err != nil {
-		return
-	}
-	if s.selectJSONStmt, err = s.db.Prepare(selectQueueJSONSQL); err != nil {
-		return
-	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertJSONStmt, insertQueueJSONSQL},
+		{&s.deleteJSONStmt, deleteQueueJSONSQL},
+		{&s.selectJSONStmt, selectQueueJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *relayQueueJSONStatements) InsertQueueJSON(

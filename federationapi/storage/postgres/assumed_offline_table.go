@@ -60,19 +60,12 @@ func NewPostgresAssumedOfflineTable(db *sql.DB) (s *assumedOfflineStatements, er
 		return
 	}
 
-	if s.insertAssumedOfflineStmt, err = db.Prepare(insertAssumedOfflineSQL); err != nil {
-		return
-	}
-	if s.selectAssumedOfflineStmt, err = db.Prepare(selectAssumedOfflineSQL); err != nil {
-		return
-	}
-	if s.deleteAssumedOfflineStmt, err = db.Prepare(deleteAssumedOfflineSQL); err != nil {
-		return
-	}
-	if s.deleteAllAssumedOfflineStmt, err = db.Prepare(deleteAllAssumedOfflineSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertAssumedOfflineStmt, insertAssumedOfflineSQL},
+		{&s.selectAssumedOfflineStmt, selectAssumedOfflineSQL},
+		{&s.deleteAssumedOfflineStmt, deleteAssumedOfflineSQL},
+		{&s.deleteAllAssumedOfflineStmt, deleteAllAssumedOfflineSQL},
+	}.Prepare(db)
 }
 
 func (s *assumedOfflineStatements) InsertAssumedOffline(

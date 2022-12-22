@@ -74,19 +74,13 @@ func NewPostgresRelayQueueTable(db *sql.DB) (s *relayQueueStatements, err error)
 	if err != nil {
 		return
 	}
-	if s.insertQueueEntryStmt, err = s.db.Prepare(insertQueueEntrySQL); err != nil {
-		return
-	}
-	if s.deleteQueueEntriesStmt, err = s.db.Prepare(deleteQueueEntriesSQL); err != nil {
-		return
-	}
-	if s.selectQueueEntriesStmt, err = s.db.Prepare(selectQueueEntriesSQL); err != nil {
-		return
-	}
-	if s.selectQueueEntryCountStmt, err = s.db.Prepare(selectQueueEntryCountSQL); err != nil {
-		return
-	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertQueueEntryStmt, insertQueueEntrySQL},
+		{&s.deleteQueueEntriesStmt, deleteQueueEntriesSQL},
+		{&s.selectQueueEntriesStmt, selectQueueEntriesSQL},
+		{&s.selectQueueEntryCountStmt, selectQueueEntryCountSQL},
+	}.Prepare(db)
 }
 
 func (s *relayQueueStatements) InsertQueueEntry(

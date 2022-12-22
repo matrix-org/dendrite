@@ -64,10 +64,10 @@ func NewSQLiteRelayQueueJSONTable(db *sql.DB) (s *relayQueueJSONStatements, err 
 	if err != nil {
 		return
 	}
-	if s.insertJSONStmt, err = db.Prepare(insertQueueJSONSQL); err != nil {
-		return
-	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertJSONStmt, insertQueueJSONSQL},
+	}.Prepare(db)
 }
 
 func (s *relayQueueJSONStatements) InsertQueueJSON(

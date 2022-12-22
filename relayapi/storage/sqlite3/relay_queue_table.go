@@ -75,19 +75,12 @@ func NewSQLiteRelayQueueTable(db *sql.DB) (s *relayQueueStatements, err error) {
 	if err != nil {
 		return
 	}
-	if s.insertQueueEntryStmt, err = db.Prepare(insertQueueEntrySQL); err != nil {
-		return
-	}
-	//if s.deleteQueueEntriesStmt, err = db.Prepare(deleteQueueEntriesSQL); err != nil {
-	//	return
-	//}
-	if s.selectQueueEntriesStmt, err = db.Prepare(selectQueueEntriesSQL); err != nil {
-		return
-	}
-	if s.selectQueueEntryCountStmt, err = db.Prepare(selectQueueEntryCountSQL); err != nil {
-		return
-	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertQueueEntryStmt, insertQueueEntrySQL},
+		{&s.selectQueueEntriesStmt, selectQueueEntriesSQL},
+		{&s.selectQueueEntryCountStmt, selectQueueEntryCountSQL},
+	}.Prepare(db)
 }
 
 func (s *relayQueueStatements) InsertQueueEntry(

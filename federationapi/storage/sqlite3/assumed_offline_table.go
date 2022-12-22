@@ -72,7 +72,13 @@ func NewSQLiteAssumedOfflineTable(db *sql.DB) (s *assumedOfflineStatements, err 
 	if s.deleteAllAssumedOfflineStmt, err = db.Prepare(deleteAllAssumedOfflineSQL); err != nil {
 		return
 	}
-	return
+
+	return s, sqlutil.StatementList{
+		{&s.insertAssumedOfflineStmt, insertAssumedOfflineSQL},
+		{&s.selectAssumedOfflineStmt, selectAssumedOfflineSQL},
+		{&s.deleteAssumedOfflineStmt, deleteAssumedOfflineSQL},
+		{&s.deleteAllAssumedOfflineStmt, deleteAllAssumedOfflineSQL},
+	}.Prepare(db)
 }
 
 func (s *assumedOfflineStatements) InsertAssumedOffline(
