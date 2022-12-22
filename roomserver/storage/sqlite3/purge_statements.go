@@ -69,12 +69,11 @@ type purgeStatements struct {
 	purgeRoomAliasesStmt          *sql.Stmt
 	purgeRoomStmt                 *sql.Stmt
 	purgeStateSnapshotEntriesStmt *sql.Stmt
-	stateBlock                    *StateBlockStatements
-	stateSnapshot                 *StateSnapshotStatements
+	stateSnapshot                 *stateSnapshotStatements
 }
 
-func PreparePurgeStatements(db *sql.DB, stateBlock *StateBlockStatements, stateSnapshot *StateSnapshotStatements) (*purgeStatements, error) {
-	s := &purgeStatements{stateBlock: stateBlock, stateSnapshot: stateSnapshot}
+func PreparePurgeStatements(db *sql.DB, stateSnapshot *stateSnapshotStatements) (*purgeStatements, error) {
+	s := &purgeStatements{stateSnapshot: stateSnapshot}
 	return s, sqlutil.StatementList{
 		{&s.purgeEventJSONStmt, purgeEventJSONSQL},
 		{&s.purgeEventsStmt, purgeEventsSQL},

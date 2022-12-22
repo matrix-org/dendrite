@@ -197,7 +197,7 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	purge, err := PreparePurgeStatements(db, stateBlock, stateSnapshot)
+	purge, err := PreparePurgeStatements(db, stateSnapshot)
 	if err != nil {
 		return err
 	}

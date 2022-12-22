@@ -124,6 +124,7 @@ type QueryProvider interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 }
 
+// ExecProvider defines the interface for querys used by RunLimitedVariablesExec.
 type ExecProvider interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
@@ -157,7 +158,7 @@ func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvide
 	return nil
 }
 
-// RunLimitedVariablesQuery split up a query with more variables than the used database can handle in multiple queries.
+// RunLimitedVariablesExec split up a query with more variables than the used database can handle in multiple queries.
 func RunLimitedVariablesExec(ctx context.Context, query string, qp ExecProvider, variables []interface{}, limit uint) error {
 	var start int
 	for start < len(variables) {
@@ -165,7 +166,7 @@ func RunLimitedVariablesExec(ctx context.Context, query string, qp ExecProvider,
 		nextQuery := strings.Replace(query, "($1)", QueryVariadic(n), 1)
 		_, err := qp.ExecContext(ctx, nextQuery, variables[start:start+n]...)
 		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("QueryContext returned an error")
+			util.GetLogger(ctx).WithError(err).Error("ExecContext returned an error")
 			return err
 		}
 		start = start + n

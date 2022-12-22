@@ -65,7 +65,7 @@ const bulkSelectStateBlockNIDsSQL = "" +
 const selectStateBlockNIDsForRoomNID = "" +
 	"SELECT state_block_nids FROM roomserver_state_snapshots WHERE room_nid = $1"
 
-type StateSnapshotStatements struct {
+type stateSnapshotStatements struct {
 	db                           *sql.DB
 	insertStateStmt              *sql.Stmt
 	bulkSelectStateBlockNIDsStmt *sql.Stmt
@@ -77,8 +77,8 @@ func CreateStateSnapshotTable(db *sql.DB) error {
 	return err
 }
 
-func PrepareStateSnapshotTable(db *sql.DB) (*StateSnapshotStatements, error) {
-	s := &StateSnapshotStatements{
+func PrepareStateSnapshotTable(db *sql.DB) (*stateSnapshotStatements, error) {
+	s := &stateSnapshotStatements{
 		db: db,
 	}
 
@@ -89,7 +89,7 @@ func PrepareStateSnapshotTable(db *sql.DB) (*StateSnapshotStatements, error) {
 	}.Prepare(db)
 }
 
-func (s *StateSnapshotStatements) InsertState(
+func (s *stateSnapshotStatements) InsertState(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, stateBlockNIDs types.StateBlockNIDs,
 ) (stateNID types.StateSnapshotNID, err error) {
 	if stateBlockNIDs == nil {
@@ -108,7 +108,7 @@ func (s *StateSnapshotStatements) InsertState(
 	return
 }
 
-func (s *StateSnapshotStatements) BulkSelectStateBlockNIDs(
+func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	ctx context.Context, txn *sql.Tx, stateNIDs []types.StateSnapshotNID,
 ) ([]types.StateBlockNIDList, error) {
 	nids := make([]interface{}, len(stateNIDs))
@@ -146,13 +146,13 @@ func (s *StateSnapshotStatements) BulkSelectStateBlockNIDs(
 	return results, nil
 }
 
-func (s *StateSnapshotStatements) BulkSelectStateForHistoryVisibility(
+func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 	ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string,
 ) ([]types.EventNID, error) {
 	return nil, tables.OptimisationNotSupportedError
 }
 
-func (s *StateSnapshotStatements) selectStateBlockNIDsForRoomNID(
+func (s *stateSnapshotStatements) selectStateBlockNIDsForRoomNID(
 	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
 ) ([]types.StateBlockNID, error) {
 	var res []types.StateBlockNID
