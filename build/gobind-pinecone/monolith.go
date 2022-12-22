@@ -481,11 +481,6 @@ func (m *DendriteMonolith) Start() {
 				if relayRetriever.running.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
 					stopRelayServerSync <- true
 				}
-			case pineconeEvents.TreeParentUpdate:
-			case pineconeEvents.SnakeDescUpdate:
-			case pineconeEvents.TreeRootAnnUpdate:
-			case pineconeEvents.SnakeEntryAdded:
-			case pineconeEvents.SnakeEntryRemoved:
 			case pineconeEvents.BroadcastReceived:
 				// eLog.Info("Broadcast received from: ", e.PeerID)
 
@@ -496,7 +491,6 @@ func (m *DendriteMonolith) Start() {
 				if err := m.federationAPI.PerformWakeupServers(base.Context(), req, res); err != nil {
 					eLog.WithError(err).Error("Failed to wakeup destination", e.PeerID)
 				}
-			case pineconeEvents.BandwidthReport:
 			default:
 			}
 		}
