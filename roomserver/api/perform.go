@@ -78,6 +78,7 @@ const (
 type PerformJoinRequest struct {
 	RoomIDOrAlias string                         `json:"room_id_or_alias"`
 	UserID        string                         `json:"user_id"`
+	IsGuest       bool                           `json:"is_guest"`
 	Content       map[string]interface{}         `json:"content"`
 	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
 	Unsigned      map[string]interface{}         `json:"unsigned"`

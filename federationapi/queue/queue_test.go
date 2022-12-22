@@ -221,28 +221,6 @@ func (d *fakeDatabase) CleanEDUs(ctx context.Context, serverName gomatrixserverl
 	return nil
 }
 
-func (d *fakeDatabase) GetPendingPDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error) {
-	d.dbMutex.Lock()
-	defer d.dbMutex.Unlock()
-
-	var count int64
-	if pdus, ok := d.associatedPDUs[serverName]; ok {
-		count = int64(len(pdus))
-	}
-	return count, nil
-}
-
-func (d *fakeDatabase) GetPendingEDUCount(ctx context.Context, serverName gomatrixserverlib.ServerName) (int64, error) {
-	d.dbMutex.Lock()
-	defer d.dbMutex.Unlock()
-
-	var count int64
-	if edus, ok := d.associatedEDUs[serverName]; ok {
-		count = int64(len(edus))
-	}
-	return count, nil
-}
-
 func (d *fakeDatabase) GetPendingPDUServerNames(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()

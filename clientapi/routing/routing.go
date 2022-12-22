@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
@@ -49,7 +50,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	publicAPIMux, wkMux, synapseAdminRouter, dendriteAdminRouter *mux.Router,
+	base *base.BaseDendrite,
 	cfg *config.ClientAPI,
 	rsAPI roomserverAPI.ClientRoomserverAPI,
 	asAPI appserviceAPI.AppServiceInternalAPI,
@@ -63,7 +64,14 @@ func Setup(
 	extRoomsProvider api.ExtraPublicRoomsProvider,
 	mscCfg *config.MSCs, natsClient *nats.Conn,
 ) {
-	prometheus.MustRegister(amtRegUsers, sendEventDuration)
+	publicAPIMux := base.PublicClientAPIMux
+	wkMux := base.PublicWellKnownAPIMux
+	synapseAdminRouter := base.SynapseAdminMux
+	dendriteAdminRouter := base.DendriteAdminMux
+
+	if base.EnableMetrics {
+		prometheus.MustRegister(amtRegUsers, sendEventDuration)
+	}
 
 	rateLimits := httputil.NewRateLimits(&cfg.RateLimiting)
 	userInteractiveAuth := auth.NewUserInteractive(userAPI, cfg)
@@ -637,7 +645,7 @@ func Setup(
 	).Methods(http.MethodGet, http.MethodPost, http.MethodOptions)
 
 	v3mux.Handle("/auth/{authType}/fallback/web",
-		httputil.MakeHTMLAPI("auth_fallback", func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
+		httputil.MakeHTMLAPI("auth_fallback", base.EnableMetrics, func(w http.ResponseWriter, req *http.Request) *util.JSONResponse {
 			vars := mux.Vars(req)
 			return AuthFallback(w, req, vars["authType"], cfg)
 		}),
