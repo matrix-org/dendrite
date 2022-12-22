@@ -21,7 +21,7 @@ import (
 )
 
 func TestAdminResetPassword(t *testing.T) {
-	alice := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
+	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
 	bob := test.NewUser(t, test.WithAccountType(uapi.AccountTypeUser))
 	vhUser := &test.User{ID: "@vhuser:vh1"}
 
@@ -45,9 +45,9 @@ func TestAdminResetPassword(t *testing.T) {
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
-			alice:  "",
-			bob:    "",
-			vhUser: "",
+			aliceAdmin: "",
+			bob:        "",
+			vhUser:     "",
 		}
 		for u := range accessTokens {
 			localpart, serverName, _ := gomatrixserverlib.SplitID('@', u.ID)
@@ -88,20 +88,27 @@ func TestAdminResetPassword(t *testing.T) {
 		}{
 			{name: "Missing auth", requestingUser: bob, wantOK: false, userID: bob.ID},
 			{name: "Bob is denied access", requestingUser: bob, wantOK: false, withHeader: true, userID: bob.ID},
-			{name: "Alice is allowed access", requestingUser: alice, wantOK: true, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
-				"password": "newPass",
+			{name: "Alice is allowed access", requestingUser: aliceAdmin, wantOK: true, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
+				"password": util.RandomString(8),
 			})},
-			{name: "Alice is allowed access, missing userID", requestingUser: alice, wantOK: false, withHeader: true, userID: ""}, // this 404s
-			{name: "Alice is allowed access, empty password", requestingUser: alice, wantOK: false, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
+			{name: "missing userID does not call function", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: ""}, // this 404s
+			{name: "rejects empty password", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
 				"password": "",
 			})},
-			{name: "Alice is allowed access, unknown server name", requestingUser: alice, wantOK: false, withHeader: true, userID: "@doesnotexist:localhost", requestOpt: test.WithJSONBody(t, map[string]interface{}{})},
-			{name: "Alice is allowed access, unknown user", requestingUser: alice, wantOK: false, withHeader: true, userID: "@doesnotexist:test", requestOpt: test.WithJSONBody(t, map[string]interface{}{})},
-			{name: "Alice is allowed access, different vhost", requestingUser: alice, wantOK: true, withHeader: true, userID: vhUser.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
-				"password": "newPass",
+			{name: "rejects unknown server name", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: "@doesnotexist:localhost", requestOpt: test.WithJSONBody(t, map[string]interface{}{})},
+			{name: "rejects unknown user", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: "@doesnotexist:test", requestOpt: test.WithJSONBody(t, map[string]interface{}{})},
+			{name: "allows changing password for different vhost", requestingUser: aliceAdmin, wantOK: true, withHeader: true, userID: vhUser.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
+				"password": util.RandomString(8),
 			})},
-			{name: "Alice is allowed access, existing user, missing body", requestingUser: alice, wantOK: false, withHeader: true, userID: bob.ID},
-			{name: "Alice is allowed access, invalid userID", requestingUser: alice, wantOK: false, withHeader: true, userID: "!notauserid:test", requestOpt: test.WithJSONBody(t, map[string]interface{}{})},
+			{name: "rejects existing user, missing body", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: bob.ID},
+			{name: "rejects invalid userID", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: "!notauserid:test", requestOpt: test.WithJSONBody(t, map[string]interface{}{})},
+			{name: "rejects invalid json", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, `{invalidJSON}`)},
+			{name: "rejects too weak password", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
+				"password": util.RandomString(6),
+			})},
+			{name: "rejects too long password", requestingUser: aliceAdmin, wantOK: false, withHeader: true, userID: bob.ID, requestOpt: test.WithJSONBody(t, map[string]interface{}{
+				"password": util.RandomString(513),
+			})},
 		}
 
 		for _, tc := range testCases {
@@ -117,6 +124,7 @@ func TestAdminResetPassword(t *testing.T) {
 
 				rec := httptest.NewRecorder()
 				base.DendriteAdminMux.ServeHTTP(rec, req)
+				t.Logf("%s", rec.Body.String())
 				if tc.wantOK && rec.Code != http.StatusOK {
 					t.Fatalf("expected http status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 				}

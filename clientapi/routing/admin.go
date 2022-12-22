@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
@@ -114,7 +115,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(err.Error()),
+			JSON: jsonerror.InvalidArgumentValue(err.Error()),
 		}
 	}
 	accAvailableResp := &userapi.QueryAccountAvailabilityResponse{}
@@ -148,6 +149,11 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 			JSON: jsonerror.MissingArgument("Expecting non-empty password."),
 		}
 	}
+
+	if resErr := internal.ValidatePassword(request.Password); resErr != nil {
+		return *resErr
+	}
+
 	updateReq := &userapi.PerformPasswordUpdateRequest{
 		Localpart:     localpart,
 		ServerName:    serverName,
