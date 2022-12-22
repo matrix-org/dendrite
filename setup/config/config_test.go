@@ -19,8 +19,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
