@@ -115,7 +115,17 @@ func TestProcessTransactionRequestPDUs(t *testing.T) {
 	assert.Equal(t, 1, len(txnRes.PDUs))
 }
 
-func createTransactionWithEDU(edu gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
+func TestProcessTransactionRequestBadPDU(t *testing.T) {
+	pdu := json.RawMessage("{\"room_id\":\"asdf\"}")
+	pdu2 := json.RawMessage("\"roomid\":\"asdf\"")
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", nil, nil, nil, false, []json.RawMessage{pdu, pdu2}, []gomatrixserverlib.EDU{}, "", "", "")
+	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+
+	assert.Nil(t, jsonRes)
+	assert.Zero(t, len(txnRes.PDUs))
+}
+
+func createTransactionWithEDU(edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
 		Generate:   true,
@@ -137,7 +147,7 @@ func createTransactionWithEDU(edu gomatrixserverlib.EDU) (TxnReq, nats.JetStream
 		UserAPI:                nil,
 	}
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, producer, true, []json.RawMessage{}, []gomatrixserverlib.EDU{edu}, "kaer.morhen", "", "ourserver")
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, producer, true, []json.RawMessage{}, edus, "kaer.morhen", "", "ourserver")
 	return txn, js, cfg
 }
 
@@ -154,8 +164,11 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 	}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
+	badEDU := gomatrixserverlib.EDU{Type: "m.typing"}
+	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edu)
+	txn, js, cfg := createTransactionWithEDU(edus)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	received := atomic.NewBool(false)
@@ -217,8 +230,11 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 	}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
+	badEDU := gomatrixserverlib.EDU{Type: "m.direct_to_device"}
+	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edu)
+	txn, js, cfg := createTransactionWithEDU(edus)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	received := atomic.NewBool(false)
@@ -291,8 +307,11 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 	}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
+	badEDU := gomatrixserverlib.EDU{Type: "m.device_list_update"}
+	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edu)
+	txn, js, cfg := createTransactionWithEDU(edus)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	received := atomic.NewBool(false)
@@ -351,8 +370,45 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
+	badEDU := gomatrixserverlib.EDU{Type: "m.receipt"}
+	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	badUser := gomatrixserverlib.EDU{Type: "m.receipt"}
+	if badUser.Content, err = json.Marshal(map[string]interface{}{
+		roomID: map[string]interface{}{
+			"m.read": map[string]interface{}{
+				"johnkaer.morhen": map[string]interface{}{
+					"data": map[string]interface{}{
+						"ts": 1533358089009,
+					},
+					"event_ids": []string{
+						"$read_this_event:matrix.org",
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Errorf("failed to marshal EDU JSON")
+	}
+	badDomain := gomatrixserverlib.EDU{Type: "m.receipt"}
+	if badDomain.Content, err = json.Marshal(map[string]interface{}{
+		roomID: map[string]interface{}{
+			"m.read": map[string]interface{}{
+				"@john:bad.domain": map[string]interface{}{
+					"data": map[string]interface{}{
+						"ts": 1533358089009,
+					},
+					"event_ids": []string{
+						"$read_this_event:matrix.org",
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Errorf("failed to marshal EDU JSON")
+	}
+	edus := []gomatrixserverlib.EDU{badEDU, badUser, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edu)
+	txn, js, cfg := createTransactionWithEDU(edus)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	received := atomic.NewBool(false)
@@ -392,8 +448,11 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 	if edu.Content, err = json.Marshal(map[string]interface{}{}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
+	badEDU := gomatrixserverlib.EDU{Type: "m.signing_key_update"}
+	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edu)
+	txn, js, cfg := createTransactionWithEDU(edus)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	received := atomic.NewBool(false)
@@ -446,8 +505,11 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 	}); err != nil {
 		t.Errorf("failed to marshal EDU JSON")
 	}
+	badEDU := gomatrixserverlib.EDU{Type: "m.presence"}
+	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
+	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edu)
+	txn, js, cfg := createTransactionWithEDU(edus)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	received := atomic.NewBool(false)
@@ -489,7 +551,7 @@ func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 
-	txn, _, _ := createTransactionWithEDU(edu)
+	txn, _, _ := createTransactionWithEDU([]gomatrixserverlib.EDU{edu})
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
