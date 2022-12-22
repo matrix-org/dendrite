@@ -36,9 +36,11 @@ func TestAdminResetPassword(t *testing.T) {
 		})
 
 		rsAPI := roomserver.NewInternalAPI(base)
+		// Needed for changing the password/login
 		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
 		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
 		keyAPI.SetUserAPI(userAPI)
+		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
 		AddPublicRoutes(base, nil, nil, nil, nil, nil, userAPI, nil, nil, nil)
 
 		// Create the users in the userapi and login
@@ -70,7 +72,6 @@ func TestAdminResetPassword(t *testing.T) {
 			}))
 			rec := httptest.NewRecorder()
 			base.PublicClientAPIMux.ServeHTTP(rec, req)
-			t.Logf("%+v\n", rec.Body.String())
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to login: %s", rec.Body.String())
 			}
