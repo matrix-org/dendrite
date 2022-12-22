@@ -6,14 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateFederationDatabase(t *testing.T, dbType test.DBType) (storage.Database, func()) {
@@ -244,5 +243,91 @@ func TestInboundPeeking(t *testing.T) {
 			gotPeekIDs = append(gotPeekIDs, p.PeekID)
 		}
 		assert.ElementsMatch(t, gotPeekIDs, peekIDs)
+	})
+}
+
+func TestServersAssumedOffline(t *testing.T) {
+	server1 := gomatrixserverlib.ServerName("server1")
+	server2 := gomatrixserverlib.ServerName("server2")
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, closeDB := mustCreateFederationDatabase(t, dbType)
+		defer closeDB()
+
+		err := db.SetServerAssumedOffline(server1)
+		assert.Nil(t, err)
+
+		isOffline, err := db.IsServerAssumedOffline(server1)
+		assert.Nil(t, err)
+		assert.True(t, isOffline)
+
+		err = db.RemoveServerAssumedOffline(server1)
+		assert.Nil(t, err)
+
+		isOffline, err = db.IsServerAssumedOffline(server1)
+		assert.Nil(t, err)
+		assert.False(t, isOffline)
+
+		err = db.SetServerAssumedOffline(server1)
+		assert.Nil(t, err)
+		err = db.SetServerAssumedOffline(server2)
+		assert.Nil(t, err)
+
+		isOffline, err = db.IsServerAssumedOffline(server1)
+		assert.Nil(t, err)
+		assert.True(t, isOffline)
+		isOffline, err = db.IsServerAssumedOffline(server2)
+		assert.Nil(t, err)
+		assert.True(t, isOffline)
+
+		err = db.RemoveAllServersAssumedOffline()
+		assert.Nil(t, err)
+
+		isOffline, err = db.IsServerAssumedOffline(server1)
+		assert.Nil(t, err)
+		assert.False(t, isOffline)
+		isOffline, err = db.IsServerAssumedOffline(server2)
+		assert.Nil(t, err)
+		assert.False(t, isOffline)
+	})
+}
+
+func TestRelayServersStored(t *testing.T) {
+	server := gomatrixserverlib.ServerName("server")
+	relayServer1 := gomatrixserverlib.ServerName("relayserver1")
+	relayServer2 := gomatrixserverlib.ServerName("relayserver2")
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, closeDB := mustCreateFederationDatabase(t, dbType)
+		defer closeDB()
+
+		err := db.AddRelayServersForServer(server, []gomatrixserverlib.ServerName{relayServer1})
+		assert.Nil(t, err)
+
+		relayServers, err := db.GetRelayServersForServer(server)
+		assert.Nil(t, err)
+		assert.Equal(t, relayServer1, relayServers[0])
+
+		err = db.RemoveRelayServersForServer(server, []gomatrixserverlib.ServerName{relayServer1})
+		assert.Nil(t, err)
+
+		relayServers, err = db.GetRelayServersForServer(server)
+		assert.Nil(t, err)
+		assert.Zero(t, len(relayServers))
+
+		err = db.AddRelayServersForServer(server, []gomatrixserverlib.ServerName{relayServer1, relayServer2})
+		assert.Nil(t, err)
+
+		relayServers, err = db.GetRelayServersForServer(server)
+		assert.Nil(t, err)
+		assert.Equal(t, relayServer1, relayServers[0])
+		assert.Equal(t, relayServer2, relayServers[1])
+
+		err = db.RemoveAllRelayServersForServer(server)
+		assert.Nil(t, err)
+
+		relayServers, err = db.GetRelayServersForServer(server)
+		assert.Nil(t, err)
+		assert.Zero(t, len(relayServers))
 	})
 }
