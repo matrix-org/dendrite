@@ -71,9 +71,6 @@ const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
 	"  SELECT server_name FROM federationsender_blacklist WHERE j.server_name = server_name" +
 	");"
 
-const purgeJoinedHostsSQL = "" +
-	"DELETE FROM federationsender_joined_hosts WHERE room_id = $1"
-
 type joinedHostsStatements struct {
 	db                                                *sql.DB
 	insertJoinedHostsStmt                             *sql.Stmt
@@ -83,7 +80,6 @@ type joinedHostsStatements struct {
 	selectAllJoinedHostsStmt                          *sql.Stmt
 	selectJoinedHostsForRoomsStmt                     *sql.Stmt
 	selectJoinedHostsForRoomsExcludingBlacklistedStmt *sql.Stmt
-	purgeJoinedHostsStmt                              *sql.Stmt
 }
 
 func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
@@ -113,9 +109,6 @@ func NewPostgresJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err erro
 		return
 	}
 	if s.selectJoinedHostsForRoomsExcludingBlacklistedStmt, err = s.db.Prepare(selectJoinedHostsForRoomsExcludingBlacklistedSQL); err != nil {
-		return
-	}
-	if s.purgeJoinedHostsStmt, err = s.db.Prepare(purgeJoinedHostsSQL); err != nil {
 		return
 	}
 	return
@@ -229,11 +222,4 @@ func joinedHostsFromStmt(
 	}
 
 	return result, rows.Err()
-}
-
-func (s *joinedHostsStatements) PurgeJoinedHosts(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeJoinedHostsStmt).ExecContext(ctx, roomID)
-	return err
 }

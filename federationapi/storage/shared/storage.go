@@ -262,7 +262,7 @@ func (d *Database) GetNotaryKeys(
 
 func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		if err := d.FederationJoinedHosts.PurgeJoinedHosts(ctx, txn, roomID); err != nil {
+		if err := d.FederationJoinedHosts.DeleteJoinedHostsForRoom(ctx, txn, roomID); err != nil {
 			return fmt.Errorf("failed to purge joined hosts: %w", err)
 		}
 		if err := d.FederationInboundPeeks.DeleteInboundPeeks(ctx, txn, roomID); err != nil {
