@@ -2,7 +2,7 @@
 postgresql:
   enabled: true
 
-configuration:
+global:
   server_name: "localhost"
 
 ingress:

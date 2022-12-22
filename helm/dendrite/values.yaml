@@ -4,7 +4,40 @@ image:
   # -- Kubernetes pullPolicy
   pullPolicy: IfNotPresent
 
-configuration:
+
+# signing key to use
+signing_key:
+  # -- Create a new signing key, if not exists
+  create: true
+  # -- Use an existing secret
+  existingSecret: ""
+
+# -- Default resource requests/limits.
+# @default -- sets some sane default values
+resources:
+  requests:
+    memory: "512Mi"
+
+  limits:
+    memory: "4096Mi"
+
+persistence:
+  storageClass: ""
+  jetstream:
+    # -- Use an existing volume claim for jetstream
+    existingClaim: ""
+    capacity: "1Gi"
+  media:
+    # -- Use an existing volume claim for media files
+    existingClaim: ""
+    capacity: "1Gi"
+  search:
+    # -- Use an existing volume claim for the fulltext search index
+    existingClaim: ""
+    capacity: "1Gi"
+
+
+global:
   # -- Servername for this Dendrite deployment
   server_name: ""
 
@@ -26,12 +59,6 @@ configuration:
   # to other servers and the federation API will not be exposed.
   disable_federation: false
 
-  # signing key to use
-  signing_key:
-    # -- Create a new signing key, if not exists
-    create: true
-    # -- Use an existing secret
-    existingSecret: ""
   key_validity_period: 168h0m0s
 
   database:
@@ -64,6 +91,32 @@ configuration:
     # become popular.
     max_age: 1h
 
+  # -- Configures phone-home statistics reporting. These statistics contain the server
+  # name, number of active users and some information on your deployment config.
+  # We use this information to understand how Dendrite is being used in the wild.
+  report_stats:
+    enabled: false
+    endpoint: https://matrix.org/report-usage-stats/push
+
+  # -- Configures the handling of presence events. Inbound controls whether we receive
+  # presence events from other servers, outbound controls whether we send presence
+  # events for our local users to other servers.
+  presence:
+    enable_inbound: false
+    enable_outbound: false
+
+  # -- Server notices allows server admins to send messages to all users on the server.
+  server_notices:
+    enabled: false
+    # The local part, display name and avatar URL (as a mxc:// URL) for the user that
+    # will send the server notices. These are visible to all users on the deployment.
+    local_part: "_server"
+    display_name: "Server Alerts"
+    avatar_url: ""
+    # The room name to be used when sending server notices. This room name will
+    # appear in user clients.
+    room_name: "Server Alerts"
+
   # prometheus metrics
   metrics:
     # -- Whether or not Prometheus metrics are enabled.
@@ -74,25 +127,6 @@ configuration:
       user: "metrics"
       # -- HTTP basic authentication password
       password: metrics
-
-  # TURN server information that this homeserver should send to clients.
-  turn:
-    # -- Duration for how long users should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more)
-    turn_user_lifetime: "24h"
-    turn_uris: []
-    turn_shared_secret: ""
-    # -- The TURN username
-    turn_username: ""
-    # -- The TURN password
-    turn_password: ""
-
-  rate_limiting:
-    # -- Enable rate limiting
-    enabled: true
-    # -- After how many requests a rate limit should be activated
-    threshold: 20
-    # -- Cooloff time in milliseconds
-    cooloff_ms: 500
 
   dns_cache:
     # -- Whether or not the DNS cache is enabled.
@@ -139,53 +173,49 @@ configuration:
     # - msc2836    (Threading, see https://github.com/matrix-org/matrix-doc/pull/2836)
     # - msc2946    (Spaces Summary, see https://github.com/matrix-org/matrix-doc/pull/2946)
 
-# -- Default resource requests/limits.
-# @default -- sets some sane default values
-resources:
-  requests:
-    memory: "512Mi"
-
-  limits:
-    memory: "4096Mi"
-
-persistence:
-  storageClass: ""
-  jetstream:
-    # -- Use an existing volume claim for jetstream
-    existingClaim: ""
-    capacity: "1Gi"
-  media:
-    # -- Use an existing volume claim for media files
-    existingClaim: ""
-    capacity: "1Gi"
-  search:
-    # -- Use an existing volume claim for the fulltext search index
-    existingClaim: ""
-    capacity: "1Gi"
-
 clientapi:
-  registration:
-    # -- Prevents new users from being able to register on this homeserver, except when
-    # using the registration shared secret below.
-    registration_disabled: true
+  # -- Prevents new users from being able to register on this homeserver, except when
+  # using the registration shared secret below.
+  registration_disabled: true
 
-    # Prevents new guest accounts from being created. Guest registration is also
-    # disabled implicitly by setting 'registration_disabled' above.
-    guests_disabled: true
+  # Prevents new guest accounts from being created. Guest registration is also
+  # disabled implicitly by setting 'registration_disabled' above.
+  guests_disabled: true
 
-    # -- If set, allows registration by anyone who knows the shared secret, regardless of
-    # whether registration is otherwise disabled.
-    shared_secret: ""
+  # -- If set, allows registration by anyone who knows the shared secret, regardless of
+  # whether registration is otherwise disabled.
+  shared_secret: ""
 
-    # -- enable reCAPTCHA registration
-    enable_registration_captcha: false
-    # -- reCAPTCHA public key
-    recaptcha_public_key: ""
-    # -- reCAPTCHA private key
-    recaptcha_private_key: ""
-    # -- reCAPTCHA bypass secret
-    recaptcha_bypass_secret: ""
-    recaptcha_siteverify_api: ""
+  # -- enable reCAPTCHA registration
+  enable_registration_captcha: false
+  # -- reCAPTCHA public key
+  recaptcha_public_key: ""
+  # -- reCAPTCHA private key
+  recaptcha_private_key: ""
+  # -- reCAPTCHA bypass secret
+  recaptcha_bypass_secret: ""
+  recaptcha_siteverify_api: ""
+
+  # TURN server information that this homeserver should send to clients.
+  turn:
+    # -- Duration for how long users should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more)
+    turn_user_lifetime: "24h"
+    turn_uris: [ ]
+    turn_shared_secret: ""
+    # -- The TURN username
+    turn_username: ""
+    # -- The TURN password
+    turn_password: ""
+
+  rate_limiting:
+    # -- Enable rate limiting
+    enabled: true
+    # -- After how many requests a rate limit should be activated
+    threshold: 20
+    # -- Cooloff time in milliseconds
+    cooloff_ms: 500
+    # -- Users which should be exempt from rate limiting
+    exempt_user_ids:
 
 federationapi:
   send_max_retries: 16
@@ -249,7 +279,6 @@ ingress:
   hosts: []
   className: ""
   hostName: ""
-  annotateFor: ""  # one of 'openshift' or 'nginx'
   # -- Extra, custom annotations
   annotations: {}
 

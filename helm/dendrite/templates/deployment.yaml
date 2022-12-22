@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: {{ $.Chart.Name }}
+  name: {{ include "dendrite.fullname" . }}
   labels:
     app: {{ $.Chart.Name }}
 spec:
@@ -23,7 +23,7 @@ spec:
           secretName: {{ .Release.Name }}-conf
       - name: {{ .Release.Name }}-signing-key
         secret:
-          secretName: {{ default (print .Release.Name "-signing-key") $.Values.configuration.signing_key.existingSecret | quote }}
+          secretName: {{ default (print .Release.Name "-signing-key") $.Values.signing_key.existingSecret | quote }}
       {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
       - name:{{ .Release.Name }}-appservices
         secret:
@@ -48,10 +48,10 @@ spec:
           - name: http
             containerPort: 8008
             protocol: TCP
-        {{- if $.Values.configuration.profiling.enabled }}
+        {{- if $.Values.global.profiling.enabled }}
         env:
           - name: PPROFLISTEN
-            value: "localhost:{{- $.Values.configuration.profiling.port -}}"
+            value: "localhost:{{- $.Values.global.profiling.port -}}"
         {{- end }}
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}

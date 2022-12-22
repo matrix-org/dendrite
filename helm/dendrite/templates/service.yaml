@@ -5,7 +5,7 @@ apiVersion: v1
 kind: Service
 metadata:
   namespace: {{ $.Release.Namespace }}
-  name: {{ $.Chart.Name }}
+  name: {{ include "dendrite.fullname" . }}
   labels:
     {{- include "dendrite.labels" . | nindent 4 }}
 spec:

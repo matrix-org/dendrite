@@ -1,4 +1,4 @@
-{{ if and .Values.configuration.signing_key.create (not .Values.configuration.signing_key.existingSecret ) }}
+{{ if and .Values.signing_key.create (not .Values.signing_key.existingSecret ) }}
 {{ $name := (print .Release.Name "-signing-key") }}
 {{ $secretName := (print .Release.Name "-signing-key") }}
 ---
