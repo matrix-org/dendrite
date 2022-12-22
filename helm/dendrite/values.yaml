@@ -200,7 +200,7 @@ clientapi:
   turn:
     # -- Duration for how long users should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more)
     turn_user_lifetime: "24h"
-    turn_uris: [ ]
+    turn_uris: []
     turn_shared_secret: ""
     # -- The TURN username
     turn_username: ""
