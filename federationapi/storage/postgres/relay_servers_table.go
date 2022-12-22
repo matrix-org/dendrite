@@ -66,19 +66,12 @@ func NewPostgresRelayServersTable(db *sql.DB) (s *relayServersStatements, err er
 		return
 	}
 
-	if s.insertRelayServersStmt, err = db.Prepare(insertRelayServersSQL); err != nil {
-		return
-	}
-	if s.selectRelayServersStmt, err = db.Prepare(selectRelayServersSQL); err != nil {
-		return
-	}
-	if s.deleteRelayServersStmt, err = db.Prepare(deleteRelayServersSQL); err != nil {
-		return
-	}
-	if s.deleteAllRelayServersStmt, err = db.Prepare(deleteAllRelayServersSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertRelayServersStmt, insertRelayServersSQL},
+		{&s.selectRelayServersStmt, selectRelayServersSQL},
+		{&s.deleteRelayServersStmt, deleteRelayServersSQL},
+		{&s.deleteAllRelayServersStmt, deleteAllRelayServersSQL},
+	}.Prepare(db)
 }
 
 func (s *relayServersStatements) InsertRelayServers(
