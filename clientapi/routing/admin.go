@@ -98,20 +98,40 @@ func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, device *userapi
 }
 
 func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
+	if req.Body == nil {
+		return util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.Unknown("Missing request body"),
+		}
+	}
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	serverName := cfg.Matrix.ServerName
-	localpart, ok := vars["localpart"]
-	if !ok {
+	var localpart string
+	userID := vars["userID"]
+	localpart, serverName, err := cfg.Matrix.SplitLocalID('@', userID)
+	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting user localpart."),
+			JSON: jsonerror.BadJSON(err.Error()),
 		}
 	}
-	if l, s, err := cfg.Matrix.SplitLocalID('@', localpart); err == nil {
-		localpart, serverName = l, s
+	accAvailableResp := &userapi.QueryAccountAvailabilityResponse{}
+	if err = userAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
+		Localpart:  localpart,
+		ServerName: serverName,
+	}, accAvailableResp); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.InternalAPIError(req.Context(), err),
+		}
+	}
+	if accAvailableResp.Available {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.Unknown("User does not exist"),
+		}
 	}
 	request := struct {
 		Password string `json:"password"`
