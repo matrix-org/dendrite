@@ -57,10 +57,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicClientAPIMux,
-		base.PublicWellKnownAPIMux,
-		base.SynapseAdminMux,
-		base.DendriteAdminMux,
+		base,
 		cfg, rsAPI, asAPI,
 		userAPI, userDirectoryProvider, federation,
 		syncProducer, transactionsCache, fsAPI, keyAPI,
