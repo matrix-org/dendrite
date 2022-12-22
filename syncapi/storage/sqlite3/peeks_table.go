@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -65,6 +64,9 @@ const selectPeekingDevicesSQL = "" +
 const selectMaxPeekIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_peeks"
 
+const purgePeeksSQL = "" +
+	"DELETE FROM syncapi_peeks WHERE room_id = $1"
+
 type peekStatements struct {
 	db                       *sql.DB
 	streamIDStatements       *StreamIDStatements
@@ -74,6 +76,7 @@ type peekStatements struct {
 	selectPeeksInRangeStmt   *sql.Stmt
 	selectPeekingDevicesStmt *sql.Stmt
 	selectMaxPeekIDStmt      *sql.Stmt
+	purgePeeksStmt           *sql.Stmt
 }
 
 func NewSqlitePeeksTable(db *sql.DB, streamID *StreamIDStatements) (tables.Peeks, error) {
@@ -101,6 +104,9 @@ func NewSqlitePeeksTable(db *sql.DB, streamID *StreamIDStatements) (tables.Peeks
 		return nil, err
 	}
 	if s.selectMaxPeekIDStmt, err = db.Prepare(selectMaxPeekIDSQL); err != nil {
+		return nil, err
+	}
+	if s.purgePeeksStmt, err = db.Prepare(purgePeeksSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -209,5 +215,6 @@ func (s *peekStatements) SelectMaxPeekID(
 func (s *peekStatements) PurgePeeks(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	return fmt.Errorf("not implemented on SQLite")
+	_, err := sqlutil.TxStmt(txn, s.purgePeeksStmt).ExecContext(ctx, roomID)
+	return err
 }

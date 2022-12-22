@@ -58,12 +58,16 @@ const selectRoomReceipts = "" +
 const selectMaxReceiptIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_receipts"
 
+const purgeReceiptsSQL = "" +
+	"DELETE FROM syncapi_receipts WHERE room_id = $1"
+
 type receiptStatements struct {
 	db                 *sql.DB
 	streamIDStatements *StreamIDStatements
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
 	selectMaxReceiptID *sql.Stmt
+	purgeReceiptsStmt  *sql.Stmt
 }
 
 func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Receipts, error) {
@@ -92,6 +96,9 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Re
 	}
 	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
 		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
+	}
+	if r.purgeReceiptsStmt, err = db.Prepare(purgeReceiptsSQL); err != nil {
+		return nil, fmt.Errorf("unable to prepare purgeReceiptsStmt statement: %w", err)
 	}
 	return r, nil
 }
@@ -157,5 +164,6 @@ func (s *receiptStatements) SelectMaxReceiptID(
 func (s *receiptStatements) PurgeReceipts(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	return fmt.Errorf("not implemented on SQLite")
+	_, err := sqlutil.TxStmt(txn, s.purgeReceiptsStmt).ExecContext(ctx, roomID)
+	return err
 }

@@ -17,7 +17,6 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -48,11 +47,15 @@ const selectBackwardExtremitiesForRoomSQL = "" +
 const deleteBackwardExtremitySQL = "" +
 	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
 
+const purgeBackwardExtremitiesSQL = "" +
+	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1"
+
 type backwardExtremitiesStatements struct {
 	db                                   *sql.DB
 	insertBackwardExtremityStmt          *sql.Stmt
 	selectBackwardExtremitiesForRoomStmt *sql.Stmt
 	deleteBackwardExtremityStmt          *sql.Stmt
+	purgeBackwardExtremitiesStmt         *sql.Stmt
 }
 
 func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities, error) {
@@ -70,6 +73,9 @@ func NewSqliteBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities
 		return nil, err
 	}
 	if s.deleteBackwardExtremityStmt, err = db.Prepare(deleteBackwardExtremitySQL); err != nil {
+		return nil, err
+	}
+	if s.purgeBackwardExtremitiesStmt, err = db.Prepare(purgeBackwardExtremitiesSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -114,5 +120,6 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 func (s *backwardExtremitiesStatements) PurgeBackwardExtremities(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	return fmt.Errorf("not implemented on SQLite")
+	_, err := sqlutil.TxStmt(txn, s.purgeBackwardExtremitiesStmt).ExecContext(ctx, roomID)
+	return err
 }

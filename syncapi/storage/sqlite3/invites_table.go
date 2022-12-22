@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -58,6 +57,9 @@ const selectInviteEventsInRangeSQL = "" +
 const selectMaxInviteIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_invite_events"
 
+const purgeInvitesSQL = "" +
+	"DELETE FROM syncapi_invite_events WHERE room_id = $1"
+
 type inviteEventsStatements struct {
 	db                            *sql.DB
 	streamIDStatements            *StreamIDStatements
@@ -65,6 +67,7 @@ type inviteEventsStatements struct {
 	selectInviteEventsInRangeStmt *sql.Stmt
 	deleteInviteEventStmt         *sql.Stmt
 	selectMaxInviteIDStmt         *sql.Stmt
+	purgeInvitesStmt              *sql.Stmt
 }
 
 func NewSqliteInvitesTable(db *sql.DB, streamID *StreamIDStatements) (tables.Invites, error) {
@@ -86,6 +89,9 @@ func NewSqliteInvitesTable(db *sql.DB, streamID *StreamIDStatements) (tables.Inv
 		return nil, err
 	}
 	if s.selectMaxInviteIDStmt, err = db.Prepare(selectMaxInviteIDSQL); err != nil {
+		return nil, err
+	}
+	if s.purgeInvitesStmt, err = db.Prepare(purgeInvitesSQL); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -197,5 +203,6 @@ func (s *inviteEventsStatements) SelectMaxInviteID(
 func (s *inviteEventsStatements) PurgeInvites(
 	ctx context.Context, txn *sql.Tx, roomID string,
 ) error {
-	return fmt.Errorf("not implemented on SQLite")
+	_, err := sqlutil.TxStmt(txn, s.purgeInvitesStmt).ExecContext(ctx, roomID)
+	return err
 }
