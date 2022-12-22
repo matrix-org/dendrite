@@ -17,6 +17,7 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -37,7 +38,8 @@ import (
 )
 
 var (
-	testData = []json.RawMessage{
+	invalidSignatures = json.RawMessage(`{"auth_events":["$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg","$BcEcbZnlFLB5rxSNSZNBn6fO3jU/TKAJ79wfKyCQLiU"],"content":{"body":"Test Message"},"depth":3917,"hashes":{"sha256":"cNAWtlHIegrji0mMA6x1rhpYCccY8W1NsWZqSpJFhjs"},"origin":"localhost","origin_server_ts":0,"prev_events":["$4GDB0bVjkWwS3G4noUZCq5oLWzpBYpwzdMcf7gj24CI"],"room_id":"!roomid:localishhost","sender":"@userid:localhost","signatures":{"localhost":{"ed2559:auto":"NKym6Kcy3u9mGUr21Hjfe3h7DfDilDhN5PqztT0QZ4NTZ+8Y7owseLolQVXp+TvNjecvzdDywsXXVvGiaQiWAQ"}},"type":"m.room.member"}`)
+	testData          = []json.RawMessage{
 		[]byte(`{"auth_events":[],"content":{"creator":"@userid:kaer.morhen"},"depth":0,"event_id":"$0ok8ynDp7kjc95e3:kaer.morhen","hashes":{"sha256":"17kPoH+h0Dk4Omn7Sus0qMb6+oGcf+CZFEgDhv7UKWs"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"jP4a04f5/F10Pw95FPpdCyKAO44JOwUQ/MZOOeA/RTU1Dn+AHPMzGSaZnuGjRr/xQuADt+I3ctb5ZQfLKNzHDw"}},"state_key":"","type":"m.room.create"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}]],"content":{"membership":"join"},"depth":1,"event_id":"$LEwEu0kxrtu5fOiS:kaer.morhen","hashes":{"sha256":"B7M88PhXf3vd1LaFtjQutFu4x/w7fHD28XKZ4sAsJTo"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}]],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"p2vqmuJn7ZBRImctSaKbXCAxCcBlIjPH9JHte1ouIUGy84gpu4eLipOvSBCLL26hXfC0Zrm4WUto6Hr+ohdrCg"}},"state_key":"@userid:kaer.morhen","type":"m.room.member"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"join_rule":"public"},"depth":2,"event_id":"$SMHlqUrNhhBBRLeN:kaer.morhen","hashes":{"sha256":"vIuJQvmMjrGxshAkj1SXe0C4RqvMbv4ZADDw9pFCWqQ"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"prev_state":[],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"hBMsb3Qppo3RaqqAl4JyTgaiWEbW5hlckATky6PrHun+F3YM203TzG7w9clwuQU5F5pZoB1a6nw+to0hN90FAw"}},"state_key":"","type":"m.room.join_rules"}`),
@@ -53,6 +55,9 @@ var (
 
 type FakeRsAPI struct {
 	rsAPI.RoomserverInternalAPI
+	shouldFailQuery  bool
+	bannedFromRoom   bool
+	shouldEventsFail bool
 }
 
 func (r *FakeRsAPI) QueryRoomVersionForRoom(
@@ -60,17 +65,11 @@ func (r *FakeRsAPI) QueryRoomVersionForRoom(
 	req *rsAPI.QueryRoomVersionForRoomRequest,
 	res *rsAPI.QueryRoomVersionForRoomResponse,
 ) error {
+	if r.shouldFailQuery {
+		return fmt.Errorf("Failure")
+	}
 	res.RoomVersion = gomatrixserverlib.RoomVersionV10
 	return nil
-}
-
-func (r *FakeRsAPI) IsServerBannedFromRoom(
-	ctx context.Context,
-	rsAPI rsAPI.FederationRoomserverAPI,
-	roomID string,
-	serverName gomatrixserverlib.ServerName,
-) bool {
-	return false
 }
 
 func (r *FakeRsAPI) QueryServerBannedFromRoom(
@@ -78,7 +77,11 @@ func (r *FakeRsAPI) QueryServerBannedFromRoom(
 	req *rsAPI.QueryServerBannedFromRoomRequest,
 	res *rsAPI.QueryServerBannedFromRoomResponse,
 ) error {
-	res.Banned = false
+	if r.bannedFromRoom {
+		res.Banned = true
+	} else {
+		res.Banned = false
+	}
 	return nil
 }
 
@@ -87,6 +90,9 @@ func (r *FakeRsAPI) InputRoomEvents(
 	req *rsAPI.InputRoomEventsRequest,
 	res *rsAPI.InputRoomEventsResponse,
 ) error {
+	if r.shouldEventsFail {
+		return fmt.Errorf("Failure")
+	}
 	return nil
 }
 
@@ -99,11 +105,15 @@ func TestEmptyTransactionRequest(t *testing.T) {
 }
 
 func TestProcessTransactionRequestPDU(t *testing.T) {
-	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", nil, nil, nil, false, []json.RawMessage{testData[0]}, []gomatrixserverlib.EDU{}, "", "", "")
+	keyRing := &test.NopJSONVerifier{}
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
-	assert.Zero(t, len(txnRes.PDUs))
+	assert.Equal(t, 1, len(txnRes.PDUs))
+	for _, result := range txnRes.PDUs {
+		assert.Empty(t, result.Error)
+	}
 }
 
 func TestProcessTransactionRequestPDUs(t *testing.T) {
@@ -113,16 +123,68 @@ func TestProcessTransactionRequestPDUs(t *testing.T) {
 
 	assert.Nil(t, jsonRes)
 	assert.Equal(t, 1, len(txnRes.PDUs))
+	for _, result := range txnRes.PDUs {
+		assert.Empty(t, result.Error)
+	}
 }
 
 func TestProcessTransactionRequestBadPDU(t *testing.T) {
 	pdu := json.RawMessage("{\"room_id\":\"asdf\"}")
 	pdu2 := json.RawMessage("\"roomid\":\"asdf\"")
-	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", nil, nil, nil, false, []json.RawMessage{pdu, pdu2}, []gomatrixserverlib.EDU{}, "", "", "")
+	keyRing := &test.NopJSONVerifier{}
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{pdu, pdu2, testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+
+	assert.Nil(t, jsonRes)
+	assert.Equal(t, 1, len(txnRes.PDUs))
+	for _, result := range txnRes.PDUs {
+		assert.Empty(t, result.Error)
+	}
+}
+
+func TestProcessTransactionRequestPDUQueryFailure(t *testing.T) {
+	keyRing := &test.NopJSONVerifier{}
+	txn := NewTxnReq(&FakeRsAPI{shouldFailQuery: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
+}
+
+func TestProcessTransactionRequestPDUBannedFromRoom(t *testing.T) {
+	keyRing := &test.NopJSONVerifier{}
+	txn := NewTxnReq(&FakeRsAPI{bannedFromRoom: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+
+	assert.Nil(t, jsonRes)
+	assert.Equal(t, 1, len(txnRes.PDUs))
+	for _, result := range txnRes.PDUs {
+		assert.NotEmpty(t, result.Error)
+	}
+}
+
+func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
+	keyRing := &test.NopJSONVerifier{}
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{invalidSignatures}, []gomatrixserverlib.EDU{}, "", "", "")
+	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+
+	assert.Nil(t, jsonRes)
+	assert.Equal(t, 1, len(txnRes.PDUs))
+	for _, result := range txnRes.PDUs {
+		assert.NotEmpty(t, result.Error)
+	}
+}
+
+func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
+	keyRing := &test.NopJSONVerifier{}
+	txn := NewTxnReq(&FakeRsAPI{shouldEventsFail: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+
+	assert.Nil(t, jsonRes)
+	assert.Equal(t, 1, len(txnRes.PDUs))
+	for _, result := range txnRes.PDUs {
+		assert.NotEmpty(t, result.Error)
+	}
 }
 
 func createTransactionWithEDU(edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
