@@ -13,6 +13,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
 )
 
 func mustCreateOutboundpeeksTable(t *testing.T, dbType test.DBType) (tables.FederationOutboundPeeks, func()) {
@@ -124,11 +125,11 @@ func TestOutboundPeeksTable(t *testing.T) {
 		if len(outboundPeeks) != len(peekIDs) {
 			t.Fatalf("inserted %d peeks, selected %d", len(peekIDs), len(outboundPeeks))
 		}
-		for i := range outboundPeeks {
-			if outboundPeeks[i].PeekID != peekIDs[i] {
-				t.Fatalf("")
-			}
+		gotPeekIDs := make([]string, 0, len(outboundPeeks))
+		for _, p := range outboundPeeks {
+			gotPeekIDs = append(gotPeekIDs, p.PeekID)
 		}
+		assert.ElementsMatch(t, gotPeekIDs, peekIDs)
 
 		// And delete them again
 		if err = tab.DeleteOutboundPeeks(ctx, nil, room.ID); err != nil {
