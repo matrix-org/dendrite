@@ -40,6 +40,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	SendRouteName = "Send"
+)
+
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeFedAPI). We need to have this enabled
@@ -131,7 +135,7 @@ func Setup(
 				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions)
+	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRouteName)
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
