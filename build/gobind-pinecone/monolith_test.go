@@ -189,3 +189,10 @@ func TestRelayRetrieverSync(t *testing.T) {
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 }
+
+func TestMonolithStarts(t *testing.T) {
+	monolith := DendriteMonolith{}
+	monolith.Start()
+	monolith.PublicKey()
+	// monolith.Stop()
+}
