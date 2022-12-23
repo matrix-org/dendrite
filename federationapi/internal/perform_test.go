@@ -78,3 +78,40 @@ func TestPerformWakeupServers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, offline)
 }
+
+func TestQueryRelayServers(t *testing.T) {
+	testDB := storage.NewFakeFederationDatabase()
+
+	server := gomatrixserverlib.ServerName("wakeup")
+	relayServers := []gomatrixserverlib.ServerName{"relay1", "relay2"}
+	err := testDB.AddRelayServersForServer(server, relayServers)
+	assert.NoError(t, err)
+
+	cfg := config.FederationAPI{
+		Matrix: &config.Global{
+			SigningIdentity: gomatrixserverlib.SigningIdentity{
+				ServerName: "relay",
+			},
+		},
+	}
+	fedClient := &testFedClient{}
+	stats := statistics.NewStatistics(testDB, 8, 3)
+	queues := queue.NewOutgoingQueues(
+		testDB, process.NewProcessContext(),
+		false,
+		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		nil,
+	)
+	fedAPI := NewFederationInternalAPI(
+		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+	)
+
+	req := api.QueryRelayServersRequest{
+		Server: server,
+	}
+	res := api.QueryRelayServersResponse{}
+	err = fedAPI.QueryRelayServers(context.Background(), &req, &res)
+	assert.NoError(t, err)
+
+	assert.Equal(t, len(relayServers), len(res.RelayServers))
+}

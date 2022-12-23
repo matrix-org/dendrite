@@ -329,6 +329,8 @@ func (d *FakeFederationDatabase) AddRelayServersForServer(serverName gomatrixser
 				d.relayServers[serverName] = append(d.relayServers[serverName], relayServer)
 			}
 		}
+	} else {
+		d.relayServers[serverName] = relayServers
 	}
 
 	return nil
