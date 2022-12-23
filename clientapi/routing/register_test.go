@@ -28,13 +28,13 @@ import (
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -280,102 +280,6 @@ func TestSessionCleanUp(t *testing.T) {
 	})
 }
 
-func Test_validateUsername(t *testing.T) {
-	tooLongUsername := strings.Repeat("a", maxUsernameLength)
-	tests := []struct {
-		name      string
-		localpart string
-		domain    gomatrixserverlib.ServerName
-		want      *util.JSONResponse
-	}{
-		{
-			name:      "empty username",
-			localpart: "",
-			domain:    "localhost",
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
-			},
-		},
-		{
-			name:      "invalid username",
-			localpart: "INVALIDUSERNAME",
-			domain:    "localhost",
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
-			},
-		},
-		{
-			name:      "username too long",
-			localpart: tooLongUsername,
-			domain:    "localhost",
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", fmt.Sprintf("@%s:%s", tooLongUsername, "localhost"), maxUsernameLength)),
-			},
-		},
-		{
-			name:      "localpart starting with an underscore",
-			localpart: "_notvalid",
-			domain:    "localhost",
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
-			},
-		},
-		{
-			name:      "valid username",
-			localpart: "valid",
-			domain:    "localhost",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := validateUsername(tt.localpart, tt.domain); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("validateUsername() = %v, want %v", got, tt.want)
-			}
-			if got := validateApplicationServiceUsername(tt.localpart, tt.domain); !reflect.DeepEqual(got, tt.want) {
-				if got != nil && got.JSON != jsonerror.InvalidUsername("Username cannot start with a '_'") {
-					t.Errorf("validateUsername() = %v, want %v", got, tt.want)
-				}
-			}
-		})
-	}
-}
-
-func Test_validatePassword(t *testing.T) {
-	tests := []struct {
-		name     string
-		password string
-		want     *util.JSONResponse
-	}{
-		{
-			name:     "password too short",
-			password: "shortpw",
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
-			},
-		},
-		{
-			name:     "password too long",
-			password: strings.Repeat("a", maxPasswordLength+1),
-			want: &util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := validatePassword(tt.password); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("validatePassword() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_register(t *testing.T) {
 	testCases := []struct {
 		name                 string
@@ -440,12 +344,9 @@ func Test_register(t *testing.T) {
 			username: "LOWERCASED", // this is going to be lower-cased
 		},
 		{
-			name:     "invalid username",
-			username: "#totalyNotValid",
-			wantResponse: util.JSONResponse{
-				Code: http.StatusBadRequest,
-				JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
-			},
+			name:         "invalid username",
+			username:     "#totalyNotValid",
+			wantResponse: *internal.UsernameResponse(internal.ErrUsernameInvalid),
 		},
 		{
 			name:     "numeric username is forbidden",
@@ -471,126 +372,128 @@ func Test_register(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			if tc.kind == "" {
-				tc.kind = "user"
-			}
-			if tc.password == "" && !tc.forceEmpty {
-				tc.password = "someRandomPassword"
-			}
-			if tc.username == "" && !tc.forceEmpty {
-				tc.username = "valid"
-			}
-			if tc.loginType == "" {
-				tc.loginType = "m.login.dummy"
-			}
-
-			reg := registerRequest{
-				Password: tc.password,
-				Username: tc.username,
-			}
-
-			body := &bytes.Buffer{}
-
-			base.Cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
-			base.Cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
-
-			err := json.NewEncoder(body).Encode(reg)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/?kind=%s", tc.kind), body)
-
-			resp := Register(req, userAPI, &base.Cfg.ClientAPI)
-			t.Logf("Resp: %+v", resp)
-
-			// The first request should return a userInteractiveResponse
-			switch r := resp.JSON.(type) {
-			case userInteractiveResponse:
-				// Check that the flows are the ones we configured
-				if !reflect.DeepEqual(r.Flows, base.Cfg.Derived.Registration.Flows) {
-					t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, base.Cfg.Derived.Registration.Flows)
+			t.Run(tc.name, func(t *testing.T) {
+				if tc.kind == "" {
+					tc.kind = "user"
 				}
-			case *jsonerror.MatrixError:
-				if !reflect.DeepEqual(tc.wantResponse, resp) {
-					t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
+				if tc.password == "" && !tc.forceEmpty {
+					tc.password = "someRandomPassword"
 				}
-				continue
-			case registerResponse:
-				// this should only be possible on guest user registration, never for normal users
-				if tc.kind != "guest" {
-					t.Fatalf("got register response on first request: %+v", r)
+				if tc.username == "" && !tc.forceEmpty {
+					tc.username = "valid"
 				}
-				// assert we've got a UserID, AccessToken and DeviceID
-				if r.UserID == "" {
-					t.Fatalf("missing userID in response")
+				if tc.loginType == "" {
+					tc.loginType = "m.login.dummy"
 				}
-				if r.AccessToken == "" {
+
+				reg := registerRequest{
+					Password: tc.password,
+					Username: tc.username,
+				}
+
+				body := &bytes.Buffer{}
+
+				base.Cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
+				base.Cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
+
+				err := json.NewEncoder(body).Encode(reg)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/?kind=%s", tc.kind), body)
+
+				resp := Register(req, userAPI, &base.Cfg.ClientAPI)
+				t.Logf("Resp: %+v", resp)
+
+				// The first request should return a userInteractiveResponse
+				switch r := resp.JSON.(type) {
+				case userInteractiveResponse:
+					// Check that the flows are the ones we configured
+					if !reflect.DeepEqual(r.Flows, base.Cfg.Derived.Registration.Flows) {
+						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, base.Cfg.Derived.Registration.Flows)
+					}
+				case *jsonerror.MatrixError:
+					if !reflect.DeepEqual(tc.wantResponse, resp) {
+						t.Fatalf("(%s), unexpected response: %+v, want: %+v", tc.name, resp, tc.wantResponse)
+					}
+					return
+				case registerResponse:
+					// this should only be possible on guest user registration, never for normal users
+					if tc.kind != "guest" {
+						t.Fatalf("got register response on first request: %+v", r)
+					}
+					// assert we've got a UserID, AccessToken and DeviceID
+					if r.UserID == "" {
+						t.Fatalf("missing userID in response")
+					}
+					if r.AccessToken == "" {
+						t.Fatalf("missing accessToken in response")
+					}
+					if r.DeviceID == "" {
+						t.Fatalf("missing deviceID in response")
+					}
+					return
+				default:
+					t.Logf("Got response: %T", resp.JSON)
+				}
+
+				// If we reached this, we should have received a UIA response
+				uia, ok := resp.JSON.(userInteractiveResponse)
+				if !ok {
+					t.Fatalf("did not receive a userInteractiveResponse: %T", resp.JSON)
+				}
+				t.Logf("%+v", uia)
+
+				// Register the user
+				reg.Auth = authDict{
+					Type:    authtypes.LoginType(tc.loginType),
+					Session: uia.Session,
+				}
+				dummy := "dummy"
+				reg.DeviceID = &dummy
+				reg.InitialDisplayName = &dummy
+				reg.Type = authtypes.LoginType(tc.loginType)
+
+				err = json.NewEncoder(body).Encode(reg)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				req = httptest.NewRequest(http.MethodPost, "/", body)
+
+				resp = Register(req, userAPI, &base.Cfg.ClientAPI)
+
+				switch resp.JSON.(type) {
+				case *jsonerror.MatrixError:
+					if !reflect.DeepEqual(tc.wantResponse, resp) {
+						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+					}
+					return
+				}
+
+				rr, ok := resp.JSON.(registerResponse)
+				if !ok {
+					t.Fatalf("expected a registerresponse, got %T", resp.JSON)
+				}
+
+				// validate the response
+				if tc.forceEmpty {
+					// when not supplying a username, one will be generated. Given this _SHOULD_ be
+					// the second user, set the username accordingly
+					reg.Username = "2"
+				}
+				wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
+				if wantUserID != rr.UserID {
+					t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
+				}
+				if rr.DeviceID != *reg.DeviceID {
+					t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
+				}
+				if rr.AccessToken == "" {
 					t.Fatalf("missing accessToken in response")
 				}
-				if r.DeviceID == "" {
-					t.Fatalf("missing deviceID in response")
-				}
-				continue
-			default:
-				t.Logf("Got response: %T", resp.JSON)
-			}
-
-			// If we reached this, we should have received a UIA response
-			uia, ok := resp.JSON.(userInteractiveResponse)
-			if !ok {
-				t.Fatalf("did not receive a userInteractiveResponse: %T", resp.JSON)
-			}
-			t.Logf("%+v", uia)
-
-			// Register the user
-			reg.Auth = authDict{
-				Type:    authtypes.LoginType(tc.loginType),
-				Session: uia.Session,
-			}
-			dummy := "dummy"
-			reg.DeviceID = &dummy
-			reg.InitialDisplayName = &dummy
-			reg.Type = authtypes.LoginType(tc.loginType)
-
-			err = json.NewEncoder(body).Encode(reg)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			req = httptest.NewRequest(http.MethodPost, "/", body)
-
-			resp = Register(req, userAPI, &base.Cfg.ClientAPI)
-
-			switch resp.JSON.(type) {
-			case *jsonerror.MatrixError:
-				if !reflect.DeepEqual(tc.wantResponse, resp) {
-					t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
-				}
-				continue
-			}
-
-			rr, ok := resp.JSON.(registerResponse)
-			if !ok {
-				t.Fatalf("expected a registerresponse, got %T", resp.JSON)
-			}
-
-			// validate the response
-			if tc.forceEmpty {
-				// when not supplying a username, one will be generated. Given this _SHOULD_ be
-				// the second user, set the username accordingly
-				reg.Username = "2"
-			}
-			wantUserID := strings.ToLower(fmt.Sprintf("@%s:%s", reg.Username, "test"))
-			if wantUserID != rr.UserID {
-				t.Fatalf("unexpected userID: %s, want %s", rr.UserID, wantUserID)
-			}
-			if rr.DeviceID != *reg.DeviceID {
-				t.Fatalf("unexpected deviceID: %s, want %s", rr.DeviceID, *reg.DeviceID)
-			}
-			if rr.AccessToken == "" {
-				t.Fatalf("missing accessToken in response")
-			}
+			})
 		}
 	})
 }

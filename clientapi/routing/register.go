@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,10 +60,7 @@ var (
 	)
 )
 
-const (
-	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
-	sessionIDLength   = 24
-)
+const sessionIDLength = 24
 
 // sessionsDict keeps track of completed auth stages for each session.
 // It shouldn't be passed by value because it contains a mutex.
@@ -199,8 +195,7 @@ func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
 }
 
 var (
-	sessions           = newSessionsDict()
-	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
+	sessions = newSessionsDict()
 )
 
 // registerRequest represents the submitted registration request.
@@ -274,44 +269,6 @@ type recaptchaResponse struct {
 	ChallengeTS time.Time `json:"challenge_ts"`
 	Hostname    string    `json:"hostname"`
 	ErrorCodes  []int     `json:"error-codes"`
-}
-
-// validateUsername returns an error response if the username is invalid
-func validateUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
-	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
-		}
-	} else if !validUsernameRegex.MatchString(localpart) {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
-		}
-	} else if localpart[0] == '_' { // Regex checks its not a zero length string
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
-		}
-	}
-	return nil
-}
-
-// validateApplicationServiceUsername returns an error response if the username is invalid for an application service
-func validateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
-	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
-		}
-	} else if !validUsernameRegex.MatchString(localpart) {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
-		}
-	}
-	return nil
 }
 
 var (
@@ -496,8 +453,8 @@ func validateApplicationService(
 	}
 
 	// Check username application service is trying to register is valid
-	if err := validateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
-		return "", err
+	if err := internal.ValidateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
+		return "", internal.UsernameResponse(err)
 	}
 
 	// No errors, registration valid
@@ -552,7 +509,9 @@ func Register(
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
 	}
-	if l, d, err := cfg.Matrix.SplitLocalID('@', r.Username); err == nil {
+	var l string
+	var d gomatrixserverlib.ServerName
+	if l, d, err = cfg.Matrix.SplitLocalID('@', r.Username); err == nil {
 		r.Username, r.ServerName = l, d
 	}
 	if req.URL.Query().Get("kind") == "guest" {
@@ -560,7 +519,7 @@ func Register(
 	}
 
 	// Don't allow numeric usernames less than MAX_INT64.
-	if _, err := strconv.ParseInt(r.Username, 10, 64); err == nil {
+	if _, err = strconv.ParseInt(r.Username, 10, 64); err == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
@@ -572,7 +531,7 @@ func Register(
 			ServerName: r.ServerName,
 		}
 		nres := &userapi.QueryNumericLocalpartResponse{}
-		if err := userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
+		if err = userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return jsonerror.InternalServerError()
 		}
@@ -589,8 +548,8 @@ func Register(
 	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
 		// Spec-compliant case (the access_token is specified and the login type
 		// is correctly set, so it's an appservice registration)
-		if resErr := validateApplicationServiceUsername(r.Username, r.ServerName); resErr != nil {
-			return *resErr
+		if err = internal.ValidateApplicationServiceUsername(r.Username, r.ServerName); err != nil {
+			return *internal.UsernameResponse(err)
 		}
 	case accessTokenErr == nil:
 		// Non-spec-compliant case (the access_token is specified but the login
@@ -602,12 +561,12 @@ func Register(
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
-		if resErr := validateUsername(r.Username, r.ServerName); resErr != nil {
-			return *resErr
+		if err = internal.ValidateUsername(r.Username, r.ServerName); err != nil {
+			return *internal.UsernameResponse(err)
 		}
 	}
-	if resErr := internal.ValidatePassword(r.Password); resErr != nil {
-		return *resErr
+	if err = internal.ValidatePassword(r.Password); err != nil {
+		return *internal.PasswordResponse(err)
 	}
 
 	logger := util.GetLogger(req.Context())
@@ -1048,8 +1007,8 @@ func RegisterAvailable(
 		}
 	}
 
-	if err := validateUsername(username, domain); err != nil {
-		return *err
+	if err := internal.ValidateUsername(username, domain); err != nil {
+		return *internal.UsernameResponse(err)
 	}
 
 	// Check if this username is reserved by an application service
@@ -1111,11 +1070,11 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	// downcase capitals
 	ssrr.User = strings.ToLower(ssrr.User)
 
-	if resErr := validateUsername(ssrr.User, cfg.Matrix.ServerName); resErr != nil {
-		return *resErr
+	if err = internal.ValidateUsername(ssrr.User, cfg.Matrix.ServerName); err != nil {
+		return *internal.UsernameResponse(err)
 	}
-	if resErr := internal.ValidatePassword(ssrr.Password); resErr != nil {
-		return *resErr
+	if err = internal.ValidatePassword(ssrr.Password); err != nil {
+		return *internal.PasswordResponse(err)
 	}
 	deviceID := "shared_secret_registration"
 
