@@ -44,13 +44,13 @@ const selectOutboundPeekSQL = "" +
 	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 const selectOutboundPeeksSQL = "" +
-	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_outbound_peeks WHERE room_id = $1 ORDER BY creation_ts"
 
 const renewOutboundPeekSQL = "" +
 	"UPDATE federationsender_outbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
 const deleteOutboundPeekSQL = "" +
-	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2"
+	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 const deleteOutboundPeeksSQL = "" +
 	"DELETE FROM federationsender_outbound_peeks WHERE room_id = $1"
@@ -74,25 +74,14 @@ func NewPostgresOutboundPeeksTable(db *sql.DB) (s *outboundPeeksStatements, err 
 		return
 	}
 
-	if s.insertOutboundPeekStmt, err = db.Prepare(insertOutboundPeekSQL); err != nil {
-		return
-	}
-	if s.selectOutboundPeekStmt, err = db.Prepare(selectOutboundPeekSQL); err != nil {
-		return
-	}
-	if s.selectOutboundPeeksStmt, err = db.Prepare(selectOutboundPeeksSQL); err != nil {
-		return
-	}
-	if s.renewOutboundPeekStmt, err = db.Prepare(renewOutboundPeekSQL); err != nil {
-		return
-	}
-	if s.deleteOutboundPeeksStmt, err = db.Prepare(deleteOutboundPeeksSQL); err != nil {
-		return
-	}
-	if s.deleteOutboundPeekStmt, err = db.Prepare(deleteOutboundPeekSQL); err != nil {
-		return
-	}
-	return
+	return s, sqlutil.StatementList{
+		{&s.insertOutboundPeekStmt, insertOutboundPeekSQL},
+		{&s.selectOutboundPeekStmt, selectOutboundPeekSQL},
+		{&s.selectOutboundPeeksStmt, selectOutboundPeeksSQL},
+		{&s.renewOutboundPeekStmt, renewOutboundPeekSQL},
+		{&s.deleteOutboundPeeksStmt, deleteOutboundPeeksSQL},
+		{&s.deleteOutboundPeekStmt, deleteOutboundPeekSQL},
+	}.Prepare(db)
 }
 
 func (s *outboundPeeksStatements) InsertOutboundPeek(

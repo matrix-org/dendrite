@@ -204,6 +204,12 @@ func (t *UserInternalAPITrace) PerformSaveThreePIDAssociation(ctx context.Contex
 	return err
 }
 
+func (t *UserInternalAPITrace) QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) error {
+	err := t.Impl.QueryAccountByLocalpart(ctx, req, res)
+	util.GetLogger(ctx).Infof("QueryAccountByLocalpart req=%+v res=%+v", js(req), js(res))
+	return err
+}
+
 func js(thing interface{}) string {
 	b, err := json.Marshal(thing)
 	if err != nil {
