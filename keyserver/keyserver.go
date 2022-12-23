@@ -18,6 +18,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/consumers"
@@ -40,6 +42,7 @@ func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI, enableMetr
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.KeyserverFederationAPI,
+	rsAPI rsapi.KeyserverRoomserverAPI,
 ) api.KeyInternalAPI {
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
@@ -47,6 +50,7 @@ func NewInternalAPI(
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
+
 	keyChangeProducer := &producers.KeyChange{
 		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent)),
 		JetStream: js,
@@ -58,8 +62,14 @@ func NewInternalAPI(
 		FedClient: fedClient,
 		Producer:  keyChangeProducer,
 	}
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, cfg.Matrix.ServerName) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
 	ap.Updater = updater
+
+	// Remove users which we don't share a room with anymore
+	if err := updater.CleanUp(); err != nil {
+		logrus.WithError(err).Error("failed to cleanup stale device lists")
+	}
+
 	go func() {
 		if err := updater.Start(); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")

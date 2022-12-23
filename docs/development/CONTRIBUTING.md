@@ -9,6 +9,28 @@ permalink: /development/contributing
 Everyone is welcome to contribute to Dendrite! We aim to make it as easy as
 possible to get started.
 
+## Contribution types
+
+We are a small team maintaining a large project. As a result, we cannot merge every feature, even if it
+is bug-free and useful, because we then commit to maintaining it indefinitely. We will always accept:
+ - bug fixes
+ - security fixes (please responsibly disclose via security@matrix.org *before* creating pull requests)
+
+We will accept the following with caveats:
+ - documentation fixes, provided they do not add additional instructions which can end up going out-of-date,
+   e.g example configs, shell commands.
+ - performance fixes, provided they do not add significantly more maintenance burden.
+ - additional functionality on existing features, provided the functionality is small and maintainable.
+ - additional functionality that, in its absence, would impact the ecosystem e.g spam and abuse mitigations
+ - test-only changes, provided they help improve coverage or test tricky code.
+
+The following items are at risk of not being accepted:
+ - Configuration or CLI changes, particularly ones which increase the overall configuration surface.
+
+The following items are unlikely to be accepted into a main Dendrite release for now:
+ - New MSC implementations.
+ - New features which are not in the specification.
+
 ## Sign off
 
 We require that everyone who contributes to the project signs off their contributions
@@ -35,7 +57,7 @@ to do so for future contributions.
 
 ## Getting up and running
 
-See the [Installation](installation) section for information on how to build an
+See the [Installation](../installation) section for information on how to build an
 instance of Dendrite. You will likely need this in order to test your changes.
 
 ## Code style
@@ -129,7 +151,7 @@ significant amount of CPU and RAM.
 
 Once the code builds, run [Sytest](https://github.com/matrix-org/sytest)
 according to the guide in
-[docs/sytest.md](https://github.com/matrix-org/dendrite/blob/main/docs/sytest.md#using-a-sytest-docker-image)
+[docs/development/sytest.md](https://github.com/matrix-org/dendrite/blob/main/docs/development/sytest.md#using-a-sytest-docker-image)
 so you can see whether something is being broken and whether there are newly
 passing tests.
 

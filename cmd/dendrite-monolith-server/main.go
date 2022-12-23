@@ -95,7 +95,7 @@ func main() {
 	}
 	keyRing := fsAPI.KeyRing()
 
-	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
 	keyAPI := keyImpl
 	if base.UseHTTPAPIs {
 		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI, base.EnableMetrics)
