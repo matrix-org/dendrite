@@ -41,7 +41,7 @@ var (
 	validUsernameRegex    = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
 
-// ValidatePassword returns an error response if the password is invalid
+// ValidatePassword returns an error if the password is invalid
 func ValidatePassword(password string) error {
 	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	if len(password) > maxPasswordLength {

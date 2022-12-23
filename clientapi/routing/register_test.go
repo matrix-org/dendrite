@@ -290,6 +290,8 @@ func Test_register(t *testing.T) {
 		forceEmpty           bool
 		registrationDisabled bool
 		guestsDisabled       bool
+		enableRecaptcha      bool
+		captchaBody          string
 		wantResponse         util.JSONResponse
 	}{
 		{
@@ -340,7 +342,7 @@ func Test_register(t *testing.T) {
 			},
 		},
 		{
-			name:     "successful registration",
+			name:     "successful registration uppercase username",
 			username: "LOWERCASED", // this is going to be lower-cased
 		},
 		{
@@ -356,6 +358,46 @@ func Test_register(t *testing.T) {
 				JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
 			},
 		},
+		{
+			name:      "disabled recaptcha login",
+			loginType: authtypes.LoginTypeRecaptcha,
+			wantResponse: util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.Unknown(ErrCaptchaDisabled.Error()),
+			},
+		},
+		{
+			name:            "enabled recaptcha, no response defined",
+			enableRecaptcha: true,
+			loginType:       authtypes.LoginTypeRecaptcha,
+			wantResponse: util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.BadJSON(ErrMissingResponse.Error()),
+			},
+		},
+		{
+			name:            "invalid captcha response",
+			enableRecaptcha: true,
+			loginType:       authtypes.LoginTypeRecaptcha,
+			captchaBody:     `notvalid`,
+			wantResponse: util.JSONResponse{
+				Code: http.StatusUnauthorized,
+				JSON: jsonerror.BadJSON(ErrInvalidCaptcha.Error()),
+			},
+		},
+		{
+			name:            "valid captcha response",
+			enableRecaptcha: true,
+			loginType:       authtypes.LoginTypeRecaptcha,
+			captchaBody:     `success`,
+		},
+		{
+			name:            "captcha invalid from remote",
+			enableRecaptcha: true,
+			loginType:       authtypes.LoginTypeRecaptcha,
+			captchaBody:     `i should fail for other reasons`,
+			wantResponse:    util.JSONResponse{Code: http.StatusInternalServerError, JSON: jsonerror.InternalServerError()},
+		},
 	}
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -367,12 +409,37 @@ func Test_register(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
 		keyAPI.SetUserAPI(userAPI)
 
-		if err := base.Cfg.Derive(); err != nil {
-			t.Fatalf("failed to derive config: %s", err)
-		}
-
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+				if tc.enableRecaptcha {
+					srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						if err := r.ParseForm(); err != nil {
+							t.Fatal(err)
+						}
+						response := r.Form.Get("response")
+
+						// Respond with valid JSON or no JSON at all to test happy/error cases
+						switch response {
+						case "success":
+							json.NewEncoder(w).Encode(recaptchaResponse{Success: true})
+						case "notvalid":
+							json.NewEncoder(w).Encode(recaptchaResponse{Success: false})
+						default:
+
+						}
+					}))
+					defer srv.Close()
+					base.Cfg.ClientAPI.RecaptchaSiteVerifyAPI = srv.URL
+				}
+
+				if err := base.Cfg.Derive(); err != nil {
+					t.Fatalf("failed to derive config: %s", err)
+				}
+
+				base.Cfg.ClientAPI.RecaptchaEnabled = tc.enableRecaptcha
+				base.Cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
+				base.Cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
+
 				if tc.kind == "" {
 					tc.kind = "user"
 				}
@@ -392,10 +459,6 @@ func Test_register(t *testing.T) {
 				}
 
 				body := &bytes.Buffer{}
-
-				base.Cfg.ClientAPI.RegistrationDisabled = tc.registrationDisabled
-				base.Cfg.ClientAPI.GuestsDisabled = tc.guestsDisabled
-
 				err := json.NewEncoder(body).Encode(reg)
 				if err != nil {
 					t.Fatal(err)
@@ -450,6 +513,11 @@ func Test_register(t *testing.T) {
 					Type:    authtypes.LoginType(tc.loginType),
 					Session: uia.Session,
 				}
+
+				if tc.captchaBody != "" {
+					reg.Auth.Response = tc.captchaBody
+				}
+
 				dummy := "dummy"
 				reg.DeviceID = &dummy
 				reg.InitialDisplayName = &dummy
@@ -466,6 +534,11 @@ func Test_register(t *testing.T) {
 
 				switch resp.JSON.(type) {
 				case *jsonerror.MatrixError:
+					if !reflect.DeepEqual(tc.wantResponse, resp) {
+						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
+					}
+					return
+				case util.JSONResponse:
 					if !reflect.DeepEqual(tc.wantResponse, resp) {
 						t.Fatalf("unexpected response: %+v, want: %+v", resp, tc.wantResponse)
 					}

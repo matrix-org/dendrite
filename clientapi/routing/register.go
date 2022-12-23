@@ -292,7 +292,7 @@ func validateRecaptcha(
 		return ErrMissingResponse
 	}
 
-	// Make a POST request to Google's API to check the captcha response
+	// Make a POST request to the captcha provider API to check the captcha response
 	resp, err := http.PostForm(cfg.RecaptchaSiteVerifyAPI,
 		url.Values{
 			"secret":   {cfg.RecaptchaPrivateKey},
@@ -508,11 +508,6 @@ func Register(
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
-	}
-	var l string
-	var d gomatrixserverlib.ServerName
-	if l, d, err = cfg.Matrix.SplitLocalID('@', r.Username); err == nil {
-		r.Username, r.ServerName = l, d
 	}
 	if req.URL.Query().Get("kind") == "guest" {
 		return handleGuestRegistration(req, r, cfg, userAPI)
