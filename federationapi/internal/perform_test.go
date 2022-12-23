@@ -35,6 +35,10 @@ type testFedClient struct {
 	shouldFail      bool
 }
 
+func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res gomatrixserverlib.RespDirectory, err error) {
+	return gomatrixserverlib.RespDirectory{}, nil
+}
+
 func TestPerformWakeupServers(t *testing.T) {
 	testDB := storage.NewFakeFederationDatabase()
 
@@ -117,4 +121,70 @@ func TestQueryRelayServers(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, len(relayServers), len(res.RelayServers))
+}
+
+func TestPerformDirectoryLookup(t *testing.T) {
+	testDB := storage.NewFakeFederationDatabase()
+
+	cfg := config.FederationAPI{
+		Matrix: &config.Global{
+			SigningIdentity: gomatrixserverlib.SigningIdentity{
+				ServerName: "relay",
+			},
+		},
+	}
+	fedClient := &testFedClient{}
+	stats := statistics.NewStatistics(testDB, 8, 3)
+	queues := queue.NewOutgoingQueues(
+		testDB, process.NewProcessContext(),
+		false,
+		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		nil,
+	)
+	fedAPI := NewFederationInternalAPI(
+		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+	)
+
+	req := api.PerformDirectoryLookupRequest{
+		RoomAlias:  "room",
+		ServerName: "server",
+	}
+	res := api.PerformDirectoryLookupResponse{}
+	err := fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
+	assert.NoError(t, err)
+}
+
+func TestPerformDirectoryLookupRelaying(t *testing.T) {
+	testDB := storage.NewFakeFederationDatabase()
+
+	server := gomatrixserverlib.ServerName("wakeup")
+	testDB.SetServerAssumedOffline(server)
+	testDB.AddRelayServersForServer(server, []gomatrixserverlib.ServerName{"relay"})
+
+	cfg := config.FederationAPI{
+		Matrix: &config.Global{
+			SigningIdentity: gomatrixserverlib.SigningIdentity{
+				ServerName: server,
+			},
+		},
+	}
+	fedClient := &testFedClient{}
+	stats := statistics.NewStatistics(testDB, 8, 3)
+	queues := queue.NewOutgoingQueues(
+		testDB, process.NewProcessContext(),
+		false,
+		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		nil,
+	)
+	fedAPI := NewFederationInternalAPI(
+		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+	)
+
+	req := api.PerformDirectoryLookupRequest{
+		RoomAlias:  "room",
+		ServerName: server,
+	}
+	res := api.PerformDirectoryLookupResponse{}
+	err := fedAPI.PerformDirectoryLookup(context.Background(), &req, &res)
+	assert.Error(t, err)
 }
