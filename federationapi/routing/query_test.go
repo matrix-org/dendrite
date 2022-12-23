@@ -92,9 +92,9 @@ func TestHandleQueryDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error: %s", err.Error())
 	}
-	vars := map[string]string{"room_alias": "#room:server"}
+	// vars := map[string]string{"room_alias": "#room:server"}
 	w := httptest.NewRecorder()
-	httpReq = mux.SetURLVars(httpReq, vars)
+	// httpReq = mux.SetURLVars(httpReq, vars)
 	handler(w, httpReq)
 
 	res := w.Result()

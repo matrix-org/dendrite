@@ -30,6 +30,9 @@ import (
 
 type testFedClient struct {
 	api.FederationClient
+	queryKeysCalled bool
+	claimKeysCalled bool
+	shouldFail      bool
 }
 
 func TestPerformWakeupServers(t *testing.T) {
