@@ -331,8 +331,7 @@ jobs:
             postgres: postgres
             api: full-http
     container:
-      # Temporary for debugging to see if this image is working better.
-      image: matrixdotorg/sytest-dendrite@sha256:434ad464a9f4ed3f8c3cc47200275b6ccb5c5031a8063daf4acea62be5a23c73
+      image: matrixdotorg/sytest-dendrite
       volumes:
         - ${{ github.workspace }}:/src
         - /root/.cache/go-build:/github/home/.cache/go-build
