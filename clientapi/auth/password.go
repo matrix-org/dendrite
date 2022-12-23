@@ -101,10 +101,6 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 	}
 
-	// Set the user, so login.Username() can do the right thing
-	r.Identifier.User = strings.ToLower(localpart)
-	r.User = strings.ToLower(localpart) // deprecated
-
 	// If we couldn't find the user by the lower cased localpart, try the provided
 	// localpart as is.
 	if !res.Exists {
@@ -127,8 +123,9 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 				JSON: jsonerror.Forbidden("The username or password was incorrect or the account does not exist."),
 			}
 		}
-		r.Identifier.User = localpart
-		r.User = localpart
 	}
+	// Set the user, so login.Username() can do the right thing
+	r.Identifier.User = res.Account.UserID
+	r.User = res.Account.UserID
 	return &r.Login, nil
 }
