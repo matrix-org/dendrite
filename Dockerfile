@@ -21,7 +21,7 @@ RUN --mount=target=. \
     GOARCH="$TARGETARCH" \
     GOOS="linux" \
     CGO_ENABLED=$([ "$TARGETARCH" = "$USERARCH" ] && echo "1" || echo "0") \
-    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/... && \
+    go build -v -ldflags="${FLAGS}" -trimpath -o /out/ ./cmd/...
 
 #
 # The dendrite base image
