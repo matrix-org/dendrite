@@ -29,7 +29,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -314,11 +314,13 @@ func (config *Dendrite) Derive() error {
 
 	if config.ClientAPI.RecaptchaEnabled {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
+		}
 	} else {
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
+		}
 	}
 
 	// Load application service configuration files
