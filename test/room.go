@@ -38,11 +38,12 @@ var (
 )
 
 type Room struct {
-	ID         string
-	Version    gomatrixserverlib.RoomVersion
-	preset     Preset
-	visibility gomatrixserverlib.HistoryVisibility
-	creator    *User
+	ID           string
+	Version      gomatrixserverlib.RoomVersion
+	preset       Preset
+	guestCanJoin bool
+	visibility   gomatrixserverlib.HistoryVisibility
+	creator      *User
 
 	authEvents   gomatrixserverlib.AuthEvents
 	currentState map[string]*gomatrixserverlib.HeaderedEvent
@@ -120,6 +121,11 @@ func (r *Room) insertCreateEvents(t *testing.T) {
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomPowerLevels, plContent, WithStateKey(""))
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomJoinRules, joinRule, WithStateKey(""))
 	r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomHistoryVisibility, hisVis, WithStateKey(""))
+	if r.guestCanJoin {
+		r.CreateAndInsert(t, r.creator, gomatrixserverlib.MRoomGuestAccess, map[string]string{
+			"guest_access": "can_join",
+		}, WithStateKey(""))
+	}
 }
 
 // Create an event in this room but do not insert it. Does not modify the room in any way (depth, fwd extremities, etc) so is thread-safe.
@@ -266,5 +272,11 @@ func RoomHistoryVisibility(vis gomatrixserverlib.HistoryVisibility) roomModifier
 func RoomVersion(ver gomatrixserverlib.RoomVersion) roomModifier {
 	return func(t *testing.T, r *Room) {
 		r.Version = ver
+	}
+}
+
+func GuestsCanJoin(canJoin bool) roomModifier {
+	return func(t *testing.T, r *Room) {
+		r.guestCanJoin = canJoin
 	}
 }

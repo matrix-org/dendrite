@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -61,8 +62,6 @@ var (
 )
 
 const (
-	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
-	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
 	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
 	sessionIDLength   = 24
 )
@@ -310,23 +309,6 @@ func validateApplicationServiceUsername(localpart string, domain gomatrixserverl
 		return &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
-		}
-	}
-	return nil
-}
-
-// validatePassword returns an error response if the password is invalid
-func validatePassword(password string) *util.JSONResponse {
-	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
-	if len(password) > maxPasswordLength {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
-		}
-	} else if len(password) > 0 && len(password) < minPasswordLength {
-		return &util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
 		}
 	}
 	return nil
@@ -624,7 +606,7 @@ func Register(
 			return *resErr
 		}
 	}
-	if resErr := validatePassword(r.Password); resErr != nil {
+	if resErr := internal.ValidatePassword(r.Password); resErr != nil {
 		return *resErr
 	}
 
@@ -1132,7 +1114,7 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if resErr := validateUsername(ssrr.User, cfg.Matrix.ServerName); resErr != nil {
 		return *resErr
 	}
-	if resErr := validatePassword(ssrr.Password); resErr != nil {
+	if resErr := internal.ValidatePassword(ssrr.Password); resErr != nil {
 		return *resErr
 	}
 	deviceID := "shared_secret_registration"

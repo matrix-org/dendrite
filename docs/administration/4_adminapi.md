@@ -44,7 +44,9 @@ This endpoint will instruct Dendrite to part the given local `userID` in the URL
 all rooms which they are currently joined. A JSON body will be returned containing
 the room IDs of all affected rooms.
 
-## POST `/_dendrite/admin/resetPassword/{localpart}`
+## POST `/_dendrite/admin/resetPassword/{userID}`
+
+Reset the password of a local user.
 
 Request body format:
 
@@ -53,9 +55,6 @@ Request body format:
     "password": "new_password_here"
 }
 ```
-
-Reset the password of a local user. The `localpart` is the username only, i.e. if
-the full user ID is `@alice:domain.com` then the local part is `alice`.
 
 ## GET `/_dendrite/admin/fulltext/reindex`
 
