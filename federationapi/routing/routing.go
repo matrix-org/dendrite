@@ -43,6 +43,7 @@ import (
 const (
 	SendRouteName           = "Send"
 	QueryDirectoryRouteName = "QueryDirectory"
+	QueryProfileRouteName   = "QueryProfile"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -255,7 +256,7 @@ func Setup(
 				httpReq, userAPI, cfg,
 			)
 		},
-	)).Methods(http.MethodGet)
+	)).Methods(http.MethodGet).Name(QueryProfileRouteName)
 
 	v1fedmux.Handle("/user/devices/{userID}", MakeFedAPI(
 		"federation_user_devices", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
