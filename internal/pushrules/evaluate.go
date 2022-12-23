@@ -104,7 +104,10 @@ func ruleMatches(rule *Rule, kind Kind, event *gomatrixserverlib.Event, ec Evalu
 	case ContentKind:
 		// TODO: "These configure behaviour for (unencrypted) messages
 		// that match certain patterns." - Does that mean "content.body"?
-		return patternMatches("content.body", rule.Pattern, event)
+		if rule.Pattern == nil {
+			return false, nil
+		}
+		return patternMatches("content.body", *rule.Pattern, event)
 
 	case RoomKind:
 		return rule.RuleID == event.RoomID(), nil
@@ -120,7 +123,10 @@ func ruleMatches(rule *Rule, kind Kind, event *gomatrixserverlib.Event, ec Evalu
 func conditionMatches(cond *Condition, event *gomatrixserverlib.Event, ec EvaluationContext) (bool, error) {
 	switch cond.Kind {
 	case EventMatchCondition:
-		return patternMatches(cond.Key, cond.Pattern, event)
+		if cond.Pattern == nil {
+			return false, fmt.Errorf("missing condition pattern")
+		}
+		return patternMatches(cond.Key, *cond.Pattern, event)
 
 	case ContainsDisplayNameCondition:
 		return patternMatches("content.body", ec.UserDisplayName(), event)
