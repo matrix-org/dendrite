@@ -1,0 +1,80 @@
+// Copyright 2022 The Matrix.org Foundation C.I.C.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package internal
+
+import (
+	"context"
+	"testing"
+
+	"github.com/matrix-org/dendrite/federationapi/api"
+	"github.com/matrix-org/dendrite/federationapi/queue"
+	"github.com/matrix-org/dendrite/federationapi/statistics"
+	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/stretchr/testify/assert"
+)
+
+type testFedClient struct {
+	api.FederationClient
+}
+
+func TestPerformWakeupServers(t *testing.T) {
+	testDB := storage.NewFakeFederationDatabase()
+
+	server := gomatrixserverlib.ServerName("wakeup")
+	testDB.AddServerToBlacklist(server)
+	testDB.SetServerAssumedOffline(server)
+	blacklisted, err := testDB.IsServerBlacklisted(server)
+	assert.NoError(t, err)
+	assert.True(t, blacklisted)
+	offline, err := testDB.IsServerAssumedOffline(server)
+	assert.NoError(t, err)
+	assert.True(t, offline)
+
+	cfg := config.FederationAPI{
+		Matrix: &config.Global{
+			SigningIdentity: gomatrixserverlib.SigningIdentity{
+				ServerName: "relay",
+			},
+		},
+	}
+	fedClient := &testFedClient{}
+	stats := statistics.NewStatistics(testDB, 8, 3)
+	queues := queue.NewOutgoingQueues(
+		testDB, process.NewProcessContext(),
+		false,
+		cfg.Matrix.ServerName, fedClient, nil, &stats,
+		nil,
+	)
+	fedAPI := NewFederationInternalAPI(
+		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
+	)
+
+	req := api.PerformWakeupServersRequest{
+		ServerNames: []gomatrixserverlib.ServerName{server},
+	}
+	res := api.PerformWakeupServersResponse{}
+	err = fedAPI.PerformWakeupServers(context.Background(), &req, &res)
+	assert.NoError(t, err)
+
+	blacklisted, err = testDB.IsServerBlacklisted(server)
+	assert.NoError(t, err)
+	assert.False(t, blacklisted)
+	offline, err = testDB.IsServerAssumedOffline(server)
+	assert.NoError(t, err)
+	assert.False(t, offline)
+}

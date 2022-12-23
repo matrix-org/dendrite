@@ -77,6 +77,12 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 		} else {
 			server.blacklisted.Store(blacklisted)
 		}
+		assumedOffline, err := s.DB.IsServerAssumedOffline(serverName)
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to get assumed offline entry %q", serverName)
+		} else {
+			server.assumedOffline.Store(assumedOffline)
+		}
 
 		knownRelayServers, err := s.DB.GetRelayServersForServer(serverName)
 		if err != nil {
