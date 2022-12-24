@@ -4,6 +4,10 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBackoff(t *testing.T) {
@@ -73,4 +77,15 @@ func TestBackoff(t *testing.T) {
 			t.Fatalf("Backoff %d should have been between %s and %s but was %s", i, minDuration, maxDuration, duration)
 		}
 	}
+}
+
+func TestRelayServersListing(t *testing.T) {
+	stats := NewStatistics(storage.NewFakeFederationDatabase(), 8, 3)
+	server := ServerStatistics{statistics: &stats}
+	server.AddRelayServers([]gomatrixserverlib.ServerName{"relay1", "relay1", "relay2"})
+	relayServers := server.KnownRelayServers()
+	assert.Equal(t, []gomatrixserverlib.ServerName{"relay1", "relay2"}, relayServers)
+	server.AddRelayServers([]gomatrixserverlib.ServerName{"relay1", "relay1", "relay2"})
+	relayServers = server.KnownRelayServers()
+	assert.Equal(t, []gomatrixserverlib.ServerName{"relay1", "relay2"}, relayServers)
 }
