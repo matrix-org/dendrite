@@ -1,1 +1,6 @@
-{"spacemanager": "0xa85233c63b9ee964add6f2cffe00fd84eb32338f","usergranted": "0x7a2088a1bfc9d81c55368ae168c2c02570cb814f","tokengranted": "0x09635f643e140090a9a8dcd712ed6285858cebef","rolemanager": "0x322813fd9a801c5507c9de605d63cea4f2ce6c44"}
+{
+  "spacemanager": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  "rolemanager": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  "tokengranted": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+  "usergranted": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+}
