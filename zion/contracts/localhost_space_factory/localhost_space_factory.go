@@ -28,15 +28,8 @@ var (
 	_ = event.NewSubscription
 )
 
-// DataTypesCreateSpaceData is an auto generated low-level Go binding around an user-defined struct.
-type DataTypesCreateSpaceData struct {
-	SpaceName      string
-	SpaceNetworkId string
-	SpaceMetadata  string
-}
-
-// DataTypesCreateSpaceEntitlementData is an auto generated low-level Go binding around an user-defined struct.
-type DataTypesCreateSpaceEntitlementData struct {
+// DataTypesCreateSpaceExtraEntitlements is an auto generated low-level Go binding around an user-defined struct.
+type DataTypesCreateSpaceExtraEntitlements struct {
 	RoleName    string
 	Permissions []string
 	Tokens      []DataTypesExternalToken
@@ -53,7 +46,7 @@ type DataTypesExternalToken struct {
 
 // LocalhostSpaceFactoryMetaData contains all meta data concerning the LocalhostSpaceFactory contract.
 var LocalhostSpaceFactoryMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_space\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenEntitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_userEntitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_spaceToken\",\"type\":\"address\"},{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"NameContainsInvalidCharacters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NameLengthInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionAlreadyExists\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SpaceAlreadyRegistered\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"SPACE_IMPLEMENTATION_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"SPACE_TOKEN_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TOKEN_IMPLEMENTATION_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"USER_IMPLEMENTATION_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"}],\"name\":\"addOwnerPermissions\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"spaceName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceMetadata\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.CreateSpaceData\",\"name\":\"_info\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"roleName\",\"type\":\"string\"},{\"internalType\":\"string[]\",\"name\":\"permissions\",\"type\":\"string[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isSingleToken\",\"type\":\"bool\"},{\"internalType\":\"uint256[]\",\"name\":\"tokenIds\",\"type\":\"uint256[]\"}],\"internalType\":\"structDataTypes.ExternalToken[]\",\"name\":\"tokens\",\"type\":\"tuple[]\"},{\"internalType\":\"address[]\",\"name\":\"users\",\"type\":\"address[]\"}],\"internalType\":\"structDataTypes.CreateSpaceEntitlementData\",\"name\":\"_entitlementData\",\"type\":\"tuple\"},{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"}],\"name\":\"createSpace\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"_spaceAddress\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwnerPermissions\",\"outputs\":[{\"internalType\":\"string[]\",\"name\":\"\",\"type\":\"string[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"ownerPermissions\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"spaceByHash\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"tokenByHash\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_space\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenEntitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_userEntitlement\",\"type\":\"address\"}],\"name\":\"updateInitialImplementations\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"name\":\"NameContainsInvalidCharacters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NameLengthInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionAlreadyExists\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SpaceAlreadyRegistered\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAdmin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"beacon\",\"type\":\"address\"}],\"name\":\"BeaconUpgraded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"version\",\"type\":\"uint8\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"SPACE_IMPLEMENTATION_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"SPACE_TOKEN_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TOKEN_IMPLEMENTATION_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"USER_IMPLEMENTATION_ADDRESS\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"}],\"name\":\"addOwnerPermissions\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"spaceName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"spaceMetadata\",\"type\":\"string\"},{\"internalType\":\"string[]\",\"name\":\"_everyonePermissions\",\"type\":\"string[]\"},{\"components\":[{\"internalType\":\"string\",\"name\":\"roleName\",\"type\":\"string\"},{\"internalType\":\"string[]\",\"name\":\"permissions\",\"type\":\"string[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"contractAddress\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"quantity\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"isSingleToken\",\"type\":\"bool\"},{\"internalType\":\"uint256[]\",\"name\":\"tokenIds\",\"type\":\"uint256[]\"}],\"internalType\":\"structDataTypes.ExternalToken[]\",\"name\":\"tokens\",\"type\":\"tuple[]\"},{\"internalType\":\"address[]\",\"name\":\"users\",\"type\":\"address[]\"}],\"internalType\":\"structDataTypes.CreateSpaceExtraEntitlements\",\"name\":\"_extraEntitlements\",\"type\":\"tuple\"}],\"name\":\"createSpace\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"_spaceAddress\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getOwnerPermissions\",\"outputs\":[{\"internalType\":\"string[]\",\"name\":\"\",\"type\":\"string[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_space\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenEntitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_userEntitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_spaceToken\",\"type\":\"address\"},{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"ownerPermissions\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"proxiableUUID\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"spaceByHash\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"tokenByHash\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_space\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenEntitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_userEntitlement\",\"type\":\"address\"}],\"name\":\"updateImplementations\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"}],\"name\":\"upgradeTo\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"upgradeToAndCall\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
 }
 
 // LocalhostSpaceFactoryABI is the input ABI used to generate the binding from.
@@ -419,6 +412,37 @@ func (_LocalhostSpaceFactory *LocalhostSpaceFactoryCallerSession) OwnerPermissio
 	return _LocalhostSpaceFactory.Contract.OwnerPermissions(&_LocalhostSpaceFactory.CallOpts, arg0)
 }
 
+// ProxiableUUID is a free data retrieval call binding the contract method 0x52d1902d.
+//
+// Solidity: function proxiableUUID() view returns(bytes32)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryCaller) ProxiableUUID(opts *bind.CallOpts) ([32]byte, error) {
+	var out []interface{}
+	err := _LocalhostSpaceFactory.contract.Call(opts, &out, "proxiableUUID")
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// ProxiableUUID is a free data retrieval call binding the contract method 0x52d1902d.
+//
+// Solidity: function proxiableUUID() view returns(bytes32)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) ProxiableUUID() ([32]byte, error) {
+	return _LocalhostSpaceFactory.Contract.ProxiableUUID(&_LocalhostSpaceFactory.CallOpts)
+}
+
+// ProxiableUUID is a free data retrieval call binding the contract method 0x52d1902d.
+//
+// Solidity: function proxiableUUID() view returns(bytes32)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryCallerSession) ProxiableUUID() ([32]byte, error) {
+	return _LocalhostSpaceFactory.Contract.ProxiableUUID(&_LocalhostSpaceFactory.CallOpts)
+}
+
 // SpaceByHash is a free data retrieval call binding the contract method 0x3312540a.
 //
 // Solidity: function spaceByHash(bytes32 ) view returns(address)
@@ -502,25 +526,46 @@ func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) AddOwnerPe
 	return _LocalhostSpaceFactory.Contract.AddOwnerPermissions(&_LocalhostSpaceFactory.TransactOpts, _permissions)
 }
 
-// CreateSpace is a paid mutator transaction binding the contract method 0x4ce89fa8.
+// CreateSpace is a paid mutator transaction binding the contract method 0xad78faf3.
 //
-// Solidity: function createSpace((string,string,string) _info, (string,string[],(address,uint256,bool,uint256[])[],address[]) _entitlementData, string[] _permissions) returns(address _spaceAddress)
-func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) CreateSpace(opts *bind.TransactOpts, _info DataTypesCreateSpaceData, _entitlementData DataTypesCreateSpaceEntitlementData, _permissions []string) (*types.Transaction, error) {
-	return _LocalhostSpaceFactory.contract.Transact(opts, "createSpace", _info, _entitlementData, _permissions)
+// Solidity: function createSpace(string spaceName, string spaceNetworkId, string spaceMetadata, string[] _everyonePermissions, (string,string[],(address,uint256,bool,uint256[])[],address[]) _extraEntitlements) returns(address _spaceAddress)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) CreateSpace(opts *bind.TransactOpts, spaceName string, spaceNetworkId string, spaceMetadata string, _everyonePermissions []string, _extraEntitlements DataTypesCreateSpaceExtraEntitlements) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.contract.Transact(opts, "createSpace", spaceName, spaceNetworkId, spaceMetadata, _everyonePermissions, _extraEntitlements)
 }
 
-// CreateSpace is a paid mutator transaction binding the contract method 0x4ce89fa8.
+// CreateSpace is a paid mutator transaction binding the contract method 0xad78faf3.
 //
-// Solidity: function createSpace((string,string,string) _info, (string,string[],(address,uint256,bool,uint256[])[],address[]) _entitlementData, string[] _permissions) returns(address _spaceAddress)
-func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) CreateSpace(_info DataTypesCreateSpaceData, _entitlementData DataTypesCreateSpaceEntitlementData, _permissions []string) (*types.Transaction, error) {
-	return _LocalhostSpaceFactory.Contract.CreateSpace(&_LocalhostSpaceFactory.TransactOpts, _info, _entitlementData, _permissions)
+// Solidity: function createSpace(string spaceName, string spaceNetworkId, string spaceMetadata, string[] _everyonePermissions, (string,string[],(address,uint256,bool,uint256[])[],address[]) _extraEntitlements) returns(address _spaceAddress)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) CreateSpace(spaceName string, spaceNetworkId string, spaceMetadata string, _everyonePermissions []string, _extraEntitlements DataTypesCreateSpaceExtraEntitlements) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.CreateSpace(&_LocalhostSpaceFactory.TransactOpts, spaceName, spaceNetworkId, spaceMetadata, _everyonePermissions, _extraEntitlements)
 }
 
-// CreateSpace is a paid mutator transaction binding the contract method 0x4ce89fa8.
+// CreateSpace is a paid mutator transaction binding the contract method 0xad78faf3.
 //
-// Solidity: function createSpace((string,string,string) _info, (string,string[],(address,uint256,bool,uint256[])[],address[]) _entitlementData, string[] _permissions) returns(address _spaceAddress)
-func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) CreateSpace(_info DataTypesCreateSpaceData, _entitlementData DataTypesCreateSpaceEntitlementData, _permissions []string) (*types.Transaction, error) {
-	return _LocalhostSpaceFactory.Contract.CreateSpace(&_LocalhostSpaceFactory.TransactOpts, _info, _entitlementData, _permissions)
+// Solidity: function createSpace(string spaceName, string spaceNetworkId, string spaceMetadata, string[] _everyonePermissions, (string,string[],(address,uint256,bool,uint256[])[],address[]) _extraEntitlements) returns(address _spaceAddress)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) CreateSpace(spaceName string, spaceNetworkId string, spaceMetadata string, _everyonePermissions []string, _extraEntitlements DataTypesCreateSpaceExtraEntitlements) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.CreateSpace(&_LocalhostSpaceFactory.TransactOpts, spaceName, spaceNetworkId, spaceMetadata, _everyonePermissions, _extraEntitlements)
+}
+
+// Initialize is a paid mutator transaction binding the contract method 0x45bfa5b1.
+//
+// Solidity: function initialize(address _space, address _tokenEntitlement, address _userEntitlement, address _spaceToken, string[] _permissions) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) Initialize(opts *bind.TransactOpts, _space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address, _spaceToken common.Address, _permissions []string) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.contract.Transact(opts, "initialize", _space, _tokenEntitlement, _userEntitlement, _spaceToken, _permissions)
+}
+
+// Initialize is a paid mutator transaction binding the contract method 0x45bfa5b1.
+//
+// Solidity: function initialize(address _space, address _tokenEntitlement, address _userEntitlement, address _spaceToken, string[] _permissions) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) Initialize(_space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address, _spaceToken common.Address, _permissions []string) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.Initialize(&_LocalhostSpaceFactory.TransactOpts, _space, _tokenEntitlement, _userEntitlement, _spaceToken, _permissions)
+}
+
+// Initialize is a paid mutator transaction binding the contract method 0x45bfa5b1.
+//
+// Solidity: function initialize(address _space, address _tokenEntitlement, address _userEntitlement, address _spaceToken, string[] _permissions) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) Initialize(_space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address, _spaceToken common.Address, _permissions []string) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.Initialize(&_LocalhostSpaceFactory.TransactOpts, _space, _tokenEntitlement, _userEntitlement, _spaceToken, _permissions)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -565,25 +610,480 @@ func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) TransferOw
 	return _LocalhostSpaceFactory.Contract.TransferOwnership(&_LocalhostSpaceFactory.TransactOpts, newOwner)
 }
 
-// UpdateInitialImplementations is a paid mutator transaction binding the contract method 0x9e3a99c1.
+// UpdateImplementations is a paid mutator transaction binding the contract method 0xdfc666ff.
 //
-// Solidity: function updateInitialImplementations(address _space, address _tokenEntitlement, address _userEntitlement) returns()
-func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) UpdateInitialImplementations(opts *bind.TransactOpts, _space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address) (*types.Transaction, error) {
-	return _LocalhostSpaceFactory.contract.Transact(opts, "updateInitialImplementations", _space, _tokenEntitlement, _userEntitlement)
+// Solidity: function updateImplementations(address _space, address _tokenEntitlement, address _userEntitlement) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) UpdateImplementations(opts *bind.TransactOpts, _space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.contract.Transact(opts, "updateImplementations", _space, _tokenEntitlement, _userEntitlement)
 }
 
-// UpdateInitialImplementations is a paid mutator transaction binding the contract method 0x9e3a99c1.
+// UpdateImplementations is a paid mutator transaction binding the contract method 0xdfc666ff.
 //
-// Solidity: function updateInitialImplementations(address _space, address _tokenEntitlement, address _userEntitlement) returns()
-func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) UpdateInitialImplementations(_space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address) (*types.Transaction, error) {
-	return _LocalhostSpaceFactory.Contract.UpdateInitialImplementations(&_LocalhostSpaceFactory.TransactOpts, _space, _tokenEntitlement, _userEntitlement)
+// Solidity: function updateImplementations(address _space, address _tokenEntitlement, address _userEntitlement) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) UpdateImplementations(_space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.UpdateImplementations(&_LocalhostSpaceFactory.TransactOpts, _space, _tokenEntitlement, _userEntitlement)
 }
 
-// UpdateInitialImplementations is a paid mutator transaction binding the contract method 0x9e3a99c1.
+// UpdateImplementations is a paid mutator transaction binding the contract method 0xdfc666ff.
 //
-// Solidity: function updateInitialImplementations(address _space, address _tokenEntitlement, address _userEntitlement) returns()
-func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) UpdateInitialImplementations(_space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address) (*types.Transaction, error) {
-	return _LocalhostSpaceFactory.Contract.UpdateInitialImplementations(&_LocalhostSpaceFactory.TransactOpts, _space, _tokenEntitlement, _userEntitlement)
+// Solidity: function updateImplementations(address _space, address _tokenEntitlement, address _userEntitlement) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) UpdateImplementations(_space common.Address, _tokenEntitlement common.Address, _userEntitlement common.Address) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.UpdateImplementations(&_LocalhostSpaceFactory.TransactOpts, _space, _tokenEntitlement, _userEntitlement)
+}
+
+// UpgradeTo is a paid mutator transaction binding the contract method 0x3659cfe6.
+//
+// Solidity: function upgradeTo(address newImplementation) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) UpgradeTo(opts *bind.TransactOpts, newImplementation common.Address) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.contract.Transact(opts, "upgradeTo", newImplementation)
+}
+
+// UpgradeTo is a paid mutator transaction binding the contract method 0x3659cfe6.
+//
+// Solidity: function upgradeTo(address newImplementation) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) UpgradeTo(newImplementation common.Address) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.UpgradeTo(&_LocalhostSpaceFactory.TransactOpts, newImplementation)
+}
+
+// UpgradeTo is a paid mutator transaction binding the contract method 0x3659cfe6.
+//
+// Solidity: function upgradeTo(address newImplementation) returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) UpgradeTo(newImplementation common.Address) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.UpgradeTo(&_LocalhostSpaceFactory.TransactOpts, newImplementation)
+}
+
+// UpgradeToAndCall is a paid mutator transaction binding the contract method 0x4f1ef286.
+//
+// Solidity: function upgradeToAndCall(address newImplementation, bytes data) payable returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactor) UpgradeToAndCall(opts *bind.TransactOpts, newImplementation common.Address, data []byte) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.contract.Transact(opts, "upgradeToAndCall", newImplementation, data)
+}
+
+// UpgradeToAndCall is a paid mutator transaction binding the contract method 0x4f1ef286.
+//
+// Solidity: function upgradeToAndCall(address newImplementation, bytes data) payable returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactorySession) UpgradeToAndCall(newImplementation common.Address, data []byte) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.UpgradeToAndCall(&_LocalhostSpaceFactory.TransactOpts, newImplementation, data)
+}
+
+// UpgradeToAndCall is a paid mutator transaction binding the contract method 0x4f1ef286.
+//
+// Solidity: function upgradeToAndCall(address newImplementation, bytes data) payable returns()
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryTransactorSession) UpgradeToAndCall(newImplementation common.Address, data []byte) (*types.Transaction, error) {
+	return _LocalhostSpaceFactory.Contract.UpgradeToAndCall(&_LocalhostSpaceFactory.TransactOpts, newImplementation, data)
+}
+
+// LocalhostSpaceFactoryAdminChangedIterator is returned from FilterAdminChanged and is used to iterate over the raw logs and unpacked data for AdminChanged events raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryAdminChangedIterator struct {
+	Event *LocalhostSpaceFactoryAdminChanged // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *LocalhostSpaceFactoryAdminChangedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LocalhostSpaceFactoryAdminChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(LocalhostSpaceFactoryAdminChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *LocalhostSpaceFactoryAdminChangedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *LocalhostSpaceFactoryAdminChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// LocalhostSpaceFactoryAdminChanged represents a AdminChanged event raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryAdminChanged struct {
+	PreviousAdmin common.Address
+	NewAdmin      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterAdminChanged is a free log retrieval operation binding the contract event 0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f.
+//
+// Solidity: event AdminChanged(address previousAdmin, address newAdmin)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) FilterAdminChanged(opts *bind.FilterOpts) (*LocalhostSpaceFactoryAdminChangedIterator, error) {
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.FilterLogs(opts, "AdminChanged")
+	if err != nil {
+		return nil, err
+	}
+	return &LocalhostSpaceFactoryAdminChangedIterator{contract: _LocalhostSpaceFactory.contract, event: "AdminChanged", logs: logs, sub: sub}, nil
+}
+
+// WatchAdminChanged is a free log subscription operation binding the contract event 0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f.
+//
+// Solidity: event AdminChanged(address previousAdmin, address newAdmin)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) WatchAdminChanged(opts *bind.WatchOpts, sink chan<- *LocalhostSpaceFactoryAdminChanged) (event.Subscription, error) {
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.WatchLogs(opts, "AdminChanged")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(LocalhostSpaceFactoryAdminChanged)
+				if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "AdminChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseAdminChanged is a log parse operation binding the contract event 0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f.
+//
+// Solidity: event AdminChanged(address previousAdmin, address newAdmin)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) ParseAdminChanged(log types.Log) (*LocalhostSpaceFactoryAdminChanged, error) {
+	event := new(LocalhostSpaceFactoryAdminChanged)
+	if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "AdminChanged", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// LocalhostSpaceFactoryBeaconUpgradedIterator is returned from FilterBeaconUpgraded and is used to iterate over the raw logs and unpacked data for BeaconUpgraded events raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryBeaconUpgradedIterator struct {
+	Event *LocalhostSpaceFactoryBeaconUpgraded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *LocalhostSpaceFactoryBeaconUpgradedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LocalhostSpaceFactoryBeaconUpgraded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(LocalhostSpaceFactoryBeaconUpgraded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *LocalhostSpaceFactoryBeaconUpgradedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *LocalhostSpaceFactoryBeaconUpgradedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// LocalhostSpaceFactoryBeaconUpgraded represents a BeaconUpgraded event raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryBeaconUpgraded struct {
+	Beacon common.Address
+	Raw    types.Log // Blockchain specific contextual infos
+}
+
+// FilterBeaconUpgraded is a free log retrieval operation binding the contract event 0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e.
+//
+// Solidity: event BeaconUpgraded(address indexed beacon)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) FilterBeaconUpgraded(opts *bind.FilterOpts, beacon []common.Address) (*LocalhostSpaceFactoryBeaconUpgradedIterator, error) {
+
+	var beaconRule []interface{}
+	for _, beaconItem := range beacon {
+		beaconRule = append(beaconRule, beaconItem)
+	}
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.FilterLogs(opts, "BeaconUpgraded", beaconRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LocalhostSpaceFactoryBeaconUpgradedIterator{contract: _LocalhostSpaceFactory.contract, event: "BeaconUpgraded", logs: logs, sub: sub}, nil
+}
+
+// WatchBeaconUpgraded is a free log subscription operation binding the contract event 0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e.
+//
+// Solidity: event BeaconUpgraded(address indexed beacon)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) WatchBeaconUpgraded(opts *bind.WatchOpts, sink chan<- *LocalhostSpaceFactoryBeaconUpgraded, beacon []common.Address) (event.Subscription, error) {
+
+	var beaconRule []interface{}
+	for _, beaconItem := range beacon {
+		beaconRule = append(beaconRule, beaconItem)
+	}
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.WatchLogs(opts, "BeaconUpgraded", beaconRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(LocalhostSpaceFactoryBeaconUpgraded)
+				if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "BeaconUpgraded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseBeaconUpgraded is a log parse operation binding the contract event 0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e.
+//
+// Solidity: event BeaconUpgraded(address indexed beacon)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) ParseBeaconUpgraded(log types.Log) (*LocalhostSpaceFactoryBeaconUpgraded, error) {
+	event := new(LocalhostSpaceFactoryBeaconUpgraded)
+	if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "BeaconUpgraded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// LocalhostSpaceFactoryInitializedIterator is returned from FilterInitialized and is used to iterate over the raw logs and unpacked data for Initialized events raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryInitializedIterator struct {
+	Event *LocalhostSpaceFactoryInitialized // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *LocalhostSpaceFactoryInitializedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LocalhostSpaceFactoryInitialized)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(LocalhostSpaceFactoryInitialized)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *LocalhostSpaceFactoryInitializedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *LocalhostSpaceFactoryInitializedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// LocalhostSpaceFactoryInitialized represents a Initialized event raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryInitialized struct {
+	Version uint8
+	Raw     types.Log // Blockchain specific contextual infos
+}
+
+// FilterInitialized is a free log retrieval operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
+//
+// Solidity: event Initialized(uint8 version)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) FilterInitialized(opts *bind.FilterOpts) (*LocalhostSpaceFactoryInitializedIterator, error) {
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.FilterLogs(opts, "Initialized")
+	if err != nil {
+		return nil, err
+	}
+	return &LocalhostSpaceFactoryInitializedIterator{contract: _LocalhostSpaceFactory.contract, event: "Initialized", logs: logs, sub: sub}, nil
+}
+
+// WatchInitialized is a free log subscription operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
+//
+// Solidity: event Initialized(uint8 version)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) WatchInitialized(opts *bind.WatchOpts, sink chan<- *LocalhostSpaceFactoryInitialized) (event.Subscription, error) {
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.WatchLogs(opts, "Initialized")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(LocalhostSpaceFactoryInitialized)
+				if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "Initialized", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseInitialized is a log parse operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
+//
+// Solidity: event Initialized(uint8 version)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) ParseInitialized(log types.Log) (*LocalhostSpaceFactoryInitialized, error) {
+	event := new(LocalhostSpaceFactoryInitialized)
+	if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "Initialized", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 // LocalhostSpaceFactoryOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the LocalhostSpaceFactory contract.
@@ -733,6 +1233,150 @@ func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) WatchOwnershipTrans
 func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) ParseOwnershipTransferred(log types.Log) (*LocalhostSpaceFactoryOwnershipTransferred, error) {
 	event := new(LocalhostSpaceFactoryOwnershipTransferred)
 	if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// LocalhostSpaceFactoryUpgradedIterator is returned from FilterUpgraded and is used to iterate over the raw logs and unpacked data for Upgraded events raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryUpgradedIterator struct {
+	Event *LocalhostSpaceFactoryUpgraded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *LocalhostSpaceFactoryUpgradedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(LocalhostSpaceFactoryUpgraded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(LocalhostSpaceFactoryUpgraded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *LocalhostSpaceFactoryUpgradedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *LocalhostSpaceFactoryUpgradedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// LocalhostSpaceFactoryUpgraded represents a Upgraded event raised by the LocalhostSpaceFactory contract.
+type LocalhostSpaceFactoryUpgraded struct {
+	Implementation common.Address
+	Raw            types.Log // Blockchain specific contextual infos
+}
+
+// FilterUpgraded is a free log retrieval operation binding the contract event 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b.
+//
+// Solidity: event Upgraded(address indexed implementation)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) FilterUpgraded(opts *bind.FilterOpts, implementation []common.Address) (*LocalhostSpaceFactoryUpgradedIterator, error) {
+
+	var implementationRule []interface{}
+	for _, implementationItem := range implementation {
+		implementationRule = append(implementationRule, implementationItem)
+	}
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.FilterLogs(opts, "Upgraded", implementationRule)
+	if err != nil {
+		return nil, err
+	}
+	return &LocalhostSpaceFactoryUpgradedIterator{contract: _LocalhostSpaceFactory.contract, event: "Upgraded", logs: logs, sub: sub}, nil
+}
+
+// WatchUpgraded is a free log subscription operation binding the contract event 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b.
+//
+// Solidity: event Upgraded(address indexed implementation)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) WatchUpgraded(opts *bind.WatchOpts, sink chan<- *LocalhostSpaceFactoryUpgraded, implementation []common.Address) (event.Subscription, error) {
+
+	var implementationRule []interface{}
+	for _, implementationItem := range implementation {
+		implementationRule = append(implementationRule, implementationItem)
+	}
+
+	logs, sub, err := _LocalhostSpaceFactory.contract.WatchLogs(opts, "Upgraded", implementationRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(LocalhostSpaceFactoryUpgraded)
+				if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "Upgraded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseUpgraded is a log parse operation binding the contract event 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b.
+//
+// Solidity: event Upgraded(address indexed implementation)
+func (_LocalhostSpaceFactory *LocalhostSpaceFactoryFilterer) ParseUpgraded(log types.Log) (*LocalhostSpaceFactoryUpgraded, error) {
+	event := new(LocalhostSpaceFactoryUpgraded)
+	if err := _LocalhostSpaceFactory.contract.UnpackLog(event, "Upgraded", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
