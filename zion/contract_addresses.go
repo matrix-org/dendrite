@@ -10,6 +10,10 @@ type SpaceManagerContractAddresses struct {
 	Tokengranted string `json:"tokengranted"`
 }
 
+type SpaceFactoryContractAddress struct {
+	SpaceFactory string `json:"spaceFactory"`
+}
+
 func loadSpaceManagerAddresses(byteValue []byte) (*SpaceManagerContractAddresses, error) {
 	var addresses SpaceManagerContractAddresses
 
@@ -19,4 +23,15 @@ func loadSpaceManagerAddresses(byteValue []byte) (*SpaceManagerContractAddresses
 	}
 
 	return &addresses, nil
+}
+
+func loadSpaceFactoryAddress(byteValue []byte) (*SpaceFactoryContractAddress, error) {
+	var address SpaceFactoryContractAddress
+
+	err := json.Unmarshal(byteValue, &address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &address, nil
 }
