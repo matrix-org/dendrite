@@ -1,6 +1,6 @@
 {
-  "rolemanager": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-  "tokengranted": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-  "spacemanager": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-  "usergranted": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1"
+  "tokengranted": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+  "rolemanager": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  "usergranted": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+  "spacemanager": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 }
