@@ -137,7 +137,7 @@ const updateEventJSONSQL = "" +
 const selectStateInRangeFilteredSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
 	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" WHERE (id > $1 AND id <= $2) AND (cardinality(add_state_ids) > 0 OR cardinality(remove_state_ids) > 0)" +
 	" AND room_id = ANY($3)" +
 	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
 	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
@@ -150,7 +150,7 @@ const selectStateInRangeFilteredSQL = "" +
 const selectStateInRangeSQL = "" +
 	"SELECT event_id, id, headered_event_json, exclude_from_sync, add_state_ids, remove_state_ids, history_visibility" +
 	" FROM syncapi_output_room_events" +
-	" WHERE (id > $1 AND id <= $2) AND (add_state_ids IS NOT NULL OR remove_state_ids IS NOT NULL)" +
+	" WHERE (id > $1 AND id <= $2) AND (cardinality(add_state_ids) > 0 OR cardinality(remove_state_ids) > 0)" +
 	" AND room_id = ANY($3)" +
 	" ORDER BY id ASC"
 

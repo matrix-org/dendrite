@@ -329,7 +329,13 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	}
 
 	// get all the state events ever (i.e. for all available rooms) between these two positions
-	stateNeededFiltered, eventMapFiltered, err := d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
+	stateNeededFiltered := stateNeeded
+	eventMapFiltered := eventMap
+	// avoid hitting the database if the result would be the same as above
+	if stateFilter != nil {
+		stateNeededFiltered, eventMapFiltered, err = d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
+	}
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil, nil
