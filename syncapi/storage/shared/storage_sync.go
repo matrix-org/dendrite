@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 type DatabaseTransaction struct {
@@ -332,7 +331,7 @@ func (d *DatabaseTransaction) GetStateDeltas(
 	stateNeededFiltered := stateNeeded
 	eventMapFiltered := eventMap
 	// avoid hitting the database if the result would be the same as above
-	if stateFilter != nil {
+	if !isStatefilterEmpty(stateFilter) {
 		stateNeededFiltered, eventMapFiltered, err = d.OutputEvents.SelectStateInRange(ctx, d.txn, r, stateFilter, allRoomIDs)
 	}
 
@@ -693,4 +692,27 @@ func (d *DatabaseTransaction) RelationsFor(ctx context.Context, roomID, eventID,
 	}
 
 	return events, prevBatch, nextBatch, nil
+}
+
+// TODO: move to GMSL
+func isStatefilterEmpty(filter *gomatrixserverlib.StateFilter) bool {
+	if filter == nil {
+		return true
+	}
+	switch {
+	case filter.NotTypes != nil && len(*filter.NotTypes) > 0:
+		return false
+	case filter.Types != nil && len(*filter.Types) > 0:
+		return false
+	case filter.Senders != nil && len(*filter.Senders) > 0:
+		return false
+	case filter.NotSenders != nil && len(*filter.NotSenders) > 0:
+		return false
+	case filter.NotRooms != nil && len(*filter.NotRooms) > 0:
+		return false
+	case filter.ContainsURL != nil:
+		return false
+	default:
+		return true
+	}
 }
