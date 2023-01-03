@@ -83,7 +83,7 @@ func Backfill(
 			"": eIDs,
 		},
 		ServerName:  request.Origin(),
-		VirtualHost: request.Origin(),
+		VirtualHost: request.Destination(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")

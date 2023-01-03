@@ -56,6 +56,7 @@ func (r *Backfiller) PerformBackfill(
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
 	//       which is what the syncapi does already.
 	if r.IsLocalServerName(request.ServerName) {
+		logrus.Debugf("backfilling via federation: %+v", request)
 		return r.backfillViaFederation(ctx, request, response)
 	}
 	// someone else is requesting the backfill, try to service their request.
@@ -319,6 +320,7 @@ FederationHit:
 			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
+			Origin:             b.virtualHost,
 		}
 		res, err := c.StateIDsBeforeEvent(ctx, targetEvent)
 		if err != nil {
