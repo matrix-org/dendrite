@@ -122,11 +122,14 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 		ctx, req.VirtualHost, requester,
 		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100,
 	)
-	if err != nil {
+	// Only return an error if we really couldn't get any events.
+	if err != nil && len(events) == 0 {
 		logrus.WithError(err).Errorf("gomatrixserverlib.RequestBackfill failed")
 		return err
 	}
-	logrus.WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
+	// If we got an error but still got events, that's fine, because a server might have returned a 404 (or something)
+	// but other servers could provide the missing event.
+	logrus.WithError(err).WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
@@ -395,6 +398,7 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
+			Origin:             b.virtualHost,
 		}
 		result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
 		if err != nil {
