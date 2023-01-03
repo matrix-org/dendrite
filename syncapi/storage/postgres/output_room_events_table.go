@@ -23,12 +23,13 @@ import (
 	"sort"
 
 	"github.com/lib/pq"
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
@@ -467,26 +468,32 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 			ExcludeFromSync: excludeFromSync,
 		})
 
-		// we queried for 1 more than the limit, so if we returned one more mark limited=true
-		if len(r.Events) > eventFilter.Limit {
-			r.Limited = true
-			// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
-			if chronologicalOrder {
-				r.Events = r.Events[1:]
-			} else {
-				r.Events = r.Events[:len(r.Events)-1]
-			}
-		}
 		result[roomID] = r
 	}
 
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 
 	if chronologicalOrder {
-		for _, x := range result {
+		for roomID, x := range result {
 			sort.SliceStable(x.Events, func(i int, j int) bool {
 				return x.Events[i].StreamPosition < x.Events[j].StreamPosition
 			})
+
+			// we queried for 1 more than the limit, so if we returned one more mark limited=true
+			if len(x.Events) > eventFilter.Limit {
+				x.Limited = true
+				// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
+				x.Events = x.Events[1:]
+				result[roomID] = x
+			}
+		}
+	} else {
+		for roomID, x := range result {
+			if len(x.Events) > eventFilter.Limit {
+				x.Limited = true
+				x.Events = x.Events[:len(x.Events)-1]
+				result[roomID] = x
+			}
 		}
 	}
 
