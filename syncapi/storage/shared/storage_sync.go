@@ -95,8 +95,8 @@ func (d *DatabaseTransaction) GetRoomHeroes(ctx context.Context, roomID, userID 
 	return d.Memberships.SelectHeroes(ctx, d.txn, roomID, userID, memberships)
 }
 
-func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
-	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, roomID, r, eventFilter, chronologicalOrder, onlySyncEvents)
+func (d *DatabaseTransaction) RecentEvents(ctx context.Context, userID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
+	return d.OutputEvents.SelectRecentEvents(ctx, d.txn, userID, r, eventFilter, chronologicalOrder, onlySyncEvents)
 }
 
 func (d *DatabaseTransaction) PositionInTopology(ctx context.Context, eventID string) (pos types.StreamPosition, spos types.StreamPosition, err error) {

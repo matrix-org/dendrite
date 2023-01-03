@@ -361,11 +361,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	return streamPos, err
 }
 
-func (s *outputRoomEventsStatements) SelectRecentEvents(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
-	chronologicalOrder bool, onlySyncEvents bool,
-) ([]types.StreamEvent, bool, error) {
+func (s *outputRoomEventsStatements) SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
 	var query string
 	if onlySyncEvents {
 		query = selectRecentEventsForSyncSQL
@@ -383,39 +379,77 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		nil, eventFilter.ContainsURL, eventFilter.Limit+1, FilterOrderDesc,
 	)
 	if err != nil {
-		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
+		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, stmt, "selectRecentEvents: stmt.close() failed")
-
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
-		return nil, false, err
+		return nil, fmt.Errorf("SelectRecentEvents failed: %w", err)
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
-	if err != nil {
-		return nil, false, err
-	}
-	if chronologicalOrder {
-		// The events need to be returned from oldest to latest, which isn't
-		// necessary the way the SQL query returns them, so a sort is necessary to
-		// ensure the events are in the right order in the slice.
-		sort.SliceStable(events, func(i int, j int) bool {
-			return events[i].StreamPosition < events[j].StreamPosition
+
+	result := make(map[string]types.RecentEvents)
+
+	for rows.Next() {
+		var (
+			roomID            string
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			excludeFromSync   bool
+			sessionID         *int64
+			txnID             *string
+			transactionID     *api.TransactionID
+			historyVisibility gomatrixserverlib.HistoryVisibility
+		)
+		if err := rows.Scan(&roomID, &eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
+			return nil, err
+		}
+		// TODO: Handle redacted events
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+
+		if sessionID != nil && txnID != nil {
+			transactionID = &api.TransactionID{
+				SessionID:     *sessionID,
+				TransactionID: *txnID,
+			}
+		}
+
+		r := result[roomID]
+
+		ev.Visibility = historyVisibility
+		r.Events = append(r.Events, types.StreamEvent{
+			HeaderedEvent:   &ev,
+			StreamPosition:  streamPos,
+			TransactionID:   transactionID,
+			ExcludeFromSync: excludeFromSync,
 		})
+
+		// we queried for 1 more than the limit, so if we returned one more mark limited=true
+		if len(r.Events) > eventFilter.Limit {
+			r.Limited = true
+			// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
+			if chronologicalOrder {
+				r.Events = r.Events[1:]
+			} else {
+				r.Events = r.Events[:len(r.Events)-1]
+			}
+		}
+		result[roomID] = r
 	}
-	// we queried for 1 more than the limit, so if we returned one more mark limited=true
-	limited := false
-	if len(events) > eventFilter.Limit {
-		limited = true
-		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
-		if chronologicalOrder {
-			events = events[1:]
-		} else {
-			events = events[:len(events)-1]
+
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
+
+	if chronologicalOrder {
+		for _, x := range result {
+			sort.SliceStable(x.Events, func(i int, j int) bool {
+				return x.Events[i].StreamPosition < x.Events[j].StreamPosition
+			})
 		}
 	}
-	return events, limited, nil
+
+	return result, rows.Err()
 }
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(

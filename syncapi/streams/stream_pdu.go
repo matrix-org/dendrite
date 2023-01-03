@@ -97,15 +97,28 @@ func (p *PDUStreamProvider) CompleteSync(
 	// Build up a /sync response. Add joined rooms.
 	req.Log.WithField("rooms", len(joinedRoomIDs)).Debug("getting join response for rooms")
 	s := time.Now()
-	for i, roomID := range joinedRoomIDs {
+	// query all recent events for all rooms
+	recentStreamEvents, err := snapshot.RecentEvents(
+		ctx, req.Device.UserID, r, &eventFilter, true, true,
+	)
+	if err != nil {
+		logrus.WithError(err).Error("failed to get recent events")
+		return from
+	}
+	req.Log.WithContext(ctx).WithFields(logrus.Fields{
+		"duration": time.Since(s),
+	}).Debugln("got all recent events")
+
+	for roomID, recentEvents := range recentStreamEvents {
+		rs := time.Now()
 		jr, jerr := p.getJoinResponseForCompleteSync(
 			ctx, snapshot, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device, false,
+			recentEvents.Events, recentEvents.Limited,
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).WithContext(ctx).WithFields(logrus.Fields{
-				"failed_after":    time.Since(s),
-				"room_id":         roomID,
-				"collected_rooms": i,
+				"failed_after": time.Since(s),
+				"room_id":      roomID,
 			}).Error("p.getJoinResponseForCompleteSync failed")
 			if ctxErr := req.Context.Err(); ctxErr != nil || jerr == sql.ErrTxDone {
 				return from
@@ -114,10 +127,11 @@ func (p *PDUStreamProvider) CompleteSync(
 		}
 		req.Response.Rooms.Join[roomID] = jr
 		req.Rooms[roomID] = gomatrixserverlib.Join
+		req.Log.WithFields(logrus.Fields{"room_id": roomID, "duration": time.Since(rs)}).Debugln("got room data")
 	}
 
 	// Add peeked rooms.
-	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
+	/*peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
 	if err != nil {
 		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
 		return from
@@ -137,7 +151,7 @@ func (p *PDUStreamProvider) CompleteSync(
 			}
 			req.Response.Rooms.Peek[peek.RoomID] = jr
 		}
-	}
+	}*/
 
 	return to
 }
@@ -185,6 +199,19 @@ func (p *PDUStreamProvider) IncrementalSync(
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
+	s := time.Now()
+	// query all recent events for all rooms
+	recentStreamEvents, err := snapshot.RecentEvents(
+		ctx, req.Device.UserID, r, &eventFilter, true, true,
+	)
+	if err != nil {
+		logrus.WithError(err).Error("failed to get recent events")
+		return from
+	}
+	req.Log.WithContext(ctx).WithFields(logrus.Fields{
+		"duration": time.Since(s),
+	}).Debugln("(inc) got all recent events")
+
 	newPos = from
 	for _, delta := range stateDeltas {
 		newRange := r
@@ -200,7 +227,7 @@ func (p *PDUStreamProvider) IncrementalSync(
 			}
 		}
 		var pos types.StreamPosition
-		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req); err != nil {
+		if pos, err = p.addRoomDeltaToResponse(ctx, snapshot, req.Device, newRange, delta, &eventFilter, &stateFilter, req, recentStreamEvents[delta.RoomID].Events, recentStreamEvents[delta.RoomID].Limited); err != nil {
 			req.Log.WithError(err).Error("d.addRoomDeltaToResponse failed")
 			if err == context.DeadlineExceeded || err == context.Canceled || err == sql.ErrTxDone {
 				return newPos
@@ -235,6 +262,8 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	eventFilter *gomatrixserverlib.RoomEventFilter,
 	stateFilter *gomatrixserverlib.StateFilter,
 	req *types.SyncRequest,
+	recentStreamEvents []types.StreamEvent,
+	limited bool,
 ) (types.StreamPosition, error) {
 
 	originalLimit := eventFilter.Limit
@@ -247,16 +276,6 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 	}
 
-	recentStreamEvents, limited, err := snapshot.RecentEvents(
-		ctx, delta.RoomID, r,
-		eventFilter, true, true,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return r.To, nil
-		}
-		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
-	}
 	recentEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
 		snapshot.StreamEventsToEvents(device, recentStreamEvents),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
@@ -273,6 +292,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	if r.Backwards {
 		latestPosition = r.From
 	}
+	var err error
 	updateLatestPosition := func(mostRecentEventID string) {
 		var pos types.StreamPosition
 		if _, pos, err = snapshot.PositionInTopology(ctx, mostRecentEventID); err == nil {
@@ -466,13 +486,14 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	wantFullState bool,
 	device *userapi.Device,
 	isPeek bool,
+	recentStreamEvents []types.StreamEvent,
+	limited bool,
 ) (jr *types.JoinResponse, err error) {
+	_ = eventFilter
 	jr = types.NewJoinResponse()
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-	recentStreamEvents, limited, err := snapshot.RecentEvents(
-		ctx, roomID, r, eventFilter, true, true,
-	)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return jr, nil
