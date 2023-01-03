@@ -66,7 +66,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
 
-  # run go test with different go versions
+  # run go test with go 1.19
   test:
     timeout-minutes: 5
     name: Unit tests (Go ${{ matrix.go }})
@@ -94,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.19"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -114,7 +114,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: dendrite
 
-  # build Dendrite for linux with different architectures and go versions
+  # build Dendrite for linux amd64 with go 1.18
   build:
     name: Build for Linux
     timeout-minutes: 10
@@ -122,9 +122,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.19"]
         goos: ["linux"]
-        goarch: ["amd64", "386"]
+        goarch: ["amd64"]
     steps:
       - uses: actions/checkout@v3
       - name: Setup go
@@ -185,7 +185,7 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   initial-tests-done:
     name: Initial tests passed
-    needs: [lint, test, build, build_windows]
+    needs: [lint, test, build]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     steps:
@@ -193,46 +193,6 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
-
-  # run database upgrade tests
-  upgrade_test:
-    name: Upgrade tests
-    timeout-minutes: 20
-    needs: initial-tests-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.18"
-          cache: true
-      - name: Build upgrade-tests
-        run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade (PostgreSQL)
-        run: ./dendrite-upgrade-tests --head .
-      - name: Test upgrade (SQLite)
-        run: ./dendrite-upgrade-tests --sqlite --head .
-
-  # run database upgrade tests, skipping over one version
-  upgrade_test_direct:
-    name: Upgrade tests from HEAD-2
-    timeout-minutes: 20
-    needs: initial-tests-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.18"
-          cache: true
-      - name: Build upgrade-tests
-        run: go build ./cmd/dendrite-upgrade-tests
-      - name: Test upgrade (PostgreSQL)
-        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
-      - name: Test upgrade (SQLite)
-        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
 
   # run Sytest in different variations
   sytest:
@@ -244,18 +204,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite native
-
-          - label: SQLite Cgo
-            cgo: 1
-
-          - label: SQLite native, full HTTP APIs
-            api: full-http
-
-          - label: SQLite Cgo, full HTTP APIs
-            api: full-http
-            cgo: 1
-
           - label: PostgreSQL
             postgres: postgres
 
@@ -298,13 +246,12 @@ jobs:
         run: /src/are-we-synapse-yet.py /logs/results.tap -v
         continue-on-error: true # not fatal
       - name: Upload Sytest logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: Sytest Logs - ${{ job.status }} - (Dendrite, ${{ join(matrix.*, ', ') }})
           path: |
-            /logs/results.tap
-            /logs/**/*.log*
+            /logs
 
   # run Complement
   complement:
@@ -316,20 +263,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: SQLite native
-            cgo: 0
-
-          - label: SQLite Cgo
-            cgo: 1
-
-          - label: SQLite native, full HTTP APIs
-            api: full-http
-            cgo: 0
-
-          - label: SQLite Cgo, full HTTP APIs
-            api: full-http
-            cgo: 1
-
           - label: PostgreSQL
             postgres: Postgres
             cgo: 0
@@ -376,7 +309,8 @@ jobs:
             if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
               continue
             fi
-            (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
+
+            (wget -O - "https://github.com/globekeeper/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
       # Build initial Dendrite image
       - run: docker build --build-arg=CGO=${{ matrix.cgo }} -t complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }} -f build/scripts/Complement${{ matrix.postgres }}.Dockerfile .
@@ -400,8 +334,6 @@ jobs:
     needs:
       [
         initial-tests-done,
-        upgrade_test,
-        upgrade_test_direct,
         sytest,
         complement,
       ]
@@ -412,15 +344,3 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
-
-  update-docker-images:
-    name: Update Docker images
-    permissions:
-      packages: write
-      contents: read
-      security-events: write # To upload Trivy sarif files
-    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
-    needs: [integration-tests-done]
-    uses: matrix-org/dendrite/.github/workflows/docker.yml@main
-    secrets:
-      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}

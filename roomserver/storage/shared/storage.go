@@ -422,14 +422,14 @@ func (d *Database) RemoveRoomAlias(ctx context.Context, alias string) error {
 	})
 }
 
-func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, stillInRoom, isRoomforgotten bool, err error) {
+func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, requestSenderUserID string) (membershipEventNID types.EventNID, membershipState tables.MembershipState, stillInRoom, isRoomforgotten bool, err error) {
 	var requestSenderUserNID types.EventStateKeyNID
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		requestSenderUserNID, err = d.assignStateKeyNID(ctx, txn, requestSenderUserID)
 		return err
 	})
 	if err != nil {
-		return 0, false, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
+		return 0, 0, false, false, fmt.Errorf("d.assignStateKeyNID: %w", err)
 	}
 
 	senderMembershipEventNID, senderMembership, isRoomforgotten, err :=
@@ -438,12 +438,12 @@ func (d *Database) GetMembership(ctx context.Context, roomNID types.RoomNID, req
 		)
 	if err == sql.ErrNoRows {
 		// The user has never been a member of that room
-		return 0, false, false, nil
+		return 0, 0, false, false, nil
 	} else if err != nil {
 		return
 	}
 
-	return senderMembershipEventNID, senderMembership == tables.MembershipStateJoin, isRoomforgotten, nil
+	return senderMembershipEventNID, senderMembership, senderMembership == tables.MembershipStateJoin, isRoomforgotten, nil
 }
 
 func (d *Database) GetMembershipEventNIDsForRoom(

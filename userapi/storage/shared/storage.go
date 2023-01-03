@@ -587,7 +587,7 @@ func (d *Database) CreateDevice(
 	ctx context.Context, localpart string, serverName gomatrixserverlib.ServerName,
 	deviceID *string, accessToken string, displayName *string, ipAddr, userAgent string,
 ) (dev *api.Device, returnErr error) {
-	if deviceID != nil {
+	if deviceID != nil && *deviceID != "" {
 		returnErr = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 			var err error
 			// Revoke existing tokens for this device

@@ -47,9 +47,6 @@ CREATE TABLE IF NOT EXISTS userapi_pushers (
 	data TEXT NOT NULL
 );
 
--- For faster deleting by app_id, pushkey pair.
-CREATE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_idx ON userapi_pushers(app_id, pushkey);
-
 -- For faster retrieving by localpart.
 CREATE INDEX IF NOT EXISTS userapi_pusher_localpart_idx ON userapi_pushers(localpart, server_name);
 

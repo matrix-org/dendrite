@@ -34,13 +34,16 @@ type JSServer struct {
 
 // OnRequestFromJS is the function that JS will invoke when there is a new request.
 // The JS function signature is:
-//   function(reqString: string): Promise<{result: string, error: string}>
+//
+//	function(reqString: string): Promise<{result: string, error: string}>
+//
 // Usage is like:
-//   const res = await global._go_js_server.fetch(reqString);
-//   if (res.error) {
-//     // handle error: this is a 'network' error, not a non-2xx error.
-//   }
-//   const rawHttpResponse = res.result;
+//
+//	const res = await global._go_js_server.fetch(reqString);
+//	if (res.error) {
+//	  // handle error: this is a 'network' error, not a non-2xx error.
+//	}
+//	const rawHttpResponse = res.result;
 func (h *JSServer) OnRequestFromJS(this js.Value, args []js.Value) interface{} {
 	// we HAVE to spawn a new goroutine and return immediately or else Go will deadlock
 	// if this request blocks at all e.g for /sync calls

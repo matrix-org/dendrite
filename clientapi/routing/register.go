@@ -45,6 +45,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/threepid"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 )
@@ -239,6 +240,7 @@ type authDict struct {
 	// Recaptcha
 	Response string `json:"response"`
 	// TODO: Lots of custom keys depending on the type
+	ThreePidCreds threepid.Credentials `json:"threepid_creds"`
 }
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#user-interactive-authentication-api
@@ -776,6 +778,7 @@ func handleRegistrationFlow(
 		}
 	}
 
+	var threePid *authtypes.ThreePID
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
@@ -791,6 +794,29 @@ func handleRegistrationFlow(
 		// there is nothing to do
 		// Add Dummy to the list of completed registration stages
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeDummy)
+
+	case authtypes.LoginTypeEmail:
+		threePid = &authtypes.ThreePID{}
+		r.Auth.ThreePidCreds.IDServer = cfg.ThreePidDelegate
+		var (
+			bound bool
+			err   error
+		)
+		bound, threePid.Address, threePid.Medium, err = threepid.CheckAssociation(req.Context(), r.Auth.ThreePidCreds, cfg)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("threepid.CheckAssociation failed")
+			return jsonerror.InternalServerError()
+		}
+		if !bound {
+			return util.JSONResponse{
+				Code: http.StatusBadRequest,
+				JSON: jsonerror.MatrixError{
+					ErrCode: "M_THREEPID_AUTH_FAILED",
+					Err:     "Failed to auth 3pid",
+				},
+			}
+		}
+		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeEmail)
 
 	case "":
 		// An empty auth type means that we want to fetch the available
@@ -850,7 +876,7 @@ func handleApplicationServiceRegistration(
 	return completeRegistration(
 		req.Context(), userAPI, r.Username, r.ServerName, "", appserviceID, req.RemoteAddr,
 		req.UserAgent(), r.Auth.Session, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
-		userapi.AccountTypeAppService,
+		userapi.AccountTypeAppService, nil,
 	)
 }
 
@@ -870,7 +896,7 @@ func checkAndCompleteFlow(
 		return completeRegistration(
 			req.Context(), userAPI, r.Username, r.ServerName, r.Password, "", req.RemoteAddr,
 			req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
-			userapi.AccountTypeUser,
+			userapi.AccountTypeUser, nil,
 		)
 	}
 	sessions.addParams(sessionID, r)
@@ -897,6 +923,7 @@ func completeRegistration(
 	inhibitLogin eventutil.WeakBoolean,
 	displayName, deviceID *string,
 	accType userapi.AccountType,
+	threePid *authtypes.ThreePID,
 ) util.JSONResponse {
 	if username == "" {
 		return util.JSONResponse{
@@ -935,6 +962,21 @@ func completeRegistration(
 
 	// Increment prometheus counter for created users
 	amtRegUsers.Inc()
+
+	// TODO-entry refuse register if threepid is already bound to account.
+	if threePid != nil {
+		err = userAPI.PerformSaveThreePIDAssociation(ctx, &userapi.PerformSaveThreePIDAssociationRequest{
+			Medium:    threePid.Medium,
+			ThreePID:  threePid.Address,
+			Localpart: accRes.Account.Localpart,
+		}, &struct{}{})
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("Failed to save 3PID association: " + err.Error()),
+			}
+		}
+	}
 
 	// Check whether inhibit_login option is set. If so, don't create an access
 	// token or a device for this user
@@ -1147,5 +1189,5 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType, nil)
 }

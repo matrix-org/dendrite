@@ -24,7 +24,9 @@ var (
 	}
 )
 
-type fakeAccountDatabase struct{}
+type fakeAccountDatabase struct {
+	api.ClientUserAPI
+}
 
 func (d *fakeAccountDatabase) PerformPasswordUpdate(ctx context.Context, req *api.PerformPasswordUpdateRequest, res *api.PerformPasswordUpdateResponse) error {
 	return nil
