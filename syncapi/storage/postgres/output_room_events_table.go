@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/matrix-org/dendrite/internal"
@@ -412,12 +413,12 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		eventFilter.Limit+1,
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("SelectRecentEvents failed: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("rowsToStreamEvents failed: %w", err)
 	}
 	if chronologicalOrder {
 		// The events need to be returned from oldest to latest, which isn't

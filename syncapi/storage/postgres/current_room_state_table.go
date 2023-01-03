@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
@@ -291,11 +292,14 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 		pq.StringArray(excludeEventIDs),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("SelectCurrentState failed: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectCurrentState: rows.close() failed")
-
-	return rowsToEvents(rows)
+	res, err := rowsToEvents(rows)
+	if err != nil {
+		return nil, fmt.Errorf("rowsToEvents failed: %w", err)
+	}
+	return res, nil
 }
 
 func (s *currentRoomStateStatements) DeleteRoomStateByEventID(

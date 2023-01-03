@@ -95,12 +95,18 @@ func (p *PDUStreamProvider) CompleteSync(
 	}
 
 	// Build up a /sync response. Add joined rooms.
-	for _, roomID := range joinedRoomIDs {
+	req.Log.WithField("rooms", len(joinedRoomIDs)).Debug("getting join response for rooms")
+	s := time.Now()
+	for i, roomID := range joinedRoomIDs {
 		jr, jerr := p.getJoinResponseForCompleteSync(
 			ctx, snapshot, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device, false,
 		)
 		if jerr != nil {
-			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
+			req.Log.WithError(jerr).WithContext(ctx).WithFields(logrus.Fields{
+				"failed_after":    time.Since(s),
+				"room_id":         roomID,
+				"collected_rooms": i,
+			}).Error("p.getJoinResponseForCompleteSync failed")
 			if ctxErr := req.Context.Err(); ctxErr != nil || jerr == sql.ErrTxDone {
 				return from
 			}
@@ -540,7 +546,7 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		}
 		backwardTopologyPos, backwardStreamPos, err = snapshot.PositionInTopology(ctx, event.EventID())
 		if err != nil {
-			return
+			return jr, fmt.Errorf("PositionInTopology failed: %w", err)
 		}
 		prevBatch = &types.TopologyToken{
 			Depth:       backwardTopologyPos,
@@ -609,7 +615,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 	filter.Types = &[]string{gomatrixserverlib.MRoomMember}
 	memberships, err := snapshot.GetStateEventsForRoom(ctx, roomID, &filter)
 	if err != nil {
-		return stateEvents, err
+		return stateEvents, fmt.Errorf("(lazyLoadMembers) GetStateEventsForRoom failed: %w", err)
 	}
 	// cache the membership events
 	for _, membership := range memberships {
