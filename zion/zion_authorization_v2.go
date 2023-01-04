@@ -171,7 +171,7 @@ func (za *ZionAuthorizationV2) isAllowedLocalhost(
 		}
 	default:
 		// channel entitlement check
-		isEntitled, err = space.IsEntitled0(
+		isEntitled, err = space.IsEntitledToChannel(
 			nil,
 			roomInfo.ChannelNetworkId,
 			user,
