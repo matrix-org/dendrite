@@ -433,7 +433,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				beforeJoinBody := fmt.Sprintf("Before invite in a %s room", tc.historyVisibility)
 				beforeJoinEv := room.CreateAndInsert(t, alice, "m.room.message", map[string]interface{}{"body": beforeJoinBody})
 				eventsToSend := append(room.Events(), beforeJoinEv)
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 				syncUntil(t, base, aliceDev.AccessToken, false,
@@ -472,7 +472,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 
 				eventsToSend = append([]*gomatrixserverlib.HeaderedEvent{}, inviteEv, afterInviteEv, joinEv, msgEv)
 
-				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", nil, false); err != nil {
+				if err := api.SendEvents(ctx, rsAPI, api.KindNew, eventsToSend, "test", "test", "test", nil, false); err != nil {
 					t.Fatalf("failed to send events: %v", err)
 				}
 				syncUntil(t, base, aliceDev.AccessToken, false,

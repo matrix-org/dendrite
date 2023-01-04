@@ -50,7 +50,7 @@ type destinationQueue struct {
 	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
-	signing            *SigningInfo
+	signing            map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
 	rsAPI              api.FederationRoomserverAPI
 	client             fedapi.FederationClient         // federation client
 	origin             gomatrixserverlib.ServerName    // origin of requests
@@ -141,23 +141,44 @@ func (oq *destinationQueue) handleBackoffNotifier() {
 	}
 }
 
+// wakeQueueIfEventsPending calls wakeQueueAndNotify only if there are
+// pending events or if forceWakeup is true. This prevents starting the
+// queue unnecessarily.
+func (oq *destinationQueue) wakeQueueIfEventsPending(forceWakeup bool) {
+	eventsPending := func() bool {
+		oq.pendingMutex.Lock()
+		defer oq.pendingMutex.Unlock()
+		return len(oq.pendingPDUs) > 0 || len(oq.pendingEDUs) > 0
+	}
+
+	// NOTE : Only wakeup and notify the queue if there are pending events
+	// or if forceWakeup is true. Otherwise there is no reason to start the
+	// queue goroutine and waste resources.
+	if forceWakeup || eventsPending() {
+		logrus.Info("Starting queue due to pending events or forceWakeup")
+		oq.wakeQueueAndNotify()
+	}
+}
+
 // wakeQueueAndNotify ensures the destination queue is running and notifies it
 // that there is pending work.
 func (oq *destinationQueue) wakeQueueAndNotify() {
-	// Wake up the queue if it's asleep.
-	oq.wakeQueueIfNeeded()
+	// NOTE : Send notification before waking queue to prevent a race
+	// where the queue was running and stops due to a timeout in between
+	// checking it and sending the notification.
 
 	// Notify the queue that there are events ready to send.
 	select {
 	case oq.notify <- struct{}{}:
 	default:
 	}
+
+	// Wake up the queue if it's asleep.
+	oq.wakeQueueIfNeeded()
 }
 
 // wakeQueueIfNeeded will wake up the destination queue if it is
-// not already running. If it is running but it is backing off
-// then we will interrupt the backoff, causing any federation
-// requests to retry.
+// not already running.
 func (oq *destinationQueue) wakeQueueIfNeeded() {
 	// Clear the backingOff flag and update the backoff metrics if it was set.
 	if oq.backingOff.CompareAndSwap(true, false) {

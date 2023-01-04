@@ -42,6 +42,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
 		return nil, err
 	}
+	blacklist, err := NewPostgresBlacklistTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	joinedHosts, err := NewPostgresJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -55,10 +59,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		return nil, err
 	}
 	queueJSON, err := NewPostgresQueueJSONTable(d.db)
-	if err != nil {
-		return nil, err
-	}
-	blacklist, err := NewPostgresBlacklistTable(d.db)
 	if err != nil {
 		return nil, err
 	}

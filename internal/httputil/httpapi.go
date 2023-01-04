@@ -42,10 +42,26 @@ type BasicAuth struct {
 	Password string `yaml:"password"`
 }
 
+type AuthAPIOpts struct {
+	GuestAccessAllowed bool
+}
+
+// AuthAPIOption is an option to MakeAuthAPI to add additional checks (e.g. guest access) to verify
+// the user is allowed to do specific things.
+type AuthAPIOption func(opts *AuthAPIOpts)
+
+// WithAllowGuests checks that guest users have access to this endpoint
+func WithAllowGuests() AuthAPIOption {
+	return func(opts *AuthAPIOpts) {
+		opts.GuestAccessAllowed = true
+	}
+}
+
 // MakeAuthAPI turns a util.JSONRequestHandler function into an http.Handler which authenticates the request.
 func MakeAuthAPI(
 	metricsName string, userAPI userapi.QueryAcccessTokenAPI,
 	f func(*http.Request, *userapi.Device) util.JSONResponse,
+	checks ...AuthAPIOption,
 ) http.Handler {
 	h := func(req *http.Request) util.JSONResponse {
 		logger := util.GetLogger(req.Context())
@@ -75,6 +91,19 @@ func MakeAuthAPI(
 				panic(r)
 			}
 		}()
+
+		// apply additional checks, if any
+		opts := AuthAPIOpts{}
+		for _, opt := range checks {
+			opt(&opts)
+		}
+
+		if !opts.GuestAccessAllowed && device.AccountType == userapi.AccountTypeGuest {
+			return util.JSONResponse{
+				Code: http.StatusForbidden,
+				JSON: jsonerror.GuestAccessForbidden("Guest access not allowed"),
+			}
+		}
 
 		jsonRes := f(req, device)
 		// do not log 4xx as errors as they are client fails, not server fails

@@ -1,5 +1,28 @@
 # Changelog
 
+## Dendrite 0.10.8 (2022-11-29)
+
+### Features
+
+* The built-in NATS Server has been updated to version 2.9.8
+* A number of under-the-hood changes have been merged for future virtual hosting support in Dendrite (running multiple domain names on the same Dendrite deployment)
+
+### Fixes
+
+* Event auth handling of invites has been refactored, which should fix some edge cases being handled incorrectly
+* Fix a bug when returning an empty protocol list, which could cause Element to display "The homeserver may be too old to support third party networks" when opening the public room directory
+* The sync API will no longer filter out the user's own membership when using lazy-loading
+* Dendrite will now correctly detect JetStream consumers being deleted, stopping the consumer goroutine as needed
+* A panic in the federation API where the server list could go out of bounds has been fixed
+* Blacklisted servers will now be excluded when querying joined servers, which improves CPU usage and performs less unnecessary outbound requests
+* A database writer will now be used to assign state key NIDs when requesting NIDs that may not exist yet
+* Dendrite will now correctly move local aliases for an upgraded room when the room is upgraded remotely
+* Dendrite will now correctly move account data for an upgraded room when the room is upgraded remotely
+* Missing state key NIDs will now be allocated on request rather than returning an error
+* Guest access is now correctly denied on a number of endpoints
+* Presence information will now be correctly sent for new private chats
+* A number of unspecced fields have been removed from outbound `/send` transactions
+
 ## Dendrite 0.10.7 (2022-11-04)
 
 ### Features
