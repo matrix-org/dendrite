@@ -141,34 +141,16 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 		return nil, err
 	}
 
-	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteRoomStateForRoomStmt, err = db.Prepare(deleteRoomStateForRoomSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRoomIDsWithAnyMembershipStmt, err = db.Prepare(selectRoomIDsWithAnyMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
-		return nil, err
-	}
-	//if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
-	//	return nil, err
-	//}
-	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCount); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertRoomStateStmt, upsertRoomStateSQL},
+		{&s.deleteRoomStateByEventIDStmt, deleteRoomStateByEventIDSQL},
+		{&s.deleteRoomStateForRoomStmt, deleteRoomStateForRoomSQL},
+		{&s.selectRoomIDsWithMembershipStmt, selectRoomIDsWithMembershipSQL},
+		{&s.selectRoomIDsWithAnyMembershipStmt, selectRoomIDsWithAnyMembershipSQL},
+		{&s.selectJoinedUsersStmt, selectJoinedUsersSQL},
+		{&s.selectStateEventStmt, selectStateEventSQL},
+		{&s.selectMembershipCountStmt, selectMembershipCount},
+	}.Prepare(db)
 }
 
 // SelectJoinedUsers returns a map of room ID to a list of joined user IDs.

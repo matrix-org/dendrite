@@ -133,7 +133,7 @@ type currentRoomStateStatements struct {
 	selectStateEventStmt               *sql.Stmt
 	selectSharedUsersStmt              *sql.Stmt
 	selectMembershipCountStmt          *sql.Stmt
-	selectRoomHeroes                   *sql.Stmt
+	selectRoomHeroesStmt               *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -153,46 +153,21 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 		return nil, err
 	}
 
-	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
-		return nil, err
-	}
-	if s.deleteRoomStateForRoomStmt, err = db.Prepare(deleteRoomStateForRoomSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectRoomIDsWithAnyMembershipStmt, err = db.Prepare(selectRoomIDsWithAnyMembershipSQL); err != nil {
-		return nil, err
-	}
-	if s.selectCurrentStateStmt, err = db.Prepare(selectCurrentStateSQL); err != nil {
-		return nil, err
-	}
-	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
-		return nil, err
-	}
-	if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
-		return nil, err
-	}
-	if s.selectEventsWithEventIDsStmt, err = db.Prepare(selectEventsWithEventIDsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
-		return nil, err
-	}
-	if s.selectSharedUsersStmt, err = db.Prepare(selectSharedUsersSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCount); err != nil {
-		return nil, err
-	}
-	if s.selectRoomHeroes, err = db.Prepare(selectRoomHeroes); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertRoomStateStmt, upsertRoomStateSQL},
+		{&s.deleteRoomStateByEventIDStmt, deleteRoomStateByEventIDSQL},
+		{&s.deleteRoomStateForRoomStmt, deleteRoomStateForRoomSQL},
+		{&s.selectRoomIDsWithMembershipStmt, selectRoomIDsWithMembershipSQL},
+		{&s.selectRoomIDsWithAnyMembershipStmt, selectRoomIDsWithAnyMembershipSQL},
+		{&s.selectCurrentStateStmt, selectCurrentStateSQL},
+		{&s.selectJoinedUsersStmt, selectJoinedUsersSQL},
+		{&s.selectJoinedUsersInRoomStmt, selectJoinedUsersInRoomSQL},
+		{&s.selectEventsWithEventIDsStmt, selectEventsWithEventIDsSQL},
+		{&s.selectStateEventStmt, selectStateEventSQL},
+		{&s.selectSharedUsersStmt, selectSharedUsersSQL},
+		{&s.selectMembershipCountStmt, selectMembershipCount},
+		{&s.selectRoomHeroesStmt, selectRoomHeroes},
+	}.Prepare(db)
 }
 
 // SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
@@ -467,12 +442,12 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 }
 
 func (s *currentRoomStateStatements) SelectRoomHeroes(ctx context.Context, txn *sql.Tx, roomID, excludeUserID string, memberships []string) ([]string, error) {
-	stmt := sqlutil.TxStmt(txn, s.selectRoomHeroes)
+	stmt := sqlutil.TxStmt(txn, s.selectRoomHeroesStmt)
 	rows, err := stmt.QueryContext(ctx, roomID, pq.StringArray(memberships), excludeUserID)
 	if err != nil {
 		return nil, err
 	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomHeroes: rows.close() failed")
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomHeroesStmt: rows.close() failed")
 
 	var stateKey string
 	result := make([]string, 0, 5)
