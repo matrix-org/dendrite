@@ -307,3 +307,64 @@ func TestLoginToken(t *testing.T) {
 		})
 	})
 }
+
+func TestQueryAccountByLocalpart(t *testing.T) {
+	alice := test.NewUser(t)
+
+	localpart, userServername, _ := gomatrixserverlib.SplitID('@', alice.ID)
+
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
+		defer close()
+
+		createdAcc, err := db.CreateAccount(ctx, localpart, userServername, "", "", alice.AccountType)
+		if err != nil {
+			t.Error(err)
+		}
+
+		testCases := func(t *testing.T, internalAPI api.UserInternalAPI) {
+			// Query existing account
+			queryAccResp := &api.QueryAccountByLocalpartResponse{}
+			if err = internalAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
+				Localpart:  localpart,
+				ServerName: userServername,
+			}, queryAccResp); err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(createdAcc, queryAccResp.Account) {
+				t.Fatalf("created and queried accounts don't match:\n%+v vs.\n%+v", createdAcc, queryAccResp.Account)
+			}
+
+			// Query non-existent account, this should result in an error
+			err = internalAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
+				Localpart:  "doesnotexist",
+				ServerName: userServername,
+			}, queryAccResp)
+
+			if err == nil {
+				t.Fatalf("expected an error, but got none: %+v", queryAccResp)
+			}
+		}
+
+		t.Run("Monolith", func(t *testing.T) {
+			testCases(t, intAPI)
+			// also test tracing
+			testCases(t, &api.UserInternalAPITrace{Impl: intAPI})
+		})
+
+		t.Run("HTTP API", func(t *testing.T) {
+			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
+			userapi.AddInternalRoutes(router, intAPI, false)
+			apiURL, cancel := test.ListenAndServe(t, router, false)
+			defer cancel()
+
+			userHTTPApi, err := inthttp.NewUserAPIClient(apiURL, &http.Client{Timeout: time.Second * 5})
+			if err != nil {
+				t.Fatalf("failed to create HTTP client: %s", err)
+			}
+			testCases(t, userHTTPApi)
+
+		})
+	})
+}

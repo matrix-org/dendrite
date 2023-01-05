@@ -82,8 +82,8 @@ func Password(
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	// Check the new password strength.
-	if resErr = internal.ValidatePassword(r.NewPassword); resErr != nil {
-		return *resErr
+	if err := internal.ValidatePassword(r.NewPassword); err != nil {
+		return *internal.PasswordResponse(err)
 	}
 
 	// Get the local part.

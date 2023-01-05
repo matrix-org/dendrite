@@ -137,7 +137,7 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 	request := struct {
 		Password string `json:"password"`
 	}{}
-	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
+	if err = json.NewDecoder(req.Body).Decode(&request); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to decode request body: " + err.Error()),
@@ -150,8 +150,8 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 		}
 	}
 
-	if resErr := internal.ValidatePassword(request.Password); resErr != nil {
-		return *resErr
+	if err = internal.ValidatePassword(request.Password); err != nil {
+		return *internal.PasswordResponse(err)
 	}
 
 	updateReq := &userapi.PerformPasswordUpdateRequest{

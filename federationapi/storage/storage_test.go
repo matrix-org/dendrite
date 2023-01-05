@@ -157,11 +157,11 @@ func TestOutboundPeeking(t *testing.T) {
 		if len(outboundPeeks) != len(peekIDs) {
 			t.Fatalf("inserted %d peeks, selected %d", len(peekIDs), len(outboundPeeks))
 		}
-		for i := range outboundPeeks {
-			if outboundPeeks[i].PeekID != peekIDs[i] {
-				t.Fatalf("unexpected peek ID: %s, want %s", outboundPeeks[i].PeekID, peekIDs[i])
-			}
+		gotPeekIDs := make([]string, 0, len(outboundPeeks))
+		for _, p := range outboundPeeks {
+			gotPeekIDs = append(gotPeekIDs, p.PeekID)
 		}
+		assert.ElementsMatch(t, gotPeekIDs, peekIDs)
 	})
 }
 
@@ -239,10 +239,10 @@ func TestInboundPeeking(t *testing.T) {
 		if len(inboundPeeks) != len(peekIDs) {
 			t.Fatalf("inserted %d peeks, selected %d", len(peekIDs), len(inboundPeeks))
 		}
-		for i := range inboundPeeks {
-			if inboundPeeks[i].PeekID != peekIDs[i] {
-				t.Fatalf("unexpected peek ID: %s, want %s", inboundPeeks[i].PeekID, peekIDs[i])
-			}
+		gotPeekIDs := make([]string, 0, len(inboundPeeks))
+		for _, p := range inboundPeeks {
+			gotPeekIDs = append(gotPeekIDs, p.PeekID)
 		}
+		assert.ElementsMatch(t, gotPeekIDs, peekIDs)
 	})
 }

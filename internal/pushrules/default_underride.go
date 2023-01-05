@@ -25,7 +25,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.call.invite",
+				Pattern: pointer("m.call.invite"),
 			},
 		},
 		Actions: []*Action{
@@ -34,11 +34,6 @@ var (
 				Kind:  SetTweakAction,
 				Tweak: SoundTweak,
 				Value: "ring",
-			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
 			},
 		},
 	}
@@ -54,7 +49,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.encrypted",
+				Pattern: pointer("m.room.encrypted"),
 			},
 		},
 		Actions: []*Action{
@@ -63,11 +58,6 @@ var (
 				Kind:  SetTweakAction,
 				Tweak: SoundTweak,
 				Value: "default",
-			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
 			},
 		},
 	}
@@ -83,20 +73,15 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.message",
+				Pattern: pointer("m.room.message"),
 			},
 		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
 			{
 				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
+				Tweak: SoundTweak,
+				Value: "default",
 			},
 		},
 	}
@@ -108,16 +93,11 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.message",
+				Pattern: pointer("m.room.message"),
 			},
 		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
 		},
 	}
 	mRuleEncryptedDefinition = Rule{
@@ -128,16 +108,11 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.encrypted",
+				Pattern: pointer("m.room.encrypted"),
 			},
 		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
-			},
 		},
 	}
 )

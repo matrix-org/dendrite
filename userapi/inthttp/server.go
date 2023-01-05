@@ -189,4 +189,9 @@ func AddRoutes(internalAPIMux *mux.Router, s api.UserInternalAPI, enableMetrics 
 		PerformSaveThreePIDAssociationPath,
 		httputil.MakeInternalRPCAPI("UserAPIPerformSaveThreePIDAssociation", enableMetrics, s.PerformSaveThreePIDAssociation),
 	)
+
+	internalAPIMux.Handle(
+		QueryAccountByLocalpartPath,
+		httputil.MakeInternalRPCAPI("AccountByLocalpart", enableMetrics, s.QueryAccountByLocalpart),
+	)
 }
