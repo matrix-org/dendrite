@@ -115,6 +115,9 @@ type CurrentRoomState interface {
 	SelectJoinedUsersInRoom(ctx context.Context, txn *sql.Tx, roomIDs []string) (map[string][]string, error)
 	// SelectSharedUsers returns a subset of otherUserIDs that share a room with userID.
 	SelectSharedUsers(ctx context.Context, txn *sql.Tx, userID string, otherUserIDs []string) ([]string, error)
+
+	SelectRoomHeroes(ctx context.Context, txn *sql.Tx, roomID, excludeUserID string, memberships []string) ([]string, error)
+	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string) (int, error)
 }
 
 // BackwardsExtremities keeps track of backwards extremities for a room.
@@ -185,7 +188,6 @@ type Receipts interface {
 type Memberships interface {
 	UpsertMembership(ctx context.Context, txn *sql.Tx, event *gomatrixserverlib.HeaderedEvent, streamPos, topologicalPos types.StreamPosition) error
 	SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string, pos types.StreamPosition) (count int, err error)
-	SelectHeroes(ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string) (heroes []string, err error)
 	SelectMembershipForUser(ctx context.Context, txn *sql.Tx, roomID, userID string, pos int64) (membership string, topologicalPos int, err error)
 	SelectMemberships(
 		ctx context.Context, txn *sql.Tx,

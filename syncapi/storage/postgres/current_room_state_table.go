@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 
 	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
@@ -110,6 +111,15 @@ const selectSharedUsersSQL = "" +
 	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
 	") AND type = 'm.room.member' AND state_key = ANY($2) AND membership IN ('join', 'invite');"
 
+const selectMembershipCount = `SELECT count(*) FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = $2`
+
+const selectRoomHeroes = `
+SELECT state_key FROM syncapi_current_room_state
+WHERE type = 'm.room.member' AND room_id = $1 AND membership = ANY($2) AND state_key != $3
+ORDER BY added_at, state_key
+LIMIT 5
+`
+
 type currentRoomStateStatements struct {
 	upsertRoomStateStmt                *sql.Stmt
 	deleteRoomStateByEventIDStmt       *sql.Stmt
@@ -122,6 +132,8 @@ type currentRoomStateStatements struct {
 	selectEventsWithEventIDsStmt       *sql.Stmt
 	selectStateEventStmt               *sql.Stmt
 	selectSharedUsersStmt              *sql.Stmt
+	selectMembershipCountStmt          *sql.Stmt
+	selectRoomHeroes                   *sql.Stmt
 }
 
 func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, error) {
@@ -172,6 +184,12 @@ func NewPostgresCurrentRoomStateTable(db *sql.DB) (tables.CurrentRoomState, erro
 		return nil, err
 	}
 	if s.selectSharedUsersStmt, err = db.Prepare(selectSharedUsersSQL); err != nil {
+		return nil, err
+	}
+	if s.selectMembershipCountStmt, err = db.Prepare(selectMembershipCount); err != nil {
+		return nil, err
+	}
+	if s.selectRoomHeroes, err = db.Prepare(selectRoomHeroes); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -446,4 +464,35 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 		result = append(result, stateKey)
 	}
 	return result, rows.Err()
+}
+
+func (s *currentRoomStateStatements) SelectRoomHeroes(ctx context.Context, txn *sql.Tx, roomID, excludeUserID string, memberships []string) ([]string, error) {
+	stmt := sqlutil.TxStmt(txn, s.selectRoomHeroes)
+	rows, err := stmt.QueryContext(ctx, roomID, pq.StringArray(memberships), excludeUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomHeroes: rows.close() failed")
+
+	var stateKey string
+	result := make([]string, 0, 5)
+	for rows.Next() {
+		if err = rows.Scan(&stateKey); err != nil {
+			return nil, err
+		}
+		result = append(result, stateKey)
+	}
+	return result, rows.Err()
+}
+
+func (s *currentRoomStateStatements) SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string) (count int, err error) {
+	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
+	err = stmt.QueryRowContext(ctx, roomID, membership).Scan(&count)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return count, nil
 }
