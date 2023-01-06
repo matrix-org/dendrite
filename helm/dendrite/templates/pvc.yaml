@@ -5,7 +5,7 @@ kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: {{ .Release.Name }}-media-pvc
+  name: {{ include "dendrite.fullname" . }}-media-pvc
 spec:
   accessModes:
     - ReadWriteOnce
@@ -21,7 +21,7 @@ kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: {{ .Release.Name }}-jetstream-pvc
+  name: {{ include "dendrite.fullname" . }}-jetstream-pvc
 spec:
   accessModes:
     - ReadWriteOnce
@@ -37,7 +37,7 @@ kind: PersistentVolumeClaim
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: {{ .Release.Name }}-search-pvc
+  name: {{ include "dendrite.fullname" . }}-search-pvc
 spec:
   accessModes:
     - ReadWriteOnce

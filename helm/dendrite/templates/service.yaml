@@ -1,5 +1,4 @@
 {{ template "validate.config" . }}
-
 ---
 apiVersion: v1
 kind: Service

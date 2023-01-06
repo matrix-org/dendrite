@@ -6,7 +6,7 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   name: {{ include "dendrite.fullname" . }}
   labels:
-    app: {{ $.Chart.Name }}
+    {{- include "dendrite.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
@@ -16,28 +16,34 @@ spec:
     metadata:
       labels:
         {{- include "dendrite.selectorLabels" . | nindent 8 }}
+      annotations:
+        confighash-global: secret-{{ .Values.global | toYaml | sha256sum | trunc 32 }}
+        confighash-clientapi: clientapi-{{ .Values.clientapi | toYaml | sha256sum | trunc 32 }}
+        confighash-federationapi: federationapi-{{ .Values.federationapi | toYaml | sha256sum | trunc 32 }}
+        confighash-mediaapi: mediaapi-{{ .Values.mediaapi | toYaml | sha256sum | trunc 32 }}
+        confighash-syncapi: syncapi-{{ .Values.syncapi | toYaml | sha256sum | trunc 32 }}
     spec:
       volumes:
-      - name: {{ .Release.Name }}-conf-vol
+      - name: {{ include "dendrite.fullname" . }}-conf-vol
         secret:
-          secretName: {{ .Release.Name }}-conf
-      - name: {{ .Release.Name }}-signing-key
+          secretName: {{ include "dendrite.fullname" . }}-conf
+      - name: {{ include "dendrite.fullname" . }}-signing-key
         secret:
-          secretName: {{ default (print .Release.Name "-signing-key") $.Values.signing_key.existingSecret | quote }}
+          secretName: {{ default (print ( include "dendrite.fullname" . ) "-signing-key") $.Values.signing_key.existingSecret | quote }}
       {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
-      - name:{{ .Release.Name }}-appservices
+      - name: {{ include "dendrite.fullname" . }}-appservices
         secret:
-          secretName: {{ .Release.Name }}-appservices-conf
+          secretName: {{ include "dendrite.fullname" . }}-appservices-conf
       {{- end }}
-      - name: {{ .Release.Name }}-jetstream
+      - name: {{ include "dendrite.fullname" . }}-jetstream
         persistentVolumeClaim:
-          claimName: {{ default (print .Release.Name "-jetstream-pvc") $.Values.persistence.jetstream.existingClaim | quote }}
-      - name: {{ .Release.Name }}-media
+          claimName: {{ default (print ( include "dendrite.fullname" . ) "-jetstream-pvc") $.Values.persistence.jetstream.existingClaim | quote }}
+      - name: {{ include "dendrite.fullname" . }}-media
         persistentVolumeClaim:
-          claimName: {{ default (print .Release.Name "-media-pvc") $.Values.persistence.media.existingClaim | quote }}
-      - name: {{ .Release.Name }}-search
+          claimName: {{ default (print ( include "dendrite.fullname" . ) "-media-pvc") $.Values.persistence.media.existingClaim | quote }}
+      - name: {{ include "dendrite.fullname" . }}-search
         persistentVolumeClaim:
-          claimName: {{ default (print .Release.Name "-search-pvc") $.Values.persistence.search.existingClaim | quote }}
+          claimName: {{ default (print ( include "dendrite.fullname" . ) "-search-pvc") $.Values.persistence.search.existingClaim | quote }}
       containers:
       - name: {{ $.Chart.Name }}
         {{- include "image.name" $.Values.image | nindent 8 }}
@@ -52,25 +58,26 @@ spec:
         env:
           - name: PPROFLISTEN
             value: "localhost:{{- $.Values.global.profiling.port -}}"
+            # TODO: Document this
         {{- end }}
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}
         volumeMounts:
         - mountPath: /etc/dendrite/
-          name: {{ .Release.Name }}-conf-vol
+          name: {{ include "dendrite.fullname" . }}-conf-vol
         - mountPath: /etc/dendrite/secrets/
-          name: {{ .Release.Name }}-signing-key
+          name: {{ include "dendrite.fullname" . }}-signing-key
         {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
         - mountPath: /etc/dendrite/appservices
-          name: {{ .Release.Name }}-appservices
+          name: {{ include "dendrite.fullname" . }}-appservices
           readOnly: true
         {{ end }}
         - mountPath: /data/media_store
-          name: {{ .Release.Name }}-media
+          name: {{ include "dendrite.fullname" . }}-media
         - mountPath: /data/jetstream
-          name: {{ .Release.Name }}-jetstream
+          name: {{ include "dendrite.fullname" . }}-jetstream
         - mountPath: /data/search
-          name: {{ .Release.Name }}-search
+          name: {{ include "dendrite.fullname" . }}-search
         livenessProbe:
           initialDelaySeconds: 10
           periodSeconds: 10

@@ -72,7 +72,7 @@ global:
     # -- Default database maximum open connections
     max_open_conns: 90
     # -- Default database maximum idle connections
-    max_idle_conns: 2
+    max_idle_conns: 5
     # -- Default database maximum lifetime
     conn_max_lifetime: -1
 

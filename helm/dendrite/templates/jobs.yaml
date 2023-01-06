@@ -1,6 +1,6 @@
 {{ if and .Values.signing_key.create (not .Values.signing_key.existingSecret ) }}
-{{ $name := (print .Release.Name "-signing-key") }}
-{{ $secretName := (print .Release.Name "-signing-key") }}
+{{ $name := (print ( include "dendrite.fullname" . ) "-signing-key") }}
+{{ $secretName := (print ( include "dendrite.fullname" . ) "-signing-key") }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -15,6 +15,7 @@ metadata:
   name: {{ $name }}
   labels:
     app.kubernetes.io/component: signingkey-job
+    {{- include "dendrite.labels" . | nindent 4 }}
 rules:
   - apiGroups:
       - ""
@@ -33,6 +34,7 @@ metadata:
   name: {{ $name }}
   labels:
     app.kubernetes.io/component: signingkey-job
+    {{- include "dendrite.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -46,6 +48,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: generate-signing-key
+  labels:
+    {{- include "dendrite.labels" . | nindent 4 }}
 spec:
   template:
     spec:

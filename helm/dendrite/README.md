@@ -36,7 +36,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://charts.bitnami.com/bitnami | postgresql | 11.6.21 |
+| https://charts.bitnami.com/bitnami | postgresql | 12.1.7 |
 ## Values
 
 | Key | Type | Default | Description |
@@ -65,7 +65,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | global.cache.max_size_estimated | string | `"1gb"` | The estimated maximum size for the global cache in bytes, or in terabytes, gigabytes, megabytes or kilobytes when the appropriate 'tb', 'gb', 'mb' or 'kb' suffix is specified. Note that this is not a hard limit, nor is it a memory limit for the entire process. A cache that is too small may ultimately provide little or no benefit. |
 | global.database.conn_max_lifetime | int | `-1` | Default database maximum lifetime |
 | global.database.host | string | `""` | Default database host |
-| global.database.max_idle_conns | int | `2` | Default database maximum idle connections |
+| global.database.max_idle_conns | int | `5` | Default database maximum idle connections |
 | global.database.max_open_conns | int | `90` | Default database maximum open connections |
 | global.database.password | string | `""` | Default database password |
 | global.database.user | string | `""` | Default database user |
