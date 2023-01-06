@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"github.com/matrix-org/dendrite/clientapi/auth"
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -42,10 +43,9 @@ type flow struct {
 
 func passwordLogin() flows {
 	f := flows{}
-	s := flow{
-		Type: "m.login.password",
-	}
-	f.Flows = append(f.Flows, s)
+	f.Flows = append(f.Flows, flow{
+		Type: authtypes.LoginTypePassword,
+	})
 	return f
 }
 
