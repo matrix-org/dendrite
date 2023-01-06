@@ -77,9 +77,10 @@ jobs:
       - name: Install chart
         run: |
           helm install --values helm/dendrite/ci/ct-postgres-sharedsecret-values.yaml dendrite helm/dendrite
-      - name: Wait for Dendrite to be up
+      - name: Wait for Postgres and Dendrite to be up
         run: |
-          kubectl wait --for=condition=ready --timeout=90s pod -l app.kubernetes.io/name=dendrite
+          kubectl wait --for=condition=ready --timeout=90s pod -l app.kubernetes.io/name=postgresql || kubectl get pods -A
+          kubectl wait --for=condition=ready --timeout=90s pod -l app.kubernetes.io/name=dendrite || kubectl get pods -A
           kubectl get pods -A
           kubectl get services
           kubectl get ingress
