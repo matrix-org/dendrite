@@ -5,8 +5,9 @@ postgresql:
     persistence:
       size: 1Gi
 
-global:
-  server_name: "localhost"
+dendrite_config:
+  global:
+    server_name: "localhost"
 
 ingress:
   enabled: true

@@ -58,7 +58,6 @@ spec:
         env:
           - name: PPROFLISTEN
             value: "localhost:{{- $.Values.global.profiling.port -}}"
-            # TODO: Document this
         {{- end }}
         resources:
         {{- toYaml $.Values.resources | nindent 10 }}
@@ -76,7 +75,7 @@ spec:
           name: {{ include "dendrite.fullname" . }}-media
         - mountPath: /data/jetstream
           name: {{ include "dendrite.fullname" . }}-jetstream
-        - mountPath: /data/search
+        - mountPath: {{ .Values.dendrite_config.sync_api.search.index_path }}
           name: {{ include "dendrite.fullname" . }}-search
         livenessProbe:
           initialDelaySeconds: 10

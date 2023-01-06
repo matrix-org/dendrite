@@ -22,23 +22,28 @@ resources:
     memory: "4096Mi"
 
 persistence:
+  # -- The storage class to use for volume claims. Defaults to the
+  # cluster default storage class.
   storageClass: ""
   jetstream:
     # -- Use an existing volume claim for jetstream
     existingClaim: ""
+    # -- PVC Storage Request for the jetstream volume
     capacity: "1Gi"
   media:
     # -- Use an existing volume claim for media files
     existingClaim: ""
+    # -- PVC Storage Request for the media volume
     capacity: "1Gi"
   search:
     # -- Use an existing volume claim for the fulltext search index
     existingClaim: ""
+    # -- PVC Storage Request for the search volume
     capacity: "1Gi"
 
 dendrite_config:
   global:
-    # -- Servername for this Dendrite deployment
+    # -- **REQUIRED** Servername for this Dendrite deployment.
     server_name: ""
 
     # -- The server name to delegate server-server communications to, with optional port
@@ -62,11 +67,11 @@ dendrite_config:
     key_validity_period: 168h0m0s
 
     database:
-      # -- Default database host
+      # -- Default database host. (**REQUIRED** if not using the postgres dependency)
       host: ""
-      # -- Default database user
+      # -- Default database user. (**REQUIRED** if not using the postgres dependency)
       user: ""
-      # -- Default database password
+      # -- Default database password. (**REQUIRED** if not using the postgres dependency)
       password: ""
 
       # -- Default database maximum open connections
@@ -91,27 +96,29 @@ dendrite_config:
       # become popular.
       max_age: 1h
 
-    # -- Configures phone-home statistics reporting. These statistics contain the server
-    # name, number of active users and some information on your deployment config.
-    # We use this information to understand how Dendrite is being used in the wild.
     report_stats:
+      # -- Configures phone-home statistics reporting. These statistics contain the server
+      # name, number of active users and some information on your deployment config.
+      # We use this information to understand how Dendrite is being used in the wild.
       enabled: false
+      # -- Endpoint to report statistics to.
       endpoint: https://matrix.org/report-usage-stats/push
 
-    # -- Configures the handling of presence events. Inbound controls whether we receive
-    # presence events from other servers, outbound controls whether we send presence
-    # events for our local users to other servers.
     presence:
+      # -- Controls whether we receive presence events from other servers
       enable_inbound: false
+      # -- Controls whether we send presence events for our local users to other servers.
+      # (_May increase CPU/memory usage_)
       enable_outbound: false
 
-    # -- Server notices allows server admins to send messages to all users on the server.
     server_notices:
+      # -- Server notices allows server admins to send messages to all users on the server.
       enabled: false
-      # The local part, display name and avatar URL (as a mxc:// URL) for the user that
-      # will send the server notices. These are visible to all users on the deployment.
+      # -- The local part for the user sending server notices.
       local_part: "_server"
+      # -- The display name for the user sending server notices.
       display_name: "Server Alerts"
+      # -- The avatar URL (as a mxc:// URL) name for the user sending server notices.
       avatar_url: ""
       # The room name to be used when sending server notices. This room name will
       # appear in user clients.
@@ -220,6 +227,7 @@ dendrite_config:
     disable_http_keepalives: false
     # -- Perspective keyservers, to use as a backup when direct key fetch
     # requests don't succeed.
+    # @default -- See value.yaml
     key_perspectives:
       - server_name: matrix.org
         keys:
@@ -236,6 +244,7 @@ dendrite_config:
     # -- The maximum number of simultaneous thumbnail generators to run.
     max_thumbnail_generators: 10
     # -- A list of thumbnail sizes to be generated for media content.
+    # @default -- See value.yaml
     thumbnail_sizes:
       - width: 32
         height: 32
@@ -256,6 +265,8 @@ dendrite_config:
     search:
       # -- Whether or not search is enabled.
       enabled: true
+      # -- The path to store the search index in.
+      index_path: /data/search
       # -- The language most likely to be used on the server - used when indexing, to
       # ensure the returned results match expectations. A full list of possible languages
       # can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46)
