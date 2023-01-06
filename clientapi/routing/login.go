@@ -46,6 +46,12 @@ func passwordLogin() flows {
 	f.Flows = append(f.Flows, flow{
 		Type: authtypes.LoginTypePassword,
 	})
+
+	// TODO: Add config option to disable
+	f.Flows = append(f.Flows, flow{
+		Type: authtypes.LoginTypeApplicationService,
+	})
+
 	return f
 }
 
