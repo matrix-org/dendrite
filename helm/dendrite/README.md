@@ -113,7 +113,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | postgresql.auth.username | string | `"dendrite"` |  |
 | postgresql.enabled | bool | See value.yaml | Enable and configure postgres as the database for dendrite. |
 | postgresql.image.repository | string | `"bitnami/postgresql"` |  |
-| postgresql.image.tag | string | `"14.4.0"` |  |
+| postgresql.image.tag | string | `"15.1.0"` |  |
 | postgresql.persistence.enabled | bool | `false` |  |
 | resources | object | sets some sane default values | Default resource requests/limits. |
 | service.port | int | `80` |  |

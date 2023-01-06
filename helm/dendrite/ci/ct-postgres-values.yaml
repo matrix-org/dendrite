@@ -1,6 +1,9 @@
 ---
 postgresql:
   enabled: true
+  primary:
+    persistence:
+      size: 1Gi
 
 global:
   server_name: "localhost"
