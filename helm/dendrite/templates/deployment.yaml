@@ -54,7 +54,7 @@ spec:
           - name: http
             containerPort: 8008
             protocol: TCP
-        {{- if $.Values.global.profiling.enabled }}
+        {{- if $.Values.dendrite_config.global.profiling.enabled }}
         env:
           - name: PPROFLISTEN
             value: "localhost:{{- $.Values.global.profiling.port -}}"
