@@ -1,2 +1,2 @@
 release-name-template: "helm-{{ .Name }}-{{ .Version }}"
-package-path: docs/
+pages-index-path: docs/index.yaml
