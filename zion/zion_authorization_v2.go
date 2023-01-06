@@ -161,7 +161,7 @@ func (za *ZionAuthorizationV2) isAllowedLocalhost(
 	switch roomInfo.ChannelNetworkId {
 	case "":
 		// ChannelNetworkId is empty. Space entitlement check.
-		isEntitled, err = space.IsEntitled(
+		isEntitled, err = space.IsEntitledToSpace(
 			nil,
 			user,
 			permission.String(),
