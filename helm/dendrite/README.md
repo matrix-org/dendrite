@@ -88,7 +88,7 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | dendrite_config.app_service_api.disable_tls_validation | bool | `false` | Disable the validation of TLS certificates of appservices. This is not recommended in production since it may allow appservice traffic to be sent to an insecure endpoint. |
 | dendrite_config.clientapi.registration_disabled | bool | `true` | Prevents new users from being able to register on this homeserver, except when using the registration shared secret below. |
 | dendrite_config.clientapi.guests_disabled | bool | `true` |  |
-| dendrite_config.clientapi.shared_secret | string | `""` | If set, allows registration by anyone who knows the shared secret, regardless of whether registration is otherwise disabled. |
+| dendrite_config.clientapi.registration_shared_secret | string | `""` | If set, allows registration by anyone who knows the shared secret, regardless of whether registration is otherwise disabled. |
 | dendrite_config.clientapi.enable_registration_captcha | bool | `false` | enable reCAPTCHA registration |
 | dendrite_config.clientapi.recaptcha_public_key | string | `""` | reCAPTCHA public key |
 | dendrite_config.clientapi.recaptcha_private_key | string | `""` | reCAPTCHA private key |

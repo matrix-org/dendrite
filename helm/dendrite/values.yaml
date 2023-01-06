@@ -179,7 +179,7 @@ dendrite_config:
 
     # -- If set, allows registration by anyone who knows the shared secret, regardless of
     # whether registration is otherwise disabled.
-    shared_secret: ""
+    registration_shared_secret: ""
 
     # -- enable reCAPTCHA registration
     enable_registration_captcha: false
