@@ -228,7 +228,7 @@ func loadConfig(
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
 	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load private_key: %w", err)
 	}
 
 	for _, v := range c.Global.VirtualHosts {
@@ -242,7 +242,7 @@ func loadConfig(
 		}
 		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
 		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load private_key for virtualhost %s: %w", v.ServerName, err)
 		}
 	}
 
