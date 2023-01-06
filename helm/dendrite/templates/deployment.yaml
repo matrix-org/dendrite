@@ -71,9 +71,9 @@ spec:
           name: {{ include "dendrite.fullname" . }}-appservices
           readOnly: true
         {{ end }}
-        - mountPath: /data/media_store
+        - mountPath: {{ .Values.dendrite_config.media_api.base_path }}
           name: {{ include "dendrite.fullname" . }}-media
-        - mountPath: /data/jetstream
+        - mountPath: {{ .Values.dendrite_config.global.jetstream.storage_path }}
           name: {{ include "dendrite.fullname" . }}-jetstream
         - mountPath: {{ .Values.dendrite_config.sync_api.search.index_path }}
           name: {{ include "dendrite.fullname" . }}-search

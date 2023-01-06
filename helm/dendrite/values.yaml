@@ -42,9 +42,13 @@ persistence:
     capacity: "1Gi"
 
 dendrite_config:
+  version: 2
   global:
     # -- **REQUIRED** Servername for this Dendrite deployment.
     server_name: ""
+
+    # -- The private key to use. (**NOTE**: This is overriden in Helm)
+    private_key: /etc/dendrite/secrets/signing.key
 
     # -- The server name to delegate server-server communications to, with optional port
     # e.g. localhost:443
@@ -60,6 +64,19 @@ dendrite_config:
       - matrix.org
       - vector.im
 
+    # -- The paths and expiry timestamps (as a UNIX timestamp in millisecond precision)
+    # to old signing keys that were formerly in use on this domain name. These
+    # keys will not be used for federation request or event signing, but will be
+    # provided to any other homeserver that asks when trying to verify old events.
+    old_private_keys:
+    #  If the old private key file is available:
+    #  - private_key: old_matrix_key.pem
+    #    expired_at: 1601024554498
+    #  If only the public key (in base64 format) and key ID are known:
+    #  - public_key: mn59Kxfdq9VziYHSBzI7+EDPDcBS2Xl7jeUdiiQcOnM=
+    #    key_id: ed25519:mykeyid
+    #    expired_at: 1601024554498
+
     # -- Disable federation. Dendrite will not be able to make any outbound HTTP requests
     # to other servers and the federation API will not be exposed.
     disable_federation: false
@@ -67,12 +84,9 @@ dendrite_config:
     key_validity_period: 168h0m0s
 
     database:
-      # -- Default database host. (**REQUIRED** if not using the postgres dependency)
-      host: ""
-      # -- Default database user. (**REQUIRED** if not using the postgres dependency)
-      user: ""
-      # -- Default database password. (**REQUIRED** if not using the postgres dependency)
-      password: ""
+      # -- The connection string for connections to Postgres.
+      # This will be set automatically if using the Postgres dependency
+      connection_string: ""
 
       # -- Default database maximum open connections
       max_open_conns: 90
@@ -80,6 +94,18 @@ dendrite_config:
       max_idle_conns: 5
       # -- Default database maximum lifetime
       conn_max_lifetime: -1
+
+    jetstream:
+      # -- Persistent directory to store JetStream streams in.
+      storage_path: "/data/jetstream"
+      # -- NATS JetStream server addresses if not using internal NATS.
+      addresses: []
+      # -- The prefix for JetStream streams
+      topic_prefix: "Dendrite"
+      # -- Keep all data in memory. (**NOTE**: This is overriden in Helm to `false`)
+      in_memory: false
+      # -- Disables TLS validation. This should **NOT** be used in production.
+      disable_tls_validation: true
 
     cache:
       # -- The estimated maximum size for the global cache in bytes, or in terabytes,
@@ -166,6 +192,8 @@ dendrite_config:
     # not recommended in production since it may allow appservice traffic
     # to be sent to an insecure endpoint.
     disable_tls_validation: false
+    # -- Appservice config files to load on startup. (**NOTE**: This is overriden by Helm, if a folder `./appservices/` exists)
+    config_files: []
 
 
   clientapi:
@@ -236,9 +264,11 @@ dendrite_config:
           - key_id: ed25519:a_RXGa
             public_key: l8Hft5qXKn1vfHrg3p4+W8gELQVo8N13JkluMfmn2sQ
 
-  mediaapi:
+  media_api:
+    # -- The path to store media files (e.g. avatars) in
+    base_path: "/data/media_store"
     # -- The max file size for uploaded media files
-    max_file_size_bytes: "10485760"
+    max_file_size_bytes: 10485760
     # Whether to dynamically generate thumbnails if needed.
     dynamic_thumbnails: false
     # -- The maximum number of simultaneous thumbnail generators to run.
@@ -266,7 +296,7 @@ dendrite_config:
       # -- Whether or not search is enabled.
       enabled: true
       # -- The path to store the search index in.
-      index_path: /data/search
+      index_path: "/data/search"
       # -- The language most likely to be used on the server - used when indexing, to
       # ensure the returned results match expectations. A full list of possible languages
       # can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46)

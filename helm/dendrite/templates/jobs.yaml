@@ -73,7 +73,7 @@ spec:
           done
           # update secret
           kubectl patch secret {{ $secretName }} -p "{\"data\":{\"signing.key\":\"$(base64 /etc/dendrite/signing-key.pem | tr -d '\n')\"}}"
-          [ $? -ne 0 ] && echo "Failed to update secret."
+          [ $? -ne 0 ] && echo "Failed to update secret." && exit 1
           echo "Signing key successfully created."
         volumeMounts:
         - mountPath: /etc/dendrite/
