@@ -195,8 +195,7 @@ dendrite_config:
     # -- Appservice config files to load on startup. (**NOTE**: This is overriden by Helm, if a folder `./appservices/` exists)
     config_files: []
 
-
-  clientapi:
+  client_api:
     # -- Prevents new users from being able to register on this homeserver, except when
     # using the registration shared secret below.
     registration_disabled: true
@@ -246,7 +245,7 @@ dendrite_config:
     # is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc.
     # The default value is 16 if not specified, which is circa 18 hours.
     send_max_retries: 16
-    # -- Disable TLS validation. This is not recommended in production!
+    # -- Disable TLS validation. This should **NOT** be used in production.
     disable_tls_validation: false
     prefer_direct_fetch: false
     # -- Prevents Dendrite from keeping HTTP connections
@@ -293,7 +292,7 @@ dendrite_config:
     real_ip_header: X-Real-IP
     # -- Configuration for the full-text search engine.
     search:
-      # -- Whether or not search is enabled.
+      # -- Whether fulltext search is enabled.
       enabled: true
       # -- The path to store the search index in.
       index_path: "/data/search"
@@ -301,6 +300,17 @@ dendrite_config:
       # ensure the returned results match expectations. A full list of possible languages
       # can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46)
       language: "en"
+
+  user_api:
+    # -- bcrypt cost to use when hashing passwords.
+    # (ranges from 4-31; 4 being least secure, 31 being most secure; _NOTE: Using a too high value can cause clients to timeout and uses more CPU._)
+    bcrypt_cost: 10
+    # -- OpenID Token lifetime in milliseconds.
+    openid_token_lifetime_ms: 3600000
+    # - Disable TLS validation when hitting push gateways. This should **NOT** be used in production.
+    push_gateway_disable_tls_validation: false
+    # -- Rooms to join users to after registration
+    auto_join_rooms: []
 
   # -- Default logging configuration
   logging:

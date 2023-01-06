@@ -93,25 +93,25 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | dendrite_config.mscs | object | `{"mscs":["msc2946"]}` | Configuration for experimental MSC's. (Valid values are: msc2836 and msc2946) |
 | dendrite_config.app_service_api.disable_tls_validation | bool | `false` | Disable the validation of TLS certificates of appservices. This is not recommended in production since it may allow appservice traffic to be sent to an insecure endpoint. |
 | dendrite_config.app_service_api.config_files | list | `[]` | Appservice config files to load on startup. (**NOTE**: This is overriden by Helm, if a folder `./appservices/` exists) |
-| dendrite_config.clientapi.registration_disabled | bool | `true` | Prevents new users from being able to register on this homeserver, except when using the registration shared secret below. |
-| dendrite_config.clientapi.guests_disabled | bool | `true` |  |
-| dendrite_config.clientapi.registration_shared_secret | string | `""` | If set, allows registration by anyone who knows the shared secret, regardless of whether registration is otherwise disabled. |
-| dendrite_config.clientapi.enable_registration_captcha | bool | `false` | enable reCAPTCHA registration |
-| dendrite_config.clientapi.recaptcha_public_key | string | `""` | reCAPTCHA public key |
-| dendrite_config.clientapi.recaptcha_private_key | string | `""` | reCAPTCHA private key |
-| dendrite_config.clientapi.recaptcha_bypass_secret | string | `""` | reCAPTCHA bypass secret |
-| dendrite_config.clientapi.recaptcha_siteverify_api | string | `""` |  |
-| dendrite_config.clientapi.turn.turn_user_lifetime | string | `"24h"` | Duration for how long users should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more) |
-| dendrite_config.clientapi.turn.turn_uris | list | `[]` |  |
-| dendrite_config.clientapi.turn.turn_shared_secret | string | `""` |  |
-| dendrite_config.clientapi.turn.turn_username | string | `""` | The TURN username |
-| dendrite_config.clientapi.turn.turn_password | string | `""` | The TURN password |
-| dendrite_config.clientapi.rate_limiting.enabled | bool | `true` | Enable rate limiting |
-| dendrite_config.clientapi.rate_limiting.threshold | int | `20` | After how many requests a rate limit should be activated |
-| dendrite_config.clientapi.rate_limiting.cooloff_ms | int | `500` | Cooloff time in milliseconds |
-| dendrite_config.clientapi.rate_limiting.exempt_user_ids | string | `nil` | Users which should be exempt from rate limiting |
+| dendrite_config.client_api.registration_disabled | bool | `true` | Prevents new users from being able to register on this homeserver, except when using the registration shared secret below. |
+| dendrite_config.client_api.guests_disabled | bool | `true` |  |
+| dendrite_config.client_api.registration_shared_secret | string | `""` | If set, allows registration by anyone who knows the shared secret, regardless of whether registration is otherwise disabled. |
+| dendrite_config.client_api.enable_registration_captcha | bool | `false` | enable reCAPTCHA registration |
+| dendrite_config.client_api.recaptcha_public_key | string | `""` | reCAPTCHA public key |
+| dendrite_config.client_api.recaptcha_private_key | string | `""` | reCAPTCHA private key |
+| dendrite_config.client_api.recaptcha_bypass_secret | string | `""` | reCAPTCHA bypass secret |
+| dendrite_config.client_api.recaptcha_siteverify_api | string | `""` |  |
+| dendrite_config.client_api.turn.turn_user_lifetime | string | `"24h"` | Duration for how long users should be considered valid ([see time.ParseDuration](https://pkg.go.dev/time#ParseDuration) for more) |
+| dendrite_config.client_api.turn.turn_uris | list | `[]` |  |
+| dendrite_config.client_api.turn.turn_shared_secret | string | `""` |  |
+| dendrite_config.client_api.turn.turn_username | string | `""` | The TURN username |
+| dendrite_config.client_api.turn.turn_password | string | `""` | The TURN password |
+| dendrite_config.client_api.rate_limiting.enabled | bool | `true` | Enable rate limiting |
+| dendrite_config.client_api.rate_limiting.threshold | int | `20` | After how many requests a rate limit should be activated |
+| dendrite_config.client_api.rate_limiting.cooloff_ms | int | `500` | Cooloff time in milliseconds |
+| dendrite_config.client_api.rate_limiting.exempt_user_ids | string | `nil` | Users which should be exempt from rate limiting |
 | dendrite_config.federation_api.send_max_retries | int | `16` | Federation failure threshold. How many consecutive failures that we should tolerate when sending federation requests to a specific server. The backoff is 2**x seconds, so 1 = 2 seconds, 2 = 4 seconds, 3 = 8 seconds, etc. The default value is 16 if not specified, which is circa 18 hours. |
-| dendrite_config.federation_api.disable_tls_validation | bool | `false` | Disable TLS validation. This is not recommended in production! |
+| dendrite_config.federation_api.disable_tls_validation | bool | `false` | Disable TLS validation. This should **NOT** be used in production. |
 | dendrite_config.federation_api.prefer_direct_fetch | bool | `false` |  |
 | dendrite_config.federation_api.disable_http_keepalives | bool | `false` | Prevents Dendrite from keeping HTTP connections open for reuse for future requests. Connections will be closed quicker but we may spend more time on TLS handshakes instead. |
 | dendrite_config.federation_api.key_perspectives | list | See value.yaml | Perspective keyservers, to use as a backup when direct key fetch requests don't succeed. |
@@ -122,9 +122,13 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | dendrite_config.media_api.thumbnail_sizes | list | See value.yaml | A list of thumbnail sizes to be generated for media content. |
 | dendrite_config.sync_api.real_ip_header | string | `"X-Real-IP"` | This option controls which HTTP header to inspect to find the real remote IP address of the client. This is likely required if Dendrite is running behind a reverse proxy server. |
 | dendrite_config.sync_api.search | object | `{"enabled":true,"index_path":"/data/search","language":"en"}` | Configuration for the full-text search engine. |
-| dendrite_config.sync_api.search.enabled | bool | `true` | Whether or not search is enabled. |
+| dendrite_config.sync_api.search.enabled | bool | `true` | Whether fulltext search is enabled. |
 | dendrite_config.sync_api.search.index_path | string | `"/data/search"` | The path to store the search index in. |
 | dendrite_config.sync_api.search.language | string | `"en"` | The language most likely to be used on the server - used when indexing, to ensure the returned results match expectations. A full list of possible languages can be found [here](https://github.com/matrix-org/dendrite/blob/76db8e90defdfb9e61f6caea8a312c5d60bcc005/internal/fulltext/bleve.go#L25-L46) |
+| dendrite_config.user_api.bcrypt_cost | int | `10` | bcrypt cost to use when hashing passwords. (ranges from 4-31; 4 being least secure, 31 being most secure; _NOTE: Using a too high value can cause clients to timeout and uses more CPU._) |
+| dendrite_config.user_api.openid_token_lifetime_ms | int | `3600000` | OpenID Token lifetime in milliseconds. |
+| dendrite_config.user_api.push_gateway_disable_tls_validation | bool | `false` |  |
+| dendrite_config.user_api.auto_join_rooms | list | `[]` | Rooms to join users to after registration |
 | dendrite_config.logging | list | `[{"level":"info","type":"std"}]` | Default logging configuration |
 | postgresql.enabled | bool | See value.yaml | Enable and configure postgres as the database for dendrite. |
 | postgresql.image.repository | string | `"bitnami/postgresql"` |  |
