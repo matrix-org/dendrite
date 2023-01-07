@@ -68,7 +68,7 @@ persistence:
 # @default -- see values.yaml
 database:
   connection_string: file:dendrite?sslmode=disable
-  max_open_conns: 100
+  max_open_conns: 90
   max_idle_conns: 2
   conn_max_lifetime: -1
 
