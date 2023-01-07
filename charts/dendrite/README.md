@@ -216,6 +216,9 @@ For more information see:
 | syncapi.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | syncapi.image.repository | string | `"matrixdotorg/dendrite-polylith"` | image repository |
 | syncapi.image.tag | string | chart.appVersion | image tag |
+| syncapi.config.search.enabled | bool | `false` | Fulltext indexing using [Bleve](https://github.com/blevesearch/bleve) |
+| syncapi.config.search.index_path | string | `/var/dendrite/searchindex` | Where to store search index |
+| syncapi.config.search.language | string | `en` | Indexing language |
 | userapi | object | values.yaml | Configure the User API For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml) |
 | userapi.config.bcrypt_cost | int | 10 | bcrypt cost (2^[cost] = rounds) |
 | userapi.database | object | See values.yaml | Override general dendrite.database parameters. |

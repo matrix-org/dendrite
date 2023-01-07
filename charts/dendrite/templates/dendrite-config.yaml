@@ -189,6 +189,10 @@ stringData:
         max_idle_conns: {{ default .Values.dendrite.database.max_idle_conns .Values.syncapi.database.max_idle_conns }}
         conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.syncapi.database.conn_max_lifetime }}
       {{- end }}
+      search:
+        enabled: {{ default "false" .Values.syncapi.config.search.enabled }}
+        index_path: {{ default "/var/dendrite/searchindex" .Values.syncapi.config.search.index_path | quote }}
+        language: {{ default "en" .Values.syncapi.config.search.language }}
     user_api:
       {{- if .Values.dendrite.polylithEnabled }}
       internal_api:

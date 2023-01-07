@@ -19,6 +19,9 @@
   {{- with (index $.Values "mediaapi") }}
     {{- $_ := set .persistence "media" $.Values.persistence.media -}}
   {{- end }}
+  {{- with (index $.Values "syncapi") }}
+    {{- $_ := set .persistence "search" $.Values.persistence.search -}}
+  {{- end }}
 {{- else }}
   {{ include "common.values.setup" . }}
   {{- $_ := set .Values.persistence "dendrite-key" (include "dendrite.keyVolume" . | fromYaml) -}}

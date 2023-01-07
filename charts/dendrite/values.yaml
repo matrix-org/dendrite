@@ -46,6 +46,11 @@ ingress:
 # -- Configure persistence settings for the chart under this key.
 # @default -- See values.yaml
 persistence:
+  search:
+    enabled: false
+    mountPath: &searchPath /var/dendrite/searchindex
+    accessMode: ReadWriteOnce
+    size: 5Gi
   media:
     enabled: false
     mountPath: &mediaPath /var/dendrite/media
@@ -336,6 +341,11 @@ syncapi:
     # -- Maximum connection lifetime
     # @default -- dendrite.database.conn_max_lifetime
     conn_max_lifetime: null
+  config:
+   search:
+     enabled: "false"
+     index_path: *searchPath
+     language: "en" # more possible languages can be found at https://github.com/blevesearch/bleve/tree/master/analysis/lang
 
 # -- Configure the Room Server
 # For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
