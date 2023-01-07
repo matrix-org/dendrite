@@ -241,6 +241,7 @@ federationapi:
     federation-certificates: []
     send-max_retires: 16
     disable_tls_validation: false
+    disable_http_keepalives: false
     proxy_outbound:
       enabled: false
       protocol: http

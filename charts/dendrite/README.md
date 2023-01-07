@@ -160,6 +160,7 @@ For more information see:
 | federationapi.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | federationapi.image.repository | string | `"matrixdotorg/dendrite-polylith"` | image repository |
 | federationapi.image.tag | string | chart.appVersion | image tag |
+| federationapi.config.disable_http_keepalives | bool | `false` | Disable HTTP keepalives, which also prevents connection reuse |
 | image | object | `{"pullPolicy":"IfNotPresent","repository":"ghcr.io/matrix-org/dendrite-monolith","tag":null}` |  IMPORTANT NOTE This chart inherits from our common library chart. You can check the default values/options here: https://github.com/k8s-at-home/library-charts/tree/main/charts/stable/common/values.yaml |
 | image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | image.repository | string | `"ghcr.io/matrix-org/dendrite-monolith"` | image repository |

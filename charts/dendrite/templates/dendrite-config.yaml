@@ -116,6 +116,7 @@ stringData:
       {{- end }}
       send_max_retries: {{ default 16 .Values.federationapi.config.send_max_retries }}
       disable_tls_validation: {{ default false .Values.federationapi.config.disable_tls_validation }}
+      disable_http_keepalives: {{ default false .Values.federationapi.config.disable_http_keepalives }}
       key_perspectives: {{- toYaml .Values.federationapi.config.key_perspectives | nindent 8 }}
       prefer_direct_fetch: {{ default false .Values.federationapi.config.prefer_direct_fetch }}
     key_server:
