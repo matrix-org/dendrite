@@ -506,6 +506,11 @@ dendrite:
     syncapi_paths: []
       # For Traefik uncomment these lines
       # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/messages
+      # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/context/{eventid:.*?}
+      # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/event/{eventid:.*?}
+      # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/relations/{eventid:.*?}
+      # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/relations/{eventid:.*?}/{reltype:.*?}
+      # - /_matrix/client/{version:.*?}/rooms/{roomid:.*?}/relations/{eventid:.*?}/{reltype:.*?}/{eventtype:.*?}
       # - /_matrix/client/{version:.*?}/keys/changes
       # - /_matrix/client/{version:.*?}/user/{userid:.*?}/filter/{filterid:.*?}
       # - /_matrix/client/{version:.*?}/user/{userid:.*?}/filter
@@ -513,7 +518,7 @@ dendrite:
       #
       # For nginx uncomment these lines and add the annotations here:
       # https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#use-regex
-      # - /_matrix/client/.*?/(sync|user/.*?/filter/?.*|keys/changes|rooms/.*?/messages)$
+      # - /_matrix/client/.*?/(sync|user/.*?/filter/?.*|keys/changes|rooms/.*?/(messages|context/.*?|relations/.*?|event/.*?))$
 
   # -- Configure the global settings for dendrite.
   # @default -- See values.yaml
