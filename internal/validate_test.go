@@ -3,10 +3,12 @@ package internal
 import (
 	"net/http"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
@@ -166,5 +168,69 @@ func Test_validateUsername(t *testing.T) {
 				t.Errorf("UsernameResponse() = %v, wantJSON %v", gotJSON, tt.wantJSON)
 			}
 		})
+	}
+}
+
+// This method tests validation of the provided Application Service token and
+// username that they're registering
+func TestValidationOfApplicationServices(t *testing.T) {
+	// Set up application service namespaces
+	regex := "@_appservice_.*"
+	regexp, err := regexp.Compile(regex)
+	if err != nil {
+		t.Errorf("Error compiling regex: %s", regex)
+	}
+
+	fakeNamespace := config.ApplicationServiceNamespace{
+		Exclusive:    true,
+		Regex:        regex,
+		RegexpObject: regexp,
+	}
+
+	// Create a fake application service
+	fakeID := "FakeAS"
+	fakeSenderLocalpart := "_appservice_bot"
+	fakeApplicationService := config.ApplicationService{
+		ID:              fakeID,
+		URL:             "null",
+		ASToken:         "1234",
+		HSToken:         "4321",
+		SenderLocalpart: fakeSenderLocalpart,
+		NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+			"users": {fakeNamespace},
+		},
+	}
+
+	// Set up a config
+	fakeConfig := &config.Dendrite{}
+	fakeConfig.Defaults(config.DefaultOpts{
+		Generate:   true,
+		Monolithic: true,
+	})
+	fakeConfig.Global.ServerName = "localhost"
+	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService}
+
+	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
+	asID, resp := ValidateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "1234")
+	if resp != nil || asID != fakeID {
+		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
+	}
+
+	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
+	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "xxxx")
+	if resp == nil || asID == fakeID {
+		t.Errorf("access_token should have been marked as invalid")
+	}
+
+	// Access token is correct, acting as valid user_id
+	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, "_appservice_bob", "1234")
+	if resp != nil || asID != fakeID {
+		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
+	}
+
+	// Access token is correct, acting as invalid user_id
+	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, "_something_else", "1234")
+	if resp == nil || asID == fakeID {
+		t.Errorf("user_id should not have been valid: @_something_else:localhost")
 	}
 }

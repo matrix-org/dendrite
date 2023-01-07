@@ -17,9 +17,9 @@ package auth
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/appservice/validate"
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
+	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/util"
 )
@@ -45,7 +45,7 @@ func (t *LoginTypeApplicationService) LoginFromJSON(
 		return nil, nil, err
 	}
 
-	_, err := validate.ValidateApplicationService(t.Config, r.Identifier.User, t.Token)
+	_, err := internal.ValidateApplicationService(t.Config, r.Identifier.User, t.Token)
 	if err != nil {
 		return nil, nil, err
 	}
