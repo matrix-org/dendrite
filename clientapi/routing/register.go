@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	asvalidate "github.com/matrix-org/dendrite/appservice/validate"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/tidwall/gjson"
 
@@ -695,7 +696,7 @@ func handleRegistrationFlow(
 	// If an access token is provided, ignore this check this is an appservice
 	// request and we will validate in validateApplicationService
 	if len(cfg.Derived.ApplicationServices) != 0 &&
-		UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
+		asvalidate.UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: spec.ASExclusive("This username is reserved by an application service."),
@@ -772,7 +773,7 @@ func handleApplicationServiceRegistration(
 
 	// Check application service register user request is valid.
 	// The application service's ID is returned if so.
-	appserviceID, err := validateApplicationService(
+	appserviceID, err := asvalidate.ValidateApplicationService(
 		cfg, r.Username, accessToken,
 	)
 	if err != nil {
