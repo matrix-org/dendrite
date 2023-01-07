@@ -207,6 +207,7 @@ stringData:
         conn_max_lifetime: {{ default .Values.dendrite.database.conn_max_lifetime .Values.userapi.database.conn_max_lifetime }}
       {{- end }}
       bcrypt_cost: {{ default 10 .Values.userapi.config.bcrypt_cost }}
+      auto_join_rooms: {{ .Values.userapi.config.auto_join_rooms }}
     tracing:
       enabled: {{ .Values.dendrite.tracing.enabled }}
       jaeger: {{- toYaml .Values.dendrite.tracing.jaeger | nindent 8 }}

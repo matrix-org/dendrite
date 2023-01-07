@@ -301,6 +301,8 @@ userapi:
     # -- bcrypt cost (2^[cost] = rounds)
     # @default -- 10
     bcrypt_cost: 10
+    auto_join_rooms: []
+    # - "#main:matrix.org"
 
 # -- Configure the Sync API
 # For more information see [the sample dendrite configuration](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
