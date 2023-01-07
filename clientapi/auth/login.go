@@ -15,7 +15,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -32,8 +31,13 @@ import (
 // called after authorization has completed, with the result of the authorization.
 // If the final return value is non-nil, an error occurred and the cleanup function
 // is nil.
-func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.UserLoginAPI, userAPI UserInternalAPIForLogin, cfg *config.ClientAPI) (*Login, LoginCleanupFunc, *util.JSONResponse) {
-	reqBytes, err := io.ReadAll(r)
+func LoginFromJSONReader(
+	req *http.Request,
+	useraccountAPI uapi.UserLoginAPI,
+	userAPI UserInternalAPIForLogin,
+	cfg *config.ClientAPI,
+) (*Login, LoginCleanupFunc, *util.JSONResponse) {
+	reqBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		err := &util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -65,6 +69,16 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 			UserAPI: userAPI,
 			Config:  cfg,
 		}
+	case authtypes.LoginTypeApplicationService:
+		token, err := ExtractAccessToken(req)
+		if err != nil {
+			token = ""
+		}
+
+		typ = &LoginTypeApplicationService{
+			Config: cfg,
+			Token:  token,
+		}
 	default:
 		err := util.JSONResponse{
 			Code: http.StatusBadRequest,
@@ -73,7 +87,7 @@ func LoginFromJSONReader(ctx context.Context, r io.Reader, useraccountAPI uapi.U
 		return nil, nil, &err
 	}
 
-	return typ.LoginFromJSON(ctx, reqBytes)
+	return typ.LoginFromJSON(req.Context(), reqBytes)
 }
 
 // UserInternalAPIForLogin contains the aspects of UserAPI required for logging in.
