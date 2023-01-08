@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -29,12 +30,49 @@ import (
 	"github.com/matrix-org/util"
 )
 
+var cfg = &config.ClientAPI{
+	Matrix: &config.Global{
+		SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: serverName,
+		},
+	},
+	Derived: &config.Derived{
+		ApplicationServices: []config.ApplicationService{
+			{
+				ID:      "anapplicationservice",
+				ASToken: "astoken",
+				NamespaceMap: map[string][]config.ApplicationServiceNamespace{
+					"users": {
+						{
+							Exclusive:    true,
+							Regex:        "@alice:example.com",
+							RegexpObject: regexp.MustCompile("@alice:example.com"),
+						},
+					},
+				},
+			},
+		},
+	},
+}
+
+func genHTTPRequest(ctx context.Context, body string, token string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", "", strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Add("Authorization", "Bearer "+token)
+	}
+	return req, err
+}
+
 func TestLoginFromJSONReader(t *testing.T) {
 	ctx := context.Background()
 
 	tsts := []struct {
-		Name string
-		Body string
+		Name  string
+		Body  string
+		Token string
 
 		WantUsername      string
 		WantDeviceID      string
@@ -62,21 +100,45 @@ func TestLoginFromJSONReader(t *testing.T) {
 			WantDeviceID:      "adevice",
 			WantDeletedTokens: []string{"atoken"},
 		},
+		{
+			Name: "appServiceWorksUserID",
+			Body: `{
+				"type": "m.login.application_service",
+				"identifier": { "type": "m.id.user", "user": "@alice:example.com" },
+				"device_id": "adevice"
+			}`,
+			Token: "astoken",
+
+			WantUsername: "@alice:example.com",
+			WantDeviceID: "adevice",
+		},
+		{
+			Name: "appServiceWorksLocalpart",
+			Body: `{
+				"type": "m.login.application_service",
+				"identifier": { "type": "m.id.user", "user": "alice" },
+				"device_id": "adevice"
+			}`,
+			Token: "astoken",
+
+			WantUsername: "alice",
+			WantDeviceID: "adevice",
+		},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
-			cfg := &config.ClientAPI{
-				Matrix: &config.Global{
-					SigningIdentity: gomatrixserverlib.SigningIdentity{
-						ServerName: serverName,
-					},
-				},
-			}
-			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
+
+			req, err := genHTTPRequest(ctx, tst.Body, tst.Token)
 			if err != nil {
-				t.Fatalf("LoginFromJSONReader failed: %+v", err)
+				t.Fatalf("genHTTPRequest failed: %v", err)
 			}
+
+			login, cleanup, jsonErr := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
+			if jsonErr != nil {
+				t.Fatalf("LoginFromJSONReader failed: %+v", jsonErr)
+			}
+
 			cleanup(ctx, &util.JSONResponse{Code: http.StatusOK})
 
 			if login.Username() != tst.WantUsername {
@@ -104,8 +166,9 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 	ctx := context.Background()
 
 	tsts := []struct {
-		Name string
-		Body string
+		Name  string
+		Body  string
+		Token string
 
 		WantErrCode string
 	}{
@@ -142,18 +205,56 @@ func TestBadLoginFromJSONReader(t *testing.T) {
             }`,
 			WantErrCode: "M_INVALID_ARGUMENT_VALUE",
 		},
+		{
+			Name: "noASToken",
+			Body: `{
+				"type": "m.login.application_service",
+				"identifier": { "type": "m.id.user", "user": "@alice:example.com" },
+				"device_id": "adevice"
+			}`,
+			WantErrCode: "M_MISSING_TOKEN",
+		},
+		{
+			Name:  "badASToken",
+			Token: "badastoken",
+			Body: `{
+				"type": "m.login.application_service",
+				"identifier": { "type": "m.id.user", "user": "@alice:example.com" },
+				"device_id": "adevice"
+			}`,
+			WantErrCode: "M_UNKNOWN_TOKEN",
+		},
+		{
+			Name:  "badASNamespace",
+			Token: "astoken",
+			Body: `{
+				"type": "m.login.application_service",
+				"identifier": { "type": "m.id.user", "user": "@bob:example.com" },
+				"device_id": "adevice"
+			}`,
+			WantErrCode: "M_EXCLUSIVE",
+		},
+		{
+			Name:  "badASUserID",
+			Token: "astoken",
+			Body: `{
+				"type": "m.login.application_service",
+				"identifier": { "type": "m.id.user", "user": "@alice:wrong.example.com" },
+				"device_id": "adevice"
+			}`,
+			WantErrCode: "M_INVALID_USERNAME",
+		},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
-			cfg := &config.ClientAPI{
-				Matrix: &config.Global{
-					SigningIdentity: gomatrixserverlib.SigningIdentity{
-						ServerName: serverName,
-					},
-				},
+
+			req, err := genHTTPRequest(ctx, tst.Body, tst.Token)
+			if err != nil {
+				t.Fatalf("genHTTPRequest failed: %v", err)
 			}
-			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, cfg)
+
+			_, cleanup, errRes := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
 			if errRes == nil {
 				cleanup(ctx, nil)
 				t.Fatalf("LoginFromJSONReader err: got %+v, want code %q", errRes, tst.WantErrCode)
