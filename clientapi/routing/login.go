@@ -68,7 +68,7 @@ func Login(
 			JSON: passwordLogin(),
 		}
 	} else if req.Method == http.MethodPost {
-		login, cleanup, authErr := auth.LoginFromJSONReader(req.Context(), req.Body, userAPI, userAPI, cfg)
+		login, cleanup, authErr := auth.LoginFromJSONReader(req, userAPI, userAPI, cfg)
 		if authErr != nil {
 			return *authErr
 		}
