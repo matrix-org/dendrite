@@ -79,7 +79,6 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 		// for the rest of the data to trickle down.
 		filter.AccountData.Limit = math.MaxInt32
 		filter.Room.AccountData.Limit = math.MaxInt32
-		filter.Room.State.Limit = math.MaxInt32
 	}
 
 	logger := util.GetLogger(req.Context()).WithFields(logrus.Fields{
@@ -91,15 +90,16 @@ func newSyncRequest(req *http.Request, device userapi.Device, syncDB storage.Dat
 	})
 
 	return &types.SyncRequest{
-		Context:       req.Context(),           //
-		Log:           logger,                  //
-		Device:        &device,                 //
-		Response:      types.NewResponse(),     // Populated by all streams
-		Filter:        filter,                  //
-		Since:         since,                   //
-		Timeout:       timeout,                 //
-		Rooms:         make(map[string]string), // Populated by the PDU stream
-		WantFullState: wantFullState,           //
+		Context:           req.Context(),             //
+		Log:               logger,                    //
+		Device:            &device,                   //
+		Response:          types.NewResponse(),       // Populated by all streams
+		Filter:            filter,                    //
+		Since:             since,                     //
+		Timeout:           timeout,                   //
+		Rooms:             make(map[string]string),   // Populated by the PDU stream
+		WantFullState:     wantFullState,             //
+		MembershipChanges: make(map[string]struct{}), // Populated by the PDU stream
 	}, nil
 }
 

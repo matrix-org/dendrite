@@ -23,15 +23,13 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
 type loginResponse struct {
-	UserID      string                       `json:"user_id"`
-	AccessToken string                       `json:"access_token"`
-	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
-	DeviceID    string                       `json:"device_id"`
+	UserID      string `json:"user_id"`
+	AccessToken string `json:"access_token"`
+	DeviceID    string `json:"device_id"`
 }
 
 type flows struct {
@@ -68,7 +66,7 @@ func Login(
 			return *authErr
 		}
 		// make a device/access token
-		authErr2 := completeAuth(req.Context(), cfg.Matrix.ServerName, userAPI, login, req.RemoteAddr, req.UserAgent())
+		authErr2 := completeAuth(req.Context(), cfg.Matrix, userAPI, login, req.RemoteAddr, req.UserAgent())
 		cleanup(req.Context(), &authErr2)
 		return authErr2
 	}
@@ -79,7 +77,7 @@ func Login(
 }
 
 func completeAuth(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, userAPI userapi.ClientUserAPI, login *auth.Login,
+	ctx context.Context, cfg *config.Global, userAPI userapi.ClientUserAPI, login *auth.Login,
 	ipAddr, userAgent string,
 ) util.JSONResponse {
 	token, err := auth.GenerateAccessToken()
@@ -88,7 +86,7 @@ func completeAuth(
 		return jsonerror.InternalServerError()
 	}
 
-	localpart, err := userutil.ParseUsernameParam(login.Username(), &serverName)
+	localpart, serverName, err := userutil.ParseUsernameParam(login.Username(), cfg)
 	if err != nil {
 		util.GetLogger(ctx).WithError(err).Error("auth.ParseUsernameParam failed")
 		return jsonerror.InternalServerError()
@@ -100,6 +98,7 @@ func completeAuth(
 		DeviceID:          login.DeviceID,
 		AccessToken:       token,
 		Localpart:         localpart,
+		ServerName:        serverName,
 		IPAddr:            ipAddr,
 		UserAgent:         userAgent,
 	}, &performRes)
@@ -115,7 +114,6 @@ func completeAuth(
 		JSON: loginResponse{
 			UserID:      performRes.Device.UserID,
 			AccessToken: performRes.Device.AccessToken,
-			HomeServer:  serverName,
 			DeviceID:    performRes.Device.ID,
 		},
 	}

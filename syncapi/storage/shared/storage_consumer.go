@@ -53,34 +53,27 @@ type Database struct {
 	NotificationData    tables.NotificationData
 	Ignores             tables.Ignores
 	Presence            tables.Presence
+	Relations           tables.Relations
 }
 
 func (d *Database) NewDatabaseSnapshot(ctx context.Context) (*DatabaseTransaction, error) {
-	return d.NewDatabaseTransaction(ctx)
-
-	/*
-		TODO: Repeatable read is probably the right thing to do here,
-		but it seems to cause some problems with the invite tests, so
-		need to investigate that further.
-
-		txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
-			// Set the isolation level so that we see a snapshot of the database.
-			// In PostgreSQL repeatable read transactions will see a snapshot taken
-			// at the first query, and since the transaction is read-only it can't
-			// run into any serialisation errors.
-			// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
-			Isolation: sql.LevelRepeatableRead,
-			ReadOnly:  true,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &DatabaseTransaction{
-			Database: d,
-			ctx:      ctx,
-			txn:      txn,
-		}, nil
-	*/
+	txn, err := d.DB.BeginTx(ctx, &sql.TxOptions{
+		// Set the isolation level so that we see a snapshot of the database.
+		// In PostgreSQL repeatable read transactions will see a snapshot taken
+		// at the first query, and since the transaction is read-only it can't
+		// run into any serialisation errors.
+		// https://www.postgresql.org/docs/9.5/static/transaction-iso.html#XACT-REPEATABLE-READ
+		Isolation: sql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &DatabaseTransaction{
+		Database: d,
+		ctx:      ctx,
+		txn:      txn,
+	}, nil
 }
 
 func (d *Database) NewDatabaseTransaction(ctx context.Context) (*DatabaseTransaction, error) {
@@ -571,18 +564,56 @@ func (d *Database) UpdatePresence(ctx context.Context, userID string, presence t
 	return pos, err
 }
 
-func (d *Database) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
-	return d.Presence.GetPresenceForUser(ctx, nil, userID)
+func (d *Database) GetPresences(ctx context.Context, userIDs []string) ([]*types.PresenceInternal, error) {
+	return d.Presence.GetPresenceForUsers(ctx, nil, userIDs)
 }
 
 func (d *Database) SelectMembershipForUser(ctx context.Context, roomID, userID string, pos int64) (membership string, topologicalPos int, err error) {
 	return d.Memberships.SelectMembershipForUser(ctx, nil, roomID, userID, pos)
 }
 
-func (s *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
-	return s.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
+func (d *Database) ReIndex(ctx context.Context, limit, afterID int64) (map[int64]gomatrixserverlib.HeaderedEvent, error) {
+	return d.OutputEvents.ReIndex(ctx, nil, limit, afterID, []string{
 		gomatrixserverlib.MRoomName,
 		gomatrixserverlib.MRoomTopic,
 		"m.room.message",
 	})
+}
+
+func (d *Database) UpdateRelations(ctx context.Context, event *gomatrixserverlib.HeaderedEvent) error {
+	var content gomatrixserverlib.RelationContent
+	if err := json.Unmarshal(event.Content(), &content); err != nil {
+		return fmt.Errorf("json.Unmarshal: %w", err)
+	}
+	switch {
+	case content.Relations == nil:
+		return nil
+	case content.Relations.EventID == "":
+		return nil
+	case content.Relations.RelationType == "":
+		return nil
+	case event.Type() == gomatrixserverlib.MRoomRedaction:
+		return nil
+	default:
+		return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+			return d.Relations.InsertRelation(
+				ctx, txn, event.RoomID(), content.Relations.EventID,
+				event.EventID(), event.Type(), content.Relations.RelationType,
+			)
+		})
+	}
+}
+
+func (d *Database) RedactRelations(ctx context.Context, roomID, redactedEventID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		return d.Relations.DeleteRelation(ctx, txn, roomID, redactedEventID)
+	})
+}
+
+func (d *Database) SelectMemberships(
+	ctx context.Context,
+	roomID string, pos types.TopologyToken,
+	membership, notMembership *string,
+) (eventIDs []string, err error) {
+	return d.Memberships.SelectMemberships(ctx, nil, roomID, pos, membership, notMembership)
 }

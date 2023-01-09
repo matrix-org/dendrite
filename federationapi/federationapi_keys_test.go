@@ -87,6 +87,7 @@ func TestMain(m *testing.M) {
 			cfg.Global.JetStream.StoragePath = config.Path(d)
 			cfg.Global.KeyID = serverKeyID
 			cfg.Global.KeyValidityPeriod = s.validity
+			cfg.FederationAPI.KeyPerspectives = nil
 			f, err := os.CreateTemp(d, "federation_keys_test*.db")
 			if err != nil {
 				return -1
@@ -103,7 +104,7 @@ func TestMain(m *testing.M) {
 
 			// Create the federation client.
 			s.fedclient = gomatrixserverlib.NewFederationClient(
-				s.config.Matrix.ServerName, serverKeyID, testPriv,
+				s.config.Matrix.SigningIdentities(),
 				gomatrixserverlib.WithTransport(transport),
 			)
 
@@ -136,7 +137,7 @@ func (m *MockRoundTripper) RoundTrip(req *http.Request) (res *http.Response, err
 	}
 
 	// Get the keys and JSON-ify them.
-	keys := routing.LocalKeys(s.config)
+	keys := routing.LocalKeys(s.config, gomatrixserverlib.ServerName(req.Host))
 	body, err := json.MarshalIndent(keys.JSON, "", "  ")
 	if err != nil {
 		return nil, err
@@ -207,7 +208,6 @@ func TestRenewalBehaviour(t *testing.T) {
 	// happy at this point that the key that we already have is from the past
 	// then repeating a key fetch should cause us to try and renew the key.
 	// If so, then the new key will end up in our cache.
-
 	serverC.renew()
 
 	res, err = serverA.api.FetchKeys(

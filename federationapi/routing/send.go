@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -196,12 +197,12 @@ type txnReq struct {
 
 // A subset of FederationClient functionality that txn requires. Useful for testing.
 type txnFederationClient interface {
-	LookupState(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
+	LookupState(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (
 		res gomatrixserverlib.RespState, err error,
 	)
-	LookupStateIDs(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error)
-	GetEvent(ctx context.Context, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
-	LookupMissingEvents(ctx context.Context, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
+	LookupStateIDs(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error)
+	GetEvent(ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string) (res gomatrixserverlib.Transaction, err error)
+	LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents,
 		roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
@@ -286,6 +287,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 			[]*gomatrixserverlib.HeaderedEvent{
 				event.Headered(roomVersion),
 			},
+			t.Destination,
 			t.Origin,
 			api.DoNotSendToOtherServers,
 			nil,
@@ -350,6 +352,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				for deviceID, message := range byUser {
 					// TODO: check that the user and the device actually exist here
 					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+						sentry.CaptureException(err)
 						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
 							"sender":    directPayload.Sender,
 							"user_id":   userID,
@@ -360,6 +363,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
 			if err := t.producer.SendDeviceListUpdate(ctx, e.Content, t.Origin); err != nil {
+				sentry.CaptureException(err)
 				util.GetLogger(ctx).WithError(err).Error("failed to InputDeviceListUpdate")
 			}
 		case gomatrixserverlib.MReceipt:
@@ -395,6 +399,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			}
 		case types.MSigningKeyUpdate:
 			if err := t.producer.SendSigningKeyUpdate(ctx, e.Content, t.Origin); err != nil {
+				sentry.CaptureException(err)
 				logrus.WithError(err).Errorf("Failed to process signing key update")
 			}
 		case gomatrixserverlib.MPresence:

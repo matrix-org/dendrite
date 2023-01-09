@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/gomatrixserverlib"
+
+	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 )
 
 // QueryLatestEventsAndStateRequest is a request to QueryLatestEventsAndState
@@ -257,7 +258,9 @@ type QueryRoomVersionForRoomResponse struct {
 
 type QueryPublishedRoomsRequest struct {
 	// Optional. If specified, returns whether this room is published or not.
-	RoomID string
+	RoomID             string
+	NetworkID          string
+	IncludeAllNetworks bool
 }
 
 type QueryPublishedRoomsResponse struct {
@@ -443,4 +446,16 @@ type QueryMembershipAtEventResponse struct {
 	// Memberships is a map from eventID to a list of events (if any). Events that
 	// do not have known state will return an empty array here.
 	Memberships map[string][]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
+}
+
+// QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a
+// a room with anymore. This is used to cleanup stale device list entries, where we would
+// otherwise keep on trying to get device lists.
+type QueryLeftUsersRequest struct {
+	StaleDeviceListUsers []string `json:"user_ids"`
+}
+
+// QueryLeftUsersResponse is the response to QueryLeftUsersRequest.
+type QueryLeftUsersResponse struct {
+	LeftUsers []string `json:"user_ids"`
 }

@@ -60,6 +60,7 @@ const (
 	QueryAccountByPasswordPath     = "/userapi/queryAccountByPassword"
 	QueryLocalpartForThreePIDPath  = "/userapi/queryLocalpartForThreePID"
 	QueryThreePIDsForLocalpartPath = "/userapi/queryThreePIDsForLocalpart"
+	QueryAccountByLocalpartPath    = "/userapi/queryAccountType"
 )
 
 // NewUserAPIClient creates a UserInternalAPI implemented by talking to a HTTP POST API.
@@ -355,11 +356,12 @@ func (h *httpUserInternalAPI) SetAvatarURL(
 
 func (h *httpUserInternalAPI) QueryNumericLocalpart(
 	ctx context.Context,
+	request *api.QueryNumericLocalpartRequest,
 	response *api.QueryNumericLocalpartResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryNumericLocalpart", h.apiURL+QueryNumericLocalpartPath,
-		h.httpClient, ctx, &struct{}{}, response,
+		h.httpClient, ctx, request, response,
 	)
 }
 
@@ -388,7 +390,7 @@ func (h *httpUserInternalAPI) QueryAccountByPassword(
 func (h *httpUserInternalAPI) SetDisplayName(
 	ctx context.Context,
 	request *api.PerformUpdateDisplayNameRequest,
-	response *struct{},
+	response *api.PerformUpdateDisplayNameResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"SetDisplayName", h.apiURL+PerformSetDisplayNamePath,
@@ -437,5 +439,16 @@ func (h *httpUserInternalAPI) PerformSaveThreePIDAssociation(
 	return httputil.CallInternalRPCAPI(
 		"PerformSaveThreePIDAssociation", h.apiURL+PerformSaveThreePIDAssociationPath,
 		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpUserInternalAPI) QueryAccountByLocalpart(
+	ctx context.Context,
+	req *api.QueryAccountByLocalpartRequest,
+	res *api.QueryAccountByLocalpartResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryAccountByLocalpart", h.apiURL+QueryAccountByLocalpartPath,
+		h.httpClient, ctx, req, res,
 	)
 }

@@ -18,6 +18,11 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/federationapi/types"
@@ -26,21 +31,18 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 )
 
 // KeyChangeConsumer consumes events that originate in key server.
 type KeyChangeConsumer struct {
-	ctx        context.Context
-	jetstream  nats.JetStreamContext
-	durable    string
-	db         storage.Database
-	queues     *queue.OutgoingQueues
-	serverName gomatrixserverlib.ServerName
-	rsAPI      roomserverAPI.FederationRoomserverAPI
-	topic      string
+	ctx               context.Context
+	jetstream         nats.JetStreamContext
+	durable           string
+	db                storage.Database
+	queues            *queue.OutgoingQueues
+	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	rsAPI             roomserverAPI.FederationRoomserverAPI
+	topic             string
 }
 
 // NewKeyChangeConsumer creates a new KeyChangeConsumer. Call Start() to begin consuming from key servers.
@@ -53,14 +55,14 @@ func NewKeyChangeConsumer(
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 ) *KeyChangeConsumer {
 	return &KeyChangeConsumer{
-		ctx:        process.Context(),
-		jetstream:  js,
-		durable:    cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
-		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
-		queues:     queues,
-		db:         store,
-		serverName: cfg.Matrix.ServerName,
-		rsAPI:      rsAPI,
+		ctx:               process.Context(),
+		jetstream:         js,
+		durable:           cfg.Matrix.JetStream.Prefixed("FederationAPIKeyChangeConsumer"),
+		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent),
+		queues:            queues,
+		db:                store,
+		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		rsAPI:             rsAPI,
 	}
 }
 
@@ -78,6 +80,7 @@ func (t *KeyChangeConsumer) onMessage(ctx context.Context, msgs []*nats.Msg) boo
 	msg := msgs[0] // Guaranteed to exist if onMessage is called
 	var m api.DeviceMessage
 	if err := json.Unmarshal(msg.Data, &m); err != nil {
+		sentry.CaptureException(err)
 		logrus.WithError(err).Errorf("failed to read device message from key change topic")
 		return true
 	}
@@ -105,10 +108,11 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	// only send key change events which originated from us
 	_, originServerName, err := gomatrixserverlib.SplitID('@', m.UserID)
 	if err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("Failed to extract domain from key change event")
 		return true
 	}
-	if originServerName != t.serverName {
+	if !t.isLocalServerName(originServerName) {
 		return true
 	}
 
@@ -118,13 +122,15 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		WantMembership: "join",
 	}, &queryRes)
 	if err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined rooms for user")
 		return true
 	}
 
 	// send this key change to all servers who share rooms with this user.
-	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
+	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
 	if err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to calculate joined hosts for rooms user is in")
 		return true
 	}
@@ -135,7 +141,7 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   gomatrixserverlib.MDeviceListUpdate,
-		Origin: string(t.serverName),
+		Origin: string(originServerName),
 	}
 	event := gomatrixserverlib.DeviceListUpdateEvent{
 		UserID:            m.UserID,
@@ -147,12 +153,13 @@ func (t *KeyChangeConsumer) onDeviceKeyMessage(m api.DeviceMessage) bool {
 		Keys:              m.KeyJSON,
 	}
 	if edu.Content, err = json.Marshal(event); err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("failed to marshal EDU JSON")
 		return true
 	}
 
 	logger.Debugf("Sending device list update message to %q", destinations)
-	err = t.queues.SendEDU(edu, t.serverName, destinations)
+	err = t.queues.SendEDU(edu, originServerName, destinations)
 	return err == nil
 }
 
@@ -160,10 +167,11 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	output := m.CrossSigningKeyUpdate
 	_, host, err := gomatrixserverlib.SplitID('@', output.UserID)
 	if err != nil {
+		sentry.CaptureException(err)
 		logrus.WithError(err).Errorf("fedsender key change consumer: user ID parse failure")
 		return true
 	}
-	if host != gomatrixserverlib.ServerName(t.serverName) {
+	if !t.isLocalServerName(host) {
 		// Ignore any messages that didn't originate locally, otherwise we'll
 		// end up parroting information we received from other servers.
 		return true
@@ -176,12 +184,14 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 		WantMembership: "join",
 	}, &queryRes)
 	if err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined rooms for user")
 		return true
 	}
 	// send this key change to all servers who share rooms with this user.
-	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true)
+	destinations, err := t.db.GetJoinedHostsForRooms(t.ctx, queryRes.RoomIDs, true, true)
 	if err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to calculate joined hosts for rooms user is in")
 		return true
 	}
@@ -193,15 +203,16 @@ func (t *KeyChangeConsumer) onCrossSigningMessage(m api.DeviceMessage) bool {
 	// Pack the EDU and marshal it
 	edu := &gomatrixserverlib.EDU{
 		Type:   types.MSigningKeyUpdate,
-		Origin: string(t.serverName),
+		Origin: string(host),
 	}
 	if edu.Content, err = json.Marshal(output); err != nil {
+		sentry.CaptureException(err)
 		logger.WithError(err).Error("fedsender key change consumer: failed to marshal output, dropping")
 		return true
 	}
 
 	logger.Debugf("Sending cross-signing update message to %q", destinations)
-	err = t.queues.SendEDU(edu, t.serverName, destinations)
+	err = t.queues.SendEDU(edu, host, destinations)
 	return err == nil
 }
 

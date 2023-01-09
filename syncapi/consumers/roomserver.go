@@ -148,6 +148,16 @@ func (s *OutputRoomEventConsumer) onRedactEvent(
 		log.WithError(err).Error("RedactEvent error'd")
 		return err
 	}
+
+	if err = s.db.RedactRelations(ctx, msg.RedactedBecause.RoomID(), msg.RedactedEventID); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":           msg.RedactedBecause.RoomID(),
+			"event_id":          msg.RedactedBecause.EventID(),
+			"redacted_event_id": msg.RedactedEventID,
+		}).WithError(err).Warn("Failed to redact relations")
+		return err
+	}
+
 	// fake a room event so we notify clients about the redaction, as if it were
 	// a normal event.
 	return s.onNewRoomEvent(ctx, api.OutputNewRoomEvent{
@@ -271,6 +281,14 @@ func (s *OutputRoomEventConsumer) onNewRoomEvent(
 		return err
 	}
 
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
+	}
+
 	s.pduStream.Advance(pduPos)
 	s.notifier.OnNewEvent(ev, ev.RoomID(), nil, types.StreamingToken{PDUPosition: pduPos})
 
@@ -315,6 +333,15 @@ func (s *OutputRoomEventConsumer) onOldRoomEvent(
 		}).WithError(err).Warn("failed to index fulltext element")
 	}
 
+	if err = s.db.UpdateRelations(ctx, ev); err != nil {
+		log.WithFields(log.Fields{
+			"room_id":  ev.RoomID(),
+			"event_id": ev.EventID(),
+			"type":     ev.Type(),
+		}).WithError(err).Warn("Failed to update relations")
+		return err
+	}
+
 	if pduPos, err = s.notifyJoinedPeeks(ctx, ev, pduPos); err != nil {
 		log.WithError(err).Errorf("Failed to notifyJoinedPeeks for PDU pos %d", pduPos)
 		return err
@@ -337,11 +364,7 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == gomatrixserverlib.Join {
 		// check it's a local join
-		_, domain, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
-		if err != nil {
-			return sp, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
-		}
-		if domain != s.cfg.Matrix.ServerName {
+		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
 			return sp, nil
 		}
 
@@ -363,9 +386,7 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if msg.Event.StateKey() == nil {
 		return
 	}
-	if _, serverName, err := gomatrixserverlib.SplitID('@', *msg.Event.StateKey()); err != nil {
-		return
-	} else if serverName != s.cfg.Matrix.ServerName {
+	if _, _, err := s.cfg.Matrix.SplitLocalID('@', *msg.Event.StateKey()); err != nil {
 		return
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
@@ -398,6 +419,13 @@ func (s *OutputRoomEventConsumer) onRetireInviteEvent(
 			"event_id":   msg.EventID,
 			log.ErrorKey: err,
 		}).Errorf("roomserver output log: remove invite failure")
+		return
+	}
+
+	// Only notify clients about retired invite events, if the user didn't accept the invite.
+	// The PDU stream will also receive an event about accepting the invitation, so there should
+	// be a "smooth" transition from invite -> join, and not invite -> leave -> join
+	if msg.Membership == gomatrixserverlib.Join {
 		return
 	}
 

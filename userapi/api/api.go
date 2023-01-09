@@ -50,6 +50,7 @@ type KeyserverUserAPI interface {
 
 type RoomserverUserAPI interface {
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
+	QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) (err error)
 }
 
 // api functions required by the media api
@@ -78,7 +79,7 @@ type ClientUserAPI interface {
 	QueryAcccessTokenAPI
 	LoginTokenInternalAPI
 	UserLoginAPI
-	QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error
+	QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error
 	QueryDevices(ctx context.Context, req *QueryDevicesRequest, res *QueryDevicesResponse) error
 	QueryProfile(ctx context.Context, req *QueryProfileRequest, res *QueryProfileResponse) error
 	QueryAccountData(ctx context.Context, req *QueryAccountDataRequest, res *QueryAccountDataResponse) error
@@ -96,7 +97,7 @@ type ClientUserAPI interface {
 	PerformAccountDeactivation(ctx context.Context, req *PerformAccountDeactivationRequest, res *PerformAccountDeactivationResponse) error
 	PerformOpenIDTokenCreation(ctx context.Context, req *PerformOpenIDTokenCreationRequest, res *PerformOpenIDTokenCreationResponse) error
 	SetAvatarURL(ctx context.Context, req *PerformSetAvatarURLRequest, res *PerformSetAvatarURLResponse) error
-	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *struct{}) error
+	SetDisplayName(ctx context.Context, req *PerformUpdateDisplayNameRequest, res *PerformUpdateDisplayNameResponse) error
 	QueryNotifications(ctx context.Context, req *QueryNotificationsRequest, res *QueryNotificationsResponse) error
 	InputAccountData(ctx context.Context, req *InputAccountDataRequest, res *InputAccountDataResponse) error
 	PerformKeyBackup(ctx context.Context, req *PerformKeyBackupRequest, res *PerformKeyBackupResponse) error
@@ -318,8 +319,9 @@ type QuerySearchProfilesResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformAccountCreationRequest struct {
-	AccountType AccountType // Required: whether this is a guest or user account
-	Localpart   string      // Required: The localpart for this account. Ignored if account type is guest.
+	AccountType AccountType                  // Required: whether this is a guest or user account
+	Localpart   string                       // Required: The localpart for this account. Ignored if account type is guest.
+	ServerName  gomatrixserverlib.ServerName // optional: if not specified, default server name used instead
 
 	AppServiceID string // optional: the application service ID (not user ID) creating this account, if any.
 	Password     string // optional: if missing then this account will be a passwordless account
@@ -334,9 +336,10 @@ type PerformAccountCreationResponse struct {
 
 // PerformAccountCreationRequest is the request for PerformAccountCreation
 type PerformPasswordUpdateRequest struct {
-	Localpart     string // Required: The localpart for this account.
-	Password      string // Required: The new password to set.
-	LogoutDevices bool   // Optional: Whether to log out all user devices.
+	Localpart     string                       // Required: The localpart for this account.
+	ServerName    gomatrixserverlib.ServerName // Required: The domain for this account.
+	Password      string                       // Required: The new password to set.
+	LogoutDevices bool                         // Optional: Whether to log out all user devices.
 }
 
 // PerformAccountCreationResponse is the response for PerformAccountCreation
@@ -360,7 +363,8 @@ type PerformLastSeenUpdateResponse struct {
 // PerformDeviceCreationRequest is the request for PerformDeviceCreation
 type PerformDeviceCreationRequest struct {
 	Localpart   string
-	AccessToken string // optional: if blank one will be made on your behalf
+	ServerName  gomatrixserverlib.ServerName // optional: if blank, default server name used
+	AccessToken string                       // optional: if blank one will be made on your behalf
 	// optional: if nil an ID is generated for you. If set, replaces any existing device session,
 	// which will generate a new access token and invalidate the old one.
 	DeviceID *string
@@ -384,7 +388,8 @@ type PerformDeviceCreationResponse struct {
 
 // PerformAccountDeactivationRequest is the request for PerformAccountDeactivation
 type PerformAccountDeactivationRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName // optional: if blank, default server name used
 }
 
 // PerformAccountDeactivationResponse is the response for PerformAccountDeactivation
@@ -432,6 +437,18 @@ type Device struct {
 	// this is the appservice ID.
 	AppserviceID string
 	AccountType  AccountType
+}
+
+func (d *Device) UserDomain() gomatrixserverlib.ServerName {
+	_, domain, err := gomatrixserverlib.SplitID('@', d.UserID)
+	if err != nil {
+		// This really is catastrophic because it means that someone
+		// managed to forge a malformed user ID for a device during
+		// login.
+		// TODO: Is there a better way to deal with this than panic?
+		panic(err)
+	}
+	return domain
 }
 
 // Account represents a Matrix account on this home server.
@@ -503,7 +520,8 @@ const (
 )
 
 type QueryPushersRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryPushersResponse struct {
@@ -511,14 +529,16 @@ type QueryPushersResponse struct {
 }
 
 type PerformPusherSetRequest struct {
-	Pusher    // Anonymous field because that's how clientapi unmarshals it.
-	Localpart string
-	Append    bool `json:"append"`
+	Pusher     // Anonymous field because that's how clientapi unmarshals it.
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	Append     bool `json:"append"`
 }
 
 type PerformPusherDeletionRequest struct {
-	Localpart string
-	SessionID int64
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	SessionID  int64
 }
 
 // Pusher represents a push notification subscriber
@@ -556,10 +576,11 @@ type QueryPushRulesResponse struct {
 }
 
 type QueryNotificationsRequest struct {
-	Localpart string `json:"localpart"` // Required.
-	From      string `json:"from,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
-	Only      string `json:"only,omitempty"`
+	Localpart  string                       `json:"localpart"`   // Required.
+	ServerName gomatrixserverlib.ServerName `json:"server_name"` // Required.
+	From       string                       `json:"from,omitempty"`
+	Limit      int                          `json:"limit,omitempty"`
+	Only       string                       `json:"only,omitempty"`
 }
 
 type QueryNotificationsResponse struct {
@@ -577,16 +598,26 @@ type Notification struct {
 }
 
 type PerformSetAvatarURLRequest struct {
-	Localpart, AvatarURL string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	AvatarURL  string
 }
-type PerformSetAvatarURLResponse struct{}
+type PerformSetAvatarURLResponse struct {
+	Profile *authtypes.Profile `json:"profile"`
+	Changed bool               `json:"changed"`
+}
+
+type QueryNumericLocalpartRequest struct {
+	ServerName gomatrixserverlib.ServerName
+}
 
 type QueryNumericLocalpartResponse struct {
 	ID int64
 }
 
 type QueryAccountAvailabilityRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryAccountAvailabilityResponse struct {
@@ -594,7 +625,9 @@ type QueryAccountAvailabilityResponse struct {
 }
 
 type QueryAccountByPasswordRequest struct {
-	Localpart, PlaintextPassword string
+	Localpart         string
+	ServerName        gomatrixserverlib.ServerName
+	PlaintextPassword string
 }
 
 type QueryAccountByPasswordResponse struct {
@@ -603,7 +636,14 @@ type QueryAccountByPasswordResponse struct {
 }
 
 type PerformUpdateDisplayNameRequest struct {
-	Localpart, DisplayName string
+	Localpart   string
+	ServerName  gomatrixserverlib.ServerName
+	DisplayName string
+}
+
+type PerformUpdateDisplayNameResponse struct {
+	Profile *authtypes.Profile `json:"profile"`
+	Changed bool               `json:"changed"`
 }
 
 type QueryLocalpartForThreePIDRequest struct {
@@ -611,11 +651,13 @@ type QueryLocalpartForThreePIDRequest struct {
 }
 
 type QueryLocalpartForThreePIDResponse struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryThreePIDsForLocalpartRequest struct {
-	Localpart string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
 }
 
 type QueryThreePIDsForLocalpartResponse struct {
@@ -625,5 +667,17 @@ type QueryThreePIDsForLocalpartResponse struct {
 type PerformForgetThreePIDRequest QueryLocalpartForThreePIDRequest
 
 type PerformSaveThreePIDAssociationRequest struct {
-	ThreePID, Localpart, Medium string
+	ThreePID   string
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+	Medium     string
+}
+
+type QueryAccountByLocalpartRequest struct {
+	Localpart  string
+	ServerName gomatrixserverlib.ServerName
+}
+
+type QueryAccountByLocalpartResponse struct {
+	Account *Account
 }

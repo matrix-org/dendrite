@@ -36,6 +36,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		Monolithic: true,
 	})
 	cfg.Global.JetStream.InMemory = true
+	cfg.FederationAPI.KeyPerspectives = nil
 	switch dbType {
 	case test.DBTypePostgres:
 		cfg.Global.Defaults(config.DefaultOpts{ // autogen a signing key
@@ -106,7 +107,8 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 	}
 	cfg.Global.JetStream.InMemory = true
 	cfg.SyncAPI.Fulltext.InMemory = true
-	base := base.NewBaseDendrite(cfg, "Tests")
+	cfg.FederationAPI.KeyPerspectives = nil
+	base := base.NewBaseDendrite(cfg, "Tests", base.DisableMetrics)
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
 }

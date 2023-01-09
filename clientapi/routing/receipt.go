@@ -15,19 +15,22 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/clientapi/producers"
 	"github.com/matrix-org/gomatrixserverlib"
 
+	"github.com/matrix-org/dendrite/userapi/api"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
 	"github.com/sirupsen/logrus"
 )
 
-func SetReceipt(req *http.Request, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
+func SetReceipt(req *http.Request, userAPI api.ClientUserAPI, syncProducer *producers.SyncAPIProducer, device *userapi.Device, roomID, receiptType, eventID string) util.JSONResponse {
 	timestamp := gomatrixserverlib.AsTimestamp(time.Now())
 	logrus.WithFields(logrus.Fields{
 		"roomID":      roomID,
@@ -37,13 +40,32 @@ func SetReceipt(req *http.Request, syncProducer *producers.SyncAPIProducer, devi
 		"timestamp":   timestamp,
 	}).Debug("Setting receipt")
 
-	// currently only m.read is accepted
-	if receiptType != "m.read" {
-		return util.MessageResponse(400, fmt.Sprintf("receipt type must be m.read not '%s'", receiptType))
-	}
+	switch receiptType {
+	case "m.read", "m.read.private":
+		if err := syncProducer.SendReceipt(req.Context(), device.UserID, roomID, eventID, receiptType, timestamp); err != nil {
+			return util.ErrorResponse(err)
+		}
 
-	if err := syncProducer.SendReceipt(req.Context(), device.UserID, roomID, eventID, receiptType, timestamp); err != nil {
-		return util.ErrorResponse(err)
+	case "m.fully_read":
+		data, err := json.Marshal(fullyReadEvent{EventID: eventID})
+		if err != nil {
+			return jsonerror.InternalServerError()
+		}
+
+		dataReq := api.InputAccountDataRequest{
+			UserID:      device.UserID,
+			DataType:    "m.fully_read",
+			RoomID:      roomID,
+			AccountData: data,
+		}
+		dataRes := api.InputAccountDataResponse{}
+		if err := userAPI.InputAccountData(req.Context(), &dataReq, &dataRes); err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("userAPI.InputAccountData failed")
+			return util.ErrorResponse(err)
+		}
+
+	default:
+		return util.MessageResponse(400, fmt.Sprintf("Receipt type '%s' not known", receiptType))
 	}
 
 	return util.JSONResponse{

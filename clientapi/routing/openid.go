@@ -63,7 +63,7 @@ func CreateOpenIDToken(
 		JSON: openIDTokenResponse{
 			AccessToken:      response.Token.Token,
 			TokenType:        "Bearer",
-			MatrixServerName: string(cfg.Matrix.ServerName),
+			MatrixServerName: string(device.UserDomain()),
 			ExpiresIn:        response.Token.ExpiresAtMS / 1000, // convert ms to s
 		},
 	}

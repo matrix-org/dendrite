@@ -34,7 +34,10 @@ func ValidateRule(kind Kind, rule *Rule) []error {
 		}
 
 	case ContentKind:
-		if rule.Pattern == "" {
+		if rule.Pattern == nil {
+			errs = append(errs, fmt.Errorf("missing content rule pattern"))
+		}
+		if rule.Pattern != nil && *rule.Pattern == "" {
 			errs = append(errs, fmt.Errorf("missing content rule pattern"))
 		}
 

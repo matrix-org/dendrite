@@ -78,6 +78,7 @@ const (
 type PerformJoinRequest struct {
 	RoomIDOrAlias string                         `json:"room_id_or_alias"`
 	UserID        string                         `json:"user_id"`
+	IsGuest       bool                           `json:"is_guest"`
 	Content       map[string]interface{}         `json:"content"`
 	ServerNames   []gomatrixserverlib.ServerName `json:"server_names"`
 	Unsigned      map[string]interface{}         `json:"unsigned"`
@@ -148,6 +149,8 @@ type PerformBackfillRequest struct {
 	Limit int `json:"limit"`
 	// The server interested in the events.
 	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+	// Which virtual host are we doing this for?
+	VirtualHost gomatrixserverlib.ServerName `json:"virtual_host"`
 }
 
 // PrevEventIDs returns the prev_event IDs of all backwards extremities, de-duplicated in a lexicographically sorted order.
@@ -168,8 +171,10 @@ type PerformBackfillResponse struct {
 }
 
 type PerformPublishRequest struct {
-	RoomID     string
-	Visibility string
+	RoomID       string
+	Visibility   string
+	AppserviceID string
+	NetworkID    string
 }
 
 type PerformPublishResponse struct {
@@ -234,4 +239,14 @@ type PerformAdminEvacuateUserRequest struct {
 type PerformAdminEvacuateUserResponse struct {
 	Affected []string `json:"affected"`
 	Error    *PerformError
+}
+
+type PerformAdminDownloadStateRequest struct {
+	RoomID     string                       `json:"room_id"`
+	UserID     string                       `json:"user_id"`
+	ServerName gomatrixserverlib.ServerName `json:"server_name"`
+}
+
+type PerformAdminDownloadStateResponse struct {
+	Error *PerformError `json:"error,omitempty"`
 }

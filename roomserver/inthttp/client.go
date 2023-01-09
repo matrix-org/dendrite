@@ -27,18 +27,19 @@ const (
 	RoomserverInputRoomEventsPath = "/roomserver/inputRoomEvents"
 
 	// Perform operations
-	RoomserverPerformInvitePath            = "/roomserver/performInvite"
-	RoomserverPerformPeekPath              = "/roomserver/performPeek"
-	RoomserverPerformUnpeekPath            = "/roomserver/performUnpeek"
-	RoomserverPerformRoomUpgradePath       = "/roomserver/performRoomUpgrade"
-	RoomserverPerformJoinPath              = "/roomserver/performJoin"
-	RoomserverPerformLeavePath             = "/roomserver/performLeave"
-	RoomserverPerformBackfillPath          = "/roomserver/performBackfill"
-	RoomserverPerformPublishPath           = "/roomserver/performPublish"
-	RoomserverPerformInboundPeekPath       = "/roomserver/performInboundPeek"
-	RoomserverPerformForgetPath            = "/roomserver/performForget"
-	RoomserverPerformAdminEvacuateRoomPath = "/roomserver/performAdminEvacuateRoom"
-	RoomserverPerformAdminEvacuateUserPath = "/roomserver/performAdminEvacuateUser"
+	RoomserverPerformInvitePath             = "/roomserver/performInvite"
+	RoomserverPerformPeekPath               = "/roomserver/performPeek"
+	RoomserverPerformUnpeekPath             = "/roomserver/performUnpeek"
+	RoomserverPerformRoomUpgradePath        = "/roomserver/performRoomUpgrade"
+	RoomserverPerformJoinPath               = "/roomserver/performJoin"
+	RoomserverPerformLeavePath              = "/roomserver/performLeave"
+	RoomserverPerformBackfillPath           = "/roomserver/performBackfill"
+	RoomserverPerformPublishPath            = "/roomserver/performPublish"
+	RoomserverPerformInboundPeekPath        = "/roomserver/performInboundPeek"
+	RoomserverPerformForgetPath             = "/roomserver/performForget"
+	RoomserverPerformAdminEvacuateRoomPath  = "/roomserver/performAdminEvacuateRoom"
+	RoomserverPerformAdminEvacuateUserPath  = "/roomserver/performAdminEvacuateUser"
+	RoomserverPerformAdminDownloadStatePath = "/roomserver/performAdminDownloadState"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -62,6 +63,7 @@ const (
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
 	RoomserverQueryMembershipAtEventPath       = "/roomserver/queryMembershipAtEvent"
+	RoomserverQueryLeftMembersPath             = "/roomserver/queryLeftMembers"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -257,6 +259,17 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateRoom(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformAdminEvacuateRoom", h.roomserverURL+RoomserverPerformAdminEvacuateRoomPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminDownloadState(
+	ctx context.Context,
+	request *api.PerformAdminDownloadStateRequest,
+	response *api.PerformAdminDownloadStateResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformAdminDownloadState", h.roomserverURL+RoomserverPerformAdminDownloadStatePath,
 		h.httpClient, ctx, request, response,
 	)
 }
@@ -538,6 +551,13 @@ func (h *httpRoomserverInternalAPI) PerformForget(
 func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, request *api.QueryMembershipAtEventRequest, response *api.QueryMembershipAtEventResponse) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryMembershiptAtEvent", h.roomserverURL+RoomserverQueryMembershipAtEventPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpRoomserverInternalAPI) QueryLeftUsers(ctx context.Context, request *api.QueryLeftUsersRequest, response *api.QueryLeftUsersResponse) error {
+	return httputil.CallInternalRPCAPI(
+		"RoomserverQueryLeftMembers", h.roomserverURL+RoomserverQueryLeftMembersPath,
 		h.httpClient, ctx, request, response,
 	)
 }

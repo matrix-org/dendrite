@@ -103,12 +103,34 @@ func (d *Database) eventStateKeyNIDs(
 	ctx context.Context, txn *sql.Tx, eventStateKeys []string,
 ) (map[string]types.EventStateKeyNID, error) {
 	result := make(map[string]types.EventStateKeyNID)
+	eventStateKeys = util.UniqueStrings(eventStateKeys)
 	nids, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, txn, eventStateKeys)
 	if err != nil {
 		return nil, err
 	}
 	for eventStateKey, nid := range nids {
 		result[eventStateKey] = nid
+	}
+	// We received some nids, but are still missing some, work out which and create them
+	if len(eventStateKeys) > len(result) {
+		var nid types.EventStateKeyNID
+		err = d.Writer.Do(d.DB, txn, func(txn *sql.Tx) error {
+			for _, eventStateKey := range eventStateKeys {
+				if _, ok := result[eventStateKey]; ok {
+					continue
+				}
+
+				nid, err = d.assignStateKeyNID(ctx, txn, eventStateKey)
+				if err != nil {
+					return err
+				}
+				result[eventStateKey] = nid
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }
@@ -469,6 +491,23 @@ func (d *Database) events(
 			eventNIDs = append(eventNIDs, nid)
 		}
 	}
+	// If we don't need to get any events from the database, short circuit now
+	if len(eventNIDs) == 0 {
+		results := make([]types.Event, 0, len(inputEventNIDs))
+		for _, nid := range inputEventNIDs {
+			event, ok := events[nid]
+			if !ok || event == nil {
+				return nil, fmt.Errorf("event %d missing", nid)
+			}
+			results = append(results, types.Event{
+				EventNID: nid,
+				Event:    event,
+			})
+		}
+		if !redactionsArePermanent {
+			d.applyRedactions(results)
+		}
+	}
 	eventJSONs, err := d.EventJSONTable.BulkSelectEventJSON(ctx, txn, eventNIDs)
 	if err != nil {
 		return nil, err
@@ -532,6 +571,12 @@ func (d *Database) events(
 		d.applyRedactions(results)
 	}
 	return results, nil
+}
+
+func (d *Database) BulkSelectSnapshotsFromEventIDs(
+	ctx context.Context, eventIDs []string,
+) (map[types.StateSnapshotNID][]string, error) {
+	return d.EventsTable.BulkSelectSnapshotsFromEventIDs(ctx, nil, eventIDs)
 }
 
 func (d *Database) MembershipUpdater(
@@ -722,9 +767,9 @@ func (d *Database) storeEvent(
 	}, redactionEvent, redactedEventID, err
 }
 
-func (d *Database) PublishRoom(ctx context.Context, roomID string, publish bool) error {
+func (d *Database) PublishRoom(ctx context.Context, roomID, appserviceID, networkID string, publish bool) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, publish)
+		return d.PublishedTable.UpsertRoomPublished(ctx, txn, roomID, appserviceID, networkID, publish)
 	})
 }
 
@@ -732,8 +777,8 @@ func (d *Database) GetPublishedRoom(ctx context.Context, roomID string) (bool, e
 	return d.PublishedTable.SelectPublishedFromRoomID(ctx, nil, roomID)
 }
 
-func (d *Database) GetPublishedRooms(ctx context.Context) ([]string, error) {
-	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, true)
+func (d *Database) GetPublishedRooms(ctx context.Context, networkID string, includeAllNetworks bool) ([]string, error) {
+	return d.PublishedTable.SelectAllPublishedRooms(ctx, nil, networkID, true, includeAllNetworks)
 }
 
 func (d *Database) MissingAuthPrevEvents(
@@ -1220,7 +1265,7 @@ func (d *Database) GetBulkStateContent(ctx context.Context, roomIDs []string, tu
 
 	}
 
-	eventStateKeyNIDMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, eventStateKeys)
+	eventStateKeyNIDMap, err := d.eventStateKeyNIDs(ctx, nil, eventStateKeys)
 	if err != nil {
 		return nil, fmt.Errorf("GetBulkStateContent: failed to map state key nids: %w", err)
 	}
@@ -1286,7 +1331,7 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	if err != nil {
 		return nil, err
 	}
-	userNIDsMap, err := d.EventStateKeysTable.BulkSelectEventStateKeyNID(ctx, nil, userIDs)
+	userNIDsMap, err := d.eventStateKeyNIDs(ctx, nil, userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -1318,6 +1363,43 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 		result[nidToUserID[nid]] = count
 	}
 	return result, nil
+}
+
+// GetLeftUsers calculates users we (the server) don't share a room with anymore.
+func (d *Database) GetLeftUsers(ctx context.Context, userIDs []string) ([]string, error) {
+	// Get the userNID for all users with a stale device list
+	stateKeyNIDMap, err := d.EventStateKeyNIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	userNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDMap))
+	userNIDtoUserID := make(map[types.EventStateKeyNID]string, len(stateKeyNIDMap))
+	// Create a map from userNID -> userID
+	for userID, nid := range stateKeyNIDMap {
+		userNIDs = append(userNIDs, nid)
+		userNIDtoUserID[nid] = userID
+	}
+
+	// Get all users whose membership is still join, knock or invite.
+	stillJoinedUsersNIDs, err := d.MembershipTable.SelectJoinedUsers(ctx, nil, userNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Remove joined users from the "user with stale devices" list, which contains left AND joined users
+	for _, joinedUser := range stillJoinedUsersNIDs {
+		delete(userNIDtoUserID, joinedUser)
+	}
+
+	// The users still in our userNIDtoUserID map are the users we don't share a room with anymore,
+	// and the return value we are looking for.
+	leftUsers := make([]string, 0, len(userNIDtoUserID))
+	for _, userID := range userNIDtoUserID {
+		leftUsers = append(leftUsers, userID)
+	}
+
+	return leftUsers, nil
 }
 
 // GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
@@ -1360,6 +1442,36 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.MembershipTable.UpdateForgetMembership(ctx, nil, roomNIDs[0], stateKeyNID, forget)
+	})
+}
+
+func (d *Database) UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error {
+
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		// un-publish old room
+		if err := d.PublishedTable.UpsertRoomPublished(ctx, txn, oldRoomID, "", "", false); err != nil {
+			return fmt.Errorf("failed to unpublish room: %w", err)
+		}
+		// publish new room
+		if err := d.PublishedTable.UpsertRoomPublished(ctx, txn, newRoomID, "", "", true); err != nil {
+			return fmt.Errorf("failed to publish room: %w", err)
+		}
+
+		// Migrate any existing room aliases
+		aliases, err := d.RoomAliasesTable.SelectAliasesFromRoomID(ctx, txn, oldRoomID)
+		if err != nil {
+			return fmt.Errorf("failed to get room aliases: %w", err)
+		}
+
+		for _, alias := range aliases {
+			if err = d.RoomAliasesTable.DeleteRoomAlias(ctx, txn, alias); err != nil {
+				return fmt.Errorf("failed to remove room alias: %w", err)
+			}
+			if err = d.RoomAliasesTable.InsertRoomAlias(ctx, txn, alias, newRoomID, eventSender); err != nil {
+				return fmt.Errorf("failed to set room alias: %w", err)
+			}
+		}
+		return nil
 	})
 }
 

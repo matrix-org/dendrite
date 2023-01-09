@@ -24,11 +24,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/storage"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 )
 
 type phoneHomeStats struct {
@@ -96,12 +97,10 @@ func (p *phoneHomeStats) collect() {
 
 	// configuration information
 	p.stats["federation_disabled"] = p.cfg.Global.DisableFederation
-	p.stats["nats_embedded"] = true
-	p.stats["nats_in_memory"] = p.cfg.Global.JetStream.InMemory
-	if len(p.cfg.Global.JetStream.Addresses) > 0 {
-		p.stats["nats_embedded"] = false
-		p.stats["nats_in_memory"] = false // probably
-	}
+	natsEmbedded := len(p.cfg.Global.JetStream.Addresses) == 0
+	p.stats["nats_embedded"] = natsEmbedded
+	p.stats["nats_in_memory"] = p.cfg.Global.JetStream.InMemory && natsEmbedded
+
 	if len(p.cfg.Logging) > 0 {
 		p.stats["log_level"] = p.cfg.Logging[0].Level
 	} else {
@@ -109,12 +108,19 @@ func (p *phoneHomeStats) collect() {
 	}
 
 	// message and room stats
-	// TODO: Find a solution to actually set these values
+	// TODO: Find a solution to actually set this value
 	p.stats["total_room_count"] = 0
-	p.stats["daily_messages"] = 0
-	p.stats["daily_sent_messages"] = 0
-	p.stats["daily_e2ee_messages"] = 0
-	p.stats["daily_sent_e2ee_messages"] = 0
+
+	messageStats, activeRooms, activeE2EERooms, err := p.db.DailyRoomsMessages(ctx, p.serverName)
+	if err != nil {
+		logrus.WithError(err).Warn("unable to query message stats, using default values")
+	}
+	p.stats["daily_messages"] = messageStats.Messages
+	p.stats["daily_sent_messages"] = messageStats.SentMessages
+	p.stats["daily_e2ee_messages"] = messageStats.MessagesE2EE
+	p.stats["daily_sent_e2ee_messages"] = messageStats.SentMessagesE2EE
+	p.stats["daily_active_rooms"] = activeRooms
+	p.stats["daily_active_e2ee_rooms"] = activeE2EERooms
 
 	// user stats and DB engine
 	userStats, db, err := p.db.UserStatistics(ctx)

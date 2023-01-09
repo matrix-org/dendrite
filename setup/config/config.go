@@ -29,7 +29,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -228,7 +228,22 @@ func loadConfig(
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
 	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load private_key: %w", err)
+	}
+
+	for _, v := range c.Global.VirtualHosts {
+		if v.KeyValidityPeriod == 0 {
+			v.KeyValidityPeriod = c.Global.KeyValidityPeriod
+		}
+		if v.PrivateKeyPath == "" || v.PrivateKey == nil || v.KeyID == "" {
+			v.KeyID = c.Global.KeyID
+			v.PrivateKey = c.Global.PrivateKey
+			continue
+		}
+		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
+		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
+			return nil, fmt.Errorf("failed to load private_key for virtualhost %s: %w", v.ServerName, err)
+		}
 	}
 
 	for _, key := range c.Global.OldVerifyKeys {
@@ -299,11 +314,13 @@ func (config *Dendrite) Derive() error {
 
 	if config.ClientAPI.RecaptchaEnabled {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
+		}
 	} else {
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
+		}
 	}
 
 	// Load application service configuration files

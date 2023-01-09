@@ -98,6 +98,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 	if err != nil {
 		return nil, err
 	}
+	relations, err := NewPostgresRelationsTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 
 	// apply migrations which need multiple tables
 	m := sqlutil.NewMigrator(d.db)
@@ -129,6 +133,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) 
 		NotificationData:    notificationData,
 		Ignores:             ignores,
 		Presence:            presence,
+		Relations:           relations,
 	}
 	return &d, nil
 }

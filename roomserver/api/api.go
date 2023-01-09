@@ -17,6 +17,7 @@ type RoomserverInternalAPI interface {
 	ClientRoomserverAPI
 	UserRoomserverAPI
 	FederationRoomserverAPI
+	KeyserverRoomserverAPI
 
 	// needed to avoid chicken and egg scenario when setting up the
 	// interdependencies between the roomserver and other input APIs
@@ -150,6 +151,7 @@ type ClientRoomserverAPI interface {
 	PerformRoomUpgrade(ctx context.Context, req *PerformRoomUpgradeRequest, resp *PerformRoomUpgradeResponse) error
 	PerformAdminEvacuateRoom(ctx context.Context, req *PerformAdminEvacuateRoomRequest, res *PerformAdminEvacuateRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformAdminDownloadState(ctx context.Context, req *PerformAdminDownloadStateRequest, res *PerformAdminDownloadStateResponse) error
 	PerformPeek(ctx context.Context, req *PerformPeekRequest, res *PerformPeekResponse) error
 	PerformUnpeek(ctx context.Context, req *PerformUnpeekRequest, res *PerformUnpeekResponse) error
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
@@ -167,6 +169,7 @@ type UserRoomserverAPI interface {
 	QueryCurrentState(ctx context.Context, req *QueryCurrentStateRequest, res *QueryCurrentStateResponse) error
 	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	PerformAdminEvacuateUser(ctx context.Context, req *PerformAdminEvacuateUserRequest, res *PerformAdminEvacuateUserResponse) error
+	PerformJoin(ctx context.Context, req *PerformJoinRequest, res *PerformJoinResponse) error
 }
 
 type FederationRoomserverAPI interface {
@@ -175,6 +178,7 @@ type FederationRoomserverAPI interface {
 	QueryBulkStateContentAPI
 	// QueryServerBannedFromRoom returns whether a server is banned from a room by server ACLs.
 	QueryServerBannedFromRoom(ctx context.Context, req *QueryServerBannedFromRoomRequest, res *QueryServerBannedFromRoomResponse) error
+	QueryMembershipsForRoom(ctx context.Context, req *QueryMembershipsForRoomRequest, res *QueryMembershipsForRoomResponse) error
 	QueryRoomVersionForRoom(ctx context.Context, req *QueryRoomVersionForRoomRequest, res *QueryRoomVersionForRoomResponse) error
 	GetRoomIDForAlias(ctx context.Context, req *GetRoomIDForAliasRequest, res *GetRoomIDForAliasResponse) error
 	QueryEventsByID(ctx context.Context, req *QueryEventsByIDRequest, res *QueryEventsByIDResponse) error
@@ -195,4 +199,8 @@ type FederationRoomserverAPI interface {
 	PerformInvite(ctx context.Context, req *PerformInviteRequest, res *PerformInviteResponse) error
 	// Query a given amount (or less) of events prior to a given set of events.
 	PerformBackfill(ctx context.Context, req *PerformBackfillRequest, res *PerformBackfillResponse) error
+}
+
+type KeyserverRoomserverAPI interface {
+	QueryLeftUsers(ctx context.Context, req *QueryLeftUsersRequest, res *QueryLeftUsersResponse) error
 }
