@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS userapi_pushers (
 CREATE INDEX IF NOT EXISTS userapi_pusher_localpart_idx ON userapi_pushers(localpart, server_name);
 
 -- Pushkey must be unique for a given user and app.
-CREATE UNIQUE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_localpart_idx ON userapi_pushers(app_id, pushkey, localpart, server_name);
+CREATE UNIQUE INDEX IF NOT EXISTS userapi_pusher_app_id_pushkey_idx ON userapi_pushers(app_id, pushkey, server_name);
 `
 
 const insertPusherSQL = "" +
