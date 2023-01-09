@@ -125,7 +125,6 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 	}
 	// Squash username to all lowercase letters
 	res := &api.QueryAccountByPasswordResponse{}
-	localpart = strings.ToLower(localpart)
 	if t.Rt != nil {
 		ok, retryIn := t.Rt.CanAct(localpart)
 		if !ok {
@@ -136,7 +135,7 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 	}
 	err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
-		Localpart:         localpart,
+		Localpart:         strings.ToLower(localpart),
 		ServerName:        domain,
 		PlaintextPassword: r.Password,
 	}, res)
