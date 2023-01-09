@@ -61,6 +61,7 @@ func Password(
 		sessionID = util.RandomString(sessionIDLength)
 	}
 	var localpart string
+	var domain gomatrixserverlib.ServerName
 	switch r.Auth.Type {
 	case authtypes.LoginTypePassword:
 		// Check if the existing password is correct.
@@ -70,6 +71,13 @@ func Password(
 		}
 		if _, authErr := typePassword.Login(req.Context(), &r.Auth.PasswordRequest); authErr != nil {
 			return *authErr
+		}
+		// Get the local part.
+		var err error
+		localpart, domain, err = gomatrixserverlib.SplitID('@', device.UserID)
+		if err != nil {
+			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
+			return jsonerror.InternalServerError()
 		}
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 	case authtypes.LoginTypeEmail:
@@ -111,6 +119,8 @@ func Password(
 				},
 			}
 		}
+		localpart = res.Localpart
+		domain = res.ServerName
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeEmail)
 	default:
 		flows := []authtypes.Flow{
@@ -139,13 +149,6 @@ func Password(
 	// Check the new password strength.
 	if resErr = validatePassword(r.NewPassword); resErr != nil {
 		return *resErr
-	}
-
-	// Get the local part.
-	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
-	if err != nil {
-		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
-		return jsonerror.InternalServerError()
 	}
 
 	// Ask the user API to perform the password change.

@@ -758,9 +758,9 @@ Can filter rooms/{roomId}/members
 Current state appears in timeline in private history with many messages after
 AS can publish rooms in their own list
 AS and main public room lists are separate
+AS can deactivate a user
 /upgrade preserves direct room state
 local user has tags copied to the new room
 remote user has tags copied to the new room
 /upgrade moves remote aliases to the new room
 Local and remote users' homeservers remove a room from their public directory on upgrade
-AS can deactivate a user

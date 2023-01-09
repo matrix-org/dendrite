@@ -194,6 +194,42 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
+  # run database upgrade tests
+  upgrade_test:
+    name: Upgrade tests
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.18"
+          cache: true
+      - name: Build upgrade-tests
+        run: go build ./cmd/dendrite-upgrade-tests
+      - name: Test upgrade (PostgreSQL)
+        run: ./dendrite-upgrade-tests --head .
+
+  # run database upgrade tests, skipping over one version
+  upgrade_test_direct:
+    name: Upgrade tests from HEAD-2
+    timeout-minutes: 20
+    needs: initial-tests-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.18"
+          cache: true
+      - name: Build upgrade-tests
+        run: go build ./cmd/dendrite-upgrade-tests
+      - name: Test upgrade (PostgreSQL)
+        run: ./dendrite-upgrade-tests -direct -from HEAD-2 --head .
+
   # run Sytest in different variations
   sytest:
     timeout-minutes: 20
@@ -344,3 +380,15 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
+
+  update-docker-images:
+    name: Update Docker images
+    permissions:
+      packages: write
+      contents: read
+      security-events: write # To upload Trivy sarif files
+    if: github.repository == 'matrix-org/dendrite' && github.ref_name == 'main'
+    needs: [integration-tests-done]
+    uses: matrix-org/dendrite/.github/workflows/docker.yml@main
+    secrets:
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}

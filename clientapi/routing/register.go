@@ -833,7 +833,7 @@ func handleRegistrationFlow(
 	// A response with current registration flow and remaining available methods
 	// will be returned if a flow has not been successfully completed yet
 	return checkAndCompleteFlow(sessions.getCompletedStages(sessionID),
-		req, r, sessionID, cfg, userAPI)
+		req, r, sessionID, cfg, userAPI, threePid)
 }
 
 // handleApplicationServiceRegistration handles the registration of an
@@ -874,9 +874,8 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, r.ServerName, "", appserviceID, req.RemoteAddr,
-		req.UserAgent(), r.Auth.Session, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
-		userapi.AccountTypeAppService, nil,
+		req.Context(), userAPI, r.Username, r.ServerName, "", appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService, nil,
 	)
 }
 
@@ -890,13 +889,13 @@ func checkAndCompleteFlow(
 	sessionID string,
 	cfg *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
+	threePid *authtypes.ThreePID,
 ) util.JSONResponse {
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.ServerName, r.Password, "", req.RemoteAddr,
-			req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
-			userapi.AccountTypeUser, nil,
+			req.Context(), userAPI, r.Username, r.ServerName, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser, threePid,
 		)
 	}
 	sessions.addParams(sessionID, r)
@@ -966,9 +965,10 @@ func completeRegistration(
 	// TODO-entry refuse register if threepid is already bound to account.
 	if threePid != nil {
 		err = userAPI.PerformSaveThreePIDAssociation(ctx, &userapi.PerformSaveThreePIDAssociationRequest{
-			Medium:    threePid.Medium,
-			ThreePID:  threePid.Address,
-			Localpart: accRes.Account.Localpart,
+			Medium:     threePid.Medium,
+			ThreePID:   threePid.Address,
+			Localpart:  accRes.Account.Localpart,
+			ServerName: accRes.Account.ServerName,
 		}, &struct{}{})
 		if err != nil {
 			return util.JSONResponse{
