@@ -625,7 +625,7 @@ func (a *UserInternalAPI) PerformAccountDeactivation(ctx context.Context, req *a
 		return err
 	}
 
-	threepids, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart)
+	threepids, err := a.DB.GetThreePIDsForLocalpart(ctx, req.Localpart, serverName)
 	if err != nil {
 		return err
 	}

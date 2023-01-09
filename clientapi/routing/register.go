@@ -965,9 +965,10 @@ func completeRegistration(
 	// TODO-entry refuse register if threepid is already bound to account.
 	if threePid != nil {
 		err = userAPI.PerformSaveThreePIDAssociation(ctx, &userapi.PerformSaveThreePIDAssociationRequest{
-			Medium:    threePid.Medium,
-			ThreePID:  threePid.Address,
-			Localpart: accRes.Account.Localpart,
+			Medium:     threePid.Medium,
+			ThreePID:   threePid.Address,
+			Localpart:  accRes.Account.Localpart,
+			ServerName: accRes.Account.ServerName,
 		}, &struct{}{})
 		if err != nil {
 			return util.JSONResponse{
