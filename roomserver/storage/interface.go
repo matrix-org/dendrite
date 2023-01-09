@@ -172,4 +172,5 @@ type Database interface {
 	ForgetRoom(ctx context.Context, userID, roomID string, forget bool) error
 
 	GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error)
+	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
 }

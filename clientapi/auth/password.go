@@ -110,11 +110,17 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			JSON: jsonerror.BadJSON("A password must be supplied."),
 		}
 	}
-	localpart, _, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(username, t.Config.Matrix)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusUnauthorized,
 			JSON: jsonerror.InvalidUsername(err.Error()),
+		}
+	}
+	if !t.Config.Matrix.IsLocalServerName(domain) {
+		return nil, &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.InvalidUsername("The server name is not known."),
 		}
 	}
 	// Squash username to all lowercase letters
@@ -129,23 +135,28 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			}
 		}
 	}
-	err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{Localpart: localpart, PlaintextPassword: r.Password}, res)
+	err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
+		Localpart:         localpart,
+		ServerName:        domain,
+		PlaintextPassword: r.Password,
+	}, res)
 	if err != nil {
 		return nil, &util.JSONResponse{
 			Code: http.StatusInternalServerError,
-			JSON: jsonerror.Unknown("unable to fetch account by password"),
+			JSON: jsonerror.Unknown("Unable to fetch account by password."),
 		}
 	}
 
 	if !res.Exists {
 		err = t.UserApi.QueryAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
+			ServerName:        domain,
 			PlaintextPassword: r.Password,
 		}, res)
 		if err != nil {
 			return nil, &util.JSONResponse{
 				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("unable to fetch account by password"),
+				JSON: jsonerror.Unknown("Unable to fetch account by password."),
 			}
 		}
 		// Technically we could tell them if the user does not exist by checking if err == sql.ErrNoRows

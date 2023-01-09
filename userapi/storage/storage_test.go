@@ -50,25 +50,25 @@ func Test_AccountData(t *testing.T) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 		alice := test.NewUser(t)
-		localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+		localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
 
 		room := test.NewRoom(t, alice)
 		events := room.Events()
 
 		contentRoom := json.RawMessage(fmt.Sprintf(`{"event_id":"%s"}`, events[len(events)-1].EventID()))
-		err = db.SaveAccountData(ctx, localpart, room.ID, "m.fully_read", contentRoom)
+		err = db.SaveAccountData(ctx, localpart, domain, room.ID, "m.fully_read", contentRoom)
 		assert.NoError(t, err, "unable to save account data")
 
 		contentGlobal := json.RawMessage(fmt.Sprintf(`{"recent_rooms":["%s"]}`, room.ID))
-		err = db.SaveAccountData(ctx, localpart, "", "im.vector.setting.breadcrumbs", contentGlobal)
+		err = db.SaveAccountData(ctx, localpart, domain, "", "im.vector.setting.breadcrumbs", contentGlobal)
 		assert.NoError(t, err, "unable to save account data")
 
-		accountData, err := db.GetAccountDataByType(ctx, localpart, room.ID, "m.fully_read")
+		accountData, err := db.GetAccountDataByType(ctx, localpart, domain, room.ID, "m.fully_read")
 		assert.NoError(t, err, "unable to get account data by type")
 		assert.Equal(t, contentRoom, accountData)
 
-		globalData, roomData, err := db.GetAccountData(ctx, localpart)
+		globalData, roomData, err := db.GetAccountData(ctx, localpart, domain)
 		assert.NoError(t, err)
 		assert.Equal(t, contentRoom, roomData[room.ID]["m.fully_read"])
 		assert.Equal(t, contentGlobal, globalData["im.vector.setting.breadcrumbs"])
@@ -81,83 +81,83 @@ func Test_Accounts(t *testing.T) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 		alice := test.NewUser(t)
-		aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+		aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 		assert.NoError(t, err)
 
-		accAlice, err := db.CreateAccount(ctx, aliceLocalpart, "testing", "", api.AccountTypeAdmin)
+		accAlice, err := db.CreateAccount(ctx, aliceLocalpart, aliceDomain, "testing", "", api.AccountTypeAdmin)
 		assert.NoError(t, err, "failed to create account")
 		// verify the newly create account is the same as returned by CreateAccount
 		var accGet *api.Account
-		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, "testing")
+		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "testing")
 		assert.NoError(t, err, "failed to get account by password")
 		assert.Equal(t, accAlice, accGet)
-		accGet, err = db.GetAccountByLocalpart(ctx, aliceLocalpart)
+		accGet, err = db.GetAccountByLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to get account by localpart")
 		assert.Equal(t, accAlice, accGet)
 
 		// check account availability
-		available, err := db.CheckAccountAvailability(ctx, aliceLocalpart)
+		available, err := db.CheckAccountAvailability(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to checkout account availability")
 		assert.Equal(t, false, available)
 
-		available, err = db.CheckAccountAvailability(ctx, "unusedname")
+		available, err = db.CheckAccountAvailability(ctx, "unusedname", aliceDomain)
 		assert.NoError(t, err, "failed to checkout account availability")
 		assert.Equal(t, true, available)
 
 		// get guest account numeric aliceLocalpart
-		first, err := db.GetNewNumericLocalpart(ctx)
+		first, err := db.GetNewNumericLocalpart(ctx, aliceDomain)
 		assert.NoError(t, err, "failed to get new numeric localpart")
 		// Create a new account to verify the numeric localpart is updated
-		_, err = db.CreateAccount(ctx, "", "testing", "", api.AccountTypeGuest)
+		_, err = db.CreateAccount(ctx, "", aliceDomain, "testing", "", api.AccountTypeGuest)
 		assert.NoError(t, err, "failed to create account")
-		second, err := db.GetNewNumericLocalpart(ctx)
+		second, err := db.GetNewNumericLocalpart(ctx, aliceDomain)
 		assert.NoError(t, err)
 		assert.Greater(t, second, first)
 
 		// update password for alice
-		err = db.SetPassword(ctx, aliceLocalpart, "newPassword")
+		err = db.SetPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.NoError(t, err, "failed to update password")
-		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, "newPassword")
+		accGet, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.NoError(t, err, "failed to get account by new password")
 		assert.Equal(t, accAlice, accGet)
 
 		// deactivate account
-		err = db.DeactivateAccount(ctx, aliceLocalpart)
+		err = db.DeactivateAccount(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to deactivate account")
 		// This should fail now, as the account is deactivated
-		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, "newPassword")
+		_, err = db.GetAccountByPassword(ctx, aliceLocalpart, aliceDomain, "newPassword")
 		assert.Error(t, err, "expected an error, got none")
 
 		// This should return an empty slice, as the account is deactivated and the 3pid is unbound
-		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
+		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "failed to get 3pid for account")
 		assert.Equal(t, len(threepids), 0)
 
-		_, err = db.GetAccountByLocalpart(ctx, "unusename")
+		_, err = db.GetAccountByLocalpart(ctx, "unusename", aliceDomain)
 		assert.Error(t, err, "expected an error for non existent localpart")
 
 		// create an empty localpart; this should never happen, but is required to test getting a numeric localpart
 		// if there's already a user without a localpart in the database
-		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeUser)
+		_, err = db.CreateAccount(ctx, "", aliceDomain, "", "", api.AccountTypeUser)
 		assert.NoError(t, err)
 
 		// test getting a numeric localpart, with an existing user without a localpart
-		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeGuest)
+		_, err = db.CreateAccount(ctx, "", aliceDomain, "", "", api.AccountTypeGuest)
 		assert.NoError(t, err)
 
 		// Create a user with a high numeric localpart, out of range for the Postgres integer (2147483647) type
-		_, err = db.CreateAccount(ctx, "2147483650", "", "", api.AccountTypeUser)
+		_, err = db.CreateAccount(ctx, "2147483650", aliceDomain, "", "", api.AccountTypeUser)
 		assert.NoError(t, err)
 
 		// Now try to create a new guest user
-		_, err = db.CreateAccount(ctx, "", "", "", api.AccountTypeGuest)
+		_, err = db.CreateAccount(ctx, "", aliceDomain, "", "", api.AccountTypeGuest)
 		assert.NoError(t, err)
 	})
 }
 
 func Test_Devices(t *testing.T) {
 	alice := test.NewUser(t)
-	localpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 	deviceID := util.RandomString(8)
 	accessToken := util.RandomString(16)
@@ -166,10 +166,10 @@ func Test_Devices(t *testing.T) {
 		db, close := mustCreateDatabase(t, dbType)
 		defer close()
 
-		deviceWithID, err := db.CreateDevice(ctx, localpart, &deviceID, accessToken, nil, "", "")
+		deviceWithID, err := db.CreateDevice(ctx, localpart, domain, &deviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
 
-		gotDevice, err := db.GetDeviceByID(ctx, localpart, deviceID)
+		gotDevice, err := db.GetDeviceByID(ctx, localpart, domain, deviceID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, deviceWithID.ID, gotDevice.ID) // GetDeviceByID doesn't populate all fields
 
@@ -179,14 +179,14 @@ func Test_Devices(t *testing.T) {
 
 		// create a device without existing device ID
 		accessToken = util.RandomString(16)
-		deviceWithoutID, err := db.CreateDevice(ctx, localpart, nil, accessToken, nil, "", "")
+		deviceWithoutID, err := db.CreateDevice(ctx, localpart, domain, nil, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create deviceWithoutID")
-		gotDeviceWithoutID, err := db.GetDeviceByID(ctx, localpart, deviceWithoutID.ID)
+		gotDeviceWithoutID, err := db.GetDeviceByID(ctx, localpart, domain, deviceWithoutID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, deviceWithoutID.ID, gotDeviceWithoutID.ID) // GetDeviceByID doesn't populate all fields
 
 		// Get devices
-		devices, err := db.GetDevicesByLocalpart(ctx, localpart)
+		devices, err := db.GetDevicesByLocalpart(ctx, localpart, domain)
 		assert.NoError(t, err, "unable to get devices by localpart")
 		assert.Equal(t, 2, len(devices))
 		deviceIDs := make([]string, 0, len(devices))
@@ -200,15 +200,15 @@ func Test_Devices(t *testing.T) {
 
 		// Update device
 		newName := "new display name"
-		err = db.UpdateDevice(ctx, localpart, deviceWithID.ID, &newName)
+		err = db.UpdateDevice(ctx, localpart, domain, deviceWithID.ID, &newName)
 		assert.NoError(t, err, "unable to update device displayname")
 		updatedAfterTimestamp := time.Now().Unix()
-		err = db.UpdateDeviceLastSeen(ctx, localpart, deviceWithID.ID, "127.0.0.1", "Element Web")
+		err = db.UpdateDeviceLastSeen(ctx, localpart, domain, deviceWithID.ID, "127.0.0.1", "Element Web")
 		assert.NoError(t, err, "unable to update device last seen")
 
 		deviceWithID.DisplayName = newName
 		deviceWithID.LastSeenIP = "127.0.0.1"
-		gotDevice, err = db.GetDeviceByID(ctx, localpart, deviceWithID.ID)
+		gotDevice, err = db.GetDeviceByID(ctx, localpart, domain, deviceWithID.ID)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 2, len(devices))
 		assert.Equal(t, deviceWithID.DisplayName, gotDevice.DisplayName)
@@ -218,20 +218,20 @@ func Test_Devices(t *testing.T) {
 		// create one more device and remove the devices step by step
 		newDeviceID := util.RandomString(16)
 		accessToken = util.RandomString(16)
-		_, err = db.CreateDevice(ctx, localpart, &newDeviceID, accessToken, nil, "", "")
+		_, err = db.CreateDevice(ctx, localpart, domain, &newDeviceID, accessToken, nil, "", "")
 		assert.NoError(t, err, "unable to create new device")
 
-		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart, domain)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 3, len(devices))
 
-		err = db.RemoveDevices(ctx, localpart, deviceIDs)
+		err = db.RemoveDevices(ctx, localpart, domain, deviceIDs)
 		assert.NoError(t, err, "unable to remove devices")
-		devices, err = db.GetDevicesByLocalpart(ctx, localpart)
+		devices, err = db.GetDevicesByLocalpart(ctx, localpart, domain)
 		assert.NoError(t, err, "unable to get device by id")
 		assert.Equal(t, 1, len(devices))
 
-		deleted, err := db.RemoveAllDevices(ctx, localpart, "")
+		deleted, err := db.RemoveAllDevices(ctx, localpart, domain, "")
 		assert.NoError(t, err, "unable to remove all devices")
 		assert.Equal(t, 1, len(deleted))
 		assert.Equal(t, newDeviceID, deleted[0].ID)
@@ -369,7 +369,7 @@ func Test_OpenID(t *testing.T) {
 
 func Test_Profile(t *testing.T) {
 	alice := test.NewUser(t)
-	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -377,30 +377,33 @@ func Test_Profile(t *testing.T) {
 		defer close()
 
 		// create account, which also creates a profile
-		_, err = db.CreateAccount(ctx, aliceLocalpart, "testing", "", api.AccountTypeAdmin)
+		_, err = db.CreateAccount(ctx, aliceLocalpart, aliceDomain, "testing", "", api.AccountTypeAdmin)
 		assert.NoError(t, err, "failed to create account")
 
-		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart)
+		gotProfile, err := db.GetProfileByLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get profile by localpart")
-		wantProfile := &authtypes.Profile{Localpart: aliceLocalpart}
+		wantProfile := &authtypes.Profile{
+			Localpart:  aliceLocalpart,
+			ServerName: string(aliceDomain),
+		}
 		assert.Equal(t, wantProfile, gotProfile)
 
 		// set avatar & displayname
 		wantProfile.DisplayName = "Alice"
-		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, "Alice")
+		gotProfile, changed, err := db.SetDisplayName(ctx, aliceLocalpart, aliceDomain, "Alice")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.NoError(t, err, "unable to set displayname")
 		assert.True(t, changed)
 
 		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, aliceDomain, "mxc://aliceAvatar")
 		assert.NoError(t, err, "unable to set avatar url")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.True(t, changed)
 
 		// Setting the same avatar again doesn't change anything
 		wantProfile.AvatarURL = "mxc://aliceAvatar"
-		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, "mxc://aliceAvatar")
+		gotProfile, changed, err = db.SetAvatarURL(ctx, aliceLocalpart, aliceDomain, "mxc://aliceAvatar")
 		assert.NoError(t, err, "unable to set avatar url")
 		assert.Equal(t, wantProfile, gotProfile)
 		assert.False(t, changed)
@@ -415,7 +418,7 @@ func Test_Profile(t *testing.T) {
 
 func Test_Pusher(t *testing.T) {
 	alice := test.NewUser(t)
-	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -437,11 +440,11 @@ func Test_Pusher(t *testing.T) {
 				ProfileTag:        util.RandomString(8),
 				Language:          util.RandomString(2),
 			}
-			err = db.UpsertPusher(ctx, wantPusher, aliceLocalpart)
+			err = db.UpsertPusher(ctx, wantPusher, aliceLocalpart, aliceDomain)
 			assert.NoError(t, err, "unable to upsert pusher")
 
 			// check it was actually persisted
-			gotPushers, err = db.GetPushers(ctx, aliceLocalpart)
+			gotPushers, err = db.GetPushers(ctx, aliceLocalpart, aliceDomain)
 			assert.NoError(t, err, "unable to get pushers")
 			assert.Equal(t, i+1, len(gotPushers))
 			assert.Equal(t, wantPusher, gotPushers[i])
@@ -449,16 +452,16 @@ func Test_Pusher(t *testing.T) {
 		}
 
 		// remove single pusher
-		err = db.RemovePusher(ctx, appID, pushKeys[0], aliceLocalpart)
+		err = db.RemovePusher(ctx, appID, pushKeys[0], aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to remove pusher")
-		gotPushers, err := db.GetPushers(ctx, aliceLocalpart)
+		gotPushers, err := db.GetPushers(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get pushers")
 		assert.Equal(t, 1, len(gotPushers))
 
 		// remove last pusher
 		err = db.RemovePushers(ctx, appID, pushKeys[1])
 		assert.NoError(t, err, "unable to remove pusher")
-		gotPushers, err = db.GetPushers(ctx, aliceLocalpart)
+		gotPushers, err = db.GetPushers(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get pushers")
 		assert.Equal(t, 0, len(gotPushers))
 	})
@@ -466,7 +469,7 @@ func Test_Pusher(t *testing.T) {
 
 func Test_ThreePID(t *testing.T) {
 	alice := test.NewUser(t)
-	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -474,15 +477,16 @@ func Test_ThreePID(t *testing.T) {
 		defer close()
 		threePID := util.RandomString(8)
 		medium := util.RandomString(8)
-		err = db.SaveThreePIDAssociation(ctx, threePID, aliceLocalpart, medium)
+		err = db.SaveThreePIDAssociation(ctx, threePID, aliceLocalpart, aliceDomain, medium)
 		assert.NoError(t, err, "unable to save threepid association")
 
 		// get the stored threepid
-		gotLocalpart, err := db.GetLocalpartForThreePID(ctx, threePID, medium)
+		gotLocalpart, gotDomain, err := db.GetLocalpartForThreePID(ctx, threePID, medium)
 		assert.NoError(t, err, "unable to get localpart for threepid")
 		assert.Equal(t, aliceLocalpart, gotLocalpart)
+		assert.Equal(t, aliceDomain, gotDomain)
 
-		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
+		threepids, err := db.GetThreePIDsForLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get threepids for localpart")
 		assert.Equal(t, 1, len(threepids))
 		assert.Equal(t, authtypes.ThreePID{
@@ -495,7 +499,7 @@ func Test_ThreePID(t *testing.T) {
 		assert.NoError(t, err, "unexpected error")
 
 		// verify it was deleted
-		threepids, err = db.GetThreePIDsForLocalpart(ctx, aliceLocalpart)
+		threepids, err = db.GetThreePIDsForLocalpart(ctx, aliceLocalpart, aliceDomain)
 		assert.NoError(t, err, "unable to get threepids for localpart")
 		assert.Equal(t, 0, len(threepids))
 	})
@@ -503,7 +507,7 @@ func Test_ThreePID(t *testing.T) {
 
 func Test_Notification(t *testing.T) {
 	alice := test.NewUser(t)
-	aliceLocalpart, _, err := gomatrixserverlib.SplitID('@', alice.ID)
+	aliceLocalpart, aliceDomain, err := gomatrixserverlib.SplitID('@', alice.ID)
 	assert.NoError(t, err)
 	room := test.NewRoom(t, alice)
 	room2 := test.NewRoom(t, alice)
@@ -531,34 +535,34 @@ func Test_Notification(t *testing.T) {
 				RoomID: roomID,
 				TS:     gomatrixserverlib.AsTimestamp(ts),
 			}
-			err = db.InsertNotification(ctx, aliceLocalpart, eventID, uint64(i+1), nil, notification)
+			err = db.InsertNotification(ctx, aliceLocalpart, aliceDomain, eventID, uint64(i+1), nil, notification)
 			assert.NoError(t, err, "unable to insert notification")
 		}
 
 		// get notifications
-		count, err := db.GetNotificationCount(ctx, aliceLocalpart, tables.AllNotifications)
+		count, err := db.GetNotificationCount(ctx, aliceLocalpart, aliceDomain, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notification count")
 		assert.Equal(t, int64(2), count)
-		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, 0, 15, tables.AllNotifications)
+		notifs, count, err := db.GetNotifications(ctx, aliceLocalpart, aliceDomain, 0, 15, tables.AllNotifications)
 		assert.NoError(t, err, "unable to get notifications")
 		assert.Equal(t, int64(10), count)
 		assert.Equal(t, 10, len(notifs))
 		// ... for a specific room
-		total, _, err := db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		total, _, err := db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(4), total)
 
 		// mark notification as read
-		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, room2.ID, 7, true)
+		affected, err := db.SetNotificationsRead(ctx, aliceLocalpart, aliceDomain, room2.ID, 7, true)
 		assert.NoError(t, err, "unable to set notifications read")
 		assert.True(t, affected)
 
 		// this should delete 2 notifications
-		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, room2.ID, 8)
+		affected, err = db.DeleteNotificationsUpTo(ctx, aliceLocalpart, aliceDomain, room2.ID, 8)
 		assert.NoError(t, err, "unable to set notifications read")
 		assert.True(t, affected)
 
-		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(2), total)
 
@@ -567,7 +571,7 @@ func Test_Notification(t *testing.T) {
 		assert.NoError(t, err)
 
 		// this should now return 0 notifications
-		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, room2.ID)
+		total, _, err = db.GetRoomNotificationCounts(ctx, aliceLocalpart, aliceDomain, room2.ID)
 		assert.NoError(t, err, "unable to get notifications for room")
 		assert.Equal(t, int64(0), total)
 	})

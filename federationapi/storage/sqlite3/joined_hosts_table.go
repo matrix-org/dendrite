@@ -66,6 +66,11 @@ const selectAllJoinedHostsSQL = "" +
 const selectJoinedHostsForRoomsSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_joined_hosts WHERE room_id IN ($1)"
 
+const selectJoinedHostsForRoomsExcludingBlacklistedSQL = "" +
+	"SELECT DISTINCT server_name FROM federationsender_joined_hosts j WHERE room_id IN ($1) AND NOT EXISTS (" +
+	"  SELECT server_name FROM federationsender_blacklist WHERE j.server_name = server_name" +
+	");"
+
 type joinedHostsStatements struct {
 	db                           *sql.DB
 	insertJoinedHostsStmt        *sql.Stmt
@@ -74,6 +79,7 @@ type joinedHostsStatements struct {
 	selectJoinedHostsStmt        *sql.Stmt
 	selectAllJoinedHostsStmt     *sql.Stmt
 	// selectJoinedHostsForRoomsStmt *sql.Stmt - prepared at runtime due to variadic
+	// selectJoinedHostsForRoomsExcludingBlacklistedStmt *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSQLiteJoinedHostsTable(db *sql.DB) (s *joinedHostsStatements, err error) {
@@ -168,14 +174,17 @@ func (s *joinedHostsStatements) SelectAllJoinedHosts(
 }
 
 func (s *joinedHostsStatements) SelectJoinedHostsForRooms(
-	ctx context.Context, roomIDs []string,
+	ctx context.Context, roomIDs []string, excludingBlacklisted bool,
 ) ([]gomatrixserverlib.ServerName, error) {
 	iRoomIDs := make([]interface{}, len(roomIDs))
 	for i := range roomIDs {
 		iRoomIDs[i] = roomIDs[i]
 	}
-
-	sql := strings.Replace(selectJoinedHostsForRoomsSQL, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
+	query := selectJoinedHostsForRoomsSQL
+	if excludingBlacklisted {
+		query = selectJoinedHostsForRoomsExcludingBlacklistedSQL
+	}
+	sql := strings.Replace(query, "($1)", sqlutil.QueryVariadic(len(iRoomIDs)), 1)
 	rows, err := s.db.QueryContext(ctx, sql, iRoomIDs...)
 	if err != nil {
 		return nil, err

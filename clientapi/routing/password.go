@@ -61,6 +61,7 @@ func Password(
 		sessionID = util.RandomString(sessionIDLength)
 	}
 	var localpart string
+	var domain gomatrixserverlib.ServerName
 	switch r.Auth.Type {
 	case authtypes.LoginTypePassword:
 		// Check if the existing password is correct.
@@ -73,7 +74,7 @@ func Password(
 		}
 		// Get the local part.
 		var err error
-		localpart, _, err = gomatrixserverlib.SplitID('@', device.UserID)
+		localpart, domain, err = gomatrixserverlib.SplitID('@', device.UserID)
 		if err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 			return jsonerror.InternalServerError()
@@ -119,6 +120,7 @@ func Password(
 			}
 		}
 		localpart = res.Localpart
+		domain = res.ServerName
 		sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypeEmail)
 	default:
 		flows := []authtypes.Flow{
@@ -151,8 +153,9 @@ func Password(
 
 	// Ask the user API to perform the password change.
 	passwordReq := &api.PerformPasswordUpdateRequest{
-		Localpart: localpart,
-		Password:  r.NewPassword,
+		Localpart:  localpart,
+		ServerName: domain,
+		Password:   r.NewPassword,
 	}
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
@@ -191,8 +194,9 @@ func Password(
 		}
 
 		pushersReq := &api.PerformPusherDeletionRequest{
-			Localpart: localpart,
-			SessionID: sessionId,
+			Localpart:  localpart,
+			ServerName: domain,
+			SessionID:  sessionId,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")
