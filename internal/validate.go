@@ -139,33 +139,18 @@ func userIDIsWithinApplicationServiceNamespace(
 		return false
 	}
 
-	if appservice != nil {
-		if appservice.SenderLocalpart == local {
-			return true
-		}
-
-		// Loop through given application service's namespaces and see if any match
-		for _, namespace := range appservice.NamespaceMap["users"] {
-			// AS namespaces are checked for validity in config
-			if namespace.RegexpObject.MatchString(userID) {
-				return true
-			}
-		}
-		return false
+	if appservice.SenderLocalpart == local {
+		return true
 	}
 
-	// Loop through all known application service's namespaces and see if any match
-	for _, knownAppService := range cfg.Derived.ApplicationServices {
-		if knownAppService.SenderLocalpart == local {
+	// Loop through given application service's namespaces and see if any match
+	for _, namespace := range appservice.NamespaceMap["users"] {
+		// AS namespaces are checked for validity in config
+		if namespace.RegexpObject.MatchString(userID) {
 			return true
 		}
-		for _, namespace := range knownAppService.NamespaceMap["users"] {
-			// AS namespaces are checked for validity in config
-			if namespace.RegexpObject.MatchString(userID) {
-				return true
-			}
-		}
 	}
+
 	return false
 }
 
