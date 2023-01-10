@@ -35,7 +35,9 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/util"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -568,5 +570,44 @@ func Test_register(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestRegisterUserWithDisplayName(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
+		defer baseClose()
+		base.Cfg.Global.ServerName = "server"
+
+		rsAPI := roomserver.NewInternalAPI(base)
+		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, nil, rsAPI)
+		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+		keyAPI.SetUserAPI(userAPI)
+		deviceName, deviceID := "deviceName", "deviceID"
+		expectedDisplayName := "DisplayName"
+		response := completeRegistration(
+			base.Context(),
+			userAPI,
+			"user",
+			"server",
+			expectedDisplayName,
+			"password",
+			"",
+			"localhost",
+			"user agent",
+			"session",
+			false,
+			&deviceName,
+			&deviceID,
+			api.AccountTypeUser,
+		)
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		req := api.QueryProfileRequest{UserID: "@user:server"}
+		var res api.QueryProfileResponse
+		err := userAPI.QueryProfile(base.Context(), &req, &res)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedDisplayName, res.DisplayName)
 	})
 }
