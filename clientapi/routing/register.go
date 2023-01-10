@@ -780,7 +780,7 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, r.ServerName, "", appserviceID, req.RemoteAddr,
+		req.Context(), userAPI, r.Username, r.ServerName, "", "", appserviceID, req.RemoteAddr,
 		req.UserAgent(), r.Auth.Session, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 		userapi.AccountTypeAppService,
 	)
@@ -800,7 +800,7 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.ServerName, r.Password, "", req.RemoteAddr,
+			req.Context(), userAPI, r.Username, r.ServerName, "", r.Password, "", req.RemoteAddr,
 			req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
 			userapi.AccountTypeUser,
 		)
@@ -824,10 +824,10 @@ func checkAndCompleteFlow(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.ClientUserAPI,
-	username string, serverName gomatrixserverlib.ServerName,
+	username string, serverName gomatrixserverlib.ServerName, displayName string,
 	password, appserviceID, ipAddr, userAgent, sessionID string,
 	inhibitLogin eventutil.WeakBoolean,
-	displayName, deviceID *string,
+	deviceDisplayName, deviceID *string,
 	accType userapi.AccountType,
 ) util.JSONResponse {
 	if username == "" {
@@ -887,12 +887,28 @@ func completeRegistration(
 		}
 	}
 
+	if displayName != "" {
+		nameReq := userapi.PerformUpdateDisplayNameRequest{
+			Localpart:   username,
+			ServerName:  serverName,
+			DisplayName: displayName,
+		}
+		var nameRes userapi.PerformUpdateDisplayNameResponse
+		err = userAPI.SetDisplayName(ctx, &nameReq, &nameRes)
+		if err != nil {
+			return util.JSONResponse{
+				Code: http.StatusInternalServerError,
+				JSON: jsonerror.Unknown("failed to set display name: " + err.Error()),
+			}
+		}
+	}
+
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		Localpart:         username,
 		ServerName:        serverName,
 		AccessToken:       token,
-		DeviceDisplayName: displayName,
+		DeviceDisplayName: deviceDisplayName,
 		DeviceID:          deviceID,
 		IPAddr:            ipAddr,
 		UserAgent:         userAgent,
@@ -1077,5 +1093,5 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.DisplayName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
 }
