@@ -10,7 +10,7 @@ permalink: /faq
 
 Dendrite aims to provide a matrix compatible server that has low resource usage compared to [Synapse](https://github.com/matrix-org/synapse).
 It also aims to provide more flexibility when scaling either up or down.
-Dendrite's code is also very easy to hack on which makes it suitable for experimenting with new matrix features such as peer-to-peer.
+Dendrite's code is very easy to hack on which makes it suitable for experimenting with new matrix features such as peer-to-peer.
 
 ## Is Dendrite stable?
 
