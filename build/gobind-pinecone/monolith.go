@@ -478,7 +478,7 @@ func (m *DendriteMonolith) Start() {
 					go relayRetriever.SyncRelayServers(stopRelayServerSync)
 				}
 			case pineconeEvents.PeerRemoved:
-				if relayRetriever.running.Load() && m.PineconeRouter.PeerCount(-1) == 0 {
+				if relayRetriever.running.Load() && m.PineconeRouter.TotalPeerCount() == 0 {
 					stopRelayServerSync <- true
 				}
 			case pineconeEvents.BroadcastReceived:

@@ -347,7 +347,7 @@ func main() {
 					go m.syncRelayServers(stopRelayServerSync, *relayServerSyncRunning)
 				}
 			case pineconeEvents.PeerRemoved:
-				if relayServerSyncRunning.Load() && pRouter.PeerCount(-1) == 0 {
+				if relayServerSyncRunning.Load() && pRouter.TotalPeerCount() == 0 {
 					stopRelayServerSync <- true
 				}
 			case pineconeEvents.BroadcastReceived:
