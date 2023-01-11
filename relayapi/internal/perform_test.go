@@ -35,10 +35,10 @@ type testFedClient struct {
 	queueDepth uint
 }
 
-func (f *testFedClient) GetAsyncEvents(ctx context.Context, u gomatrixserverlib.UserID, prev gomatrixserverlib.RelayEntry, relayServer gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetAsyncEvents, err error) {
+func (f *testFedClient) P2PGetTransactionFromRelay(ctx context.Context, u gomatrixserverlib.UserID, prev gomatrixserverlib.RelayEntry, relayServer gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetRelayTxn, err error) {
 	f.queryCount++
 	if !f.shouldFail {
-		res = gomatrixserverlib.RespGetAsyncEvents{
+		res = gomatrixserverlib.RespGetRelayTxn{
 			Txn:     gomatrixserverlib.Transaction{},
 			EntryID: 0,
 		}

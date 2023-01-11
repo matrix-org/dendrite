@@ -25,9 +25,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ForwardAsync implements /_matrix/federation/v1/forward_async/{txnID}/{userID}
+// SendTxnToRelay implements PUT /_matrix/federation/v1/relay_txn/{txnID}/{userID}
 // This endpoint can be extracted into a separate relay server service.
-func ForwardAsync(
+func SendTxnToRelay(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
 	relayAPI api.RelayInternalAPI,

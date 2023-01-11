@@ -31,19 +31,19 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	response *api.PerformRelayServerSyncResponse,
 ) error {
 	prevEntry := gomatrixserverlib.RelayEntry{EntryID: -1}
-	asyncResponse, err := r.fedClient.GetAsyncEvents(ctx, request.UserID, prevEntry, request.RelayServer)
+	asyncResponse, err := r.fedClient.P2PGetTransactionFromRelay(ctx, request.UserID, prevEntry, request.RelayServer)
 	if err != nil {
-		logrus.Errorf("GetAsyncEvents: %s", err.Error())
+		logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 		return err
 	}
 	r.processTransaction(&asyncResponse.Txn)
 
 	for asyncResponse.EntriesQueued {
 		logrus.Infof("Retrieving next entry from relay, previous: %v", prevEntry)
-		asyncResponse, err = r.fedClient.GetAsyncEvents(ctx, request.UserID, prevEntry, request.RelayServer)
+		asyncResponse, err = r.fedClient.P2PGetTransactionFromRelay(ctx, request.UserID, prevEntry, request.RelayServer)
 		prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
 		if err != nil {
-			logrus.Errorf("GetAsyncEvents: %s", err.Error())
+			logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
 		}
 		r.processTransaction(&asyncResponse.Txn)

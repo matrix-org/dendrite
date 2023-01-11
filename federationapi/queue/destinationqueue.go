@@ -418,7 +418,7 @@ func (oq *destinationQueue) nextTransaction(
 			return userErr, false
 		}
 		for _, relayServer := range relayServers {
-			_, asyncErr := oq.client.SendAsyncTransaction(ctx, *userID, t, relayServer)
+			_, asyncErr := oq.client.P2PSendTransactionToRelay(ctx, *userID, t, relayServer)
 			if asyncErr != nil {
 				err = asyncErr
 			} else {

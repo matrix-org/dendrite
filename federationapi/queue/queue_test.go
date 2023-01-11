@@ -89,7 +89,7 @@ func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixse
 	return gomatrixserverlib.RespSend{}, result
 }
 
-func (f *stubFederationClient) SendAsyncTransaction(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error) {
+func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error) {
 	var result error
 	if !f.shouldTxAsyncSucceed {
 		result = fmt.Errorf("async transaction failed")

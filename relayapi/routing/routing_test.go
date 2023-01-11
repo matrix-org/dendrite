@@ -34,12 +34,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type forwardAsyncContent struct {
+type sendRelayContent struct {
 	PDUs []json.RawMessage       `json:"pdus"`
 	EDUs []gomatrixserverlib.EDU `json:"edus"`
 }
 
-func TestHandleForwardAsync(t *testing.T) {
+func TestHandleSendRelay(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer close()
 
@@ -60,13 +60,13 @@ func TestHandleForwardAsync(t *testing.T) {
 	}
 	routing.Setup(fedMux, &cfg, r, keyRing)
 
-	handler := fedMux.Get(routing.ForwardAsyncRouteName).GetHandler().ServeHTTP
+	handler := fedMux.Get(routing.SendRelayTransactionRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/forward_async/1234/@user:local")
-	content := forwardAsyncContent{}
+	req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/send_relay/1234/@user:local")
+	content := sendRelayContent{}
 	err := req.SetContent(content)
 	if err != nil {
 		t.Fatalf("Error: %s", err.Error())
@@ -85,7 +85,7 @@ func TestHandleForwardAsync(t *testing.T) {
 	assert.Equal(t, 200, res.StatusCode)
 }
 
-func TestHandleForwardAsyncBadUserID(t *testing.T) {
+func TestHandleSendRelayBadUserID(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer close()
 
@@ -106,13 +106,13 @@ func TestHandleForwardAsyncBadUserID(t *testing.T) {
 	}
 	routing.Setup(fedMux, &cfg, r, keyRing)
 
-	handler := fedMux.Get(routing.ForwardAsyncRouteName).GetHandler().ServeHTTP
+	handler := fedMux.Get(routing.SendRelayTransactionRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/forward_async/1234/user")
-	content := forwardAsyncContent{}
+	req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/send_relay/1234/user")
+	content := sendRelayContent{}
 	err := req.SetContent(content)
 	if err != nil {
 		t.Fatalf("Error: %s", err.Error())
@@ -131,7 +131,7 @@ func TestHandleForwardAsyncBadUserID(t *testing.T) {
 	assert.NotEqual(t, 200, res.StatusCode)
 }
 
-func TestHandleAsyncEvents(t *testing.T) {
+func TestHandleRelayTxn(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer close()
 
@@ -152,12 +152,12 @@ func TestHandleAsyncEvents(t *testing.T) {
 	}
 	routing.Setup(fedMux, &cfg, r, keyRing)
 
-	handler := fedMux.Get(routing.AsyncEventsRouteName).GetHandler().ServeHTTP
+	handler := fedMux.Get(routing.GetRelayTransactionRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("GET", serverName, "remote", "/async_events/@user:local")
+	req := gomatrixserverlib.NewFederationRequest("GET", serverName, "remote", "/relay_txn/@user:local")
 	content := gomatrixserverlib.RelayEntry{EntryID: 0}
 	err := req.SetContent(content)
 	if err != nil {
@@ -177,7 +177,7 @@ func TestHandleAsyncEvents(t *testing.T) {
 	assert.Equal(t, 200, res.StatusCode)
 }
 
-func TestHandleAsyncEventsBadUserID(t *testing.T) {
+func TestHandleRelayTxnBadUserID(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer close()
 
@@ -198,12 +198,12 @@ func TestHandleAsyncEventsBadUserID(t *testing.T) {
 	}
 	routing.Setup(fedMux, &cfg, r, keyRing)
 
-	handler := fedMux.Get(routing.AsyncEventsRouteName).GetHandler().ServeHTTP
+	handler := fedMux.Get(routing.GetRelayTransactionRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("GET", serverName, "remote", "/async_events/user")
+	req := gomatrixserverlib.NewFederationRequest("GET", serverName, "remote", "/relay_txn/user")
 	content := gomatrixserverlib.RelayEntry{EntryID: 0}
 	err := req.SetContent(content)
 	if err != nil {

@@ -24,21 +24,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type AsyncEventsResponse struct {
+type RelayTxnResponse struct {
 	Txn           gomatrixserverlib.Transaction `json:"transaction"`
 	EntryID       int64                         `json:"entry_id,omitempty"`
 	EntriesQueued bool                          `json:"entries_queued"`
 }
 
-// GetAsyncEvents implements /_matrix/federation/v1/async_events/{userID}
+// GetTxnFromRelay implements /_matrix/federation/v1/relay_txn/{userID}
 // This endpoint can be extracted into a separate relay server service.
-func GetAsyncEvents(
+func GetTxnFromRelay(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
 	relayAPI api.RelayInternalAPI,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Handling async_events for %s", userID.Raw())
+	logrus.Infof("Handling relay_txn for %s", userID.Raw())
 
 	entryProvided := false
 	var previousEntry gomatrixserverlib.RelayEntry
@@ -67,7 +67,7 @@ func GetAsyncEvents(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: AsyncEventsResponse{
+		JSON: RelayTxnResponse{
 			Txn:           response.Txn,
 			EntryID:       response.EntryID,
 			EntriesQueued: response.EntriesQueued,

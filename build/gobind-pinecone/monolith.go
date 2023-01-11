@@ -575,7 +575,7 @@ func (m *RelayServerRetriever) GetQueriedServerStatus() map[gomatrixserverlib.Se
 }
 
 func (m *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverlib.ServerName) {
-	logrus.Info("querying relay servers for async_events")
+	logrus.Info("querying relay servers for any available transactions")
 	for _, server := range relayServers {
 		userID, err := gomatrixserverlib.NewUserID("@user:"+string(m.ServerName), false)
 		if err != nil {

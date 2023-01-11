@@ -50,7 +50,7 @@ func createFederationRequest(
 	content interface{},
 ) gomatrixserverlib.FederationRequest {
 	var federationPathPrefixV1 = "/_matrix/federation/v1"
-	path := federationPathPrefixV1 + "/forward_async/" + string(txnID) + "/" + userID.Raw()
+	path := federationPathPrefixV1 + "/send_relay/" + string(txnID) + "/" + userID.Raw()
 	request := gomatrixserverlib.NewFederationRequest("PUT", origin, destination, path)
 	request.SetContent(content)
 
@@ -75,7 +75,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
+	response := routing.SendTxnToRelay(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.Equal(t, 200, response.Code)
 }
@@ -104,7 +104,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
+	response := routing.SendTxnToRelay(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.NotEqual(t, 200, response.Code)
 }
@@ -138,7 +138,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
+	response := routing.SendTxnToRelay(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.NotEqual(t, 200, response.Code)
 }
@@ -172,7 +172,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(httpReq, &request, relayAPI, "1", *userID)
+	response := routing.SendTxnToRelay(httpReq, &request, relayAPI, "1", *userID)
 
 	assert.NotEqual(t, 200, response.Code)
 }
@@ -195,7 +195,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	response := routing.ForwardAsync(
+	response := routing.SendTxnToRelay(
 		httpReq, &request, relayAPI, txn.TransactionID, *userID)
 	transaction, _, err := db.GetAsyncTransaction(context.TODO(), *userID)
 	assert.NoError(t, err, "Failed retrieving transaction")

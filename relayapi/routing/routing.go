@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	ForwardAsyncRouteName = "ForwardAsync"
-	AsyncEventsRouteName  = "AsyncEvents"
+	SendRelayTransactionRouteName = "SendRelayTxn"
+	GetRelayTransactionRouteName  = "GetRelayTxn"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -50,8 +50,8 @@ func Setup(
 ) {
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
 
-	v1fedmux.Handle("/forward_async/{txnID}/{userID}", MakeRelayAPI(
-		"relay_forward_async", "", cfg.Matrix.IsLocalServerName, keys,
+	v1fedmux.Handle("/send_relay/{txnID}/{userID}", MakeRelayAPI(
+		"send_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
 			if err != nil {
@@ -60,15 +60,15 @@ func Setup(
 					JSON: jsonerror.InvalidUsername("Username was invalid"),
 				}
 			}
-			return ForwardAsync(
+			return SendTxnToRelay(
 				httpReq, request, relayAPI, gomatrixserverlib.TransactionID(vars["txnID"]),
 				*userID,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions).Name(ForwardAsyncRouteName)
+	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRelayTransactionRouteName)
 
-	v1fedmux.Handle("/async_events/{userID}", MakeRelayAPI(
-		"relay_async_events", "", cfg.Matrix.IsLocalServerName, keys,
+	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
+		"get_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
 			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
 			if err != nil {
@@ -77,9 +77,9 @@ func Setup(
 					JSON: jsonerror.InvalidUsername("Username was invalid"),
 				}
 			}
-			return GetAsyncEvents(httpReq, request, relayAPI, *userID)
+			return GetTxnFromRelay(httpReq, request, relayAPI, *userID)
 		},
-	)).Methods(http.MethodGet, http.MethodOptions).Name(AsyncEventsRouteName)
+	)).Methods(http.MethodGet, http.MethodOptions).Name(GetRelayTransactionRouteName)
 }
 
 // MakeRelayAPI makes an http.Handler that checks matrix relay authentication.
