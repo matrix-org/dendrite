@@ -75,6 +75,7 @@ jobs:
             /logs/**/*.log*
           
   element_web:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
       - uses: tecolicom/actions-use-apt-tools@v1
