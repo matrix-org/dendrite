@@ -53,10 +53,10 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 }
 
 // PerformStoreAsync implements api.RelayInternalAPI
-func (r *RelayInternalAPI) PerformStoreAsync(
+func (r *RelayInternalAPI) PerformStoreTransaction(
 	ctx context.Context,
-	request *api.PerformStoreAsyncRequest,
-	response *api.PerformStoreAsyncResponse,
+	request *api.PerformStoreTransactionRequest,
+	response *api.PerformStoreTransactionResponse,
 ) error {
 	logrus.Warnf("Storing transaction for %v", request.UserID)
 	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
@@ -76,12 +76,12 @@ func (r *RelayInternalAPI) PerformStoreAsync(
 }
 
 // QueryAsyncTransactions implements api.RelayInternalAPI
-func (r *RelayInternalAPI) QueryAsyncTransactions(
+func (r *RelayInternalAPI) QueryTransactions(
 	ctx context.Context,
-	request *api.QueryAsyncTransactionsRequest,
-	response *api.QueryAsyncTransactionsResponse,
+	request *api.QueryRelayTransactionsRequest,
+	response *api.QueryRelayTransactionsResponse,
 ) error {
-	logrus.Infof("QueryAsyncTransactions for %s", request.UserID.Raw())
+	logrus.Infof("QueryTransactions for %s", request.UserID.Raw())
 	if request.PreviousEntry.EntryID >= 0 {
 		logrus.Infof("Cleaning previous entry (%v) from db for %s",
 			request.PreviousEntry.EntryID,
@@ -103,7 +103,7 @@ func (r *RelayInternalAPI) QueryAsyncTransactions(
 
 	if transaction != nil && receipt != nil {
 		logrus.Infof("Obtained transaction (%v) for %s", transaction.TransactionID, request.UserID.Raw())
-		response.Txn = *transaction
+		response.Transaction = *transaction
 		response.EntryID = receipt.GetNID()
 		response.EntriesQueued = true
 	} else {

@@ -35,7 +35,7 @@ func TestRelayAPIClientPerormSync(t *testing.T) {
 func TestRelayAPIClientStore(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "/api"+RelayAPIPerformStoreAsyncPath, req.URL.String())
+		assert.Equal(t, "/api"+RelayAPIPerformStoreTransactionPath, req.URL.String())
 	}))
 	defer server.Close()
 
@@ -45,13 +45,13 @@ func TestRelayAPIClientStore(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	cl.PerformStoreAsync(ctx, &api.PerformStoreAsyncRequest{}, &api.PerformStoreAsyncResponse{})
+	cl.PerformStoreTransaction(ctx, &api.PerformStoreTransactionRequest{}, &api.PerformStoreTransactionResponse{})
 }
 
 func TestRelayAPIClientQuery(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "/api"+RelayAPIQueryAsyncTransactionsPath, req.URL.String())
+		assert.Equal(t, "/api"+RelayAPIQueryTransactionsPath, req.URL.String())
 	}))
 	defer server.Close()
 
@@ -61,5 +61,5 @@ func TestRelayAPIClientQuery(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	cl.QueryAsyncTransactions(ctx, &api.QueryAsyncTransactionsRequest{}, &api.QueryAsyncTransactionsResponse{})
+	cl.QueryTransactions(ctx, &api.QueryRelayTransactionsRequest{}, &api.QueryRelayTransactionsResponse{})
 }

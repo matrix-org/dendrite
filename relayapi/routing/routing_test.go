@@ -131,7 +131,7 @@ func TestHandleSendRelayBadUserID(t *testing.T) {
 	assert.NotEqual(t, 200, res.StatusCode)
 }
 
-func TestHandleRelayTxn(t *testing.T) {
+func TestHandleRelayTransaction(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer close()
 

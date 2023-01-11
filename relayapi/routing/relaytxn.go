@@ -24,8 +24,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type RelayTxnResponse struct {
-	Txn           gomatrixserverlib.Transaction `json:"transaction"`
+type RelayTransactionResponse struct {
+	Transaction   gomatrixserverlib.Transaction `json:"transaction"`
 	EntryID       int64                         `json:"entry_id,omitempty"`
 	EntriesQueued bool                          `json:"entries_queued"`
 }
@@ -47,15 +47,15 @@ func GetTxnFromRelay(
 		entryProvided = true
 	}
 
-	request := api.QueryAsyncTransactionsRequest{
+	request := api.QueryRelayTransactionsRequest{
 		UserID:        userID,
 		PreviousEntry: gomatrixserverlib.RelayEntry{EntryID: -1},
 	}
 	if entryProvided {
 		request.PreviousEntry = previousEntry
 	}
-	var response api.QueryAsyncTransactionsResponse
-	err := relayAPI.QueryAsyncTransactions(
+	var response api.QueryRelayTransactionsResponse
+	err := relayAPI.QueryTransactions(
 		httpReq.Context(),
 		&request,
 		&response)
@@ -67,8 +67,8 @@ func GetTxnFromRelay(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: RelayTxnResponse{
-			Txn:           response.Txn,
+		JSON: RelayTransactionResponse{
+			Transaction:   response.Transaction,
 			EntryID:       response.EntryID,
 			EntriesQueued: response.EntriesQueued,
 		},

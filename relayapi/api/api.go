@@ -32,18 +32,18 @@ type RelayInternalAPI interface {
 }
 
 type RelayServerAPI interface {
-	// Store async transactions for forwarding to the destination at a later time.
-	PerformStoreAsync(
+	// Store transactions for forwarding to the destination at a later time.
+	PerformStoreTransaction(
 		ctx context.Context,
-		request *PerformStoreAsyncRequest,
-		response *PerformStoreAsyncResponse,
+		request *PerformStoreTransactionRequest,
+		response *PerformStoreTransactionResponse,
 	) error
 
 	// Obtain the oldest stored transaction for the specified userID.
-	QueryAsyncTransactions(
+	QueryTransactions(
 		ctx context.Context,
-		request *QueryAsyncTransactionsRequest,
-		response *QueryAsyncTransactionsResponse,
+		request *QueryRelayTransactionsRequest,
+		response *QueryRelayTransactionsResponse,
 	) error
 }
 
@@ -63,21 +63,21 @@ type QueryRelayServersResponse struct {
 	RelayServers []gomatrixserverlib.ServerName
 }
 
-type PerformStoreAsyncRequest struct {
+type PerformStoreTransactionRequest struct {
 	Txn    gomatrixserverlib.Transaction `json:"transaction"`
 	UserID gomatrixserverlib.UserID      `json:"user_id"`
 }
 
-type PerformStoreAsyncResponse struct {
+type PerformStoreTransactionResponse struct {
 }
 
-type QueryAsyncTransactionsRequest struct {
+type QueryRelayTransactionsRequest struct {
 	UserID        gomatrixserverlib.UserID     `json:"user_id"`
 	PreviousEntry gomatrixserverlib.RelayEntry `json:"prev_entry,omitempty"`
 }
 
-type QueryAsyncTransactionsResponse struct {
-	Txn           gomatrixserverlib.Transaction `json:"transaction"`
+type QueryRelayTransactionsResponse struct {
+	Transaction   gomatrixserverlib.Transaction `json:"transaction"`
 	EntryID       int64                         `json:"entry_id"`
 	EntriesQueued bool                          `json:"entries_queued"`
 }

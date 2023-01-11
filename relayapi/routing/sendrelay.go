@@ -25,9 +25,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SendTxnToRelay implements PUT /_matrix/federation/v1/relay_txn/{txnID}/{userID}
+// SendTransactionToRelay implements PUT /_matrix/federation/v1/relay_txn/{txnID}/{userID}
 // This endpoint can be extracted into a separate relay server service.
-func SendTxnToRelay(
+func SendTransactionToRelay(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
 	relayAPI api.RelayInternalAPI,
@@ -65,12 +65,12 @@ func SendTxnToRelay(
 
 	util.GetLogger(httpReq.Context()).Warnf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
-	req := api.PerformStoreAsyncRequest{
+	req := api.PerformStoreTransactionRequest{
 		Txn:    t,
 		UserID: userID,
 	}
-	res := api.PerformStoreAsyncResponse{}
-	err := relayAPI.PerformStoreAsync(httpReq.Context(), &req, &res)
+	res := api.PerformStoreTransactionResponse{}
+	err := relayAPI.PerformStoreTransaction(httpReq.Context(), &req, &res)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

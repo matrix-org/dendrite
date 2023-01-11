@@ -26,9 +26,9 @@ import (
 
 // HTTP paths for the internal HTTP API
 const (
-	RelayAPIPerformRelayServerSyncPath = "/relayapi/performRelayServerSync"
-	RelayAPIPerformStoreAsyncPath      = "/relayapi/performStoreAsync"
-	RelayAPIQueryAsyncTransactionsPath = "/relayapi/queryAsyncTransactions"
+	RelayAPIPerformRelayServerSyncPath  = "/relayapi/performRelayServerSync"
+	RelayAPIPerformStoreTransactionPath = "/relayapi/performStoreTransaction"
+	RelayAPIQueryTransactionsPath       = "/relayapi/queryTransactions"
 )
 
 // NewRelayAPIClient creates a RelayInternalAPI implemented by talking to a HTTP POST API.
@@ -61,24 +61,24 @@ func (h *httpRelayInternalAPI) PerformRelayServerSync(
 	)
 }
 
-func (h *httpRelayInternalAPI) PerformStoreAsync(
+func (h *httpRelayInternalAPI) PerformStoreTransaction(
 	ctx context.Context,
-	request *api.PerformStoreAsyncRequest,
-	response *api.PerformStoreAsyncResponse,
+	request *api.PerformStoreTransactionRequest,
+	response *api.PerformStoreTransactionResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
-		"PerformStoreAsync", h.relayAPIURL+RelayAPIPerformStoreAsyncPath,
+		"PerformStoreTransaction", h.relayAPIURL+RelayAPIPerformStoreTransactionPath,
 		h.httpClient, ctx, request, response,
 	)
 }
 
-func (h *httpRelayInternalAPI) QueryAsyncTransactions(
+func (h *httpRelayInternalAPI) QueryTransactions(
 	ctx context.Context,
-	request *api.QueryAsyncTransactionsRequest,
-	response *api.QueryAsyncTransactionsResponse,
+	request *api.QueryRelayTransactionsRequest,
+	response *api.QueryRelayTransactionsResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
-		"QueryAsyncTransactions", h.relayAPIURL+RelayAPIQueryAsyncTransactionsPath,
+		"QueryTransactions", h.relayAPIURL+RelayAPIQueryTransactionsPath,
 		h.httpClient, ctx, request, response,
 	)
 }

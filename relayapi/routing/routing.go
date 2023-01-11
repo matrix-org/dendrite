@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	SendRelayTransactionRouteName = "SendRelayTxn"
-	GetRelayTransactionRouteName  = "GetRelayTxn"
+	SendRelayTransactionRouteName = "SendRelayTransaction"
+	GetRelayTransactionRouteName  = "GetRelayTransaction"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -60,7 +60,7 @@ func Setup(
 					JSON: jsonerror.InvalidUsername("Username was invalid"),
 				}
 			}
-			return SendTxnToRelay(
+			return SendTransactionToRelay(
 				httpReq, request, relayAPI, gomatrixserverlib.TransactionID(vars["txnID"]),
 				*userID,
 			)

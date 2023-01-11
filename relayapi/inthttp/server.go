@@ -30,12 +30,12 @@ func AddRoutes(intAPI api.RelayInternalAPI, internalAPIMux *mux.Router, enableMe
 	)
 
 	internalAPIMux.Handle(
-		RelayAPIPerformStoreAsyncPath,
-		httputil.MakeInternalRPCAPI("RelayAPIPerformStoreAsync", enableMetrics, intAPI.PerformStoreAsync),
+		RelayAPIPerformStoreTransactionPath,
+		httputil.MakeInternalRPCAPI("RelayAPIPerformStoreTransaction", enableMetrics, intAPI.PerformStoreTransaction),
 	)
 
 	internalAPIMux.Handle(
-		RelayAPIQueryAsyncTransactionsPath,
-		httputil.MakeInternalRPCAPI("RelayAPIQueryAsyncTransactions", enableMetrics, intAPI.QueryAsyncTransactions),
+		RelayAPIQueryTransactionsPath,
+		httputil.MakeInternalRPCAPI("RelayAPIQueryTransactions", enableMetrics, intAPI.QueryTransactions),
 	)
 }
