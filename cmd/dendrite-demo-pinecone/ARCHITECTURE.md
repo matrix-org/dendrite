@@ -44,7 +44,7 @@ In the future this will probably need to change in order to handle more complex 
     - If sending to any of the relay servers succeeds, that transaction is considered to be successfully sent.      
 -   2: The relay server `forwarder` stores the transaction json in it's database and marks it as destined for `P2P Node B`.
 -   3: When `P2P Node B` comes online, it queries all it's relay servers for any missed messages.
--   4: The relay server `retriever` will look in it's database for any transactions that are destined for `P2P Node B` and return them one at a time.
+-   4: The relay server `retriever` will look in it's database for any transactions that are destined for `P2P Node B` and returns them one at a time.
 
 For now, it is important that we don’t design out a hybrid approach of having both sender-side and recipient-side relay servers. 
 Both approaches make sense and determining which makes for a better experience depends on the use case.
