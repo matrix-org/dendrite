@@ -113,11 +113,11 @@ func TestQueryRelayServers(t *testing.T) {
 		testDB, &cfg, nil, fedClient, &stats, nil, queues, nil,
 	)
 
-	req := api.QueryRelayServersRequest{
+	req := api.P2PQueryRelayServersRequest{
 		Server: server,
 	}
-	res := api.QueryRelayServersResponse{}
-	err = fedAPI.QueryRelayServers(context.Background(), &req, &res)
+	res := api.P2PQueryRelayServersResponse{}
+	err = fedAPI.P2PQueryRelayServers(context.Background(), &req, &res)
 	assert.NoError(t, err)
 
 	assert.Equal(t, len(relayServers), len(res.RelayServers))

@@ -512,10 +512,10 @@ func (h *httpFederationInternalAPI) QueryPublicKeys(
 	)
 }
 
-func (h *httpFederationInternalAPI) QueryRelayServers(
+func (h *httpFederationInternalAPI) P2PQueryRelayServers(
 	ctx context.Context,
-	request *api.QueryRelayServersRequest,
-	response *api.QueryRelayServersResponse,
+	request *api.P2PQueryRelayServersRequest,
+	response *api.P2PQueryRelayServersResponse,
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryRelayServers", h.federationAPIURL+FederationAPIQueryRelayServers,

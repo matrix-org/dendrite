@@ -133,7 +133,7 @@ type FakeFedAPI struct {
 	api.FederationInternalAPI
 }
 
-func (f *FakeFedAPI) QueryRelayServers(ctx context.Context, req *api.QueryRelayServersRequest, res *api.QueryRelayServersResponse) error {
+func (f *FakeFedAPI) P2PQueryRelayServers(ctx context.Context, req *api.P2PQueryRelayServersRequest, res *api.P2PQueryRelayServersResponse) error {
 	res.RelayServers = testRelayServers
 	return nil
 }

@@ -377,9 +377,9 @@ type RelayServerRetriever struct {
 }
 
 func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
-	request := api.QueryRelayServersRequest{Server: gomatrixserverlib.ServerName(m.ServerName)}
-	response := api.QueryRelayServersResponse{}
-	err := m.FederationAPI.QueryRelayServers(m.Context, &request, &response)
+	request := api.P2PQueryRelayServersRequest{Server: gomatrixserverlib.ServerName(m.ServerName)}
+	response := api.P2PQueryRelayServersResponse{}
+	err := m.FederationAPI.P2PQueryRelayServers(m.Context, &request, &response)
 	if err != nil {
 		eLog.Warnf("Failed obtaining list of this node's relay servers: %s", err.Error())
 	}

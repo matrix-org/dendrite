@@ -37,10 +37,10 @@ type FederationInternalAPI interface {
 	) error
 
 	// Relay Server sync api used in the pinecone demos.
-	QueryRelayServers(
+	P2PQueryRelayServers(
 		ctx context.Context,
-		request *QueryRelayServersRequest,
-		response *QueryRelayServersResponse,
+		request *P2PQueryRelayServersRequest,
+		response *P2PQueryRelayServersResponse,
 	) error
 }
 
@@ -243,27 +243,27 @@ type InputPublicKeysRequest struct {
 type InputPublicKeysResponse struct {
 }
 
-type QueryRelayServersRequest struct {
+type P2PQueryRelayServersRequest struct {
 	Server gomatrixserverlib.ServerName
 }
 
-type QueryRelayServersResponse struct {
+type P2PQueryRelayServersResponse struct {
 	RelayServers []gomatrixserverlib.ServerName
 }
 
-type PerformStoreAsyncRequest struct {
-	Txn    gomatrixserverlib.Transaction `json:"transaction"`
-	UserID gomatrixserverlib.UserID      `json:"user_id"`
+type P2PPerformStoreAsyncRequest struct {
+	Transaction gomatrixserverlib.Transaction `json:"transaction"`
+	UserID      gomatrixserverlib.UserID      `json:"user_id"`
 }
 
-type PerformStoreAsyncResponse struct {
+type P2PPerformStoreAsyncResponse struct {
 }
 
-type QueryAsyncTransactionsRequest struct {
+type P2PQueryAsyncTransactionsRequest struct {
 	UserID gomatrixserverlib.UserID `json:"user_id"`
 }
 
-type QueryAsyncTransactionsResponse struct {
-	Txn            gomatrixserverlib.Transaction `json:"transaction"`
+type P2PQueryAsyncTransactionsResponse struct {
+	Transaction    gomatrixserverlib.Transaction `json:"transaction"`
 	RemainingCount uint32                        `json:"remaining"`
 }
