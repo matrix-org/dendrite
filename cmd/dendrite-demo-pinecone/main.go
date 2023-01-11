@@ -381,7 +381,7 @@ func (m *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
 	response := api.QueryRelayServersResponse{}
 	err := m.FederationAPI.QueryRelayServers(m.Context, &request, &response)
 	if err != nil {
-		// TODO
+		eLog.Warnf("Failed obtaining list of this node's relay servers: %s", err.Error())
 	}
 	for _, server := range response.RelayServers {
 		m.RelayServersQueried[server] = false
