@@ -410,11 +410,13 @@ func (m *RelayServerRetriever) syncRelayServers(stop <-chan bool, running atomic
 
 		select {
 		case <-stop:
+			// We have been asked to stop syncing, drain the timer and return.
 			if !t.Stop() {
 				<-t.C
 			}
 			return
 		case <-t.C:
+			// The timer has expired. Continue to the next loop iteration.
 		}
 	}
 }
