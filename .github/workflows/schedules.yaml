@@ -98,6 +98,9 @@ jobs:
           CI_PACKAGE: true
         run: yarn build
         working-directory: ./element-web
+      - name: Edit Test Config
+        run: |
+          sed -i '/HOMESERVER/c\        HOMESERVER: "dendrite",' cypress.config.ts
       - name: "Run cypress tests"
         uses: cypress-io/github-action@v4.1.1
         with:
@@ -107,4 +110,3 @@ jobs:
         env:
           PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
           TMPDIR: ${{ runner.temp }}
-          HOMESERVER: 'dendrite'
