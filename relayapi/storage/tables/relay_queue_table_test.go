@@ -37,7 +37,10 @@ type RelayQueueDatabase struct {
 	Table  tables.RelayQueue
 }
 
-func mustCreateQueueTable(t *testing.T, dbType test.DBType) (database RelayQueueDatabase, close func()) {
+func mustCreateQueueTable(
+	t *testing.T,
+	dbType test.DBType,
+) (database RelayQueueDatabase, close func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{

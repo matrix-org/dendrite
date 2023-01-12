@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/federationapi/storage/tables"
 	"github.com/matrix-org/dendrite/federationapi/types"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -44,26 +45,6 @@ type Database struct {
 	NotaryServerKeysJSON     tables.FederationNotaryServerKeysJSON
 	NotaryServerKeysMetadata tables.FederationNotaryServerKeysMetadata
 	ServerSigningKeys        tables.FederationServerSigningKeys
-}
-
-// An Receipt contains the NIDs of a call to GetNextTransactionPDUs/EDUs.
-// We don't actually export the NIDs but we need the caller to be able
-// to pass them back so that we can clean up if the transaction sends
-// successfully.
-type Receipt struct {
-	nid int64
-}
-
-func NewReceipt(nid int64) Receipt {
-	return Receipt{nid: nid}
-}
-
-func (r *Receipt) GetNID() int64 {
-	return r.nid
-}
-
-func (r *Receipt) String() string {
-	return fmt.Sprintf("%d", r.nid)
 }
 
 // UpdateRoom updates the joined hosts for a room and returns what the joined
@@ -145,7 +126,7 @@ func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string,
 // metadata entries.
 func (d *Database) StoreJSON(
 	ctx context.Context, js string,
-) (*Receipt, error) {
+) (*receipt.Receipt, error) {
 	var nid int64
 	var err error
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -155,9 +136,8 @@ func (d *Database) StoreJSON(
 	if err != nil {
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
-	return &Receipt{
-		nid: nid,
-	}, nil
+	newReceipt := receipt.NewReceipt(nid)
+	return &newReceipt, nil
 }
 
 func (d *Database) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {

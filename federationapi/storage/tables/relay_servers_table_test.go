@@ -27,7 +27,10 @@ type RelayServersDatabase struct {
 	Table  tables.FederationRelayServers
 }
 
-func mustCreateRelayServersTable(t *testing.T, dbType test.DBType) (database RelayServersDatabase, close func()) {
+func mustCreateRelayServersTable(
+	t *testing.T,
+	dbType test.DBType,
+) (database RelayServersDatabase, close func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{

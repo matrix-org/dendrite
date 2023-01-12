@@ -30,7 +30,7 @@ import (
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -138,12 +138,12 @@ func NewOutgoingQueues(
 }
 
 type queuedPDU struct {
-	receipt *shared.Receipt
+	receipt *receipt.Receipt
 	pdu     *gomatrixserverlib.HeaderedEvent
 }
 
 type queuedEDU struct {
-	receipt *shared.Receipt
+	receipt *receipt.Receipt
 	edu     *gomatrixserverlib.EDU
 }
 

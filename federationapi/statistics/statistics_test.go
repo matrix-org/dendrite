@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/storage"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -106,7 +106,7 @@ func TestBackoff(t *testing.T) {
 }
 
 func TestRelayServersListing(t *testing.T) {
-	stats := NewStatistics(storage.NewFakeFederationDatabase(), FailuresUntilBlacklist, FailuresUntilAssumedOffline)
+	stats := NewStatistics(test.NewInMemoryFederationDatabase(), FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	server := ServerStatistics{statistics: &stats}
 	server.AddRelayServers([]gomatrixserverlib.ServerName{"relay1", "relay1", "relay2"})
 	relayServers := server.KnownRelayServers()

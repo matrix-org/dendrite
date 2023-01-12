@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -41,7 +42,7 @@ var defaultExpireEDUTypes = map[string]time.Duration{
 func (d *Database) AssociateEDUWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.ServerName]struct{},
-	receipt *Receipt,
+	receipt *receipt.Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
 ) error {
@@ -62,12 +63,12 @@ func (d *Database) AssociateEDUWithDestinations(
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueueEDUs.InsertQueueEDU(
-				ctx,         // context
-				txn,         // SQL transaction
-				eduType,     // EDU type for coalescing
-				destination, // destination server name
-				receipt.nid, // NID from the federationapi_queue_json table
-				expiresAt,   // The timestamp this EDU will expire
+				ctx,              // context
+				txn,              // SQL transaction
+				eduType,          // EDU type for coalescing
+				destination,      // destination server name
+				receipt.GetNID(), // NID from the federationapi_queue_json table
+				expiresAt,        // The timestamp this EDU will expire
 			)
 		}
 		return err
@@ -81,10 +82,10 @@ func (d *Database) GetPendingEDUs(
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) (
-	edus map[*Receipt]*gomatrixserverlib.EDU,
+	edus map[*receipt.Receipt]*gomatrixserverlib.EDU,
 	err error,
 ) {
-	edus = make(map[*Receipt]*gomatrixserverlib.EDU)
+	edus = make(map[*receipt.Receipt]*gomatrixserverlib.EDU)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nids, err := d.FederationQueueEDUs.SelectQueueEDUs(ctx, txn, serverName, limit)
 		if err != nil {
@@ -94,7 +95,8 @@ func (d *Database) GetPendingEDUs(
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
 			if edu, ok := d.Cache.GetFederationQueuedEDU(nid); ok {
-				edus[&Receipt{nid}] = edu
+				newReceipt := receipt.NewReceipt(nid)
+				edus[&newReceipt] = edu
 			} else {
 				retrieve = append(retrieve, nid)
 			}
@@ -110,7 +112,8 @@ func (d *Database) GetPendingEDUs(
 			if err := json.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
-			edus[&Receipt{nid}] = &event
+			newReceipt := receipt.NewReceipt(nid)
+			edus[&newReceipt] = &event
 			d.Cache.StoreFederationQueuedEDU(nid, &event)
 		}
 
@@ -124,7 +127,7 @@ func (d *Database) GetPendingEDUs(
 func (d *Database) CleanEDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
-	receipts []*Receipt,
+	receipts []*receipt.Receipt,
 ) error {
 	if len(receipts) == 0 {
 		return errors.New("expected receipt")
@@ -132,7 +135,7 @@ func (d *Database) CleanEDUs(
 
 	nids := make([]int64, len(receipts))
 	for i := range receipts {
-		nids[i] = receipts[i].nid
+		nids[i] = receipts[i].GetNID()
 	}
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {

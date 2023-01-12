@@ -22,8 +22,8 @@ import (
 	fedAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/api"
-	"github.com/matrix-org/dendrite/relayapi/storage"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,7 +35,12 @@ type testFedClient struct {
 	queueDepth uint
 }
 
-func (f *testFedClient) P2PGetTransactionFromRelay(ctx context.Context, u gomatrixserverlib.UserID, prev gomatrixserverlib.RelayEntry, relayServer gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetRelayTransaction, err error) {
+func (f *testFedClient) P2PGetTransactionFromRelay(
+	ctx context.Context,
+	u gomatrixserverlib.UserID,
+	prev gomatrixserverlib.RelayEntry,
+	relayServer gomatrixserverlib.ServerName,
+) (res gomatrixserverlib.RespGetRelayTransaction, err error) {
 	f.queryCount++
 	if !f.shouldFail {
 		res = gomatrixserverlib.RespGetRelayTransaction{
@@ -56,7 +61,7 @@ func (f *testFedClient) P2PGetTransactionFromRelay(ctx context.Context, u gomatr
 }
 
 func TestPerformRelayServerSync(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -81,7 +86,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncFedError(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -106,7 +111,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 }
 
 func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,

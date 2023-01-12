@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/storage/tables"
@@ -37,8 +37,9 @@ type Database struct {
 }
 
 func (d *Database) StoreTransaction(
-	ctx context.Context, transaction gomatrixserverlib.Transaction,
-) (*shared.Receipt, error) {
+	ctx context.Context,
+	transaction gomatrixserverlib.Transaction,
+) (*receipt.Receipt, error) {
 	var err error
 	json, err := json.Marshal(transaction)
 	if err != nil {
@@ -54,7 +55,7 @@ func (d *Database) StoreTransaction(
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
 
-	receipt := shared.NewReceipt(nid)
+	receipt := receipt.NewReceipt(nid)
 	return &receipt, nil
 }
 
@@ -62,7 +63,7 @@ func (d *Database) AssociateTransactionWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.UserID]struct{},
 	transactionID gomatrixserverlib.TransactionID,
-	receipt *shared.Receipt,
+	receipt *receipt.Receipt,
 ) error {
 	for destination := range destinations {
 		err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -81,7 +82,7 @@ func (d *Database) AssociateTransactionWithDestinations(
 func (d *Database) CleanTransactions(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
-	receipts []*shared.Receipt,
+	receipts []*receipt.Receipt,
 ) error {
 	nids := make([]int64, len(receipts))
 	for i, receipt := range receipts {
@@ -110,7 +111,7 @@ func (d *Database) CleanTransactions(
 func (d *Database) GetTransaction(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
-) (*gomatrixserverlib.Transaction, *shared.Receipt, error) {
+) (*gomatrixserverlib.Transaction, *receipt.Receipt, error) {
 	nids, err := d.RelayQueue.SelectQueueEntries(ctx, nil, userID.Domain(), 1)
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.SelectQueueEntries: %w", err)
@@ -134,7 +135,7 @@ func (d *Database) GetTransaction(
 		return nil, nil, fmt.Errorf("Unmarshal transaction: %w", err)
 	}
 
-	receipt := shared.NewReceipt(nids[0])
+	receipt := receipt.NewReceipt(nids[0])
 	return transaction, &receipt, nil
 }
 

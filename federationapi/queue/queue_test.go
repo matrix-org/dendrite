@@ -54,7 +54,7 @@ func mustCreateFederationDatabase(t *testing.T, dbType test.DBType, realDatabase
 		}
 	} else {
 		// Fake Database
-		db := storage.NewFakeFederationDatabase()
+		db := test.NewInMemoryFederationDatabase()
 		b := struct {
 			ProcessContext *process.ProcessContext
 		}{ProcessContext: process.NewProcessContext()}

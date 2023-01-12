@@ -33,7 +33,12 @@ type Database struct {
 }
 
 // NewDatabase opens a new database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(gomatrixserverlib.ServerName) bool) (*Database, error) {
+func NewDatabase(
+	base *base.BaseDendrite,
+	dbProperties *config.DatabaseOptions,
+	cache caching.FederationCache,
+	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+) (*Database, error) {
 	var d Database
 	var err error
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {

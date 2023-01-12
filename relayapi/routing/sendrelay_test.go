@@ -23,8 +23,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/relayapi/routing"
-	"github.com/matrix-org/dendrite/relayapi/storage"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -58,7 +58,7 @@ func createFederationRequest(
 }
 
 func TestForwardEmptyReturnsOk(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -81,7 +81,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 }
 
 func TestForwardBadJSONReturnsError(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -110,7 +110,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 }
 
 func TestForwardTooManyPDUsReturnsError(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -144,7 +144,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 }
 
 func TestForwardTooManyEDUsReturnsError(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -178,7 +178,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 }
 
 func TestUniqueTransactionStoredInDatabase(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,

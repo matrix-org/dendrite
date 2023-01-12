@@ -29,7 +29,12 @@ import (
 )
 
 // NewDatabase opens a new database
-func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.FederationCache, isLocalServerName func(gomatrixserverlib.ServerName) bool) (Database, error) {
+func NewDatabase(
+	base *base.BaseDendrite,
+	dbProperties *config.DatabaseOptions,
+	cache caching.FederationCache,
+	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.NewDatabase(base, dbProperties, cache, isLocalServerName)

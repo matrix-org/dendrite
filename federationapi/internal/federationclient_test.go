@@ -21,9 +21,9 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -50,7 +50,7 @@ func (t *testFedClient) ClaimKeys(ctx context.Context, origin, s gomatrixserverl
 }
 
 func TestFederationClientQueryKeys(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
@@ -80,7 +80,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 }
 
 func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 	testDB.AddServerToBlacklist("server")
 
 	cfg := config.FederationAPI{
@@ -111,7 +111,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 }
 
 func TestFederationClientQueryKeysFailure(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
@@ -141,7 +141,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 }
 
 func TestFederationClientClaimKeys(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
@@ -171,7 +171,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 }
 
 func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 	testDB.AddServerToBlacklist("server")
 
 	cfg := config.FederationAPI{

@@ -33,7 +33,11 @@ const (
 
 // NewRelayAPIClient creates a RelayInternalAPI implemented by talking to a HTTP POST API.
 // If httpClient is nil an error is returned
-func NewRelayAPIClient(relayapiURL string, httpClient *http.Client, cache caching.ServerKeyCache) (api.RelayInternalAPI, error) {
+func NewRelayAPIClient(
+	relayapiURL string,
+	httpClient *http.Client,
+	cache caching.ServerKeyCache,
+) (api.RelayInternalAPI, error) {
 	if httpClient == nil {
 		return nil, errors.New("NewRelayInternalAPIHTTP: httpClient is <nil>")
 	}

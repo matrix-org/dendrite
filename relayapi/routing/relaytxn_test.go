@@ -22,8 +22,8 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/relayapi/internal"
 	"github.com/matrix-org/dendrite/relayapi/routing"
-	"github.com/matrix-org/dendrite/relayapi/storage"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,7 +41,7 @@ func createQuery(
 }
 
 func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -74,7 +74,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 }
 
 func TestGetReturnsSavedTransaction(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,
@@ -124,7 +124,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 }
 
 func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
-	testDB := storage.NewFakeRelayDatabase()
+	testDB := test.NewInMemoryRelayDatabase()
 	db := shared.Database{
 		Writer:         sqlutil.NewDummyWriter(),
 		RelayQueue:     testDB,

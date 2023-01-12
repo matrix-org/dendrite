@@ -21,9 +21,9 @@ import (
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/queue"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
-	"github.com/matrix-org/dendrite/federationapi/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/process"
+	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +40,7 @@ func (t *testFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixs
 }
 
 func TestPerformWakeupServers(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	server := gomatrixserverlib.ServerName("wakeup")
 	testDB.AddServerToBlacklist(server)
@@ -87,7 +87,7 @@ func TestPerformWakeupServers(t *testing.T) {
 }
 
 func TestQueryRelayServers(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	server := gomatrixserverlib.ServerName("wakeup")
 	relayServers := []gomatrixserverlib.ServerName{"relay1", "relay2"}
@@ -124,7 +124,7 @@ func TestQueryRelayServers(t *testing.T) {
 }
 
 func TestPerformDirectoryLookup(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{
@@ -155,7 +155,7 @@ func TestPerformDirectoryLookup(t *testing.T) {
 }
 
 func TestPerformDirectoryLookupRelaying(t *testing.T) {
-	testDB := storage.NewFakeFederationDatabase()
+	testDB := test.NewInMemoryFederationDatabase()
 
 	server := gomatrixserverlib.ServerName("wakeup")
 	testDB.SetServerAssumedOffline(server)

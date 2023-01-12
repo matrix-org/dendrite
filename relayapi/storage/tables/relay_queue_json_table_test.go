@@ -50,7 +50,10 @@ type RelayQueueJSONDatabase struct {
 	Table  tables.RelayQueueJSON
 }
 
-func mustCreateQueueJSONTable(t *testing.T, dbType test.DBType) (database RelayQueueJSONDatabase, close func()) {
+func mustCreateQueueJSONTable(
+	t *testing.T,
+	dbType test.DBType,
+) (database RelayQueueJSONDatabase, close func()) {
 	t.Helper()
 	connStr, close := test.PrepareDBConnectionString(t, dbType)
 	db, err := sqlutil.Open(&config.DatabaseOptions{

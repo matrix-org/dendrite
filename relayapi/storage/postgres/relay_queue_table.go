@@ -66,7 +66,9 @@ type relayQueueStatements struct {
 	selectQueueEntryCountStmt *sql.Stmt
 }
 
-func NewPostgresRelayQueueTable(db *sql.DB) (s *relayQueueStatements, err error) {
+func NewPostgresRelayQueueTable(
+	db *sql.DB,
+) (s *relayQueueStatements, err error) {
 	s = &relayQueueStatements{
 		db: db,
 	}
@@ -101,7 +103,8 @@ func (s *relayQueueStatements) InsertQueueEntry(
 }
 
 func (s *relayQueueStatements) DeleteQueueEntries(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
+	txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	jsonNIDs []int64,
 ) error {
@@ -111,7 +114,8 @@ func (s *relayQueueStatements) DeleteQueueEntries(
 }
 
 func (s *relayQueueStatements) SelectQueueEntries(
-	ctx context.Context, txn *sql.Tx,
+	ctx context.Context,
+	txn *sql.Tx,
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) ([]int64, error) {
@@ -134,7 +138,9 @@ func (s *relayQueueStatements) SelectQueueEntries(
 }
 
 func (s *relayQueueStatements) SelectQueueEntryCount(
-	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+	ctx context.Context,
+	txn *sql.Tx,
+	serverName gomatrixserverlib.ServerName,
 ) (int64, error) {
 	var count int64
 	stmt := sqlutil.TxStmt(txn, s.selectQueueEntryCountStmt)

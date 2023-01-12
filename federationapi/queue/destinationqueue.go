@@ -29,7 +29,7 @@ import (
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -70,7 +70,7 @@ type destinationQueue struct {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, receipt *shared.Receipt) {
+func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, nid *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
@@ -85,7 +85,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 		if len(oq.pendingPDUs) < maxPDUsInMemory {
 			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
 				pdu:     event,
-				receipt: receipt,
+				receipt: nid,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -101,7 +101,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, re
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *shared.Receipt) {
+func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, nid *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
@@ -116,7 +116,7 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *share
 		if len(oq.pendingEDUs) < maxEDUsInMemory {
 			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
 				edu:     event,
-				receipt: receipt,
+				receipt: nid,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -479,7 +479,7 @@ func (oq *destinationQueue) nextTransaction(
 func (oq *destinationQueue) createTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) (gomatrixserverlib.Transaction, []*shared.Receipt, []*shared.Receipt) {
+) (gomatrixserverlib.Transaction, []*receipt.Receipt, []*receipt.Receipt) {
 	// If there's no projected transaction ID then generate one. If
 	// the transaction succeeds then we'll set it back to "" so that
 	// we generate a new one next time. If it fails, we'll preserve
@@ -500,8 +500,8 @@ func (oq *destinationQueue) createTransaction(
 	t.OriginServerTS = gomatrixserverlib.AsTimestamp(time.Now())
 	t.TransactionID = oq.transactionID
 
-	var pduReceipts []*shared.Receipt
-	var eduReceipts []*shared.Receipt
+	var pduReceipts []*receipt.Receipt
+	var eduReceipts []*receipt.Receipt
 
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.

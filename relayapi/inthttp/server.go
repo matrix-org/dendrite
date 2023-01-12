@@ -26,16 +26,28 @@ import (
 func AddRoutes(intAPI api.RelayInternalAPI, internalAPIMux *mux.Router, enableMetrics bool) {
 	internalAPIMux.Handle(
 		RelayAPIPerformRelayServerSyncPath,
-		httputil.MakeInternalRPCAPI("RelayAPIPerformRelayServerSync", enableMetrics, intAPI.PerformRelayServerSync),
+		httputil.MakeInternalRPCAPI(
+			"RelayAPIPerformRelayServerSync",
+			enableMetrics,
+			intAPI.PerformRelayServerSync,
+		),
 	)
 
 	internalAPIMux.Handle(
 		RelayAPIPerformStoreTransactionPath,
-		httputil.MakeInternalRPCAPI("RelayAPIPerformStoreTransaction", enableMetrics, intAPI.PerformStoreTransaction),
+		httputil.MakeInternalRPCAPI(
+			"RelayAPIPerformStoreTransaction",
+			enableMetrics,
+			intAPI.PerformStoreTransaction,
+		),
 	)
 
 	internalAPIMux.Handle(
 		RelayAPIQueryTransactionsPath,
-		httputil.MakeInternalRPCAPI("RelayAPIQueryTransactions", enableMetrics, intAPI.QueryTransactions),
+		httputil.MakeInternalRPCAPI(
+			"RelayAPIQueryTransactions",
+			enableMetrics,
+			intAPI.QueryTransactions,
+		),
 	)
 }

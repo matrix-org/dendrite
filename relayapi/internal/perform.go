@@ -17,7 +17,7 @@ package internal
 import (
 	"context"
 
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -87,8 +87,8 @@ func (r *RelayInternalAPI) QueryTransactions(
 			request.PreviousEntry.EntryID,
 			request.UserID.Raw(),
 		)
-		prevReceipt := shared.NewReceipt(request.PreviousEntry.EntryID)
-		err := r.db.CleanTransactions(ctx, request.UserID, []*shared.Receipt{&prevReceipt})
+		prevReceipt := receipt.NewReceipt(request.PreviousEntry.EntryID)
+		err := r.db.CleanTransactions(ctx, request.UserID, []*receipt.Receipt{&prevReceipt})
 		if err != nil {
 			logrus.Errorf("db.CleanTransactions: %s", err.Error())
 			return err
