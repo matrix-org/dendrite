@@ -41,14 +41,14 @@ func (d *Database) StoreTransaction(
 	transaction gomatrixserverlib.Transaction,
 ) (*receipt.Receipt, error) {
 	var err error
-	json, err := json.Marshal(transaction)
+	jsonTransaction, err := json.Marshal(transaction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal: %w", err)
 	}
 
 	var nid int64
 	_ = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		nid, err = d.RelayQueueJSON.InsertQueueJSON(ctx, txn, string(json))
+		nid, err = d.RelayQueueJSON.InsertQueueJSON(ctx, txn, string(jsonTransaction))
 		return err
 	})
 	if err != nil {
