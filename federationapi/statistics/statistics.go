@@ -83,7 +83,9 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get relay server list for %q", serverName)
 		} else {
+			server.relayMutex.Lock()
 			server.knownRelayServers = knownRelayServers
+			server.relayMutex.Unlock()
 		}
 	}
 	return server
@@ -112,6 +114,7 @@ type ServerStatistics struct {
 	backoffNotifier   func()                       // notifies destination queue when backoff completes
 	notifierMutex     sync.Mutex
 	knownRelayServers []gomatrixserverlib.ServerName
+	relayMutex        sync.Mutex
 }
 
 const maxJitterMultiplier = 1.4
@@ -207,8 +210,8 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 		s.backoffUntil.Store(until)
 
 		s.statistics.backoffMutex.Lock()
-		defer s.statistics.backoffMutex.Unlock()
 		s.statistics.backoffTimers[s.serverName] = time.AfterFunc(time.Until(until), s.backoffFinished)
+		s.statistics.backoffMutex.Unlock()
 	}
 
 	return s.backoffUntil.Load().(time.Time), false
@@ -302,6 +305,8 @@ func (s *ServerStatistics) SuccessCount() uint32 {
 // KnownRelayServers returns the list of relay servers associated with this
 // server.
 func (s *ServerStatistics) KnownRelayServers() []gomatrixserverlib.ServerName {
+	s.relayMutex.Lock()
+	defer s.relayMutex.Unlock()
 	return s.knownRelayServers
 }
 
@@ -324,13 +329,18 @@ func (s *ServerStatistics) AddRelayServers(relayServers []gomatrixserverlib.Serv
 
 	for _, newServer := range uniqueList {
 		alreadyKnown := false
-		for _, srv := range s.knownRelayServers {
+		knownRelayServers := s.KnownRelayServers()
+		for _, srv := range knownRelayServers {
 			if srv == newServer {
 				alreadyKnown = true
 			}
 		}
 		if !alreadyKnown {
-			s.knownRelayServers = append(s.knownRelayServers, newServer)
+			{
+				s.relayMutex.Lock()
+				s.knownRelayServers = append(s.knownRelayServers, newServer)
+				s.relayMutex.Unlock()
+			}
 		}
 	}
 }
