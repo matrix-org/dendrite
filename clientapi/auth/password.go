@@ -101,6 +101,8 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 		}
 	}
 
+	// If we couldn't find the user by the lower cased localpart, try the provided
+	// localpart as is.
 	if !res.Exists {
 		err = t.GetAccountByPassword(ctx, &api.QueryAccountByPasswordRequest{
 			Localpart:         localpart,
@@ -122,5 +124,8 @@ func (t *LoginTypePassword) Login(ctx context.Context, req interface{}) (*Login,
 			}
 		}
 	}
+	// Set the user, so login.Username() can do the right thing
+	r.Identifier.User = res.Account.UserID
+	r.User = res.Account.UserID
 	return &r.Login, nil
 }

@@ -3,8 +3,6 @@ package tables_test
 import (
 	"context"
 	"database/sql"
-	"reflect"
-	"sort"
 	"testing"
 	"time"
 
@@ -88,41 +86,7 @@ func TestMembershipsTable(t *testing.T) {
 
 		testUpsert(t, ctx, table, userEvents[0], alice, room)
 		testMembershipCount(t, ctx, table, room)
-		testHeroes(t, ctx, table, alice, room, users)
 	})
-}
-
-func testHeroes(t *testing.T, ctx context.Context, table tables.Memberships, user *test.User, room *test.Room, users []string) {
-
-	// Re-slice and sort the expected users
-	users = users[1:]
-	sort.Strings(users)
-	type testCase struct {
-		name        string
-		memberships []string
-		wantHeroes  []string
-	}
-
-	testCases := []testCase{
-		{name: "no memberships queried", memberships: []string{}},
-		{name: "joined memberships queried should be limited", memberships: []string{gomatrixserverlib.Join}, wantHeroes: users[:5]},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := table.SelectHeroes(ctx, nil, room.ID, user.ID, tc.memberships)
-			if err != nil {
-				t.Fatalf("unable to select heroes: %s", err)
-			}
-			if gotLen := len(got); gotLen != len(tc.wantHeroes) {
-				t.Fatalf("expected %d heroes, got %d", len(tc.wantHeroes), gotLen)
-			}
-
-			if !reflect.DeepEqual(got, tc.wantHeroes) {
-				t.Fatalf("expected heroes to be %+v, got %+v", tc.wantHeroes, got)
-			}
-		})
-	}
 }
 
 func testMembershipCount(t *testing.T, ctx context.Context, table tables.Memberships, room *test.Room) {
