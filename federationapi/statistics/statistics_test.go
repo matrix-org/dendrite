@@ -10,8 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	FailuresUntilAssumedOffline = 2
+	FailuresUntilBlacklist      = 7
+)
+
 func TestBackoff(t *testing.T) {
-	stats := NewStatistics(nil, 7, 2)
+	stats := NewStatistics(nil, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	server := ServerStatistics{
 		statistics: &stats,
 		serverName: "test.com",
@@ -50,6 +55,21 @@ func TestBackoff(t *testing.T) {
 			}
 		}
 
+		// Check if we should be assumed offline by now.
+		if i >= stats.FailuresUntilAssumedOffline {
+			if !assumedOffline {
+				t.Fatalf("Backoff %d should have resulted in assumed offline but didn't", i)
+			} else {
+				t.Logf("Backoff %d is assumed offline as expected", i)
+			}
+		} else {
+			if assumedOffline {
+				t.Fatalf("Backoff %d should not have resulted in assumed offline but did", i)
+			} else {
+				t.Logf("Backoff %d is not assumed offline as expected", i)
+			}
+		}
+
 		// Check if we should be blacklisted by now.
 		if i >= stats.FailuresUntilBlacklist {
 			if !blacklist {
@@ -59,6 +79,12 @@ func TestBackoff(t *testing.T) {
 			} else {
 				t.Logf("Backoff %d is blacklisted as expected", i)
 				continue
+			}
+		} else {
+			if blacklist {
+				t.Fatalf("Backoff %d should not have resulted in blacklist but did", i)
+			} else {
+				t.Logf("Backoff %d is not blacklisted as expected", i)
 			}
 		}
 
