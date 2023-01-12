@@ -14,6 +14,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/stretchr/testify/assert"
 )
 
 var ctx = context.Background()
@@ -664,3 +665,181 @@ func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *typ
 	return &tok
 }
 */
+
+func pointer[t any](s t) *t {
+	return &s
+}
+
+func TestRoomSummary(t *testing.T) {
+
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	charlie := test.NewUser(t)
+
+	// Create some dummy users
+	moreUsers := []*test.User{}
+	moreUserIDs := []string{}
+	for i := 0; i < 10; i++ {
+		u := test.NewUser(t)
+		moreUsers = append(moreUsers, u)
+		moreUserIDs = append(moreUserIDs, u.ID)
+	}
+
+	testCases := []struct {
+		name             string
+		wantSummary      *types.Summary
+		additionalEvents func(t *testing.T, room *test.Room)
+	}{
+		{
+			name:        "after initial creation",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{}},
+		},
+		{
+			name:        "invited user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(1), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "invited user, but declined",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "joined user after invitation",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(0), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "multiple joined user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(3), InvitedMemberCount: pointer(0), Heroes: []string{charlie.ID, bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, charlie, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(charlie.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "multiple joined/invited user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(1), Heroes: []string{charlie.ID, bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(charlie.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "multiple joined/invited/left user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(1), Heroes: []string{charlie.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(charlie.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "leaving user after joining",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "many users", // heroes ordered by stream id
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(len(moreUserIDs) + 1), InvitedMemberCount: pointer(0), Heroes: moreUserIDs[:5]},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				for _, x := range moreUsers {
+					room.CreateAndInsert(t, x, gomatrixserverlib.MRoomMember, map[string]interface{}{
+						"membership": "join",
+					}, test.WithStateKey(x.ID))
+				}
+			},
+		},
+		{
+			name:        "canonical alias set",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(0), Heroes: []string{}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomCanonicalAlias, map[string]interface{}{
+					"alias": "myalias",
+				}, test.WithStateKey(""))
+			},
+		},
+		{
+			name:        "room name set",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(0), Heroes: []string{}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomName, map[string]interface{}{
+					"name": "my room name",
+				}, test.WithStateKey(""))
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		defer close()
+		defer closeBase()
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+
+				r := test.NewRoom(t, alice)
+
+				if tc.additionalEvents != nil {
+					tc.additionalEvents(t, r)
+				}
+
+				// write the room before creating a transaction
+				MustWriteEvents(t, db, r.Events())
+
+				transaction, err := db.NewDatabaseTransaction(ctx)
+				assert.NoError(t, err)
+				defer transaction.Rollback()
+
+				summary, err := transaction.GetRoomSummary(ctx, r.ID, alice.ID)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantSummary, summary)
+			})
+		}
+	})
+}
