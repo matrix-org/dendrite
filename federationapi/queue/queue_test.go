@@ -528,8 +528,8 @@ func TestRetryServerSendsPDUSuccessfully(t *testing.T) {
 	poll.WaitOn(t, checkBlacklisted, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	fc.shouldTxSucceed = true
-	db.RemoveServerFromBlacklist(destination)
-	queues.RetryServer(destination)
+	wasBlacklisted := dest.statistics.MarkServerAlive()
+	queues.RetryServer(destination, wasBlacklisted)
 	checkRetry := func(log poll.LogT) poll.Result {
 		data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
 		assert.NoError(t, dbErr)
@@ -579,8 +579,8 @@ func TestRetryServerSendsEDUSuccessfully(t *testing.T) {
 	poll.WaitOn(t, checkBlacklisted, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
 	fc.shouldTxSucceed = true
-	db.RemoveServerFromBlacklist(destination)
-	queues.RetryServer(destination)
+	wasBlacklisted := dest.statistics.MarkServerAlive()
+	queues.RetryServer(destination, wasBlacklisted)
 	checkRetry := func(log poll.LogT) poll.Result {
 		data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
 		assert.NoError(t, dbErr)
@@ -821,8 +821,8 @@ func TestQueueInteractsWithRealDatabasePDUAndEDU(t *testing.T) {
 		poll.WaitOn(t, checkBlacklisted, poll.WithTimeout(10*time.Second), poll.WithDelay(100*time.Millisecond))
 
 		fc.shouldTxSucceed = true
-		db.RemoveServerFromBlacklist(destination)
-		queues.RetryServer(destination)
+		wasBlacklisted := dest.statistics.MarkServerAlive()
+		queues.RetryServer(destination, wasBlacklisted)
 		checkRetry := func(log poll.LogT) poll.Result {
 			pduData, dbErrPDU := db.GetPendingPDUs(pc.Context(), destination, 200)
 			assert.NoError(t, dbErrPDU)

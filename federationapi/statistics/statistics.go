@@ -214,6 +214,14 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 	return s.backoffUntil.Load().(time.Time), false
 }
 
+// MarkServerAlive removes the assumed offline and blacklisted statuses from this server.
+// Returns whether the server was blacklisted before this point.
+func (s *ServerStatistics) MarkServerAlive() bool {
+	s.removeAssumedOffline()
+	wasBlacklisted := s.removeBlacklist()
+	return wasBlacklisted
+}
+
 // ClearBackoff stops the backoff timer for this destination if it is running
 // and removes the timer from the backoffTimers map.
 func (s *ServerStatistics) ClearBackoff() {
@@ -262,14 +270,26 @@ func (s *ServerStatistics) AssumedOffline() bool {
 	return s.assumedOffline.Load()
 }
 
-// RemoveBlacklist removes the blacklisted status from the server.
-func (s *ServerStatistics) RemoveBlacklist() {
+// removeBlacklist removes the blacklisted status from the server.
+// Returns whether the server was blacklisted.
+func (s *ServerStatistics) removeBlacklist() bool {
+	var wasBlacklisted bool
+
+	if s.Blacklisted() {
+		wasBlacklisted = true
+		_ = s.statistics.DB.RemoveServerFromBlacklist(s.serverName)
+	}
 	s.cancel()
 	s.backoffCount.Store(0)
+
+	return wasBlacklisted
 }
 
-// RemoveAssumedOffline removes the assumed offline status from the server.
-func (s *ServerStatistics) RemoveAssumedOffline() {
+// removeAssumedOffline removes the assumed offline status from the server.
+func (s *ServerStatistics) removeAssumedOffline() {
+	if s.AssumedOffline() {
+		_ = s.statistics.DB.RemoveServerAssumedOffline(s.serverName)
+	}
 	s.assumedOffline.Store(false)
 }
 
