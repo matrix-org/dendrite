@@ -37,12 +37,12 @@ type Database struct {
 }
 
 func (d *Database) StoreTransaction(
-	ctx context.Context, txn gomatrixserverlib.Transaction,
+	ctx context.Context, transaction gomatrixserverlib.Transaction,
 ) (*shared.Receipt, error) {
 	var err error
-	json, err := json.Marshal(txn)
+	json, err := json.Marshal(transaction)
 	if err != nil {
-		return nil, fmt.Errorf("d.JSONUnmarshall: %w", err)
+		return nil, fmt.Errorf("failed to marshal: %w", err)
 	}
 
 	var nid int64
@@ -83,7 +83,6 @@ func (d *Database) CleanTransactions(
 	userID gomatrixserverlib.UserID,
 	receipts []*shared.Receipt,
 ) error {
-	println(len(receipts))
 	nids := make([]int64, len(receipts))
 	for i, receipt := range receipts {
 		nids[i] = receipt.GetNID()
@@ -132,7 +131,7 @@ func (d *Database) GetTransaction(
 	transaction := &gomatrixserverlib.Transaction{}
 	err = json.Unmarshal(txns[nids[0]], transaction)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unmarshall transaction: %w", err)
+		return nil, nil, fmt.Errorf("Unmarshal transaction: %w", err)
 	}
 
 	receipt := shared.NewReceipt(nids[0])

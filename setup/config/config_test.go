@@ -218,7 +218,7 @@ relay_api:
     connection_string: file:relayapi.db
 mscs:
   database:
-    connection_string: file:federationapi.db
+    connection_string: file:mscs.db
 tracing:
   enabled: false
   jaeger:

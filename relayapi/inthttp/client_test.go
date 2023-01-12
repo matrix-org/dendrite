@@ -16,7 +16,7 @@ func TestRelayAPIClientNil(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestRelayAPIClientPerormSync(t *testing.T) {
+func TestRelayAPIClientPerformSync(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		assert.Equal(t, "/api"+RelayAPIPerformRelayServerSyncPath, req.URL.String())

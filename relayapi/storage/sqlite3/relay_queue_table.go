@@ -27,20 +27,20 @@ import (
 
 const relayQueueSchema = `
 CREATE TABLE IF NOT EXISTS relayapi_queue (
-    -- The transaction ID that was generated before persisting the event.
+	-- The transaction ID that was generated before persisting the event.
 	transaction_id TEXT NOT NULL,
-    -- The domain part of the user ID the m.room.member event is for.
+	-- The domain part of the user ID the m.room.member event is for.
 	server_name TEXT NOT NULL,
 	-- The JSON NID from the relayapi_queue_json table.
 	json_nid BIGINT NOT NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_queue_json_nid_idx
-    ON relayapi_queue (json_nid, server_name);
+	ON relayapi_queue (json_nid, server_name);
 CREATE INDEX IF NOT EXISTS relayapi_queue_json_nid_idx
-    ON relayapi_queue (json_nid);
+	ON relayapi_queue (json_nid);
 CREATE INDEX IF NOT EXISTS relayapi_queue_server_name_idx
-    ON relayapi_queue (server_name);
+	ON relayapi_queue (server_name);
 `
 
 const insertQueueEntrySQL = "" +

@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS relayapi_queue_json (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS relayapi_queue_json_json_nid_idx
-    ON relayapi_queue_json (json_nid);
+	ON relayapi_queue_json (json_nid);
 `
 
 const insertQueueJSONSQL = "" +

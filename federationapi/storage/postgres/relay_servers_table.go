@@ -25,7 +25,7 @@ import (
 
 const relayServersSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_relay_servers (
-    -- The destination server name
+	-- The destination server name
 	server_name TEXT NOT NULL,
 	-- The relay server name for a given destination
 	relay_server_name TEXT NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS federationsender_relay_servers (
 );
 
 CREATE INDEX IF NOT EXISTS federationsender_relay_servers_server_name_idx
-    ON federationsender_relay_servers (server_name);
+	ON federationsender_relay_servers (server_name);
 `
 
 const insertRelayServersSQL = "" +

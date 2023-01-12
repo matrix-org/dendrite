@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PerformRelayServerSync implements api.FederationInternalAPI
+// PerformRelayServerSync implements api.RelayInternalAPI
 func (r *RelayInternalAPI) PerformRelayServerSync(
 	ctx context.Context,
 	request *api.PerformRelayServerSyncRequest,
