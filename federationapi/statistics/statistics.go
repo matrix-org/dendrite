@@ -317,18 +317,20 @@ func (s *ServerStatistics) AddRelayServers(relayServers []gomatrixserverlib.Serv
 	}
 
 	err := s.statistics.DB.AddRelayServersForServer(s.serverName, uniqueList)
-	if err == nil {
+	if err != nil {
+		logrus.WithError(err).Errorf("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
+		return
+	}
 
-		for _, newServer := range uniqueList {
-			alreadyKnown := false
-			for _, srv := range s.knownRelayServers {
-				if srv == newServer {
-					alreadyKnown = true
-				}
+	for _, newServer := range uniqueList {
+		alreadyKnown := false
+		for _, srv := range s.knownRelayServers {
+			if srv == newServer {
+				alreadyKnown = true
 			}
-			if !alreadyKnown {
-				s.knownRelayServers = append(s.knownRelayServers, newServer)
-			}
+		}
+		if !alreadyKnown {
+			s.knownRelayServers = append(s.knownRelayServers, newServer)
 		}
 	}
 }
