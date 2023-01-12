@@ -30,9 +30,9 @@ type RelayTransactionResponse struct {
 	EntriesQueued bool                          `json:"entries_queued"`
 }
 
-// GetTxnFromRelay implements /_matrix/federation/v1/relay_txn/{userID}
+// GetTransactionFromRelay implements /_matrix/federation/v1/relay_txn/{userID}
 // This endpoint can be extracted into a separate relay server service.
-func GetTxnFromRelay(
+func GetTransactionFromRelay(
 	httpReq *http.Request,
 	fedReq *gomatrixserverlib.FederationRequest,
 	relayAPI api.RelayInternalAPI,

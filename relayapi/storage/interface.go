@@ -22,9 +22,9 @@ import (
 )
 
 type Database interface {
-	StoreAsyncTransaction(ctx context.Context, txn gomatrixserverlib.Transaction) (*shared.Receipt, error)
-	AssociateAsyncTransactionWithDestinations(ctx context.Context, destinations map[gomatrixserverlib.UserID]struct{}, transactionID gomatrixserverlib.TransactionID, receipt *shared.Receipt) error
-	CleanAsyncTransactions(ctx context.Context, userID gomatrixserverlib.UserID, receipts []*shared.Receipt) error
-	GetAsyncTransaction(ctx context.Context, userID gomatrixserverlib.UserID) (*gomatrixserverlib.Transaction, *shared.Receipt, error)
-	GetAsyncTransactionCount(ctx context.Context, userID gomatrixserverlib.UserID) (int64, error)
+	StoreTransaction(ctx context.Context, txn gomatrixserverlib.Transaction) (*shared.Receipt, error)
+	AssociateTransactionWithDestinations(ctx context.Context, destinations map[gomatrixserverlib.UserID]struct{}, transactionID gomatrixserverlib.TransactionID, receipt *shared.Receipt) error
+	CleanTransactions(ctx context.Context, userID gomatrixserverlib.UserID, receipts []*shared.Receipt) error
+	GetTransaction(ctx context.Context, userID gomatrixserverlib.UserID) (*gomatrixserverlib.Transaction, *shared.Receipt, error)
+	GetTransactionCount(ctx context.Context, userID gomatrixserverlib.UserID) (int64, error)
 }

@@ -250,20 +250,3 @@ type P2PQueryRelayServersRequest struct {
 type P2PQueryRelayServersResponse struct {
 	RelayServers []gomatrixserverlib.ServerName
 }
-
-type P2PPerformStoreAsyncRequest struct {
-	Transaction gomatrixserverlib.Transaction `json:"transaction"`
-	UserID      gomatrixserverlib.UserID      `json:"user_id"`
-}
-
-type P2PPerformStoreAsyncResponse struct {
-}
-
-type P2PQueryAsyncTransactionsRequest struct {
-	UserID gomatrixserverlib.UserID `json:"user_id"`
-}
-
-type P2PQueryAsyncTransactionsResponse struct {
-	Transaction    gomatrixserverlib.Transaction `json:"transaction"`
-	RemainingCount uint32                        `json:"remaining"`
-}

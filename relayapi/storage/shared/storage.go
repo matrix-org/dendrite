@@ -36,7 +36,7 @@ type Database struct {
 	RelayQueueJSON    tables.RelayQueueJSON
 }
 
-func (d *Database) StoreAsyncTransaction(
+func (d *Database) StoreTransaction(
 	ctx context.Context, txn gomatrixserverlib.Transaction,
 ) (*shared.Receipt, error) {
 	var err error
@@ -58,7 +58,7 @@ func (d *Database) StoreAsyncTransaction(
 	return &receipt, nil
 }
 
-func (d *Database) AssociateAsyncTransactionWithDestinations(
+func (d *Database) AssociateTransactionWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.UserID]struct{},
 	transactionID gomatrixserverlib.TransactionID,
@@ -78,7 +78,7 @@ func (d *Database) AssociateAsyncTransactionWithDestinations(
 	return nil
 }
 
-func (d *Database) CleanAsyncTransactions(
+func (d *Database) CleanTransactions(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
 	receipts []*shared.Receipt,
@@ -108,7 +108,7 @@ func (d *Database) CleanAsyncTransactions(
 	return nil
 }
 
-func (d *Database) GetAsyncTransaction(
+func (d *Database) GetTransaction(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
 ) (*gomatrixserverlib.Transaction, *shared.Receipt, error) {
@@ -139,7 +139,7 @@ func (d *Database) GetAsyncTransaction(
 	return transaction, &receipt, nil
 }
 
-func (d *Database) GetAsyncTransactionCount(
+func (d *Database) GetTransactionCount(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
 ) (int64, error) {

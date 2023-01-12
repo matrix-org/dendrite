@@ -74,9 +74,9 @@ func (r *stubFederationRoomServerAPI) QueryServerBannedFromRoom(ctx context.Cont
 type stubFederationClient struct {
 	api.FederationClient
 	shouldTxSucceed      bool
-	shouldTxAsyncSucceed bool
+	shouldTxRelaySucceed bool
 	txCount              atomic.Uint32
-	txAsyncCount         atomic.Uint32
+	txRelayCount         atomic.Uint32
 }
 
 func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error) {
@@ -91,11 +91,11 @@ func (f *stubFederationClient) SendTransaction(ctx context.Context, t gomatrixse
 
 func (f *stubFederationClient) P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error) {
 	var result error
-	if !f.shouldTxAsyncSucceed {
-		result = fmt.Errorf("async transaction failed")
+	if !f.shouldTxRelaySucceed {
+		result = fmt.Errorf("relay transaction failed")
 	}
 
-	f.txAsyncCount.Add(1)
+	f.txRelayCount.Add(1)
 	return gomatrixserverlib.EmptyResp{}, result
 }
 
@@ -114,14 +114,14 @@ func mustCreateEDU(t *testing.T) *gomatrixserverlib.EDU {
 	return &gomatrixserverlib.EDU{Type: gomatrixserverlib.MTyping}
 }
 
-func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxAsyncSucceed bool, t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
+func testSetup(failuresUntilBlacklist uint32, failuresUntilAssumedOffline uint32, shouldTxSucceed bool, shouldTxRelaySucceed bool, t *testing.T, dbType test.DBType, realDatabase bool) (storage.Database, *stubFederationClient, *OutgoingQueues, *process.ProcessContext, func()) {
 	db, processContext, close := mustCreateFederationDatabase(t, dbType, realDatabase)
 
 	fc := &stubFederationClient{
 		shouldTxSucceed:      shouldTxSucceed,
-		shouldTxAsyncSucceed: shouldTxAsyncSucceed,
+		shouldTxRelaySucceed: shouldTxRelaySucceed,
 		txCount:              *atomic.NewUint32(0),
-		txAsyncCount:         *atomic.NewUint32(0),
+		txRelayCount:         *atomic.NewUint32(0),
 	}
 	rs := &stubFederationRoomServerAPI{}
 
@@ -903,7 +903,7 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 }
 
-func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
+func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
@@ -924,7 +924,7 @@ func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == 1 {
-			if fc.txAsyncCount.Load() == 1 {
+			if fc.txRelayCount.Load() == 1 {
 				data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
 				assert.NoError(t, dbErr)
 				if len(data) == 0 {
@@ -932,7 +932,7 @@ func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 				}
 				return poll.Continue("waiting for event to be removed from database. Currently present PDU: %d", len(data))
 			}
-			return poll.Continue("waiting for more async send attempts before checking database. Currently %d", fc.txAsyncCount.Load())
+			return poll.Continue("waiting for more relay send attempts before checking database. Currently %d", fc.txRelayCount.Load())
 		}
 		return poll.Continue("waiting for more send attempts before checking database. Currently %d", fc.txCount.Load())
 	}
@@ -942,7 +942,7 @@ func TestSendPDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 	assert.Equal(t, true, assumedOffline)
 }
 
-func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
+func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	t.Parallel()
 	failuresUntilBlacklist := uint32(16)
 	failuresUntilAssumedOffline := uint32(1)
@@ -963,7 +963,7 @@ func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 
 	check := func(log poll.LogT) poll.Result {
 		if fc.txCount.Load() == 1 {
-			if fc.txAsyncCount.Load() == 1 {
+			if fc.txRelayCount.Load() == 1 {
 				data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
 				assert.NoError(t, dbErr)
 				if len(data) == 0 {
@@ -971,7 +971,7 @@ func TestSendEDUOnAsyncSuccessRemovedFromDB(t *testing.T) {
 				}
 				return poll.Continue("waiting for event to be removed from database. Currently present EDU: %d", len(data))
 			}
-			return poll.Continue("waiting for more async send attempts before checking database. Currently %d", fc.txAsyncCount.Load())
+			return poll.Continue("waiting for more relay send attempts before checking database. Currently %d", fc.txRelayCount.Load())
 		}
 		return poll.Continue("waiting for more send attempts before checking database. Currently %d", fc.txCount.Load())
 	}

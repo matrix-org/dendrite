@@ -18,11 +18,11 @@ type FederationAPI struct {
 	// The default value is 16 if not specified, which is circa 18 hours.
 	FederationMaxRetries uint32 `yaml:"send_max_retries"`
 
-	// How many consecutive failures that we should tolerate when sending federation
-	// requests to a specific server until we should assume they are offline. If we
-	// assume they are offline then we will attempt to send messages to their async
-	// relay server if we know of one that is appropriate.
-	FederationRetriesUntilAssumedOffline uint32 `yaml:"retries_until_assumed_offline"`
+	// P2P Feature: How many consecutive failures that we should tolerate when
+	// sending federation requests to a specific server until we should assume they
+	// are offline. If we assume they are offline then we will attempt to send
+	// messages to their relay server if we know of one that is appropriate.
+	P2PFederationRetriesUntilAssumedOffline uint32 `yaml:"p2p_retries_until_assumed_offline"`
 
 	// FederationDisableTLSValidation disables the validation of X.509 TLS certs
 	// on remote federation endpoints. This is not recommended in production!
@@ -49,7 +49,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 		c.Database.Defaults(10)
 	}
 	c.FederationMaxRetries = 16
-	c.FederationRetriesUntilAssumedOffline = 2
+	c.P2PFederationRetriesUntilAssumedOffline = 2
 	c.DisableTLSValidation = false
 	c.DisableHTTPKeepalives = false
 	if opts.Generate {

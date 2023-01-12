@@ -371,7 +371,7 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		terr, asyncSuccess := oq.nextTransaction(toSendPDUs, toSendEDUs)
+		terr, relaySuccess := oq.nextTransaction(toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			_, blacklisted := oq.statistics.Failure()
@@ -388,7 +388,7 @@ func (oq *destinationQueue) backgroundSend() {
 				return
 			}
 		} else {
-			oq.handleTransactionSuccess(pduCount, eduCount, asyncSuccess)
+			oq.handleTransactionSuccess(pduCount, eduCount, relaySuccess)
 		}
 	}
 }
@@ -396,11 +396,11 @@ func (oq *destinationQueue) backgroundSend() {
 // nextTransaction creates a new transaction from the pending event
 // queue and sends it.
 // Returns an error if the transaction wasn't sent. And whether the success
-// was to an async relay server or not.
+// was to a relay server or not.
 func (oq *destinationQueue) nextTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) (err error, asyncSuccess bool) {
+) (err error, relaySuccess bool) {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
@@ -418,14 +418,14 @@ func (oq *destinationQueue) nextTransaction(
 			return userErr, false
 		}
 		for _, relayServer := range relayServers {
-			_, asyncErr := oq.client.P2PSendTransactionToRelay(ctx, *userID, t, relayServer)
-			if asyncErr != nil {
-				err = asyncErr
+			_, relayErr := oq.client.P2PSendTransactionToRelay(ctx, *userID, t, relayServer)
+			if relayErr != nil {
+				err = relayErr
 			} else {
-				asyncSuccess = true
+				relaySuccess = true
 			}
 		}
-		if asyncSuccess {
+		if relaySuccess {
 			err = nil
 		}
 	} else {
@@ -450,7 +450,7 @@ func (oq *destinationQueue) nextTransaction(
 		oq.transactionIDMutex.Lock()
 		oq.transactionID = ""
 		oq.transactionIDMutex.Unlock()
-		return nil, asyncSuccess
+		return nil, relaySuccess
 	case gomatrix.HTTPError:
 		// Report that we failed to send the transaction and we
 		// will retry again, subject to backoff.
@@ -553,10 +553,10 @@ func (oq *destinationQueue) blacklistDestination() {
 
 // handleTransactionSuccess updates the cached event queues as well as the success and
 // backoff information for this server.
-func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int, asyncSuccess bool) {
+func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int, relaySuccess bool) {
 	// If we successfully sent the transaction then clear out
 	// the pending events and EDUs, and wipe our transaction ID.
-	oq.statistics.Success(asyncSuccess)
+	oq.statistics.Success(relaySuccess)
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 

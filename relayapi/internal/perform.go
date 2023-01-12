@@ -52,19 +52,19 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	return nil
 }
 
-// PerformStoreAsync implements api.RelayInternalAPI
+// PerformStoreTransaction implements api.RelayInternalAPI
 func (r *RelayInternalAPI) PerformStoreTransaction(
 	ctx context.Context,
 	request *api.PerformStoreTransactionRequest,
 	response *api.PerformStoreTransactionResponse,
 ) error {
 	logrus.Warnf("Storing transaction for %v", request.UserID)
-	receipt, err := r.db.StoreAsyncTransaction(ctx, request.Txn)
+	receipt, err := r.db.StoreTransaction(ctx, request.Txn)
 	if err != nil {
-		logrus.Errorf("db.StoreAsyncTransaction: %s", err.Error())
+		logrus.Errorf("db.StoreTransaction: %s", err.Error())
 		return err
 	}
-	err = r.db.AssociateAsyncTransactionWithDestinations(
+	err = r.db.AssociateTransactionWithDestinations(
 		ctx,
 		map[gomatrixserverlib.UserID]struct{}{
 			request.UserID: {},
@@ -75,7 +75,7 @@ func (r *RelayInternalAPI) PerformStoreTransaction(
 	return err
 }
 
-// QueryAsyncTransactions implements api.RelayInternalAPI
+// QueryTransactions implements api.RelayInternalAPI
 func (r *RelayInternalAPI) QueryTransactions(
 	ctx context.Context,
 	request *api.QueryRelayTransactionsRequest,
@@ -88,16 +88,16 @@ func (r *RelayInternalAPI) QueryTransactions(
 			request.UserID.Raw(),
 		)
 		prevReceipt := shared.NewReceipt(request.PreviousEntry.EntryID)
-		err := r.db.CleanAsyncTransactions(ctx, request.UserID, []*shared.Receipt{&prevReceipt})
+		err := r.db.CleanTransactions(ctx, request.UserID, []*shared.Receipt{&prevReceipt})
 		if err != nil {
-			logrus.Errorf("db.CleanAsyncTransactions: %s", err.Error())
+			logrus.Errorf("db.CleanTransactions: %s", err.Error())
 			return err
 		}
 	}
 
-	transaction, receipt, err := r.db.GetAsyncTransaction(ctx, request.UserID)
+	transaction, receipt, err := r.db.GetTransaction(ctx, request.UserID)
 	if err != nil {
-		logrus.Errorf("db.GetAsyncTransaction: %s", err.Error())
+		logrus.Errorf("db.GetTransaction: %s", err.Error())
 		return err
 	}
 

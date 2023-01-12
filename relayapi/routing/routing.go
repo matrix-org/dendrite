@@ -77,7 +77,7 @@ func Setup(
 					JSON: jsonerror.InvalidUsername("Username was invalid"),
 				}
 			}
-			return GetTxnFromRelay(httpReq, request, relayAPI, *userID)
+			return GetTransactionFromRelay(httpReq, request, relayAPI, *userID)
 		},
 	)).Methods(http.MethodGet, http.MethodOptions).Name(GetRelayTransactionRouteName)
 }

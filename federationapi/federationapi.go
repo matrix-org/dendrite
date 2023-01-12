@@ -119,7 +119,7 @@ func NewInternalAPI(
 	stats := statistics.NewStatistics(
 		federationDB,
 		cfg.FederationMaxRetries+1,
-		cfg.FederationRetriesUntilAssumedOffline+1)
+		cfg.P2PFederationRetriesUntilAssumedOffline+1)
 
 	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 

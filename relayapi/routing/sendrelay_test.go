@@ -197,10 +197,10 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 
 	response := routing.SendTransactionToRelay(
 		httpReq, &request, relayAPI, txn.TransactionID, *userID)
-	transaction, _, err := db.GetAsyncTransaction(context.TODO(), *userID)
+	transaction, _, err := db.GetTransaction(context.TODO(), *userID)
 	assert.NoError(t, err, "Failed retrieving transaction")
 
-	transactionCount, err := db.GetAsyncTransactionCount(context.TODO(), *userID)
+	transactionCount, err := db.GetTransactionCount(context.TODO(), *userID)
 	assert.NoError(t, err, "Failed retrieving transaction count")
 
 	assert.Equal(t, 200, response.Code)
