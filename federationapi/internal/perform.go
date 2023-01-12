@@ -14,6 +14,7 @@ import (
 
 	"github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/consumers"
+	"github.com/matrix-org/dendrite/federationapi/statistics"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/version"
 )
@@ -41,7 +42,7 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	}
 	response.RoomID = dir.RoomID
 	response.ServerNames = dir.Servers
-	r.statistics.ForServer(request.ServerName).Success(false)
+	r.statistics.ForServer(request.ServerName).Success(statistics.SendDirect)
 	return nil
 }
 
@@ -174,7 +175,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.MakeJoin: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success(false)
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// Set all the fields to be what they should be, this should be a no-op
 	// but it's possible that the remote server returned us something "odd"
@@ -229,7 +230,7 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.SendJoin: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success(false)
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// If the remote server returned an event in the "event" key of
 	// the send_join request then we should use that instead. It may
@@ -461,7 +462,7 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 		r.statistics.ForServer(serverName).Failure()
 		return fmt.Errorf("r.federation.Peek: %w", err)
 	}
-	r.statistics.ForServer(serverName).Success(false)
+	r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 
 	// Work out if we support the room version that has been supplied in
 	// the peek response.
@@ -605,7 +606,7 @@ func (r *FederationInternalAPI) PerformLeave(
 			continue
 		}
 
-		r.statistics.ForServer(serverName).Success(false)
+		r.statistics.ForServer(serverName).Success(statistics.SendDirect)
 		return nil
 	}
 

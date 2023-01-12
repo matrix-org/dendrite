@@ -89,6 +89,13 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 	return server
 }
 
+type SendMethod uint8
+
+const (
+	SendDirect SendMethod = iota
+	SendViaRelay
+)
+
 // ServerStatistics contains information about our interactions with a
 // remote federated host, e.g. how many times we were successful, how
 // many times we failed etc. It also manages the backoff time and black-
@@ -139,16 +146,16 @@ func (s *ServerStatistics) AssignBackoffNotifier(notifier func()) {
 // attempt, which increases the sent counter and resets the idle and
 // failure counters. If a host was blacklisted at this point then
 // we will unblacklist it.
-// `async` specifies whether the success was to the actual destination
+// `relay` specifies whether the success was to the actual destination
 // or one of their relay servers.
-func (s *ServerStatistics) Success(async bool) {
+func (s *ServerStatistics) Success(method SendMethod) {
 	s.cancel()
 	s.backoffCount.Store(0)
 	// NOTE : Sending to the final destination vs. a relay server has
 	// slightly different semantics.
-	if !async {
+	if method == SendDirect {
 		s.successCounter.Inc()
-		if s.statistics.DB != nil {
+		if s.blacklisted.Load() && s.statistics.DB != nil {
 			if err := s.statistics.DB.RemoveServerFromBlacklist(s.serverName); err != nil {
 				logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
 			}
