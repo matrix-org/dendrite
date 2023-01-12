@@ -25,9 +25,8 @@ func (r *FederationInternalAPI) PerformDirectoryLookup(
 	request *api.PerformDirectoryLookupRequest,
 	response *api.PerformDirectoryLookupResponse,
 ) (err error) {
-	stats := r.statistics.ForServer(request.ServerName)
-	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
+	if !r.shouldAttemptDirectFederation(request.ServerName) {
+		return fmt.Errorf("relay servers have no meaningful response for directory lookup.")
 	}
 
 	dir, err := r.federation.LookupRoomAlias(
@@ -150,9 +149,8 @@ func (r *FederationInternalAPI) performJoinUsingServer(
 	supportedVersions []gomatrixserverlib.RoomVersion,
 	unsigned map[string]interface{},
 ) error {
-	stats := r.statistics.ForServer(serverName)
-	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
+	if !r.shouldAttemptDirectFederation(serverName) {
+		return fmt.Errorf("relay servers have no meaningful response for join.")
 	}
 
 	_, origin, err := r.cfg.Matrix.SplitLocalID('@', userID)
@@ -418,9 +416,8 @@ func (r *FederationInternalAPI) performOutboundPeekUsingServer(
 	serverName gomatrixserverlib.ServerName,
 	supportedVersions []gomatrixserverlib.RoomVersion,
 ) error {
-	stats := r.statistics.ForServer(serverName)
-	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
+	if !r.shouldAttemptDirectFederation(serverName) {
+		return fmt.Errorf("relay servers have no meaningful response for outbound peek.")
 	}
 
 	// create a unique ID for this peek.
@@ -532,8 +529,7 @@ func (r *FederationInternalAPI) PerformLeave(
 	// Try each server that we were provided until we land on one that
 	// successfully completes the make-leave send-leave dance.
 	for _, serverName := range request.ServerNames {
-		stats := r.statistics.ForServer(serverName)
-		if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		if !r.shouldAttemptDirectFederation(serverName) {
 			continue
 		}
 
@@ -637,9 +633,10 @@ func (r *FederationInternalAPI) PerformInvite(
 		return fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
 	}
 
-	stats := r.statistics.ForServer(destination)
-	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
-		return fmt.Errorf("not performing federation since server is assumed offline with known relay servers")
+	// TODO (devon): This should be allowed via a relay. Currently only transactions
+	// can be sent to relays. Would need to extend relays to handle invites.
+	if !r.shouldAttemptDirectFederation(destination) {
+		return fmt.Errorf("relay servers have no meaningful response for invite.")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -839,4 +836,14 @@ func (r *FederationInternalAPI) P2PQueryRelayServers(
 
 	response.RelayServers = relayServers
 	return nil
+}
+
+func (r *FederationInternalAPI) shouldAttemptDirectFederation(destination gomatrixserverlib.ServerName) bool {
+	var shouldRelay bool
+	stats := r.statistics.ForServer(destination)
+	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {
+		shouldRelay = true
+	}
+
+	return !shouldRelay
 }
