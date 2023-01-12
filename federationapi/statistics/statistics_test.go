@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	FailuresUntilAssumedOffline = 2
-	FailuresUntilBlacklist      = 7
+	FailuresUntilAssumedOffline = 3
+	FailuresUntilBlacklist      = 8
 )
 
 func TestBackoff(t *testing.T) {
@@ -106,7 +106,7 @@ func TestBackoff(t *testing.T) {
 }
 
 func TestRelayServersListing(t *testing.T) {
-	stats := NewStatistics(storage.NewFakeFederationDatabase(), 8, 3)
+	stats := NewStatistics(storage.NewFakeFederationDatabase(), FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	server := ServerStatistics{statistics: &stats}
 	server.AddRelayServers([]gomatrixserverlib.ServerName{"relay1", "relay1", "relay2"})
 	relayServers := server.KnownRelayServers()

@@ -28,6 +28,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	FailuresUntilAssumedOffline = 3
+	FailuresUntilBlacklist      = 8
+)
+
 func (t *testFedClient) QueryKeys(ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string) (gomatrixserverlib.RespQueryKeys, error) {
 	t.queryKeysCalled = true
 	if t.shouldFail {
@@ -55,7 +60,7 @@ func TestFederationClientQueryKeys(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, 8, 3)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -86,7 +91,7 @@ func TestFederationClientQueryKeysBlacklisted(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, 8, 3)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -116,7 +121,7 @@ func TestFederationClientQueryKeysFailure(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{shouldFail: true}
-	stats := statistics.NewStatistics(testDB, 8, 3)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -146,7 +151,7 @@ func TestFederationClientClaimKeys(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, 8, 3)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
@@ -177,7 +182,7 @@ func TestFederationClientClaimKeysBlacklisted(t *testing.T) {
 		},
 	}
 	fedClient := &testFedClient{}
-	stats := statistics.NewStatistics(testDB, 8, 3)
+	stats := statistics.NewStatistics(testDB, FailuresUntilBlacklist, FailuresUntilAssumedOffline)
 	queues := queue.NewOutgoingQueues(
 		testDB, process.NewProcessContext(),
 		false,
