@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -44,7 +45,7 @@ const selectRelayServersSQL = "" +
 	"SELECT relay_server_name FROM federationsender_relay_servers WHERE server_name = $1"
 
 const deleteRelayServersSQL = "" +
-	"DELETE FROM federationsender_relay_servers WHERE server_name = $1 AND relay_server_name IN ($2)"
+	"DELETE FROM federationsender_relay_servers WHERE server_name = $1 AND relay_server_name = ANY($2)"
 
 const deleteAllRelayServersSQL = "" +
 	"DELETE FROM federationsender_relay_servers WHERE server_name = $1"
@@ -118,13 +119,9 @@ func (s *relayServersStatements) DeleteRelayServers(
 	serverName gomatrixserverlib.ServerName,
 	relayServers []gomatrixserverlib.ServerName,
 ) error {
-	for _, relayServer := range relayServers {
-		stmt := sqlutil.TxStmt(txn, s.deleteRelayServersStmt)
-		if _, err := stmt.ExecContext(ctx, serverName, relayServer); err != nil {
-			return err
-		}
-	}
-	return nil
+	stmt := sqlutil.TxStmt(txn, s.deleteRelayServersStmt)
+	_, err := stmt.ExecContext(ctx, serverName, pq.Array(relayServers))
+	return err
 }
 
 func (s *relayServersStatements) DeleteAllRelayServers(

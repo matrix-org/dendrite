@@ -19,6 +19,7 @@ const (
 	server1 = "server1"
 	server2 = "server2"
 	server3 = "server3"
+	server4 = "server4"
 )
 
 type RelayServersDatabase struct {
@@ -96,13 +97,14 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		db, close := mustCreateRelayServersTable(t, dbType)
 		defer close()
-		expectedRelayServers := []gomatrixserverlib.ServerName{server2, server3}
+		relayServers1 := []gomatrixserverlib.ServerName{server2, server3}
+		relayServers2 := []gomatrixserverlib.ServerName{server1, server3, server4}
 
-		err := db.Table.InsertRelayServers(ctx, nil, server1, expectedRelayServers)
+		err := db.Table.InsertRelayServers(ctx, nil, server1, relayServers1)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
-		err = db.Table.InsertRelayServers(ctx, nil, server2, expectedRelayServers)
+		err = db.Table.InsertRelayServers(ctx, nil, server2, relayServers2)
 		if err != nil {
 			t.Fatalf("Failed inserting transaction: %s", err.Error())
 		}
@@ -111,21 +113,25 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed deleting relay servers for %s: %s", server1, err.Error())
 		}
+		err = db.Table.DeleteRelayServers(ctx, nil, server2, []gomatrixserverlib.ServerName{server1, server4})
+		if err != nil {
+			t.Fatalf("Failed deleting relay servers for %s: %s", server2, err.Error())
+		}
 
-		expectedRelayServers1 := []gomatrixserverlib.ServerName{server3}
+		updatedExpectedRelayServers := []gomatrixserverlib.ServerName{server3}
 		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
-		if !Equal(relayServers, expectedRelayServers1) {
-			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers1, relayServers)
+		if !Equal(relayServers, updatedExpectedRelayServers) {
+			t.Fatalf("Expected: %v \nActual: %v", updatedExpectedRelayServers, relayServers)
 		}
 		relayServers, err = db.Table.SelectRelayServers(ctx, nil, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
-		if !Equal(relayServers, expectedRelayServers) {
-			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers, relayServers)
+		if !Equal(relayServers, updatedExpectedRelayServers) {
+			t.Fatalf("Expected: %v \nActual: %v", updatedExpectedRelayServers, relayServers)
 		}
 	})
 }

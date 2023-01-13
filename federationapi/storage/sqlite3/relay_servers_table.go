@@ -17,6 +17,7 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
@@ -50,10 +51,10 @@ const deleteAllRelayServersSQL = "" +
 	"DELETE FROM federationsender_relay_servers WHERE server_name = $1"
 
 type relayServersStatements struct {
-	db                        *sql.DB
-	insertRelayServersStmt    *sql.Stmt
-	selectRelayServersStmt    *sql.Stmt
-	deleteRelayServersStmt    *sql.Stmt
+	db                     *sql.DB
+	insertRelayServersStmt *sql.Stmt
+	selectRelayServersStmt *sql.Stmt
+	// deleteRelayServersStmt    *sql.Stmt - prepared at runtime due to variadic
 	deleteAllRelayServersStmt *sql.Stmt
 }
 
@@ -69,7 +70,6 @@ func NewSQLiteRelayServersTable(db *sql.DB) (s *relayServersStatements, err erro
 	return s, sqlutil.StatementList{
 		{&s.insertRelayServersStmt, insertRelayServersSQL},
 		{&s.selectRelayServersStmt, selectRelayServersSQL},
-		{&s.deleteRelayServersStmt, deleteRelayServersSQL},
 		{&s.deleteAllRelayServersStmt, deleteAllRelayServersSQL},
 	}.Prepare(db)
 }
@@ -118,13 +118,21 @@ func (s *relayServersStatements) DeleteRelayServers(
 	serverName gomatrixserverlib.ServerName,
 	relayServers []gomatrixserverlib.ServerName,
 ) error {
-	for _, relayServer := range relayServers {
-		stmt := sqlutil.TxStmt(txn, s.deleteRelayServersStmt)
-		if _, err := stmt.ExecContext(ctx, serverName, relayServer); err != nil {
-			return err
-		}
+	deleteSQL := strings.Replace(deleteRelayServersSQL, "($2)", sqlutil.QueryVariadicOffset(len(relayServers), 1), 1)
+	deleteStmt, err := s.db.Prepare(deleteSQL)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	stmt := sqlutil.TxStmt(txn, deleteStmt)
+	params := make([]interface{}, len(relayServers)+1)
+	params[0] = serverName
+	for i, v := range relayServers {
+		params[i+1] = v
+	}
+
+	_, err = stmt.ExecContext(ctx, params...)
+	return err
 }
 
 func (s *relayServersStatements) DeleteAllRelayServers(
