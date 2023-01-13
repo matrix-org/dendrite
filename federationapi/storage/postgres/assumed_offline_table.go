@@ -25,8 +25,7 @@ import (
 const assumedOfflineSchema = `
 CREATE TABLE IF NOT EXISTS federationsender_assumed_offline(
     -- The assumed offline server name
-	server_name TEXT NOT NULL,
-	UNIQUE (server_name)
+	server_name TEXT PRIMARY KEY NOT NULL
 );
 `
 
