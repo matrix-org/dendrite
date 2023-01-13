@@ -18,6 +18,7 @@ type FederationInternalAPI interface {
 	gomatrixserverlib.KeyDatabase
 	ClientFederationAPI
 	RoomserverFederationAPI
+	P2PFederationAPI
 
 	QueryServerKeys(ctx context.Context, request *QueryServerKeysRequest, response *QueryServerKeysResponse) error
 	LookupServerKeys(ctx context.Context, s gomatrixserverlib.ServerName, keyRequests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) ([]gomatrixserverlib.ServerKeys, error)
@@ -34,13 +35,6 @@ type FederationInternalAPI interface {
 		ctx context.Context,
 		request *PerformWakeupServersRequest,
 		response *PerformWakeupServersResponse,
-	) error
-
-	// Relay Server sync api used in the pinecone demos.
-	P2PQueryRelayServers(
-		ctx context.Context,
-		request *P2PQueryRelayServersRequest,
-		response *P2PQueryRelayServersResponse,
 	) error
 }
 
@@ -77,6 +71,15 @@ type RoomserverFederationAPI interface {
 	LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
 }
 
+type P2PFederationAPI interface {
+	// Relay Server sync api used in the pinecone demos.
+	P2PQueryRelayServers(
+		ctx context.Context,
+		request *P2PQueryRelayServersRequest,
+		response *P2PQueryRelayServersResponse,
+	) error
+}
+
 // KeyserverFederationAPI is a subset of gomatrixserverlib.FederationClient functions which the keyserver
 // implements as proxy calls, with built-in backoff/retries/etc. Errors returned from functions in
 // this interface are of type FederationClientError
@@ -88,11 +91,9 @@ type KeyserverFederationAPI interface {
 
 // an interface for gmsl.FederationClient - contains functions called by federationapi only.
 type FederationClient interface {
+	P2PFederationClient
 	gomatrixserverlib.KeyClient
 	SendTransaction(ctx context.Context, t gomatrixserverlib.Transaction) (res gomatrixserverlib.RespSend, err error)
-
-	P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error)
-	P2PGetTransactionFromRelay(ctx context.Context, u gomatrixserverlib.UserID, prev gomatrixserverlib.RelayEntry, relayServer gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetRelayTransaction, err error)
 
 	// Perform operations
 	LookupRoomAlias(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomAlias string) (res gomatrixserverlib.RespDirectory, err error)
@@ -117,6 +118,11 @@ type FederationClient interface {
 	LookupState(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespState, err error)
 	LookupStateIDs(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, eventID string) (res gomatrixserverlib.RespStateIDs, err error)
 	LookupMissingEvents(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMissingEvents, err error)
+}
+
+type P2PFederationClient interface {
+	P2PSendTransactionToRelay(ctx context.Context, u gomatrixserverlib.UserID, t gomatrixserverlib.Transaction, forwardingServer gomatrixserverlib.ServerName) (res gomatrixserverlib.EmptyResp, err error)
+	P2PGetTransactionFromRelay(ctx context.Context, u gomatrixserverlib.UserID, prev gomatrixserverlib.RelayEntry, relayServer gomatrixserverlib.ServerName) (res gomatrixserverlib.RespGetRelayTransaction, err error)
 }
 
 // FederationClientError is returned from FederationClient methods in the event of a problem.
