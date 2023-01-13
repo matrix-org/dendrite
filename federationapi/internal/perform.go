@@ -738,7 +738,9 @@ func sanityCheckAuthChain(authChain []*gomatrixserverlib.Event) error {
 	return fmt.Errorf("auth chain response is missing m.room.create event")
 }
 
-func setDefaultRoomVersionFromJoinEvent(joinEvent gomatrixserverlib.EventBuilder) gomatrixserverlib.RoomVersion {
+func setDefaultRoomVersionFromJoinEvent(
+	joinEvent gomatrixserverlib.EventBuilder,
+) gomatrixserverlib.RoomVersion {
 	// if auth events are not event references we know it must be v3+
 	// we have to do these shenanigans to satisfy sytest, specifically for:
 	// "Outbound federation rejects m.room.create events with an unknown room version"
@@ -829,7 +831,7 @@ func (r *FederationInternalAPI) P2PQueryRelayServers(
 	response *api.P2PQueryRelayServersResponse,
 ) error {
 	logrus.Infof("Getting relay servers for: %s", request.Server)
-	relayServers, err := r.db.GetRelayServersForServer(request.Server)
+	relayServers, err := r.db.P2PGetRelayServersForServer(ctx, request.Server)
 	if err != nil {
 		return err
 	}
@@ -838,7 +840,9 @@ func (r *FederationInternalAPI) P2PQueryRelayServers(
 	return nil
 }
 
-func (r *FederationInternalAPI) shouldAttemptDirectFederation(destination gomatrixserverlib.ServerName) bool {
+func (r *FederationInternalAPI) shouldAttemptDirectFederation(
+	destination gomatrixserverlib.ServerName,
+) bool {
 	var shouldRelay bool
 	stats := r.statistics.ForServer(destination)
 	if stats.AssumedOffline() && len(stats.KnownRelayServers()) > 0 {

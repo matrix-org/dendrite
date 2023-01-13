@@ -100,11 +100,18 @@ func (d *Database) GetJoinedHosts(
 // GetAllJoinedHosts returns the currently joined hosts for
 // all rooms known to the federation sender.
 // Returns an error if something goes wrong.
-func (d *Database) GetAllJoinedHosts(ctx context.Context) ([]gomatrixserverlib.ServerName, error) {
+func (d *Database) GetAllJoinedHosts(
+	ctx context.Context,
+) ([]gomatrixserverlib.ServerName, error) {
 	return d.FederationJoinedHosts.SelectAllJoinedHosts(ctx)
 }
 
-func (d *Database) GetJoinedHostsForRooms(ctx context.Context, roomIDs []string, excludeSelf, excludeBlacklisted bool) ([]gomatrixserverlib.ServerName, error) {
+func (d *Database) GetJoinedHostsForRooms(
+	ctx context.Context,
+	roomIDs []string,
+	excludeSelf,
+	excludeBlacklisted bool,
+) ([]gomatrixserverlib.ServerName, error) {
 	servers, err := d.FederationJoinedHosts.SelectJoinedHostsForRooms(ctx, roomIDs, excludeBlacklisted)
 	if err != nil {
 		return nil, err
@@ -140,13 +147,17 @@ func (d *Database) StoreJSON(
 	return &newReceipt, nil
 }
 
-func (d *Database) AddServerToBlacklist(serverName gomatrixserverlib.ServerName) error {
+func (d *Database) AddServerToBlacklist(
+	serverName gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationBlacklist.InsertBlacklist(context.TODO(), txn, serverName)
 	})
 }
 
-func (d *Database) RemoveServerFromBlacklist(serverName gomatrixserverlib.ServerName) error {
+func (d *Database) RemoveServerFromBlacklist(
+	serverName gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationBlacklist.DeleteBlacklist(context.TODO(), txn, serverName)
 	})
@@ -158,95 +169,166 @@ func (d *Database) RemoveAllServersFromBlacklist() error {
 	})
 }
 
-func (d *Database) IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error) {
+func (d *Database) IsServerBlacklisted(
+	serverName gomatrixserverlib.ServerName,
+) (bool, error) {
 	return d.FederationBlacklist.SelectBlacklist(context.TODO(), nil, serverName)
 }
 
-func (d *Database) SetServerAssumedOffline(serverName gomatrixserverlib.ServerName) error {
+func (d *Database) SetServerAssumedOffline(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationAssumedOffline.InsertAssumedOffline(context.TODO(), txn, serverName)
+		return d.FederationAssumedOffline.InsertAssumedOffline(ctx, txn, serverName)
 	})
 }
 
-func (d *Database) RemoveServerAssumedOffline(serverName gomatrixserverlib.ServerName) error {
+func (d *Database) RemoveServerAssumedOffline(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationAssumedOffline.DeleteAssumedOffline(context.TODO(), txn, serverName)
+		return d.FederationAssumedOffline.DeleteAssumedOffline(ctx, txn, serverName)
 	})
 }
 
-func (d *Database) RemoveAllServersAssumedOffline() error {
+func (d *Database) RemoveAllServersAssumedOffline(
+	ctx context.Context,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationAssumedOffline.DeleteAllAssumedOffline(context.TODO(), txn)
+		return d.FederationAssumedOffline.DeleteAllAssumedOffline(ctx, txn)
 	})
 }
 
-func (d *Database) IsServerAssumedOffline(serverName gomatrixserverlib.ServerName) (bool, error) {
-	return d.FederationAssumedOffline.SelectAssumedOffline(context.TODO(), nil, serverName)
+func (d *Database) IsServerAssumedOffline(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+) (bool, error) {
+	return d.FederationAssumedOffline.SelectAssumedOffline(ctx, nil, serverName)
 }
 
-func (d *Database) AddRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
+func (d *Database) P2PAddRelayServersForServer(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	relayServers []gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationRelayServers.InsertRelayServers(context.TODO(), txn, serverName, relayServers)
+		return d.FederationRelayServers.InsertRelayServers(ctx, txn, serverName, relayServers)
 	})
 }
 
-func (d *Database) GetRelayServersForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error) {
-	return d.FederationRelayServers.SelectRelayServers(context.TODO(), nil, serverName)
+func (d *Database) P2PGetRelayServersForServer(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+) ([]gomatrixserverlib.ServerName, error) {
+	return d.FederationRelayServers.SelectRelayServers(ctx, nil, serverName)
 }
 
-func (d *Database) RemoveRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
+func (d *Database) P2PRemoveRelayServersForServer(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	relayServers []gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationRelayServers.DeleteRelayServers(context.TODO(), txn, serverName, relayServers)
+		return d.FederationRelayServers.DeleteRelayServers(ctx, txn, serverName, relayServers)
 	})
 }
 
-func (d *Database) RemoveAllRelayServersForServer(serverName gomatrixserverlib.ServerName) error {
+func (d *Database) P2PRemoveAllRelayServersForServer(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.FederationRelayServers.DeleteAllRelayServers(context.TODO(), txn, serverName)
+		return d.FederationRelayServers.DeleteAllRelayServers(ctx, txn, serverName)
 	})
 }
 
-func (d *Database) AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *Database) AddOutboundPeek(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	roomID string,
+	peekID string,
+	renewalInterval int64,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationOutboundPeeks.InsertOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *Database) RenewOutboundPeek(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	roomID string,
+	peekID string,
+	renewalInterval int64,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationOutboundPeeks.RenewOutboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) GetOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.OutboundPeek, error) {
+func (d *Database) GetOutboundPeek(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	roomID,
+	peekID string,
+) (*types.OutboundPeek, error) {
 	return d.FederationOutboundPeeks.SelectOutboundPeek(ctx, nil, serverName, roomID, peekID)
 }
 
-func (d *Database) GetOutboundPeeks(ctx context.Context, roomID string) ([]types.OutboundPeek, error) {
+func (d *Database) GetOutboundPeeks(
+	ctx context.Context,
+	roomID string,
+) ([]types.OutboundPeek, error) {
 	return d.FederationOutboundPeeks.SelectOutboundPeeks(ctx, nil, roomID)
 }
 
-func (d *Database) AddInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *Database) AddInboundPeek(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	roomID string,
+	peekID string,
+	renewalInterval int64,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationInboundPeeks.InsertInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) RenewInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error {
+func (d *Database) RenewInboundPeek(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	roomID string,
+	peekID string,
+	renewalInterval int64,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.FederationInboundPeeks.RenewInboundPeek(ctx, txn, serverName, roomID, peekID, renewalInterval)
 	})
 }
 
-func (d *Database) GetInboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string) (*types.InboundPeek, error) {
+func (d *Database) GetInboundPeek(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	roomID string,
+	peekID string,
+) (*types.InboundPeek, error) {
 	return d.FederationInboundPeeks.SelectInboundPeek(ctx, nil, serverName, roomID, peekID)
 }
 
-func (d *Database) GetInboundPeeks(ctx context.Context, roomID string) ([]types.InboundPeek, error) {
+func (d *Database) GetInboundPeeks(
+	ctx context.Context,
+	roomID string,
+) ([]types.InboundPeek, error) {
 	return d.FederationInboundPeeks.SelectInboundPeeks(ctx, nil, roomID)
 }
 
-func (d *Database) UpdateNotaryKeys(ctx context.Context, serverName gomatrixserverlib.ServerName, serverKeys gomatrixserverlib.ServerKeys) error {
+func (d *Database) UpdateNotaryKeys(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	serverKeys gomatrixserverlib.ServerKeys,
+) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		validUntil := serverKeys.ValidUntilTS
 		// Servers MUST use the lesser of this field and 7 days into the future when determining if a key is valid.
@@ -281,7 +363,9 @@ func (d *Database) UpdateNotaryKeys(ctx context.Context, serverName gomatrixserv
 }
 
 func (d *Database) GetNotaryKeys(
-	ctx context.Context, serverName gomatrixserverlib.ServerName, optKeyIDs []gomatrixserverlib.KeyID,
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	optKeyIDs []gomatrixserverlib.KeyID,
 ) (sks []gomatrixserverlib.ServerKeys, err error) {
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		sks, err = d.NotaryServerKeysMetadata.SelectKeys(ctx, txn, serverName, optKeyIDs)

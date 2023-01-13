@@ -44,11 +44,11 @@ func TestPerformWakeupServers(t *testing.T) {
 
 	server := gomatrixserverlib.ServerName("wakeup")
 	testDB.AddServerToBlacklist(server)
-	testDB.SetServerAssumedOffline(server)
+	testDB.SetServerAssumedOffline(context.Background(), server)
 	blacklisted, err := testDB.IsServerBlacklisted(server)
 	assert.NoError(t, err)
 	assert.True(t, blacklisted)
-	offline, err := testDB.IsServerAssumedOffline(server)
+	offline, err := testDB.IsServerAssumedOffline(context.Background(), server)
 	assert.NoError(t, err)
 	assert.True(t, offline)
 
@@ -81,7 +81,7 @@ func TestPerformWakeupServers(t *testing.T) {
 	blacklisted, err = testDB.IsServerBlacklisted(server)
 	assert.NoError(t, err)
 	assert.False(t, blacklisted)
-	offline, err = testDB.IsServerAssumedOffline(server)
+	offline, err = testDB.IsServerAssumedOffline(context.Background(), server)
 	assert.NoError(t, err)
 	assert.False(t, offline)
 }
@@ -91,7 +91,7 @@ func TestQueryRelayServers(t *testing.T) {
 
 	server := gomatrixserverlib.ServerName("wakeup")
 	relayServers := []gomatrixserverlib.ServerName{"relay1", "relay2"}
-	err := testDB.AddRelayServersForServer(server, relayServers)
+	err := testDB.P2PAddRelayServersForServer(context.Background(), server, relayServers)
 	assert.NoError(t, err)
 
 	cfg := config.FederationAPI{
@@ -158,8 +158,8 @@ func TestPerformDirectoryLookupRelaying(t *testing.T) {
 	testDB := test.NewInMemoryFederationDatabase()
 
 	server := gomatrixserverlib.ServerName("wakeup")
-	testDB.SetServerAssumedOffline(server)
-	testDB.AddRelayServersForServer(server, []gomatrixserverlib.ServerName{"relay"})
+	testDB.SetServerAssumedOffline(context.Background(), server)
+	testDB.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{"relay"})
 
 	cfg := config.FederationAPI{
 		Matrix: &config.Global{

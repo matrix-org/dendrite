@@ -858,7 +858,7 @@ func TestSendPDUMultipleFailuresAssumedOffline(t *testing.T) {
 			data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerAssumedOffline(destination); val {
+				if val, _ := db.IsServerAssumedOffline(context.Background(), destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be assumed offline")
@@ -891,7 +891,7 @@ func TestSendEDUMultipleFailuresAssumedOffline(t *testing.T) {
 			data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
 			assert.NoError(t, dbErr)
 			if len(data) == 1 {
-				if val, _ := db.IsServerAssumedOffline(destination); val {
+				if val, _ := db.IsServerAssumedOffline(context.Background(), destination); val {
 					return poll.Success()
 				}
 				return poll.Continue("waiting for server to be assumed offline")
@@ -938,7 +938,7 @@ func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
-	assumedOffline, _ := db.IsServerAssumedOffline(destination)
+	assumedOffline, _ := db.IsServerAssumedOffline(context.Background(), destination)
 	assert.Equal(t, true, assumedOffline)
 }
 
@@ -977,6 +977,6 @@ func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	}
 	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 
-	assumedOffline, _ := db.IsServerAssumedOffline(destination)
+	assumedOffline, _ := db.IsServerAssumedOffline(context.Background(), destination)
 	assert.Equal(t, true, assumedOffline)
 }

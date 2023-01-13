@@ -54,16 +54,15 @@ type Database interface {
 	RemoveAllServersFromBlacklist() error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 
-	// these don't have contexts passed in as we want things to happen regardless of the request context
-	SetServerAssumedOffline(serverName gomatrixserverlib.ServerName) error
-	RemoveServerAssumedOffline(serverName gomatrixserverlib.ServerName) error
-	RemoveAllServersAssumedOffline() error
-	IsServerAssumedOffline(serverName gomatrixserverlib.ServerName) (bool, error)
+	SetServerAssumedOffline(ctx context.Context, serverName gomatrixserverlib.ServerName) error
+	RemoveServerAssumedOffline(ctx context.Context, serverName gomatrixserverlib.ServerName) error
+	RemoveAllServersAssumedOffline(ctx context.Context) error
+	IsServerAssumedOffline(ctx context.Context, serverName gomatrixserverlib.ServerName) (bool, error)
 
-	AddRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
-	GetRelayServersForServer(serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
-	RemoveRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
-	RemoveAllRelayServersForServer(serverName gomatrixserverlib.ServerName) error
+	P2PAddRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+	P2PGetRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
+	P2PRemoveRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+	P2PRemoveAllRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName) error
 
 	AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error
 	RenewOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error

@@ -254,39 +254,39 @@ func TestServersAssumedOffline(t *testing.T) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
 		defer closeDB()
 
-		err := db.SetServerAssumedOffline(server1)
+		err := db.SetServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 
-		isOffline, err := db.IsServerAssumedOffline(server1)
+		isOffline, err := db.IsServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 
-		err = db.RemoveServerAssumedOffline(server1)
+		err = db.RemoveServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 
-		isOffline, err = db.IsServerAssumedOffline(server1)
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
 
-		err = db.SetServerAssumedOffline(server1)
+		err = db.SetServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
-		err = db.SetServerAssumedOffline(server2)
+		err = db.SetServerAssumedOffline(context.Background(), server2)
 		assert.Nil(t, err)
 
-		isOffline, err = db.IsServerAssumedOffline(server1)
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
-		isOffline, err = db.IsServerAssumedOffline(server2)
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 
-		err = db.RemoveAllServersAssumedOffline()
+		err = db.RemoveAllServersAssumedOffline(context.Background())
 		assert.Nil(t, err)
 
-		isOffline, err = db.IsServerAssumedOffline(server1)
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
-		isOffline, err = db.IsServerAssumedOffline(server2)
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
 	})
@@ -301,32 +301,32 @@ func TestRelayServersStored(t *testing.T) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
 		defer closeDB()
 
-		err := db.AddRelayServersForServer(server, []gomatrixserverlib.ServerName{relayServer1})
+		err := db.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1})
 		assert.Nil(t, err)
 
-		relayServers, err := db.GetRelayServersForServer(server)
+		relayServers, err := db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Equal(t, relayServer1, relayServers[0])
 
-		err = db.RemoveRelayServersForServer(server, []gomatrixserverlib.ServerName{relayServer1})
+		err = db.P2PRemoveRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1})
 		assert.Nil(t, err)
 
-		relayServers, err = db.GetRelayServersForServer(server)
+		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Zero(t, len(relayServers))
 
-		err = db.AddRelayServersForServer(server, []gomatrixserverlib.ServerName{relayServer1, relayServer2})
+		err = db.P2PAddRelayServersForServer(context.Background(), server, []gomatrixserverlib.ServerName{relayServer1, relayServer2})
 		assert.Nil(t, err)
 
-		relayServers, err = db.GetRelayServersForServer(server)
+		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Equal(t, relayServer1, relayServers[0])
 		assert.Equal(t, relayServer2, relayServers[1])
 
-		err = db.RemoveAllRelayServersForServer(server)
+		err = db.P2PRemoveAllRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 
-		relayServers, err = db.GetRelayServersForServer(server)
+		relayServers, err = db.P2PGetRelayServersForServer(context.Background(), server)
 		assert.Nil(t, err)
 		assert.Zero(t, len(relayServers))
 	})

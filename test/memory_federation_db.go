@@ -311,6 +311,7 @@ func (d *InMemoryFederationDatabase) IsServerBlacklisted(
 }
 
 func (d *InMemoryFederationDatabase) SetServerAssumedOffline(
+	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 ) error {
 	d.dbMutex.Lock()
@@ -321,6 +322,7 @@ func (d *InMemoryFederationDatabase) SetServerAssumedOffline(
 }
 
 func (d *InMemoryFederationDatabase) RemoveServerAssumedOffline(
+	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 ) error {
 	d.dbMutex.Lock()
@@ -330,7 +332,9 @@ func (d *InMemoryFederationDatabase) RemoveServerAssumedOffline(
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffine() error {
+func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffine(
+	ctx context.Context,
+) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
@@ -339,6 +343,7 @@ func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffine() error {
 }
 
 func (d *InMemoryFederationDatabase) IsServerAssumedOffline(
+	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 ) (bool, error) {
 	d.dbMutex.Lock()
@@ -352,7 +357,8 @@ func (d *InMemoryFederationDatabase) IsServerAssumedOffline(
 	return assumedOffline, nil
 }
 
-func (d *InMemoryFederationDatabase) GetRelayServersForServer(
+func (d *InMemoryFederationDatabase) P2PGetRelayServersForServer(
+	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 ) ([]gomatrixserverlib.ServerName, error) {
 	d.dbMutex.Lock()
@@ -366,7 +372,8 @@ func (d *InMemoryFederationDatabase) GetRelayServersForServer(
 	return knownRelayServers, nil
 }
 
-func (d *InMemoryFederationDatabase) AddRelayServersForServer(
+func (d *InMemoryFederationDatabase) P2PAddRelayServersForServer(
+	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
 	relayServers []gomatrixserverlib.ServerName,
 ) error {
@@ -420,15 +427,15 @@ func (d *InMemoryFederationDatabase) GetJoinedHostsForRooms(ctx context.Context,
 	return nil, nil
 }
 
-func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffline() error {
+func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffline(ctx context.Context) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) RemoveRelayServersForServer(serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
+func (d *InMemoryFederationDatabase) P2PRemoveRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
 	return nil
 }
 
-func (d *InMemoryFederationDatabase) RemoveAllRelayServersForServer(serverName gomatrixserverlib.ServerName) error {
+func (d *InMemoryFederationDatabase) P2PRemoveAllRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName) error {
 	return nil
 }
 

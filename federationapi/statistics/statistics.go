@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	"context"
 	"math"
 	"math/rand"
 	"sync"
@@ -72,14 +73,14 @@ func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerS
 		} else {
 			server.blacklisted.Store(blacklisted)
 		}
-		assumedOffline, err := s.DB.IsServerAssumedOffline(serverName)
+		assumedOffline, err := s.DB.IsServerAssumedOffline(context.Background(), serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get assumed offline entry %q", serverName)
 		} else {
 			server.assumedOffline.Store(assumedOffline)
 		}
 
-		knownRelayServers, err := s.DB.GetRelayServersForServer(serverName)
+		knownRelayServers, err := s.DB.P2PGetRelayServersForServer(context.Background(), serverName)
 		if err != nil {
 			logrus.WithError(err).Errorf("Failed to get relay server list for %q", serverName)
 		} else {
@@ -186,7 +187,7 @@ func (s *ServerStatistics) Failure() (time.Time, bool) {
 		if backoffCount >= s.statistics.FailuresUntilAssumedOffline {
 			s.assumedOffline.CompareAndSwap(false, true)
 			if s.statistics.DB != nil {
-				if err := s.statistics.DB.SetServerAssumedOffline(s.serverName); err != nil {
+				if err := s.statistics.DB.SetServerAssumedOffline(context.Background(), s.serverName); err != nil {
 					logrus.WithError(err).Errorf("Failed to set %q as assumed offline", s.serverName)
 				}
 			}
@@ -291,7 +292,7 @@ func (s *ServerStatistics) removeBlacklist() bool {
 // removeAssumedOffline removes the assumed offline status from the server.
 func (s *ServerStatistics) removeAssumedOffline() {
 	if s.AssumedOffline() {
-		_ = s.statistics.DB.RemoveServerAssumedOffline(s.serverName)
+		_ = s.statistics.DB.RemoveServerAssumedOffline(context.Background(), s.serverName)
 	}
 	s.assumedOffline.Store(false)
 }
@@ -321,7 +322,7 @@ func (s *ServerStatistics) AddRelayServers(relayServers []gomatrixserverlib.Serv
 		uniqueList = append(uniqueList, srv)
 	}
 
-	err := s.statistics.DB.AddRelayServersForServer(s.serverName, uniqueList)
+	err := s.statistics.DB.P2PAddRelayServersForServer(context.Background(), s.serverName, uniqueList)
 	if err != nil {
 		logrus.WithError(err).Errorf("Failed to add relay servers for %q. Servers: %v", s.serverName, uniqueList)
 		return
