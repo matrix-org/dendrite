@@ -85,7 +85,7 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 			c.RecaptchaApiJsUrl = "https://www.google.com/recaptcha/api.js"
 		}
 		if c.RecaptchaFormField == "" {
-			c.RecaptchaFormField = "g-recaptcha"
+			c.RecaptchaFormField = "g-recaptcha-response"
 		}
 		if c.RecaptchaSitekeyClass == "" {
 			c.RecaptchaSitekeyClass = "g-recaptcha"
