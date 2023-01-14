@@ -1,128 +1,33 @@
 # Dendrite
 
-[![Build status](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml/badge.svg?event=push)](https://github.com/matrix-org/dendrite/actions/workflows/dendrite.yml) [![Dendrite](https://img.shields.io/matrix/dendrite:matrix.org.svg?label=%23dendrite%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite:matrix.org) [![Dendrite Dev](https://img.shields.io/matrix/dendrite-dev:matrix.org.svg?label=%23dendrite-dev%3Amatrix.org&logo=matrix&server_fqdn=matrix.org)](https://matrix.to/#/#dendrite-dev:matrix.org)
+# Fork!
+## Differences to upstream:
+- Replace official Pinecone with my fork of it that contains a [patch to fix an issue](https://github.com/BieHDC/pinecone/commit/87da81cee2e39b2f109e4a9ec156c526ae4a5616) with custom routers.
+- Added `cmd/dendrite-demo-pinecone-i2p`
 
-Dendrite is a second-generation Matrix homeserver written in Go.
-It intends to provide an **efficient**, **reliable** and **scalable** alternative to [Synapse](https://github.com/matrix-org/synapse):
 
-- Efficient: A small memory footprint with better baseline performance than an out-of-the-box Synapse.
-- Reliable: Implements the Matrix specification as written, using the
-  [same test suite](https://github.com/matrix-org/sytest) as Synapse as well as
-  a [brand new Go test suite](https://github.com/matrix-org/complement).
-- Scalable: can run on multiple machines and eventually scale to massive homeserver deployments.
+## How to run
+See the [Readme](https://github.com/BieHDC/dendrite/tree/main/cmd/dendrite-demo-pinecone-i2p/README.md).
 
-Dendrite is **beta** software, which means:
 
-- Dendrite is ready for early adopters. We recommend running in Monolith mode with a PostgreSQL database.
-- Dendrite has periodic releases. We intend to release new versions as we fix bugs and land significant features.
-- Dendrite supports database schema upgrades between releases. This means you should never lose your messages when upgrading Dendrite.
-
-This does not mean:
-
-- Dendrite is bug-free. It has not yet been battle-tested in the real world and so will be error prone initially.
-- Dendrite is feature-complete. There may be client or federation APIs that are not implemented.
-- Dendrite is ready for massive homeserver deployments. There is no sharding of microservices (although it is possible to run them on separate machines) and there is no high-availability/clustering support.
-
-Currently, we expect Dendrite to function well for small (10s/100s of users) homeserver deployments as well as P2P Matrix nodes in-browser or on mobile devices.
-In the future, we will be able to scale up to gigantic servers (equivalent to `matrix.org`) via polylith mode.
-
-If you have further questions, please take a look at [our FAQ](docs/FAQ.md) or join us in:
-
-- **[#dendrite:matrix.org](https://matrix.to/#/#dendrite:matrix.org)** - General chat about the Dendrite project, for users and server admins alike
-- **[#dendrite-dev:matrix.org](https://matrix.to/#/#dendrite-dev:matrix.org)** - The place for developers, where all Dendrite development discussion happens
-- **[#dendrite-alerts:matrix.org](https://matrix.to/#/#dendrite-alerts:matrix.org)** - Release notifications and important info, highly recommended for all Dendrite server admins
-
-## Requirements
-
-See the [Planning your Installation](https://matrix-org.github.io/dendrite/installation/planning) page for
-more information on requirements.
-
-To build Dendrite, you will need Go 1.18 or later.
-
-For a usable federating Dendrite deployment, you will also need:
-
-- A domain name (or subdomain)
-- A valid TLS certificate issued by a trusted authority for that domain
-- SRV records or a well-known file pointing to your deployment
-
-Also recommended are:
-
-- A PostgreSQL database engine, which will perform better than SQLite with many users and/or larger rooms
-- A reverse proxy server, such as nginx, configured [like this sample](https://github.com/matrix-org/dendrite/blob/master/docs/nginx/monolith-sample.conf)
-
-The [Federation Tester](https://federationtester.matrix.org) can be used to verify your deployment.
-
-## Get started
-
-If you wish to build a fully-federating Dendrite instance, see [the Installation documentation](https://matrix-org.github.io/dendrite/installation). For running in Docker, see [build/docker](build/docker).
-
-The following instructions are enough to get Dendrite started as a non-federating test deployment using self-signed certificates and SQLite databases:
-
-```bash
-$ git clone https://github.com/matrix-org/dendrite
-$ cd dendrite
-$ ./build.sh
-
-# Generate a Matrix signing key for federation (required)
-$ ./bin/generate-keys --private-key matrix_key.pem
-
-# Generate a self-signed certificate (optional, but a valid TLS certificate is normally
-# needed for Matrix federation/clients to work properly!)
-$ ./bin/generate-keys --tls-cert server.crt --tls-key server.key
-
-# Copy and modify the config file - you'll need to set a server name and paths to the keys
-# at the very least, along with setting up the database connection strings.
-$ cp dendrite-sample.monolith.yaml dendrite.yaml
-
-# Build and run the server:
-$ ./bin/dendrite-monolith-server --tls-cert server.crt --tls-key server.key --config dendrite.yaml
-
-# Create an user account (add -admin for an admin user).
-# Specify the localpart only, e.g. 'alice' for '@alice:domain.com'
-$ ./bin/create-account --config dendrite.yaml --username alice
+## How to build
 ```
+cd cmd/dendrite-demo-pinecone-i2p
+go build
+```
+Needs Go 1.18 or later. Your distro should take care of it.
 
-Then point your favourite Matrix client at `http://localhost:8008` or `https://localhost:8448`.
 
-## Progress
+## Todo
+- Do real world testing.
+- Check for privacy leaks.
+- Figure out how to forward the :8008 client listener and make clients connect over .i2p aswell (for non self hosters).
+- Upstream the pinecone-"fix"?
+- Fix the DialContext [issue of the SAM lib](https://github.com/eyedeekay/sam3/blob/45106d2b7062a690dfad30841163b510855469df/stream.go#L117)
+- Monitor [store and forward pr](https://github.com/matrix-org/dendrite/pull/2917). We need to sync it with i2p.
+- Monitor cross-network stuff, generally [this](https://arewep2pyet.com/).
+- ...
 
-We use a script called Are We Synapse Yet which checks Sytest compliance rates. Sytest is a black-box homeserver
-test rig with around 900 tests. The script works out how many of these tests are passing on Dendrite and it
-updates with CI. As of August 2022 we're at around 90% CS API coverage and 95% Federation coverage, though check
-CI for the latest numbers. In practice, this means you can communicate locally and via federation with Synapse
-servers such as matrix.org reasonably well, although there are still some missing features (like SSO and Third-party ID APIs).
 
-We are prioritising features that will benefit single-user homeservers first (e.g Receipts, E2E) rather
-than features that massive deployments may be interested in (OpenID, Guests, Admin APIs, AS API).
-This means Dendrite supports amongst others:
-
-- Core room functionality (creating rooms, invites, auth rules)
-- Room versions 1 to 10 supported
-- Backfilling locally and via federation
-- Accounts, profiles and devices
-- Published room lists
-- Typing
-- Media APIs
-- Redaction
-- Tagging
-- Context
-- E2E keys and device lists
-- Receipts
-- Push
-- Guests
-- User Directory
-- Presence
-- Fulltext search
-
-## Contributing
-
-We would be grateful for any help on issues marked as
-[Are We Synapse Yet](https://github.com/matrix-org/dendrite/labels/are-we-synapse-yet). These issues
-all have related Sytests which need to pass in order for the issue to be closed. Once you've written your
-code, you can quickly run Sytest to ensure that the test names are now passing.
-
-If you're new to the project, see our
-[Contributing page](https://matrix-org.github.io/dendrite/development/contributing) to get up to speed, then
-look for [Good First Issues](https://github.com/matrix-org/dendrite/labels/good%20first%20issue). If you're
-familiar with the project, look for [Help Wanted](https://github.com/matrix-org/dendrite/labels/help-wanted)
-issues.
+For more information about Dendrite itself check out the [main repo](https://github.com/matrix-org/dendrite).
+Do not report bugs to them that might be our bugs.

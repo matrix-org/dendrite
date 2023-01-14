@@ -11,6 +11,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/docker/docker v20.10.19+incompatible
 	github.com/docker/go-connections v0.4.0
+	github.com/eyedeekay/onramp v0.0.0-20230107033213-2f2d359ffb2c
 	github.com/getsentry/sentry-go v0.14.0
 	github.com/gologme/log v1.3.0
 	github.com/google/go-cmp v0.5.9
@@ -77,10 +78,13 @@ require (
 	github.com/blevesearch/zapx/v14 v14.3.5 // indirect
 	github.com/blevesearch/zapx/v15 v15.3.5 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cretz/bine v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/eyedeekay/i2pkeys v0.0.0-20220804220722-1048b5ce6ba7 // indirect
+	github.com/eyedeekay/sam3 v0.33.3 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
@@ -142,3 +146,5 @@ require (
 )
 
 go 1.18
+
+replace github.com/matrix-org/pinecone => github.com/BieHDC/pinecone v0.0.0-20230114195523-87da81cee2e3
