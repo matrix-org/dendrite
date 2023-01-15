@@ -41,30 +41,21 @@ type flow struct {
 	Type string `json:"type"`
 }
 
-func passwordLogin() flows {
-	f := flows{}
-	f.Flows = append(f.Flows, flow{
-		Type: authtypes.LoginTypePassword,
-	})
-
-	// TODO: Add config option to disable
-	f.Flows = append(f.Flows, flow{
-		Type: authtypes.LoginTypeApplicationService,
-	})
-
-	return f
-}
-
 // Login implements GET and POST /login
 func Login(
 	req *http.Request, userAPI userapi.ClientUserAPI,
 	cfg *config.ClientAPI,
 ) util.JSONResponse {
 	if req.Method == http.MethodGet {
-		// TODO: support other forms of login other than password, depending on config options
+		// TODO: support other forms of login, depending on config options
 		return util.JSONResponse{
 			Code: http.StatusOK,
-			JSON: passwordLogin(),
+			JSON: flows{
+				Flows: []flow{
+					{Type: authtypes.LoginTypePassword},
+					{Type: authtypes.LoginTypeApplicationService},
+				},
+			},
 		}
 	} else if req.Method == http.MethodPost {
 		login, cleanup, authErr := auth.LoginFromJSONReader(req, userAPI, userAPI, cfg)
