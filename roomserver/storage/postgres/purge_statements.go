@@ -95,79 +95,39 @@ func PreparePurgeStatements(db *sql.DB) (*purgeStatements, error) {
 	}.Prepare(db)
 }
 
-func (s *purgeStatements) PurgeEventJSONs(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeEventJSONStmt).ExecContext(ctx, roomNID)
-	return err
-}
-
-func (s *purgeStatements) PurgeEvents(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomNID)
-	return err
-}
-
-func (s *purgeStatements) PurgeInvites(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeInvitesStmt).ExecContext(ctx, roomNID)
-	return err
-}
-
-func (s *purgeStatements) PurgeMemberships(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomNID)
-	return err
-}
-
-func (s *purgeStatements) PurgePreviousEvents(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgePreviousEventsStmt).ExecContext(ctx, roomNID)
-	return err
-}
-
-func (s *purgeStatements) PurgePublished(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgePublishedStmt).ExecContext(ctx, roomID)
-	return err
-}
-
-func (s *purgeStatements) PurgeRedactions(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeRedactionStmt).ExecContext(ctx, roomNID)
-	return err
-}
-
-func (s *purgeStatements) PurgeRoomAliases(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeRoomAliasesStmt).ExecContext(ctx, roomID)
-	return err
-}
-
 func (s *purgeStatements) PurgeRoom(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
+	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, roomID string,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeRoomStmt).ExecContext(ctx, roomNID)
-	return err
-}
 
-func (s *purgeStatements) PurgeStateBlocks(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeStateBlockEntriesStmt).ExecContext(ctx, roomNID)
-	return err
-}
+	// purge by roomID
+	purgeByRoomID := []*sql.Stmt{
+		s.purgeRoomAliasesStmt,
+		s.purgePublishedStmt,
+	}
+	for _, stmt := range purgeByRoomID {
+		_, err := sqlutil.TxStmt(txn, stmt).ExecContext(ctx, roomID)
+		if err != nil {
+			return err
+		}
+	}
 
-func (s *purgeStatements) PurgeStateSnapshots(
-	ctx context.Context, txn *sql.Tx, roomNID types.RoomNID,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeStateSnapshotEntriesStmt).ExecContext(ctx, roomNID)
-	return err
+	// purge by roomNID
+	purgeByRoomNID := []*sql.Stmt{
+		s.purgeStateBlockEntriesStmt,
+		s.purgeStateSnapshotEntriesStmt,
+		s.purgeInvitesStmt,
+		s.purgeMembershipsStmt,
+		s.purgePreviousEventsStmt,
+		s.purgeEventJSONStmt,
+		s.purgeRedactionStmt,
+		s.purgeEventsStmt,
+		s.purgeRoomStmt,
+	}
+	for _, stmt := range purgeByRoomNID {
+		_, err := sqlutil.TxStmt(txn, stmt).ExecContext(ctx, roomNID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

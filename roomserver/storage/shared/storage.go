@@ -1457,40 +1457,7 @@ func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
 			}
 			return fmt.Errorf("failed to lock the room: %w", err)
 		}
-		if err = d.Purge.PurgeStateBlocks(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge state blocks: %w", err)
-		}
-		if err = d.Purge.PurgeStateSnapshots(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge state snapshots: %w", err)
-		}
-		if err = d.Purge.PurgeInvites(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge invites: %w", err)
-		}
-		if err = d.Purge.PurgeMemberships(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge memberships: %w", err)
-		}
-		if err = d.Purge.PurgeRoomAliases(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("failed to purge room aliases: %w", err)
-		}
-		if err = d.Purge.PurgePublished(ctx, txn, roomID); err != nil {
-			return fmt.Errorf("failed to purge published: %w", err)
-		}
-		if err = d.Purge.PurgePreviousEvents(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge previous events: %w", err)
-		}
-		if err = d.Purge.PurgeEventJSONs(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge event JSONs: %w", err)
-		}
-		if err = d.Purge.PurgeRedactions(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge redactions: %w", err)
-		}
-		if err = d.Purge.PurgeEvents(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge events: %w", err)
-		}
-		if err = d.Purge.PurgeRoom(ctx, txn, roomNID); err != nil {
-			return fmt.Errorf("failed to purge room: %w", err)
-		}
-		return nil
+		return d.Purge.PurgeRoom(ctx, txn, roomNID, roomID)
 	})
 }
 

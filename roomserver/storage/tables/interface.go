@@ -175,17 +175,9 @@ type Redactions interface {
 }
 
 type Purge interface {
-	PurgeEventJSONs(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeRoom(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeStateSnapshots(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeStateBlocks(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgePreviousEvents(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeInvites(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeMemberships(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgePublished(ctx context.Context, txn *sql.Tx, roomID string) error
-	PurgeRedactions(ctx context.Context, txn *sql.Tx, roomNID types.RoomNID) error
-	PurgeRoomAliases(ctx context.Context, txn *sql.Tx, roomID string) error
+	PurgeRoom(
+		ctx context.Context, txn *sql.Tx, roomNID types.RoomNID, roomID string,
+	) error
 }
 
 // StrippedEvent represents a stripped event for returning extracted content values.

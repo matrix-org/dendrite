@@ -44,7 +44,7 @@ func TestAdminResetPassword(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
 		keyAPI.SetUserAPI(userAPI)
 		// We mostly need the userAPI for this test, so nil for other APIs/caches etc.
-		AddPublicRoutes(base, nil, nil, nil, nil, nil, userAPI, nil, nil, nil)
+		AddPublicRoutes(base, nil, rsAPI, nil, nil, nil, userAPI, nil, nil, nil)
 
 		// Create the users in the userapi and login
 		accessTokens := map[*test.User]string{
@@ -115,6 +115,7 @@ func TestAdminResetPassword(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
+			tc := tc // ensure we don't accidentally only test the last test case
 			t.Run(tc.name, func(t *testing.T) {
 				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/resetPassword/"+tc.userID)
 				if tc.requestOpt != nil {
@@ -215,8 +216,9 @@ func TestPurgeRoom(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
+			tc := tc // ensure we don't accidentally only test the last test case
 			t.Run(tc.name, func(t *testing.T) {
-				req := test.NewRequest(t, http.MethodGet, "/_dendrite/admin/purgeRoom/"+tc.roomID)
+				req := test.NewRequest(t, http.MethodPost, "/_dendrite/admin/purgeRoom/"+tc.roomID)
 
 				req.Header.Set("Authorization", "Bearer "+accessTokens[aliceAdmin])
 

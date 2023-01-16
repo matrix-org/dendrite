@@ -131,7 +131,8 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 	case api.OutputTypePurgeRoom:
 		err = s.onPurgeRoom(s.ctx, *output.PurgeRoom)
 		if err != nil {
-			return true
+			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from sync API")
+			return true // non-fatal, as otherwise we end up in a loop of trying to purge the room
 		}
 	default:
 		log.WithField("type", output.Type).Debug(
