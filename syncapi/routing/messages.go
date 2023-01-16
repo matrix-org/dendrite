@@ -57,7 +57,7 @@ type messagesResp struct {
 	StartStream string                          `json:"start_stream,omitempty"` // NOTSPEC: used by Cerulean, so clients can hit /messages then immediately /sync with a latest sync token
 	End         string                          `json:"end,omitempty"`
 	Chunk       []gomatrixserverlib.ClientEvent `json:"chunk"`
-	State       []gomatrixserverlib.ClientEvent `json:"state"`
+	State       []gomatrixserverlib.ClientEvent `json:"state,omitempty"`
 }
 
 // OnIncomingMessagesRequest implements the /messages endpoint from the
