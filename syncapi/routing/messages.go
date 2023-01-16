@@ -17,6 +17,7 @@ package routing
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -177,10 +178,11 @@ func OnIncomingMessagesRequest(
 		// If "to" isn't provided, it defaults to either the earliest stream
 		// position (if we're going backward) or to the latest one (if we're
 		// going forward).
-		to, err = setToDefault(req.Context(), snapshot, backwardOrdering, roomID)
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("setToDefault failed")
-			return jsonerror.InternalServerError()
+		to = types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
+		if backwardOrdering {
+			// go 1 earlier than the first event so we correctly fetch the earliest event
+			// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
+			to = types.TopologyToken{}
 		}
 		wasToProvided = false
 	}
@@ -576,25 +578,4 @@ func (r *messagesReq) backfill(roomID string, backwardsExtremities map[string][]
 	}
 
 	return events, nil
-}
-
-// setToDefault returns the default value for the "to" query parameter of a
-// request to /messages if not provided. It defaults to either the earliest
-// topological position (if we're going backward) or to the latest one (if we're
-// going forward).
-// Returns an error if there was an issue with retrieving the latest position
-// from the database
-func setToDefault(
-	ctx context.Context, snapshot storage.DatabaseTransaction, backwardOrdering bool,
-	roomID string,
-) (to types.TopologyToken, err error) {
-	if backwardOrdering {
-		// go 1 earlier than the first event so we correctly fetch the earliest event
-		// this is because Database.GetEventsInTopologicalRange is exclusive of the lower-bound.
-		to = types.TopologyToken{}
-	} else {
-		to, err = snapshot.MaxTopologicalPosition(ctx, roomID)
-	}
-
-	return
 }

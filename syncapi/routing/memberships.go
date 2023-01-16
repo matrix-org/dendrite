@@ -16,6 +16,7 @@ package routing
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -90,16 +91,14 @@ func GetMemberships(
 
 	atToken, err := types.NewTopologyTokenFromString(at)
 	if err != nil {
+		atToken = types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 		if queryRes.HasBeenInRoom && !queryRes.IsInRoom {
 			// If you have left the room then this will be the members of the room when you left.
 			atToken, err = db.EventPositionInTopology(req.Context(), queryRes.EventID)
-		} else {
-			// If you are joined to the room then this will be the current members of the room.
-			atToken, err = db.MaxTopologicalPosition(req.Context(), roomID)
-		}
-		if err != nil {
-			util.GetLogger(req.Context()).WithError(err).Error("unable to get 'atToken'")
-			return jsonerror.InternalServerError()
+			if err != nil {
+				util.GetLogger(req.Context()).WithError(err).Error("unable to get 'atToken'")
+				return jsonerror.InternalServerError()
+			}
 		}
 	}
 

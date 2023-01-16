@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -199,10 +200,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 		_ = MustWriteEvents(t, db, events)
 
 		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
-			from, err := snapshot.MaxTopologicalPosition(ctx, r.ID)
-			if err != nil {
-				t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
-			}
+			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 			t.Logf("max topo pos = %+v", from)
 			// head towards the beginning of time
 			to := types.TopologyToken{}
