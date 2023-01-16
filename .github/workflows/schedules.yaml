@@ -73,3 +73,41 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
+          
+  element_web:
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    steps:
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          # Our test suite includes some screenshot tests with unusual diacritics, which are
+          # supposed to be covered by STIXGeneral.
+          tools: fonts-stix
+      - uses: actions/checkout@v2
+        with:
+          repository: matrix-org/matrix-react-sdk
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+      - name: Fetch layered build
+        run: scripts/ci/layered.sh
+      - name: Copy config
+        run: cp element.io/develop/config.json config.json
+        working-directory: ./element-web
+      - name: Build
+        env:
+          CI_PACKAGE: true
+        run: yarn build
+        working-directory: ./element-web
+      - name: Edit Test Config
+        run: |
+          sed -i '/HOMESERVER/c\        HOMESERVER: "dendrite",' cypress.config.ts
+      - name: "Run cypress tests"
+        uses: cypress-io/github-action@v4.1.1
+        with:
+          browser: chrome
+          start: npx serve -p 8080 ./element-web/webapp
+          wait-on: 'http://localhost:8080'
+        env:
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
+          TMPDIR: ${{ runner.temp }}

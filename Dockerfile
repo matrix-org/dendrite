@@ -27,6 +27,7 @@ RUN --mount=target=. \
 # The dendrite base image
 #
 FROM alpine:latest AS dendrite-base
+RUN apk --update --no-cache add curl
 LABEL org.opencontainers.image.description="Next-generation Matrix homeserver written in Go"
 LABEL org.opencontainers.image.source="https://github.com/matrix-org/dendrite"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
