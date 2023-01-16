@@ -35,18 +35,13 @@ func NewStatistics(db storage.Database, failuresUntilBlacklist uint32) Statistic
 		DB:                     db,
 		FailuresUntilBlacklist: failuresUntilBlacklist,
 		backoffTimers:          make(map[gomatrixserverlib.ServerName]*time.Timer),
+		servers:                make(map[gomatrixserverlib.ServerName]*ServerStatistics),
 	}
 }
 
 // ForServer returns server statistics for the given server name. If it
 // does not exist, it will create empty statistics and return those.
 func (s *Statistics) ForServer(serverName gomatrixserverlib.ServerName) *ServerStatistics {
-	// If the map hasn't been initialised yet then do that.
-	if s.servers == nil {
-		s.mutex.Lock()
-		s.servers = make(map[gomatrixserverlib.ServerName]*ServerStatistics)
-		s.mutex.Unlock()
-	}
 	// Look up if we have statistics for this server already.
 	s.mutex.RLock()
 	server, found := s.servers[serverName]
