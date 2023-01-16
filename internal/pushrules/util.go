@@ -128,3 +128,7 @@ func parseRoomMemberCountCondition(s string) (func(int) bool, error) {
 	b = int(v)
 	return cmp, nil
 }
+
+func pointer[t any](s t) *t {
+	return &s
+}

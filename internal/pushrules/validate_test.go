@@ -12,15 +12,16 @@ func TestValidateRuleNegatives(t *testing.T) {
 		Rule          Rule
 		WantErrString string
 	}{
-		{"emptyRuleID", OverrideKind, Rule{}, "invalid rule ID"},
-		{"invalidKind", Kind("something else"), Rule{}, "invalid rule kind"},
-		{"ruleIDBackslash", OverrideKind, Rule{RuleID: "#foo\\:example.com"}, "invalid rule ID"},
-		{"noActions", OverrideKind, Rule{}, "missing actions"},
-		{"invalidAction", OverrideKind, Rule{Actions: []*Action{{}}}, "invalid rule action kind"},
-		{"invalidCondition", OverrideKind, Rule{Conditions: []*Condition{{}}}, "invalid rule condition kind"},
-		{"overrideNoCondition", OverrideKind, Rule{}, "missing rule conditions"},
-		{"underrideNoCondition", UnderrideKind, Rule{}, "missing rule conditions"},
-		{"contentNoPattern", ContentKind, Rule{}, "missing content rule pattern"},
+		{Name: "emptyRuleID", Kind: OverrideKind, Rule: Rule{}, WantErrString: "invalid rule ID"},
+		{Name: "invalidKind", Kind: Kind("something else"), Rule: Rule{}, WantErrString: "invalid rule kind"},
+		{Name: "ruleIDBackslash", Kind: OverrideKind, Rule: Rule{RuleID: "#foo\\:example.com"}, WantErrString: "invalid rule ID"},
+		{Name: "noActions", Kind: OverrideKind, Rule: Rule{}, WantErrString: "missing actions"},
+		{Name: "invalidAction", Kind: OverrideKind, Rule: Rule{Actions: []*Action{{}}}, WantErrString: "invalid rule action kind"},
+		{Name: "invalidCondition", Kind: OverrideKind, Rule: Rule{Conditions: []*Condition{{}}}, WantErrString: "invalid rule condition kind"},
+		{Name: "overrideNoCondition", Kind: OverrideKind, Rule: Rule{}, WantErrString: "missing rule conditions"},
+		{Name: "underrideNoCondition", Kind: UnderrideKind, Rule: Rule{}, WantErrString: "missing rule conditions"},
+		{Name: "contentNoPattern", Kind: ContentKind, Rule: Rule{}, WantErrString: "missing content rule pattern"},
+		{Name: "contentEmptyPattern", Kind: ContentKind, Rule: Rule{Pattern: pointer("")}, WantErrString: "missing content rule pattern"},
 	}
 	for _, tst := range tsts {
 		t.Run(tst.Name, func(t *testing.T) {
