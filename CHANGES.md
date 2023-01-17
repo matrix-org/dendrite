@@ -1,5 +1,24 @@
 # Changelog
 
+## Dendrite 0.10.9 (2023-01-17)
+
+### Features
+
+* Stale device lists are now cleaned up on startup, removing entries for users the server doesn't share a room with anymore
+* Dendrite now has its own Helm chart
+
+### Fixes
+
+* Push rules have seen several tweaks and fixes, which should, for example, fix notifications for `m.read_receipts`
+* Outgoing presence will now correctly be sent to newly joined hosts
+* Fixes the `/_dendrite/admin/resetPassword/{userID}` admin endpoint to use the correct variable
+* Federated backfilling for medium/large rooms has been fixed
+* `/login` causing wrong device list updates has been resolved
+* `/sync` should now return the correct room summary heroes
+* The default config options for `recaptcha_sitekey_class` and `recaptcha_form_field` are now set correctly 
+* `/messages` now omits empty `state` to be more spec compliant (contributed by [handlerug](https://github.com/handlerug))
+* `/sync` has been optimised to only query state events for history visibility if they are really needed
+
 ## Dendrite 0.10.8 (2022-11-29)
 
 ### Features
