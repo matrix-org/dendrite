@@ -90,22 +90,19 @@ func (d *Database) CleanTransactions(
 	}
 
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		err := d.RelayQueue.DeleteQueueEntries(ctx, txn, userID.Domain(), nids)
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("d.deleteQueueEntries: %w", err)
-	}
+		deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, txn, userID.Domain(), nids)
+		deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
 
-	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		dbErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
-		return dbErr
+		if deleteEntryErr != nil {
+			return fmt.Errorf("d.deleteQueueEntries: %w", deleteEntryErr)
+		}
+		if deleteJSONErr != nil {
+			return fmt.Errorf("d.deleteQueueJSON: %w", deleteJSONErr)
+		}
+		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("d.deleteQueueJSON: %w", err)
-	}
 
-	return nil
+	return err
 }
 
 func (d *Database) GetTransaction(
