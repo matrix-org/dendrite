@@ -254,35 +254,45 @@ func TestServersAssumedOffline(t *testing.T) {
 		db, closeDB := mustCreateFederationDatabase(t, dbType)
 		defer closeDB()
 
+		// Set server1 & server2 as assumed offline.
 		err := db.SetServerAssumedOffline(context.Background(), server1)
-		assert.Nil(t, err)
-
-		isOffline, err := db.IsServerAssumedOffline(context.Background(), server1)
-		assert.Nil(t, err)
-		assert.True(t, isOffline)
-
-		err = db.RemoveServerAssumedOffline(context.Background(), server1)
-		assert.Nil(t, err)
-
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
-		assert.Nil(t, err)
-		assert.False(t, isOffline)
-
-		err = db.SetServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		err = db.SetServerAssumedOffline(context.Background(), server2)
 		assert.Nil(t, err)
 
-		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
+		// Ensure both servers are assumed offline.
+		isOffline, err := db.IsServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
 		assert.Nil(t, err)
 		assert.True(t, isOffline)
 
+		// Set server1 as not assumed offline.
+		err = db.RemoveServerAssumedOffline(context.Background(), server1)
+		assert.Nil(t, err)
+
+		// Ensure both servers have correct state.
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
+		assert.Nil(t, err)
+		assert.False(t, isOffline)
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server2)
+		assert.Nil(t, err)
+		assert.True(t, isOffline)
+
+		// Re-set server1 as assumed offline.
+		err = db.SetServerAssumedOffline(context.Background(), server1)
+		assert.Nil(t, err)
+
+		// Ensure server1 is assumed offline.
+		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
+		assert.Nil(t, err)
+		assert.True(t, isOffline)
+
 		err = db.RemoveAllServersAssumedOffline(context.Background())
 		assert.Nil(t, err)
 
+		// Ensure both servers have correct state.
 		isOffline, err = db.IsServerAssumedOffline(context.Background(), server1)
 		assert.Nil(t, err)
 		assert.False(t, isOffline)
