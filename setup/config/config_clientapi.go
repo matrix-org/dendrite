@@ -85,10 +85,10 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 			c.RecaptchaApiJsUrl = "https://www.google.com/recaptcha/api.js"
 		}
 		if c.RecaptchaFormField == "" {
-			c.RecaptchaFormField = "g-recaptcha"
+			c.RecaptchaFormField = "g-recaptcha-response"
 		}
 		if c.RecaptchaSitekeyClass == "" {
-			c.RecaptchaSitekeyClass = "g-recaptcha-response"
+			c.RecaptchaSitekeyClass = "g-recaptcha"
 		}
 		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
 		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
