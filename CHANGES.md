@@ -6,6 +6,7 @@
 
 * Stale device lists are now cleaned up on startup, removing entries for users the server doesn't share a room with anymore
 * Dendrite now has its own Helm chart
+* Guest access is now handled correctly (disallow joins, kick guests on revocation of guest access, as well as over federation)
 
 ### Fixes
 
