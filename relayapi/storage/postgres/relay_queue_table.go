@@ -52,6 +52,7 @@ const deleteQueueEntriesSQL = "" +
 const selectQueueEntriesSQL = "" +
 	"SELECT json_nid FROM relayapi_queue" +
 	" WHERE server_name = $1" +
+	" ORDER BY json_nid" +
 	" LIMIT $2"
 
 const selectQueueEntryCountSQL = "" +

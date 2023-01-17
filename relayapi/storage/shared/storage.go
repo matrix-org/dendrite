@@ -109,7 +109,8 @@ func (d *Database) GetTransaction(
 	ctx context.Context,
 	userID gomatrixserverlib.UserID,
 ) (*gomatrixserverlib.Transaction, *receipt.Receipt, error) {
-	nids, err := d.RelayQueue.SelectQueueEntries(ctx, nil, userID.Domain(), 1)
+	entriesRequested := 1
+	nids, err := d.RelayQueue.SelectQueueEntries(ctx, nil, userID.Domain(), entriesRequested)
 	if err != nil {
 		return nil, nil, fmt.Errorf("d.SelectQueueEntries: %w", err)
 	}

@@ -107,6 +107,47 @@ func TestShouldRetrieveInsertedQueueTransaction(t *testing.T) {
 	})
 }
 
+func TestShouldRetrieveOldestInsertedQueueTransaction(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateQueueTable(t, dbType)
+		defer close()
+
+		transactionID := gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
+		serverName := gomatrixserverlib.ServerName("domain")
+		nid := int64(2)
+		err := db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, nid)
+		if err != nil {
+			t.Fatalf("Failed inserting transaction: %s", err.Error())
+		}
+
+		transactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
+		serverName = gomatrixserverlib.ServerName("domain")
+		oldestNID := int64(1)
+		err = db.Table.InsertQueueEntry(ctx, nil, transactionID, serverName, oldestNID)
+		if err != nil {
+			t.Fatalf("Failed inserting transaction: %s", err.Error())
+		}
+
+		retrievedNids, err := db.Table.SelectQueueEntries(ctx, nil, serverName, 1)
+		if err != nil {
+			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+		}
+
+		assert.Equal(t, oldestNID, retrievedNids[0])
+		assert.Equal(t, 1, len(retrievedNids))
+
+		retrievedNids, err = db.Table.SelectQueueEntries(ctx, nil, serverName, 10)
+		if err != nil {
+			t.Fatalf("Failed retrieving transaction: %s", err.Error())
+		}
+
+		assert.Equal(t, oldestNID, retrievedNids[0])
+		assert.Equal(t, nid, retrievedNids[1])
+		assert.Equal(t, 2, len(retrievedNids))
+	})
+}
+
 func TestShouldDeleteQueueTransaction(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
