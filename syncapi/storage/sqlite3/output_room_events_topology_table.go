@@ -61,10 +61,6 @@ const selectPositionInTopologySQL = "" +
 	"SELECT topological_position, stream_position FROM syncapi_output_room_events_topology" +
 	" WHERE event_id = $1"
 
-const selectMaxPositionInTopologySQL = "" +
-	"SELECT MAX(topological_position), stream_position FROM syncapi_output_room_events_topology" +
-	" WHERE room_id = $1 ORDER BY stream_position DESC"
-
 const selectStreamToTopologicalPositionAscSQL = "" +
 	"SELECT topological_position FROM syncapi_output_room_events_topology WHERE room_id = $1 AND stream_position >= $2 ORDER BY topological_position ASC LIMIT 1;"
 
@@ -77,7 +73,6 @@ type outputRoomEventsTopologyStatements struct {
 	selectEventIDsInRangeASCStmt              *sql.Stmt
 	selectEventIDsInRangeDESCStmt             *sql.Stmt
 	selectPositionInTopologyStmt              *sql.Stmt
-	selectMaxPositionInTopologyStmt           *sql.Stmt
 	selectStreamToTopologicalPositionAscStmt  *sql.Stmt
 	selectStreamToTopologicalPositionDescStmt *sql.Stmt
 }
@@ -100,9 +95,6 @@ func NewSqliteTopologyTable(db *sql.DB) (tables.Topology, error) {
 		return nil, err
 	}
 	if s.selectPositionInTopologyStmt, err = db.Prepare(selectPositionInTopologySQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxPositionInTopologyStmt, err = db.Prepare(selectMaxPositionInTopologySQL); err != nil {
 		return nil, err
 	}
 	if s.selectStreamToTopologicalPositionAscStmt, err = db.Prepare(selectStreamToTopologicalPositionAscSQL); err != nil {
@@ -180,13 +172,5 @@ func (s *outputRoomEventsTopologyStatements) SelectStreamToTopologicalPosition(
 	} else {
 		err = sqlutil.TxStmt(txn, s.selectStreamToTopologicalPositionAscStmt).QueryRowContext(ctx, roomID, streamPos).Scan(&topoPos)
 	}
-	return
-}
-
-func (s *outputRoomEventsTopologyStatements) SelectMaxPositionInTopology(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) (pos types.StreamPosition, spos types.StreamPosition, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMaxPositionInTopologyStmt)
-	err = stmt.QueryRowContext(ctx, roomID).Scan(&pos, &spos)
 	return
 }

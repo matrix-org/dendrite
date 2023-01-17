@@ -384,19 +384,32 @@ func applyHistoryVisibilityFilter(
 	roomID, userID string,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	// We need to make sure we always include the latest states events, if they are in the timeline.
-	// We grep at least limit * 2 events, to ensure we really get the needed events.
-	filter := gomatrixserverlib.DefaultStateFilter()
-	stateEvents, err := snapshot.CurrentState(ctx, roomID, &filter, nil)
-	if err != nil {
-		// Not a fatal error, we can continue without the stateEvents,
-		// they are only needed if there are state events in the timeline.
-		logrus.WithError(err).Warnf("Failed to get current room state for history visibility")
+	// We need to make sure we always include the latest state events, if they are in the timeline.
+	alwaysIncludeIDs := make(map[string]struct{})
+	var stateTypes []string
+	var senders []string
+	for _, ev := range recentEvents {
+		if ev.StateKey() != nil {
+			stateTypes = append(stateTypes, ev.Type())
+			senders = append(senders, ev.Sender())
+		}
 	}
-	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
-	for _, ev := range stateEvents {
-		alwaysIncludeIDs[ev.EventID()] = struct{}{}
+
+	// Only get the state again if there are state events in the timeline
+	if len(stateTypes) > 0 {
+		filter := gomatrixserverlib.DefaultStateFilter()
+		filter.Types = &stateTypes
+		filter.Senders = &senders
+		stateEvents, err := snapshot.CurrentState(ctx, roomID, &filter, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current room state for history visibility calculation: %w", err)
+		}
+
+		for _, ev := range stateEvents {
+			alwaysIncludeIDs[ev.EventID()] = struct{}{}
+		}
 	}
+
 	startTime := time.Now()
 	events, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
 	if err != nil {
