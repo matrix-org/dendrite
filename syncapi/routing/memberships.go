@@ -19,14 +19,13 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/matrix-org/util"
-
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/util"
 )
 
 type getMembershipResponse struct {
@@ -88,6 +87,7 @@ func GetMemberships(
 	if err != nil {
 		return jsonerror.InternalServerError()
 	}
+	defer db.Rollback() // nolint: errcheck
 
 	atToken, err := types.NewTopologyTokenFromString(at)
 	if err != nil {
