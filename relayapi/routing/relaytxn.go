@@ -40,25 +40,12 @@ func GetTransactionFromRelay(
 ) util.JSONResponse {
 	logrus.Infof("Handling relay_txn for %s", userID.Raw())
 
-	entryProvided := false
-	var previousEntry gomatrixserverlib.RelayEntry
+	previousEntry := gomatrixserverlib.RelayEntry{EntryID: -1}
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err == nil {
 		logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
-		entryProvided = true
 	}
 
-	request := api.QueryRelayTransactionsRequest{
-		UserID:        userID,
-		PreviousEntry: gomatrixserverlib.RelayEntry{EntryID: -1},
-	}
-	if entryProvided {
-		request.PreviousEntry = previousEntry
-	}
-	var response api.QueryRelayTransactionsResponse
-	err := relayAPI.QueryTransactions(
-		httpReq.Context(),
-		&request,
-		&response)
+	response, err := relayAPI.QueryTransactions(httpReq.Context(), userID, previousEntry)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

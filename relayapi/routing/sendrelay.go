@@ -65,12 +65,7 @@ func SendTransactionToRelay(
 
 	util.GetLogger(httpReq.Context()).Warnf("Received transaction %q from %q containing %d PDUs, %d EDUs", txnID, fedReq.Origin(), len(t.PDUs), len(t.EDUs))
 
-	req := api.PerformStoreTransactionRequest{
-		Txn:    t,
-		UserID: userID,
-	}
-	res := api.PerformStoreTransactionResponse{}
-	err := relayAPI.PerformStoreTransaction(httpReq.Context(), &req, &res)
+	err := relayAPI.PerformStoreTransaction(httpReq.Context(), t, userID)
 	if err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,

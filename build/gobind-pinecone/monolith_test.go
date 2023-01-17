@@ -142,7 +142,7 @@ type FakeRelayAPI struct {
 	relayServerAPI.RelayInternalAPI
 }
 
-func (r *FakeRelayAPI) PerformRelayServerSync(ctx context.Context, req *relayServerAPI.PerformRelayServerSyncRequest, res *relayServerAPI.PerformRelayServerSyncResponse) error {
+func (r *FakeRelayAPI) PerformRelayServerSync(ctx context.Context, userID gomatrixserverlib.UserID, relayServer gomatrixserverlib.ServerName) error {
 	return nil
 }
 

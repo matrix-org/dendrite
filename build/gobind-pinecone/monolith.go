@@ -581,12 +581,7 @@ func (m *RelayServerRetriever) queryRelayServers(relayServers []gomatrixserverli
 		if err != nil {
 			return
 		}
-		request := relayServerAPI.PerformRelayServerSyncRequest{
-			UserID:      *userID,
-			RelayServer: server,
-		}
-		response := relayServerAPI.PerformRelayServerSyncResponse{}
-		err = m.RelayAPI.PerformRelayServerSync(context.Background(), &request, &response)
+		err = m.RelayAPI.PerformRelayServerSync(context.Background(), *userID, server)
 		if err == nil {
 			func() {
 				m.queriedServersMutex.Lock()

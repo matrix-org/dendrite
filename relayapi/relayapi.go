@@ -15,11 +15,9 @@
 package relayapi
 
 import (
-	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/relayapi/internal"
-	"github.com/matrix-org/dendrite/relayapi/inthttp"
 	"github.com/matrix-org/dendrite/relayapi/routing"
 	"github.com/matrix-org/dendrite/relayapi/storage"
 	rsAPI "github.com/matrix-org/dendrite/roomserver/api"
@@ -27,12 +25,6 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 )
-
-// AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
-// on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.RelayInternalAPI, enableMetrics bool) {
-	inthttp.AddRoutes(intAPI, router, enableMetrics)
-}
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
 func AddPublicRoutes(

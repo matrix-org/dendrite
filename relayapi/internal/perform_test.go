@@ -21,7 +21,6 @@ import (
 
 	fedAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
-	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/dendrite/relayapi/storage/shared"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -76,12 +75,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "",
 	)
 
-	req := api.PerformRelayServerSyncRequest{
-		UserID:      *userID,
-		RelayServer: gomatrixserverlib.ServerName("relay"),
-	}
-	res := api.PerformRelayServerSyncResponse{}
-	err = relayAPI.PerformRelayServerSync(context.Background(), &req, &res)
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
 	assert.NoError(t, err)
 }
 
@@ -101,12 +95,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "",
 	)
 
-	req := api.PerformRelayServerSyncRequest{
-		UserID:      *userID,
-		RelayServer: gomatrixserverlib.ServerName("relay"),
-	}
-	res := api.PerformRelayServerSyncResponse{}
-	err = relayAPI.PerformRelayServerSync(context.Background(), &req, &res)
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
 	assert.Error(t, err)
 }
 
@@ -126,12 +115,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 		&db, fedClient, nil, nil, nil, false, "",
 	)
 
-	req := api.PerformRelayServerSyncRequest{
-		UserID:      *userID,
-		RelayServer: gomatrixserverlib.ServerName("relay"),
-	}
-	res := api.PerformRelayServerSyncResponse{}
-	err = relayAPI.PerformRelayServerSync(context.Background(), &req, &res)
+	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
 	assert.NoError(t, err)
 	assert.Equal(t, uint(3), fedClient.queryCount)
 }

@@ -24,56 +24,29 @@ import (
 type RelayInternalAPI interface {
 	RelayServerAPI
 
+	// Retrieve from external relay server all transactions stored for us and process them.
 	PerformRelayServerSync(
 		ctx context.Context,
-		request *PerformRelayServerSyncRequest,
-		response *PerformRelayServerSyncResponse,
+		userID gomatrixserverlib.UserID,
+		relayServer gomatrixserverlib.ServerName,
 	) error
 }
 
+// RelayServerAPI exposes the store & query transaction functionality of a relay server.
 type RelayServerAPI interface {
 	// Store transactions for forwarding to the destination at a later time.
 	PerformStoreTransaction(
 		ctx context.Context,
-		request *PerformStoreTransactionRequest,
-		response *PerformStoreTransactionResponse,
+		transaction gomatrixserverlib.Transaction,
+		userID gomatrixserverlib.UserID,
 	) error
 
 	// Obtain the oldest stored transaction for the specified userID.
 	QueryTransactions(
 		ctx context.Context,
-		request *QueryRelayTransactionsRequest,
-		response *QueryRelayTransactionsResponse,
-	) error
-}
-
-type PerformRelayServerSyncRequest struct {
-	UserID      gomatrixserverlib.UserID     `json:"user_id"`
-	RelayServer gomatrixserverlib.ServerName `json:"relay_server"`
-}
-
-type PerformRelayServerSyncResponse struct {
-}
-
-type QueryRelayServersRequest struct {
-	Server gomatrixserverlib.ServerName
-}
-
-type QueryRelayServersResponse struct {
-	RelayServers []gomatrixserverlib.ServerName
-}
-
-type PerformStoreTransactionRequest struct {
-	Txn    gomatrixserverlib.Transaction `json:"transaction"`
-	UserID gomatrixserverlib.UserID      `json:"user_id"`
-}
-
-type PerformStoreTransactionResponse struct {
-}
-
-type QueryRelayTransactionsRequest struct {
-	UserID        gomatrixserverlib.UserID     `json:"user_id"`
-	PreviousEntry gomatrixserverlib.RelayEntry `json:"prev_entry,omitempty"`
+		userID gomatrixserverlib.UserID,
+		previousEntry gomatrixserverlib.RelayEntry,
+	) (QueryRelayTransactionsResponse, error)
 }
 
 type QueryRelayTransactionsResponse struct {
