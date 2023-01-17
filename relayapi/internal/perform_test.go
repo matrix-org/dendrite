@@ -41,20 +41,20 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 	relayServer gomatrixserverlib.ServerName,
 ) (res gomatrixserverlib.RespGetRelayTransaction, err error) {
 	f.queryCount++
-	if !f.shouldFail {
-		res = gomatrixserverlib.RespGetRelayTransaction{
-			Txn:     gomatrixserverlib.Transaction{},
-			EntryID: 0,
-		}
-		if f.queueDepth > 0 {
-			res.EntriesQueued = true
-		} else {
-			res.EntriesQueued = false
-		}
-		f.queueDepth -= 1
-	} else {
-		err = fmt.Errorf("Error")
+	if f.shouldFail {
+		return res, fmt.Errorf("Error")
 	}
+
+	res = gomatrixserverlib.RespGetRelayTransaction{
+		Txn:     gomatrixserverlib.Transaction{},
+		EntryID: 0,
+	}
+	if f.queueDepth > 0 {
+		res.EntriesQueued = true
+	} else {
+		res.EntriesQueued = false
+	}
+	f.queueDepth -= 1
 
 	return
 }
