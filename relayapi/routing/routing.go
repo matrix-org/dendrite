@@ -29,11 +29,6 @@ import (
 	"github.com/matrix-org/util"
 )
 
-const (
-	SendRelayTransactionRouteName = "SendRelayTransaction"
-	GetRelayTransactionRouteName  = "GetRelayTransaction"
-)
-
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeRelayAPI). We need to have this enabled
@@ -65,7 +60,7 @@ func Setup(
 				*userID,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRelayTransactionRouteName)
+	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
 		"get_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
@@ -79,7 +74,7 @@ func Setup(
 			}
 			return GetTransactionFromRelay(httpReq, request, relayAPI, *userID)
 		},
-	)).Methods(http.MethodGet, http.MethodOptions).Name(GetRelayTransactionRouteName)
+	)).Methods(http.MethodGet, http.MethodOptions)
 }
 
 // MakeRelayAPI makes an http.Handler that checks matrix relay authentication.
