@@ -68,15 +68,15 @@ func TestCreateInvalidRelayPublicRoutesPanics(t *testing.T) {
 	})
 }
 
-func createGetRelayTxnHTTPRequest(userID string) *http.Request {
+func createGetRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, userID string) *http.Request {
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
-	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("GET", serverName, "remote", "/_matrix/federation/v1/relay_txn/"+userID)
+	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	req := gomatrixserverlib.NewFederationRequest("GET", origin, serverName, "/_matrix/federation/v1/relay_txn/"+userID)
 	content := gomatrixserverlib.RelayEntry{EntryID: 0}
 	req.SetContent(content)
-	req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
+	req.Sign(origin, gomatrixserverlib.KeyID(keyID), sk)
 	httpreq, _ := req.HTTPRequest()
 	vars := map[string]string{"userID": userID}
 	httpreq = mux.SetURLVars(httpreq, vars)
@@ -88,15 +88,15 @@ type sendRelayContent struct {
 	EDUs []gomatrixserverlib.EDU `json:"edus"`
 }
 
-func createSendRelayTxnHTTPRequest(txnID string, userID string) *http.Request {
+func createSendRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, txnID string, userID string) *http.Request {
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
-	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/_matrix/federation/v1/send_relay/"+txnID+"/"+userID)
+	origin := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+	req := gomatrixserverlib.NewFederationRequest("PUT", origin, serverName, "/_matrix/federation/v1/send_relay/"+txnID+"/"+userID)
 	content := sendRelayContent{}
 	req.SetContent(content)
-	req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
+	req.Sign(origin, gomatrixserverlib.KeyID(keyID), sk)
 	httpreq, _ := req.HTTPRequest()
 	vars := map[string]string{"userID": userID, "txnID": txnID}
 	httpreq = mux.SetURLVars(httpreq, vars)
@@ -122,22 +122,22 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 	}{
 		{
 			name:     "relay_txn invalid user id",
-			req:      createGetRelayTxnHTTPRequest("user:local"),
+			req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "user:local"),
 			wantCode: 400,
 		},
 		{
 			name:     "relay_txn valid user id",
-			req:      createGetRelayTxnHTTPRequest("@user:local"),
+			req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "@user:local"),
 			wantCode: 200,
 		},
 		{
 			name:     "send_relay invalid user id",
-			req:      createSendRelayTxnHTTPRequest("123", "user:local"),
+			req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "user:local"),
 			wantCode: 400,
 		},
 		{
 			name:     "send_relay valid user id",
-			req:      createSendRelayTxnHTTPRequest("123", "@user:local"),
+			req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
 			wantCode: 200,
 		},
 	}
