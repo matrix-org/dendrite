@@ -47,8 +47,5 @@ If a device list update goes missing, the server resyncs on the next one
 
 Leaves are present in non-gapped incremental syncs
 
-# Below test was passing for the wrong reason, failing correctly since #2858
-New federated private chats get full presence information (SYN-115)
-
 # We don't have any state to calculate m.room.guest_access when accepting invites
 Guest users can accept invites to private rooms over federation
