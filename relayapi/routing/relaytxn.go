@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -41,9 +42,19 @@ func GetTransactionFromRelay(
 	logrus.Infof("Handling relay_txn for %s", userID.Raw())
 
 	previousEntry := gomatrixserverlib.RelayEntry{}
-	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err == nil {
-		logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
+	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.BadJSON("invalid json provided"),
+		}
 	}
+	if previousEntry.EntryID < 0 {
+		return util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.BadJSON("Invalid entry id provided. Must be >= 0."),
+		}
+	}
+	logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
 
 	response, err := relayAPI.QueryTransactions(httpReq.Context(), userID, previousEntry)
 	if err != nil {

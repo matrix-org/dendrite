@@ -60,7 +60,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
+	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -71,6 +71,31 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 	count, err := db.GetTransactionCount(context.Background(), *userID)
 	assert.NoError(t, err)
 	assert.Zero(t, count)
+}
+
+func TestGetInvalidPrevEntryFails(t *testing.T) {
+	testDB := test.NewInMemoryRelayDatabase()
+	db := shared.Database{
+		Writer:         sqlutil.NewDummyWriter(),
+		RelayQueue:     testDB,
+		RelayQueueJSON: testDB,
+	}
+	httpReq := &http.Request{}
+	userID, err := gomatrixserverlib.NewUserID("@local:domain", false)
+	assert.NoError(t, err, "Invalid userID")
+
+	transaction := createTransaction()
+
+	_, err = db.StoreTransaction(context.Background(), transaction)
+	assert.NoError(t, err, "Failed to store transaction")
+
+	relayAPI := internal.NewRelayInternalAPI(
+		&db, nil, nil, nil, nil, false, "",
+	)
+
+	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
+	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
+	assert.Equal(t, http.StatusInternalServerError, response.Code)
 }
 
 func TestGetReturnsSavedTransaction(t *testing.T) {
@@ -101,7 +126,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
+	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
@@ -164,7 +189,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 		&db, nil, nil, nil, nil, false, "",
 	)
 
-	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
+	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
