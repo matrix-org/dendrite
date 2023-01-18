@@ -274,8 +274,9 @@ func (r *Inputer) processRoomEvent(
 
 	// Check if the event is allowed by its auth events. If it isn't then
 	// we consider the event to be "rejected" — it will still be persisted.
-	if rejectionErr = gomatrixserverlib.Allowed(event, &authEvents); rejectionErr != nil {
+	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
 		isRejected = true
+		rejectionErr = err
 		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
 	}
 
