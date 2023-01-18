@@ -69,6 +69,22 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			Monolithic: false, // because we need a database per component
 		})
 		cfg.Global.ServerName = "test"
+		connStr, _ := test.PrepareDBConnectionString(t, dbType)
+		cfg.FederationAPI.Database.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.KeyServer.Database.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.MSCs.Database.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.MediaAPI.Database.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.RoomServer.Database.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.SyncAPI.Database.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(connStr)
+		connStr, _ = test.PrepareDBConnectionString(t, dbType)
+		cfg.RelayAPI.Database.ConnectionString = config.DataSource(connStr)
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
@@ -82,6 +98,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 				cfg.RoomServer.Database.ConnectionString,
 				cfg.SyncAPI.Database.ConnectionString,
 				cfg.UserAPI.AccountDatabase.ConnectionString,
+				cfg.RelayAPI.Database.ConnectionString,
 			}
 			for _, fileURI := range dbFiles {
 				path := strings.TrimPrefix(string(fileURI), "file:")

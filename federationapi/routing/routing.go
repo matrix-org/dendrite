@@ -67,9 +67,11 @@ func Setup(
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) {
-	prometheus.MustRegister(
-		internal.PDUCountTotal, internal.EDUCountTotal,
-	)
+	if cfg.Matrix.Metrics.Enabled {
+		prometheus.MustRegister(
+			internal.PDUCountTotal, internal.EDUCountTotal,
+		)
+	}
 
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()

@@ -546,48 +546,53 @@ type sendContent struct {
 }
 
 func TestHandleSend(t *testing.T) {
-	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
-	defer close()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
 
-	fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-	keyMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath()
-	cfg := config.FederationAPI{
-		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: "remote",
+		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
+		keyMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath()
+		cfg := config.FederationAPI{
+			Matrix: &config.Global{
+				SigningIdentity: gomatrixserverlib.SigningIdentity{
+					ServerName: "remote",
+				},
+				Metrics: config.Metrics{
+					Enabled: false,
+				},
 			},
-		},
-	}
-	fedapi := fedAPI.NewInternalAPI(base, nil, nil, nil, nil, true)
-	serverKeyAPI := &signing.YggdrasilKeys{}
-	keyRing := serverKeyAPI.KeyRing()
-	r, ok := fedapi.(*fedInternal.FederationInternalAPI)
-	if !ok {
-		panic("This is a programming error.")
-	}
-	routing.Setup(fedMux, keyMux, nil, &cfg, nil, r, keyRing, nil, nil, nil, &base.Cfg.MSCs, nil, nil)
+		}
+		fedapi := fedAPI.NewInternalAPI(base, nil, nil, nil, nil, true)
+		serverKeyAPI := &signing.YggdrasilKeys{}
+		keyRing := serverKeyAPI.KeyRing()
+		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
+		if !ok {
+			panic("This is a programming error.")
+		}
+		routing.Setup(fedMux, keyMux, nil, &cfg, nil, r, keyRing, nil, nil, nil, &base.Cfg.MSCs, nil, nil)
 
-	handler := fedMux.Get(routing.SendRouteName).GetHandler().ServeHTTP
-	_, sk, _ := ed25519.GenerateKey(nil)
-	keyID := signing.KeyID
-	pk := sk.Public().(ed25519.PublicKey)
-	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/send/1234")
-	content := sendContent{}
-	err := req.SetContent(content)
-	if err != nil {
-		t.Fatalf("Error: %s", err.Error())
-	}
-	req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
-	httpReq, err := req.HTTPRequest()
-	if err != nil {
-		t.Fatalf("Error: %s", err.Error())
-	}
-	vars := map[string]string{"txnID": "1234"}
-	w := httptest.NewRecorder()
-	httpReq = mux.SetURLVars(httpReq, vars)
-	handler(w, httpReq)
+		handler := fedMux.Get(routing.SendRouteName).GetHandler().ServeHTTP
+		_, sk, _ := ed25519.GenerateKey(nil)
+		keyID := signing.KeyID
+		pk := sk.Public().(ed25519.PublicKey)
+		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+		req := gomatrixserverlib.NewFederationRequest("PUT", serverName, "remote", "/send/1234")
+		content := sendContent{}
+		err := req.SetContent(content)
+		if err != nil {
+			t.Fatalf("Error: %s", err.Error())
+		}
+		req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
+		httpReq, err := req.HTTPRequest()
+		if err != nil {
+			t.Fatalf("Error: %s", err.Error())
+		}
+		vars := map[string]string{"txnID": "1234"}
+		w := httptest.NewRecorder()
+		httpReq = mux.SetURLVars(httpReq, vars)
+		handler(w, httpReq)
 
-	res := w.Result()
-	assert.Equal(t, 200, res.StatusCode)
+		res := w.Result()
+		assert.Equal(t, 200, res.StatusCode)
+	})
 }

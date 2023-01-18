@@ -104,49 +104,51 @@ func createSendRelayTxnHTTPRequest(serverName gomatrixserverlib.ServerName, txnI
 }
 
 func TestCreateRelayPublicRoutes(t *testing.T) {
-	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
-	defer close()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
 
-	relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
-	assert.NotNil(t, relayAPI)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
+		assert.NotNil(t, relayAPI)
 
-	serverKeyAPI := &signing.YggdrasilKeys{}
-	keyRing := serverKeyAPI.KeyRing()
-	relayapi.AddPublicRoutes(base, keyRing, relayAPI)
+		serverKeyAPI := &signing.YggdrasilKeys{}
+		keyRing := serverKeyAPI.KeyRing()
+		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
 
-	testCases := []struct {
-		name            string
-		req             *http.Request
-		wantCode        int
-		wantJoinedRooms []string
-	}{
-		{
-			name:     "relay_txn invalid user id",
-			req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "user:local"),
-			wantCode: 400,
-		},
-		{
-			name:     "relay_txn valid user id",
-			req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "@user:local"),
-			wantCode: 200,
-		},
-		{
-			name:     "send_relay invalid user id",
-			req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "user:local"),
-			wantCode: 400,
-		},
-		{
-			name:     "send_relay valid user id",
-			req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
-			wantCode: 200,
-		},
-	}
-
-	for _, tc := range testCases {
-		w := httptest.NewRecorder()
-		base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
-		if w.Code != tc.wantCode {
-			t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+		testCases := []struct {
+			name            string
+			req             *http.Request
+			wantCode        int
+			wantJoinedRooms []string
+		}{
+			{
+				name:     "relay_txn invalid user id",
+				req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "user:local"),
+				wantCode: 400,
+			},
+			{
+				name:     "relay_txn valid user id",
+				req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "@user:local"),
+				wantCode: 200,
+			},
+			{
+				name:     "send_relay invalid user id",
+				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "user:local"),
+				wantCode: 400,
+			},
+			{
+				name:     "send_relay valid user id",
+				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
+				wantCode: 200,
+			},
 		}
-	}
+
+		for _, tc := range testCases {
+			w := httptest.NewRecorder()
+			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			if w.Code != tc.wantCode {
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+			}
+		}
+	})
 }
