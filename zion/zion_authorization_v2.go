@@ -32,15 +32,17 @@ type ZionAuthorizationV2 struct {
 	store                 Store
 	localhostSpaceFactory *localhost_space_factory.LocalhostSpaceFactory
 	localhostSpaces       map[string]*localhost_space.LocalhostSpace
-	//goerliSpaceFactory    *goerli_space_factory.LocalhostSpaceFactory
-	//goerliSpaces          map[string]*goerli_space.LocalhostSpace
+	//goerliSpaceFactory    *goerli_space_factory.GoerliSpaceFactory
+	//goerliSpaces          map[string]*goerli_space.GoerliSpace
 }
 
 func NewZionAuthorizationV2(chainId int, ethClient *ethclient.Client, store Store) (authorization.Authorization, error) {
 	za := &ZionAuthorizationV2{
-		chainId:   chainId,
-		ethClient: ethClient,
-		store:     store,
+		chainId:         chainId,
+		ethClient:       ethClient,
+		store:           store,
+		localhostSpaces: make(map[string]*localhost_space.LocalhostSpace),
+		//goerliSpaces: make(map[string]*goerli_space.GoerliSpace),
 	}
 	switch za.chainId {
 	case 1337, 31337:
@@ -94,8 +96,7 @@ func (za *ZionAuthorizationV2) IsAllowed(args authorization.AuthorizationArgs) (
 }
 
 func (za *ZionAuthorizationV2) getSpaceLocalhost(networkId string) (*localhost_space.LocalhostSpace, error) {
-	space := za.localhostSpaces[networkId]
-	if space == nil {
+	if za.localhostSpaces[networkId] == nil {
 		// convert the networkId to keccak256 spaceIdHash
 		spaceIdHash := NetworkIdToHash(networkId)
 		// then use the spaceFactory to fetch the space address
@@ -104,16 +105,16 @@ func (za *ZionAuthorizationV2) getSpaceLocalhost(networkId string) (*localhost_s
 			return nil, err
 		}
 		// cache the space for future use
-		space, err = localhost_space.NewLocalhostSpace(spaceAddress, za.ethClient)
+		space, err := localhost_space.NewLocalhostSpace(spaceAddress, za.ethClient)
 		if err != nil {
 			return nil, err
 		}
 		za.localhostSpaces[networkId] = space
 	}
-	return space, nil
+	return za.localhostSpaces[networkId], nil
 }
 
-func (za *ZionAuthorizationV2) isSpaceChannelDisabledLocalhost(roomInfo RoomInfo) (bool, error) {
+func (za *ZionAuthorizationV2) isSpaceOrChannelDisabledLocalhost(roomInfo RoomInfo) (bool, error) {
 	if za.localhostSpaceFactory == nil {
 		return false, errors.New("error fetching localhost space factory contract")
 	}
@@ -121,6 +122,10 @@ func (za *ZionAuthorizationV2) isSpaceChannelDisabledLocalhost(roomInfo RoomInfo
 	space, err := za.getSpaceLocalhost(roomInfo.SpaceNetworkId)
 	if err != nil {
 		return false, err
+	}
+	if space == nil {
+		errMsg := fmt.Sprintf("error fetching localhost space contract for %s", roomInfo.SpaceNetworkId)
+		return false, errors.New(errMsg)
 	}
 
 	switch roomInfo.ChannelNetworkId {
@@ -130,6 +135,9 @@ func (za *ZionAuthorizationV2) isSpaceChannelDisabledLocalhost(roomInfo RoomInfo
 	default:
 		channelIdHash := NetworkIdToHash(roomInfo.ChannelNetworkId)
 		channel, err := space.GetChannelByHash(nil, channelIdHash)
+		if err != nil {
+			return false, err
+		}
 		return channel.Disabled, err
 	}
 }
@@ -139,12 +147,12 @@ func (za *ZionAuthorizationV2) isAllowedLocalhost(
 	user common.Address,
 	permission authorization.Permission,
 ) (bool, error) {
-	if za.localhostSpaceFactory != nil {
+	if za.localhostSpaceFactory == nil {
 		return false, errors.New("localhost SpaceFactory is not initialised")
 	}
 
 	// check if space / channel is disabled.
-	disabled, err := za.isSpaceChannelDisabledLocalhost(roomInfo)
+	disabled, err := za.isSpaceOrChannelDisabledLocalhost(roomInfo)
 	if disabled {
 		return false, ErrSpaceDisabled
 	} else if err != nil {
