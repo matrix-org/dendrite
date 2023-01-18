@@ -347,4 +347,4 @@ ingress:
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8008
