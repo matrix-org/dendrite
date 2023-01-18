@@ -65,18 +65,25 @@ func (d *Database) AssociateTransactionWithDestinations(
 	transactionID gomatrixserverlib.TransactionID,
 	receipt *receipt.Receipt,
 ) error {
-	for destination := range destinations {
-		err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		var lastErr error
+		for destination := range destinations {
+			destination := destination
 			err := d.RelayQueue.InsertQueueEntry(
-				ctx, txn, transactionID, destination.Domain(), receipt.GetNID())
-			return err
-		})
-		if err != nil {
-			return fmt.Errorf("d.insertQueueEntry: %w", err)
+				ctx,
+				txn,
+				transactionID,
+				destination.Domain(),
+				receipt.GetNID(),
+			)
+			if err != nil {
+				lastErr = fmt.Errorf("d.insertQueueEntry: %w", err)
+			}
 		}
-	}
+		return lastErr
+	})
 
-	return nil
+	return err
 }
 
 func (d *Database) CleanTransactions(
