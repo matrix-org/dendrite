@@ -30,7 +30,9 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	userID gomatrixserverlib.UserID,
 	relayServer gomatrixserverlib.ServerName,
 ) error {
-	prevEntry := gomatrixserverlib.RelayEntry{EntryID: -1}
+	// Providing a default RelayEntry (EntryID = 0) is done to ask the relay if there are any
+	// transactions available for this node.
+	prevEntry := gomatrixserverlib.RelayEntry{}
 	asyncResponse, err := r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 	if err != nil {
 		logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
@@ -38,7 +40,9 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 	}
 	r.processTransaction(&asyncResponse.Txn)
 
+	prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
+		// There are still more entries available for this node from the relay.
 		logrus.Infof("Retrieving next entry from relay, previous: %v", prevEntry)
 		asyncResponse, err = r.fedClient.P2PGetTransactionFromRelay(ctx, userID, prevEntry, relayServer)
 		prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
@@ -82,7 +86,7 @@ func (r *RelayInternalAPI) QueryTransactions(
 	previousEntry gomatrixserverlib.RelayEntry,
 ) (api.QueryRelayTransactionsResponse, error) {
 	logrus.Infof("QueryTransactions for %s", userID.Raw())
-	if previousEntry.EntryID >= 0 {
+	if previousEntry.EntryID > 0 {
 		logrus.Infof("Cleaning previous entry (%v) from db for %s",
 			previousEntry.EntryID,
 			userID.Raw(),
@@ -109,7 +113,7 @@ func (r *RelayInternalAPI) QueryTransactions(
 		response.EntriesQueued = true
 	} else {
 		logrus.Infof("No more entries in the queue for %s", userID.Raw())
-		response.EntryID = -1
+		response.EntryID = 0
 		response.EntriesQueued = false
 	}
 

@@ -40,7 +40,7 @@ func GetTransactionFromRelay(
 ) util.JSONResponse {
 	logrus.Infof("Handling relay_txn for %s", userID.Raw())
 
-	previousEntry := gomatrixserverlib.RelayEntry{EntryID: -1}
+	previousEntry := gomatrixserverlib.RelayEntry{}
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err == nil {
 		logrus.Infof("Previous entry provided: %v", previousEntry.EntryID)
 	}
