@@ -26,7 +26,6 @@ type EthereumAuthConfig struct {
 	NetworkUrl        string `yaml:"network_url"`  // Blockchain network provider URL
 	ConfigChainID     string `yaml:"chain_id"`     // Blockchain chain ID. Env variable can replace this property.
 	ConfigEnableAuthz string `yaml:"enable_authz"` // Enable / disable authorization during development. todo: remove this flag when feature is done.
-	ContractVersion   string // todo: remove this setting when v2 migration is done.
 	chainID           int
 	enableAuthz       bool // todo: remove this flag when feature is done.
 }

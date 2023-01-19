@@ -30,7 +30,6 @@ var (
 	version                               = flag.Bool("version", false, "Shows the current version and exits immediately.")
 	enableRegistrationWithoutVerification = flag.Bool("really-enable-open-registration", false, "This allows open registration without secondary verification (reCAPTCHA). This is NOT RECOMMENDED and will SIGNIFICANTLY increase the risk that your server will be used to send spam or conduct attacks, which may result in your server being banned from rooms.")
 	enableAuthorizationChecks             = flag.Bool("enable-authz", false, "Enables authorization checks (aka space/channel gating).")
-	contractVersion                       = flag.String("contract-version", "v1", "Contract version to use. Valid values are v1 and v2. Default is v1. Remove this flag when v2 migration is done.")
 )
 
 // ParseFlags parses the commandline flags and uses them to create a config.
@@ -60,12 +59,6 @@ func ParseFlags(monolith bool) *config.Dendrite {
 	// todo: remove this flag when feature is done.
 	cfg.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz = strconv.FormatBool(*enableAuthorizationChecks)
 	logrus.Info("--enable-authz flag is set to ", *enableAuthorizationChecks)
-
-	// cmdline --contract-version. Contract version to use. Valid values are v1
-	// and v2. Default is v1.
-	// todo: Remove this flag when v2 migration is done.
-	cfg.ClientAPI.PublicKeyAuthentication.Ethereum.ContractVersion = *contractVersion
-	logrus.Info("--contract-version flag is set to ", *contractVersion)
 
 	return cfg
 }
