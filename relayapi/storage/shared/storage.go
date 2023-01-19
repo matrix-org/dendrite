@@ -98,6 +98,15 @@ func (d *Database) CleanTransactions(
 
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		deleteEntryErr := d.RelayQueue.DeleteQueueEntries(ctx, txn, userID.Domain(), nids)
+		// TODO : If there are still queue entries for any of these nids for other destinations
+		// then we shouldn't delete the json entries.
+		// But this can't happen with the current api design.
+		// There will only ever be one server entry for each nid since each call to send_relay
+		// only accepts a single server name and inside there we create a new json entry.
+		// So for multiple destinations we would call send_relay multiple times and have multiple
+		// json entries of the same transaction.
+		//
+		// TLDR; this works as expected right now but can easily be optimized in the future.
 		deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
 
 		if deleteEntryErr != nil {
