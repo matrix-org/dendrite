@@ -649,6 +649,53 @@ func (d *DatabaseTransaction) MaxStreamPositionForPresence(ctx context.Context) 
 	return d.Presence.GetMaxPresenceID(ctx, d.txn)
 }
 
+func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		if err := d.BackwardExtremities.PurgeBackwardExtremities(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge backward extremities: %w", err)
+		}
+		if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge current room state: %w", err)
+		}
+		if err := d.Invites.PurgeInvites(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge invites: %w", err)
+		}
+		if err := d.Memberships.PurgeMemberships(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge memberships: %w", err)
+		}
+		if err := d.NotificationData.PurgeNotificationData(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge notification data: %w", err)
+		}
+		if err := d.OutputEvents.PurgeEvents(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge events: %w", err)
+		}
+		if err := d.Topology.PurgeEventsTopology(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge events topology: %w", err)
+		}
+		if err := d.Peeks.PurgePeeks(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge peeks: %w", err)
+		}
+		if err := d.Receipts.PurgeReceipts(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("failed to purge receipts: %w", err)
+		}
+		return nil
+	})
+}
+
+func (d *Database) PurgeRoomState(
+	ctx context.Context, roomID string,
+) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		// If the event is a create event then we'll delete all of the existing
+		// data for the room. The only reason that a create event would be replayed
+		// to us in this way is if we're about to receive the entire room state.
+		if err := d.CurrentRoomState.DeleteRoomStateForRoom(ctx, txn, roomID); err != nil {
+			return fmt.Errorf("d.CurrentRoomState.DeleteRoomStateForRoom: %w", err)
+		}
+		return nil
+	})
+}
+
 func (d *DatabaseTransaction) MaxStreamPositionForRelations(ctx context.Context) (types.StreamPosition, error) {
 	id, err := d.Relations.SelectMaxRelationID(ctx, d.txn)
 	return types.StreamPosition(id), err
