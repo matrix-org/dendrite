@@ -54,6 +54,7 @@ func main() {
 		} else {
 			cfg.Global.DatabaseOptions.ConnectionString = uri
 		}
+		cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
 		cfg.Logging = []config.LogrusHook{
 			{
 				Type:  "file",
