@@ -482,3 +482,7 @@ func (d *InMemoryFederationDatabase) GetNotaryKeys(ctx context.Context, serverNa
 func (d *InMemoryFederationDatabase) DeleteExpiredEDUs(ctx context.Context) error {
 	return nil
 }
+
+func (d *InMemoryFederationDatabase) PurgeRoom(ctx context.Context, roomID string) error {
+	return nil
+}
