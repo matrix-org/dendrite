@@ -419,14 +419,19 @@ func (oq *destinationQueue) nextTransaction(
 		if userErr != nil {
 			return userErr, sendMethod
 		}
+
+		// Attempt sending to each known relay server.
 		for _, relayServer := range relayServers {
 			_, relayErr := oq.client.P2PSendTransactionToRelay(ctx, *userID, t, relayServer)
 			if relayErr != nil {
 				err = relayErr
 			} else {
+				// If sending to one of the relay servers succeeds, consider the send successful.
 				relaySuccess = true
 			}
 		}
+
+		// Clear the error if sending to any of the relay servers succeeded.
 		if relaySuccess {
 			err = nil
 		}
