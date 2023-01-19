@@ -55,9 +55,16 @@ type Database interface {
 	RemoveAllServersFromBlacklist() error
 	IsServerBlacklisted(serverName gomatrixserverlib.ServerName) (bool, error)
 
+	// Adds the server to the list of assumed offline servers.
+	// If the server already exists in the table, nothing happens and returns success.
 	SetServerAssumedOffline(ctx context.Context, serverName gomatrixserverlib.ServerName) error
+	// Removes the server from the list of assumed offline servers.
+	// If the server doesn't exist in the table, nothing happens and returns success.
 	RemoveServerAssumedOffline(ctx context.Context, serverName gomatrixserverlib.ServerName) error
+	// Purges all entries from the assumed offline table.
 	RemoveAllServersAssumedOffline(ctx context.Context) error
+	// Gets whether the provided server is present in the table.
+	// If it is present, returns true. If not, returns false.
 	IsServerAssumedOffline(ctx context.Context, serverName gomatrixserverlib.ServerName) (bool, error)
 
 	AddOutboundPeek(ctx context.Context, serverName gomatrixserverlib.ServerName, roomID, peekID string, renewalInterval int64) error
