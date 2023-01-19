@@ -72,6 +72,9 @@ SELECT event_id FROM
 		 	AND ($4 IS NULL OR t.membership <> $4)
 `
 
+const purgeMembershipsSQL = "" +
+	"DELETE FROM syncapi_memberships WHERE room_id = $1"
+
 type membershipsStatements struct {
 	db                        *sql.DB
 	upsertMembershipStmt      *sql.Stmt
@@ -79,6 +82,7 @@ type membershipsStatements struct {
 	//selectHeroesStmt          *sql.Stmt - prepared at runtime due to variadic
 	selectMembershipForUserStmt *sql.Stmt
 	selectMembersStmt           *sql.Stmt
+	purgeMembershipsStmt        *sql.Stmt
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -94,6 +98,7 @@ func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
 		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
 		{&s.selectMembersStmt, selectMembersSQL},
+		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
 	}.Prepare(db)
 }
 
@@ -140,6 +145,13 @@ func (s *membershipsStatements) SelectMembershipForUser(
 		return "", 0, err
 	}
 	return membership, topologyPos, nil
+}
+
+func (s *membershipsStatements) PurgeMemberships(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomID)
+	return err
 }
 
 func (s *membershipsStatements) SelectMemberships(

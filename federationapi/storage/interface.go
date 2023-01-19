@@ -77,6 +77,8 @@ type Database interface {
 	GetNotaryKeys(ctx context.Context, serverName gomatrixserverlib.ServerName, optKeyIDs []gomatrixserverlib.KeyID) ([]gomatrixserverlib.ServerKeys, error)
 	// DeleteExpiredEDUs cleans up expired EDUs
 	DeleteExpiredEDUs(ctx context.Context) error
+
+	PurgeRoom(ctx context.Context, roomID string) error
 }
 
 type P2PDatabase interface {

@@ -45,8 +45,8 @@ spec:
         persistentVolumeClaim:
           claimName: {{ default (print ( include "dendrite.fullname" . ) "-search-pvc") $.Values.persistence.search.existingClaim | quote }}
       containers:
-      - name: {{ $.Chart.Name }}
-        {{- include "image.name" $.Values.image | nindent 8 }}
+      - name: {{ .Chart.Name }}
+        {{- include "image.name" . | nindent 8 }}
         args:
           - '--config'
           - '/etc/dendrite/dendrite.yaml'

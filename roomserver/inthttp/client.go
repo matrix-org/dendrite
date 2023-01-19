@@ -40,6 +40,7 @@ const (
 	RoomserverPerformAdminEvacuateRoomPath  = "/roomserver/performAdminEvacuateRoom"
 	RoomserverPerformAdminEvacuateUserPath  = "/roomserver/performAdminEvacuateUser"
 	RoomserverPerformAdminDownloadStatePath = "/roomserver/performAdminDownloadState"
+	RoomserverPerformAdminPurgeRoomPath     = "/roomserver/performAdminPurgeRoom"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -281,6 +282,17 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateUser(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformAdminEvacuateUser", h.roomserverURL+RoomserverPerformAdminEvacuateUserPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpRoomserverInternalAPI) PerformAdminPurgeRoom(
+	ctx context.Context,
+	request *api.PerformAdminPurgeRoomRequest,
+	response *api.PerformAdminPurgeRoomResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformAdminPurgeRoom", h.roomserverURL+RoomserverPerformAdminPurgeRoomPath,
 		h.httpClient, ctx, request, response,
 	)
 }
