@@ -371,7 +371,7 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		terr, relaySuccess := oq.nextTransaction(toSendPDUs, toSendEDUs)
+		terr, sendMethod := oq.nextTransaction(toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			_, blacklisted := oq.statistics.Failure()
@@ -388,7 +388,7 @@ func (oq *destinationQueue) backgroundSend() {
 				return
 			}
 		} else {
-			oq.handleTransactionSuccess(pduCount, eduCount, relaySuccess)
+			oq.handleTransactionSuccess(pduCount, eduCount, sendMethod)
 		}
 	}
 }
