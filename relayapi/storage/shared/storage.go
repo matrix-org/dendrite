@@ -106,7 +106,7 @@ func (d *Database) CleanTransactions(
 		// So for multiple destinations we would call send_relay multiple times and have multiple
 		// json entries of the same transaction.
 		//
-		// TLDR; this works as expected right now but can easily be optimized in the future.
+		// TLDR; this works as expected right now but can easily be optimised in the future.
 		deleteJSONErr := d.RelayQueueJSON.DeleteQueueJSON(ctx, txn, nids)
 
 		if deleteEntryErr != nil {
