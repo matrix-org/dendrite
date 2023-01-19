@@ -31,17 +31,17 @@ import (
 func (d *Database) AssociatePDUWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.ServerName]struct{},
-	receipt *receipt.Receipt,
+	dbReceipt *receipt.Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueuePDUs.InsertQueuePDU(
-				ctx,              // context
-				txn,              // SQL transaction
-				"",               // transaction ID
-				destination,      // destination server name
-				receipt.GetNID(), // NID from the federationapi_queue_json table
+				ctx,                // context
+				txn,                // SQL transaction
+				"",                 // transaction ID
+				destination,        // destination server name
+				dbReceipt.GetNID(), // NID from the federationapi_queue_json table
 			)
 		}
 		return err

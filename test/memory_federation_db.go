@@ -97,9 +97,9 @@ func (d *InMemoryFederationDatabase) GetPendingPDUs(
 	pduCount := 0
 	pdus = make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent)
 	if receipts, ok := d.associatedPDUs[serverName]; ok {
-		for nid := range receipts {
-			if event, ok := d.pendingPDUs[nid]; ok {
-				pdus[nid] = event
+		for dbReceipt := range receipts {
+			if event, ok := d.pendingPDUs[dbReceipt]; ok {
+				pdus[dbReceipt] = event
 				pduCount++
 				if pduCount == limit {
 					break
@@ -121,9 +121,9 @@ func (d *InMemoryFederationDatabase) GetPendingEDUs(
 	eduCount := 0
 	edus = make(map[*receipt.Receipt]*gomatrixserverlib.EDU)
 	if receipts, ok := d.associatedEDUs[serverName]; ok {
-		for nid := range receipts {
-			if event, ok := d.pendingEDUs[nid]; ok {
-				edus[nid] = event
+		for dbReceipt := range receipts {
+			if event, ok := d.pendingEDUs[dbReceipt]; ok {
+				edus[dbReceipt] = event
 				eduCount++
 				if eduCount == limit {
 					break
@@ -137,17 +137,17 @@ func (d *InMemoryFederationDatabase) GetPendingEDUs(
 func (d *InMemoryFederationDatabase) AssociatePDUWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.ServerName]struct{},
-	nid *receipt.Receipt,
+	dbReceipt *receipt.Receipt,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	if _, ok := d.pendingPDUs[nid]; ok {
+	if _, ok := d.pendingPDUs[dbReceipt]; ok {
 		for destination := range destinations {
 			if _, ok := d.associatedPDUs[destination]; !ok {
 				d.associatedPDUs[destination] = make(map[*receipt.Receipt]struct{})
 			}
-			d.associatedPDUs[destination][nid] = struct{}{}
+			d.associatedPDUs[destination][dbReceipt] = struct{}{}
 		}
 
 		return nil
@@ -159,19 +159,19 @@ func (d *InMemoryFederationDatabase) AssociatePDUWithDestinations(
 func (d *InMemoryFederationDatabase) AssociateEDUWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.ServerName]struct{},
-	nid *receipt.Receipt,
+	dbReceipt *receipt.Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
 ) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	if _, ok := d.pendingEDUs[nid]; ok {
+	if _, ok := d.pendingEDUs[dbReceipt]; ok {
 		for destination := range destinations {
 			if _, ok := d.associatedEDUs[destination]; !ok {
 				d.associatedEDUs[destination] = make(map[*receipt.Receipt]struct{})
 			}
-			d.associatedEDUs[destination][nid] = struct{}{}
+			d.associatedEDUs[destination][dbReceipt] = struct{}{}
 		}
 
 		return nil
@@ -189,8 +189,8 @@ func (d *InMemoryFederationDatabase) CleanPDUs(
 	defer d.dbMutex.Unlock()
 
 	if pdus, ok := d.associatedPDUs[serverName]; ok {
-		for _, nid := range receipts {
-			delete(pdus, nid)
+		for _, dbReceipt := range receipts {
+			delete(pdus, dbReceipt)
 		}
 	}
 
@@ -206,8 +206,8 @@ func (d *InMemoryFederationDatabase) CleanEDUs(
 	defer d.dbMutex.Unlock()
 
 	if edus, ok := d.associatedEDUs[serverName]; ok {
-		for _, nid := range receipts {
-			delete(edus, nid)
+		for _, dbReceipt := range receipts {
+			delete(edus, dbReceipt)
 		}
 	}
 

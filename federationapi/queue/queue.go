@@ -138,13 +138,13 @@ func NewOutgoingQueues(
 }
 
 type queuedPDU struct {
-	receipt *receipt.Receipt
-	pdu     *gomatrixserverlib.HeaderedEvent
+	dbReceipt *receipt.Receipt
+	pdu       *gomatrixserverlib.HeaderedEvent
 }
 
 type queuedEDU struct {
-	receipt *receipt.Receipt
-	edu     *gomatrixserverlib.EDU
+	dbReceipt *receipt.Receipt
+	edu       *gomatrixserverlib.EDU
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {

@@ -55,15 +55,15 @@ func (d *Database) StoreTransaction(
 		return nil, fmt.Errorf("d.insertQueueJSON: %w", err)
 	}
 
-	receipt := receipt.NewReceipt(nid)
-	return &receipt, nil
+	newReceipt := receipt.NewReceipt(nid)
+	return &newReceipt, nil
 }
 
 func (d *Database) AssociateTransactionWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.UserID]struct{},
 	transactionID gomatrixserverlib.TransactionID,
-	receipt *receipt.Receipt,
+	dbReceipt *receipt.Receipt,
 ) error {
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var lastErr error
@@ -74,7 +74,7 @@ func (d *Database) AssociateTransactionWithDestinations(
 				txn,
 				transactionID,
 				destination.Domain(),
-				receipt.GetNID(),
+				dbReceipt.GetNID(),
 			)
 			if err != nil {
 				lastErr = fmt.Errorf("d.insertQueueEntry: %w", err)
@@ -92,8 +92,8 @@ func (d *Database) CleanTransactions(
 	receipts []*receipt.Receipt,
 ) error {
 	nids := make([]int64, len(receipts))
-	for i, receipt := range receipts {
-		nids[i] = receipt.GetNID()
+	for i, dbReceipt := range receipts {
+		nids[i] = dbReceipt.GetNID()
 	}
 
 	err := d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
@@ -145,8 +145,8 @@ func (d *Database) GetTransaction(
 		return nil, nil, fmt.Errorf("Unmarshal transaction: %w", err)
 	}
 
-	receipt := receipt.NewReceipt(firstNID)
-	return transaction, &receipt, nil
+	newReceipt := receipt.NewReceipt(firstNID)
+	return transaction, &newReceipt, nil
 }
 
 func (d *Database) GetTransactionCount(

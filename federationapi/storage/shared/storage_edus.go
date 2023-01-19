@@ -42,7 +42,7 @@ var defaultExpireEDUTypes = map[string]time.Duration{
 func (d *Database) AssociateEDUWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.ServerName]struct{},
-	receipt *receipt.Receipt,
+	dbReceipt *receipt.Receipt,
 	eduType string,
 	expireEDUTypes map[string]time.Duration,
 ) error {
@@ -63,12 +63,12 @@ func (d *Database) AssociateEDUWithDestinations(
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueueEDUs.InsertQueueEDU(
-				ctx,              // context
-				txn,              // SQL transaction
-				eduType,          // EDU type for coalescing
-				destination,      // destination server name
-				receipt.GetNID(), // NID from the federationapi_queue_json table
-				expiresAt,        // The timestamp this EDU will expire
+				ctx,                // context
+				txn,                // SQL transaction
+				eduType,            // EDU type for coalescing
+				destination,        // destination server name
+				dbReceipt.GetNID(), // NID from the federationapi_queue_json table
+				expiresAt,          // The timestamp this EDU will expire
 			)
 		}
 		return err

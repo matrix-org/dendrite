@@ -70,7 +70,7 @@ type destinationQueue struct {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, nid *receipt.Receipt) {
+func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, dbReceipt *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
@@ -84,8 +84,8 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, ni
 		oq.pendingMutex.Lock()
 		if len(oq.pendingPDUs) < maxPDUsInMemory {
 			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:     event,
-				receipt: nid,
+				pdu:          event,
+				eventReceipt: dbReceipt,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -101,7 +101,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, ni
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, nid *receipt.Receipt) {
+func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *receipt.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
@@ -115,8 +115,8 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, nid *receipt.R
 		oq.pendingMutex.Lock()
 		if len(oq.pendingEDUs) < maxEDUsInMemory {
 			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:     event,
-				receipt: nid,
+				edu:          event,
+				eventReceipt: dbReceipt,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -210,10 +210,10 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 	gotPDUs := map[string]struct{}{}
 	gotEDUs := map[string]struct{}{}
 	for _, pdu := range oq.pendingPDUs {
-		gotPDUs[pdu.receipt.String()] = struct{}{}
+		gotPDUs[pdu.eventReceipt.String()] = struct{}{}
 	}
 	for _, edu := range oq.pendingEDUs {
-		gotEDUs[edu.receipt.String()] = struct{}{}
+		gotEDUs[edu.eventReceipt.String()] = struct{}{}
 	}
 
 	overflowed := false
@@ -518,7 +518,7 @@ func (oq *destinationQueue) createTransaction(
 		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
-		pduReceipts = append(pduReceipts, pdu.receipt)
+		pduReceipts = append(pduReceipts, pdu.eventReceipt)
 	}
 
 	// Do the same for pending EDUS in the queue.
@@ -528,7 +528,7 @@ func (oq *destinationQueue) createTransaction(
 			continue
 		}
 		t.EDUs = append(t.EDUs, *edu.edu)
-		eduReceipts = append(eduReceipts, edu.receipt)
+		eduReceipts = append(eduReceipts, edu.eventReceipt)
 	}
 
 	return t, pduReceipts, eduReceipts
