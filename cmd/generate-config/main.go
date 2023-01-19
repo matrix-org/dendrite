@@ -54,6 +54,9 @@ func main() {
 		} else {
 			cfg.Global.DatabaseOptions.ConnectionString = uri
 		}
+		cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
+		cfg.Global.JetStream.StoragePath = config.Path(*dirPath)
+		cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(*dirPath, "searchindex"))
 		cfg.Logging = []config.LogrusHook{
 			{
 				Type:  "file",
