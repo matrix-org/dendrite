@@ -15,8 +15,10 @@
 
 
 {{- define "image.name" -}}
-image: {{ .name }}
+{{- with .Values.image -}}
+image: {{ .repository }}:{{ .tag | default (printf "v%s" $.Chart.AppVersion) }}
 imagePullPolicy: {{ .pullPolicy }}
+{{- end -}}
 {{- end -}}
 
 {{/*

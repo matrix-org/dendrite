@@ -1,8 +1,10 @@
 image:
   # -- Docker repository/image to use
-  name: "ghcr.io/matrix-org/dendrite-monolith:v0.10.8"
+  repository: "ghcr.io/matrix-org/dendrite-monolith"
   # -- Kubernetes pullPolicy
   pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
 
 
 # signing key to use
@@ -345,4 +347,4 @@ ingress:
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8008

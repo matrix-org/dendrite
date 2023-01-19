@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -92,8 +94,61 @@ func (d *DatabaseTransaction) MembershipCount(ctx context.Context, roomID, membe
 	return d.Memberships.SelectMembershipCount(ctx, d.txn, roomID, membership, pos)
 }
 
-func (d *DatabaseTransaction) GetRoomHeroes(ctx context.Context, roomID, userID string, memberships []string) ([]string, error) {
-	return d.Memberships.SelectHeroes(ctx, d.txn, roomID, userID, memberships)
+func (d *DatabaseTransaction) GetRoomSummary(ctx context.Context, roomID, userID string) (*types.Summary, error) {
+	summary := &types.Summary{Heroes: []string{}}
+
+	joinCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, gomatrixserverlib.Join)
+	if err != nil {
+		return summary, err
+	}
+	inviteCount, err := d.CurrentRoomState.SelectMembershipCount(ctx, d.txn, roomID, gomatrixserverlib.Invite)
+	if err != nil {
+		return summary, err
+	}
+	summary.InvitedMemberCount = &inviteCount
+	summary.JoinedMemberCount = &joinCount
+
+	// Get the room name and canonical alias, if any
+	filter := gomatrixserverlib.DefaultStateFilter()
+	filterTypes := []string{gomatrixserverlib.MRoomName, gomatrixserverlib.MRoomCanonicalAlias}
+	filterRooms := []string{roomID}
+
+	filter.Types = &filterTypes
+	filter.Rooms = &filterRooms
+	evs, err := d.CurrentRoomState.SelectCurrentState(ctx, d.txn, roomID, &filter, nil)
+	if err != nil {
+		return summary, err
+	}
+
+	for _, ev := range evs {
+		switch ev.Type() {
+		case gomatrixserverlib.MRoomName:
+			if gjson.GetBytes(ev.Content(), "name").Str != "" {
+				return summary, nil
+			}
+		case gomatrixserverlib.MRoomCanonicalAlias:
+			if gjson.GetBytes(ev.Content(), "alias").Str != "" {
+				return summary, nil
+			}
+		}
+	}
+
+	// If there's no room name or canonical alias, get the room heroes, excluding the user
+	heroes, err := d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{gomatrixserverlib.Join, gomatrixserverlib.Invite})
+	if err != nil {
+		return summary, err
+	}
+
+	// "When no joined or invited members are available, this should consist of the banned and left users"
+	if len(heroes) == 0 {
+		heroes, err = d.CurrentRoomState.SelectRoomHeroes(ctx, d.txn, roomID, userID, []string{gomatrixserverlib.Leave, gomatrixserverlib.Ban})
+		if err != nil {
+			return summary, err
+		}
+	}
+	summary.Heroes = heroes
+
+	return summary, nil
 }
 
 func (d *DatabaseTransaction) RecentEvents(ctx context.Context, roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) ([]types.StreamEvent, bool, error) {
@@ -215,16 +270,6 @@ func (d *DatabaseTransaction) BackwardExtremitiesForRoom(
 	return d.BackwardExtremities.SelectBackwardExtremitiesForRoom(ctx, d.txn, roomID)
 }
 
-func (d *DatabaseTransaction) MaxTopologicalPosition(
-	ctx context.Context, roomID string,
-) (types.TopologyToken, error) {
-	depth, streamPos, err := d.Topology.SelectMaxPositionInTopology(ctx, d.txn, roomID)
-	if err != nil {
-		return types.TopologyToken{}, err
-	}
-	return types.TopologyToken{Depth: depth, PDUPosition: streamPos}, nil
-}
-
 func (d *DatabaseTransaction) EventPositionInTopology(
 	ctx context.Context, eventID string,
 ) (types.TopologyToken, error) {
@@ -243,11 +288,7 @@ func (d *DatabaseTransaction) StreamToTopologicalPosition(
 	case err == sql.ErrNoRows && backwardOrdering: // no events in range, going backward
 		return types.TopologyToken{PDUPosition: streamPos}, nil
 	case err == sql.ErrNoRows && !backwardOrdering: // no events in range, going forward
-		topoPos, streamPos, err = d.Topology.SelectMaxPositionInTopology(ctx, d.txn, roomID)
-		if err != nil {
-			return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectMaxPositionInTopology: %w", err)
-		}
-		return types.TopologyToken{Depth: topoPos, PDUPosition: streamPos}, nil
+		return types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}, nil
 	case err != nil: // some other error happened
 		return types.TopologyToken{}, fmt.Errorf("d.Topology.SelectStreamToTopologicalPosition: %w", err)
 	default:
