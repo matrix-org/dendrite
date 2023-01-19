@@ -14,7 +14,7 @@ func NewRoomserverAuthorization(cfg *config.ClientAPI, roomQueryAPI roomserver.Q
 		auth, err := zion.NewZionAuthorization(cfg, roomQueryAPI)
 
 		if err != nil {
-			log.Errorln("Failed to initialise Zion authorization manager. Using default.", err)
+			log.Errorf("failed to initialise Zion authorization manager, using default. Error: %v", err)
 		} else {
 			return auth
 		}
