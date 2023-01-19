@@ -84,8 +84,8 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, db
 		oq.pendingMutex.Lock()
 		if len(oq.pendingPDUs) < maxPDUsInMemory {
 			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:          event,
-				eventReceipt: dbReceipt,
+				pdu:       event,
+				dbReceipt: dbReceipt,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -115,8 +115,8 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *rec
 		oq.pendingMutex.Lock()
 		if len(oq.pendingEDUs) < maxEDUsInMemory {
 			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:          event,
-				eventReceipt: dbReceipt,
+				edu:       event,
+				dbReceipt: dbReceipt,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -210,10 +210,10 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 	gotPDUs := map[string]struct{}{}
 	gotEDUs := map[string]struct{}{}
 	for _, pdu := range oq.pendingPDUs {
-		gotPDUs[pdu.eventReceipt.String()] = struct{}{}
+		gotPDUs[pdu.dbReceipt.String()] = struct{}{}
 	}
 	for _, edu := range oq.pendingEDUs {
-		gotEDUs[edu.eventReceipt.String()] = struct{}{}
+		gotEDUs[edu.dbReceipt.String()] = struct{}{}
 	}
 
 	overflowed := false
@@ -518,7 +518,7 @@ func (oq *destinationQueue) createTransaction(
 		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
-		pduReceipts = append(pduReceipts, pdu.eventReceipt)
+		pduReceipts = append(pduReceipts, pdu.dbReceipt)
 	}
 
 	// Do the same for pending EDUS in the queue.
@@ -528,7 +528,7 @@ func (oq *destinationQueue) createTransaction(
 			continue
 		}
 		t.EDUs = append(t.EDUs, *edu.edu)
-		eduReceipts = append(eduReceipts, edu.eventReceipt)
+		eduReceipts = append(eduReceipts, edu.dbReceipt)
 	}
 
 	return t, pduReceipts, eduReceipts
