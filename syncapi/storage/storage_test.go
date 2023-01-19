@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -199,10 +200,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 		_ = MustWriteEvents(t, db, events)
 
 		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
-			from, err := snapshot.MaxTopologicalPosition(ctx, r.ID)
-			if err != nil {
-				t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
-			}
+			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 			t.Logf("max topo pos = %+v", from)
 			// head towards the beginning of time
 			to := types.TopologyToken{}
@@ -216,6 +214,88 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			gots := snapshot.StreamEventsToEvents(nil, paginatedEvents)
 			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
 		})
+	})
+}
+
+func TestStreamToTopologicalPosition(t *testing.T) {
+	alice := test.NewUser(t)
+	r := test.NewRoom(t, alice)
+
+	testCases := []struct {
+		name             string
+		roomID           string
+		streamPos        types.StreamPosition
+		backwardOrdering bool
+		wantToken        types.TopologyToken
+	}{
+		{
+			name:             "forward ordering found streamPos returns found position",
+			roomID:           r.ID,
+			streamPos:        1,
+			backwardOrdering: false,
+			wantToken:        types.TopologyToken{Depth: 1, PDUPosition: 1},
+		},
+		{
+			name:             "forward ordering not found streamPos returns max position",
+			roomID:           r.ID,
+			streamPos:        100,
+			backwardOrdering: false,
+			wantToken:        types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64},
+		},
+		{
+			name:             "backward ordering found streamPos returns found position",
+			roomID:           r.ID,
+			streamPos:        1,
+			backwardOrdering: true,
+			wantToken:        types.TopologyToken{Depth: 1, PDUPosition: 1},
+		},
+		{
+			name:             "backward ordering not found streamPos returns maxDepth with param pduPosition",
+			roomID:           r.ID,
+			streamPos:        100,
+			backwardOrdering: true,
+			wantToken:        types.TopologyToken{Depth: 5, PDUPosition: 100},
+		},
+		{
+			name:             "backward non-existent room returns zero token",
+			roomID:           "!doesnotexist:localhost",
+			streamPos:        1,
+			backwardOrdering: true,
+			wantToken:        types.TopologyToken{Depth: 0, PDUPosition: 1},
+		},
+		{
+			name:             "forward non-existent room returns max token",
+			roomID:           "!doesnotexist:localhost",
+			streamPos:        1,
+			backwardOrdering: false,
+			wantToken:        types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		defer close()
+		defer closeBase()
+
+		txn, err := db.NewDatabaseTransaction(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer txn.Rollback()
+		MustWriteEvents(t, db, r.Events())
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				token, err := txn.StreamToTopologicalPosition(ctx, tc.roomID, tc.streamPos, tc.backwardOrdering)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.wantToken != token {
+					t.Fatalf("expected token %q, got %q", tc.wantToken, token)
+				}
+			})
+		}
+
 	})
 }
 

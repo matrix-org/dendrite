@@ -84,8 +84,6 @@ type DatabaseTransaction interface {
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
 	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
 	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities map[string][]string, err error)
-	// MaxTopologicalPosition returns the highest topological position for a given room.
-	MaxTopologicalPosition(ctx context.Context, roomID string) (types.TopologyToken, error)
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
