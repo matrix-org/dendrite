@@ -82,8 +82,19 @@ type Database interface {
 }
 
 type P2PDatabase interface {
+	// Stores the given list of servers as relay servers for the provided destination server.
+	// Providing duplicates will only lead to a single entry and won't lead to an error.
 	P2PAddRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+
+	// Get the list of relay servers associated with the provided destination server.
+	// If no entry exists in the table, an empty list is returned and does not result in an error.
 	P2PGetRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName) ([]gomatrixserverlib.ServerName, error)
+
+	// Deletes any entries for the provided destination server that match the provided relayServers list.
+	// If any of the provided servers don't match an entry, nothing happens and no error is returned.
 	P2PRemoveRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error
+
+	// Deletes all entries for the provided destination server.
+	// If the destination server doesn't exist in the table, nothing happens and no error is returned.
 	P2PRemoveAllRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName) error
 }

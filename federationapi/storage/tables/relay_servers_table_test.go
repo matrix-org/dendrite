@@ -92,6 +92,54 @@ func TestShouldInsertRelayServers(t *testing.T) {
 	})
 }
 
+func TestShouldInsertRelayServersWithDuplicates(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateRelayServersTable(t, dbType)
+		defer close()
+		insertRelayServers := []gomatrixserverlib.ServerName{server2, server2, server2, server3, server2}
+		expectedRelayServers := []gomatrixserverlib.ServerName{server2, server3}
+
+		err := db.Table.InsertRelayServers(ctx, nil, server1, insertRelayServers)
+		if err != nil {
+			t.Fatalf("Failed inserting transaction: %s", err.Error())
+		}
+
+		// Insert the same list again, this shouldn't fail and should have no effect.
+		err = db.Table.InsertRelayServers(ctx, nil, server1, insertRelayServers)
+		if err != nil {
+			t.Fatalf("Failed inserting transaction: %s", err.Error())
+		}
+
+		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		if err != nil {
+			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
+		}
+
+		if !Equal(relayServers, expectedRelayServers) {
+			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers, relayServers)
+		}
+	})
+}
+
+func TestShouldGetRelayServersUnknownDestination(t *testing.T) {
+	ctx := context.Background()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close := mustCreateRelayServersTable(t, dbType)
+		defer close()
+
+		// Query relay servers for a destination that doesn't exist in the table.
+		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
+		if err != nil {
+			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
+		}
+
+		if !Equal(relayServers, []gomatrixserverlib.ServerName{}) {
+			t.Fatalf("Expected: %v \nActual: %v", []gomatrixserverlib.ServerName{}, relayServers)
+		}
+	})
+}
+
 func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 	ctx := context.Background()
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
@@ -118,20 +166,20 @@ func TestShouldDeleteCorrectRelayServers(t *testing.T) {
 			t.Fatalf("Failed deleting relay servers for %s: %s", server2, err.Error())
 		}
 
-		updatedExpectedRelayServers := []gomatrixserverlib.ServerName{server3}
+		expectedRelayServers := []gomatrixserverlib.ServerName{server3}
 		relayServers, err := db.Table.SelectRelayServers(ctx, nil, server1)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
-		if !Equal(relayServers, updatedExpectedRelayServers) {
-			t.Fatalf("Expected: %v \nActual: %v", updatedExpectedRelayServers, relayServers)
+		if !Equal(relayServers, expectedRelayServers) {
+			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers, relayServers)
 		}
 		relayServers, err = db.Table.SelectRelayServers(ctx, nil, server2)
 		if err != nil {
 			t.Fatalf("Failed retrieving relay servers for %s: %s", relayServers, err.Error())
 		}
-		if !Equal(relayServers, updatedExpectedRelayServers) {
-			t.Fatalf("Expected: %v \nActual: %v", updatedExpectedRelayServers, relayServers)
+		if !Equal(relayServers, expectedRelayServers) {
+			t.Fatalf("Expected: %v \nActual: %v", expectedRelayServers, relayServers)
 		}
 	})
 }
