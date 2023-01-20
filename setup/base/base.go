@@ -264,6 +264,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 
 // Close implements io.Closer
 func (b *BaseDendrite) Close() error {
+	b.ProcessContext.ShutdownDendrite()
+	b.ProcessContext.WaitForShutdown()
 	return b.tracerCloser.Close()
 }
 

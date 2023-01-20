@@ -32,6 +32,7 @@ import (
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -49,8 +50,7 @@ import (
 // applied:
 // nolint: gocyclo
 func Setup(
-	fedMux, keyMux, wkMux *mux.Router,
-	cfg *config.FederationAPI,
+	base *base.BaseDendrite,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI *fedInternal.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
@@ -61,9 +61,16 @@ func Setup(
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) {
-	prometheus.MustRegister(
-		pduCountTotal, eduCountTotal,
-	)
+	fedMux := base.PublicFederationAPIMux
+	keyMux := base.PublicKeyAPIMux
+	wkMux := base.PublicWellKnownAPIMux
+	cfg := &base.Cfg.FederationAPI
+
+	if base.EnableMetrics {
+		prometheus.MustRegister(
+			pduCountTotal, eduCountTotal,
+		)
+	}
 
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()

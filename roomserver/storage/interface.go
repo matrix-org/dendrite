@@ -173,5 +173,6 @@ type Database interface {
 
 	GetHistoryVisibilityState(ctx context.Context, roomInfo *types.RoomInfo, eventID string, domain string) ([]*gomatrixserverlib.Event, error)
 	GetLeftUsers(ctx context.Context, userIDs []string) ([]string, error)
+	PurgeRoom(ctx context.Context, roomID string) error
 	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
 }
