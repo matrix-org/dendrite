@@ -28,13 +28,10 @@ import (
 	fedclient "github.com/matrix-org/dendrite/federationapi/api"
 	fedInternal "github.com/matrix-org/dendrite/federationapi/internal"
 	"github.com/matrix-org/dendrite/federationapi/routing"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
@@ -51,36 +48,27 @@ func TestHandleQueryDirectory(t *testing.T) {
 	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
 	defer close()
 
-	defer func() {
-		prometheus.Unregister(internal.PDUCountTotal)
-		prometheus.Unregister(internal.EDUCountTotal)
-	}()
-
 	fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-	keyMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath()
-	cfg := config.FederationAPI{
-		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: "remote",
-			},
-		},
-	}
+	base.PublicFederationAPIMux = fedMux
+	base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
+	base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
 	fedClient := fakeFedClient{}
-	fedapi := fedAPI.NewInternalAPI(base, &fedClient, nil, nil, nil, true)
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
+	fedapi := fedAPI.NewInternalAPI(base, &fedClient, nil, nil, keyRing, true)
+	userapi := fakeUserAPI{}
 	r, ok := fedapi.(*fedInternal.FederationInternalAPI)
 	if !ok {
 		panic("This is a programming error.")
 	}
-	routing.Setup(fedMux, keyMux, nil, &cfg, nil, r, keyRing, &fedClient, nil, nil, &base.Cfg.MSCs, nil, nil)
+	routing.Setup(base, nil, r, keyRing, &fedClient, &userapi, nil, &base.Cfg.MSCs, nil, nil)
 
 	handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
 	_, sk, _ := ed25519.GenerateKey(nil)
 	keyID := signing.KeyID
 	pk := sk.Public().(ed25519.PublicKey)
 	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("GET", serverName, "remote", "/query/directory?room_alias="+url.QueryEscape("#room:server"))
+	req := gomatrixserverlib.NewFederationRequest("GET", serverName, testOrigin, "/query/directory?room_alias="+url.QueryEscape("#room:server"))
 	type queryContent struct{}
 	content := queryContent{}
 	err := req.SetContent(content)

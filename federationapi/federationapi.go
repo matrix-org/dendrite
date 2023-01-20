@@ -85,10 +85,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		cfg,
+		base,
 		rsAPI, f, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,

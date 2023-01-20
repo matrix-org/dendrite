@@ -767,3 +767,15 @@ Local and remote users' homeservers remove a room from their public directory on
 Guest users denied access over federation if guest access prohibited
 Guest users are kicked from guest_access rooms on revocation of guest_access
 Guest users are kicked from guest_access rooms on revocation of guest_access over federation
+User can create and send/receive messages in a room with version 10
+local user can join room with version 10
+User can invite local user to room with version 10
+remote user can join room with version 10
+User can invite remote user to room with version 10
+Remote user can backfill in a room with version 10
+Can reject invites over federation for rooms with version 10
+Can receive redactions from regular users over federation in room version 10
+New federated private chats get full presence information (SYN-115)
+/state returns M_NOT_FOUND for an outlier
+/state_ids returns M_NOT_FOUND for an outlier
+Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
