@@ -596,7 +596,10 @@ func (b *BaseDendrite) WaitForShutdown() {
 		}
 	}
 	if b.Fulltext != nil {
-		b.Fulltext.Close()
+		err := b.Fulltext.Close()
+		if err != nil {
+			logrus.Warnf("failed to close full text search!")
+		}
 	}
 
 	logrus.Warnf("Dendrite is exiting now")
