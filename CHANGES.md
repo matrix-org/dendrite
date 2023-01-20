@@ -1,5 +1,19 @@
 # Changelog
 
+## Dendrite 0.11.0 (2023-01-20)
+
+The last three missing federation API Sytests have been fixed - bringing us to 100% server-server Synapse parity, with client-server parity at 93% 🎉
+
+### Features
+
+* Added `/_dendrite/admin/purgeRoom/{roomID}` to clean up the database
+* The default room version was updated to 10 (contributed by [FSG-Cat](https://github.com/FSG-Cat))
+
+### Fixes
+
+* An oversight in the `create-config` binary, which now correctly sets the media path if specified (contributed by [BieHDC](https://github.com/BieHDC))
+* The Helm chart now uses the `$.Chart.AppVersion` as the default image version to pull, with the possibility to override it (contributed by [genofire](https://github.com/genofire))
+
 ## Dendrite 0.10.9 (2023-01-17)
 
 ### Features

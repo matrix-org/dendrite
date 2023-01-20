@@ -1,6 +1,6 @@
 # dendrite
 
-![Version: 0.10.8](https://img.shields.io/badge/Version-0.10.8-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.10.8](https://img.shields.io/badge/AppVersion-0.10.8-informational?style=flat-square)
+![Version: 0.11.0](https://img.shields.io/badge/Version-0.11.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.11.0](https://img.shields.io/badge/AppVersion-0.11.0-informational?style=flat-square)
 Dendrite Matrix Homeserver
 
 Status: **NOT PRODUCTION READY**
@@ -41,8 +41,9 @@ Create a folder `appservices` and place your configurations in there.  The confi
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| image.name | string | `"ghcr.io/matrix-org/dendrite-monolith:v0.10.8"` | Docker repository/image to use |
+| image.repository | string | `"ghcr.io/matrix-org/dendrite-monolith"` | Docker repository/image to use |
 | image.pullPolicy | string | `"IfNotPresent"` | Kubernetes pullPolicy |
+| image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | signing_key.create | bool | `true` | Create a new signing key, if not exists |
 | signing_key.existingSecret | string | `""` | Use an existing secret |
 | resources | object | sets some sane default values | Default resource requests/limits. |
@@ -144,4 +145,4 @@ Create a folder `appservices` and place your configurations in there.  The confi
 | ingress.annotations | object | `{}` | Extra, custom annotations |
 | ingress.tls | list | `[]` |  |
 | service.type | string | `"ClusterIP"` |  |
-| service.port | int | `80` |  |
+| service.port | int | `8008` |  |
