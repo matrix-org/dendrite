@@ -43,6 +43,7 @@ type Database struct {
 	MembershipTable     tables.Membership
 	PublishedTable      tables.Published
 	RedactionsTable     tables.Redactions
+	Purge               tables.Purge
 	GetRoomUpdaterFn    func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
@@ -1442,6 +1443,21 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.MembershipTable.UpdateForgetMembership(ctx, nil, roomNIDs[0], stateKeyNID, forget)
+	})
+}
+
+// PurgeRoom removes all information about a given room from the roomserver.
+// For large rooms this operation may take a considerable amount of time.
+func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomNID, err := d.RoomsTable.SelectRoomNIDForUpdate(ctx, txn, roomID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return fmt.Errorf("room %s does not exist", roomID)
+			}
+			return fmt.Errorf("failed to lock the room: %w", err)
+		}
+		return d.Purge.PurgeRoom(ctx, txn, roomNID, roomID)
 	})
 }
 
