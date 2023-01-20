@@ -62,7 +62,12 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), close
+		base := base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics)
+		return base, func() {
+			base.ShutdownDendrite()
+			base.WaitForShutdown()
+			close()
+		}
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
 			Generate:   true,
@@ -72,7 +77,10 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)
-		return base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics), func() {
+		base := base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics)
+		return base, func() {
+			base.ShutdownDendrite()
+			base.WaitForShutdown()
 			// cleanup db files. This risks getting out of sync as we add more database strings :(
 			dbFiles := []config.DataSource{
 				cfg.FederationAPI.Database.ConnectionString,

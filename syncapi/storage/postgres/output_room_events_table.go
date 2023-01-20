@@ -176,6 +176,9 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+const purgeEventsSQL = "" +
+	"DELETE FROM syncapi_output_room_events WHERE room_id = $1"
+
 const selectSearchSQL = "SELECT id, event_id, headered_event_json FROM syncapi_output_room_events WHERE id > $1 AND type = ANY($2) ORDER BY id ASC LIMIT $3"
 
 type outputRoomEventsStatements struct {
@@ -193,6 +196,7 @@ type outputRoomEventsStatements struct {
 	selectContextEventStmt         *sql.Stmt
 	selectContextBeforeEventStmt   *sql.Stmt
 	selectContextAfterEventStmt    *sql.Stmt
+	purgeEventsStmt                *sql.Stmt
 	selectSearchStmt               *sql.Stmt
 }
 
@@ -230,6 +234,7 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.purgeEventsStmt, purgeEventsSQL},
 		{&s.selectSearchStmt, selectSearchSQL},
 	}.Prepare(db)
 }
@@ -656,6 +661,13 @@ func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {
 		})
 	}
 	return result, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) PurgeEvents(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeEventsStmt).ExecContext(ctx, roomID)
+	return err
 }
 
 func (s *outputRoomEventsStatements) ReIndex(ctx context.Context, txn *sql.Tx, limit, afterID int64, types []string) (map[int64]gomatrixserverlib.HeaderedEvent, error) {

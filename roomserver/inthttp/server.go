@@ -66,6 +66,11 @@ func AddRoutes(r api.RoomserverInternalAPI, internalAPIMux *mux.Router, enableMe
 	)
 
 	internalAPIMux.Handle(
+		RoomserverPerformAdminPurgeRoomPath,
+		httputil.MakeInternalRPCAPI("RoomserverPerformAdminPurgeRoom", enableMetrics, r.PerformAdminPurgeRoom),
+	)
+
+	internalAPIMux.Handle(
 		RoomserverPerformAdminDownloadStatePath,
 		httputil.MakeInternalRPCAPI("RoomserverPerformAdminDownloadState", enableMetrics, r.PerformAdminDownloadState),
 	)
