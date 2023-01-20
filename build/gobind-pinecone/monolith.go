@@ -51,7 +51,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/setup/process"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
@@ -80,6 +79,7 @@ const (
 
 type DendriteMonolith struct {
 	logger              logrus.Logger
+	baseDendrite        *base.BaseDendrite
 	PineconeRouter      *pineconeRouter.Router
 	PineconeMulticast   *pineconeMulticast.Multicast
 	PineconeQUIC        *pineconeSessions.Sessions
@@ -88,7 +88,6 @@ type DendriteMonolith struct {
 	CacheDirectory      string
 	listener            net.Listener
 	httpServer          *http.Server
-	processContext      *process.ProcessContext
 	userAPI             userapiAPI.UserInternalAPI
 	federationAPI       api.FederationInternalAPI
 	relayServersQueried map[gomatrixserverlib.ServerName]bool
@@ -343,9 +342,9 @@ func (m *DendriteMonolith) Start() {
 		panic(err)
 	}
 
-	base := base.NewBaseDendrite(cfg, "Monolith")
+	base := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+	m.baseDendrite = base
 	base.ConfigureAdminEndpoints()
-	defer base.Close() // nolint: errcheck
 
 	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
 
@@ -434,8 +433,6 @@ func (m *DendriteMonolith) Start() {
 		Handler: h2c.NewHandler(pMux, h2s),
 	}
 
-	m.processContext = base.ProcessContext
-
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
 
@@ -443,7 +440,7 @@ func (m *DendriteMonolith) Start() {
 		case net.ErrClosed, http.ErrServerClosed:
 			m.logger.Info("Stopped listening on ", cfg.Global.ServerName)
 		default:
-			m.logger.Fatal(err)
+			m.logger.Error("Stopped listening on ", cfg.Global.ServerName)
 		}
 	}()
 	go func() {
@@ -453,7 +450,7 @@ func (m *DendriteMonolith) Start() {
 		case net.ErrClosed, http.ErrServerClosed:
 			m.logger.Info("Stopped listening on ", cfg.Global.ServerName)
 		default:
-			m.logger.Fatal(err)
+			m.logger.Error("Stopped listening on ", cfg.Global.ServerName)
 		}
 	}()
 
@@ -498,12 +495,12 @@ func (m *DendriteMonolith) Start() {
 }
 
 func (m *DendriteMonolith) Stop() {
-	m.processContext.ShutdownDendrite()
+	m.baseDendrite.Close()
+	m.baseDendrite.WaitForShutdown()
 	_ = m.listener.Close()
 	m.PineconeMulticast.Stop()
 	_ = m.PineconeQUIC.Close()
 	_ = m.PineconeRouter.Close()
-	m.processContext.WaitForComponentsToFinish()
 }
 
 type RelayServerRetriever struct {

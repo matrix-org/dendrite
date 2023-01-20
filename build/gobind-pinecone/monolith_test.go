@@ -194,5 +194,5 @@ func TestMonolithStarts(t *testing.T) {
 	monolith := DendriteMonolith{}
 	monolith.Start()
 	monolith.PublicKey()
-	// monolith.Stop()
+	monolith.Stop()
 }
