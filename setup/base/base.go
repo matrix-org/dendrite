@@ -595,6 +595,9 @@ func (b *BaseDendrite) WaitForShutdown() {
 			logrus.Warnf("failed to flush all Sentry events!")
 		}
 	}
+	if b.Fulltext != nil {
+		b.Fulltext.Close()
+	}
 
 	logrus.Warnf("Dendrite is exiting now")
 }
