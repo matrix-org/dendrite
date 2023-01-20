@@ -3,7 +3,7 @@ image:
   repository: "ghcr.io/matrix-org/dendrite-monolith"
   # -- Kubernetes pullPolicy
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
+  # -- Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
 
