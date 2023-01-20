@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -29,7 +28,6 @@ var (
 	configPath                            = flag.String("config", "dendrite.yaml", "The path to the config file. For more information, see the config file in this repository.")
 	version                               = flag.Bool("version", false, "Shows the current version and exits immediately.")
 	enableRegistrationWithoutVerification = flag.Bool("really-enable-open-registration", false, "This allows open registration without secondary verification (reCAPTCHA). This is NOT RECOMMENDED and will SIGNIFICANTLY increase the risk that your server will be used to send spam or conduct attacks, which may result in your server being banned from rooms.")
-	enableAuthorizationChecks             = flag.Bool("enable-authz", false, "Enables authorization checks (aka space/channel gating).")
 )
 
 // ParseFlags parses the commandline flags and uses them to create a config.
@@ -54,11 +52,6 @@ func ParseFlags(monolith bool) *config.Dendrite {
 	if *enableRegistrationWithoutVerification {
 		cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
 	}
-
-	// cmdline --enable-authz flag. env overrides it so that deployment scripts can set it.
-	// todo: remove this flag when feature is done.
-	cfg.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz = strconv.FormatBool(*enableAuthorizationChecks)
-	logrus.Info("--enable-authz flag is set to ", *enableAuthorizationChecks)
 
 	return cfg
 }

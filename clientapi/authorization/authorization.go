@@ -1,6 +1,8 @@
 package authorization
 
 import (
+	"flag"
+
 	"github.com/matrix-org/dendrite/authorization"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -9,16 +11,20 @@ import (
 )
 
 func NewRoomserverAuthorization(cfg *config.ClientAPI, roomQueryAPI roomserver.QueryEventsAPI) authorization.Authorization {
-	// Load authorization manager for Zion
-	if cfg.PublicKeyAuthentication.Ethereum.GetEnableAuthZ() {
-		auth, err := zion.NewZionAuthorization(cfg, roomQueryAPI)
 
+	if flag.Lookup("test.v") == nil {
+		// normal run
+		// Load authorization manager for Zion
+		auth, err := zion.NewZionAuthorization(cfg, roomQueryAPI)
 		if err != nil {
-			log.Errorf("failed to initialise Zion authorization manager, using default. Error: %v", err)
-		} else {
-			return auth
+			// Cannot proceed without an authorization manager
+			log.Fatalf("failed to initialise Zion authorization manager, using default. Error: %v", err)
 		}
+
+		return auth
+	} else {
+		// run under go test
+		return &authorization.DefaultAuthorization{}
 	}
 
-	return &authorization.DefaultAuthorization{}
 }
