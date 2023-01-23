@@ -37,6 +37,11 @@ import (
 	"gotest.tools/v3/poll"
 )
 
+const (
+	testOrigin      = gomatrixserverlib.ServerName("kaer.morhen")
+	testDestination = gomatrixserverlib.ServerName("white.orchard")
+)
+
 var (
 	invalidSignatures = json.RawMessage(`{"auth_events":["$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg","$BcEcbZnlFLB5rxSNSZNBn6fO3jU/TKAJ79wfKyCQLiU"],"content":{"body":"Test Message"},"depth":3917,"hashes":{"sha256":"cNAWtlHIegrji0mMA6x1rhpYCccY8W1NsWZqSpJFhjs"},"origin":"localhost","origin_server_ts":0,"prev_events":["$4GDB0bVjkWwS3G4noUZCq5oLWzpBYpwzdMcf7gj24CI"],"room_id":"!roomid:localishhost","sender":"@userid:localhost","signatures":{"localhost":{"ed2559:auto":"NKym6Kcy3u9mGUr21Hjfe3h7DfDilDhN5PqztT0QZ4NTZ+8Y7owseLolQVXp+TvNjecvzdDywsXXVvGiaQiWAQ"}},"type":"m.room.member"}`)
 	testData          = []json.RawMessage{
@@ -49,8 +54,11 @@ var (
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"body":"Test Message"},"depth":5,"event_id":"$gl2T9l3qm0kUbiIJ:kaer.morhen","hashes":{"sha256":"Qx3nRMHLDPSL5hBAzuX84FiSSP0K0Kju2iFoBWH4Za8"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$UKNe10XzYzG0TeA9:kaer.morhen",{"sha256":"KtSRyMjt0ZSjsv2koixTRCxIRCGoOp6QrKscsW97XRo"}]],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"sqDgv3EG7ml5VREzmT9aZeBpS4gAPNIaIeJOwqjDhY0GPU/BcpX5wY4R7hYLrNe5cChgV+eFy/GWm1Zfg5FfDg"}},"type":"m.room.message"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"body":"Test Message"},"depth":6,"event_id":"$MYSbs8m4rEbsCWXD:kaer.morhen","hashes":{"sha256":"kgbYM7v4Ud2YaBsjBTolM4ySg6rHcJNYI6nWhMSdFUA"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$gl2T9l3qm0kUbiIJ:kaer.morhen",{"sha256":"C/rD04h9wGxRdN2G/IBfrgoE1UovzLZ+uskwaKZ37/Q"}]],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"x0UoKh968jj/F5l1/R7Ew0T6CTKuew3PLNHASNxqck/bkNe8yYQiDHXRr+kZxObeqPZZTpaF1+EI+bLU9W8GDQ"}},"type":"m.room.message"}`),
 		[]byte(`{"auth_events":[["$0ok8ynDp7kjc95e3:kaer.morhen",{"sha256":"sWCi6Ckp9rDimQON+MrUlNRkyfZ2tjbPbWfg2NMB18Q"}],["$LEwEu0kxrtu5fOiS:kaer.morhen",{"sha256":"1aKajq6DWHru1R1HJjvdWMEavkJJHGaTmPvfuERUXaA"}]],"content":{"body":"Test Message"},"depth":7,"event_id":"$N5x9WJkl9ClPrAEg:kaer.morhen","hashes":{"sha256":"FWM8oz4yquTunRZ67qlW2gzPDzdWfBP6RPHXhK1I/x8"},"origin":"kaer.morhen","origin_server_ts":0,"prev_events":[["$MYSbs8m4rEbsCWXD:kaer.morhen",{"sha256":"fatqgW+SE8mb2wFn3UN+drmluoD4UJ/EcSrL6Ur9q1M"}]],"room_id":"!roomid:kaer.morhen","sender":"@userid:kaer.morhen","signatures":{"kaer.morhen":{"ed25519:auto":"Y+LX/xcyufoXMOIoqQBNOzy6lZfUGB1ffgXIrSugk6obMiyAsiRejHQN/pciZXsHKxMJLYRFAz4zSJoS/LGPAA"}},"type":"m.room.message"}`),
-		[]byte(`{"auth_events":["$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg","$BcEcbZnlFLB5rxSNSZNBn6fO3jU/TKAJ79wfKyCQLiU"],"content":{"body":"Test Message"},"depth":3917,"hashes":{"sha256":"cNAWtlHIegrji0mMA6x1rhpYCccY8W1NsWZqSpJFhjs"},"origin":"localhost","origin_server_ts":0,"prev_events":["$4GDB0bVjkWwS3G4noUZCq5oLWzpBYpwzdMcf7gj24CI"],"room_id":"!roomid:localhost","sender":"@userid:localhost","signatures":{"localhost":{"ed25519:auto":"NKym6Kcy3u9mGUr21Hjfe3h7DfDilDhN5PqztT0QZ4NTZ+8Y7owseLolQVXp+TvNjecvzdDywsXXVvGiuQiWAQ"}},"type":"m.room.message"}`),
 	}
+	testEvent       = []byte(`{"auth_events":["$x4MKEPRSF6OGlo0qpnsP3BfSmYX5HhVlykOsQH3ECyg","$BcEcbZnlFLB5rxSNSZNBn6fO3jU/TKAJ79wfKyCQLiU"],"content":{"body":"Test Message"},"depth":3917,"hashes":{"sha256":"cNAWtlHIegrji0mMA6x1rhpYCccY8W1NsWZqSpJFhjs"},"origin":"localhost","origin_server_ts":0,"prev_events":["$4GDB0bVjkWwS3G4noUZCq5oLWzpBYpwzdMcf7gj24CI"],"room_id":"!roomid:localhost","sender":"@userid:localhost","signatures":{"localhost":{"ed25519:auto":"NKym6Kcy3u9mGUr21Hjfe3h7DfDilDhN5PqztT0QZ4NTZ+8Y7owseLolQVXp+TvNjecvzdDywsXXVvGiuQiWAQ"}},"type":"m.room.message"}`)
+	testRoomVersion = gomatrixserverlib.RoomVersionV1
+	testEvents      = []*gomatrixserverlib.HeaderedEvent{}
+	testStateEvents = make(map[gomatrixserverlib.StateKeyTuple]*gomatrixserverlib.HeaderedEvent)
 )
 
 type FakeRsAPI struct {
@@ -106,7 +114,7 @@ func TestEmptyTransactionRequest(t *testing.T) {
 
 func TestProcessTransactionRequestPDU(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -118,7 +126,7 @@ func TestProcessTransactionRequestPDU(t *testing.T) {
 
 func TestProcessTransactionRequestPDUs(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, testData, []gomatrixserverlib.EDU{}, "", "", "")
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, append(testData, testEvent), []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -132,7 +140,7 @@ func TestProcessTransactionRequestBadPDU(t *testing.T) {
 	pdu := json.RawMessage("{\"room_id\":\"asdf\"}")
 	pdu2 := json.RawMessage("\"roomid\":\"asdf\"")
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{pdu, pdu2, testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txn := NewTxnReq(&FakeRsAPI{}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{pdu, pdu2, testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -144,7 +152,7 @@ func TestProcessTransactionRequestBadPDU(t *testing.T) {
 
 func TestProcessTransactionRequestPDUQueryFailure(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{shouldFailQuery: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txn := NewTxnReq(&FakeRsAPI{shouldFailQuery: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -153,7 +161,7 @@ func TestProcessTransactionRequestPDUQueryFailure(t *testing.T) {
 
 func TestProcessTransactionRequestPDUBannedFromRoom(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{bannedFromRoom: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txn := NewTxnReq(&FakeRsAPI{bannedFromRoom: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -177,7 +185,7 @@ func TestProcessTransactionRequestPDUInvalidSignature(t *testing.T) {
 
 func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
 	keyRing := &test.NopJSONVerifier{}
-	txn := NewTxnReq(&FakeRsAPI{shouldEventsFail: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testData[len(testData)-1]}, []gomatrixserverlib.EDU{}, "", "", "")
+	txn := NewTxnReq(&FakeRsAPI{shouldEventsFail: true}, nil, "ourserver", keyRing, nil, nil, false, []json.RawMessage{testEvent}, []gomatrixserverlib.EDU{}, "", "", "")
 	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
 
 	assert.Nil(t, jsonRes)
@@ -187,7 +195,7 @@ func TestProcessTransactionRequestPDUSendFail(t *testing.T) {
 	}
 }
 
-func createTransactionWithEDU(edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
+func createTransactionWithEDU(ctx *process.ProcessContext, edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStreamContext, *config.Dendrite) {
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
 		Generate:   true,
@@ -195,8 +203,7 @@ func createTransactionWithEDU(edus []gomatrixserverlib.EDU) (TxnReq, nats.JetStr
 	})
 	cfg.Global.JetStream.InMemory = true
 	natsInstance := &jetstream.NATSInstance{}
-	pc := process.NewProcessContext()
-	js, _ := natsInstance.Prepare(pc, &cfg.Global.JetStream)
+	js, _ := natsInstance.Prepare(ctx, &cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
 		JetStream:              js,
 		TopicReceiptEvent:      cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
@@ -230,9 +237,9 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edus)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, js, cfg := createTransactionWithEDU(ctx, edus)
 	received := atomic.NewBool(false)
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -250,13 +257,13 @@ func TestProcessTransactionRequestEDUTyping(t *testing.T) {
 		return true
 	}
 	err = jetstream.JetStreamConsumer(
-		ctx, js, cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
+		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputTypingEvent),
 		cfg.Global.JetStream.Durable("TestTypingConsumer"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 	assert.Nil(t, err)
 
-	txnRes, jsonRes := txn.ProcessTransaction(ctx)
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
 
@@ -296,9 +303,9 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edus)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, js, cfg := createTransactionWithEDU(ctx, edus)
 	received := atomic.NewBool(false)
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -316,13 +323,13 @@ func TestProcessTransactionRequestEDUToDevice(t *testing.T) {
 		return true
 	}
 	err = jetstream.JetStreamConsumer(
-		ctx, js, cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
 		cfg.Global.JetStream.Durable("TestToDevice"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 	assert.Nil(t, err)
 
-	txnRes, jsonRes := txn.ProcessTransaction(ctx)
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
 
@@ -373,9 +380,9 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edus)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, js, cfg := createTransactionWithEDU(ctx, edus)
 	received := atomic.NewBool(false)
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -393,13 +400,13 @@ func TestProcessTransactionRequestEDUDeviceListUpdate(t *testing.T) {
 		return true
 	}
 	err = jetstream.JetStreamConsumer(
-		ctx, js, cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
+		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.InputDeviceListUpdate),
 		cfg.Global.JetStream.Durable("TestDeviceListUpdate"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 	assert.Nil(t, err)
 
-	txnRes, jsonRes := txn.ProcessTransaction(ctx)
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
 
@@ -470,9 +477,9 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 	}
 	edus := []gomatrixserverlib.EDU{badEDU, badUser, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edus)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, js, cfg := createTransactionWithEDU(ctx, edus)
 	received := atomic.NewBool(false)
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -485,13 +492,13 @@ func TestProcessTransactionRequestEDUReceipt(t *testing.T) {
 		return true
 	}
 	err = jetstream.JetStreamConsumer(
-		ctx, js, cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
+		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputReceiptEvent),
 		cfg.Global.JetStream.Durable("TestReceipt"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 	assert.Nil(t, err)
 
-	txnRes, jsonRes := txn.ProcessTransaction(ctx)
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
 
@@ -514,9 +521,9 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edus)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, js, cfg := createTransactionWithEDU(ctx, edus)
 	received := atomic.NewBool(false)
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -532,13 +539,13 @@ func TestProcessTransactionRequestEDUSigningKeyUpdate(t *testing.T) {
 		return true
 	}
 	err = jetstream.JetStreamConsumer(
-		ctx, js, cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
 		cfg.Global.JetStream.Durable("TestSigningKeyUpdate"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 	assert.Nil(t, err)
 
-	txnRes, jsonRes := txn.ProcessTransaction(ctx)
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
 
@@ -571,9 +578,9 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 	badEDU.Content = gomatrixserverlib.RawJSON("badjson")
 	edus := []gomatrixserverlib.EDU{badEDU, edu}
 
-	txn, js, cfg := createTransactionWithEDU(edus)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, js, cfg := createTransactionWithEDU(ctx, edus)
 	received := atomic.NewBool(false)
 	onMessage := func(ctx context.Context, msgs []*nats.Msg) bool {
 		msg := msgs[0] // Guaranteed to exist if onMessage is called
@@ -587,13 +594,13 @@ func TestProcessTransactionRequestEDUPresence(t *testing.T) {
 		return true
 	}
 	err = jetstream.JetStreamConsumer(
-		ctx, js, cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
+		ctx.Context(), js, cfg.Global.JetStream.Prefixed(jetstream.OutputPresenceEvent),
 		cfg.Global.JetStream.Durable("TestPresence"), 1,
 		onMessage, nats.DeliverAll(), nats.ManualAck(),
 	)
 	assert.Nil(t, err)
 
-	txnRes, jsonRes := txn.ProcessTransaction(ctx)
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
 
@@ -613,9 +620,201 @@ func TestProcessTransactionRequestEDUUnhandled(t *testing.T) {
 		t.Errorf("failed to marshal EDU JSON")
 	}
 
-	txn, _, _ := createTransactionWithEDU([]gomatrixserverlib.EDU{edu})
-	txnRes, jsonRes := txn.ProcessTransaction(context.Background())
+	ctx := process.NewProcessContext()
+	defer ctx.ShutdownDendrite()
+	txn, _, _ := createTransactionWithEDU(ctx, []gomatrixserverlib.EDU{edu})
+	txnRes, jsonRes := txn.ProcessTransaction(ctx.Context())
 
 	assert.Nil(t, jsonRes)
 	assert.Zero(t, len(txnRes.PDUs))
+}
+
+func init() {
+	for _, j := range testData {
+		e, err := gomatrixserverlib.NewEventFromTrustedJSON(j, false, testRoomVersion)
+		if err != nil {
+			panic("cannot load test data: " + err.Error())
+		}
+		h := e.Headered(testRoomVersion)
+		testEvents = append(testEvents, h)
+		if e.StateKey() != nil {
+			testStateEvents[gomatrixserverlib.StateKeyTuple{
+				EventType: e.Type(),
+				StateKey:  *e.StateKey(),
+			}] = h
+		}
+	}
+}
+
+type testRoomserverAPI struct {
+	rsAPI.RoomserverInternalAPITrace
+	inputRoomEvents           []rsAPI.InputRoomEvent
+	queryStateAfterEvents     func(*rsAPI.QueryStateAfterEventsRequest) rsAPI.QueryStateAfterEventsResponse
+	queryEventsByID           func(req *rsAPI.QueryEventsByIDRequest) rsAPI.QueryEventsByIDResponse
+	queryLatestEventsAndState func(*rsAPI.QueryLatestEventsAndStateRequest) rsAPI.QueryLatestEventsAndStateResponse
+}
+
+func (t *testRoomserverAPI) InputRoomEvents(
+	ctx context.Context,
+	request *rsAPI.InputRoomEventsRequest,
+	response *rsAPI.InputRoomEventsResponse,
+) error {
+	t.inputRoomEvents = append(t.inputRoomEvents, request.InputRoomEvents...)
+	for _, ire := range request.InputRoomEvents {
+		fmt.Println("InputRoomEvents: ", ire.Event.EventID())
+	}
+	return nil
+}
+
+// Query the latest events and state for a room from the room server.
+func (t *testRoomserverAPI) QueryLatestEventsAndState(
+	ctx context.Context,
+	request *rsAPI.QueryLatestEventsAndStateRequest,
+	response *rsAPI.QueryLatestEventsAndStateResponse,
+) error {
+	r := t.queryLatestEventsAndState(request)
+	response.RoomExists = r.RoomExists
+	response.RoomVersion = testRoomVersion
+	response.LatestEvents = r.LatestEvents
+	response.StateEvents = r.StateEvents
+	response.Depth = r.Depth
+	return nil
+}
+
+// Query the state after a list of events in a room from the room server.
+func (t *testRoomserverAPI) QueryStateAfterEvents(
+	ctx context.Context,
+	request *rsAPI.QueryStateAfterEventsRequest,
+	response *rsAPI.QueryStateAfterEventsResponse,
+) error {
+	response.RoomVersion = testRoomVersion
+	res := t.queryStateAfterEvents(request)
+	response.PrevEventsExist = res.PrevEventsExist
+	response.RoomExists = res.RoomExists
+	response.StateEvents = res.StateEvents
+	return nil
+}
+
+// Query a list of events by event ID.
+func (t *testRoomserverAPI) QueryEventsByID(
+	ctx context.Context,
+	request *rsAPI.QueryEventsByIDRequest,
+	response *rsAPI.QueryEventsByIDResponse,
+) error {
+	res := t.queryEventsByID(request)
+	response.Events = res.Events
+	return nil
+}
+
+// Query if a server is joined to a room
+func (t *testRoomserverAPI) QueryServerJoinedToRoom(
+	ctx context.Context,
+	request *rsAPI.QueryServerJoinedToRoomRequest,
+	response *rsAPI.QueryServerJoinedToRoomResponse,
+) error {
+	response.RoomExists = true
+	response.IsInRoom = true
+	return nil
+}
+
+// Asks for the room version for a given room.
+func (t *testRoomserverAPI) QueryRoomVersionForRoom(
+	ctx context.Context,
+	request *rsAPI.QueryRoomVersionForRoomRequest,
+	response *rsAPI.QueryRoomVersionForRoomResponse,
+) error {
+	response.RoomVersion = testRoomVersion
+	return nil
+}
+
+func (t *testRoomserverAPI) QueryServerBannedFromRoom(
+	ctx context.Context, req *rsAPI.QueryServerBannedFromRoomRequest, res *rsAPI.QueryServerBannedFromRoomResponse,
+) error {
+	res.Banned = false
+	return nil
+}
+
+func mustCreateTransaction(rsAPI rsAPI.FederationRoomserverAPI, pdus []json.RawMessage) *TxnReq {
+	t := NewTxnReq(
+		rsAPI,
+		nil,
+		"",
+		&test.NopJSONVerifier{},
+		NewMutexByRoom(),
+		nil,
+		false,
+		pdus,
+		nil,
+		testOrigin,
+		gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano())),
+		testDestination)
+	t.PDUs = pdus
+	t.Origin = testOrigin
+	t.TransactionID = gomatrixserverlib.TransactionID(fmt.Sprintf("%d", time.Now().UnixNano()))
+	t.Destination = testDestination
+	return &t
+}
+
+func mustProcessTransaction(t *testing.T, txn *TxnReq, pdusWithErrors []string) {
+	res, err := txn.ProcessTransaction(context.Background())
+	if err != nil {
+		t.Errorf("txn.processTransaction returned an error: %v", err)
+		return
+	}
+	if len(res.PDUs) != len(txn.PDUs) {
+		t.Errorf("txn.processTransaction did not return results for all PDUs, got %d want %d", len(res.PDUs), len(txn.PDUs))
+		return
+	}
+NextPDU:
+	for eventID, result := range res.PDUs {
+		if result.Error == "" {
+			continue
+		}
+		for _, eventIDWantError := range pdusWithErrors {
+			if eventID == eventIDWantError {
+				break NextPDU
+			}
+		}
+		t.Errorf("txn.processTransaction PDU %s returned an error %s", eventID, result.Error)
+	}
+}
+
+func assertInputRoomEvents(t *testing.T, got []rsAPI.InputRoomEvent, want []*gomatrixserverlib.HeaderedEvent) {
+	for _, g := range got {
+		fmt.Println("GOT ", g.Event.EventID())
+	}
+	if len(got) != len(want) {
+		t.Errorf("wrong number of InputRoomEvents: got %d want %d", len(got), len(want))
+		return
+	}
+	for i := range got {
+		if got[i].Event.EventID() != want[i].EventID() {
+			t.Errorf("InputRoomEvents[%d] got %s want %s", i, got[i].Event.EventID(), want[i].EventID())
+		}
+	}
+}
+
+// The purpose of this test is to check that receiving an event over federation for which we have the prev_events works correctly, and passes it on
+// to the roomserver. It's the most basic test possible.
+func TestBasicTransaction(t *testing.T) {
+	rsAPI := &testRoomserverAPI{}
+	pdus := []json.RawMessage{
+		testData[len(testData)-1], // a message event
+	}
+	txn := mustCreateTransaction(rsAPI, pdus)
+	mustProcessTransaction(t, txn, nil)
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
+}
+
+// The purpose of this test is to check that if the event received fails auth checks the event is still sent to the roomserver
+// as it does the auth check.
+func TestTransactionFailAuthChecks(t *testing.T) {
+	rsAPI := &testRoomserverAPI{}
+	pdus := []json.RawMessage{
+		testData[len(testData)-1], // a message event
+	}
+	txn := mustCreateTransaction(rsAPI, pdus)
+	mustProcessTransaction(t, txn, []string{})
+	// expect message to be sent to the roomserver
+	assertInputRoomEvents(t, rsAPI.inputRoomEvents, []*gomatrixserverlib.HeaderedEvent{testEvents[len(testEvents)-1]})
 }
