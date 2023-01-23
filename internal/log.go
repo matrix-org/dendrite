@@ -101,6 +101,8 @@ func SetupPprof() {
 
 // SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
 func SetupStdLogging() {
+	levelLogAddedMu.Lock()
+	defer levelLogAddedMu.Unlock()
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&utcFormatter{
 		&logrus.TextFormatter{
