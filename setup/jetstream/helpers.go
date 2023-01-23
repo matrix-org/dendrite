@@ -77,6 +77,11 @@ func JetStreamConsumer(
 					// The consumer was deleted so stop.
 					return
 				} else {
+					// Unfortunately, there's no ErrServerShutdown or similar, so we need to compare the string
+					if err.Error() == "nats: Server Shutdown" {
+						logrus.WithContext(ctx).Warn("nats server shutting down")
+						return
+					}
 					// Something else went wrong, so we'll panic.
 					sentry.CaptureException(err)
 					logrus.WithContext(ctx).WithField("subject", subj).Fatal(err)

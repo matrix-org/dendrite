@@ -70,6 +70,7 @@ func main() {
 			cfg.AppServiceAPI.DisableTLSValidation = true
 			cfg.ClientAPI.RateLimiting.Enabled = false
 			cfg.FederationAPI.DisableTLSValidation = false
+			cfg.FederationAPI.DisableHTTPKeepalives = true
 			// don't hit matrix.org when running tests!!!
 			cfg.FederationAPI.KeyPerspectives = config.KeyPerspectives{}
 			cfg.MediaAPI.BasePath = config.Path(filepath.Join(*dirPath, "media"))
