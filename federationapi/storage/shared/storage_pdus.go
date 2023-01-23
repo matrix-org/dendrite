@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -30,17 +31,17 @@ import (
 func (d *Database) AssociatePDUWithDestinations(
 	ctx context.Context,
 	destinations map[gomatrixserverlib.ServerName]struct{},
-	receipt *Receipt,
+	dbReceipt *receipt.Receipt,
 ) error {
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		var err error
 		for destination := range destinations {
 			err = d.FederationQueuePDUs.InsertQueuePDU(
-				ctx,         // context
-				txn,         // SQL transaction
-				"",          // transaction ID
-				destination, // destination server name
-				receipt.nid, // NID from the federationapi_queue_json table
+				ctx,                // context
+				txn,                // SQL transaction
+				"",                 // transaction ID
+				destination,        // destination server name
+				dbReceipt.GetNID(), // NID from the federationapi_queue_json table
 			)
 		}
 		return err
@@ -54,7 +55,7 @@ func (d *Database) GetPendingPDUs(
 	serverName gomatrixserverlib.ServerName,
 	limit int,
 ) (
-	events map[*Receipt]*gomatrixserverlib.HeaderedEvent,
+	events map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent,
 	err error,
 ) {
 	// Strictly speaking this doesn't need to be using the writer
@@ -62,7 +63,7 @@ func (d *Database) GetPendingPDUs(
 	// a guarantee of transactional isolation, it's actually useful
 	// to know in SQLite mode that nothing else is trying to modify
 	// the database.
-	events = make(map[*Receipt]*gomatrixserverlib.HeaderedEvent)
+	events = make(map[*receipt.Receipt]*gomatrixserverlib.HeaderedEvent)
 	err = d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		nids, err := d.FederationQueuePDUs.SelectQueuePDUs(ctx, txn, serverName, limit)
 		if err != nil {
@@ -72,7 +73,8 @@ func (d *Database) GetPendingPDUs(
 		retrieve := make([]int64, 0, len(nids))
 		for _, nid := range nids {
 			if event, ok := d.Cache.GetFederationQueuedPDU(nid); ok {
-				events[&Receipt{nid}] = event
+				newReceipt := receipt.NewReceipt(nid)
+				events[&newReceipt] = event
 			} else {
 				retrieve = append(retrieve, nid)
 			}
@@ -88,7 +90,8 @@ func (d *Database) GetPendingPDUs(
 			if err := json.Unmarshal(blob, &event); err != nil {
 				return fmt.Errorf("json.Unmarshal: %w", err)
 			}
-			events[&Receipt{nid}] = &event
+			newReceipt := receipt.NewReceipt(nid)
+			events[&newReceipt] = &event
 			d.Cache.StoreFederationQueuedPDU(nid, &event)
 		}
 
@@ -103,7 +106,7 @@ func (d *Database) GetPendingPDUs(
 func (d *Database) CleanPDUs(
 	ctx context.Context,
 	serverName gomatrixserverlib.ServerName,
-	receipts []*Receipt,
+	receipts []*receipt.Receipt,
 ) error {
 	if len(receipts) == 0 {
 		return errors.New("expected receipt")
@@ -111,7 +114,7 @@ func (d *Database) CleanPDUs(
 
 	nids := make([]int64, len(receipts))
 	for i := range receipts {
-		nids[i] = receipts[i].nid
+		nids[i] = receipts[i].GetNID()
 	}
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {

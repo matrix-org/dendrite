@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
 func TestLoadConfigRelative(t *testing.T) {
-	_, err := loadConfig("/my/config/dir", []byte(testConfig),
+	cfg, err := loadConfig("/my/config/dir", []byte(testConfig),
 		mockReadFile{
 			"/my/config/dir/matrix_key.pem": testKey,
 			"/my/config/dir/tls_cert.pem":   testCert,
@@ -33,6 +34,15 @@ func TestLoadConfigRelative(t *testing.T) {
 	)
 	if err != nil {
 		t.Error("failed to load config:", err)
+	}
+
+	configErrors := &ConfigErrors{}
+	cfg.Verify(configErrors, false)
+	if len(*configErrors) > 0 {
+		for _, err := range *configErrors {
+			logrus.Errorf("Configuration error: %s", err)
+		}
+		t.Error("configuration verification failed")
 	}
 }
 
@@ -68,6 +78,8 @@ global:
     display_name: "Server alerts"
     avatar: ""
     room_name: "Server Alerts"	
+  jetstream:
+    addresses: ["test"]
 app_service_api:
   internal_api:
     listen: http://localhost:7777
@@ -84,7 +96,7 @@ client_api:
     connect: http://localhost:7771
   external_api:
     listen: http://[::]:8071
-  registration_disabled: false
+  registration_disabled: true
   registration_shared_secret: ""
   enable_registration_captcha: false
   recaptcha_public_key: ""
@@ -112,6 +124,8 @@ federation_api:
     connect: http://localhost:7772
   external_api:
     listen: http://[::]:8072
+  database:
+    connection_string: file:federationapi.db
 key_server:
   internal_api:
     listen: http://localhost:7779
@@ -194,6 +208,17 @@ user_api:
     max_open_conns: 100
     max_idle_conns: 2
     conn_max_lifetime: -1
+relay_api:
+  internal_api:
+    listen: http://localhost:7775
+    connect: http://localhost:7775
+  external_api:
+    listen: http://[::]:8075
+  database:
+    connection_string: file:relayapi.db
+mscs:
+  database:
+    connection_string: file:mscs.db
 tracing:
   enabled: false
   jaeger:

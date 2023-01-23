@@ -41,6 +41,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	SendRouteName           = "Send"
+	QueryDirectoryRouteName = "QueryDirectory"
+	QueryProfileRouteName   = "QueryProfile"
+)
+
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeFedAPI). We need to have this enabled
@@ -68,7 +74,7 @@ func Setup(
 
 	if base.EnableMetrics {
 		prometheus.MustRegister(
-			pduCountTotal, eduCountTotal,
+			internal.PDUCountTotal, internal.EDUCountTotal,
 		)
 	}
 
@@ -138,7 +144,7 @@ func Setup(
 				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions)
+	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRouteName)
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
@@ -248,7 +254,7 @@ func Setup(
 				httpReq, federation, cfg, rsAPI, fsAPI,
 			)
 		},
-	)).Methods(http.MethodGet)
+	)).Methods(http.MethodGet).Name(QueryDirectoryRouteName)
 
 	v1fedmux.Handle("/query/profile", MakeFedAPI(
 		"federation_query_profile", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
@@ -257,7 +263,7 @@ func Setup(
 				httpReq, userAPI, cfg,
 			)
 		},
-	)).Methods(http.MethodGet)
+	)).Methods(http.MethodGet).Name(QueryProfileRouteName)
 
 	v1fedmux.Handle("/user/devices/{userID}", MakeFedAPI(
 		"federation_user_devices", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,

@@ -101,7 +101,6 @@ func currentUser() string {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
-// TODO: namespace for concurrent package tests
 func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, close func()) {
 	if dbType == DBTypeSQLite {
 		// this will be made in the t.TempDir, which is unique per test
