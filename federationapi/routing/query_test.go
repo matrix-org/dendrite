@@ -45,48 +45,50 @@ func (f *fakeFedClient) LookupRoomAlias(ctx context.Context, origin, s gomatrixs
 }
 
 func TestHandleQueryDirectory(t *testing.T) {
-	base, close := testrig.CreateBaseDendrite(t, test.DBTypeSQLite)
-	defer close()
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
 
-	fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
-	base.PublicFederationAPIMux = fedMux
-	base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
-	base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
-	fedClient := fakeFedClient{}
-	serverKeyAPI := &signing.YggdrasilKeys{}
-	keyRing := serverKeyAPI.KeyRing()
-	fedapi := fedAPI.NewInternalAPI(base, &fedClient, nil, nil, keyRing, true)
-	userapi := fakeUserAPI{}
-	r, ok := fedapi.(*fedInternal.FederationInternalAPI)
-	if !ok {
-		panic("This is a programming error.")
-	}
-	routing.Setup(base, nil, r, keyRing, &fedClient, &userapi, nil, &base.Cfg.MSCs, nil, nil)
+		fedMux := mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicFederationPathPrefix).Subrouter().UseEncodedPath()
+		base.PublicFederationAPIMux = fedMux
+		base.Cfg.FederationAPI.Matrix.SigningIdentity.ServerName = testOrigin
+		base.Cfg.FederationAPI.Matrix.Metrics.Enabled = false
+		fedClient := fakeFedClient{}
+		serverKeyAPI := &signing.YggdrasilKeys{}
+		keyRing := serverKeyAPI.KeyRing()
+		fedapi := fedAPI.NewInternalAPI(base, &fedClient, nil, nil, keyRing, true)
+		userapi := fakeUserAPI{}
+		r, ok := fedapi.(*fedInternal.FederationInternalAPI)
+		if !ok {
+			panic("This is a programming error.")
+		}
+		routing.Setup(base, nil, r, keyRing, &fedClient, &userapi, nil, &base.Cfg.MSCs, nil, nil)
 
-	handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
-	_, sk, _ := ed25519.GenerateKey(nil)
-	keyID := signing.KeyID
-	pk := sk.Public().(ed25519.PublicKey)
-	serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	req := gomatrixserverlib.NewFederationRequest("GET", serverName, testOrigin, "/query/directory?room_alias="+url.QueryEscape("#room:server"))
-	type queryContent struct{}
-	content := queryContent{}
-	err := req.SetContent(content)
-	if err != nil {
-		t.Fatalf("Error: %s", err.Error())
-	}
-	req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
-	httpReq, err := req.HTTPRequest()
-	if err != nil {
-		t.Fatalf("Error: %s", err.Error())
-	}
-	// vars := map[string]string{"room_alias": "#room:server"}
-	w := httptest.NewRecorder()
-	// httpReq = mux.SetURLVars(httpReq, vars)
-	handler(w, httpReq)
+		handler := fedMux.Get(routing.QueryDirectoryRouteName).GetHandler().ServeHTTP
+		_, sk, _ := ed25519.GenerateKey(nil)
+		keyID := signing.KeyID
+		pk := sk.Public().(ed25519.PublicKey)
+		serverName := gomatrixserverlib.ServerName(hex.EncodeToString(pk))
+		req := gomatrixserverlib.NewFederationRequest("GET", serverName, testOrigin, "/query/directory?room_alias="+url.QueryEscape("#room:server"))
+		type queryContent struct{}
+		content := queryContent{}
+		err := req.SetContent(content)
+		if err != nil {
+			t.Fatalf("Error: %s", err.Error())
+		}
+		req.Sign(serverName, gomatrixserverlib.KeyID(keyID), sk)
+		httpReq, err := req.HTTPRequest()
+		if err != nil {
+			t.Fatalf("Error: %s", err.Error())
+		}
+		// vars := map[string]string{"room_alias": "#room:server"}
+		w := httptest.NewRecorder()
+		// httpReq = mux.SetURLVars(httpReq, vars)
+		handler(w, httpReq)
 
-	res := w.Result()
-	data, _ := io.ReadAll(res.Body)
-	println(string(data))
-	assert.Equal(t, 200, res.StatusCode)
+		res := w.Result()
+		data, _ := io.ReadAll(res.Body)
+		println(string(data))
+		assert.Equal(t, 200, res.StatusCode)
+	})
 }
