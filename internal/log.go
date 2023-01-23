@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/matrix-org/util"
 
@@ -37,6 +38,7 @@ import (
 // this unfortunately results in us adding the same hook multiple times.
 // This map ensures we only ever add one level hook.
 var stdLevelLogAdded = make(map[logrus.Level]bool)
+var levelLogAddedMu = &sync.Mutex{}
 
 type utcFormatter struct {
 	logrus.Formatter
