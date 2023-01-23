@@ -779,3 +779,8 @@ New federated private chats get full presence information (SYN-115)
 /state returns M_NOT_FOUND for an outlier
 /state_ids returns M_NOT_FOUND for an outlier
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
+Invited user can reject invite for empty room
+Invited user can reject local invite after originator leaves
+Guest users can join guest_access rooms
+Forgotten room messages cannot be paginated
+Local device key changes get to remote servers with correct prev_id
