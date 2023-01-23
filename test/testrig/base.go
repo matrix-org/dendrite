@@ -71,25 +71,6 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		})
 		cfg.Global.ServerName = "test"
 
-		// TODO (devon): remove?
-		// // Configure each components db connection to be unique so tests can run in parallel
-		// connStr, _ := test.PrepareDBConnectionString(t, dbType)
-		// cfg.FederationAPI.Database.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.KeyServer.Database.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.MSCs.Database.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.MediaAPI.Database.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.RoomServer.Database.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.SyncAPI.Database.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(connStr)
-		// connStr, _ = test.PrepareDBConnectionString(t, dbType)
-		// cfg.RelayAPI.Database.ConnectionString = config.DataSource(connStr)
-
 		// use a distinct prefix else concurrent postgres/sqlite runs will clash since NATS will use
 		// the file system event with InMemory=true :(
 		cfg.Global.JetStream.TopicPrefix = fmt.Sprintf("Test_%d_", dbType)

@@ -103,17 +103,6 @@ func currentUser() string {
 // unless close() is called.
 func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, close func()) {
 	if dbType == DBTypeSQLite {
-		// TODO (devon): remove?
-		// rand.Seed(time.Now().UnixNano())
-		// randBytes := make([]byte, 32)
-		// rand.Read(randBytes)
-		// dbName := fmt.Sprintf("dendrite_test_%s.db", hex.EncodeToString(randBytes[:16]))
-		// return fmt.Sprintf("file:%s", dbName), func() {
-		// 	err := os.Remove(dbName)
-		// 	if err != nil {
-		// 		t.Fatalf("failed to cleanup sqlite db '%s': %s", dbName, err)
-		// 	}
-
 		// this will be made in the t.TempDir, which is unique per test
 		dbname := filepath.Join(t.TempDir(), "dendrite_test.db")
 		return fmt.Sprintf("file:%s", dbname), func() {
