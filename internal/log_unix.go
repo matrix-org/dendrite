@@ -85,6 +85,8 @@ func checkSyslogHookParams(params map[string]interface{}) {
 }
 
 func setupStdLogHook(level logrus.Level) {
+	levelLogAddedMu.Lock()
+	defer levelLogAddedMu.Unlock()
 	if stdLevelLogAdded[level] {
 		return
 	}
