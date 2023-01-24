@@ -589,7 +589,15 @@ func (r *RelayServerRetriever) SetRelayServers(servers []gomatrixserverlib.Serve
 	defer r.queriedServersMutex.Unlock()
 	r.relayServersQueried = make(map[gomatrixserverlib.ServerName]bool)
 	for _, server := range servers {
-		// TODO : add servers to dendrite database
+		request := api.P2PAddRelayServersRequest{
+			Server:       gomatrixserverlib.ServerName(r.ServerName),
+			RelayServers: servers,
+		}
+		response := api.P2PAddRelayServersResponse{}
+		err := r.FederationAPI.P2PAddRelayServers(r.Context, &request, &response)
+		if err != nil {
+			logrus.Warnf("Failed adding relay servers for this node: %s", err.Error())
+		}
 		r.relayServersQueried[server] = false
 	}
 
