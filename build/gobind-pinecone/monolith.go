@@ -176,8 +176,18 @@ func (m *DendriteMonolith) SetRelayServer(nodeKey string, uri string) {
 		}
 
 		if userID, err := gomatrixserverlib.NewUserID(uri, false); err == nil {
+			hexKey, decodeErr := hex.DecodeString(string(userID.Domain()))
+			if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
+				logrus.Warnf("UserID domain is not a valid ed25519 public key: %v", userID.Domain())
+				continue
+			}
 			relays = append(relays, userID.Domain())
 		} else {
+			hexKey, decodeErr := hex.DecodeString(uri)
+			if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
+				logrus.Warnf("Relay server uri is not a valid ed25519 public key: %v", uri)
+				continue
+			}
 			relays = append(relays, gomatrixserverlib.ServerName(uri))
 		}
 	}
@@ -186,8 +196,29 @@ func (m *DendriteMonolith) SetRelayServer(nodeKey string, uri string) {
 		logrus.Infof("Setting relay servers to: %v", relays)
 		m.relayRetriever.SetRelayServers(relays)
 	} else {
-		// TODO: add relay/s for other node
+		// TODO: add relay/s for other nodes
 	}
+}
+
+func (m *DendriteMonolith) GetRelayServers(nodeKey string) string {
+	if nodeKey == m.PublicKey() {
+		relays := m.relayRetriever.GetRelayServers()
+		relaysString := ""
+
+		for i, relay := range relays {
+			if i != 0 {
+				// Append a comma to the previous entry if there is one.
+				relaysString += ","
+			}
+			relaysString += string(relay)
+		}
+
+		return relaysString
+	} else {
+		// TODO: return relays for other nodes
+	}
+
+	return ""
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -563,6 +594,17 @@ func (r *RelayServerRetriever) SetRelayServers(servers []gomatrixserverlib.Serve
 	}
 
 	r.StartSync()
+}
+
+func (r *RelayServerRetriever) GetRelayServers() []gomatrixserverlib.ServerName {
+	r.queriedServersMutex.Lock()
+	defer r.queriedServersMutex.Unlock()
+	relayServers := []gomatrixserverlib.ServerName{}
+	for server := range r.relayServersQueried {
+		relayServers = append(relayServers, server)
+	}
+
+	return relayServers
 }
 
 func (r *RelayServerRetriever) StartSync() {
