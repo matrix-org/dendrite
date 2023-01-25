@@ -26,6 +26,7 @@ const (
 	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
 	FederationAPIQueryRelayServers                 = "/federationapi/queryRelayServers"
 	FederationAPIAddRelayServers                   = "/federationapi/addRelayServers"
+	FederationAPIRemoveRelayServers                = "/federationapi/removeRelayServers"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -531,6 +532,17 @@ func (h *httpFederationInternalAPI) P2PAddRelayServers(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"AddRelayServers", h.federationAPIURL+FederationAPIAddRelayServers,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) P2PRemoveRelayServers(
+	ctx context.Context,
+	request *api.P2PRemoveRelayServersRequest,
+	response *api.P2PRemoveRelayServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"RemoveRelayServers", h.federationAPIURL+FederationAPIRemoveRelayServers,
 		h.httpClient, ctx, request, response,
 	)
 }

@@ -167,43 +167,123 @@ func (m *DendriteMonolith) SetStaticPeer(uri string) {
 	}
 }
 
-func (m *DendriteMonolith) SetRelayServer(nodeKey string, uri string) {
+func getServerKeyFromString(nodeID string) (gomatrixserverlib.ServerName, error) {
+	var nodeKey gomatrixserverlib.ServerName
+	if userID, err := gomatrixserverlib.NewUserID(nodeID, false); err == nil {
+		hexKey, decodeErr := hex.DecodeString(string(userID.Domain()))
+		if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
+			return "", fmt.Errorf("UserID domain is not a valid ed25519 public key: %v", userID.Domain())
+		} else {
+			nodeKey = userID.Domain()
+		}
+	} else {
+		hexKey, decodeErr := hex.DecodeString(nodeID)
+		if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
+			return "", fmt.Errorf("Relay server uri is not a valid ed25519 public key: %v", nodeID)
+		} else {
+			nodeKey = gomatrixserverlib.ServerName(nodeID)
+		}
+	}
+
+	return nodeKey, nil
+}
+
+func updateNodeRelayServers(
+	node gomatrixserverlib.ServerName,
+	relays []gomatrixserverlib.ServerName,
+	ctx context.Context,
+	fedAPI api.FederationInternalAPI,
+) {
+	// Get the current relay list
+	request := api.P2PQueryRelayServersRequest{Server: node}
+	response := api.P2PQueryRelayServersResponse{}
+	err := fedAPI.P2PQueryRelayServers(ctx, &request, &response)
+	if err != nil {
+		logrus.Warnf("Failed obtaining list of relay servers for %s: %s", node, err.Error())
+	}
+
+	// Remove old, non-matching relays
+	var serversToRemove []gomatrixserverlib.ServerName
+	for _, existingServer := range response.RelayServers {
+		shouldRemove := true
+		for _, newServer := range relays {
+			if newServer == existingServer {
+				shouldRemove = false
+				break
+			}
+		}
+
+		if shouldRemove {
+			serversToRemove = append(serversToRemove, existingServer)
+		}
+	}
+	removeRequest := api.P2PRemoveRelayServersRequest{
+		Server:       node,
+		RelayServers: serversToRemove,
+	}
+	removeResponse := api.P2PRemoveRelayServersResponse{}
+	err = fedAPI.P2PRemoveRelayServers(ctx, &removeRequest, &removeResponse)
+	if err != nil {
+		logrus.Warnf("Failed removing old relay servers for %s: %s", node, err.Error())
+	}
+
+	// Add new relays
+	addRequest := api.P2PAddRelayServersRequest{
+		Server:       node,
+		RelayServers: relays,
+	}
+	addResponse := api.P2PAddRelayServersResponse{}
+	err = fedAPI.P2PAddRelayServers(ctx, &addRequest, &addResponse)
+	if err != nil {
+		logrus.Warnf("Failed adding relay servers for %s: %s", node, err.Error())
+	}
+}
+
+func (m *DendriteMonolith) SetRelayServers(nodeID string, uris string) {
 	relays := []gomatrixserverlib.ServerName{}
-	for _, uri := range strings.Split(uri, ",") {
+	for _, uri := range strings.Split(uris, ",") {
 		uri = strings.TrimSpace(uri)
 		if len(uri) == 0 {
 			continue
 		}
 
-		if userID, err := gomatrixserverlib.NewUserID(uri, false); err == nil {
-			hexKey, decodeErr := hex.DecodeString(string(userID.Domain()))
-			if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
-				logrus.Warnf("UserID domain is not a valid ed25519 public key: %v", userID.Domain())
-				continue
-			}
-			relays = append(relays, userID.Domain())
-		} else {
-			hexKey, decodeErr := hex.DecodeString(uri)
-			if decodeErr != nil || len(hexKey) != ed25519.PublicKeySize {
-				logrus.Warnf("Relay server uri is not a valid ed25519 public key: %v", uri)
-				continue
-			}
-			relays = append(relays, gomatrixserverlib.ServerName(uri))
+		nodeKey, err := getServerKeyFromString(uri)
+		if err != nil {
+			logrus.Errorf(err.Error())
+			continue
 		}
+		relays = append(relays, nodeKey)
 	}
 
-	if nodeKey == m.PublicKey() {
-		logrus.Infof("Setting relay servers to: %v", relays)
+	nodeKey, err := getServerKeyFromString(nodeID)
+	if err != nil {
+		logrus.Errorf(err.Error())
+		return
+	}
+
+	if string(nodeKey) == m.PublicKey() {
+		logrus.Infof("Setting own relay servers to: %v", relays)
 		m.relayRetriever.SetRelayServers(relays)
 	} else {
-		// TODO: add relay/s for other nodes
+		updateNodeRelayServers(
+			gomatrixserverlib.ServerName(nodeKey),
+			relays,
+			m.baseDendrite.Context(),
+			m.federationAPI,
+		)
 	}
 }
 
-func (m *DendriteMonolith) GetRelayServers(nodeKey string) string {
-	if nodeKey == m.PublicKey() {
+func (m *DendriteMonolith) GetRelayServers(nodeID string) string {
+	nodeKey, err := getServerKeyFromString(nodeID)
+	if err != nil {
+		logrus.Errorf(err.Error())
+		return ""
+	}
+
+	relaysString := ""
+	if string(nodeKey) == m.PublicKey() {
 		relays := m.relayRetriever.GetRelayServers()
-		relaysString := ""
 
 		for i, relay := range relays {
 			if i != 0 {
@@ -212,13 +292,25 @@ func (m *DendriteMonolith) GetRelayServers(nodeKey string) string {
 			}
 			relaysString += string(relay)
 		}
-
-		return relaysString
 	} else {
-		// TODO: return relays for other nodes
+		request := api.P2PQueryRelayServersRequest{Server: gomatrixserverlib.ServerName(nodeKey)}
+		response := api.P2PQueryRelayServersResponse{}
+		err := m.federationAPI.P2PQueryRelayServers(m.baseDendrite.Context(), &request, &response)
+		if err != nil {
+			logrus.Warnf("Failed obtaining list of this node's relay servers: %s", err.Error())
+			return ""
+		}
+
+		for i, relay := range response.RelayServers {
+			if i != 0 {
+				// Append a comma to the previous entry if there is one.
+				relaysString += ","
+			}
+			relaysString += string(relay)
+		}
 	}
 
-	return ""
+	return relaysString
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
@@ -548,7 +640,7 @@ func (m *DendriteMonolith) Start() {
 }
 
 func (m *DendriteMonolith) Stop() {
-	m.baseDendrite.Close()
+	_ = m.baseDendrite.Close()
 	m.baseDendrite.WaitForShutdown()
 	_ = m.listener.Close()
 	m.PineconeMulticast.Stop()
@@ -585,19 +677,13 @@ func (r *RelayServerRetriever) InitializeRelayServers(eLog *logrus.Entry) {
 }
 
 func (r *RelayServerRetriever) SetRelayServers(servers []gomatrixserverlib.ServerName) {
+	updateNodeRelayServers(r.ServerName, servers, r.Context, r.FederationAPI)
+
+	// Replace list of servers to sync with and mark them all as unsynced.
 	r.queriedServersMutex.Lock()
 	defer r.queriedServersMutex.Unlock()
 	r.relayServersQueried = make(map[gomatrixserverlib.ServerName]bool)
 	for _, server := range servers {
-		request := api.P2PAddRelayServersRequest{
-			Server:       gomatrixserverlib.ServerName(r.ServerName),
-			RelayServers: servers,
-		}
-		response := api.P2PAddRelayServersResponse{}
-		err := r.FederationAPI.P2PAddRelayServers(r.Context, &request, &response)
-		if err != nil {
-			logrus.Warnf("Failed adding relay servers for this node: %s", err.Error())
-		}
 		r.relayServersQueried[server] = false
 	}
 

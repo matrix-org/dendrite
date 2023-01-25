@@ -85,6 +85,13 @@ type P2PFederationAPI interface {
 		request *P2PAddRelayServersRequest,
 		response *P2PAddRelayServersResponse,
 	) error
+
+	// Remove relay server associations from the given server.
+	P2PRemoveRelayServers(
+		ctx context.Context,
+		request *P2PRemoveRelayServersRequest,
+		response *P2PRemoveRelayServersResponse,
+	) error
 }
 
 // KeyserverFederationAPI is a subset of gomatrixserverlib.FederationClient functions which the keyserver
@@ -270,4 +277,12 @@ type P2PAddRelayServersRequest struct {
 }
 
 type P2PAddRelayServersResponse struct {
+}
+
+type P2PRemoveRelayServersRequest struct {
+	Server       gomatrixserverlib.ServerName
+	RelayServers []gomatrixserverlib.ServerName
+}
+
+type P2PRemoveRelayServersResponse struct {
 }

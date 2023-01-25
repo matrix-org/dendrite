@@ -855,6 +855,21 @@ func (r *FederationInternalAPI) P2PAddRelayServers(
 	return nil
 }
 
+// P2PRemoveRelayServers implements api.FederationInternalAPI
+func (r *FederationInternalAPI) P2PRemoveRelayServers(
+	ctx context.Context,
+	request *api.P2PRemoveRelayServersRequest,
+	response *api.P2PRemoveRelayServersResponse,
+) error {
+	logrus.Infof("Adding relay servers for: %s", request.Server)
+	err := r.db.P2PRemoveRelayServersForServer(ctx, request.Server, request.RelayServers)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *FederationInternalAPI) shouldAttemptDirectFederation(
 	destination gomatrixserverlib.ServerName,
 ) bool {
