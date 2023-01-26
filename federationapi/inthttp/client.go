@@ -24,6 +24,7 @@ const (
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
 	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
+	FederationAPIQueryRelayServers                 = "/federationapi/queryRelayServers"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -507,6 +508,17 @@ func (h *httpFederationInternalAPI) QueryPublicKeys(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryPublicKeys", h.federationAPIURL+FederationAPIQueryPublicKeyPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) P2PQueryRelayServers(
+	ctx context.Context,
+	request *api.P2PQueryRelayServersRequest,
+	response *api.P2PQueryRelayServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryRelayServers", h.federationAPIURL+FederationAPIQueryRelayServers,
 		h.httpClient, ctx, request, response,
 	)
 }

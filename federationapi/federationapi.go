@@ -85,10 +85,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		cfg,
+		base,
 		rsAPI, f, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,
@@ -116,7 +113,10 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
+	stats := statistics.NewStatistics(
+		federationDB,
+		cfg.FederationMaxRetries+1,
+		cfg.P2PFederationRetriesUntilAssumedOffline+1)
 
 	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 

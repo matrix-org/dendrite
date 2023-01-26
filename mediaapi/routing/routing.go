@@ -108,13 +108,16 @@ func makeDownloadAPI(
 	activeRemoteRequests *types.ActiveRemoteRequests,
 	activeThumbnailGeneration *types.ActiveThumbnailGeneration,
 ) http.HandlerFunc {
-	counterVec := promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: name,
-			Help: "Total number of media_api requests for either thumbnails or full downloads",
-		},
-		[]string{"code"},
-	)
+	var counterVec *prometheus.CounterVec
+	if cfg.Matrix.Metrics.Enabled {
+		counterVec = promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: name,
+				Help: "Total number of media_api requests for either thumbnails or full downloads",
+			},
+			[]string{"code"},
+		)
+	}
 	httpHandler := func(w http.ResponseWriter, req *http.Request) {
 		req = util.RequestWithLogging(req)
 
@@ -166,5 +169,12 @@ func makeDownloadAPI(
 			vars["downloadName"],
 		)
 	}
-	return promhttp.InstrumentHandlerCounter(counterVec, http.HandlerFunc(httpHandler))
+
+	var handlerFunc http.HandlerFunc
+	if counterVec != nil {
+		handlerFunc = promhttp.InstrumentHandlerCounter(counterVec, http.HandlerFunc(httpHandler))
+	} else {
+		handlerFunc = http.HandlerFunc(httpHandler)
+	}
+	return handlerFunc
 }

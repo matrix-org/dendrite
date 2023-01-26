@@ -264,6 +264,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 
 // Close implements io.Closer
 func (b *BaseDendrite) Close() error {
+	b.ProcessContext.ShutdownDendrite()
+	b.ProcessContext.WaitForShutdown()
 	return b.tracerCloser.Close()
 }
 
@@ -591,6 +593,12 @@ func (b *BaseDendrite) WaitForShutdown() {
 	if b.Cfg.Global.Sentry.Enabled {
 		if !sentry.Flush(time.Second * 5) {
 			logrus.Warnf("failed to flush all Sentry events!")
+		}
+	}
+	if b.Fulltext != nil {
+		err := b.Fulltext.Close()
+		if err != nil {
+			logrus.Warnf("failed to close full text search!")
 		}
 	}
 

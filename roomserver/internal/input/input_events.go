@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -40,7 +41,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -166,6 +166,7 @@ func (r *Inputer) processRoomEvent(
 		missingPrev = !input.HasState && len(missingPrevIDs) > 0
 	}
 
+	// If we have missing events (auth or prev), we build a list of servers to ask
 	if missingAuth || missingPrev {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
 			RoomID:             event.RoomID(),
@@ -200,59 +201,8 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// First of all, check that the auth events of the event are known.
-	// If they aren't then we will ask the federation API for them.
 	isRejected := false
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-	knownEvents := map[string]*types.Event{}
-	if err = r.fetchAuthEvents(ctx, logger, roomInfo, virtualHost, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
-		return fmt.Errorf("r.fetchAuthEvents: %w", err)
-	}
-
-	// Check if the event is allowed by its auth events. If it isn't then
-	// we consider the event to be "rejected" — it will still be persisted.
 	var rejectionErr error
-	if rejectionErr = gomatrixserverlib.Allowed(event, &authEvents); rejectionErr != nil {
-		isRejected = true
-		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
-	}
-
-	// Accumulate the auth event NIDs.
-	authEventIDs := event.AuthEventIDs()
-	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
-	for _, authEventID := range authEventIDs {
-		if _, ok := knownEvents[authEventID]; !ok {
-			// Unknown auth events only really matter if the event actually failed
-			// auth. If it passed auth then we can assume that everything that was
-			// known was sufficient, even if extraneous auth events were specified
-			// but weren't found.
-			if isRejected {
-				if event.StateKey() != nil {
-					return fmt.Errorf(
-						"missing auth event %s for state event %s (type %q, state key %q)",
-						authEventID, event.EventID(), event.Type(), *event.StateKey(),
-					)
-				} else {
-					return fmt.Errorf(
-						"missing auth event %s for timeline event %s (type %q)",
-						authEventID, event.EventID(), event.Type(),
-					)
-				}
-			}
-		} else {
-			authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
-		}
-	}
-
-	var softfail bool
-	if input.Kind == api.KindNew {
-		// Check that the event passes authentication checks based on the
-		// current room state.
-		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
-		if err != nil {
-			logger.WithError(err).Warn("Error authing soft-failed event")
-		}
-	}
 
 	// At this point we are checking whether we know all of the prev events, and
 	// if we know the state before the prev events. This is necessary before we
@@ -311,6 +261,59 @@ func (r *Inputer) processRoomEvent(
 			// reject the event and hope that it gets unrejected later.
 			isRejected = true
 			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
+		}
+	}
+
+	// Check that the auth events of the event are known.
+	// If they aren't then we will ask the federation API for them.
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	knownEvents := map[string]*types.Event{}
+	if err = r.fetchAuthEvents(ctx, logger, roomInfo, virtualHost, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+		return fmt.Errorf("r.fetchAuthEvents: %w", err)
+	}
+
+	// Check if the event is allowed by its auth events. If it isn't then
+	// we consider the event to be "rejected" — it will still be persisted.
+	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
+		isRejected = true
+		rejectionErr = err
+		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
+	}
+
+	// Accumulate the auth event NIDs.
+	authEventIDs := event.AuthEventIDs()
+	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
+	for _, authEventID := range authEventIDs {
+		if _, ok := knownEvents[authEventID]; !ok {
+			// Unknown auth events only really matter if the event actually failed
+			// auth. If it passed auth then we can assume that everything that was
+			// known was sufficient, even if extraneous auth events were specified
+			// but weren't found.
+			if isRejected {
+				if event.StateKey() != nil {
+					return fmt.Errorf(
+						"missing auth event %s for state event %s (type %q, state key %q)",
+						authEventID, event.EventID(), event.Type(), *event.StateKey(),
+					)
+				} else {
+					return fmt.Errorf(
+						"missing auth event %s for timeline event %s (type %q)",
+						authEventID, event.EventID(), event.Type(),
+					)
+				}
+			}
+		} else {
+			authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
+		}
+	}
+
+	var softfail bool
+	if input.Kind == api.KindNew {
+		// Check that the event passes authentication checks based on the
+		// current room state.
+		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
+		if err != nil {
+			logger.WithError(err).Warn("Error authing soft-failed event")
 		}
 	}
 

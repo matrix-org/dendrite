@@ -32,6 +32,8 @@ import (
 // If something fails here it means that the logging was improperly configured,
 // so we just exit with the error
 func SetupHookLogging(hooks []config.LogrusHook, componentName string) {
+	levelLogAddedMu.Lock()
+	defer levelLogAddedMu.Unlock()
 	for _, hook := range hooks {
 		// Check we received a proper logging level
 		level, err := logrus.ParseLevel(hook.Level)

@@ -13,5 +13,5 @@ spec:
   ports:
     - name: http
       protocol: TCP
-      port: 8008
+      port: {{ .Values.service.port }}
       targetPort: 8008

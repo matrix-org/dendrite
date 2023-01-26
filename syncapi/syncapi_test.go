@@ -521,6 +521,252 @@ func verifyEventVisible(t *testing.T, wantVisible bool, wantVisibleEvent *gomatr
 	}
 }
 
+func TestGetMembership(t *testing.T) {
+	alice := test.NewUser(t)
+
+	aliceDev := userapi.Device{
+		ID:          "ALICEID",
+		UserID:      alice.ID,
+		AccessToken: "ALICE_BEARER_TOKEN",
+		DisplayName: "Alice",
+		AccountType: userapi.AccountTypeUser,
+	}
+
+	bob := test.NewUser(t)
+	bobDev := userapi.Device{
+		ID:          "BOBID",
+		UserID:      bob.ID,
+		AccessToken: "notjoinedtoanyrooms",
+	}
+
+	testCases := []struct {
+		name             string
+		roomID           string
+		additionalEvents func(t *testing.T, room *test.Room)
+		request          func(t *testing.T, room *test.Room) *http.Request
+		wantOK           bool
+		wantMemberCount  int
+		useSleep         bool // :/
+	}{
+		{
+			name: "/members - Alice joined",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+				}))
+			},
+			wantOK:          true,
+			wantMemberCount: 1,
+		},
+		{
+			name: "/members - Bob never joined",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": bobDev.AccessToken,
+				}))
+			},
+			wantOK: false,
+		},
+		{
+			name: "/joined_members - Bob never joined",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": bobDev.AccessToken,
+				}))
+			},
+			wantOK: false,
+		},
+		{
+			name: "/joined_members - Alice joined",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+				}))
+			},
+			wantOK: true,
+		},
+		{
+			name: "Alice leaves before Bob joins, should not be able to see Bob",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+				}))
+			},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(alice.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+			useSleep:        true,
+			wantOK:          true,
+			wantMemberCount: 1,
+		},
+		{
+			name: "Alice leaves after Bob joins, should be able to see Bob",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+				}))
+			},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(alice.ID))
+			},
+			useSleep:        true,
+			wantOK:          true,
+			wantMemberCount: 2,
+		},
+		{
+			name: "/joined_members - Alice leaves, shouldn't be able to see members ",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/joined_members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+				}))
+			},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(alice.ID))
+			},
+			useSleep: true,
+			wantOK:   false,
+		},
+		{
+			name: "'at' specified, returns memberships before Bob joins",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+					"at":           "t2_5",
+				}))
+			},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+			useSleep:        true,
+			wantOK:          true,
+			wantMemberCount: 1,
+		},
+		{
+			name: "'membership=leave' specified, returns no memberships",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+					"membership":   "leave",
+				}))
+			},
+			wantOK:          true,
+			wantMemberCount: 0,
+		},
+		{
+			name: "'not_membership=join' specified, returns no memberships",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token":   aliceDev.AccessToken,
+					"not_membership": "join",
+				}))
+			},
+			wantOK:          true,
+			wantMemberCount: 0,
+		},
+		{
+			name: "'not_membership=leave' & 'membership=join' specified, returns correct memberships",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", room.ID), test.WithQueryParams(map[string]string{
+					"access_token":   aliceDev.AccessToken,
+					"not_membership": "leave",
+					"membership":     "join",
+				}))
+			},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+			wantOK:          true,
+			wantMemberCount: 1,
+		},
+		{
+			name: "non-existent room ID",
+			request: func(t *testing.T, room *test.Room) *http.Request {
+				return test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/members", "!notavalidroom:test"), test.WithQueryParams(map[string]string{
+					"access_token": aliceDev.AccessToken,
+				}))
+			},
+			wantOK: false,
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
+
+		jsctx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsctx, &base.Cfg.Global.JetStream)
+
+		// Use an actual roomserver for this
+		rsAPI := roomserver.NewInternalAPI(base)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		AddPublicRoutes(base, &syncUserAPI{accounts: []userapi.Device{aliceDev, bobDev}}, rsAPI, &syncKeyAPI{})
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				room := test.NewRoom(t, alice)
+				t.Cleanup(func() {
+					t.Logf("running cleanup for %s", tc.name)
+				})
+				// inject additional events
+				if tc.additionalEvents != nil {
+					tc.additionalEvents(t, room)
+				}
+				if err := api.SendEvents(context.Background(), rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+					t.Fatalf("failed to send events: %v", err)
+				}
+
+				// wait for the events to come down sync
+				if tc.useSleep {
+					time.Sleep(time.Millisecond * 100)
+				} else {
+					syncUntil(t, base, aliceDev.AccessToken, false, func(syncBody string) bool {
+						// wait for the last sent eventID to come down sync
+						path := fmt.Sprintf(`rooms.join.%s.timeline.events.#(event_id=="%s")`, room.ID, room.Events()[len(room.Events())-1].EventID())
+						return gjson.Get(syncBody, path).Exists()
+					})
+				}
+
+				w := httptest.NewRecorder()
+				base.PublicClientAPIMux.ServeHTTP(w, tc.request(t, room))
+				if w.Code != 200 && tc.wantOK {
+					t.Logf("%s", w.Body.String())
+					t.Fatalf("got HTTP %d want %d", w.Code, 200)
+				}
+				t.Logf("[%s] Resp: %s", tc.name, w.Body.String())
+
+				// check we got the expected events
+				if tc.wantOK {
+					memberCount := len(gjson.GetBytes(w.Body.Bytes(), "chunk").Array())
+					if memberCount != tc.wantMemberCount {
+						t.Fatalf("expected %d members, got %d", tc.wantMemberCount, memberCount)
+					}
+				}
+			})
+		}
+	})
+}
+
 func TestSendToDevice(t *testing.T) {
 	test.WithAllDatabases(t, testSendToDevice)
 }

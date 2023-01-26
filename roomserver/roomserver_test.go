@@ -14,6 +14,10 @@ import (
 
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 
+	"github.com/matrix-org/dendrite/federationapi"
+	"github.com/matrix-org/dendrite/keyserver"
+	"github.com/matrix-org/dendrite/setup/jetstream"
+	"github.com/matrix-org/dendrite/syncapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
 	"github.com/matrix-org/dendrite/roomserver"
@@ -221,5 +225,166 @@ func Test_QueryLeftUsers(t *testing.T) {
 			testCase(traceAPI)
 		})
 
+	})
+}
+
+func TestPurgeRoom(t *testing.T) {
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	room := test.NewRoom(t, alice, test.RoomPreset(test.PresetTrustedPrivateChat))
+
+	// Invite Bob
+	inviteEvent := room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+		"membership": "invite",
+	}, test.WithStateKey(bob.ID))
+
+	ctx := context.Background()
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, db, close := mustCreateDatabase(t, dbType)
+		defer close()
+
+		jsCtx, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
+		defer jetstream.DeleteAllStreams(jsCtx, &base.Cfg.Global.JetStream)
+
+		fedClient := base.CreateFederationClient()
+		rsAPI := roomserver.NewInternalAPI(base)
+		keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fedClient, rsAPI)
+		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
+
+		// this starts the JetStream consumers
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
+		rsAPI.SetFederationAPI(nil, nil)
+
+		// Create the room
+		if err := api.SendEvents(ctx, rsAPI, api.KindNew, room.Events(), "test", "test", "test", nil, false); err != nil {
+			t.Fatalf("failed to send events: %v", err)
+		}
+
+		// some dummy entries to validate after purging
+		publishResp := &api.PerformPublishResponse{}
+		if err := rsAPI.PerformPublish(ctx, &api.PerformPublishRequest{RoomID: room.ID, Visibility: "public"}, publishResp); err != nil {
+			t.Fatal(err)
+		}
+		if publishResp.Error != nil {
+			t.Fatal(publishResp.Error)
+		}
+
+		isPublished, err := db.GetPublishedRoom(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !isPublished {
+			t.Fatalf("room should be published before purging")
+		}
+
+		aliasResp := &api.SetRoomAliasResponse{}
+		if err = rsAPI.SetRoomAlias(ctx, &api.SetRoomAliasRequest{RoomID: room.ID, Alias: "myalias", UserID: alice.ID}, aliasResp); err != nil {
+			t.Fatal(err)
+		}
+		// check the alias is actually there
+		aliasesResp := &api.GetAliasesForRoomIDResponse{}
+		if err = rsAPI.GetAliasesForRoomID(ctx, &api.GetAliasesForRoomIDRequest{RoomID: room.ID}, aliasesResp); err != nil {
+			t.Fatal(err)
+		}
+		wantAliases := 1
+		if gotAliases := len(aliasesResp.Aliases); gotAliases != wantAliases {
+			t.Fatalf("expected %d aliases, got %d", wantAliases, gotAliases)
+		}
+
+		// validate the room exists before purging
+		roomInfo, err := db.RoomInfo(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if roomInfo == nil {
+			t.Fatalf("room does not exist")
+		}
+		// remember the roomInfo before purging
+		existingRoomInfo := roomInfo
+
+		// validate there is an invite for bob
+		nids, err := db.EventStateKeyNIDs(ctx, []string{bob.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		bobNID, ok := nids[bob.ID]
+		if !ok {
+			t.Fatalf("%s does not exist", bob.ID)
+		}
+
+		_, inviteEventIDs, _, err := db.GetInvitesForUser(ctx, roomInfo.RoomNID, bobNID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantInviteCount := 1
+		if inviteCount := len(inviteEventIDs); inviteCount != wantInviteCount {
+			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+		}
+		if inviteEventIDs[0] != inviteEvent.EventID() {
+			t.Fatalf("expected invite event ID %s, got %s", inviteEvent.EventID(), inviteEventIDs[0])
+		}
+
+		// purge the room from the database
+		purgeResp := &api.PerformAdminPurgeRoomResponse{}
+		if err = rsAPI.PerformAdminPurgeRoom(ctx, &api.PerformAdminPurgeRoomRequest{RoomID: room.ID}, purgeResp); err != nil {
+			t.Fatal(err)
+		}
+
+		// wait for all consumers to process the purge event
+		var sum = 1
+		timeout := time.Second * 5
+		deadline, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		for sum > 0 {
+			if deadline.Err() != nil {
+				t.Fatalf("test timed out after %s", timeout)
+			}
+			sum = 0
+			consumerCh := jsCtx.Consumers(base.Cfg.Global.JetStream.Prefixed(jetstream.OutputRoomEvent))
+			for x := range consumerCh {
+				sum += x.NumAckPending
+			}
+			time.Sleep(time.Millisecond)
+		}
+
+		roomInfo, err = db.RoomInfo(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if roomInfo != nil {
+			t.Fatalf("room should not exist after purging: %+v", roomInfo)
+		}
+
+		// validation below
+
+		// There should be no invite left
+		_, inviteEventIDs, _, err = db.GetInvitesForUser(ctx, existingRoomInfo.RoomNID, bobNID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if inviteCount := len(inviteEventIDs); inviteCount > 0 {
+			t.Fatalf("expected there to be only %d invite events, got %d", wantInviteCount, inviteCount)
+		}
+
+		// aliases should be deleted
+		aliases, err := db.GetAliasesForRoomID(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if aliasCount := len(aliases); aliasCount > 0 {
+			t.Fatalf("expected there to be only %d invite events, got %d", 0, aliasCount)
+		}
+
+		// published room should be deleted
+		isPublished, err = db.GetPublishedRoom(ctx, room.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if isPublished {
+			t.Fatalf("room should not be published after purging")
+		}
 	})
 }

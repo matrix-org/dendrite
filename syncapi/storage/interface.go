@@ -84,8 +84,6 @@ type DatabaseTransaction interface {
 	EventPositionInTopology(ctx context.Context, eventID string) (types.TopologyToken, error)
 	// BackwardExtremitiesForRoom returns a map of backwards extremity event ID to a list of its prev_events.
 	BackwardExtremitiesForRoom(ctx context.Context, roomID string) (backwardExtremities map[string][]string, err error)
-	// MaxTopologicalPosition returns the highest topological position for a given room.
-	MaxTopologicalPosition(ctx context.Context, roomID string) (types.TopologyToken, error)
 	// StreamEventsToEvents converts streamEvent to Event. If device is non-nil and
 	// matches the streamevent.transactionID device then the transaction ID gets
 	// added to the unsigned section of the output event.
@@ -134,6 +132,8 @@ type Database interface {
 	// PurgeRoomState completely purges room state from the sync API. This is done when
 	// receiving an output event that completely resets the state.
 	PurgeRoomState(ctx context.Context, roomID string) error
+	// PurgeRoom entirely eliminates a room from the sync API, timeline, state and all.
+	PurgeRoom(ctx context.Context, roomID string) error
 	// UpsertAccountData keeps track of new or updated account data, by saving the type
 	// of the new/updated data, and the user ID and room ID the data is related to (empty)
 	// room ID means the data isn't specific to any room)
