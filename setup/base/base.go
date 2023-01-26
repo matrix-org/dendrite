@@ -18,8 +18,10 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -64,6 +66,9 @@ import (
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 )
+
+//go:embed static/*.gotmpl
+var staticContent embed.FS
 
 // BaseDendrite is a base for creating new instances of dendrite. It parses
 // command line flags and config, and exposes methods for creating various
@@ -493,8 +498,16 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	b.ConfigureAdminEndpoints()
 
+	tmpl := template.Must(template.ParseFS(staticContent, "static/*.gotmpl"))
+
 	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "static/index.html")
+		if err := tmpl.ExecuteTemplate(w, "index.gotmpl", map[string]string{
+			"Version": internal.VersionString(),
+		}); err != nil {
+			logrus.WithError(err).Error("failed to execute landing page template")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("failed to execute template"))
+		}
 	})
 
 	var clientHandler http.Handler
