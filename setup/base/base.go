@@ -15,6 +15,7 @@
 package base
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"database/sql"
@@ -488,7 +489,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	//Redirect for Landing Page
 	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusSeeOther)
+		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
 	})
 
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
@@ -498,16 +499,17 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	b.ConfigureAdminEndpoints()
 
+	// Parse and execute the landing page template
 	tmpl := template.Must(template.ParseFS(staticContent, "static/*.gotmpl"))
+	landingPage := &bytes.Buffer{}
+	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
+		"Version": internal.VersionString(),
+	}); err != nil {
+		logrus.WithError(err).Fatal("failed to execute landing page template")
+	}
 
 	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if err := tmpl.ExecuteTemplate(w, "index.gotmpl", map[string]string{
-			"Version": internal.VersionString(),
-		}); err != nil {
-			logrus.WithError(err).Error("failed to execute landing page template")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("failed to execute template"))
-		}
+		_, _ = w.Write(landingPage.Bytes())
 	})
 
 	var clientHandler http.Handler
