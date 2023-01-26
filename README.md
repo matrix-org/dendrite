@@ -61,7 +61,7 @@ The following instructions are enough to get Dendrite started as a non-federatin
 ```bash
 $ git clone https://github.com/matrix-org/dendrite
 $ cd dendrite
-$ ./build.sh
+$ go build -o bin/ ./cmd/...
 
 # Generate a Matrix signing key for federation (required)
 $ ./bin/generate-keys --private-key matrix_key.pem

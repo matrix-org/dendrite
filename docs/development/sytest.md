@@ -24,7 +24,7 @@ After running the tests, a script will print the tests you need to add to
 You should proceed after you see no build problems for dendrite after running:
 
 ```sh
-./build.sh
+go build -o bin/ ./cmd/...
 ```
 
 If you are fixing an issue marked with
