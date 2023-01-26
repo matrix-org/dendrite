@@ -266,6 +266,8 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 
 // Close implements io.Closer
 func (b *BaseDendrite) Close() error {
+	b.ProcessContext.ShutdownDendrite()
+	b.ProcessContext.WaitForShutdown()
 	return b.tracerCloser.Close()
 }
 
@@ -416,6 +418,24 @@ func (b *BaseDendrite) configureHTTPErrors() {
 	b.PublicClientAPIMux.MethodNotAllowedHandler = http.HandlerFunc(clientNotFoundHandler)
 }
 
+func (b *BaseDendrite) ConfigureAdminEndpoints() {
+	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
+		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
+			w.WriteHeader(503)
+			_ = json.NewEncoder(w).Encode(struct {
+				Warnings []string `json:"warnings"`
+			}{
+				Warnings: reasons,
+			})
+			return
+		}
+		w.WriteHeader(200)
+	})
+}
+
 // SetupAndServeHTTP sets up the HTTP server to serve endpoints registered on
 // ApiMux under /api/ and adds a prometheus handler under /metrics.
 func (b *BaseDendrite) SetupAndServeHTTP(
@@ -471,25 +491,10 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
+	b.ConfigureAdminEndpoints()
+
 	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/index.html")
-	})
-
-	b.DendriteAdminMux.HandleFunc("/monitor/up", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
-	})
-
-	b.DendriteAdminMux.HandleFunc("/monitor/health", func(w http.ResponseWriter, r *http.Request) {
-		if isDegraded, reasons := b.ProcessContext.IsDegraded(); isDegraded {
-			w.WriteHeader(503)
-			_ = json.NewEncoder(w).Encode(struct {
-				Warnings []string `json:"warnings"`
-			}{
-				Warnings: reasons,
-			})
-			return
-		}
-		w.WriteHeader(200)
 	})
 
 	var clientHandler http.Handler
@@ -601,6 +606,12 @@ func (b *BaseDendrite) WaitForShutdown() {
 	if b.Cfg.Global.Sentry.Enabled {
 		if !sentry.Flush(time.Second * 5) {
 			logrus.Warnf("failed to flush all Sentry events!")
+		}
+	}
+	if b.Fulltext != nil {
+		err := b.Fulltext.Close()
+		if err != nil {
+			logrus.Warnf("failed to close full text search!")
 		}
 	}
 

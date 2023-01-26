@@ -29,7 +29,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -62,6 +62,7 @@ type Dendrite struct {
 	RoomServer    RoomServer    `yaml:"room_server"`
 	SyncAPI       SyncAPI       `yaml:"sync_api"`
 	UserAPI       UserAPI       `yaml:"user_api"`
+	RelayAPI      RelayAPI      `yaml:"relay_api"`
 
 	MSCs MSCs `yaml:"mscs"`
 
@@ -228,7 +229,7 @@ func loadConfig(
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
 	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load private_key: %w", err)
 	}
 
 	for _, v := range c.Global.VirtualHosts {
@@ -242,7 +243,7 @@ func loadConfig(
 		}
 		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
 		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load private_key for virtualhost %s: %w", v.ServerName, err)
 		}
 	}
 
@@ -314,11 +315,13 @@ func (config *Dendrite) Derive() error {
 
 	if config.ClientAPI.RecaptchaEnabled {
 		config.Derived.Registration.Params[authtypes.LoginTypeRecaptcha] = map[string]string{"public_key": config.ClientAPI.RecaptchaPublicKey}
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeRecaptcha}},
+		}
 	} else {
-		config.Derived.Registration.Flows = append(config.Derived.Registration.Flows,
-			authtypes.Flow{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}})
+		config.Derived.Registration.Flows = []authtypes.Flow{
+			{Stages: []authtypes.LoginType{authtypes.LoginTypeDummy}},
+		}
 	}
 
 	// Load application service configuration files
@@ -347,6 +350,7 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.SyncAPI.Defaults(opts)
 	c.UserAPI.Defaults(opts)
 	c.AppServiceAPI.Defaults(opts)
+	c.RelayAPI.Defaults(opts)
 	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
@@ -359,7 +363,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI, &c.MSCs,
+		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs, isMonolith)
 	}
@@ -375,6 +379,7 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
+	c.RelayAPI.Matrix = &c.Global
 	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived

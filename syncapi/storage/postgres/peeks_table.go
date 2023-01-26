@@ -65,6 +65,9 @@ const selectPeekingDevicesSQL = "" +
 const selectMaxPeekIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_peeks"
 
+const purgePeeksSQL = "" +
+	"DELETE FROM syncapi_peeks WHERE room_id = $1"
+
 type peekStatements struct {
 	db                       *sql.DB
 	insertPeekStmt           *sql.Stmt
@@ -73,6 +76,7 @@ type peekStatements struct {
 	selectPeeksInRangeStmt   *sql.Stmt
 	selectPeekingDevicesStmt *sql.Stmt
 	selectMaxPeekIDStmt      *sql.Stmt
+	purgePeeksStmt           *sql.Stmt
 }
 
 func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
@@ -83,25 +87,15 @@ func NewPostgresPeeksTable(db *sql.DB) (tables.Peeks, error) {
 	s := &peekStatements{
 		db: db,
 	}
-	if s.insertPeekStmt, err = db.Prepare(insertPeekSQL); err != nil {
-		return nil, err
-	}
-	if s.deletePeekStmt, err = db.Prepare(deletePeekSQL); err != nil {
-		return nil, err
-	}
-	if s.deletePeeksStmt, err = db.Prepare(deletePeeksSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPeeksInRangeStmt, err = db.Prepare(selectPeeksInRangeSQL); err != nil {
-		return nil, err
-	}
-	if s.selectPeekingDevicesStmt, err = db.Prepare(selectPeekingDevicesSQL); err != nil {
-		return nil, err
-	}
-	if s.selectMaxPeekIDStmt, err = db.Prepare(selectMaxPeekIDSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.insertPeekStmt, insertPeekSQL},
+		{&s.deletePeekStmt, deletePeekSQL},
+		{&s.deletePeeksStmt, deletePeeksSQL},
+		{&s.selectPeeksInRangeStmt, selectPeeksInRangeSQL},
+		{&s.selectPeekingDevicesStmt, selectPeekingDevicesSQL},
+		{&s.selectMaxPeekIDStmt, selectMaxPeekIDSQL},
+		{&s.purgePeeksStmt, purgePeeksSQL},
+	}.Prepare(db)
 }
 
 func (s *peekStatements) InsertPeek(
@@ -183,4 +177,11 @@ func (s *peekStatements) SelectMaxPeekID(
 		id = nullableID.Int64
 	}
 	return
+}
+
+func (s *peekStatements) PurgePeeks(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgePeeksStmt).ExecContext(ctx, roomID)
+	return err
 }

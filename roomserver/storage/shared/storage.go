@@ -43,6 +43,7 @@ type Database struct {
 	MembershipTable     tables.Membership
 	PublishedTable      tables.Published
 	RedactionsTable     tables.Redactions
+	Purge               tables.Purge
 	GetRoomUpdaterFn    func(ctx context.Context, roomInfo *types.RoomInfo) (*RoomUpdater, error)
 }
 
@@ -1365,6 +1366,43 @@ func (d *Database) JoinedUsersSetInRooms(ctx context.Context, roomIDs, userIDs [
 	return result, nil
 }
 
+// GetLeftUsers calculates users we (the server) don't share a room with anymore.
+func (d *Database) GetLeftUsers(ctx context.Context, userIDs []string) ([]string, error) {
+	// Get the userNID for all users with a stale device list
+	stateKeyNIDMap, err := d.EventStateKeyNIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	userNIDs := make([]types.EventStateKeyNID, 0, len(stateKeyNIDMap))
+	userNIDtoUserID := make(map[types.EventStateKeyNID]string, len(stateKeyNIDMap))
+	// Create a map from userNID -> userID
+	for userID, nid := range stateKeyNIDMap {
+		userNIDs = append(userNIDs, nid)
+		userNIDtoUserID[nid] = userID
+	}
+
+	// Get all users whose membership is still join, knock or invite.
+	stillJoinedUsersNIDs, err := d.MembershipTable.SelectJoinedUsers(ctx, nil, userNIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Remove joined users from the "user with stale devices" list, which contains left AND joined users
+	for _, joinedUser := range stillJoinedUsersNIDs {
+		delete(userNIDtoUserID, joinedUser)
+	}
+
+	// The users still in our userNIDtoUserID map are the users we don't share a room with anymore,
+	// and the return value we are looking for.
+	leftUsers := make([]string, 0, len(userNIDtoUserID))
+	for _, userID := range userNIDtoUserID {
+		leftUsers = append(leftUsers, userID)
+	}
+
+	return leftUsers, nil
+}
+
 // GetLocalServerInRoom returns true if we think we're in a given room or false otherwise.
 func (d *Database) GetLocalServerInRoom(ctx context.Context, roomNID types.RoomNID) (bool, error) {
 	return d.MembershipTable.SelectLocalServerInRoom(ctx, nil, roomNID)
@@ -1405,6 +1443,21 @@ func (d *Database) ForgetRoom(ctx context.Context, userID, roomID string, forget
 
 	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
 		return d.MembershipTable.UpdateForgetMembership(ctx, nil, roomNIDs[0], stateKeyNID, forget)
+	})
+}
+
+// PurgeRoom removes all information about a given room from the roomserver.
+// For large rooms this operation may take a considerable amount of time.
+func (d *Database) PurgeRoom(ctx context.Context, roomID string) error {
+	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
+		roomNID, err := d.RoomsTable.SelectRoomNIDForUpdate(ctx, txn, roomID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return fmt.Errorf("room %s does not exist", roomID)
+			}
+			return fmt.Errorf("failed to lock the room: %w", err)
+		}
+		return d.Purge.PurgeRoom(ctx, txn, roomNID, roomID)
 	})
 }
 

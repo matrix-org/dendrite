@@ -19,10 +19,12 @@ package input
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -31,13 +33,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
+	userAPI "github.com/matrix-org/dendrite/userapi/api"
+
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/internal/hooks"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/roomserver/internal/helpers"
 	"github.com/matrix-org/dendrite/roomserver/state"
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
@@ -163,6 +166,7 @@ func (r *Inputer) processRoomEvent(
 		missingPrev = !input.HasState && len(missingPrevIDs) > 0
 	}
 
+	// If we have missing events (auth or prev), we build a list of servers to ask
 	if missingAuth || missingPrev {
 		serverReq := &fedapi.QueryJoinedHostServerNamesInRoomRequest{
 			RoomID:             event.RoomID(),
@@ -197,59 +201,8 @@ func (r *Inputer) processRoomEvent(
 		}
 	}
 
-	// First of all, check that the auth events of the event are known.
-	// If they aren't then we will ask the federation API for them.
 	isRejected := false
-	authEvents := gomatrixserverlib.NewAuthEvents(nil)
-	knownEvents := map[string]*types.Event{}
-	if err = r.fetchAuthEvents(ctx, logger, roomInfo, virtualHost, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
-		return fmt.Errorf("r.fetchAuthEvents: %w", err)
-	}
-
-	// Check if the event is allowed by its auth events. If it isn't then
-	// we consider the event to be "rejected" — it will still be persisted.
 	var rejectionErr error
-	if rejectionErr = gomatrixserverlib.Allowed(event, &authEvents); rejectionErr != nil {
-		isRejected = true
-		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
-	}
-
-	// Accumulate the auth event NIDs.
-	authEventIDs := event.AuthEventIDs()
-	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
-	for _, authEventID := range authEventIDs {
-		if _, ok := knownEvents[authEventID]; !ok {
-			// Unknown auth events only really matter if the event actually failed
-			// auth. If it passed auth then we can assume that everything that was
-			// known was sufficient, even if extraneous auth events were specified
-			// but weren't found.
-			if isRejected {
-				if event.StateKey() != nil {
-					return fmt.Errorf(
-						"missing auth event %s for state event %s (type %q, state key %q)",
-						authEventID, event.EventID(), event.Type(), *event.StateKey(),
-					)
-				} else {
-					return fmt.Errorf(
-						"missing auth event %s for timeline event %s (type %q)",
-						authEventID, event.EventID(), event.Type(),
-					)
-				}
-			}
-		} else {
-			authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
-		}
-	}
-
-	var softfail bool
-	if input.Kind == api.KindNew {
-		// Check that the event passes authentication checks based on the
-		// current room state.
-		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
-		if err != nil {
-			logger.WithError(err).Warn("Error authing soft-failed event")
-		}
-	}
 
 	// At this point we are checking whether we know all of the prev events, and
 	// if we know the state before the prev events. This is necessary before we
@@ -308,6 +261,59 @@ func (r *Inputer) processRoomEvent(
 			// reject the event and hope that it gets unrejected later.
 			isRejected = true
 			rejectionErr = fmt.Errorf("missing prev events and no other servers to ask")
+		}
+	}
+
+	// Check that the auth events of the event are known.
+	// If they aren't then we will ask the federation API for them.
+	authEvents := gomatrixserverlib.NewAuthEvents(nil)
+	knownEvents := map[string]*types.Event{}
+	if err = r.fetchAuthEvents(ctx, logger, roomInfo, virtualHost, headered, &authEvents, knownEvents, serverRes.ServerNames); err != nil {
+		return fmt.Errorf("r.fetchAuthEvents: %w", err)
+	}
+
+	// Check if the event is allowed by its auth events. If it isn't then
+	// we consider the event to be "rejected" — it will still be persisted.
+	if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
+		isRejected = true
+		rejectionErr = err
+		logger.WithError(rejectionErr).Warnf("Event %s not allowed by auth events", event.EventID())
+	}
+
+	// Accumulate the auth event NIDs.
+	authEventIDs := event.AuthEventIDs()
+	authEventNIDs := make([]types.EventNID, 0, len(authEventIDs))
+	for _, authEventID := range authEventIDs {
+		if _, ok := knownEvents[authEventID]; !ok {
+			// Unknown auth events only really matter if the event actually failed
+			// auth. If it passed auth then we can assume that everything that was
+			// known was sufficient, even if extraneous auth events were specified
+			// but weren't found.
+			if isRejected {
+				if event.StateKey() != nil {
+					return fmt.Errorf(
+						"missing auth event %s for state event %s (type %q, state key %q)",
+						authEventID, event.EventID(), event.Type(), *event.StateKey(),
+					)
+				} else {
+					return fmt.Errorf(
+						"missing auth event %s for timeline event %s (type %q)",
+						authEventID, event.EventID(), event.Type(),
+					)
+				}
+			}
+		} else {
+			authEventNIDs = append(authEventNIDs, knownEvents[authEventID].EventNID)
+		}
+	}
+
+	var softfail bool
+	if input.Kind == api.KindNew {
+		// Check that the event passes authentication checks based on the
+		// current room state.
+		softfail, err = helpers.CheckForSoftFail(ctx, r.DB, headered, input.StateEventIDs)
+		if err != nil {
+			logger.WithError(err).Warn("Error authing soft-failed event")
 		}
 	}
 
@@ -437,6 +443,13 @@ func (r *Inputer) processRoomEvent(
 		})
 		if err != nil {
 			return fmt.Errorf("r.WriteOutputEvents (redactions): %w", err)
+		}
+	}
+
+	// If guest_access changed and is not can_join, kick all guest users.
+	if event.Type() == gomatrixserverlib.MRoomGuestAccess && gjson.GetBytes(event.Content(), "guest_access").Str != "can_join" {
+		if err = r.kickGuests(ctx, event, roomInfo); err != nil {
+			logrus.WithError(err).Error("failed to kick guest users on m.room.guest_access revocation")
 		}
 	}
 
@@ -728,4 +741,99 @@ func (r *Inputer) calculateAndSetState(
 	}
 	succeeded = true
 	return nil
+}
+
+// kickGuests kicks guests users from m.room.guest_access rooms, if guest access is now prohibited.
+func (r *Inputer) kickGuests(ctx context.Context, event *gomatrixserverlib.Event, roomInfo *types.RoomInfo) error {
+	membershipNIDs, err := r.DB.GetMembershipEventNIDsForRoom(ctx, roomInfo.RoomNID, true, true)
+	if err != nil {
+		return err
+	}
+
+	memberEvents, err := r.DB.Events(ctx, membershipNIDs)
+	if err != nil {
+		return err
+	}
+
+	inputEvents := make([]api.InputRoomEvent, 0, len(memberEvents))
+	latestReq := &api.QueryLatestEventsAndStateRequest{
+		RoomID: event.RoomID(),
+	}
+	latestRes := &api.QueryLatestEventsAndStateResponse{}
+	if err = r.Queryer.QueryLatestEventsAndState(ctx, latestReq, latestRes); err != nil {
+		return err
+	}
+
+	prevEvents := latestRes.LatestEvents
+	for _, memberEvent := range memberEvents {
+		if memberEvent.StateKey() == nil {
+			continue
+		}
+
+		localpart, senderDomain, err := gomatrixserverlib.SplitID('@', *memberEvent.StateKey())
+		if err != nil {
+			continue
+		}
+
+		accountRes := &userAPI.QueryAccountByLocalpartResponse{}
+		if err = r.UserAPI.QueryAccountByLocalpart(ctx, &userAPI.QueryAccountByLocalpartRequest{
+			Localpart:  localpart,
+			ServerName: senderDomain,
+		}, accountRes); err != nil {
+			return err
+		}
+		if accountRes.Account == nil {
+			continue
+		}
+
+		if accountRes.Account.AccountType != userAPI.AccountTypeGuest {
+			continue
+		}
+
+		var memberContent gomatrixserverlib.MemberContent
+		if err = json.Unmarshal(memberEvent.Content(), &memberContent); err != nil {
+			return err
+		}
+		memberContent.Membership = gomatrixserverlib.Leave
+
+		stateKey := *memberEvent.StateKey()
+		fledglingEvent := &gomatrixserverlib.EventBuilder{
+			RoomID:     event.RoomID(),
+			Type:       gomatrixserverlib.MRoomMember,
+			StateKey:   &stateKey,
+			Sender:     stateKey,
+			PrevEvents: prevEvents,
+		}
+
+		if fledglingEvent.Content, err = json.Marshal(memberContent); err != nil {
+			return err
+		}
+
+		eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(fledglingEvent)
+		if err != nil {
+			return err
+		}
+
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, r.SigningIdentity, time.Now(), &eventsNeeded, latestRes)
+		if err != nil {
+			return err
+		}
+
+		inputEvents = append(inputEvents, api.InputRoomEvent{
+			Kind:         api.KindNew,
+			Event:        event,
+			Origin:       senderDomain,
+			SendAsServer: string(senderDomain),
+		})
+		prevEvents = []gomatrixserverlib.EventReference{
+			event.EventReference(),
+		}
+	}
+
+	inputReq := &api.InputRoomEventsRequest{
+		InputRoomEvents: inputEvents,
+		Asynchronous:    true, // Needs to be async, as we otherwise create a deadlock
+	}
+	inputRes := &api.InputRoomEventsResponse{}
+	return r.InputRoomEvents(ctx, inputReq, inputRes)
 }

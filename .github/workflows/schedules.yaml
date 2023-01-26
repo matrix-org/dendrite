@@ -10,79 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # run go test with different go versions
-  test:
-    timeout-minutes: 20
-    name: Unit tests (Go ${{ matrix.go }})
-    runs-on: ubuntu-latest
-    # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        # Docker Hub image
-        image: postgres:13-alpine
-        # Provide the password for postgres
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dendrite
-        ports:
-          # Maps tcp port 5432 on service container to the host
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    strategy:
-      fail-fast: false
-      matrix:
-        go: ["1.18", "1.19"]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ matrix.go }}
-      - name: Set up gotestfmt
-        uses: gotesttools/gotestfmt-action@v2
-        with:
-          # Optional: pass GITHUB_TOKEN to avoid rate limiting.
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go${{ matrix.go }}-test-race-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go${{ matrix.go }}-test-race-
-      - run: go test -race -json -v -coverpkg=./... -coverprofile=cover.out $(go list ./... | grep -v /cmd/dendrite*) 2>&1 | gotestfmt
-        env:
-          POSTGRES_HOST: localhost
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: dendrite
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-
-  # Dummy step to gate other tests on without repeating the whole list
-  initial-tests-done:
-    name: Initial tests passed
-    needs: [test]
-    runs-on: ubuntu-latest
-    if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    steps:
-      - name: Check initial tests passed
-        uses: re-actors/alls-green@release/v1
-        with:
-          jobs: ${{ toJSON(needs) }}
-
   # run Sytest in different variations
   sytest:
     timeout-minutes: 60
-    needs: initial-tests-done
     name: "Sytest (${{ matrix.label }})"
     runs-on: ubuntu-latest
     strategy:
@@ -104,13 +34,23 @@ jobs:
       image: matrixdotorg/sytest-dendrite:latest
       volumes:
         - ${{ github.workspace }}:/src
+        - /root/.cache/go-build:/github/home/.cache/go-build
+        - /root/.cache/go-mod:/gopath/pkg/mod
       env:
         POSTGRES: ${{ matrix.postgres && 1}}
         API: ${{ matrix.api && 1 }}
         SYTEST_BRANCH: ${{ github.head_ref }}
         RACE_DETECTION: 1
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            /gopath/pkg/mod
+          key: ${{ runner.os }}-go-sytest-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-sytest-
       - name: Run Sytest
         run: /bootstrap.sh dendrite
         working-directory: /src
@@ -133,3 +73,41 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
+          
+  element_web:
+    timeout-minutes: 120
+    runs-on: ubuntu-latest
+    steps:
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          # Our test suite includes some screenshot tests with unusual diacritics, which are
+          # supposed to be covered by STIXGeneral.
+          tools: fonts-stix
+      - uses: actions/checkout@v2
+        with:
+          repository: matrix-org/matrix-react-sdk
+      - uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+      - name: Fetch layered build
+        run: scripts/ci/layered.sh
+      - name: Copy config
+        run: cp element.io/develop/config.json config.json
+        working-directory: ./element-web
+      - name: Build
+        env:
+          CI_PACKAGE: true
+        run: yarn build
+        working-directory: ./element-web
+      - name: Edit Test Config
+        run: |
+          sed -i '/HOMESERVER/c\        HOMESERVER: "dendrite",' cypress.config.ts
+      - name: "Run cypress tests"
+        uses: cypress-io/github-action@v4.1.1
+        with:
+          browser: chrome
+          start: npx serve -p 8080 ./element-web/webapp
+          wait-on: 'http://localhost:8080'
+        env:
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
+          TMPDIR: ${{ runner.temp }}

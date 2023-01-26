@@ -8,29 +8,29 @@ import (
 )
 
 // AddRoutes adds the AppServiceQueryAPI handlers to the http.ServeMux.
-func AddRoutes(a api.AppServiceInternalAPI, internalAPIMux *mux.Router) {
+func AddRoutes(a api.AppServiceInternalAPI, internalAPIMux *mux.Router, enableMetrics bool) {
 	internalAPIMux.Handle(
 		AppServiceRoomAliasExistsPath,
-		httputil.MakeInternalRPCAPI("AppserviceRoomAliasExists", a.RoomAliasExists),
+		httputil.MakeInternalRPCAPI("AppserviceRoomAliasExists", enableMetrics, a.RoomAliasExists),
 	)
 
 	internalAPIMux.Handle(
 		AppServiceUserIDExistsPath,
-		httputil.MakeInternalRPCAPI("AppserviceUserIDExists", a.UserIDExists),
+		httputil.MakeInternalRPCAPI("AppserviceUserIDExists", enableMetrics, a.UserIDExists),
 	)
 
 	internalAPIMux.Handle(
 		AppServiceProtocolsPath,
-		httputil.MakeInternalRPCAPI("AppserviceProtocols", a.Protocols),
+		httputil.MakeInternalRPCAPI("AppserviceProtocols", enableMetrics, a.Protocols),
 	)
 
 	internalAPIMux.Handle(
 		AppServiceLocationsPath,
-		httputil.MakeInternalRPCAPI("AppserviceLocations", a.Locations),
+		httputil.MakeInternalRPCAPI("AppserviceLocations", enableMetrics, a.Locations),
 	)
 
 	internalAPIMux.Handle(
 		AppServiceUserPath,
-		httputil.MakeInternalRPCAPI("AppserviceUser", a.User),
+		httputil.MakeInternalRPCAPI("AppserviceUser", enableMetrics, a.User),
 	)
 }

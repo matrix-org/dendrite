@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -61,6 +62,7 @@ COPY . .
 RUN go build ./cmd/dendrite-monolith-server
 RUN go build ./cmd/generate-keys
 RUN go build ./cmd/generate-config
+RUN go build ./cmd/create-account
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
@@ -104,6 +106,7 @@ COPY . .
 RUN go build ./cmd/dendrite-monolith-server
 RUN go build ./cmd/generate-keys
 RUN go build ./cmd/generate-config
+RUN go build ./cmd/create-account
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
@@ -457,6 +460,46 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 	log.Printf("URL %s -> %s \n", csAPIURL, containerID)
 	if err = runTests(csAPIURL, v); err != nil {
 		return fmt.Errorf("failed to run tests on version %s: %s", v, err)
+	}
+
+	err = testCreateAccount(dockerClient, v, containerID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// test that create-account is working
+func testCreateAccount(dockerClient *client.Client, v string, containerID string) error {
+	createUser := strings.ToLower("createaccountuser-" + v)
+	log.Printf("%s: Creating account %s with create-account\n", v, createUser)
+
+	respID, err := dockerClient.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
+		AttachStderr: true,
+		AttachStdout: true,
+		Cmd: []string{
+			"/build/create-account",
+			"-username", createUser,
+			"-password", "someRandomPassword",
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to ContainerExecCreate: %w", err)
+	}
+
+	response, err := dockerClient.ContainerExecAttach(context.Background(), respID.ID, types.ExecStartCheck{})
+	if err != nil {
+		return fmt.Errorf("failed to attach to container: %w", err)
+	}
+	defer response.Close()
+
+	data, err := ioutil.ReadAll(response.Reader)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Contains(data, []byte("AccessToken")) {
+		return fmt.Errorf("failed to create-account: %s", string(data))
 	}
 	return nil
 }

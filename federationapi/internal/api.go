@@ -109,13 +109,14 @@ func NewFederationInternalAPI(
 
 func (a *FederationInternalAPI) isBlacklistedOrBackingOff(s gomatrixserverlib.ServerName) (*statistics.ServerStatistics, error) {
 	stats := a.statistics.ForServer(s)
-	until, blacklisted := stats.BackoffInfo()
-	if blacklisted {
+	if stats.Blacklisted() {
 		return stats, &api.FederationClientError{
 			Blacklisted: true,
 		}
 	}
+
 	now := time.Now()
+	until := stats.BackoffInfo()
 	if until != nil && now.Before(*until) {
 		return stats, &api.FederationClientError{
 			RetryAfter: time.Until(*until),
@@ -163,7 +164,7 @@ func (a *FederationInternalAPI) doRequestIfNotBackingOffOrBlacklisted(
 			RetryAfter:  retryAfter,
 		}
 	}
-	stats.Success()
+	stats.Success(statistics.SendDirect)
 	return res, nil
 }
 
@@ -171,7 +172,7 @@ func (a *FederationInternalAPI) doRequestIfNotBlacklisted(
 	s gomatrixserverlib.ServerName, request func() (interface{}, error),
 ) (interface{}, error) {
 	stats := a.statistics.ForServer(s)
-	if _, blacklisted := stats.BackoffInfo(); blacklisted {
+	if blacklisted := stats.Blacklisted(); blacklisted {
 		return stats, &api.FederationClientError{
 			Err:         fmt.Sprintf("server %q is blacklisted", s),
 			Blacklisted: true,

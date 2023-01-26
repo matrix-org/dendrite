@@ -30,7 +30,7 @@ import (
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -138,13 +138,13 @@ func NewOutgoingQueues(
 }
 
 type queuedPDU struct {
-	receipt *shared.Receipt
-	pdu     *gomatrixserverlib.HeaderedEvent
+	dbReceipt *receipt.Receipt
+	pdu       *gomatrixserverlib.HeaderedEvent
 }
 
 type queuedEDU struct {
-	receipt *shared.Receipt
-	edu     *gomatrixserverlib.EDU
+	dbReceipt *receipt.Receipt
+	edu       *gomatrixserverlib.EDU
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
@@ -374,24 +374,13 @@ func (oqs *OutgoingQueues) SendEDU(
 	return nil
 }
 
-// IsServerBlacklisted returns whether or not the provided server is currently
-// blacklisted.
-func (oqs *OutgoingQueues) IsServerBlacklisted(srv gomatrixserverlib.ServerName) bool {
-	return oqs.statistics.ForServer(srv).Blacklisted()
-}
-
 // RetryServer attempts to resend events to the given server if we had given up.
-func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
+func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName, wasBlacklisted bool) {
 	if oqs.disabled {
 		return
 	}
 
-	serverStatistics := oqs.statistics.ForServer(srv)
-	forceWakeup := serverStatistics.Blacklisted()
-	serverStatistics.RemoveBlacklist()
-	serverStatistics.ClearBackoff()
-
 	if queue := oqs.getQueue(srv); queue != nil {
-		queue.wakeQueueIfEventsPending(forceWakeup)
+		queue.wakeQueueIfEventsPending(wasBlacklisted)
 	}
 }

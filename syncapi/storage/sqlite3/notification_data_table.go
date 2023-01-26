@@ -38,6 +38,7 @@ func NewSqliteNotificationDataTable(db *sql.DB, streamID *StreamIDStatements) (t
 	return r, sqlutil.StatementList{
 		{&r.upsertRoomUnreadCounts, upsertRoomUnreadNotificationCountsSQL},
 		{&r.selectMaxID, selectMaxNotificationIDSQL},
+		{&r.purgeNotificationData, purgeNotificationDataSQL},
 		// {&r.selectUserUnreadCountsForRooms, selectUserUnreadNotificationsForRooms}, // used at runtime
 	}.Prepare(db)
 }
@@ -47,6 +48,7 @@ type notificationDataStatements struct {
 	streamIDStatements     *StreamIDStatements
 	upsertRoomUnreadCounts *sql.Stmt
 	selectMaxID            *sql.Stmt
+	purgeNotificationData  *sql.Stmt
 	//selectUserUnreadCountsForRooms *sql.Stmt
 }
 
@@ -72,6 +74,9 @@ const selectUserUnreadNotificationsForRooms = `SELECT room_id, notification_coun
 	      room_id IN ($2)`
 
 const selectMaxNotificationIDSQL = `SELECT CASE COUNT(*) WHEN 0 THEN 0 ELSE MAX(id) END FROM syncapi_notification_data`
+
+const purgeNotificationDataSQL = "" +
+	"DELETE FROM syncapi_notification_data WHERE room_id = $1"
 
 func (r *notificationDataStatements) UpsertRoomUnreadCounts(ctx context.Context, txn *sql.Tx, userID, roomID string, notificationCount, highlightCount int) (pos types.StreamPosition, err error) {
 	pos, err = r.streamIDStatements.nextNotificationID(ctx, nil)
@@ -123,4 +128,11 @@ func (r *notificationDataStatements) SelectMaxID(ctx context.Context, txn *sql.T
 	var id int64
 	err := sqlutil.TxStmt(txn, r.selectMaxID).QueryRowContext(ctx).Scan(&id)
 	return id, err
+}
+
+func (s *notificationDataStatements) PurgeNotificationData(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeNotificationData).ExecContext(ctx, roomID)
+	return err
 }
