@@ -1,8 +1,10 @@
 ---
 title: Preparing database storage
 parent: Installation
-nav_order: 3
-permalink: /installation/database
+nav_order: 2
+parent: Manual
+grand_parent: Installation
+permalink: /installation/manual/database
 ---
 
 # Preparing database storage

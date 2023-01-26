@@ -1,17 +1,18 @@
 version: "3.4"
+
 services:
   postgres:
     hostname: postgres
-    image: postgres:14
+    image: postgres:15-alpine
     restart: always
     volumes:
-      - ./postgres/create_db.sh:/docker-entrypoint-initdb.d/20-create_db.sh
-      # To persist your PostgreSQL databases outside of the Docker image, 
-      # to prevent data loss, modify the following ./path_to path:
-      - ./path_to/postgresql:/var/lib/postgresql/data
+      # This will create a docker volume to persist the database files in.
+      # If you prefer those files to be outside of docker, you'll need to change this.
+      - dendrite_postgres_data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: itsasecret
       POSTGRES_USER: dendrite
+      POSTGRES_DATABASE: dendrite
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dendrite"]
       interval: 5s
@@ -28,116 +29,119 @@ services:
       --store_dir /var/lib/nats
       --cluster_name Dendrite
     volumes:
-      # To persist your NATS JetStream streams outside of the Docker image,
-      # prevent data loss, modify the following ./path_to path:
-      - ./path_to/nats:/var/lib/nats
+      - dendrite_jetstream:/var/lib/nats
     networks:
       - internal
+
+  # This "component" will exit immediately, it's only purpose is
+  # to provide the common settings
+  component:
+    image: matrixdotorg/dendrite-polylith:latest
+    restart: "no"
+    networks:
+      - internal
+    volumes:
+      - ./config:/etc/dendrite
+    depends_on:
+      jetstream:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
   client_api:
+    extends:
+      service: component
     hostname: client_api
-    image: matrixdotorg/dendrite-polylith:latest
     command: clientapi
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-      - postgres
-    networks:
-      - internal
     restart: unless-stopped
+    depends_on:
+      user_api:
+        condition: service_started
 
   media_api:
+    extends:
+      service: component
     hostname: media_api
-    image: matrixdotorg/dendrite-polylith:latest
     command: mediaapi
-    volumes:
-      - ./config:/etc/dendrite
-      - ./media:/var/dendrite/media
-    networks:
-      - internal
     restart: unless-stopped
+    volumes:
+      - dendrite_media:/var/dendrite/media
 
   sync_api:
+    extends:
+      service: component
     hostname: sync_api
-    image: matrixdotorg/dendrite-polylith:latest
     command: syncapi
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-      - postgres
-    networks:
-      - internal
     restart: unless-stopped
+    volumes:
+      - dendrite_search_index:/var/dendrite/searchindex
+    depends_on:
+      room_server:
+        condition: service_started
+      user_api:
+        condition: service_started
+      key_server:
+        condition: service_started
 
   room_server:
+    extends:
+      service: component
     hostname: room_server
-    image: matrixdotorg/dendrite-polylith:latest
     command: roomserver
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-      - postgres
-    networks:
-      - internal
     restart: unless-stopped
 
   federation_api:
+    extends:
+      service: component
     hostname: federation_api
-    image: matrixdotorg/dendrite-polylith:latest
     command: federationapi
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-      - postgres
-    networks:
-      - internal
     restart: unless-stopped
+    depends_on:
+      room_server:
+        condition: service_started
       
   key_server:
+    extends:
+      service: component
     hostname: key_server
-    image: matrixdotorg/dendrite-polylith:latest
     command: keyserver
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-      - postgres
-    networks:
-      - internal
     restart: unless-stopped
-      
+    depends_on:
+      room_server:
+        condition: service_started
+      federation_api:
+        condition: service_started
+
   user_api:
+    extends:
+      service: component
     hostname: user_api
-    image: matrixdotorg/dendrite-polylith:latest
     command: userapi
-    volumes:
-      - ./config:/etc/dendrite
-    depends_on:
-      - jetstream
-      - postgres
-    networks:
-      - internal
     restart: unless-stopped
+    depends_on:
+      room_server:
+        condition: service_started
+      key_server:
+        condition: service_started
 
   appservice_api:
+    extends:
+      service: component
     hostname: appservice_api
-    image: matrixdotorg/dendrite-polylith:latest
     command: appservice
-    volumes:
-      - ./config:/etc/dendrite
-    networks:
-      - internal
-    depends_on:
-      - jetstream
-      - postgres
-      - room_server
-      - user_api
     restart: unless-stopped
+    depends_on:
+      room_server:
+        condition: service_started
+      user_api:
+        condition: service_started
 
 networks:
   internal:
     attachable: true
+
+volumes:
+  dendrite_jetstream:
+  dendrite_postgres_data:
+  dendrite_media:
+  dendrite_search_index:

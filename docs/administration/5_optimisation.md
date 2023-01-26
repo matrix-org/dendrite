@@ -1,9 +1,9 @@
 ---
 title: Optimise your installation
-parent: Installation
+parent: Administration
 has_toc: true
-nav_order: 11
-permalink: /installation/start/optimisation
+nav_order: 5
+permalink: /administration/optimisation
 ---
 
 # Optimise your installation

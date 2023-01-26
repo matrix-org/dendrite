@@ -1,8 +1,9 @@
 ---
 title: Generating signing keys
-parent: Installation
-nav_order: 8
-permalink: /installation/signingkeys
+parent: Manual
+grand_parent: Installation
+nav_order: 4
+permalink: /installation/manual/signingkeys
 ---
 
 # Generating signing keys

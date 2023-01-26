@@ -1,6 +1,7 @@
 ---
 title: Troubleshooting
 parent: Administration
+nav_order: 6
 permalink: /administration/troubleshooting
 ---
 
@@ -77,7 +78,7 @@ If there aren't, you will see a log lines like this:
 level=warning msg="IMPORTANT: Process file descriptor limit is currently 65535, it is recommended to raise the limit for Dendrite to at least 65535 to avoid issues"
 ```
 
-Follow the [Optimisation](../installation/11_optimisation.md) instructions to correct the
+Follow the [Optimisation](11_optimisation.md) instructions to correct the
 available number of file descriptors.
 
 ## 6. STUN/TURN Server tester

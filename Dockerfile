@@ -1,15 +1,10 @@
 #syntax=docker/dockerfile:1.2
 
 #
-# base installs required dependencies and runs go mod download to cache dependencies
-#
-FROM --platform=${BUILDPLATFORM} docker.io/golang:1.19-alpine AS base
-RUN apk --update --no-cache add bash build-base curl
-
-#
 # build creates all needed binaries
 #
-FROM --platform=${BUILDPLATFORM} base AS build
+FROM --platform=${BUILDPLATFORM} docker.io/golang:1.19-alpine AS build
+RUN apk --update --no-cache add bash build-base curl
 WORKDIR /src
 ARG TARGETOS
 ARG TARGETARCH

@@ -69,8 +69,7 @@ global:
   # e.g. localhost:443
   well_known_server_name: ""
 
-  # The server name to delegate client-server communications to, with optional port
-  # e.g. localhost:443
+  # The base URL to delegate client-server communications to e.g. https://localhost
   well_known_client_name: ""
 
   # Lists of domains that the server will trust as identity servers to verify third
@@ -111,18 +110,6 @@ global:
 
   # Configuration for NATS JetStream
   jetstream:
-    # A list of NATS Server addresses to connect to. If none are specified, an
-    # internal NATS server will be started automatically when running Dendrite in
-    # monolith mode. For polylith deployments, it is required to specify the address
-    # of at least one NATS Server node.
-    addresses:
-    # - localhost:4222
-
-    # Disable the validation of TLS certificates of NATS. This is
-    # not recommended in production since it may allow NATS traffic
-    # to be sent to an insecure endpoint.
-    disable_tls_validation: false
-
     # Persistent directory to store JetStream streams in. This directory should be
     # preserved across Dendrite restarts.
     storage_path: ./

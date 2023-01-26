@@ -1,6 +1,7 @@
 ---
 title: Supported admin APIs
 parent: Administration
+nav_order: 4
 permalink: /administration/adminapi
 ---
 
