@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"regexp"
 	"strings"
@@ -53,17 +54,6 @@ var cfg = &config.ClientAPI{
 			},
 		},
 	},
-}
-
-func genHTTPRequest(ctx context.Context, body string, token string) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", "", strings.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	if token != "" {
-		req.Header.Add("Authorization", "Bearer "+token)
-	}
-	return req, err
 }
 
 func TestLoginFromJSONReader(t *testing.T) {
@@ -129,9 +119,9 @@ func TestLoginFromJSONReader(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 
-			req, err := genHTTPRequest(ctx, tst.Body, tst.Token)
-			if err != nil {
-				t.Fatalf("genHTTPRequest failed: %v", err)
+			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tst.Body))
+			if tst.Token != "" {
+				req.Header.Add("Authorization", "Bearer "+tst.Token)
 			}
 
 			login, cleanup, jsonErr := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
@@ -249,9 +239,9 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 		t.Run(tst.Name, func(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 
-			req, err := genHTTPRequest(ctx, tst.Body, tst.Token)
-			if err != nil {
-				t.Fatalf("genHTTPRequest failed: %v", err)
+			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tst.Body))
+			if tst.Token != "" {
+				req.Header.Add("Authorization", "Bearer "+tst.Token)
 			}
 
 			_, cleanup, errRes := LoginFromJSONReader(req, &userAPI, &userAPI, cfg)
