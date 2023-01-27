@@ -772,7 +772,7 @@ func handleApplicationServiceRegistration(
 
 	// Check application service register user request is valid.
 	// The application service's ID is returned if so.
-	appserviceID, err := internal.ValidateApplicationService(
+	appserviceID, err := internal.ValidateApplicationServiceRequest(
 		cfg, r.Username, accessToken,
 	)
 	if err != nil {
