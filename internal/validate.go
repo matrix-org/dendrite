@@ -129,23 +129,25 @@ func userIDIsWithinApplicationServiceNamespace(
 	userID string,
 	appservice *config.ApplicationService,
 ) bool {
-	var local, domain, err = gomatrixserverlib.SplitID('@', userID)
+	var localpart, domain, err = gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		// Not a valid userID
 		return false
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
+		// This is a federated userID
 		return false
 	}
 
-	if appservice.SenderLocalpart == local {
+	if localpart == appservice.SenderLocalpart {
+		// This is the application service bot userID
 		return true
 	}
 
 	// Loop through given application service's namespaces and see if any match
 	for _, namespace := range appservice.NamespaceMap["users"] {
-		// AS namespaces are checked for validity in config
+		// Application service namespaces are checked for validity in config
 		if namespace.RegexpObject.MatchString(userID) {
 			return true
 		}
@@ -172,26 +174,19 @@ func userIDMatchesMultipleExclusiveNamespaces(
 	return false
 }
 
-// UsernameMatchesExclusiveNamespaces will check if a given username matches any
-// application service's exclusive users namespace
-func UsernameMatchesExclusiveNamespaces(
+// ValidateApplicationServiceRequest checks if a provided application service
+// token corresponds to one that is registered, and, if so, checks if the
+// supplied userIDOrLocalpart is within that application service's namespace.
+//
+// As long as these two requirements are met, the matched application service
+// ID will be returned. Otherwise, it will return a JSON response with the
+// appropriate error message.
+func ValidateApplicationServiceRequest(
 	cfg *config.ClientAPI,
-	username string,
-) bool {
-	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
-	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
-}
-
-// validateApplicationService checks if a provided application service token
-// corresponds to one that is registered. If so, then it checks if the desired
-// username is within that application service's namespace. As long as these
-// two requirements are met, no error will be returned.
-func ValidateApplicationService(
-	cfg *config.ClientAPI,
-	username string,
+	userIDOrLocalpart string,
 	accessToken string,
 ) (string, *util.JSONResponse) {
-	localpart, domain, err := userutil.ParseUsernameParam(username, cfg.Matrix)
+	localpart, domain, err := userutil.ParseUsernameParam(userIDOrLocalpart, cfg.Matrix)
 	if err != nil {
 		return "", &util.JSONResponse{
 			Code: http.StatusUnauthorized,
@@ -223,7 +218,7 @@ func ValidateApplicationService(
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
-				"Supplied username %s did not match any namespaces for application service ID: %s", username, matchedApplicationService.ID)),
+				"Supplied username %s did not match any namespaces for application service ID: %s", userIDOrLocalpart, matchedApplicationService.ID)),
 		}
 	}
 
@@ -232,7 +227,7 @@ func ValidateApplicationService(
 		return "", &util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive(fmt.Sprintf(
-				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", username)),
+				"Supplied username %s matches multiple exclusive application service namespaces. Only 1 match allowed", userIDOrLocalpart)),
 		}
 	}
 

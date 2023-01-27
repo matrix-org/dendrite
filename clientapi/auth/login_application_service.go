@@ -45,7 +45,7 @@ func (t *LoginTypeApplicationService) LoginFromJSON(
 		return nil, nil, err
 	}
 
-	_, err := internal.ValidateApplicationService(t.Config, r.Identifier.User, t.Token)
+	_, err := internal.ValidateApplicationServiceRequest(t.Config, r.Identifier.User, t.Token)
 	if err != nil {
 		return nil, nil, err
 	}
