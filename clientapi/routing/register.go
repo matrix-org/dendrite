@@ -509,6 +509,16 @@ func handleGuestRegistration(
 	}
 }
 
+// localpartMatchesExclusiveNamespaces will check if a given username matches any
+// application service's exclusive users namespace
+func localpartMatchesExclusiveNamespaces(
+	cfg *config.ClientAPI,
+	localpart string,
+) bool {
+	userID := userutil.MakeUserID(localpart, cfg.Matrix.ServerName)
+	return cfg.Derived.ExclusiveApplicationServicesUsernameRegexp.MatchString(userID)
+}
+
 // handleRegistrationFlow will direct and complete registration flow stages
 // that the client has requested.
 // nolint: gocyclo
@@ -557,7 +567,7 @@ func handleRegistrationFlow(
 	// If an access token is provided, ignore this check this is an appservice
 	// request and we will validate in validateApplicationService
 	if len(cfg.Derived.ApplicationServices) != 0 &&
-		internal.UsernameMatchesExclusiveNamespaces(cfg, r.Username) {
+		localpartMatchesExclusiveNamespaces(cfg, r.Username) {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.ASExclusive("This username is reserved by an application service."),
