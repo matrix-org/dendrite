@@ -173,7 +173,7 @@ func Test_validateUsername(t *testing.T) {
 
 // This method tests validation of the provided Application Service token and
 // username that they're registering
-func TestValidationOfApplicationServices(t *testing.T) {
+func TestValidateApplicationServiceRequest(t *testing.T) {
 	// Create a fake application service
 	regex := "@_appservice_.*"
 	fakeNamespace := config.ApplicationServiceNamespace{
