@@ -41,7 +41,7 @@ func Test_validatePassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotErr := ValidatePassword(tt.password)
 			if !reflect.DeepEqual(gotErr, tt.wantError) {
-				t.Errorf("validatePassword() = %v, wantJSON %v", gotErr, tt.wantError)
+				t.Errorf("validatePassword() = %v, wantError %v", gotErr, tt.wantError)
 			}
 
 			if got := PasswordResponse(gotErr); !reflect.DeepEqual(got, tt.wantJSON) {
@@ -195,7 +195,7 @@ func TestValidationOfApplicationServices(t *testing.T) {
 
 	// Create a second fake application service where userIDs ending in
 	// "_overlap" overlap with the first.
-	regex = "@.*_overlap"
+	regex = "@_.*_overlap"
 	fakeNamespace = config.ApplicationServiceNamespace{
 		Exclusive:    true,
 		Regex:        regex,
@@ -221,49 +221,83 @@ func TestValidationOfApplicationServices(t *testing.T) {
 	fakeConfig.Global.ServerName = "localhost"
 	fakeConfig.ClientAPI.Derived.ApplicationServices = []config.ApplicationService{fakeApplicationService, fakeApplicationServiceOverlap}
 
-	// Access token is correct, user_id omitted so we are acting as SenderLocalpart
-	asID, resp := ValidateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, fakeApplicationService.ASToken)
-	if resp != nil || asID != fakeApplicationService.ID {
-		t.Errorf("appservice should have validated and returned correct ID: %s", resp.JSON)
+	tests := []struct {
+		name      string
+		localpart string
+		asToken   string
+		wantError bool
+		wantASID  string
+	}{
+		// Access token is correct, userID omitted so we are acting as SenderLocalpart
+		{
+			name:      "correct access token but omitted userID",
+			localpart: fakeSenderLocalpart,
+			asToken:   fakeApplicationService.ASToken,
+			wantError: false,
+			wantASID:  fakeApplicationService.ID,
+		},
+		// Access token is incorrect, userID omitted so we are acting as SenderLocalpart
+		{
+			name:      "incorrect access token but omitted userID",
+			localpart: fakeSenderLocalpart,
+			asToken:   "xxxx",
+			wantError: true,
+			wantASID:  "",
+		},
+		// Access token is correct, acting as valid userID
+		{
+			name:      "correct access token and valid userID",
+			localpart: "_appservice_bob",
+			asToken:   fakeApplicationService.ASToken,
+			wantError: false,
+			wantASID:  fakeApplicationService.ID,
+		},
+		// Access token is correct, acting as invalid userID
+		{
+			name:      "correct access token but invalid userID",
+			localpart: "_something_else",
+			asToken:   fakeApplicationService.ASToken,
+			wantError: true,
+			wantASID:  "",
+		},
+		// Access token is correct, acting as userID that matches two exclusive namespaces
+		{
+			name:      "correct access token but non-exclusive userID",
+			localpart: "_appservice_overlap",
+			asToken:   fakeApplicationService.ASToken,
+			wantError: true,
+			wantASID:  "",
+		},
+		// Access token is correct, acting as matching userID that is too long
+		{
+			name:      "correct access token but too long userID",
+			localpart: "_appservice_" + strings.Repeat("a", maxUsernameLength),
+			asToken:   fakeApplicationService.ASToken,
+			wantError: true,
+			wantASID:  "",
+		},
+		// Access token is correct, acting as userID that matches but is invalid
+		{
+			name:      "correct access token and matching but invalid userID",
+			localpart: "@_appservice_bob::",
+			asToken:   fakeApplicationService.ASToken,
+			wantError: true,
+			wantASID:  "",
+		},
 	}
 
-	// Access token is incorrect, user_id omitted so we are acting as SenderLocalpart
-	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, fakeSenderLocalpart, "xxxx")
-	if resp == nil || asID == fakeApplicationService.ID {
-		t.Errorf("access_token should have been marked as invalid")
-	}
-
-	// Access token is correct, acting as valid user_id
-	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, "_appservice_bob", fakeApplicationService.ASToken)
-	if resp != nil || asID != fakeApplicationService.ID {
-		t.Errorf("access_token and user_id should've been valid: %s", resp.JSON)
-	}
-
-	// Access token is correct, acting as invalid user_id
-	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, "_something_else", fakeApplicationService.ASToken)
-	if resp == nil || asID == fakeApplicationService.ID {
-		t.Errorf("user_id should not have been valid: @_something_else:localhost")
-	}
-
-	// Access token is correct, acting as user_id that matches two exclusive namespaces
-	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, "_appservice_overlap", fakeApplicationService.ASToken)
-	if resp == nil || asID == fakeApplicationService.ID {
-		t.Errorf("user_id should not have been valid: @_appservice_overlap:localhost")
-	}
-
-	// Access token is correct, acting as matching user_id that is too long
-	asID, resp = ValidateApplicationService(
-		&fakeConfig.ClientAPI,
-		"_appservice_"+strings.Repeat("a", maxUsernameLength),
-		fakeApplicationService.ASToken,
-	)
-	if resp == nil || asID == fakeApplicationService.ID {
-		t.Errorf("user_id exceeding maxUsernameLength should not have been valid")
-	}
-
-	// Access token is correct, acting as user_id that matches but is invalid
-	asID, resp = ValidateApplicationService(&fakeConfig.ClientAPI, "@_appservice_bob::", fakeApplicationService.ASToken)
-	if resp == nil || asID == fakeApplicationService.ID {
-		t.Errorf("user_id should not have been valid: @_appservice_bob::")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotASID, gotResp := ValidateApplicationServiceRequest(&fakeConfig.ClientAPI, tt.localpart, tt.asToken)
+			if tt.wantError && gotResp == nil {
+				t.Error("expected an error, but succeeded")
+			}
+			if !tt.wantError && gotResp != nil {
+				t.Errorf("expected success, but returned error: %v", *gotResp)
+			}
+			if gotASID != tt.wantASID {
+				t.Errorf("returned '%s', but expected '%s'", gotASID, tt.wantASID)
+			}
+		})
 	}
 }
