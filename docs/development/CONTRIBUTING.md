@@ -108,7 +108,7 @@ To configure the connection to a remote Postgres, you can use the following envi
 
 ```bash
 POSTGRES_USER=postgres
-POSTGERS_PASSWORD=yourPostgresPassword
+POSTGRES_PASSWORD=yourPostgresPassword
 POSTGRES_HOST=localhost
 POSTGRES_DB=postgres # the superuser database to use
 ```
