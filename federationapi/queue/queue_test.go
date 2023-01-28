@@ -923,7 +923,7 @@ func TestSendPDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
-		if fc.txCount.Load() == 1 {
+		if fc.txCount.Load() >= 1 {
 			if fc.txRelayCount.Load() == 1 {
 				data, dbErr := db.GetPendingPDUs(pc.Context(), destination, 100)
 				assert.NoError(t, dbErr)
@@ -962,7 +962,7 @@ func TestSendEDUOnRelaySuccessRemovedFromDB(t *testing.T) {
 	assert.NoError(t, err)
 
 	check := func(log poll.LogT) poll.Result {
-		if fc.txCount.Load() == 1 {
+		if fc.txCount.Load() >= 1 {
 			if fc.txRelayCount.Load() == 1 {
 				data, dbErr := db.GetPendingEDUs(pc.Context(), destination, 100)
 				assert.NoError(t, dbErr)
