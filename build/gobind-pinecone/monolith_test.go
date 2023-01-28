@@ -198,32 +198,53 @@ func TestMonolithStarts(t *testing.T) {
 }
 
 func TestMonolithSetRelayServers(t *testing.T) {
-	// "valid,invalid,,valid"
-	// ensure both valids and only them exist
-	// test with both valid & invalid nodeID input
-	// test with both self & remote nodeID
 	testCases := []struct {
 		name           string
 		nodeID         string
 		relays         string
 		expectedRelays string
+		expectSelf     bool
 	}{
 		{
 			name:           "assorted valid, invalid, empty & self keys",
 			nodeID:         "@valid:abcdef123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
 			relays:         "@valid:123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd,@invalid:notakey,,",
 			expectedRelays: "123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+			expectSelf:     true,
+		},
+		{
+			name:           "invalid node key",
+			nodeID:         "@invalid:notakey",
+			relays:         "@valid:123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd,@invalid:notakey,,",
+			expectedRelays: "",
+			expectSelf:     false,
+		},
+		{
+			name:           "node is self",
+			nodeID:         "self",
+			relays:         "@valid:123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd,@invalid:notakey,,",
+			expectedRelays: "123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+			expectSelf:     false,
 		},
 	}
 
 	for _, tc := range testCases {
 		monolith := DendriteMonolith{}
 		monolith.Start()
-		inputRelays := tc.relays + "," + monolith.PublicKey()
-		expectedRelays := tc.expectedRelays + "," + monolith.PublicKey()
-		monolith.SetRelayServers(tc.nodeID, inputRelays)
 
-		relays := monolith.GetRelayServers(tc.nodeID)
+		inputRelays := tc.relays
+		expectedRelays := tc.expectedRelays
+		if tc.expectSelf {
+			inputRelays += "," + monolith.PublicKey()
+			expectedRelays += "," + monolith.PublicKey()
+		}
+		nodeID := tc.nodeID
+		if nodeID == "self" {
+			nodeID = monolith.PublicKey()
+		}
+
+		monolith.SetRelayServers(nodeID, inputRelays)
+		relays := monolith.GetRelayServers(nodeID)
 		monolith.Stop()
 
 		if relays != expectedRelays {
