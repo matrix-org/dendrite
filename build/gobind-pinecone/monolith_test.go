@@ -196,3 +196,84 @@ func TestMonolithStarts(t *testing.T) {
 	monolith.PublicKey()
 	monolith.Stop()
 }
+
+func TestMonolithSetRelayServers(t *testing.T) {
+	// "valid,invalid,,valid"
+	// ensure both valids and only them exist
+	// test with both valid & invalid nodeID input
+	// test with both self & remote nodeID
+	testCases := []struct {
+		name           string
+		nodeID         string
+		relays         string
+		expectedRelays string
+	}{
+		{
+			name:           "assorted valid, invalid, empty & self keys",
+			nodeID:         "@valid:abcdef123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+			relays:         "@valid:123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd,@invalid:notakey,,",
+			expectedRelays: "123456123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+		},
+	}
+
+	for _, tc := range testCases {
+		monolith := DendriteMonolith{}
+		monolith.Start()
+		inputRelays := tc.relays + "," + monolith.PublicKey()
+		expectedRelays := tc.expectedRelays + "," + monolith.PublicKey()
+		monolith.SetRelayServers(tc.nodeID, inputRelays)
+
+		relays := monolith.GetRelayServers(tc.nodeID)
+		monolith.Stop()
+
+		if relays != expectedRelays {
+			t.Fatalf("%s: expected %s got %s", tc.name, expectedRelays, relays)
+		}
+	}
+}
+
+func TestParseServerKey(t *testing.T) {
+	testCases := []struct {
+		name        string
+		serverKey   string
+		expectedErr bool
+		expectedKey gomatrixserverlib.ServerName
+	}{
+		{
+			name:        "valid userid as key",
+			serverKey:   "@valid:abcdef123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+			expectedErr: false,
+			expectedKey: "abcdef123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+		},
+		{
+			name:        "valid key",
+			serverKey:   "abcdef123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+			expectedErr: false,
+			expectedKey: "abcdef123456abcdef123456abcdef123456abcdef123456abcdef123456abcd",
+		},
+		{
+			name:        "invalid userid key",
+			serverKey:   "@invalid:notakey",
+			expectedErr: true,
+			expectedKey: "",
+		},
+		{
+			name:        "invalid key",
+			serverKey:   "@invalid:notakey",
+			expectedErr: true,
+			expectedKey: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		key, err := getServerKeyFromString(tc.serverKey)
+		if tc.expectedErr && err == nil {
+			t.Fatalf("%s: expected an error", tc.name)
+		} else if !tc.expectedErr && err != nil {
+			t.Fatalf("%s: didn't expect an error: %s", tc.name, err.Error())
+		}
+		if tc.expectedKey != key {
+			t.Fatalf("%s: keys not equal. expected: %s got: %s", tc.name, tc.expectedKey, key)
+		}
+	}
+}
