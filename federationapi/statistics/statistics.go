@@ -164,6 +164,8 @@ func (s *ServerStatistics) Success(method SendMethod) {
 				logrus.WithError(err).Errorf("Failed to remove %q from blacklist", s.serverName)
 			}
 		}
+
+		s.removeAssumedOffline()
 	}
 }
 
