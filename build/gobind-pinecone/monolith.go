@@ -600,20 +600,21 @@ func (m *DendriteMonolith) Start() {
 		}
 	}()
 
-	go func(ch <-chan pineconeEvents.Event) {
-		eLog := logrus.WithField("pinecone", "events")
-		stopRelayServerSync := make(chan bool)
+	stopRelayServerSync := make(chan bool)
 
-		m.relayRetriever = RelayServerRetriever{
-			Context:             context.Background(),
-			ServerName:          gomatrixserverlib.ServerName(m.PineconeRouter.PublicKey().String()),
-			FederationAPI:       m.federationAPI,
-			relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
-			RelayAPI:            monolith.RelayAPI,
-			running:             *atomic.NewBool(false),
-			quit:                stopRelayServerSync,
-		}
-		m.relayRetriever.InitializeRelayServers(eLog)
+	eLog := logrus.WithField("pinecone", "events")
+	m.relayRetriever = RelayServerRetriever{
+		Context:             context.Background(),
+		ServerName:          gomatrixserverlib.ServerName(m.PineconeRouter.PublicKey().String()),
+		FederationAPI:       m.federationAPI,
+		relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
+		RelayAPI:            monolith.RelayAPI,
+		running:             *atomic.NewBool(false),
+		quit:                stopRelayServerSync,
+	}
+	m.relayRetriever.InitializeRelayServers(eLog)
+
+	go func(ch <-chan pineconeEvents.Event) {
 
 		for event := range ch {
 			switch e := event.(type) {

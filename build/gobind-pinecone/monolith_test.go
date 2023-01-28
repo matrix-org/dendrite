@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -247,10 +248,31 @@ func TestMonolithSetRelayServers(t *testing.T) {
 		relays := monolith.GetRelayServers(nodeID)
 		monolith.Stop()
 
-		if relays != expectedRelays {
+		if !containSameKeys(strings.Split(relays, ","), strings.Split(expectedRelays, ",")) {
 			t.Fatalf("%s: expected %s got %s", tc.name, expectedRelays, relays)
 		}
 	}
+}
+
+func containSameKeys(expected []string, actual []string) bool {
+	if len(expected) != len(actual) {
+		return false
+	}
+
+	for _, expectedKey := range expected {
+		hasMatch := false
+		for _, actualKey := range actual {
+			if actualKey == expectedKey {
+				hasMatch = true
+			}
+		}
+
+		if !hasMatch {
+			return false
+		}
+	}
+
+	return true
 }
 
 func TestParseServerKey(t *testing.T) {
