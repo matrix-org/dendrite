@@ -90,6 +90,7 @@ type DendriteMonolith struct {
 	httpServer        *http.Server
 	userAPI           userapiAPI.UserInternalAPI
 	federationAPI     api.FederationInternalAPI
+	relayAPI          relayServerAPI.RelayInternalAPI
 	relayRetriever    RelayServerRetriever
 }
 
@@ -313,6 +314,14 @@ func (m *DendriteMonolith) GetRelayServers(nodeID string) string {
 	return relaysString
 }
 
+func (m *DendriteMonolith) RelayingEnabled() bool {
+	return m.relayAPI.RelayingEnabled()
+}
+
+func (m *DendriteMonolith) SetRelayingEnabled(enabled bool) {
+	m.relayAPI.SetRelayingEnabled(enabled)
+}
+
 func (m *DendriteMonolith) DisconnectType(peertype int) {
 	for _, p := range m.PineconeRouter.Peers() {
 		if int(peertype) == p.PeerType {
@@ -528,7 +537,7 @@ func (m *DendriteMonolith) Start() {
 		Config:                 &base.Cfg.FederationAPI,
 		UserAPI:                m.userAPI,
 	}
-	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer)
+	m.relayAPI = relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer, false)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
@@ -541,7 +550,7 @@ func (m *DendriteMonolith) Start() {
 		RoomserverAPI:            rsAPI,
 		UserAPI:                  m.userAPI,
 		KeyAPI:                   keyAPI,
-		RelayAPI:                 relayAPI,
+		RelayAPI:                 m.relayAPI,
 		ExtPublicRoomsProvider:   roomProvider,
 		ExtUserDirectoryProvider: userProvider,
 	}

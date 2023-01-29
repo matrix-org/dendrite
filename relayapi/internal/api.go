@@ -15,6 +15,8 @@
 package internal
 
 import (
+	"sync"
+
 	fedAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/producers"
 	"github.com/matrix-org/dendrite/relayapi/storage"
@@ -30,6 +32,8 @@ type RelayInternalAPI struct {
 	producer               *producers.SyncAPIProducer
 	presenceEnabledInbound bool
 	serverName             gomatrixserverlib.ServerName
+	relayingEnabledMutex   sync.Mutex
+	relayingEnabled        bool
 }
 
 func NewRelayInternalAPI(
@@ -40,6 +44,7 @@ func NewRelayInternalAPI(
 	producer *producers.SyncAPIProducer,
 	presenceEnabledInbound bool,
 	serverName gomatrixserverlib.ServerName,
+	relayingEnabled bool,
 ) *RelayInternalAPI {
 	return &RelayInternalAPI{
 		db:                     db,
@@ -49,5 +54,6 @@ func NewRelayInternalAPI(
 		producer:               producer,
 		presenceEnabledInbound: presenceEnabledInbound,
 		serverName:             serverName,
+		relayingEnabled:        relayingEnabled,
 	}
 }

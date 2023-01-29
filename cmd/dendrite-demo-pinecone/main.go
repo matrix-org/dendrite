@@ -244,7 +244,7 @@ func main() {
 		Config:                 &base.Cfg.FederationAPI,
 		UserAPI:                userAPI,
 	}
-	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer)
+	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer, true)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

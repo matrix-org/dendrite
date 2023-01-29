@@ -24,6 +24,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SetRelayingEnabled implements api.RelayInternalAPI
+func (r *RelayInternalAPI) SetRelayingEnabled(enabled bool) {
+	r.relayingEnabledMutex.Lock()
+	defer r.relayingEnabledMutex.Unlock()
+	r.relayingEnabled = enabled
+}
+
+// RelayingEnabled implements api.RelayInternalAPI
+func (r *RelayInternalAPI) RelayingEnabled() bool {
+	r.relayingEnabledMutex.Lock()
+	defer r.relayingEnabledMutex.Unlock()
+	return r.relayingEnabled
+}
+
 // PerformRelayServerSync implements api.RelayInternalAPI
 func (r *RelayInternalAPI) PerformRelayServerSync(
 	ctx context.Context,

@@ -36,7 +36,7 @@ func TestCreateNewRelayInternalAPI(t *testing.T) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
 		assert.NotNil(t, relayAPI)
 	})
 }
@@ -52,7 +52,7 @@ func TestCreateRelayInternalInvalidDatabasePanics(t *testing.T) {
 		defer close()
 
 		assert.Panics(t, func() {
-			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
+			relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
 		})
 	})
 }
@@ -108,7 +108,7 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		base, close := testrig.CreateBaseDendrite(t, dbType)
 		defer close()
 
-		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil)
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, true)
 		assert.NotNil(t, relayAPI)
 
 		serverKeyAPI := &signing.YggdrasilKeys{}
@@ -116,10 +116,9 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
 
 		testCases := []struct {
-			name            string
-			req             *http.Request
-			wantCode        int
-			wantJoinedRooms []string
+			name     string
+			req      *http.Request
+			wantCode int
 		}{
 			{
 				name:     "relay_txn invalid user id",
@@ -140,6 +139,45 @@ func TestCreateRelayPublicRoutes(t *testing.T) {
 				name:     "send_relay valid user id",
 				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
 				wantCode: 200,
+			},
+		}
+
+		for _, tc := range testCases {
+			w := httptest.NewRecorder()
+			base.PublicFederationAPIMux.ServeHTTP(w, tc.req)
+			if w.Code != tc.wantCode {
+				t.Fatalf("%s: got HTTP %d want %d", tc.name, w.Code, tc.wantCode)
+			}
+		}
+	})
+}
+
+func TestDisableRelayPublicRoutes(t *testing.T) {
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		base, close := testrig.CreateBaseDendrite(t, dbType)
+		defer close()
+
+		relayAPI := relayapi.NewRelayInternalAPI(base, nil, nil, nil, nil, false)
+		assert.NotNil(t, relayAPI)
+
+		serverKeyAPI := &signing.YggdrasilKeys{}
+		keyRing := serverKeyAPI.KeyRing()
+		relayapi.AddPublicRoutes(base, keyRing, relayAPI)
+
+		testCases := []struct {
+			name     string
+			req      *http.Request
+			wantCode int
+		}{
+			{
+				name:     "relay_txn valid user id",
+				req:      createGetRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "@user:local"),
+				wantCode: 404,
+			},
+			{
+				name:     "send_relay valid user id",
+				req:      createSendRelayTxnHTTPRequest(base.Cfg.Global.ServerName, "123", "@user:local"),
+				wantCode: 404,
 			},
 		}
 

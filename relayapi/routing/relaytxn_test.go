@@ -57,7 +57,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
@@ -90,7 +90,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
@@ -123,7 +123,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
@@ -186,7 +186,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})

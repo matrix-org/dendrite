@@ -30,6 +30,12 @@ type RelayInternalAPI interface {
 		userID gomatrixserverlib.UserID,
 		relayServer gomatrixserverlib.ServerName,
 	) error
+
+	// Tells the relayapi whether or not it should act as a relay server for external servers.
+	SetRelayingEnabled(bool)
+
+	// Obtain whether the relayapi is currently configured to act as a relay server for external servers.
+	RelayingEnabled() bool
 }
 
 // RelayServerAPI exposes the store & query transaction functionality of a relay server.

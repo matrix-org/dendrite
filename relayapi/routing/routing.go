@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -48,6 +49,14 @@ func Setup(
 	v1fedmux.Handle("/send_relay/{txnID}/{userID}", MakeRelayAPI(
 		"send_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			logrus.Infof("Handling send_relay from: %s", request.Origin())
+			if !relayAPI.RelayingEnabled() {
+				logrus.Warnf("Dropping send_relay from: %s", request.Origin())
+				return util.JSONResponse{
+					Code: http.StatusNotFound,
+				}
+			}
+
 			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
@@ -65,6 +74,14 @@ func Setup(
 	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
 		"get_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			logrus.Infof("Handling relay_txn from: %s", request.Origin())
+			if !relayAPI.RelayingEnabled() {
+				logrus.Warnf("Dropping relay_txn from: %s", request.Origin())
+				return util.JSONResponse{
+					Code: http.StatusNotFound,
+				}
+			}
+
 			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
