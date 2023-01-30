@@ -159,6 +159,7 @@ func Context(
 	}).Debug("applied history visibility (context eventsBefore/eventsAfter)")
 
 	// TODO: Get the actual state at the last event returned by SelectContextAfterEvent
+	stateFilter.LazyLoadMembers = false
 	state, err := snapshot.CurrentState(ctx, roomID, &stateFilter, nil)
 	if err != nil {
 		logrus.WithError(err).Error("unable to fetch current room state")

@@ -156,12 +156,12 @@ func TestRecentEventsPDU(t *testing.T) {
 			tc := testCases[i]
 			t.Run(tc.Name, func(st *testing.T) {
 				var filter gomatrixserverlib.RoomEventFilter
-				var gotEvents []types.StreamEvent
+				var gotEvents map[string]types.RecentEvents
 				var limited bool
 				filter.Limit = tc.Limit
 				WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 					var err error
-					gotEvents, limited, err = snapshot.RecentEvents(ctx, r.ID, types.Range{
+					gotEvents, err = snapshot.RecentEvents(ctx, []string{r.ID}, types.Range{
 						From: tc.From,
 						To:   tc.To,
 					}, &filter, !tc.ReverseOrder, true)
@@ -169,15 +169,18 @@ func TestRecentEventsPDU(t *testing.T) {
 						st.Fatalf("failed to do sync: %s", err)
 					}
 				})
+				streamEvents := gotEvents[r.ID]
+				limited = streamEvents.Limited
 				if limited != tc.WantLimited {
 					st.Errorf("got limited=%v want %v", limited, tc.WantLimited)
 				}
-				if len(gotEvents) != len(tc.WantEvents) {
+				if len(streamEvents.Events) != len(tc.WantEvents) {
 					st.Errorf("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
 				}
-				for j := range gotEvents {
-					if !reflect.DeepEqual(gotEvents[j].JSON(), tc.WantEvents[j].JSON()) {
-						st.Errorf("event %d got %s want %s", j, string(gotEvents[j].JSON()), string(tc.WantEvents[j].JSON()))
+
+				for j := range streamEvents.Events {
+					if !reflect.DeepEqual(streamEvents.Events[j].JSON(), tc.WantEvents[j].JSON()) {
+						st.Errorf("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
 					}
 				}
 			})

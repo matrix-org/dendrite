@@ -366,11 +366,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 	return streamPos, err
 }
 
-func (s *outputRoomEventsStatements) SelectRecentEvents(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
-	chronologicalOrder bool, onlySyncEvents bool,
-) ([]types.StreamEvent, bool, error) {
+func (s *outputRoomEventsStatements) SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomIDs []string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
 	var query string
 	if onlySyncEvents {
 		query = selectRecentEventsForSyncSQL
@@ -381,25 +377,25 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, query,
 		[]interface{}{
-			roomID, r.Low(), r.High(),
+			roomIDs, r.Low(), r.High(),
 		},
 		eventFilter.Senders, eventFilter.NotSenders,
 		eventFilter.Types, eventFilter.NotTypes,
 		nil, eventFilter.ContainsURL, eventFilter.Limit+1, FilterOrderDesc,
 	)
 	if err != nil {
-		return nil, false, fmt.Errorf("s.prepareWithFilters: %w", err)
+		return nil, fmt.Errorf("s.prepareWithFilters: %w", err)
 	}
 	defer internal.CloseAndLogIfError(ctx, stmt, "selectRecentEvents: stmt.close() failed")
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
 	events, err := rowsToStreamEvents(rows)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if chronologicalOrder {
 		// The events need to be returned from oldest to latest, which isn't
@@ -410,9 +406,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		})
 	}
 	// we queried for 1 more than the limit, so if we returned one more mark limited=true
-	limited := false
 	if len(events) > eventFilter.Limit {
-		limited = true
 		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
 		if chronologicalOrder {
 			events = events[1:]
@@ -420,7 +414,7 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 			events = events[:len(events)-1]
 		}
 	}
-	return events, limited, nil
+	return map[string]types.RecentEvents{}, nil
 }
 
 func (s *outputRoomEventsStatements) SelectEarlyEvents(

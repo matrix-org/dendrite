@@ -21,16 +21,14 @@ import (
 	"encoding/json"
 	"sort"
 
+	"github.com/lib/pq"
 	"github.com/matrix-org/dendrite/internal"
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/syncapi/storage/postgres/deltas"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
-
-	"github.com/lib/pq"
 	"github.com/matrix-org/gomatrixserverlib"
-
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 )
 
 const outputRoomEventsSchema = `
@@ -109,14 +107,27 @@ const selectRecentEventsSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id DESC LIMIT $8"
 
-const selectRecentEventsForSyncSQL = "" +
-	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
-	" WHERE room_id = $1 AND id > $2 AND id <= $3 AND exclude_from_sync = FALSE" +
-	" AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )" +
-	" AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )" +
-	" AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )" +
-	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
-	" ORDER BY id DESC LIMIT $8"
+const selectRecentEventsForSyncSQL = `
+WITH room_ids AS (
+     SELECT unnest($1::text[]) AS room_id
+)
+SELECT    x.*
+FROM room_ids,
+          LATERAL  (
+              SELECT room_id, event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility
+                    FROM syncapi_output_room_events recent_events
+                    WHERE
+                      recent_events.room_id = room_ids.room_id
+                      AND recent_events.exclude_from_sync = FALSE
+                      AND id > $2 AND id <= $3
+                      AND ( $4::text[] IS NULL OR     sender  = ANY($4)  )
+                      AND ( $5::text[] IS NULL OR NOT(sender  = ANY($5)) )
+                      AND ( $6::text[] IS NULL OR     type LIKE ANY($6)  )
+                      AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )
+                    ORDER BY recent_events.id DESC
+                    LIMIT $8
+              ) AS x
+`
 
 const selectEarlyEventsSQL = "" +
 	"SELECT event_id, id, headered_event_json, session_id, exclude_from_sync, transaction_id, history_visibility FROM syncapi_output_room_events" +
@@ -396,11 +407,7 @@ func (s *outputRoomEventsStatements) InsertEvent(
 // selectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
 // If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude
 // from sync.
-func (s *outputRoomEventsStatements) SelectRecentEvents(
-	ctx context.Context, txn *sql.Tx,
-	roomID string, r types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
-	chronologicalOrder bool, onlySyncEvents bool,
-) ([]types.StreamEvent, bool, error) {
+func (s *outputRoomEventsStatements) SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomIDs []string, ra types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)
@@ -408,8 +415,9 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsStmt)
 	}
 	senders, notSenders := getSendersRoomEventFilter(eventFilter)
+
 	rows, err := stmt.QueryContext(
-		ctx, roomID, r.Low(), r.High(),
+		ctx, pq.StringArray(roomIDs), ra.Low(), ra.High(),
 		pq.StringArray(senders),
 		pq.StringArray(notSenders),
 		pq.StringArray(filterConvertTypeWildcardToSQL(eventFilter.Types)),
@@ -417,34 +425,80 @@ func (s *outputRoomEventsStatements) SelectRecentEvents(
 		eventFilter.Limit+1,
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "selectRecentEvents: rows.close() failed")
-	events, err := rowsToStreamEvents(rows)
-	if err != nil {
-		return nil, false, err
-	}
-	if chronologicalOrder {
-		// The events need to be returned from oldest to latest, which isn't
-		// necessary the way the SQL query returns them, so a sort is necessary to
-		// ensure the events are in the right order in the slice.
-		sort.SliceStable(events, func(i int, j int) bool {
-			return events[i].StreamPosition < events[j].StreamPosition
-		})
-	}
-	// we queried for 1 more than the limit, so if we returned one more mark limited=true
-	limited := false
-	if len(events) > eventFilter.Limit {
-		limited = true
-		// re-slice the extra (oldest) event out: in chronological order this is the first entry, else the last.
-		if chronologicalOrder {
-			events = events[1:]
-		} else {
-			events = events[:len(events)-1]
+
+	result := make(map[string]types.RecentEvents)
+
+	for rows.Next() {
+		var (
+			roomID            string
+			eventID           string
+			streamPos         types.StreamPosition
+			eventBytes        []byte
+			excludeFromSync   bool
+			sessionID         *int64
+			txnID             *string
+			transactionID     *api.TransactionID
+			historyVisibility gomatrixserverlib.HistoryVisibility
+		)
+		if err := rows.Scan(&roomID, &eventID, &streamPos, &eventBytes, &sessionID, &excludeFromSync, &txnID, &historyVisibility); err != nil {
+			return nil, err
 		}
+		// TODO: Handle redacted events
+		var ev gomatrixserverlib.HeaderedEvent
+		if err := ev.UnmarshalJSONWithEventID(eventBytes, eventID); err != nil {
+			return nil, err
+		}
+
+		if sessionID != nil && txnID != nil {
+			transactionID = &api.TransactionID{
+				SessionID:     *sessionID,
+				TransactionID: *txnID,
+			}
+		}
+
+		r := result[roomID]
+
+		ev.Visibility = historyVisibility
+		r.Events = append(r.Events, types.StreamEvent{
+			HeaderedEvent:   &ev,
+			StreamPosition:  streamPos,
+			TransactionID:   transactionID,
+			ExcludeFromSync: excludeFromSync,
+		})
+
+		result[roomID] = r
 	}
 
-	return events, limited, nil
+	if chronologicalOrder {
+		for roomID, evs := range result {
+			// The events need to be returned from oldest to latest, which isn't
+			// necessary the way the SQL query returns them, so a sort is necessary to
+			// ensure the events are in the right order in the slice.
+			sort.SliceStable(evs.Events, func(i int, j int) bool {
+				return evs.Events[i].StreamPosition < evs.Events[j].StreamPosition
+			})
+
+			if len(evs.Events) > eventFilter.Limit {
+				evs.Limited = true
+				evs.Events = evs.Events[1:]
+			}
+
+			result[roomID] = evs
+		}
+	} else {
+		for roomID, evs := range result {
+			if len(evs.Events) > eventFilter.Limit {
+				evs.Limited = true
+				evs.Events = evs.Events[:len(evs.Events)-1]
+			}
+
+			result[roomID] = evs
+		}
+	}
+	return result, rows.Err()
 }
 
 // selectEarlyEvents returns the earliest events in the given room, starting
