@@ -64,11 +64,12 @@ import (
 )
 
 var (
-	instanceName   = flag.String("name", "dendrite-p2p-pinecone", "the name of this P2P demo instance")
-	instancePort   = flag.Int("port", 8008, "the port that the client API will listen on")
-	instancePeer   = flag.String("peer", "", "the static Pinecone peers to connect to, comma separated-list")
-	instanceListen = flag.String("listen", ":0", "the port Pinecone peers can connect to")
-	instanceDir    = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
+	instanceName            = flag.String("name", "dendrite-p2p-pinecone", "the name of this P2P demo instance")
+	instancePort            = flag.Int("port", 8008, "the port that the client API will listen on")
+	instancePeer            = flag.String("peer", "", "the static Pinecone peers to connect to, comma separated-list")
+	instanceListen          = flag.String("listen", ":0", "the port Pinecone peers can connect to")
+	instanceDir             = flag.String("dir", ".", "the directory to store the databases in (if --config not specified)")
+	instanceRelayingEnabled = flag.Bool("relay", false, "whether to enable store & forward relaying for other nodes")
 )
 
 const relayServerRetryInterval = time.Second * 30
@@ -244,7 +245,8 @@ func main() {
 		Config:                 &base.Cfg.FederationAPI,
 		UserAPI:                userAPI,
 	}
-	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer, true)
+	relayAPI := relayapi.NewRelayInternalAPI(base, federation, rsAPI, keyRing, producer, *instanceRelayingEnabled)
+	logrus.Infof("Relaying enabled: %v", relayAPI.RelayingEnabled())
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
