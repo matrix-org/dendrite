@@ -46,8 +46,8 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 	}
 
 	res = gomatrixserverlib.RespGetRelayTransaction{
-		Txn:     gomatrixserverlib.Transaction{},
-		EntryID: 0,
+		Transaction: gomatrixserverlib.Transaction{},
+		EntryID:     0,
 	}
 	if f.queueDepth > 0 {
 		res.EntriesQueued = true
