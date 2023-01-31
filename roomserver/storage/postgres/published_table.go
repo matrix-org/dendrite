@@ -69,6 +69,10 @@ func CreatePublishedTable(db *sql.DB) error {
 		Version: "roomserver: published appservice",
 		Up:      deltas.UpPulishedAppservice,
 	})
+	m.AddMigrations(sqlutil.Migration{
+		Version: "roomserver: published appservice pkey",
+		Up:      deltas.UpPulishedAppservicePrimaryKey,
+	})
 	return m.Up(context.Background())
 }
 
