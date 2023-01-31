@@ -33,6 +33,7 @@ import (
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/embed"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/keys"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/relay"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
@@ -49,7 +50,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
-	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/userapi"
 	"github.com/matrix-org/gomatrixserverlib"
 
@@ -71,7 +71,6 @@ var (
 	instanceRelayingEnabled = flag.Bool("relay", false, "whether to enable store & forward relaying for other nodes")
 )
 
-// nolint:gocyclo
 func main() {
 	flag.Parse()
 	internal.SetupPprof()
@@ -97,40 +96,8 @@ func main() {
 		pk = sk.Public().(ed25519.PublicKey)
 	} else {
 		keyfile := filepath.Join(*instanceDir, *instanceName) + ".pem"
-		if _, err := os.Stat(keyfile); os.IsNotExist(err) {
-			oldkeyfile := *instanceName + ".key"
-			if _, err = os.Stat(oldkeyfile); os.IsNotExist(err) {
-				if err = test.NewMatrixKey(keyfile); err != nil {
-					panic("failed to generate a new PEM key: " + err.Error())
-				}
-				if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
-					panic("failed to load PEM key: " + err.Error())
-				}
-				if len(sk) != ed25519.PrivateKeySize {
-					panic("the private key is not long enough")
-				}
-			} else {
-				if sk, err = os.ReadFile(oldkeyfile); err != nil {
-					panic("failed to read the old private key: " + err.Error())
-				}
-				if len(sk) != ed25519.PrivateKeySize {
-					panic("the private key is not long enough")
-				}
-				if err := test.SaveMatrixKey(keyfile, sk); err != nil {
-					panic("failed to convert the private key to PEM format: " + err.Error())
-				}
-			}
-		} else {
-			var err error
-			if _, sk, err = config.LoadMatrixKey(keyfile, os.ReadFile); err != nil {
-				panic("failed to load PEM key: " + err.Error())
-			}
-			if len(sk) != ed25519.PrivateKeySize {
-				panic("the private key is not long enough")
-			}
-		}
-
-		pk = sk.Public().(ed25519.PublicKey)
+		oldKeyfile := *instanceName + ".key"
+		sk, pk = keys.GetOrCreateKey(keyfile, oldKeyfile)
 
 		cfg.Defaults(config.DefaultOpts{
 			Generate:   true,
