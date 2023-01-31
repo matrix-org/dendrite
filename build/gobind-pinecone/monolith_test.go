@@ -15,19 +15,13 @@
 package gobind
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/matrix-org/dendrite/federationapi/api"
-	relayServerAPI "github.com/matrix-org/dendrite/relayapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gotest.tools/v3/poll"
 )
 
 var TestBuf = []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
@@ -126,69 +120,6 @@ func TestConduitReadCopyFails(t *testing.T) {
 	conduit := Conduit{conn: &TestNetConn{shouldFail: true}}
 	_, err := conduit.ReadCopy()
 	assert.Error(t, err)
-}
-
-var testRelayServers = []gomatrixserverlib.ServerName{"relay1", "relay2"}
-
-type FakeFedAPI struct {
-	api.FederationInternalAPI
-}
-
-func (f *FakeFedAPI) P2PQueryRelayServers(ctx context.Context, req *api.P2PQueryRelayServersRequest, res *api.P2PQueryRelayServersResponse) error {
-	res.RelayServers = testRelayServers
-	return nil
-}
-
-type FakeRelayAPI struct {
-	relayServerAPI.RelayInternalAPI
-}
-
-func (r *FakeRelayAPI) PerformRelayServerSync(ctx context.Context, userID gomatrixserverlib.UserID, relayServer gomatrixserverlib.ServerName) error {
-	return nil
-}
-
-func TestRelayRetrieverInitialization(t *testing.T) {
-	retriever := RelayServerRetriever{
-		Context:             context.Background(),
-		ServerName:          "server",
-		relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
-		FederationAPI:       &FakeFedAPI{},
-		RelayAPI:            &FakeRelayAPI{},
-	}
-
-	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
-	relayServers := retriever.GetQueriedServerStatus()
-	assert.Equal(t, 2, len(relayServers))
-}
-
-func TestRelayRetrieverSync(t *testing.T) {
-	retriever := RelayServerRetriever{
-		Context:             context.Background(),
-		ServerName:          "server",
-		relayServersQueried: make(map[gomatrixserverlib.ServerName]bool),
-		FederationAPI:       &FakeFedAPI{},
-		RelayAPI:            &FakeRelayAPI{},
-	}
-
-	retriever.InitializeRelayServers(logrus.WithField("test", "relay"))
-	relayServers := retriever.GetQueriedServerStatus()
-	assert.Equal(t, 2, len(relayServers))
-
-	stopRelayServerSync := make(chan bool)
-	go retriever.SyncRelayServers(stopRelayServerSync)
-
-	check := func(log poll.LogT) poll.Result {
-		relayServers := retriever.GetQueriedServerStatus()
-		for _, queried := range relayServers {
-			if !queried {
-				return poll.Continue("waiting for all servers to be queried")
-			}
-		}
-
-		stopRelayServerSync <- true
-		return poll.Success()
-	}
-	poll.WaitOn(t, check, poll.WithTimeout(5*time.Second), poll.WithDelay(100*time.Millisecond))
 }
 
 func TestMonolithStarts(t *testing.T) {
