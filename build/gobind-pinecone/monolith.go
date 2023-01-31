@@ -21,20 +21,17 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/clientapi/userutil"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conduit"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/relay"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
@@ -291,16 +288,14 @@ func (m *DendriteMonolith) DisconnectPort(port int) {
 	m.PineconeRouter.Disconnect(types.SwitchPortID(port), nil)
 }
 
-func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) {
+func (m *DendriteMonolith) Conduit(zone string, peertype int) (*conduit.Conduit, error) {
 	l, r := net.Pipe()
-	conduit := &Conduit{conn: r, port: 0}
+	newConduit := conduit.NewConduit(r, 0)
 	go func() {
-		conduit.portMutex.Lock()
-		defer conduit.portMutex.Unlock()
-
 		logrus.Errorf("Attempting authenticated connect")
+		var port types.SwitchPortID
 		var err error
-		if conduit.port, err = m.PineconeRouter.Connect(
+		if port, err = m.PineconeRouter.Connect(
 			l,
 			pineconeRouter.ConnectionZone(zone),
 			pineconeRouter.ConnectionPeerType(peertype),
@@ -308,12 +303,13 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*Conduit, error) 
 			logrus.Errorf("Authenticated connect failed: %s", err)
 			_ = l.Close()
 			_ = r.Close()
-			_ = conduit.Close()
+			_ = newConduit.Close()
 			return
 		}
-		logrus.Infof("Authenticated connect succeeded (port %d)", conduit.port)
+		newConduit.SetPort(port)
+		logrus.Infof("Authenticated connect succeeded (port %d)", newConduit.Port())
 	}()
-	return conduit, nil
+	return &newConduit, nil
 }
 
 func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, error) {
@@ -601,53 +597,4 @@ func (m *DendriteMonolith) Stop() {
 	m.PineconeMulticast.Stop()
 	_ = m.PineconeQUIC.Close()
 	_ = m.PineconeRouter.Close()
-}
-
-const MaxFrameSize = types.MaxFrameSize
-
-type Conduit struct {
-	closed    atomic.Bool
-	conn      net.Conn
-	port      types.SwitchPortID
-	portMutex sync.Mutex
-}
-
-func (c *Conduit) Port() int {
-	c.portMutex.Lock()
-	defer c.portMutex.Unlock()
-	return int(c.port)
-}
-
-func (c *Conduit) Read(b []byte) (int, error) {
-	if c.closed.Load() {
-		return 0, io.EOF
-	}
-	return c.conn.Read(b)
-}
-
-func (c *Conduit) ReadCopy() ([]byte, error) {
-	if c.closed.Load() {
-		return nil, io.EOF
-	}
-	var buf [65535 * 2]byte
-	n, err := c.conn.Read(buf[:])
-	if err != nil {
-		return nil, err
-	}
-	return buf[:n], nil
-}
-
-func (c *Conduit) Write(b []byte) (int, error) {
-	if c.closed.Load() {
-		return 0, io.EOF
-	}
-	return c.conn.Write(b)
-}
-
-func (c *Conduit) Close() error {
-	if c.closed.Load() {
-		return io.ErrClosedPipe
-	}
-	c.closed.Store(true)
-	return c.conn.Close()
 }
