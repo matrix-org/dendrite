@@ -407,7 +407,11 @@ func (s *outputRoomEventsStatements) InsertEvent(
 // selectRecentEvents returns the most recent events in the given room, up to a maximum of 'limit'.
 // If onlySyncEvents has a value of true, only returns the events that aren't marked as to exclude
 // from sync.
-func (s *outputRoomEventsStatements) SelectRecentEvents(ctx context.Context, txn *sql.Tx, roomIDs []string, ra types.Range, eventFilter *gomatrixserverlib.RoomEventFilter, chronologicalOrder bool, onlySyncEvents bool) (map[string]types.RecentEvents, error) {
+func (s *outputRoomEventsStatements) SelectRecentEvents(
+	ctx context.Context, txn *sql.Tx,
+	roomIDs []string, ra types.Range, eventFilter *gomatrixserverlib.RoomEventFilter,
+	chronologicalOrder bool, onlySyncEvents bool,
+) (map[string]types.RecentEvents, error) {
 	var stmt *sql.Stmt
 	if onlySyncEvents {
 		stmt = sqlutil.TxStmt(txn, s.selectRecentEventsForSyncStmt)

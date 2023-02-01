@@ -200,7 +200,7 @@ func visibilityForEvents(
 			visibility:        event.Visibility,
 		}
 		ev, ok := membershipResp.Memberships[eventID]
-		if !ok {
+		if !ok || ev == nil {
 			result[eventID] = vis
 			continue
 		}
