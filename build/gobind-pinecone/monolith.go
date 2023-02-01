@@ -32,7 +32,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conduit"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/conn"
-	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/keys"
+	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/monolith"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/relay"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/rooms"
 	"github.com/matrix-org/dendrite/cmd/dendrite-demo-pinecone/users"
@@ -47,21 +47,18 @@ import (
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/userapi"
 	userapiAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/matrix-org/pinecone/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
 	pineconeRouter "github.com/matrix-org/pinecone/router"
 	pineconeEvents "github.com/matrix-org/pinecone/router/events"
-	pineconeSessions "github.com/matrix-org/pinecone/sessions"
-	"github.com/matrix-org/pinecone/types"
 
 	_ "golang.org/x/mobile/bind"
 )
@@ -74,24 +71,20 @@ const (
 )
 
 type DendriteMonolith struct {
-	logger            logrus.Logger
-	baseDendrite      *base.BaseDendrite
-	PineconeRouter    *pineconeRouter.Router
-	PineconeMulticast *pineconeMulticast.Multicast
-	PineconeQUIC      *pineconeSessions.Sessions
-	PineconeManager   *pineconeConnections.ConnectionManager
-	StorageDirectory  string
-	CacheDirectory    string
-	listener          net.Listener
-	httpServer        *http.Server
-	userAPI           userapiAPI.UserInternalAPI
-	federationAPI     api.FederationInternalAPI
-	relayAPI          relayServerAPI.RelayInternalAPI
-	relayRetriever    relay.RelayServerRetriever
+	logger           logrus.Logger
+	baseDendrite     *base.BaseDendrite
+	p2pMonolith      monolith.P2PMonolith
+	StorageDirectory string
+	listener         net.Listener
+	httpServer       *http.Server
+	userAPI          userapiAPI.UserInternalAPI
+	federationAPI    api.FederationInternalAPI
+	relayAPI         relayServerAPI.RelayInternalAPI
+	relayRetriever   relay.RelayServerRetriever
 }
 
 func (m *DendriteMonolith) PublicKey() string {
-	return m.PineconeRouter.PublicKey().String()
+	return m.p2pMonolith.Router.PublicKey().String()
 }
 
 func (m *DendriteMonolith) BaseURL() string {
@@ -99,11 +92,11 @@ func (m *DendriteMonolith) BaseURL() string {
 }
 
 func (m *DendriteMonolith) PeerCount(peertype int) int {
-	return m.PineconeRouter.PeerCount(peertype)
+	return m.p2pMonolith.Router.PeerCount(peertype)
 }
 
 func (m *DendriteMonolith) SessionCount() int {
-	return len(m.PineconeQUIC.Protocol("matrix").Sessions())
+	return len(m.p2pMonolith.Sessions.Protocol("matrix").Sessions())
 }
 
 type InterfaceInfo struct {
@@ -145,22 +138,22 @@ func (m *DendriteMonolith) RegisterNetworkCallback(intfCallback InterfaceRetriev
 		}
 		return intfs
 	}
-	m.PineconeMulticast.RegisterNetworkCallback(callback)
+	m.p2pMonolith.Multicast.RegisterNetworkCallback(callback)
 }
 
 func (m *DendriteMonolith) SetMulticastEnabled(enabled bool) {
 	if enabled {
-		m.PineconeMulticast.Start()
+		m.p2pMonolith.Multicast.Start()
 	} else {
-		m.PineconeMulticast.Stop()
+		m.p2pMonolith.Multicast.Stop()
 		m.DisconnectType(int(pineconeRouter.PeerTypeMulticast))
 	}
 }
 
 func (m *DendriteMonolith) SetStaticPeer(uri string) {
-	m.PineconeManager.RemovePeers()
+	m.p2pMonolith.ConnManager.RemovePeers()
 	for _, uri := range strings.Split(uri, ",") {
-		m.PineconeManager.AddPeer(strings.TrimSpace(uri))
+		m.p2pMonolith.ConnManager.AddPeer(strings.TrimSpace(uri))
 	}
 }
 
@@ -268,23 +261,23 @@ func (m *DendriteMonolith) SetRelayingEnabled(enabled bool) {
 }
 
 func (m *DendriteMonolith) DisconnectType(peertype int) {
-	for _, p := range m.PineconeRouter.Peers() {
+	for _, p := range m.p2pMonolith.Router.Peers() {
 		if int(peertype) == p.PeerType {
-			m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
+			m.p2pMonolith.Router.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
 }
 
 func (m *DendriteMonolith) DisconnectZone(zone string) {
-	for _, p := range m.PineconeRouter.Peers() {
+	for _, p := range m.p2pMonolith.Router.Peers() {
 		if zone == p.Zone {
-			m.PineconeRouter.Disconnect(types.SwitchPortID(p.Port), nil)
+			m.p2pMonolith.Router.Disconnect(types.SwitchPortID(p.Port), nil)
 		}
 	}
 }
 
 func (m *DendriteMonolith) DisconnectPort(port int) {
-	m.PineconeRouter.Disconnect(types.SwitchPortID(port), nil)
+	m.p2pMonolith.Router.Disconnect(types.SwitchPortID(port), nil)
 }
 
 func (m *DendriteMonolith) Conduit(zone string, peertype int) (*conduit.Conduit, error) {
@@ -294,7 +287,7 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*conduit.Conduit,
 		logrus.Errorf("Attempting authenticated connect")
 		var port types.SwitchPortID
 		var err error
-		if port, err = m.PineconeRouter.Connect(
+		if port, err = m.p2pMonolith.Router.Connect(
 			l,
 			pineconeRouter.ConnectionZone(zone),
 			pineconeRouter.ConnectionPeerType(peertype),
@@ -312,7 +305,7 @@ func (m *DendriteMonolith) Conduit(zone string, peertype int) (*conduit.Conduit,
 }
 
 func (m *DendriteMonolith) RegisterUser(localpart, password string) (string, error) {
-	pubkey := m.PineconeRouter.PublicKey()
+	pubkey := m.p2pMonolith.Router.PublicKey()
 	userID := userutil.MakeUserID(
 		localpart,
 		gomatrixserverlib.ServerName(hex.EncodeToString(pubkey[:])),
@@ -353,7 +346,7 @@ func (m *DendriteMonolith) RegisterDevice(localpart, deviceID string) (string, e
 func (m *DendriteMonolith) Start() {
 	keyfile := filepath.Join(m.StorageDirectory, "p2p.pem")
 	oldKeyfile := filepath.Join(m.StorageDirectory, "p2p.key")
-	sk, pk := keys.GetOrCreateKey(keyfile, oldKeyfile)
+	sk, pk := monolith.GetOrCreateKey(keyfile, oldKeyfile)
 
 	var err error
 	m.listener, err = net.Listen("tcp", "localhost:65432")
@@ -367,50 +360,20 @@ func (m *DendriteMonolith) Start() {
 	m.logger.SetOutput(BindLogger{})
 	logrus.SetOutput(BindLogger{})
 
-	pineconeEventChannel := make(chan pineconeEvents.Event)
-	m.PineconeRouter = pineconeRouter.NewRouter(logrus.WithField("pinecone", "router"), sk)
-	m.PineconeRouter.EnableHopLimiting()
-	m.PineconeRouter.EnableWakeupBroadcasts()
-	m.PineconeRouter.Subscribe(pineconeEventChannel)
-
-	m.PineconeQUIC = pineconeSessions.NewSessions(logrus.WithField("pinecone", "sessions"), m.PineconeRouter, []string{"matrix"})
-	m.PineconeMulticast = pineconeMulticast.NewMulticast(logrus.WithField("pinecone", "multicast"), m.PineconeRouter)
-	m.PineconeManager = pineconeConnections.NewConnectionManager(m.PineconeRouter, nil)
+	m.p2pMonolith = monolith.P2PMonolith{}
+	m.p2pMonolith.SetupPinecone(sk)
 
 	prefix := hex.EncodeToString(pk)
-	cfg := &config.Dendrite{}
-	cfg.Defaults(config.DefaultOpts{
-		Generate:   true,
-		Monolithic: true,
-	})
+	cfg := monolith.GenerateDefaultConfig(sk, m.StorageDirectory, prefix)
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
-	cfg.Global.PrivateKey = sk
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.JetStream.InMemory = false
-	cfg.Global.JetStream.StoragePath = config.Path(filepath.Join(m.CacheDirectory, prefix))
-	cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-account.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.MediaAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-mediaapi.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.SyncAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-syncapi.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.RoomServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-roomserver.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.KeyServer.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-keyserver.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.FederationAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-federationsender.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.MediaAPI.BasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
-	cfg.MediaAPI.AbsBasePath = config.Path(filepath.Join(m.CacheDirectory, "media"))
-	cfg.RelayAPI.Database.ConnectionString = config.DataSource(fmt.Sprintf("file:%s-relayapi.db", filepath.Join(m.StorageDirectory, prefix)))
-	cfg.MSCs.MSCs = []string{"msc2836", "msc2946"}
-	cfg.ClientAPI.RegistrationDisabled = false
-	cfg.ClientAPI.OpenRegistrationWithoutVerificationEnabled = true
-	cfg.SyncAPI.Fulltext.Enabled = true
-	cfg.SyncAPI.Fulltext.IndexPath = config.Path(filepath.Join(m.CacheDirectory, "search"))
-	if err = cfg.Derive(); err != nil {
-		panic(err)
-	}
 
 	base := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
 	m.baseDendrite = base
 	base.ConfigureAdminEndpoints()
 
-	federation := conn.CreateFederationClient(base, m.PineconeQUIC)
+	federation := conn.CreateFederationClient(base, m.p2pMonolith.Sessions)
 
 	serverKeyAPI := &signing.YggdrasilKeys{}
 	keyRing := serverKeyAPI.KeyRing()
@@ -431,8 +394,8 @@ func (m *DendriteMonolith) Start() {
 	// This is different to rsAPI which can be the http client which doesn't need this dependency
 	rsAPI.SetFederationAPI(m.federationAPI, keyRing)
 
-	userProvider := users.NewPineconeUserProvider(m.PineconeRouter, m.PineconeQUIC, m.userAPI, federation)
-	roomProvider := rooms.NewPineconeRoomProvider(m.PineconeRouter, m.PineconeQUIC, m.federationAPI, federation)
+	userProvider := users.NewPineconeUserProvider(m.p2pMonolith.Router, m.p2pMonolith.Sessions, m.userAPI, federation)
+	roomProvider := rooms.NewPineconeRoomProvider(m.p2pMonolith.Router, m.p2pMonolith.Sessions, m.federationAPI, federation)
 
 	js, _ := base.NATS.Prepare(base.ProcessContext, &base.Cfg.Global.JetStream)
 	producer := &producers.SyncAPIProducer{
@@ -450,7 +413,7 @@ func (m *DendriteMonolith) Start() {
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,
-		Client:    conn.CreateClient(base, m.PineconeQUIC),
+		Client:    conn.CreateClient(base, m.p2pMonolith.Sessions),
 		FedClient: federation,
 		KeyRing:   keyRing,
 
@@ -471,14 +434,14 @@ func (m *DendriteMonolith) Start() {
 	httpRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 	httpRouter.PathPrefix(httputil.DendriteAdminPathPrefix).Handler(base.DendriteAdminMux)
 	httpRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(base.SynapseAdminMux)
-	httpRouter.HandleFunc("/pinecone", m.PineconeRouter.ManholeHandler)
+	httpRouter.HandleFunc("/pinecone", m.p2pMonolith.Router.ManholeHandler)
 
 	pMux := mux.NewRouter().SkipClean(true).UseEncodedPath()
 	pMux.PathPrefix(users.PublicURL).HandlerFunc(userProvider.FederatedUserProfiles)
 	pMux.PathPrefix(httputil.PublicFederationPathPrefix).Handler(base.PublicFederationAPIMux)
 	pMux.PathPrefix(httputil.PublicMediaPathPrefix).Handler(base.PublicMediaAPIMux)
 
-	pHTTP := m.PineconeQUIC.Protocol("matrix").HTTP()
+	pHTTP := m.p2pMonolith.Sessions.Protocol("matrix").HTTP()
 	pHTTP.Mux().Handle(users.PublicURL, pMux)
 	pHTTP.Mux().Handle(httputil.PublicFederationPathPrefix, pMux)
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, pMux)
@@ -500,7 +463,7 @@ func (m *DendriteMonolith) Start() {
 	go func() {
 		m.logger.Info("Listening on ", cfg.Global.ServerName)
 
-		switch m.httpServer.Serve(m.PineconeQUIC.Protocol("matrix")) {
+		switch m.httpServer.Serve(m.p2pMonolith.Sessions.Protocol("matrix")) {
 		case net.ErrClosed, http.ErrServerClosed:
 			m.logger.Info("Stopped listening on ", cfg.Global.ServerName)
 		default:
@@ -522,7 +485,7 @@ func (m *DendriteMonolith) Start() {
 	eLog := logrus.WithField("pinecone", "events")
 	m.relayRetriever = relay.NewRelayServerRetriever(
 		context.Background(),
-		gomatrixserverlib.ServerName(m.PineconeRouter.PublicKey().String()),
+		gomatrixserverlib.ServerName(m.p2pMonolith.Router.PublicKey().String()),
 		m.federationAPI,
 		monolith.RelayAPI,
 		stopRelayServerSync,
@@ -535,7 +498,7 @@ func (m *DendriteMonolith) Start() {
 			case pineconeEvents.PeerAdded:
 				m.relayRetriever.StartSync()
 			case pineconeEvents.PeerRemoved:
-				if m.relayRetriever.IsRunning() && m.PineconeRouter.TotalPeerCount() == 0 {
+				if m.relayRetriever.IsRunning() && m.p2pMonolith.Router.TotalPeerCount() == 0 {
 					stopRelayServerSync <- true
 				}
 			case pineconeEvents.BroadcastReceived:
@@ -551,14 +514,14 @@ func (m *DendriteMonolith) Start() {
 			default:
 			}
 		}
-	}(pineconeEventChannel)
+	}(m.p2pMonolith.EventChannel)
 }
 
 func (m *DendriteMonolith) Stop() {
 	_ = m.baseDendrite.Close()
 	m.baseDendrite.WaitForShutdown()
 	_ = m.listener.Close()
-	m.PineconeMulticast.Stop()
-	_ = m.PineconeQUIC.Close()
-	_ = m.PineconeRouter.Close()
+	m.p2pMonolith.Multicast.Stop()
+	_ = m.p2pMonolith.Sessions.Close()
+	_ = m.p2pMonolith.Router.Close()
 }
