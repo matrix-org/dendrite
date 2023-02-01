@@ -107,6 +107,8 @@ const selectRecentEventsSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id DESC LIMIT $8"
 
+// selectRecentEventsForSyncSQL contains an optimization to get the recent events for a list of rooms, using a LATERAL JOIN
+// The sub select inside LATERAL () is executed for all room_ids it gets as a parameter $1
 const selectRecentEventsForSyncSQL = `
 WITH room_ids AS (
      SELECT unnest($1::text[]) AS room_id

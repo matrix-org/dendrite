@@ -99,6 +99,8 @@ const bulkSelectStateForHistoryVisibilitySQL = `
 	  AND (event_type_nid = 7 OR event_state_key LIKE '%:' || $2);
 `
 
+// bulkSelectMembershipForHistoryVisibilitySQL is an optimization to get membership events for a specific user for defined set of events.
+// Returns the event_id of the event we want the membership event for, the event_id of the membership event and the membership event JSON.
 const bulkSelectMembershipForHistoryVisibilitySQL = `
 SELECT re.event_id, re2.event_id, rej.event_json
 FROM roomserver_events re
