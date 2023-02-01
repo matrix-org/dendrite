@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/lib/pq"
@@ -223,11 +224,29 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		return nil, err
 	}
 
+	migrationName := "syncapi: rename dupe index (output_room_events)"
+
+	var cName string
+	err = db.QueryRowContext(context.Background(), "select constraint_name from information_schema.table_constraints where table_name = 'syncapi_output_room_events' AND constraint_name = 'syncapi_event_id_idx'").Scan(&cName)
+	switch err {
+	case sql.ErrNoRows: // migration was already executed, as the index was renamed
+		if err = sqlutil.InsertMigration(context.Background(), db, migrationName); err != nil {
+			return nil, fmt.Errorf("unable to manually insert migration '%s': %w", migrationName, err)
+		}
+	case nil:
+	default:
+		return nil, err
+	}
+
 	m := sqlutil.NewMigrator(db)
 	m.AddMigrations(
 		sqlutil.Migration{
 			Version: "syncapi: add history visibility column (output_room_events)",
 			Up:      deltas.UpAddHistoryVisibilityColumnOutputRoomEvents,
+		},
+		sqlutil.Migration{
+			Version: migrationName,
+			Up:      deltas.UpRenameOutputRoomEventsIndex,
 		},
 	)
 	err = m.Up(context.Background())
