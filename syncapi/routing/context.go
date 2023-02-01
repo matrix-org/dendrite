@@ -67,6 +67,8 @@ func Context(
 			errMsg = "unable to parse filter"
 		case *strconv.NumError:
 			errMsg = "unable to parse limit"
+		default:
+			errMsg = err.Error()
 		}
 		return util.JSONResponse{
 			Code:    http.StatusBadRequest,
@@ -268,9 +270,7 @@ func applyLazyLoadMembers(
 	newState := []*gomatrixserverlib.HeaderedEvent{}
 	membershipEvents := []*gomatrixserverlib.HeaderedEvent{}
 	for _, event := range state {
-		if event.Type() != gomatrixserverlib.MRoomMember {
-			newState = append(newState, event)
-		} else {
+		if event.Type() == gomatrixserverlib.MRoomMember {
 			// did the user send an event?
 			if _, ok := x[event.Sender()]; ok {
 				membershipEvents = append(membershipEvents, event)
