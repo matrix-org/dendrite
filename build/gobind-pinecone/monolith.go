@@ -342,12 +342,10 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.JetStream.InMemory = false
 
 	enableRelaying := false
-	enableMetrics := true
-	enableWebsockets := true
+	enableMetrics := false
+	enableWebsockets := false
 	m.p2pMonolith.SetupDendrite(cfg, 65432, enableRelaying, enableMetrics, enableWebsockets)
-
-	useTCPListener := false
-	m.p2pMonolith.StartMonolith(useTCPListener)
+	m.p2pMonolith.StartMonolith()
 }
 
 func (m *DendriteMonolith) Stop() {

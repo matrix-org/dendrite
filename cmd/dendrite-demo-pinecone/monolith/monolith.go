@@ -50,8 +50,6 @@ import (
 	userAPI "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	pineconeConnections "github.com/matrix-org/pinecone/connections"
 	pineconeMulticast "github.com/matrix-org/pinecone/multicast"
@@ -199,8 +197,8 @@ func (p *P2PMonolith) GetUserAPI() userAPI.UserInternalAPI {
 	return p.dendrite.UserAPI
 }
 
-func (p *P2PMonolith) StartMonolith(useTCPListener bool) {
-	p.startHTTPServers(useTCPListener)
+func (p *P2PMonolith) StartMonolith() {
+	p.startHTTPServers()
 	p.startEventHandler()
 }
 
@@ -284,26 +282,7 @@ func (p *P2PMonolith) setupHttpServers(userProvider *users.PineconeUserProvider,
 	pHTTP.Mux().Handle(httputil.PublicMediaPathPrefix, p.pineconeMux)
 }
 
-func (p *P2PMonolith) startHTTPServers(useTCPListener bool) {
-	var handler http.Handler
-	var httpServeFunc func() error
-	if useTCPListener {
-		var err error
-		p.httpListenAddr = "localhost:" + fmt.Sprint(p.port)
-		p.listener, err = net.Listen("tcp", p.httpListenAddr)
-		if err != nil {
-			panic(err)
-		}
-
-		h2s := &http2.Server{}
-		handler = h2c.NewHandler(p.pineconeMux, h2s)
-		httpServeFunc = func() error { return http.Serve(p.listener, p.httpMux) }
-	} else {
-		handler = p.pineconeMux
-		p.httpListenAddr = fmt.Sprintf(":%d", p.port)
-		httpServeFunc = func() error { return http.ListenAndServe(p.httpListenAddr, p.httpMux) }
-	}
-
+func (p *P2PMonolith) startHTTPServers() {
 	go func() {
 		// Build both ends of a HTTP multiplex.
 		httpServer := &http.Server{
@@ -315,7 +294,7 @@ func (p *P2PMonolith) startHTTPServers(useTCPListener bool) {
 			BaseContext: func(_ net.Listener) context.Context {
 				return context.Background()
 			},
-			Handler: handler,
+			Handler: p.pineconeMux,
 		}
 
 		pubkey := p.Router.PublicKey()
@@ -330,9 +309,10 @@ func (p *P2PMonolith) startHTTPServers(useTCPListener bool) {
 		}
 	}()
 
+	p.httpListenAddr = fmt.Sprintf(":%d", p.port)
 	go func() {
 		logrus.Info("Listening on ", p.httpListenAddr)
-		switch httpServeFunc() {
+		switch http.ListenAndServe(p.httpListenAddr, p.httpMux) {
 		case net.ErrClosed, http.ErrServerClosed:
 			logrus.Info("Stopped listening on ", p.httpListenAddr)
 		default:

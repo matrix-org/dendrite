@@ -90,9 +90,7 @@ func main() {
 	enableMetrics := true
 	enableWebsockets := true
 	p2pMonolith.SetupDendrite(cfg, *instancePort, *instanceRelayingEnabled, enableMetrics, enableWebsockets)
-
-	useTCPListener := false
-	p2pMonolith.StartMonolith(useTCPListener)
+	p2pMonolith.StartMonolith()
 	p2pMonolith.WaitForShutdown()
 
 	go func() {
