@@ -121,10 +121,7 @@ func ApplyHistoryVisibilityFilter(
 
 	// Get the mapping from eventID -> eventVisibility
 	eventsFiltered := make([]*gomatrixserverlib.HeaderedEvent, 0, len(events))
-	visibilities, err := visibilityForEvents(ctx, rsAPI, events, userID, events[0].RoomID())
-	if err != nil {
-		return eventsFiltered, err
-	}
+	visibilities := visibilityForEvents(ctx, rsAPI, events, userID, events[0].RoomID())
 	for _, ev := range events {
 		evVis := visibilities[ev.EventID()]
 		evVis.membershipCurrent = membershipCurrent
@@ -175,7 +172,7 @@ func visibilityForEvents(
 	rsAPI api.SyncRoomserverAPI,
 	events []*gomatrixserverlib.HeaderedEvent,
 	userID, roomID string,
-) (map[string]eventVisibility, error) {
+) map[string]eventVisibility {
 	eventIDs := make([]string, len(events))
 	for i := range events {
 		eventIDs[i] = events[i].EventID()
@@ -185,6 +182,7 @@ func visibilityForEvents(
 
 	// get the membership events for all eventIDs
 	membershipResp := &api.QueryMembershipAtEventResponse{}
+
 	err := rsAPI.QueryMembershipAtEvent(ctx, &api.QueryMembershipAtEventRequest{
 		RoomID:   roomID,
 		EventIDs: eventIDs,
@@ -201,19 +199,20 @@ func visibilityForEvents(
 			membershipAtEvent: gomatrixserverlib.Leave, // default to leave, to not expose events by accident
 			visibility:        event.Visibility,
 		}
-		membershipEvs, ok := membershipResp.Memberships[eventID]
+		ev, ok := membershipResp.Memberships[eventID]
 		if !ok {
 			result[eventID] = vis
 			continue
 		}
-		for _, ev := range membershipEvs {
-			membership, err := ev.Membership()
-			if err != nil {
-				return result, err
-			}
-			vis.membershipAtEvent = membership
+
+		membership, err := ev.Membership()
+		if err != nil {
+			result[eventID] = vis
+			continue
 		}
+		vis.membershipAtEvent = membership
+
 		result[eventID] = vis
 	}
-	return result, nil
+	return result
 }

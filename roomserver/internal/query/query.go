@@ -216,7 +216,8 @@ func (r *Queryer) QueryMembershipAtEvent(
 	request *api.QueryMembershipAtEventRequest,
 	response *api.QueryMembershipAtEventResponse,
 ) error {
-	response.Memberships = make(map[string][]*gomatrixserverlib.HeaderedEvent)
+	response.Memberships = make(map[string]*gomatrixserverlib.HeaderedEvent)
+
 	info, err := r.DB.RoomInfo(ctx, request.RoomID)
 	if err != nil {
 		return fmt.Errorf("unable to get roomInfo: %w", err)
@@ -225,7 +226,6 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("no roomInfo found")
 	}
 
-	// get the users stateKeyNID
 	stateKeyNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.UserID})
 	if err != nil {
 		return fmt.Errorf("unable to get stateKeyNIDs for %s: %w", request.UserID, err)
@@ -234,59 +234,78 @@ func (r *Queryer) QueryMembershipAtEvent(
 		return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
 	}
 
-	stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, info, request.EventIDs, stateKeyNIDs[request.UserID])
-	if err != nil {
-		return fmt.Errorf("unable to get state before event: %w", err)
+	response.Memberships, err = r.DB.GetMembershipForHistoryVisibility(ctx, stateKeyNIDs[request.UserID], info, request.EventIDs...)
+	switch err {
+	case nil:
+		return nil
+	//case tables.OptimisationNotSupportedError: // fallthrough
+	default:
+		return err
 	}
 
-	// If we only have one or less state entries, we can short circuit the below
-	// loop and avoid hitting the database
-	allStateEventNIDs := make(map[types.EventNID]types.StateEntry)
-	for _, eventID := range request.EventIDs {
-		stateEntry := stateEntries[eventID]
-		for _, s := range stateEntry {
-			allStateEventNIDs[s.EventNID] = s
+	/*
+		// get the users stateKeyNID
+		stateKeyNIDs, err := r.DB.EventStateKeyNIDs(ctx, []string{request.UserID})
+		if err != nil {
+			return fmt.Errorf("unable to get stateKeyNIDs for %s: %w", request.UserID, err)
 		}
-	}
-
-	var canShortCircuit bool
-	if len(allStateEventNIDs) <= 1 {
-		canShortCircuit = true
-	}
-
-	var memberships []types.Event
-	for _, eventID := range request.EventIDs {
-		stateEntry, ok := stateEntries[eventID]
-		if !ok || len(stateEntry) == 0 {
-			response.Memberships[eventID] = []*gomatrixserverlib.HeaderedEvent{}
-			continue
+		if _, ok := stateKeyNIDs[request.UserID]; !ok {
+			return fmt.Errorf("requested stateKeyNID for %s was not found", request.UserID)
 		}
 
-		// If we can short circuit, e.g. we only have 0 or 1 membership events, we only get the memberships
-		// once. If we have more than one membership event, we need to get the state for each state entry.
-		if canShortCircuit {
-			if len(memberships) == 0 {
+		stateEntries, err := helpers.MembershipAtEvent(ctx, r.DB, nil, request.EventIDs, stateKeyNIDs[request.UserID])
+		if err != nil {
+			return fmt.Errorf("unable to get state before event: %w", err)
+		}
+
+		// If we only have one or less state entries, we can short circuit the below
+		// loop and avoid hitting the database
+		allStateEventNIDs := make(map[types.EventNID]types.StateEntry)
+		for _, eventID := range request.EventIDs {
+			stateEntry := stateEntries[eventID]
+			for _, s := range stateEntry {
+				allStateEventNIDs[s.EventNID] = s
+			}
+		}
+
+		var canShortCircuit bool
+		if len(allStateEventNIDs) <= 1 {
+			canShortCircuit = true
+		}
+
+		var memberships []types.Event
+		for _, eventID := range request.EventIDs {
+			stateEntry, ok := stateEntries[eventID]
+			if !ok || len(stateEntry) == 0 {
+				response.Memberships[eventID] = nil
+				continue
+			}
+
+			// If we can short circuit, e.g. we only have 0 or 1 membership events, we only get the memberships
+			// once. If we have more than one membership event, we need to get the state for each state entry.
+			if canShortCircuit {
+				if len(memberships) == 0 {
+					memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
+				}
+			} else {
 				memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
 			}
-		} else {
-			memberships, err = helpers.GetMembershipsAtState(ctx, r.DB, stateEntry, false)
-		}
-		if err != nil {
-			return fmt.Errorf("unable to get memberships at state: %w", err)
-		}
-
-		res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
-
-		for i := range memberships {
-			ev := memberships[i]
-			if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
-				res = append(res, ev.Headered(info.RoomVersion))
+			if err != nil {
+				return fmt.Errorf("unable to get memberships at state: %w", err)
 			}
-		}
-		response.Memberships[eventID] = res
-	}
 
-	return nil
+			res := make([]*gomatrixserverlib.HeaderedEvent, 0, len(memberships))
+
+			for i := range memberships {
+				ev := memberships[i]
+				if ev.Type() == gomatrixserverlib.MRoomMember && ev.StateKeyEquals(request.UserID) {
+					res = append(res, ev.Headered(roomVersion))
+				}
+			}
+			response.Memberships[eventID] = res
+		}
+
+		return nil*/
 }
 
 // QueryMembershipsForRoom implements api.RoomserverInternalAPI

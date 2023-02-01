@@ -175,4 +175,8 @@ type Database interface {
 	GetLeftUsers(ctx context.Context, userIDs []string) ([]string, error)
 	PurgeRoom(ctx context.Context, roomID string) error
 	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
+
+	GetMembershipForHistoryVisibility(
+		ctx context.Context, userNID types.EventStateKeyNID, info *types.RoomInfo, eventIDs ...string,
+	) (map[string]*gomatrixserverlib.HeaderedEvent, error)
 }
