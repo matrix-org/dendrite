@@ -82,17 +82,11 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
-	s := time.Now()
 	recentEvents, err := snapshot.RecentEvents(ctx, joinedRoomIDs, r, &eventFilter, true, true)
 	if err != nil {
 		return from
 	}
-	logrus.WithFields(logrus.Fields{
-		"duration": time.Since(s),
-		"rooms":    len(joinedRoomIDs)}).
-		Debugf("got recent events for all rooms")
 	// Build up a /sync response. Add joined rooms.
-	s = time.Now()
 	for _, roomID := range joinedRoomIDs {
 		events := recentEvents[roomID]
 		// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
@@ -117,10 +111,6 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Response.Rooms.Join[roomID] = jr
 		req.Rooms[roomID] = gomatrixserverlib.Join
 	}
-	logrus.WithFields(logrus.Fields{
-		"duration": time.Since(s),
-		"rooms":    len(joinedRoomIDs)}).
-		Debugf("built join response for all rooms")
 
 	// Add peeked rooms.
 	peeks, err := snapshot.PeeksInRange(ctx, req.Device.UserID, req.Device.ID, r)
