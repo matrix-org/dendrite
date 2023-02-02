@@ -77,6 +77,33 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
+
+  sytest-coverage:
+    timeout-minutes: 5
+    name: "Sytest Coverage"
+    runs-on: ubuntu-latest
+    needs: sytest # only run once Sytest is done
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.20
+          cache: true
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      - name: Install gocovmerge
+        run: go install github.com/wadey/gocovmerge@latest
+      - name: Run gocovmerge
+        run: |
+          find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > sytest.cov
+          go tool cover -func=sytest.cov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./sytest.cov
+          flags: sytest
+          fail_ci_if_error: true
           
   element_web:
     if: ${{ false }} # disable for now
