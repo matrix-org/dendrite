@@ -83,8 +83,6 @@ jobs:
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
-        with:
-          name: Sytest*
       - name: Install gocovmerge
         run: go install github.com/wadey/gocovmerge@latest
       - name: Run gocovmerge
@@ -160,7 +158,7 @@ jobs:
           cat <<EOF > /tmp/posttest.sh
           #!/bin/bash
           mkdir -p /tmp/Complement/logs/\$2/\$1/
-          docker cp \$1:/dendrite/integrationcover.log /tmp/Complement/logs/\$2/\$1/
+          docker cp \$1:/dendrite/complementcover.log /tmp/Complement/logs/\$2/\$1/
           EOF
           
           chmod +x /tmp/posttest.sh
@@ -184,7 +182,7 @@ jobs:
         with:
           name: Complement Logs - (Dendrite, ${{ join(matrix.*, ', ') }})
           path: |
-            /tmp/Complement/**/integrationcover.log
+            /tmp/Complement/**/complementcover.log
 
   complement-coverage:
     timeout-minutes: 5
@@ -201,13 +199,11 @@ jobs:
           cache: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
-        with:
-          name: Complement*
       - name: Install gocovmerge
         run: go install github.com/wadey/gocovmerge@latest
       - name: Run gocovmerge
         run: |
-          find -name 'integrationcover.log' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > complement.cov
+          find -name 'complementcover.log' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > complement.cov
           go tool cover -func=complement.cov
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
