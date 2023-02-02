@@ -207,7 +207,7 @@ jobs:
         name: Run Complement Tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-dendrite:${{ matrix.postgres }}${{ matrix.api }}${{ matrix.cgo }}
-          API: ${{ matrix.api && 1 }}
+          COMPLEMENT_DENDRITE_API: ${{ matrix.api && 1 }}
           COMPLEMENT_SHARE_ENV_PREFIX: COMPLEMENT_DENDRITE_
           COMPLEMENT_DENDRITE_COVER: 1
           COMPLEMENT_POST_TEST_SCRIPT: /tmp/posttest.sh
