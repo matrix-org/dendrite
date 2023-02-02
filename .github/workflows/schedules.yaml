@@ -23,16 +23,6 @@ jobs:
       matrix:
         include:
           - label: SQLite
-
-          - label: SQLite, full HTTP APIs
-            api: full-http
-
-          - label: PostgreSQL
-            postgres: postgres
-
-          - label: PostgreSQL, full HTTP APIs
-            postgres: postgres
-            api: full-http
     container:
       image: matrixdotorg/sytest-dendrite:latest
       volumes:
@@ -117,26 +107,6 @@ jobs:
         include:
           - label: SQLite native
             cgo: 0
-
-          - label: SQLite Cgo
-            cgo: 1
-
-          - label: SQLite native, full HTTP APIs
-            api: full-http
-            cgo: 0
-
-          - label: SQLite Cgo, full HTTP APIs
-            api: full-http
-            cgo: 1
-
-          - label: PostgreSQL
-            postgres: Postgres
-            cgo: 0
-
-          - label: PostgreSQL, full HTTP APIs
-            postgres: Postgres
-            api: full-http
-            cgo: 0
     steps:
       # Env vars are set file a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on env to run Complement.
       # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
@@ -211,13 +181,13 @@ jobs:
         with:
           name: Complement Logs - (Dendrite, ${{ join(matrix.*, ', ') }})
           path: |
-            /tmp/**/integrationcover.log
+            /tmp/Complement/**/integrationcover.log
 
   complement-coverage:
     timeout-minutes: 5
     name: "Complement Coverage"
     runs-on: ubuntu-latest
-    needs: complement # only run once Sytest is done
+    needs: complement # only run once Complement is done
     if: ${{ always() }}
     steps:
       - uses: actions/checkout@v3
