@@ -83,6 +83,7 @@ jobs:
     name: "Sytest Coverage"
     runs-on: ubuntu-latest
     needs: sytest # only run once Sytest is done
+    if: ${{ always() }}
     steps:
       - uses: actions/checkout@v3
       - name: Install Go
