@@ -64,7 +64,7 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.Equal(t, false, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
@@ -130,7 +130,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
@@ -139,7 +139,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
@@ -193,7 +193,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
@@ -201,7 +201,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction2, jsonResponse.Transaction)
 
@@ -210,7 +210,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 

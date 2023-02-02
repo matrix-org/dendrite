@@ -34,10 +34,6 @@ import (
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeRelayAPI). We need to have this enabled
 // so we can decode paths like foo/bar%2Fbaz as [foo, bar/baz] - by default it will decode to [foo, bar, baz]
-//
-// Due to Setup being used to call many other functions, a gocyclo nolint is
-// applied:
-// nolint: gocyclo
 func Setup(
 	fedMux *mux.Router,
 	cfg *config.FederationAPI,

@@ -52,7 +52,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 		logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 		return err
 	}
-	r.processTransaction(&asyncResponse.Txn)
+	r.processTransaction(&asyncResponse.Transaction)
 
 	prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
@@ -64,7 +64,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 			logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
 		}
-		r.processTransaction(&asyncResponse.Txn)
+		r.processTransaction(&asyncResponse.Transaction)
 	}
 
 	return nil

@@ -36,11 +36,7 @@ func SendTransactionToRelay(
 ) util.JSONResponse {
 	logrus.Infof("Processing send_relay for %s", userID.Raw())
 
-	var txnEvents struct {
-		PDUs []json.RawMessage       `json:"pdus"`
-		EDUs []gomatrixserverlib.EDU `json:"edus"`
-	}
-
+	var txnEvents gomatrixserverlib.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
 		logrus.Info("The request body could not be decoded into valid JSON." + err.Error())
 		return util.JSONResponse{
