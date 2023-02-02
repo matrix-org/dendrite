@@ -926,3 +926,61 @@ func TestRoomSummary(t *testing.T) {
 		}
 	})
 }
+
+func TestRecentEvents(t *testing.T) {
+	alice := test.NewUser(t)
+	room1 := test.NewRoom(t, alice)
+	room2 := test.NewRoom(t, alice)
+	roomIDs := []string{room1.ID, room2.ID}
+	rooms := map[string]*test.Room{
+		room1.ID: room1,
+		room2.ID: room2,
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		filter := gomatrixserverlib.DefaultRoomEventFilter()
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		t.Cleanup(func() {
+			close()
+			closeBase()
+		})
+
+		MustWriteEvents(t, db, room1.Events())
+		MustWriteEvents(t, db, room2.Events())
+
+		transaction, err := db.NewDatabaseTransaction(ctx)
+		assert.NoError(t, err)
+		defer transaction.Rollback()
+
+		// get all recent events from 0 to 100 (we only created 5 events, so we should get 5 back)
+		roomEvs, err := transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, true, true)
+		assert.NoError(t, err)
+		assert.Equal(t, len(roomEvs), 2, "unexpected recent events response")
+		for _, recentEvents := range roomEvs {
+			assert.Equal(t, 5, len(recentEvents.Events), "unexpected recent events for room")
+		}
+
+		// update the filter to only return one event
+		filter.Limit = 1
+		roomEvs, err = transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, true, true)
+		assert.NoError(t, err)
+		assert.Equal(t, len(roomEvs), 2, "unexpected recent events response")
+		for roomID, recentEvents := range roomEvs {
+			origEvents := rooms[roomID].Events()
+			assert.Equal(t, true, recentEvents.Limited, "expected events to be limited")
+			assert.Equal(t, 1, len(recentEvents.Events), "unexpected recent events for room")
+			assert.Equal(t, origEvents[len(origEvents)-1].EventID(), recentEvents.Events[0].EventID())
+		}
+
+		// not chronologically ordered still returns the events in order (given ORDER BY id DESC)
+		roomEvs, err = transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, false, true)
+		assert.NoError(t, err)
+		assert.Equal(t, len(roomEvs), 2, "unexpected recent events response")
+		for roomID, recentEvents := range roomEvs {
+			origEvents := rooms[roomID].Events()
+			assert.Equal(t, true, recentEvents.Limited, "expected events to be limited")
+			assert.Equal(t, 1, len(recentEvents.Events), "unexpected recent events for room")
+			assert.Equal(t, origEvents[len(origEvents)-1].EventID(), recentEvents.Events[0].EventID())
+		}
+	})
+}

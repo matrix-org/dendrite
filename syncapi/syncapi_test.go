@@ -449,6 +449,7 @@ func testHistoryVisibility(t *testing.T, dbType test.DBType) {
 				base.PublicClientAPIMux.ServeHTTP(w, test.NewRequest(t, "GET", fmt.Sprintf("/_matrix/client/v3/rooms/%s/messages", room.ID), test.WithQueryParams(map[string]string{
 					"access_token": bobDev.AccessToken,
 					"dir":          "b",
+					"filter":       `{"lazy_load_members":true}`, // check that lazy loading doesn't break history visibility
 				})))
 				if w.Code != 200 {
 					t.Logf("%s", w.Body.String())
