@@ -203,6 +203,12 @@ jobs:
         run: go install github.com/wadey/gocovmerge@latest
       - name: Run gocovmerge
         run: |
+          echo "env:"
+          env
+          echo "ls:"
+          ls -la
+          echo "Find:"
+          find -name 'complementcover.log'
           find -name 'complementcover.log' | xargs gocovmerge | grep -Ev 'relayapi|setup/mscs|api_trace' > complement.cov
           go tool cover -func=complement.cov
       - name: Upload coverage to Codecov
