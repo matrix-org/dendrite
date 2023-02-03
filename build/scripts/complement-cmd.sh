@@ -10,7 +10,7 @@ if [[ "${COVER}" -eq 1 ]]; then
     --tls-key server.key \
     --config dendrite.yaml \
     -api=${API:-0} \
-    --test.coverprofile=integrationcover.log
+    --test.coverprofile=complementcover.log
 else
   echo "Not running with coverage"
   exec /dendrite/dendrite-monolith-server \
