@@ -340,6 +340,9 @@ func (m *DendriteMonolith) Start() {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName(hex.EncodeToString(pk))
 	cfg.Global.KeyID = gomatrixserverlib.KeyID(signing.KeyID)
 	cfg.Global.JetStream.InMemory = false
+	// NOTE : disabled for now since there is a 64 bit alignment panic on 32 bit systems
+	// This isn't actually fixed: https://github.com/blevesearch/zapx/pull/147
+	cfg.SyncAPI.Fulltext.Enabled = false
 
 	enableRelaying := false
 	enableMetrics := false
