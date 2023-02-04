@@ -46,6 +46,8 @@ const (
 	PeerTypeMulticast = pineconeRouter.PeerTypeMulticast
 	PeerTypeBluetooth = pineconeRouter.PeerTypeBluetooth
 	PeerTypeBonjour   = pineconeRouter.PeerTypeBonjour
+
+	MaxFrameSize = types.MaxFrameSize
 )
 
 // Re-export Conduit in this package for bindings.
