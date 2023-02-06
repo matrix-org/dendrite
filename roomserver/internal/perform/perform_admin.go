@@ -168,7 +168,7 @@ func (r *Admin) PerformAdminEvacuateRoom(
 
 	inputReq := &api.InputRoomEventsRequest{
 		InputRoomEvents: inputEvents,
-		Asynchronous:    true,
+		Asynchronous:    false,
 	}
 	inputRes := &api.InputRoomEventsResponse{}
 	return r.Inputer.InputRoomEvents(ctx, inputReq, inputRes)
