@@ -66,6 +66,9 @@ Indexing is done in the background, the server logs every 1000 events (or below)
 
 This endpoint instructs Dendrite to immediately query `/devices/{userID}` on a federated server. An empty JSON body will be returned on success, updating all locally stored user devices/keys. This can be used to possibly resolve E2EE issues, where the remote user can't decrypt messages.
 
+## POST `/_dendrite/admin/purgeRoom/{roomID}`
+
+This endpoint instructs Dendrite to remove the given room from its database. It does **NOT** remove media files. Depending on the size of the room, this may take a while. Will return an empty JSON once other components were instructed to delete the room.
 
 ## POST `/_synapse/admin/v1/send_server_notice`
 
