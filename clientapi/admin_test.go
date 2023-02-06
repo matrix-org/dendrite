@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/federationapi"
@@ -151,7 +152,10 @@ func TestPurgeRoom(t *testing.T) {
 
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		base, baseClose := testrig.CreateBaseDendrite(t, dbType)
-		defer baseClose()
+		t.Cleanup(func() {
+			time.Sleep(time.Millisecond * 50)
+			baseClose()
+		})
 
 		fedClient := base.CreateFederationClient()
 		rsAPI := roomserver.NewInternalAPI(base)
