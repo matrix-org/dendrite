@@ -68,7 +68,7 @@ This endpoint instructs Dendrite to immediately query `/devices/{userID}` on a f
 
 ## POST `/_dendrite/admin/purgeRoom/{roomID}`
 
-This endpoint instructs Dendrite to remove the given room from its database. It does **NOT** remove media files. Depending on the size of the room, this may take a while. Will return an empty JSON once other components were instructed to delete the room.
+This endpoint instructs Dendrite to remove the given room from its database. Before doing so, it will evacuate all local users from the room. It does **NOT** remove media files. Depending on the size of the room, this may take a while. Will return an empty JSON once other components were instructed to delete the room.
 
 ## POST `/_synapse/admin/v1/send_server_notice`
 

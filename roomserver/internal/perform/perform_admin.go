@@ -257,7 +257,20 @@ func (r *Admin) PerformAdminPurgeRoom(
 		return nil
 	}
 
-	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
+	evacResp := &api.PerformAdminEvacuateRoomResponse{}
+	if err := r.PerformAdminEvacuateRoom(ctx, &api.PerformAdminEvacuateRoomRequest{RoomID: req.RoomID}, evacResp); err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("failed to evacuate room: %s", err),
+		}
+		return nil
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"room_id":         req.RoomID,
+		"evacuated_users": len(evacResp.Affected),
+	}).Warn("Evacuated room, purging room from roomserver now")
+
 	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
 		logrus.WithField("room_id", req.RoomID).WithError(err).Warn("Failed to purge room from roomserver")
 		res.Error = &api.PerformError{
