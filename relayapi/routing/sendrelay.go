@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SendTransactionToRelay implements PUT /_matrix/federation/v1/relay_txn/{txnID}/{userID}
+// SendTransactionToRelay implements PUT /_matrix/federation/v1/send_relay/{txnID}/{userID}
 // This endpoint can be extracted into a separate relay server service.
 func SendTransactionToRelay(
 	httpReq *http.Request,
@@ -34,11 +34,9 @@ func SendTransactionToRelay(
 	txnID gomatrixserverlib.TransactionID,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
-	var txnEvents struct {
-		PDUs []json.RawMessage       `json:"pdus"`
-		EDUs []gomatrixserverlib.EDU `json:"edus"`
-	}
+	logrus.Infof("Processing send_relay for %s", userID.Raw())
 
+	var txnEvents gomatrixserverlib.RelayEvents
 	if err := json.Unmarshal(fedReq.Content(), &txnEvents); err != nil {
 		logrus.Info("The request body could not be decoded into valid JSON." + err.Error())
 		return util.JSONResponse{

@@ -72,11 +72,25 @@ type RoomserverFederationAPI interface {
 }
 
 type P2PFederationAPI interface {
-	// Relay Server sync api used in the pinecone demos.
+	// Get the relay servers associated for the given server.
 	P2PQueryRelayServers(
 		ctx context.Context,
 		request *P2PQueryRelayServersRequest,
 		response *P2PQueryRelayServersResponse,
+	) error
+
+	// Add relay server associations to the given server.
+	P2PAddRelayServers(
+		ctx context.Context,
+		request *P2PAddRelayServersRequest,
+		response *P2PAddRelayServersResponse,
+	) error
+
+	// Remove relay server associations from the given server.
+	P2PRemoveRelayServers(
+		ctx context.Context,
+		request *P2PRemoveRelayServersRequest,
+		response *P2PRemoveRelayServersResponse,
 	) error
 }
 
@@ -255,4 +269,20 @@ type P2PQueryRelayServersRequest struct {
 
 type P2PQueryRelayServersResponse struct {
 	RelayServers []gomatrixserverlib.ServerName
+}
+
+type P2PAddRelayServersRequest struct {
+	Server       gomatrixserverlib.ServerName
+	RelayServers []gomatrixserverlib.ServerName
+}
+
+type P2PAddRelayServersResponse struct {
+}
+
+type P2PRemoveRelayServersRequest struct {
+	Server       gomatrixserverlib.ServerName
+	RelayServers []gomatrixserverlib.ServerName
+}
+
+type P2PRemoveRelayServersResponse struct {
 }

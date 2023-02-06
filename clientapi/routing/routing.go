@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/matrix-org/dendrite/setup/base"
@@ -198,18 +199,24 @@ func Setup(
 	// server notifications
 	if cfg.Matrix.ServerNotices.Enabled {
 		logrus.Info("Enabling server notices at /_synapse/admin/v1/send_server_notice")
-		serverNotificationSender, err := getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
-		if err != nil {
-			logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
-		}
+		var serverNotificationSender *userapi.Device
+		var err error
+		notificationSenderOnce := &sync.Once{}
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice/{txnID}",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+				notificationSenderOnce.Do(func() {
+					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
+					if err != nil {
+						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+					}
+				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r
 				}
-				vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
+				var vars map[string]string
+				vars, err = httputil.URLDecodeMapValues(mux.Vars(req))
 				if err != nil {
 					return util.ErrorResponse(err)
 				}
@@ -225,6 +232,12 @@ func Setup(
 
 		synapseAdminRouter.Handle("/admin/v1/send_server_notice",
 			httputil.MakeAuthAPI("send_server_notice", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
+				notificationSenderOnce.Do(func() {
+					serverNotificationSender, err = getSenderDevice(context.Background(), rsAPI, userAPI, cfg)
+					if err != nil {
+						logrus.WithError(err).Fatal("unable to get account for sending sending server notices")
+					}
+				})
 				// not specced, but ensure we're rate limiting requests to this endpoint
 				if r := rateLimits.Limit(req, device); r != nil {
 					return *r

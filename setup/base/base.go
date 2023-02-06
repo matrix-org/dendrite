@@ -15,11 +15,14 @@
 package base
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -65,6 +68,9 @@ import (
 	userapiinthttp "github.com/matrix-org/dendrite/userapi/inthttp"
 )
 
+//go:embed static/*.gotmpl
+var staticContent embed.FS
+
 // BaseDendrite is a base for creating new instances of dendrite. It parses
 // command line flags and config, and exposes methods for creating various
 // resources. All errors are handled by logging then exiting, so all methods
@@ -79,6 +85,7 @@ type BaseDendrite struct {
 	PublicKeyAPIMux        *mux.Router
 	PublicMediaAPIMux      *mux.Router
 	PublicWellKnownAPIMux  *mux.Router
+	PublicStaticMux        *mux.Router
 	InternalAPIMux         *mux.Router
 	DendriteAdminMux       *mux.Router
 	SynapseAdminMux        *mux.Router
@@ -250,6 +257,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		PublicKeyAPIMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicKeyPathPrefix).Subrouter().UseEncodedPath(),
 		PublicMediaAPIMux:      mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicMediaPathPrefix).Subrouter().UseEncodedPath(),
 		PublicWellKnownAPIMux:  mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicWellKnownPrefix).Subrouter().UseEncodedPath(),
+		PublicStaticMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.PublicStaticPath).Subrouter().UseEncodedPath(),
 		InternalAPIMux:         mux.NewRouter().SkipClean(true).PathPrefix(httputil.InternalPathPrefix).Subrouter().UseEncodedPath(),
 		DendriteAdminMux:       mux.NewRouter().SkipClean(true).PathPrefix(httputil.DendriteAdminPathPrefix).Subrouter().UseEncodedPath(),
 		SynapseAdminMux:        mux.NewRouter().SkipClean(true).PathPrefix(httputil.SynapseAdminPathPrefix).Subrouter().UseEncodedPath(),
@@ -405,6 +413,7 @@ func (b *BaseDendrite) configureHTTPErrors() {
 	for _, router := range []*mux.Router{
 		b.PublicMediaAPIMux, b.DendriteAdminMux,
 		b.SynapseAdminMux, b.PublicWellKnownAPIMux,
+		b.PublicStaticMux,
 	} {
 		router.NotFoundHandler = notFoundCORSHandler
 		router.MethodNotAllowedHandler = notAllowedCORSHandler
@@ -478,12 +487,30 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 
 	b.configureHTTPErrors()
 
+	//Redirect for Landing Page
+	externalRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, httputil.PublicStaticPath, http.StatusFound)
+	})
+
 	internalRouter.PathPrefix(httputil.InternalPathPrefix).Handler(b.InternalAPIMux)
 	if b.Cfg.Global.Metrics.Enabled {
 		internalRouter.Handle("/metrics", httputil.WrapHandlerInBasicAuth(promhttp.Handler(), b.Cfg.Global.Metrics.BasicAuth))
 	}
 
 	b.ConfigureAdminEndpoints()
+
+	// Parse and execute the landing page template
+	tmpl := template.Must(template.ParseFS(staticContent, "static/*.gotmpl"))
+	landingPage := &bytes.Buffer{}
+	if err := tmpl.ExecuteTemplate(landingPage, "index.gotmpl", map[string]string{
+		"Version": internal.VersionString(),
+	}); err != nil {
+		logrus.WithError(err).Fatal("failed to execute landing page template")
+	}
+
+	b.PublicStaticMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(landingPage.Bytes())
+	})
 
 	var clientHandler http.Handler
 	clientHandler = b.PublicClientAPIMux
@@ -510,6 +537,7 @@ func (b *BaseDendrite) SetupAndServeHTTP(
 	externalRouter.PathPrefix(httputil.SynapseAdminPathPrefix).Handler(b.SynapseAdminMux)
 	externalRouter.PathPrefix(httputil.PublicMediaPathPrefix).Handler(b.PublicMediaAPIMux)
 	externalRouter.PathPrefix(httputil.PublicWellKnownPrefix).Handler(b.PublicWellKnownAPIMux)
+	externalRouter.PathPrefix(httputil.PublicStaticPath).Handler(b.PublicStaticMux)
 
 	b.startupLock.Unlock()
 	if internalAddr != NoListener && internalAddr != externalAddr {

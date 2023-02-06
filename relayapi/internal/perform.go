@@ -24,6 +24,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SetRelayingEnabled implements api.RelayInternalAPI
+func (r *RelayInternalAPI) SetRelayingEnabled(enabled bool) {
+	r.relayingEnabledMutex.Lock()
+	defer r.relayingEnabledMutex.Unlock()
+	r.relayingEnabled = enabled
+}
+
+// RelayingEnabled implements api.RelayInternalAPI
+func (r *RelayInternalAPI) RelayingEnabled() bool {
+	r.relayingEnabledMutex.Lock()
+	defer r.relayingEnabledMutex.Unlock()
+	return r.relayingEnabled
+}
+
 // PerformRelayServerSync implements api.RelayInternalAPI
 func (r *RelayInternalAPI) PerformRelayServerSync(
 	ctx context.Context,
@@ -38,7 +52,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 		logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 		return err
 	}
-	r.processTransaction(&asyncResponse.Txn)
+	r.processTransaction(&asyncResponse.Transaction)
 
 	prevEntry = gomatrixserverlib.RelayEntry{EntryID: asyncResponse.EntryID}
 	for asyncResponse.EntriesQueued {
@@ -50,7 +64,7 @@ func (r *RelayInternalAPI) PerformRelayServerSync(
 			logrus.Errorf("P2PGetTransactionFromRelay: %s", err.Error())
 			return err
 		}
-		r.processTransaction(&asyncResponse.Txn)
+		r.processTransaction(&asyncResponse.Transaction)
 	}
 
 	return nil

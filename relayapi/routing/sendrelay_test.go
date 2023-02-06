@@ -72,7 +72,7 @@ func TestForwardEmptyReturnsOk(t *testing.T) {
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, txn)
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	response := routing.SendTransactionToRelay(httpReq, &request, relayAPI, "1", *userID)
@@ -101,7 +101,7 @@ func TestForwardBadJSONReturnsError(t *testing.T) {
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, content)
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	response := routing.SendTransactionToRelay(httpReq, &request, relayAPI, "1", *userID)
@@ -135,7 +135,7 @@ func TestForwardTooManyPDUsReturnsError(t *testing.T) {
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, content)
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	response := routing.SendTransactionToRelay(httpReq, &request, relayAPI, "1", *userID)
@@ -169,7 +169,7 @@ func TestForwardTooManyEDUsReturnsError(t *testing.T) {
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, content)
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	response := routing.SendTransactionToRelay(httpReq, &request, relayAPI, "1", *userID)
@@ -192,7 +192,7 @@ func TestUniqueTransactionStoredInDatabase(t *testing.T) {
 	request := createFederationRequest(*userID, txn.TransactionID, txn.Origin, txn.Destination, txn)
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	response := routing.SendTransactionToRelay(

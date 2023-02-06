@@ -10,7 +10,7 @@ Transactions include a list of PDUs, (which contain, among other things, lists o
 There is no additional information sent along with the transaction other than what is typically added to them during Matrix federation today. 
 In the future this will probably need to change in order to handle more complex room state resolution during p2p usage.
 
-### Relay Server Architecture
+### Design
 
 ```
                      0                            +--------------------+
@@ -57,3 +57,78 @@ But in order to achieve this, you are either relying on p2p presence broadcasts 
 #### Recipient-Side Relay Servers
 
 If we have agreed to some static relay server before going off and doing other things, or if we are talking about more global p2p federation, then having a recipient designated relay server can cut down on redundant traffic since it will sit there idle until the recipient pulls events from it.
+
+### API
+
+Relay servers make use of 2 new matrix federation endpoints.
+These are:
+- PUT /_matrix/federation/v1/send_relay/{txnID}/{userID}
+- GET /_matrix/federation/v1/relay_txn/{userID}
+
+#### Send_Relay
+
+The `send_relay` endpoint is used to send events to a relay server that are destined for some other node. Servers can send events to this endpoint if they wish for the relay server to store & forward events for them when they go offline.
+
+##### Request
+
+###### Request Parameters
+
+|  Name  |  Type  |  Description                                        |
+|--------|--------|-----------------------------------------------------|
+| txnID  | string | **Required:** The transaction ID.                   |
+| userID | string | **Required:** The destination for this transaciton. |
+
+###### Request Body
+
+|  Name  |  Type  |  Description                           |
+|--------|--------|----------------------------------------|
+| pdus   | [PDU]  | **Required:** List of pdus. Max 50.    |
+| edus   | [EDU]  | List of edus. May be omitted. Max 100. |
+
+##### Responses
+
+|  Code  |  Reason                                          |
+|--------|--------------------------------------------------|
+| 200    | Successfully stored transaction for forwarding.  |
+| 400    | Invalid userID.                                  |
+| 400    | Invalid request body.                            |
+| 400    | Too many pdus or edus.                           |
+| 500    | Server failed processing transaction.            |
+
+#### Relay_Txn
+
+The `relay_txn` endpoint is used to get events from a relay server that are destined for you. Servers can send events to this endpoint if they wish for the relay server to store & forward events for them when they go offline.
+
+##### Request
+
+**This needs to be changed to prevent nodes from obtaining transactions not destined for them. Possibly by adding a signature field to the request.**
+
+###### Request Parameters
+
+|  Name  |  Type  |  Description                                                   |
+|--------|--------|----------------------------------------------------------------|
+| userID | string | **Required:** The user ID that events are being requested for. |
+
+###### Request Body
+
+|  Name    |  Type  |  Description                           |
+|----------|--------|----------------------------------------|
+| entry_id | int64  | **Required:** The id of the previous transaction received from the relay. Provided in the previous response to this endpoint. |
+
+##### Responses
+
+|  Code  |  Reason                                          |
+|--------|--------------------------------------------------|
+| 200    | Successfully stored transaction for forwarding.  |
+| 400    | Invalid userID.                                  |
+| 400    | Invalid request body.                            |
+| 400    | Invalid previous entry. Must be >= 0             |
+| 500    | Server failed processing transaction.            |
+
+###### 200 Response Body
+
+|  Name          |  Type        |  Description                                                             |
+|----------------|--------------|--------------------------------------------------------------------------|
+| transaction    | Transaction  | **Required:** A matrix transaction.                                      |
+| entry_id       | int64        | An ID associated with this transaction.                                  |
+| entries_queued | bool         | **Required:** Whether or not there are more events stored for this user. |

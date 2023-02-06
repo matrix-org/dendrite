@@ -46,8 +46,8 @@ func (f *testFedClient) P2PGetTransactionFromRelay(
 	}
 
 	res = gomatrixserverlib.RespGetRelayTransaction{
-		Txn:     gomatrixserverlib.Transaction{},
-		EntryID: 0,
+		Transaction: gomatrixserverlib.Transaction{},
+		EntryID:     0,
 	}
 	if f.queueDepth > 0 {
 		res.EntriesQueued = true
@@ -72,7 +72,7 @@ func TestPerformRelayServerSync(t *testing.T) {
 
 	fedClient := &testFedClient{}
 	relayAPI := NewRelayInternalAPI(
-		&db, fedClient, nil, nil, nil, false, "",
+		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
 	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
@@ -92,7 +92,7 @@ func TestPerformRelayServerSyncFedError(t *testing.T) {
 
 	fedClient := &testFedClient{shouldFail: true}
 	relayAPI := NewRelayInternalAPI(
-		&db, fedClient, nil, nil, nil, false, "",
+		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
 	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))
@@ -112,7 +112,7 @@ func TestPerformRelayServerSyncRunsUntilQueueEmpty(t *testing.T) {
 
 	fedClient := &testFedClient{queueDepth: 2}
 	relayAPI := NewRelayInternalAPI(
-		&db, fedClient, nil, nil, nil, false, "",
+		&db, fedClient, nil, nil, nil, false, "", true,
 	)
 
 	err = relayAPI.PerformRelayServerSync(context.Background(), *userID, gomatrixserverlib.ServerName("relay"))

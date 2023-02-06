@@ -399,6 +399,33 @@ func (d *InMemoryFederationDatabase) P2PAddRelayServersForServer(
 	return nil
 }
 
+func (d *InMemoryFederationDatabase) P2PRemoveRelayServersForServer(
+	ctx context.Context,
+	serverName gomatrixserverlib.ServerName,
+	relayServers []gomatrixserverlib.ServerName,
+) error {
+	d.dbMutex.Lock()
+	defer d.dbMutex.Unlock()
+
+	if knownRelayServers, ok := d.relayServers[serverName]; ok {
+		for _, relayServer := range relayServers {
+			for i, knownRelayServer := range knownRelayServers {
+				if relayServer == knownRelayServer {
+					d.relayServers[serverName] = append(
+						d.relayServers[serverName][:i],
+						d.relayServers[serverName][i+1:]...,
+					)
+					break
+				}
+			}
+		}
+	} else {
+		d.relayServers[serverName] = relayServers
+	}
+
+	return nil
+}
+
 func (d *InMemoryFederationDatabase) FetchKeys(ctx context.Context, requests map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.Timestamp) (map[gomatrixserverlib.PublicKeyLookupRequest]gomatrixserverlib.PublicKeyLookupResult, error) {
 	return nil, nil
 }
@@ -428,10 +455,6 @@ func (d *InMemoryFederationDatabase) GetJoinedHostsForRooms(ctx context.Context,
 }
 
 func (d *InMemoryFederationDatabase) RemoveAllServersAssumedOffline(ctx context.Context) error {
-	return nil
-}
-
-func (d *InMemoryFederationDatabase) P2PRemoveRelayServersForServer(ctx context.Context, serverName gomatrixserverlib.ServerName, relayServers []gomatrixserverlib.ServerName) error {
 	return nil
 }
 

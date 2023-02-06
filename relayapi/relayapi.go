@@ -54,6 +54,7 @@ func NewRelayInternalAPI(
 	rsAPI rsAPI.RoomserverInternalAPI,
 	keyRing *gomatrixserverlib.KeyRing,
 	producer *producers.SyncAPIProducer,
+	relayingEnabled bool,
 ) api.RelayInternalAPI {
 	cfg := &base.Cfg.RelayAPI
 
@@ -70,5 +71,6 @@ func NewRelayInternalAPI(
 		producer,
 		base.Cfg.Global.Presence.EnableInbound,
 		base.Cfg.Global.ServerName,
+		relayingEnabled,
 	)
 }

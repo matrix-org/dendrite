@@ -25,13 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type RelayTransactionResponse struct {
-	Transaction   gomatrixserverlib.Transaction `json:"transaction"`
-	EntryID       int64                         `json:"entry_id,omitempty"`
-	EntriesQueued bool                          `json:"entries_queued"`
-}
-
-// GetTransactionFromRelay implements /_matrix/federation/v1/relay_txn/{userID}
+// GetTransactionFromRelay implements GET /_matrix/federation/v1/relay_txn/{userID}
 // This endpoint can be extracted into a separate relay server service.
 func GetTransactionFromRelay(
 	httpReq *http.Request,
@@ -39,9 +33,9 @@ func GetTransactionFromRelay(
 	relayAPI api.RelayInternalAPI,
 	userID gomatrixserverlib.UserID,
 ) util.JSONResponse {
-	logrus.Infof("Handling relay_txn for %s", userID.Raw())
+	logrus.Infof("Processing relay_txn for %s", userID.Raw())
 
-	previousEntry := gomatrixserverlib.RelayEntry{}
+	var previousEntry gomatrixserverlib.RelayEntry
 	if err := json.Unmarshal(fedReq.Content(), &previousEntry); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusInternalServerError,
@@ -65,7 +59,7 @@ func GetTransactionFromRelay(
 
 	return util.JSONResponse{
 		Code: http.StatusOK,
-		JSON: RelayTransactionResponse{
+		JSON: gomatrixserverlib.RespGetRelayTransaction{
 			Transaction:   response.Transaction,
 			EntryID:       response.EntryID,
 			EntriesQueued: response.EntriesQueued,

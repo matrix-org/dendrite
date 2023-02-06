@@ -27,16 +27,13 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/sirupsen/logrus"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
 // The provided publicAPIMux MUST have `UseEncodedPath()` enabled or else routes will incorrectly
 // path unescape twice (once from the router, once from MakeRelayAPI). We need to have this enabled
 // so we can decode paths like foo/bar%2Fbaz as [foo, bar/baz] - by default it will decode to [foo, bar, baz]
-//
-// Due to Setup being used to call many other functions, a gocyclo nolint is
-// applied:
-// nolint: gocyclo
 func Setup(
 	fedMux *mux.Router,
 	cfg *config.FederationAPI,
@@ -48,6 +45,14 @@ func Setup(
 	v1fedmux.Handle("/send_relay/{txnID}/{userID}", MakeRelayAPI(
 		"send_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			logrus.Infof("Handling send_relay from: %s", request.Origin())
+			if !relayAPI.RelayingEnabled() {
+				logrus.Warnf("Dropping send_relay from: %s", request.Origin())
+				return util.JSONResponse{
+					Code: http.StatusNotFound,
+				}
+			}
+
 			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{
@@ -65,6 +70,14 @@ func Setup(
 	v1fedmux.Handle("/relay_txn/{userID}", MakeRelayAPI(
 		"get_relay_transaction", "", cfg.Matrix.IsLocalServerName, keys,
 		func(httpReq *http.Request, request *gomatrixserverlib.FederationRequest, vars map[string]string) util.JSONResponse {
+			logrus.Infof("Handling relay_txn from: %s", request.Origin())
+			if !relayAPI.RelayingEnabled() {
+				logrus.Warnf("Dropping relay_txn from: %s", request.Origin())
+				return util.JSONResponse{
+					Code: http.StatusNotFound,
+				}
+			}
+
 			userID, err := gomatrixserverlib.NewUserID(vars["userID"], false)
 			if err != nil {
 				return util.JSONResponse{

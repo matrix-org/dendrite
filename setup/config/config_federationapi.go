@@ -49,7 +49,7 @@ func (c *FederationAPI) Defaults(opts DefaultOpts) {
 		c.Database.Defaults(10)
 	}
 	c.FederationMaxRetries = 16
-	c.P2PFederationRetriesUntilAssumedOffline = 2
+	c.P2PFederationRetriesUntilAssumedOffline = 1
 	c.DisableTLSValidation = false
 	c.DisableHTTPKeepalives = false
 	if opts.Generate {

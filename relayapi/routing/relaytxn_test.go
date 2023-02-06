@@ -57,14 +57,14 @@ func TestGetEmptyDatabaseReturnsNothing(t *testing.T) {
 	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.Equal(t, false, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
@@ -90,7 +90,7 @@ func TestGetInvalidPrevEntryFails(t *testing.T) {
 	assert.NoError(t, err, "Failed to store transaction")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{EntryID: -1})
@@ -123,14 +123,14 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
@@ -139,7 +139,7 @@ func TestGetReturnsSavedTransaction(t *testing.T) {
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 
@@ -186,14 +186,14 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	assert.NoError(t, err, "Failed to associate transaction with user")
 
 	relayAPI := internal.NewRelayInternalAPI(
-		&db, nil, nil, nil, nil, false, "",
+		&db, nil, nil, nil, nil, false, "", true,
 	)
 
 	request := createQuery(*userID, gomatrixserverlib.RelayEntry{})
 	response := routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse := response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse := response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction, jsonResponse.Transaction)
 
@@ -201,7 +201,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.True(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, transaction2, jsonResponse.Transaction)
 
@@ -210,7 +210,7 @@ func TestGetReturnsMultipleSavedTransactions(t *testing.T) {
 	response = routing.GetTransactionFromRelay(httpReq, &request, relayAPI, *userID)
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	jsonResponse = response.JSON.(routing.RelayTransactionResponse)
+	jsonResponse = response.JSON.(gomatrixserverlib.RespGetRelayTransaction)
 	assert.False(t, jsonResponse.EntriesQueued)
 	assert.Equal(t, gomatrixserverlib.Transaction{}, jsonResponse.Transaction)
 

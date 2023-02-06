@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -109,7 +110,7 @@ func (r *Leaver) performLeaveRoomByID(
 					// mimic the returned values from Synapse
 					res.Message = "You cannot reject this invite"
 					res.Code = 403
-					return nil, fmt.Errorf("You cannot reject this invite")
+					return nil, jsonerror.LeaveServerNoticeError()
 				}
 			}
 		}
