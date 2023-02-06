@@ -105,6 +105,9 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 		filter.Senders, filter.NotSenders,
 		filter.Types, filter.NotTypes,
 		[]string{}, nil, filter.Limit, FilterOrderAsc)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	rows, err := stmt.QueryContext(ctx, params...)
 	if err != nil {
@@ -133,7 +136,7 @@ func (s *accountDataStatements) SelectAccountDataInRange(
 	if pos == 0 {
 		pos = r.High()
 	}
-	return data, pos, nil
+	return data, pos, rows.Err()
 }
 
 func (s *accountDataStatements) SelectMaxAccountDataID(
