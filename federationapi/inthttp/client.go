@@ -23,6 +23,10 @@ const (
 	FederationAPIPerformInviteRequestPath          = "/federationapi/performInviteRequest"
 	FederationAPIPerformOutboundPeekRequestPath    = "/federationapi/performOutboundPeekRequest"
 	FederationAPIPerformBroadcastEDUPath           = "/federationapi/performBroadcastEDU"
+	FederationAPIPerformWakeupServers              = "/federationapi/performWakeupServers"
+	FederationAPIQueryRelayServers                 = "/federationapi/queryRelayServers"
+	FederationAPIAddRelayServers                   = "/federationapi/addRelayServers"
+	FederationAPIRemoveRelayServers                = "/federationapi/removeRelayServers"
 
 	FederationAPIGetUserDevicesPath      = "/federationapi/client/getUserDevices"
 	FederationAPIClaimKeysPath           = "/federationapi/client/claimKeys"
@@ -150,18 +154,32 @@ func (h *httpFederationInternalAPI) PerformBroadcastEDU(
 	)
 }
 
+// Handle an instruction to remove the respective servers from being blacklisted.
+func (h *httpFederationInternalAPI) PerformWakeupServers(
+	ctx context.Context,
+	request *api.PerformWakeupServersRequest,
+	response *api.PerformWakeupServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"PerformWakeupServers", h.federationAPIURL+FederationAPIPerformWakeupServers,
+		h.httpClient, ctx, request, response,
+	)
+}
+
 type getUserDevices struct {
 	S      gomatrixserverlib.ServerName
+	Origin gomatrixserverlib.ServerName
 	UserID string
 }
 
 func (h *httpFederationInternalAPI) GetUserDevices(
-	ctx context.Context, s gomatrixserverlib.ServerName, userID string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, userID string,
 ) (gomatrixserverlib.RespUserDevices, error) {
 	return httputil.CallInternalProxyAPI[getUserDevices, gomatrixserverlib.RespUserDevices, *api.FederationClientError](
 		"GetUserDevices", h.federationAPIURL+FederationAPIGetUserDevicesPath, h.httpClient,
 		ctx, &getUserDevices{
 			S:      s,
+			Origin: origin,
 			UserID: userID,
 		},
 	)
@@ -169,52 +187,58 @@ func (h *httpFederationInternalAPI) GetUserDevices(
 
 type claimKeys struct {
 	S           gomatrixserverlib.ServerName
+	Origin      gomatrixserverlib.ServerName
 	OneTimeKeys map[string]map[string]string
 }
 
 func (h *httpFederationInternalAPI) ClaimKeys(
-	ctx context.Context, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, oneTimeKeys map[string]map[string]string,
 ) (gomatrixserverlib.RespClaimKeys, error) {
 	return httputil.CallInternalProxyAPI[claimKeys, gomatrixserverlib.RespClaimKeys, *api.FederationClientError](
 		"ClaimKeys", h.federationAPIURL+FederationAPIClaimKeysPath, h.httpClient,
 		ctx, &claimKeys{
 			S:           s,
+			Origin:      origin,
 			OneTimeKeys: oneTimeKeys,
 		},
 	)
 }
 
 type queryKeys struct {
-	S    gomatrixserverlib.ServerName
-	Keys map[string][]string
+	S      gomatrixserverlib.ServerName
+	Origin gomatrixserverlib.ServerName
+	Keys   map[string][]string
 }
 
 func (h *httpFederationInternalAPI) QueryKeys(
-	ctx context.Context, s gomatrixserverlib.ServerName, keys map[string][]string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, keys map[string][]string,
 ) (gomatrixserverlib.RespQueryKeys, error) {
 	return httputil.CallInternalProxyAPI[queryKeys, gomatrixserverlib.RespQueryKeys, *api.FederationClientError](
 		"QueryKeys", h.federationAPIURL+FederationAPIQueryKeysPath, h.httpClient,
 		ctx, &queryKeys{
-			S:    s,
-			Keys: keys,
+			S:      s,
+			Origin: origin,
+			Keys:   keys,
 		},
 	)
 }
 
 type backfill struct {
 	S        gomatrixserverlib.ServerName
+	Origin   gomatrixserverlib.ServerName
 	RoomID   string
 	Limit    int
 	EventIDs []string
 }
 
 func (h *httpFederationInternalAPI) Backfill(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID string, limit int, eventIDs []string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string, limit int, eventIDs []string,
 ) (gomatrixserverlib.Transaction, error) {
 	return httputil.CallInternalProxyAPI[backfill, gomatrixserverlib.Transaction, *api.FederationClientError](
 		"Backfill", h.federationAPIURL+FederationAPIBackfillPath, h.httpClient,
 		ctx, &backfill{
 			S:        s,
+			Origin:   origin,
 			RoomID:   roomID,
 			Limit:    limit,
 			EventIDs: eventIDs,
@@ -224,18 +248,20 @@ func (h *httpFederationInternalAPI) Backfill(
 
 type lookupState struct {
 	S           gomatrixserverlib.ServerName
+	Origin      gomatrixserverlib.ServerName
 	RoomID      string
 	EventID     string
 	RoomVersion gomatrixserverlib.RoomVersion
 }
 
 func (h *httpFederationInternalAPI) LookupState(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, eventID string, roomVersion gomatrixserverlib.RoomVersion,
 ) (gomatrixserverlib.RespState, error) {
 	return httputil.CallInternalProxyAPI[lookupState, gomatrixserverlib.RespState, *api.FederationClientError](
 		"LookupState", h.federationAPIURL+FederationAPILookupStatePath, h.httpClient,
 		ctx, &lookupState{
 			S:           s,
+			Origin:      origin,
 			RoomID:      roomID,
 			EventID:     eventID,
 			RoomVersion: roomVersion,
@@ -245,17 +271,19 @@ func (h *httpFederationInternalAPI) LookupState(
 
 type lookupStateIDs struct {
 	S       gomatrixserverlib.ServerName
+	Origin  gomatrixserverlib.ServerName
 	RoomID  string
 	EventID string
 }
 
 func (h *httpFederationInternalAPI) LookupStateIDs(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID, eventID string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, eventID string,
 ) (gomatrixserverlib.RespStateIDs, error) {
 	return httputil.CallInternalProxyAPI[lookupStateIDs, gomatrixserverlib.RespStateIDs, *api.FederationClientError](
 		"LookupStateIDs", h.federationAPIURL+FederationAPILookupStateIDsPath, h.httpClient,
 		ctx, &lookupStateIDs{
 			S:       s,
+			Origin:  origin,
 			RoomID:  roomID,
 			EventID: eventID,
 		},
@@ -264,19 +292,21 @@ func (h *httpFederationInternalAPI) LookupStateIDs(
 
 type lookupMissingEvents struct {
 	S           gomatrixserverlib.ServerName
+	Origin      gomatrixserverlib.ServerName
 	RoomID      string
 	Missing     gomatrixserverlib.MissingEvents
 	RoomVersion gomatrixserverlib.RoomVersion
 }
 
 func (h *httpFederationInternalAPI) LookupMissingEvents(
-	ctx context.Context, s gomatrixserverlib.ServerName, roomID string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID string,
 	missing gomatrixserverlib.MissingEvents, roomVersion gomatrixserverlib.RoomVersion,
 ) (res gomatrixserverlib.RespMissingEvents, err error) {
 	return httputil.CallInternalProxyAPI[lookupMissingEvents, gomatrixserverlib.RespMissingEvents, *api.FederationClientError](
 		"LookupMissingEvents", h.federationAPIURL+FederationAPILookupMissingEventsPath, h.httpClient,
 		ctx, &lookupMissingEvents{
 			S:           s,
+			Origin:      origin,
 			RoomID:      roomID,
 			Missing:     missing,
 			RoomVersion: roomVersion,
@@ -286,16 +316,18 @@ func (h *httpFederationInternalAPI) LookupMissingEvents(
 
 type getEvent struct {
 	S       gomatrixserverlib.ServerName
+	Origin  gomatrixserverlib.ServerName
 	EventID string
 }
 
 func (h *httpFederationInternalAPI) GetEvent(
-	ctx context.Context, s gomatrixserverlib.ServerName, eventID string,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, eventID string,
 ) (gomatrixserverlib.Transaction, error) {
 	return httputil.CallInternalProxyAPI[getEvent, gomatrixserverlib.Transaction, *api.FederationClientError](
 		"GetEvent", h.federationAPIURL+FederationAPIGetEventPath, h.httpClient,
 		ctx, &getEvent{
 			S:       s,
+			Origin:  origin,
 			EventID: eventID,
 		},
 	)
@@ -303,19 +335,21 @@ func (h *httpFederationInternalAPI) GetEvent(
 
 type getEventAuth struct {
 	S           gomatrixserverlib.ServerName
+	Origin      gomatrixserverlib.ServerName
 	RoomVersion gomatrixserverlib.RoomVersion
 	RoomID      string
 	EventID     string
 }
 
 func (h *httpFederationInternalAPI) GetEventAuth(
-	ctx context.Context, s gomatrixserverlib.ServerName,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName,
 	roomVersion gomatrixserverlib.RoomVersion, roomID, eventID string,
 ) (gomatrixserverlib.RespEventAuth, error) {
 	return httputil.CallInternalProxyAPI[getEventAuth, gomatrixserverlib.RespEventAuth, *api.FederationClientError](
 		"GetEventAuth", h.federationAPIURL+FederationAPIGetEventAuthPath, h.httpClient,
 		ctx, &getEventAuth{
 			S:           s,
+			Origin:      origin,
 			RoomVersion: roomVersion,
 			RoomID:      roomID,
 			EventID:     eventID,
@@ -351,18 +385,20 @@ func (h *httpFederationInternalAPI) LookupServerKeys(
 
 type eventRelationships struct {
 	S       gomatrixserverlib.ServerName
+	Origin  gomatrixserverlib.ServerName
 	Req     gomatrixserverlib.MSC2836EventRelationshipsRequest
 	RoomVer gomatrixserverlib.RoomVersion
 }
 
 func (h *httpFederationInternalAPI) MSC2836EventRelationships(
-	ctx context.Context, s gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest,
+	ctx context.Context, origin, s gomatrixserverlib.ServerName, r gomatrixserverlib.MSC2836EventRelationshipsRequest,
 	roomVersion gomatrixserverlib.RoomVersion,
 ) (res gomatrixserverlib.MSC2836EventRelationshipsResponse, err error) {
 	return httputil.CallInternalProxyAPI[eventRelationships, gomatrixserverlib.MSC2836EventRelationshipsResponse, *api.FederationClientError](
 		"MSC2836EventRelationships", h.federationAPIURL+FederationAPIEventRelationshipsPath, h.httpClient,
 		ctx, &eventRelationships{
 			S:       s,
+			Origin:  origin,
 			Req:     r,
 			RoomVer: roomVersion,
 		},
@@ -371,17 +407,19 @@ func (h *httpFederationInternalAPI) MSC2836EventRelationships(
 
 type spacesReq struct {
 	S             gomatrixserverlib.ServerName
+	Origin        gomatrixserverlib.ServerName
 	SuggestedOnly bool
 	RoomID        string
 }
 
 func (h *httpFederationInternalAPI) MSC2946Spaces(
-	ctx context.Context, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool,
+	ctx context.Context, origin, dst gomatrixserverlib.ServerName, roomID string, suggestedOnly bool,
 ) (res gomatrixserverlib.MSC2946SpacesResponse, err error) {
 	return httputil.CallInternalProxyAPI[spacesReq, gomatrixserverlib.MSC2946SpacesResponse, *api.FederationClientError](
 		"MSC2836EventRelationships", h.federationAPIURL+FederationAPISpacesSummaryPath, h.httpClient,
 		ctx, &spacesReq{
 			S:             dst,
+			Origin:        origin,
 			SuggestedOnly: suggestedOnly,
 			RoomID:        roomID,
 		},
@@ -472,6 +510,39 @@ func (h *httpFederationInternalAPI) QueryPublicKeys(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryPublicKeys", h.federationAPIURL+FederationAPIQueryPublicKeyPath,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) P2PQueryRelayServers(
+	ctx context.Context,
+	request *api.P2PQueryRelayServersRequest,
+	response *api.P2PQueryRelayServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"QueryRelayServers", h.federationAPIURL+FederationAPIQueryRelayServers,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) P2PAddRelayServers(
+	ctx context.Context,
+	request *api.P2PAddRelayServersRequest,
+	response *api.P2PAddRelayServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"AddRelayServers", h.federationAPIURL+FederationAPIAddRelayServers,
+		h.httpClient, ctx, request, response,
+	)
+}
+
+func (h *httpFederationInternalAPI) P2PRemoveRelayServers(
+	ctx context.Context,
+	request *api.P2PRemoveRelayServersRequest,
+	response *api.P2PRemoveRelayServersResponse,
+) error {
+	return httputil.CallInternalRPCAPI(
+		"RemoveRelayServers", h.federationAPIURL+FederationAPIRemoveRelayServers,
 		h.httpClient, ctx, request, response,
 	)
 }

@@ -22,15 +22,15 @@ const (
 	MRuleTombstone           = ".m.rule.tombstone"
 	MRuleRoomNotif           = ".m.rule.roomnotif"
 	MRuleReaction            = ".m.rule.reaction"
+	MRuleRoomACLs            = ".m.rule.room.server_acl"
 )
 
 var (
 	mRuleMasterDefinition = Rule{
-		RuleID:     MRuleMaster,
-		Default:    true,
-		Enabled:    false,
-		Conditions: []*Condition{},
-		Actions:    []*Action{{Kind: DontNotifyAction}},
+		RuleID:  MRuleMaster,
+		Default: true,
+		Enabled: false,
+		Actions: []*Action{{Kind: DontNotifyAction}},
 	}
 	mRuleSuppressNoticesDefinition = Rule{
 		RuleID:  MRuleSuppressNotices,
@@ -40,7 +40,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "content.msgtype",
-				Pattern: "m.notice",
+				Pattern: pointer("m.notice"),
 			},
 		},
 		Actions: []*Action{{Kind: DontNotifyAction}},
@@ -53,7 +53,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.member",
+				Pattern: pointer("m.room.member"),
 			},
 		},
 		Actions: []*Action{{Kind: DontNotifyAction}},
@@ -73,7 +73,6 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: true,
 			},
 		},
 	}
@@ -85,12 +84,12 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.tombstone",
+				Pattern: pointer("m.room.tombstone"),
 			},
 			{
 				Kind:    EventMatchCondition,
 				Key:     "state_key",
-				Pattern: "",
+				Pattern: pointer(""),
 			},
 		},
 		Actions: []*Action{
@@ -98,9 +97,26 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: true,
 			},
 		},
+	}
+	mRuleACLsDefinition = Rule{
+		RuleID:  MRuleRoomACLs,
+		Default: true,
+		Enabled: true,
+		Conditions: []*Condition{
+			{
+				Kind:    EventMatchCondition,
+				Key:     "type",
+				Pattern: pointer("m.room.server_acl"),
+			},
+			{
+				Kind:    EventMatchCondition,
+				Key:     "state_key",
+				Pattern: pointer(""),
+			},
+		},
+		Actions: []*Action{},
 	}
 	mRuleRoomNotifDefinition = Rule{
 		RuleID:  MRuleRoomNotif,
@@ -110,7 +126,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "content.body",
-				Pattern: "@room",
+				Pattern: pointer("@room"),
 			},
 			{
 				Kind: SenderNotificationPermissionCondition,
@@ -122,7 +138,6 @@ var (
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
-				Value: true,
 			},
 		},
 	}
@@ -134,7 +149,7 @@ var (
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.reaction",
+				Pattern: pointer("m.reaction"),
 			},
 		},
 		Actions: []*Action{
@@ -152,17 +167,17 @@ func mRuleInviteForMeDefinition(userID string) *Rule {
 			{
 				Kind:    EventMatchCondition,
 				Key:     "type",
-				Pattern: "m.room.member",
+				Pattern: pointer("m.room.member"),
 			},
 			{
 				Kind:    EventMatchCondition,
 				Key:     "content.membership",
-				Pattern: "invite",
+				Pattern: pointer("invite"),
 			},
 			{
 				Kind:    EventMatchCondition,
 				Key:     "state_key",
-				Pattern: userID,
+				Pattern: pointer(userID),
 			},
 		},
 		Actions: []*Action{
@@ -171,11 +186,6 @@ func mRuleInviteForMeDefinition(userID string) *Rule {
 				Kind:  SetTweakAction,
 				Tweak: SoundTweak,
 				Value: "default",
-			},
-			{
-				Kind:  SetTweakAction,
-				Tweak: HighlightTweak,
-				Value: false,
 			},
 		},
 	}

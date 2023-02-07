@@ -85,4 +85,9 @@ type Database interface {
 
 	StoreCrossSigningKeysForUser(ctx context.Context, userID string, keyMap types.CrossSigningKeyMap) error
 	StoreCrossSigningSigsForTarget(ctx context.Context, originUserID string, originKeyID gomatrixserverlib.KeyID, targetUserID string, targetKeyID gomatrixserverlib.KeyID, signature gomatrixserverlib.Base64Bytes) error
+
+	DeleteStaleDeviceLists(
+		ctx context.Context,
+		userIDs []string,
+	) error
 }

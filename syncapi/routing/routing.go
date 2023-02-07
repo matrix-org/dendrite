@@ -58,7 +58,7 @@ func Setup(
 	// TODO: Add AS support for all handlers below.
 	v3mux.Handle("/sync", httputil.MakeAuthAPI("sync", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingSyncRequest(req, device)
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, httputil.WithAllowGuests())).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/messages", httputil.MakeAuthAPI("room_messages", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
@@ -79,7 +79,7 @@ func Setup(
 			return util.ErrorResponse(err)
 		}
 		return OnIncomingMessagesRequest(req, syncDB, vars["roomID"], device, rsAPI, cfg, srp, lazyLoadCache)
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, httputil.WithAllowGuests())).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/event/{eventID}",
 		httputil.MakeAuthAPI("rooms_get_event", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -88,7 +88,7 @@ func Setup(
 				return util.ErrorResponse(err)
 			}
 			return GetEvent(req, device, vars["roomID"], vars["eventID"], cfg, syncDB, rsAPI)
-		}),
+		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/user/{userId}/filter",
@@ -113,7 +113,7 @@ func Setup(
 
 	v3mux.Handle("/keys/changes", httputil.MakeAuthAPI("keys_changes", userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
 		return srp.OnIncomingKeyChangeRequest(req, device)
-	})).Methods(http.MethodGet, http.MethodOptions)
+	}, httputil.WithAllowGuests())).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomId}/context/{eventId}",
 		httputil.MakeAuthAPI(gomatrixserverlib.Join, userAPI, func(req *http.Request, device *userapi.Device) util.JSONResponse {
@@ -128,7 +128,7 @@ func Setup(
 				vars["roomId"], vars["eventId"],
 				lazyLoadCache,
 			)
-		}),
+		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}",
@@ -142,7 +142,7 @@ func Setup(
 				req, device, syncDB, rsAPI,
 				vars["roomId"], vars["eventId"], "", "",
 			)
-		}),
+		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}",
@@ -156,7 +156,7 @@ func Setup(
 				req, device, syncDB, rsAPI,
 				vars["roomId"], vars["eventId"], vars["relType"], "",
 			)
-		}),
+		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v1unstablemux.Handle("/rooms/{roomId}/relations/{eventId}/{relType}/{eventType}",
@@ -170,7 +170,7 @@ func Setup(
 				req, device, syncDB, rsAPI,
 				vars["roomId"], vars["eventId"], vars["relType"], vars["eventType"],
 			)
-		}),
+		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/search",
@@ -211,7 +211,7 @@ func Setup(
 
 			at := req.URL.Query().Get("at")
 			return GetMemberships(req, device, vars["roomID"], syncDB, rsAPI, false, membership, notMembership, at)
-		}),
+		}, httputil.WithAllowGuests()),
 	).Methods(http.MethodGet, http.MethodOptions)
 
 	v3mux.Handle("/rooms/{roomID}/joined_members",

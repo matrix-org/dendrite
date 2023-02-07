@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -38,6 +39,7 @@ var (
 	flagHead             = flag.String("head", "", "Location to a dendrite repository to treat as HEAD instead of Github")
 	flagDockerHost       = flag.String("docker-host", "localhost", "The hostname of the docker client. 'localhost' if running locally, 'host.docker.internal' if running in Docker.")
 	flagDirect           = flag.Bool("direct", false, "If a direct upgrade from the defined FROM version to TO should be done")
+	flagSqlite           = flag.Bool("sqlite", false, "Test SQLite instead of PostgreSQL")
 	alphaNumerics        = regexp.MustCompile("[^a-zA-Z0-9]+")
 )
 
@@ -49,7 +51,9 @@ const HEAD = "HEAD"
 // due to the error:
 // When using COPY with more than one source file, the destination must be a directory and end with a /
 // We need to run a postgres anyway, so use the dockerfile associated with Complement instead.
-const Dockerfile = `FROM golang:1.19-buster as build
+
+const DockerfilePostgreSQL = `FROM golang:1.19-buster as build
+
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
@@ -60,6 +64,7 @@ COPY . .
 RUN go build --race ./cmd/dendrite-monolith-server
 RUN go build --race ./cmd/generate-keys
 RUN go build --race ./cmd/generate-config
+RUN go build --race ./cmd/create-account
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 
@@ -91,6 +96,43 @@ PARAMS="--tls-cert server.crt --tls-key server.key --config dendrite.yaml" \n\
 ENV SERVER_NAME=localhost
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh `
+
+const DockerfileSQLite = `FROM golang:1.18-stretch as build
+RUN apt-get update && apt-get install -y postgresql
+WORKDIR /build
+
+# Copy the build context to the repo as this is the right dendrite code. This is different to the
+# Complement Dockerfile which wgets a branch.
+COPY . .
+
+RUN go build ./cmd/dendrite-monolith-server
+RUN go build ./cmd/generate-keys
+RUN go build ./cmd/generate-config
+RUN go build ./cmd/create-account
+RUN ./generate-config --ci > dendrite.yaml
+RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
+
+# Make sure the SQLite databases are in a persistent location, we're already mapping
+# the postgresql folder so let's just use that for simplicity
+RUN sed -i "s%connection_string:.file:%connection_string: file:\/var\/lib\/postgresql\/9.6\/main\/%g" dendrite.yaml 
+
+# This entry script starts postgres, waits for it to be up then starts dendrite
+RUN echo '\
+sed -i "s/server_name: localhost/server_name: ${SERVER_NAME}/g" dendrite.yaml \n\
+PARAMS="--tls-cert server.crt --tls-key server.key --config dendrite.yaml" \n\
+./dendrite-monolith-server --really-enable-open-registration ${PARAMS} || ./dendrite-monolith-server ${PARAMS} \n\
+' > run_dendrite.sh && chmod +x run_dendrite.sh
+
+ENV SERVER_NAME=localhost
+EXPOSE 8008 8448
+CMD /build/run_dendrite.sh `
+
+func dockerfile() []byte {
+	if *flagSqlite {
+		return []byte(DockerfileSQLite)
+	}
+	return []byte(DockerfilePostgreSQL)
+}
 
 const dendriteUpgradeTestLabel = "dendrite_upgrade_test"
 
@@ -150,7 +192,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 	if branchOrTagName == HEAD && *flagHead != "" {
 		log.Printf("%s: Using %s as HEAD", branchOrTagName, *flagHead)
 		// add top level Dockerfile
-		err = os.WriteFile(path.Join(*flagHead, "Dockerfile"), []byte(Dockerfile), os.ModePerm)
+		err = os.WriteFile(path.Join(*flagHead, "Dockerfile"), dockerfile(), os.ModePerm)
 		if err != nil {
 			return "", fmt.Errorf("custom HEAD: failed to inject /Dockerfile: %w", err)
 		}
@@ -166,7 +208,7 @@ func buildDendrite(httpClient *http.Client, dockerClient *client.Client, tmpDir,
 		// pull an archive, this contains a top-level directory which screws with the build context
 		// which we need to fix up post download
 		u := fmt.Sprintf("https://github.com/matrix-org/dendrite/archive/%s.tar.gz", branchOrTagName)
-		tarball, err = downloadArchive(httpClient, tmpDir, u, []byte(Dockerfile))
+		tarball, err = downloadArchive(httpClient, tmpDir, u, dockerfile())
 		if err != nil {
 			return "", fmt.Errorf("failed to download archive %s: %w", u, err)
 		}
@@ -367,7 +409,8 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 	// hit /versions to check it is up
 	var lastErr error
 	for i := 0; i < 500; i++ {
-		res, err := http.Get(versionsURL)
+		var res *http.Response
+		res, err = http.Get(versionsURL)
 		if err != nil {
 			lastErr = fmt.Errorf("GET %s => error: %s", versionsURL, err)
 			time.Sleep(50 * time.Millisecond)
@@ -381,18 +424,22 @@ func runImage(dockerClient *client.Client, volumeName, version, imageID string) 
 		lastErr = nil
 		break
 	}
-	if lastErr != nil {
-		logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-		})
-		// ignore errors when cannot get logs, it's just for debugging anyways
-		if err == nil {
-			logbody, err := io.ReadAll(logs)
-			if err == nil {
-				log.Printf("Container logs:\n\n%s\n\n", string(logbody))
+	logs, err := dockerClient.ContainerLogs(context.Background(), containerID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+	})
+	// ignore errors when cannot get logs, it's just for debugging anyways
+	if err == nil {
+		go func() {
+			for {
+				if body, err := io.ReadAll(logs); err == nil && len(body) > 0 {
+					log.Printf("%s: %s", version, string(body))
+				} else {
+					return
+				}
 			}
-		}
+		}()
 	}
 	return baseURL, containerID, lastErr
 }
@@ -419,6 +466,45 @@ func loadAndRunTests(dockerClient *client.Client, volumeName, v string, branchTo
 	// Sleep to let the database sync before returning and destroying the dendrite container
 	time.Sleep(5 * time.Second)
 
+	err = testCreateAccount(dockerClient, v, containerID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// test that create-account is working
+func testCreateAccount(dockerClient *client.Client, v string, containerID string) error {
+	createUser := strings.ToLower("createaccountuser-" + v)
+	log.Printf("%s: Creating account %s with create-account\n", v, createUser)
+
+	respID, err := dockerClient.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
+		AttachStderr: true,
+		AttachStdout: true,
+		Cmd: []string{
+			"/build/create-account",
+			"-username", createUser,
+			"-password", "someRandomPassword",
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to ContainerExecCreate: %w", err)
+	}
+
+	response, err := dockerClient.ContainerExecAttach(context.Background(), respID.ID, types.ExecStartCheck{})
+	if err != nil {
+		return fmt.Errorf("failed to attach to container: %w", err)
+	}
+	defer response.Close()
+
+	data, err := ioutil.ReadAll(response.Reader)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Contains(data, []byte("AccessToken")) {
+		return fmt.Errorf("failed to create-account: %s", string(data))
+	}
 	return nil
 }
 

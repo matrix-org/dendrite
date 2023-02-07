@@ -1,0 +1,13 @@
+---
+postgresql:
+  enabled: true
+  primary:
+    persistence:
+      size: 1Gi
+
+dendrite_config:
+  global:
+    server_name: "localhost"
+
+ingress:
+  enabled: true

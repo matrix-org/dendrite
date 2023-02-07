@@ -74,7 +74,7 @@ func GetPostPublicRooms(
 	serverName := gomatrixserverlib.ServerName(request.Server)
 	if serverName != "" && !cfg.Matrix.IsLocalServerName(serverName) {
 		res, err := federation.GetPublicRoomsFiltered(
-			req.Context(), serverName,
+			req.Context(), cfg.Matrix.ServerName, serverName,
 			int(request.Limit), request.Since,
 			request.Filter.SearchTerms, false,
 			"",

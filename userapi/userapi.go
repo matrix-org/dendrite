@@ -37,8 +37,8 @@ import (
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI) {
-	inthttp.AddRoutes(router, intAPI)
+func AddInternalRoutes(router *mux.Router, intAPI api.UserInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(router, intAPI, enableMetrics)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
