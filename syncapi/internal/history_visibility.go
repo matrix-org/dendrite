@@ -199,7 +199,7 @@ func visibilityForEvents(
 			membershipAtEvent: gomatrixserverlib.Leave, // default to leave, to not expose events by accident
 			visibility:        event.Visibility,
 		}
-		ev, ok := membershipResp.Memberships[eventID]
+		ev, ok := membershipResp.Membership[eventID]
 		if !ok || ev == nil {
 			result[eventID] = vis
 			continue

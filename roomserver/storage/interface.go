@@ -176,6 +176,9 @@ type Database interface {
 	PurgeRoom(ctx context.Context, roomID string) error
 	UpgradeRoom(ctx context.Context, oldRoomID, newRoomID, eventSender string) error
 
+	// GetMembershipForHistoryVisibility queries the membership events for the given eventIDs.
+	// Returns a map from (input) eventID -> membership event. If no membership event is found, returns an empty event, resulting in
+	// a membership of "leave" when calculating history visibility.
 	GetMembershipForHistoryVisibility(
 		ctx context.Context, userNID types.EventStateKeyNID, info *types.RoomInfo, eventIDs ...string,
 	) (map[string]*gomatrixserverlib.HeaderedEvent, error)

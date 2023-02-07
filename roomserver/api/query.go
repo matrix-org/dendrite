@@ -433,7 +433,7 @@ func (r *QueryCurrentStateResponse) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// QueryMembershipAtEventRequest requests the membership events for a user
+// QueryMembershipAtEventRequest requests the membership event for a user
 // for a list of eventIDs.
 type QueryMembershipAtEventRequest struct {
 	RoomID   string
@@ -443,9 +443,10 @@ type QueryMembershipAtEventRequest struct {
 
 // QueryMembershipAtEventResponse is the response to QueryMembershipAtEventRequest.
 type QueryMembershipAtEventResponse struct {
-	// Memberships is a map from eventID to a list of events (if any). Events that
-	// do not have known state will return an empty array here.
-	Memberships map[string]*gomatrixserverlib.HeaderedEvent `json:"memberships"`
+	// Membership is a map from eventID to membership event. Events that
+	// do not have known state will return a nil event, resulting in a "leave" membership
+	// when calculating history visibility.
+	Membership map[string]*gomatrixserverlib.HeaderedEvent `json:"membership"`
 }
 
 // QueryLeftUsersRequest is a request to calculate users that we (the server) don't share a
