@@ -267,6 +267,15 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 	stateFilter *gomatrixserverlib.StateFilter,
 	excludeEventIDs []string,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
+	// We're going to query members later, so remove them from this request
+	if stateFilter.LazyLoadMembers && !stateFilter.IncludeRedundantMembers {
+		notTypes := &[]string{gomatrixserverlib.MRoomMember}
+		if stateFilter.NotTypes != nil {
+			*stateFilter.NotTypes = append(*stateFilter.NotTypes, gomatrixserverlib.MRoomMember)
+		} else {
+			stateFilter.NotTypes = notTypes
+		}
+	}
 	stmt, params, err := prepareWithFilters(
 		s.db, txn, selectCurrentStateSQL,
 		[]interface{}{

@@ -91,6 +91,10 @@ type StateSnapshot interface {
 	// which users are in a room faster than having to load the entire room state. In the
 	// case of SQLite, this will return tables.OptimisationNotSupportedError.
 	BulkSelectStateForHistoryVisibility(ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string) ([]types.EventNID, error)
+
+	BulkSelectMembershipForHistoryVisibility(
+		ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string,
+	) (map[string]*gomatrixserverlib.HeaderedEvent, error)
 }
 
 type StateBlock interface {

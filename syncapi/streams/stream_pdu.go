@@ -82,19 +82,24 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("unable to update event filter with ignored users")
 	}
 
-	// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
-	// TODO: This might be inefficient, when joined to many and/or large rooms.
+	recentEvents, err := snapshot.RecentEvents(ctx, joinedRoomIDs, r, &eventFilter, true, true)
+	if err != nil {
+		return from
+	}
+	// Build up a /sync response. Add joined rooms.
 	for _, roomID := range joinedRoomIDs {
+		events := recentEvents[roomID]
+		// Invalidate the lazyLoadCache, otherwise we end up with missing displaynames/avatars
+		// TODO: This might be inefficient, when joined to many and/or large rooms.
 		joinedUsers := p.notifier.JoinedUsers(roomID)
 		for _, sharedUser := range joinedUsers {
 			p.lazyLoadCache.InvalidateLazyLoadedUser(req.Device, roomID, sharedUser)
 		}
-	}
 
-	// Build up a /sync response. Add joined rooms.
-	for _, roomID := range joinedRoomIDs {
+		// get the join response for each room
 		jr, jerr := p.getJoinResponseForCompleteSync(
-			ctx, snapshot, roomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device, false,
+			ctx, snapshot, roomID, &stateFilter, req.WantFullState, req.Device, false,
+			events.Events, events.Limited,
 		)
 		if jerr != nil {
 			req.Log.WithError(jerr).Error("p.getJoinResponseForCompleteSync failed")
@@ -113,11 +118,25 @@ func (p *PDUStreamProvider) CompleteSync(
 		req.Log.WithError(err).Error("p.DB.PeeksInRange failed")
 		return from
 	}
-	for _, peek := range peeks {
-		if !peek.Deleted {
+	if len(peeks) > 0 {
+		peekRooms := make([]string, 0, len(peeks))
+		for _, peek := range peeks {
+			if !peek.Deleted {
+				peekRooms = append(peekRooms, peek.RoomID)
+			}
+		}
+
+		recentEvents, err = snapshot.RecentEvents(ctx, peekRooms, r, &eventFilter, true, true)
+		if err != nil {
+			return from
+		}
+
+		for _, roomID := range peekRooms {
 			var jr *types.JoinResponse
+			events := recentEvents[roomID]
 			jr, err = p.getJoinResponseForCompleteSync(
-				ctx, snapshot, peek.RoomID, r, &stateFilter, &eventFilter, req.WantFullState, req.Device, true,
+				ctx, snapshot, roomID, &stateFilter, req.WantFullState, req.Device, true,
+				events.Events, events.Limited,
 			)
 			if err != nil {
 				req.Log.WithError(err).Error("p.getJoinResponseForCompleteSync failed")
@@ -126,7 +145,7 @@ func (p *PDUStreamProvider) CompleteSync(
 				}
 				continue
 			}
-			req.Response.Rooms.Peek[peek.RoomID] = jr
+			req.Response.Rooms.Peek[roomID] = jr
 		}
 	}
 
@@ -227,7 +246,7 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	stateFilter *gomatrixserverlib.StateFilter,
 	req *types.SyncRequest,
 ) (types.StreamPosition, error) {
-
+	var err error
 	originalLimit := eventFilter.Limit
 	// If we're going backwards, grep at least X events, this is mostly to satisfy Sytest
 	if r.Backwards && originalLimit < recentEventBackwardsLimit {
@@ -238,8 +257,8 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 	}
 
-	recentStreamEvents, limited, err := snapshot.RecentEvents(
-		ctx, delta.RoomID, r,
+	dbEvents, err := snapshot.RecentEvents(
+		ctx, []string{delta.RoomID}, r,
 		eventFilter, true, true,
 	)
 	if err != nil {
@@ -248,6 +267,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 		}
 		return r.From, fmt.Errorf("p.DB.RecentEvents: %w", err)
 	}
+
+	recentStreamEvents := dbEvents[delta.RoomID].Events
+	limited := dbEvents[delta.RoomID].Limited
+
 	recentEvents := gomatrixserverlib.HeaderedReverseTopologicalOrdering(
 		snapshot.StreamEventsToEvents(device, recentStreamEvents),
 		gomatrixserverlib.TopologicalOrderByPrevEvents,
@@ -420,7 +443,7 @@ func applyHistoryVisibilityFilter(
 		"room_id":  roomID,
 		"before":   len(recentEvents),
 		"after":    len(events),
-	}).Trace("Applied history visibility (sync)")
+	}).Debugf("Applied history visibility (sync)")
 	return events, nil
 }
 
@@ -428,25 +451,16 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 	ctx context.Context,
 	snapshot storage.DatabaseTransaction,
 	roomID string,
-	r types.Range,
 	stateFilter *gomatrixserverlib.StateFilter,
-	eventFilter *gomatrixserverlib.RoomEventFilter,
 	wantFullState bool,
 	device *userapi.Device,
 	isPeek bool,
+	recentStreamEvents []types.StreamEvent,
+	limited bool,
 ) (jr *types.JoinResponse, err error) {
 	jr = types.NewJoinResponse()
 	// TODO: When filters are added, we may need to call this multiple times to get enough events.
 	//       See: https://github.com/matrix-org/synapse/blob/v0.19.3/synapse/handlers/sync.py#L316
-	recentStreamEvents, limited, err := snapshot.RecentEvents(
-		ctx, roomID, r, eventFilter, true, true,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return jr, nil
-		}
-		return
-	}
 
 	// Work our way through the timeline events and pick out the event IDs
 	// of any state events that appear in the timeline. We'll specifically
