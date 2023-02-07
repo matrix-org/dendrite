@@ -96,7 +96,7 @@ ENV SERVER_NAME=localhost
 EXPOSE 8008 8448
 CMD /build/run_dendrite.sh `
 
-const DockerfileSQLite = `FROM golang:1.18-stretch as build
+const DockerfileSQLite = `FROM golang:1.19-buster as build
 RUN apt-get update && apt-get install -y postgresql
 WORKDIR /build
 
@@ -104,10 +104,10 @@ WORKDIR /build
 # Complement Dockerfile which wgets a branch.
 COPY . .
 
-RUN go build ./cmd/dendrite-monolith-server
-RUN go build ./cmd/generate-keys
-RUN go build ./cmd/generate-config
-RUN go build ./cmd/create-account
+RUN go build --race  ./cmd/dendrite-monolith-server
+RUN go build --race  ./cmd/generate-keys
+RUN go build --race  ./cmd/generate-config
+RUN go build --race  ./cmd/create-account
 RUN ./generate-config --ci > dendrite.yaml
 RUN ./generate-keys --private-key matrix_key.pem --tls-cert server.crt --tls-key server.key
 

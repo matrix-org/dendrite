@@ -80,3 +80,4 @@ media_store/
 **/__debug_bin
 
 .env
+build/*
