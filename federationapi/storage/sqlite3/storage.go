@@ -1,5 +1,4 @@
-// Copyright 2017-2018 New Vector Ltd
-// Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+// Copyright 2022 The Matrix.org Foundation C.I.C.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,6 +40,10 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter()); err != nil {
 		return nil, err
 	}
+	blacklist, err := NewSQLiteBlacklistTable(d.db)
+	if err != nil {
+		return nil, err
+	}
 	joinedHosts, err := NewSQLiteJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -57,7 +60,11 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
-	blacklist, err := NewSQLiteBlacklistTable(d.db)
+	assumedOffline, err := NewSQLiteAssumedOfflineTable(d.db)
+	if err != nil {
+		return nil, err
+	}
+	relayServers, err := NewSQLiteRelayServersTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +110,8 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationQueueEDUs:      queueEDUs,
 		FederationQueueJSON:      queueJSON,
 		FederationBlacklist:      blacklist,
+		FederationAssumedOffline: assumedOffline,
+		FederationRelayServers:   relayServers,
 		FederationOutboundPeeks:  outboundPeeks,
 		FederationInboundPeeks:   inboundPeeks,
 		NotaryServerKeysJSON:     notaryKeys,

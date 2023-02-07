@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/matrix-org/dendrite/internal"
+
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -50,8 +52,7 @@ func (h *httpClient) Notify(ctx context.Context, url string, req *NotifyRequest,
 		return err
 	}
 
-	//nolint:errcheck
-	defer hresp.Body.Close()
+	defer internal.CloseAndLogIfError(ctx, hresp.Body, "failed to close response body")
 
 	if hresp.StatusCode == http.StatusOK {
 		return json.NewDecoder(hresp.Body).Decode(resp)

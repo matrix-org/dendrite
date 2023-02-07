@@ -31,13 +31,14 @@ func GetPushers(
 	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
 	var queryRes userapi.QueryPushersResponse
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return jsonerror.InternalServerError()
 	}
 	err = userAPI.QueryPushers(req.Context(), &userapi.QueryPushersRequest{
-		Localpart: localpart,
+		Localpart:  localpart,
+		ServerName: domain,
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryPushers failed")
@@ -59,7 +60,7 @@ func SetPusher(
 	req *http.Request, device *userapi.Device,
 	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
-	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return jsonerror.InternalServerError()
@@ -93,6 +94,7 @@ func SetPusher(
 
 	}
 	body.Localpart = localpart
+	body.ServerName = domain
 	body.SessionID = device.SessionID
 	err = userAPI.PerformPusherSet(req.Context(), &body, &struct{}{})
 	if err != nil {

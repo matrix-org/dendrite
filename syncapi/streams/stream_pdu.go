@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -14,11 +13,9 @@ import (
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 
+	"github.com/matrix-org/dendrite/syncapi/notifier"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
-
-	"github.com/matrix-org/dendrite/syncapi/notifier"
 )
 
 // The max number of per-room goroutines to have running.
@@ -339,7 +336,10 @@ func (p *PDUStreamProvider) addRoomDeltaToResponse(
 	case gomatrixserverlib.Join:
 		jr := types.NewJoinResponse()
 		if hasMembershipChange {
-			p.addRoomSummary(ctx, snapshot, jr, delta.RoomID, device.UserID, latestPosition)
+			jr.Summary, err = snapshot.GetRoomSummary(ctx, delta.RoomID, device.UserID)
+			if err != nil {
+				logrus.WithError(err).Warn("failed to get room summary")
+			}
 		}
 		jr.Timeline.PrevBatch = &prevBatch
 		jr.Timeline.Events = gomatrixserverlib.HeaderedToClientEvents(events, gomatrixserverlib.FormatSync)
@@ -384,19 +384,32 @@ func applyHistoryVisibilityFilter(
 	roomID, userID string,
 	recentEvents []*gomatrixserverlib.HeaderedEvent,
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
-	// We need to make sure we always include the latest states events, if they are in the timeline.
-	// We grep at least limit * 2 events, to ensure we really get the needed events.
-	filter := gomatrixserverlib.DefaultStateFilter()
-	stateEvents, err := snapshot.CurrentState(ctx, roomID, &filter, nil)
-	if err != nil {
-		// Not a fatal error, we can continue without the stateEvents,
-		// they are only needed if there are state events in the timeline.
-		logrus.WithError(err).Warnf("Failed to get current room state for history visibility")
+	// We need to make sure we always include the latest state events, if they are in the timeline.
+	alwaysIncludeIDs := make(map[string]struct{})
+	var stateTypes []string
+	var senders []string
+	for _, ev := range recentEvents {
+		if ev.StateKey() != nil {
+			stateTypes = append(stateTypes, ev.Type())
+			senders = append(senders, ev.Sender())
+		}
 	}
-	alwaysIncludeIDs := make(map[string]struct{}, len(stateEvents))
-	for _, ev := range stateEvents {
-		alwaysIncludeIDs[ev.EventID()] = struct{}{}
+
+	// Only get the state again if there are state events in the timeline
+	if len(stateTypes) > 0 {
+		filter := gomatrixserverlib.DefaultStateFilter()
+		filter.Types = &stateTypes
+		filter.Senders = &senders
+		stateEvents, err := snapshot.CurrentState(ctx, roomID, &filter, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current room state for history visibility calculation: %w", err)
+		}
+
+		for _, ev := range stateEvents {
+			alwaysIncludeIDs[ev.EventID()] = struct{}{}
+		}
 	}
+
 	startTime := time.Now()
 	events, err := internal.ApplyHistoryVisibilityFilter(ctx, snapshot, rsAPI, recentEvents, alwaysIncludeIDs, userID, "sync")
 	if err != nil {
@@ -409,45 +422,6 @@ func applyHistoryVisibilityFilter(
 		"after":    len(events),
 	}).Trace("Applied history visibility (sync)")
 	return events, nil
-}
-
-func (p *PDUStreamProvider) addRoomSummary(ctx context.Context, snapshot storage.DatabaseTransaction, jr *types.JoinResponse, roomID, userID string, latestPosition types.StreamPosition) {
-	// Work out how many members are in the room.
-	joinedCount, _ := snapshot.MembershipCount(ctx, roomID, gomatrixserverlib.Join, latestPosition)
-	invitedCount, _ := snapshot.MembershipCount(ctx, roomID, gomatrixserverlib.Invite, latestPosition)
-
-	jr.Summary.JoinedMemberCount = &joinedCount
-	jr.Summary.InvitedMemberCount = &invitedCount
-
-	fetchStates := []gomatrixserverlib.StateKeyTuple{
-		{EventType: gomatrixserverlib.MRoomName},
-		{EventType: gomatrixserverlib.MRoomCanonicalAlias},
-	}
-	// Check if the room has a name or a canonical alias
-	latestState := &roomserverAPI.QueryLatestEventsAndStateResponse{}
-	err := p.rsAPI.QueryLatestEventsAndState(ctx, &roomserverAPI.QueryLatestEventsAndStateRequest{StateToFetch: fetchStates, RoomID: roomID}, latestState)
-	if err != nil {
-		return
-	}
-	// Check if the room has a name or canonical alias, if so, return.
-	for _, ev := range latestState.StateEvents {
-		switch ev.Type() {
-		case gomatrixserverlib.MRoomName:
-			if gjson.GetBytes(ev.Content(), "name").Str != "" {
-				return
-			}
-		case gomatrixserverlib.MRoomCanonicalAlias:
-			if gjson.GetBytes(ev.Content(), "alias").Str != "" {
-				return
-			}
-		}
-	}
-	heroes, err := snapshot.GetRoomHeroes(ctx, roomID, userID, []string{"join", "invite"})
-	if err != nil {
-		return
-	}
-	sort.Strings(heroes)
-	jr.Summary.Heroes = heroes
 }
 
 func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
@@ -493,7 +467,10 @@ func (p *PDUStreamProvider) getJoinResponseForCompleteSync(
 		return
 	}
 
-	p.addRoomSummary(ctx, snapshot, jr, roomID, device.UserID, r.From)
+	jr.Summary, err = snapshot.GetRoomSummary(ctx, roomID, device.UserID)
+	if err != nil {
+		logrus.WithError(err).Warn("failed to get room summary")
+	}
 
 	// We don't include a device here as we don't need to send down
 	// transaction IDs for complete syncs, but we do it anyway because Sytest demands it for:
@@ -588,7 +565,7 @@ func (p *PDUStreamProvider) lazyLoadMembers(
 			isGappedIncremental := limited && incremental
 			// We want this users membership event, keep it in the list
 			stateKey := *event.StateKey()
-			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental {
+			if _, ok := timelineUsers[stateKey]; ok || isGappedIncremental || stateKey == device.UserID {
 				newStateEvents = append(newStateEvents, event)
 				if !stateFilter.IncludeRedundantMembers {
 					p.lazyLoadCache.StoreLazyLoadedUser(device, roomID, stateKey, event.EventID())

@@ -131,10 +131,20 @@ func MakeJoin(
 		return jsonerror.InternalServerError()
 	}
 
+	identity, err := cfg.Matrix.SigningIdentityFor(request.Destination())
+	if err != nil {
+		return util.JSONResponse{
+			Code: http.StatusNotFound,
+			JSON: jsonerror.NotFound(
+				fmt.Sprintf("Server name %q does not exist", request.Destination()),
+			),
+		}
+	}
+
 	queryRes := api.QueryLatestEventsAndStateResponse{
 		RoomVersion: verRes.RoomVersion,
 	}
-	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, time.Now(), rsAPI, &queryRes)
+	event, err := eventutil.QueryAndBuildEvent(httpReq.Context(), &builder, cfg.Matrix, identity, time.Now(), rsAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return util.JSONResponse{
 			Code: http.StatusNotFound,

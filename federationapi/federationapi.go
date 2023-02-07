@@ -43,8 +43,8 @@ import (
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI) {
-	inthttp.AddRoutes(intAPI, router)
+func AddInternalRoutes(router *mux.Router, intAPI api.FederationInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(intAPI, router, enableMetrics)
 }
 
 // AddPublicRoutes sets up and registers HTTP handlers on the base API muxes for the FederationAPI component.
@@ -85,10 +85,7 @@ func AddPublicRoutes(
 	}
 
 	routing.Setup(
-		base.PublicFederationAPIMux,
-		base.PublicKeyAPIMux,
-		base.PublicWellKnownAPIMux,
-		cfg,
+		base,
 		rsAPI, f, keyRing,
 		federation, userAPI, keyAPI, mscCfg,
 		servers, producer,
@@ -116,23 +113,24 @@ func NewInternalAPI(
 		_ = federationDB.RemoveAllServersFromBlacklist()
 	}
 
-	stats := statistics.NewStatistics(federationDB, cfg.FederationMaxRetries+1)
+	stats := statistics.NewStatistics(
+		federationDB,
+		cfg.FederationMaxRetries+1,
+		cfg.P2PFederationRetriesUntilAssumedOffline+1)
 
-	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+	js, nats := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
+
+	signingInfo := base.Cfg.Global.SigningIdentities()
 
 	queues := queue.NewOutgoingQueues(
 		federationDB, base.ProcessContext,
 		cfg.Matrix.DisableFederation,
 		cfg.Matrix.ServerName, federation, rsAPI, &stats,
-		&queue.SigningInfo{
-			KeyID:      cfg.Matrix.KeyID,
-			PrivateKey: cfg.Matrix.PrivateKey,
-			ServerName: cfg.Matrix.ServerName,
-		},
+		signingInfo,
 	)
 
 	rsConsumer := consumers.NewOutputRoomEventConsumer(
-		base.ProcessContext, cfg, js, queues,
+		base.ProcessContext, cfg, js, nats, queues,
 		federationDB, rsAPI,
 	)
 	if err = rsConsumer.Start(); err != nil {

@@ -103,7 +103,7 @@ func (f *fedClient) GetServerKeys(ctx context.Context, matrixServer gomatrixserv
 	return keys, nil
 }
 
-func (f *fedClient) MakeJoin(ctx context.Context, s gomatrixserverlib.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMakeJoin, err error) {
+func (f *fedClient) MakeJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, roomID, userID string, roomVersions []gomatrixserverlib.RoomVersion) (res gomatrixserverlib.RespMakeJoin, err error) {
 	for _, r := range f.allowJoins {
 		if r.ID == roomID {
 			res.RoomVersion = r.Version
@@ -127,7 +127,7 @@ func (f *fedClient) MakeJoin(ctx context.Context, s gomatrixserverlib.ServerName
 	}
 	return
 }
-func (f *fedClient) SendJoin(ctx context.Context, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res gomatrixserverlib.RespSendJoin, err error) {
+func (f *fedClient) SendJoin(ctx context.Context, origin, s gomatrixserverlib.ServerName, event *gomatrixserverlib.Event) (res gomatrixserverlib.RespSendJoin, err error) {
 	f.fedClientMutex.Lock()
 	defer f.fedClientMutex.Unlock()
 	for _, r := range f.allowJoins {
@@ -273,17 +273,17 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.JetStream.InMemory = true
-	base := base.NewBaseDendrite(cfg, "Monolith")
+	b := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
 	keyRing := &test.NopJSONVerifier{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.
-	federationapi.AddPublicRoutes(base, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, nil)
-	baseURL, cancel := test.ListenAndServe(t, base.PublicFederationAPIMux, true)
+	federationapi.AddPublicRoutes(b, nil, nil, keyRing, nil, &internal.FederationInternalAPI{}, nil, nil)
+	baseURL, cancel := test.ListenAndServe(t, b.PublicFederationAPIMux, true)
 	defer cancel()
 	serverName := gomatrixserverlib.ServerName(strings.TrimPrefix(baseURL, "https://"))
 
 	fedCli := gomatrixserverlib.NewFederationClient(
-		serverName, cfg.Global.KeyID, cfg.Global.PrivateKey,
+		cfg.Global.SigningIdentities(),
 		gomatrixserverlib.WithSkipVerify(true),
 	)
 
@@ -326,7 +326,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 			t.Errorf("failed to create invite v2 request: %s", err)
 			continue
 		}
-		_, err = fedCli.SendInviteV2(context.Background(), serverName, invReq)
+		_, err = fedCli.SendInviteV2(context.Background(), cfg.Global.ServerName, serverName, invReq)
 		if err == nil {
 			t.Errorf("expected an error, got none")
 			continue

@@ -22,10 +22,11 @@ import (
 
 func KeyServer(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	fsAPI := base.FederationAPIHTTPClient()
-	intAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	rsAPI := base.RoomserverHTTPClient()
+	intAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
 	intAPI.SetUserAPI(base.UserAPIClient())
 
-	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI)
+	keyserver.AddInternalRoutes(base.InternalAPIMux, intAPI, base.EnableMetrics)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.KeyServer.InternalAPI.Listen, // internal listener

@@ -1,0 +1,103 @@
+{{ template "validate.config" . }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ include "dendrite.fullname" . }}
+  labels:
+    {{- include "dendrite.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "dendrite.selectorLabels" . | nindent 6 }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        {{- include "dendrite.selectorLabels" . | nindent 8 }}
+      annotations:
+        confighash-global: secret-{{ .Values.global | toYaml | sha256sum | trunc 32 }}
+        confighash-clientapi: clientapi-{{ .Values.clientapi | toYaml | sha256sum | trunc 32 }}
+        confighash-federationapi: federationapi-{{ .Values.federationapi | toYaml | sha256sum | trunc 32 }}
+        confighash-mediaapi: mediaapi-{{ .Values.mediaapi | toYaml | sha256sum | trunc 32 }}
+        confighash-syncapi: syncapi-{{ .Values.syncapi | toYaml | sha256sum | trunc 32 }}
+    spec:
+      volumes:
+      - name: {{ include "dendrite.fullname" . }}-conf-vol
+        secret:
+          secretName: {{ include "dendrite.fullname" . }}-conf
+      - name: {{ include "dendrite.fullname" . }}-signing-key
+        secret:
+          secretName: {{ default (print ( include "dendrite.fullname" . ) "-signing-key") $.Values.signing_key.existingSecret | quote }}
+      {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
+      - name: {{ include "dendrite.fullname" . }}-appservices
+        secret:
+          secretName: {{ include "dendrite.fullname" . }}-appservices-conf
+      {{- end }}
+      - name: {{ include "dendrite.fullname" . }}-jetstream
+        persistentVolumeClaim:
+          claimName: {{ default (print ( include "dendrite.fullname" . ) "-jetstream-pvc") $.Values.persistence.jetstream.existingClaim | quote }}
+      - name: {{ include "dendrite.fullname" . }}-media
+        persistentVolumeClaim:
+          claimName: {{ default (print ( include "dendrite.fullname" . ) "-media-pvc") $.Values.persistence.media.existingClaim | quote }}
+      - name: {{ include "dendrite.fullname" . }}-search
+        persistentVolumeClaim:
+          claimName: {{ default (print ( include "dendrite.fullname" . ) "-search-pvc") $.Values.persistence.search.existingClaim | quote }}
+      containers:
+      - name: {{ .Chart.Name }}
+        {{- include "image.name" . | nindent 8 }}
+        args:
+          - '--config'
+          - '/etc/dendrite/dendrite.yaml'
+        ports:
+          - name: http
+            containerPort: 8008
+            protocol: TCP
+        {{- if $.Values.dendrite_config.global.profiling.enabled }}
+        env:
+          - name: PPROFLISTEN
+            value: "localhost:{{- $.Values.global.profiling.port -}}"
+        {{- end }}
+        resources:
+        {{- toYaml $.Values.resources | nindent 10 }}
+        volumeMounts:
+        - mountPath: /etc/dendrite/
+          name: {{ include "dendrite.fullname" . }}-conf-vol
+        - mountPath: /etc/dendrite/secrets/
+          name: {{ include "dendrite.fullname" . }}-signing-key
+        {{- if (gt (len ($.Files.Glob "appservices/*")) 0) }}
+        - mountPath: /etc/dendrite/appservices
+          name: {{ include "dendrite.fullname" . }}-appservices
+          readOnly: true
+        {{ end }}
+        - mountPath: {{ .Values.dendrite_config.media_api.base_path }}
+          name: {{ include "dendrite.fullname" . }}-media
+        - mountPath: {{ .Values.dendrite_config.global.jetstream.storage_path }}
+          name: {{ include "dendrite.fullname" . }}-jetstream
+        - mountPath: {{ .Values.dendrite_config.sync_api.search.index_path }}
+          name: {{ include "dendrite.fullname" . }}-search
+        livenessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+          httpGet:
+            path: /_dendrite/monitor/health
+            port: http
+        readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+          httpGet:
+            path: /_dendrite/monitor/health
+            port: http
+        startupProbe:
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+          httpGet:
+            path: /_dendrite/monitor/up
+            port: http
