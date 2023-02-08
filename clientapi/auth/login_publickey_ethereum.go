@@ -25,7 +25,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/spruceid/siwe-go"
 )
 
@@ -117,18 +116,10 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 		return false, jsonerror.InvalidParam("auth.message")
 	}
 
-	cfg := &config.Global{
-		SigningIdentity: gomatrixserverlib.SigningIdentity{
-			ServerName: gomatrixserverlib.ServerName("localhost"),
-		},
-	}
-
-	serverName := cfg.ServerName
-
 	// Check signature to verify message was not tempered
-	_, err = message.Verify(pk.Signature, (*string)(&serverName), nil, nil)
+	_, err = message.Verify(pk.Signature, (*string)(&pk.config.Matrix.ServerName), nil, nil)
 	if err != nil {
-		return false, jsonerror.InvalidSignature(err.Error() + " signature:" + pk.Signature + " server_name:" + string(serverName) + " messageDomain:" + message.GetDomain())
+		return false, jsonerror.InvalidSignature(err.Error() + " signature:" + pk.Signature + " server_name:" + string(pk.config.Matrix.ServerName) + " messageDomain:" + message.GetDomain())
 	}
 
 	// Error if the user ID does not match the signed message.
