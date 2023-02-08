@@ -481,7 +481,7 @@ jobs:
         upgrade_test_direct,
         sytest,
         complement,
-        integration,
+        integration
       ]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
