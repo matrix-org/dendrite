@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/spruceid/siwe-go"
 )
 
@@ -116,7 +117,13 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 		return false, jsonerror.InvalidParam("auth.message")
 	}
 
-	serverName := pk.config.Matrix.ServerName
+	cfg := &config.Global{
+		SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: gomatrixserverlib.ServerName("localhost"),
+		},
+	}
+
+	serverName := cfg.ServerName
 
 	// Check signature to verify message was not tempered
 	_, err = message.Verify(pk.Signature, (*string)(&serverName), nil, nil)
