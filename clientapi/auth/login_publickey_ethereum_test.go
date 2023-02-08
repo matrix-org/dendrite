@@ -37,7 +37,9 @@ type loginContext struct {
 
 func createLoginContext(_ *testing.T) *loginContext {
 	cfg := &config.ClientAPI{
-		Matrix:                         &config.Global{},
+		Matrix: &config.Global{
+			ServerName: testutil.TestServerName,
+		},
 		Derived:                        &config.Derived{},
 		PasswordAuthenticationDisabled: true,
 		PublicKeyAuthentication: config.PublicKeyAuthentication{

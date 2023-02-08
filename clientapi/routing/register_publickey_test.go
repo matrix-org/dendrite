@@ -42,7 +42,9 @@ type registerContext struct {
 
 func createRegisterContext(_ *testing.T) *registerContext {
 	cfg := &config.ClientAPI{
-		Matrix:                         &config.Global{},
+		Matrix: &config.Global{
+			ServerName: testutil.TestServerName,
+		},
 		Derived:                        &config.Derived{},
 		PasswordAuthenticationDisabled: true,
 		PublicKeyAuthentication: config.PublicKeyAuthentication{

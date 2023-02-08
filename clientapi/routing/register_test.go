@@ -475,7 +475,7 @@ func Test_register(t *testing.T) {
 
 				// The first request should return a userInteractiveResponse
 				switch r := resp.JSON.(type) {
-				case UserInteractiveResponse:
+				case userInteractiveResponse:
 					// Check that the flows are the ones we configured
 					if !reflect.DeepEqual(r.Flows, base.Cfg.Derived.Registration.Flows) {
 						t.Fatalf("unexpected registration flows: %+v, want %+v", r.Flows, base.Cfg.Derived.Registration.Flows)
@@ -506,7 +506,7 @@ func Test_register(t *testing.T) {
 				}
 
 				// If we reached this, we should have received a UIA response
-				uia, ok := resp.JSON.(UserInteractiveResponse)
+				uia, ok := resp.JSON.(userInteractiveResponse)
 				if !ok {
 					t.Fatalf("did not receive a userInteractiveResponse: %T", resp.JSON)
 				}
