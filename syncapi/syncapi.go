@@ -42,6 +42,7 @@ func AddPublicRoutes(
 	base *base.BaseDendrite,
 	userAPI userapi.SyncUserAPI,
 	rsAPI api.SyncRoomserverAPI,
+	crsAPI api.ClientRoomserverAPI,
 	keyAPI keyapi.SyncKeyAPI,
 ) {
 	cfg := &base.Cfg.SyncAPI
@@ -133,6 +134,6 @@ func AddPublicRoutes(
 
 	routing.Setup(
 		base.PublicClientAPIMux, requestPool, syncDB, userAPI,
-		rsAPI, cfg, clientCfg, base.Caches, base.Fulltext,
+		rsAPI, crsAPI, cfg, clientCfg, base.Caches, base.Fulltext,
 	)
 }

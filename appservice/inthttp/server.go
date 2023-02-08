@@ -33,4 +33,5 @@ func AddRoutes(a api.AppServiceInternalAPI, internalAPIMux *mux.Router, enableMe
 		AppServiceUserPath,
 		httputil.MakeInternalRPCAPI("AppserviceUser", enableMetrics, a.User),
 	)
+
 }

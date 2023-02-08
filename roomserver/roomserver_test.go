@@ -22,11 +22,16 @@ import (
 
 	"github.com/matrix-org/dendrite/roomserver"
 	"github.com/matrix-org/dendrite/roomserver/api"
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 )
+
+type clientRoomserverAPI struct {
+	rsapi.ClientRoomserverAPI
+}
 
 func mustCreateDatabase(t *testing.T, dbType test.DBType) (*base.BaseDendrite, storage.Database, func()) {
 	t.Helper()
@@ -253,7 +258,7 @@ func TestPurgeRoom(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI, &clientRoomserverAPI{}, keyAPI)
 		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 

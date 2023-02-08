@@ -17,11 +17,16 @@ import (
 	"github.com/matrix-org/util"
 	"github.com/tidwall/gjson"
 
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
+
+type clientRoomserverAPI struct {
+	rsapi.ClientRoomserverAPI
+}
 
 func TestAdminResetPassword(t *testing.T) {
 	aliceAdmin := test.NewUser(t, test.WithAccountType(uapi.AccountTypeAdmin))
@@ -159,7 +164,7 @@ func TestPurgeRoom(t *testing.T) {
 		userAPI := userapi.NewInternalAPI(base, &base.Cfg.UserAPI, nil, keyAPI, rsAPI, nil)
 
 		// this starts the JetStream consumers
-		syncapi.AddPublicRoutes(base, userAPI, rsAPI, keyAPI)
+		syncapi.AddPublicRoutes(base, userAPI, rsAPI, &clientRoomserverAPI{}, keyAPI)
 		federationapi.NewInternalAPI(base, fedClient, rsAPI, base.Caches, nil, true)
 		rsAPI.SetFederationAPI(nil, nil)
 		keyAPI.SetUserAPI(userAPI)

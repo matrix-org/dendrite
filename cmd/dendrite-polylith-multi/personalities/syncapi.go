@@ -22,12 +22,13 @@ import (
 
 func SyncAPI(base *basepkg.BaseDendrite, cfg *config.Dendrite) {
 	userAPI := base.UserAPIClient()
+	base.RoomserverHTTPClient()
 
 	rsAPI := base.RoomserverHTTPClient()
 
 	syncapi.AddPublicRoutes(
 		base,
-		userAPI, rsAPI,
+		userAPI, rsAPI, rsAPI,
 		base.KeyServerHTTPClient(),
 	)
 

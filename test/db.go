@@ -173,7 +173,7 @@ func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
 	for dbName, dbType := range dbs {
 		dbt := dbType
 		t.Run(dbName, func(tt *testing.T) {
-			tt.Parallel()
+			//tt.Parallel()
 			testFn(tt, dbt)
 		})
 	}

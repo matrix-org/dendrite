@@ -21,6 +21,8 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 COPY --from=base /build/bin/* /usr/bin/
 
+COPY --from=base /build/dendrite-zion.yaml /usr/config/dendrite-zion.yaml
+
 VOLUME /etc/dendrite
 WORKDIR /etc/dendrite
 
