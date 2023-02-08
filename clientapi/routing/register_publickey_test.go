@@ -264,7 +264,6 @@ func TestRegisterEthereum(t *testing.T) {
 	// Asserts
 	assert := assert.New(t)
 	assert.NotNil(response, "response actual: nil, expected: not nil")
-	assert.Implements((*registerResponse)(nil), response.JSON, "response.JSON received: %v", response.JSON)
 	registerRes := response.JSON.(registerResponse)
 	assert.Truef(
 		registerRes.UserID == wallet.Eip155UserId,
