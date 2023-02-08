@@ -1,6 +1,6 @@
 #syntax=docker/dockerfile:1.2
 
-FROM golang:1.19-buster as build
+FROM golang:1.18-stretch as build
 RUN apt-get update && apt-get install -y sqlite3
 WORKDIR /build
 
@@ -14,10 +14,10 @@ ARG CGO
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-config && \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/dendrite-monolith-server && \
-    CGO_ENABLED=${CGO} go test --race -c -cover -covermode=atomic -o /dendrite/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server && \
+    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-config && \
+    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/generate-keys && \
+    CGO_ENABLED=${CGO} go build -o /dendrite ./cmd/dendrite-monolith-server && \
+    CGO_ENABLED=${CGO} go test -c -cover -covermode=atomic -o /dendrite/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server && \
     cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /dendrite
