@@ -171,6 +171,15 @@ func LeaveServerNoticeError() *MatrixError {
 	}
 }
 
+// ServerDisabledNoticeError is an error returned when trying to sync a server
+// that is disabled
+func ServerDisabledNoticeError() *MatrixError {
+	return &MatrixError{
+		ErrCode: "Z_UNAUTHORISED_SERVER_DISABLED",
+		Err:     "You cannot remain in a disabled server",
+	}
+}
+
 type IncompatibleRoomVersionError struct {
 	RoomVersion string `json:"room_version"`
 	Error       string `json:"error"`

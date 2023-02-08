@@ -2,84 +2,71 @@ package zion
 
 import (
 	_ "embed"
+	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/matrix-org/dendrite/authorization"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
-	zion_goerli "github.com/matrix-org/dendrite/zion/contracts/zion_goerli"
-	zion_localhost "github.com/matrix-org/dendrite/zion/contracts/zion_localhost"
+
 	log "github.com/sirupsen/logrus"
 )
 
-//go:embed contracts/zion_localhost/space-manager.json
-var localhostJson []byte
-
-//go:embed contracts/zion_goerli/space-manager.json
-var goerliJson []byte
+var ErrSpaceDisabled = errors.New("space disabled")
+var ErrChannelDisabled = errors.New("channel disabled")
 
 type ZionAuthorization struct {
-	store                 StoreAPI
-	spaceManagerLocalhost *zion_localhost.ZionSpaceManagerLocalhost
-	spaceManagerGoerli    *zion_goerli.ZionSpaceManagerGoerli
-	chainId               int
-}
-type ClientRoomserverStruct struct {
-	roomserver.ClientRoomserverAPI
+	chainId       int
+	ethClient     *ethclient.Client
+	store         Store
+	spaceContract SpaceContract
 }
 
-type SyncRoomserverStruct struct {
-	roomserver.SyncRoomserverAPI
-}
-
-type RoomserverStoreAPI interface {
-	roomserver.QueryLatestEventsAndStateAPI
-	NewRoomserverStore() StoreAPI
-}
-
-func (c ClientRoomserverStruct) NewRoomserverStore() StoreAPI {
-	return &ClientRoomserverStore{
-		rsAPI: c,
-	}
-}
-
-func (c SyncRoomserverStruct) NewRoomserverStore() StoreAPI {
-	return &SyncRoomserverStore{
-		rsAPI: c,
-	}
-}
-
-func NewZionAuthorization(cfg *config.ClientAPI, rsAPI RoomserverStoreAPI) (authorization.Authorization, error) {
+func NewZionAuthorization(cfg *config.ClientAPI, roomQueryAPI roomserver.QueryEventsAPI) (authorization.Authorization, error) {
+	// create the authorization states
+	store := NewStore(roomQueryAPI)
+	chainId := cfg.PublicKeyAuthentication.Ethereum.GetChainID()
+	// initialise the eth client.
 	if cfg.PublicKeyAuthentication.Ethereum.NetworkUrl == "" {
 		log.Errorf("No blockchain network url specified in config\n")
 		return nil, nil
 	}
-
-	var auth ZionAuthorization
-
-	auth.chainId = cfg.PublicKeyAuthentication.Ethereum.GetChainID()
-	auth.store = rsAPI.NewRoomserverStore()
-
-	switch auth.chainId {
-	case 1337, 31337:
-		localhost, err := newZionSpaceManagerLocalhost(cfg.PublicKeyAuthentication.Ethereum.NetworkUrl)
-		if err != nil {
-			log.Errorln("error instantiating ZionSpaceManagerLocalhost", err)
-		}
-		auth.spaceManagerLocalhost = localhost
-
-	case 5:
-		goerli, err := newZionSpaceManagerGoerli(cfg.PublicKeyAuthentication.Ethereum.NetworkUrl)
-		if err != nil {
-			log.Errorln("error instantiating ZionSpaceManagerGoerli", err)
-		}
-		auth.spaceManagerGoerli = goerli
-
-	default:
-		log.Errorf("Unsupported chain id: %d\n", auth.chainId)
+	ethClient, err := GetEthClient(cfg.PublicKeyAuthentication.Ethereum.NetworkUrl)
+	if err != nil {
+		log.Errorf("Cannot connect to eth client %v\n", cfg.PublicKeyAuthentication.Ethereum.NetworkUrl)
+		return nil, err
 	}
 
-	return &auth, nil
+	za := &ZionAuthorization{
+		chainId:   chainId,
+		ethClient: ethClient,
+		store:     store,
+	}
+	switch za.chainId {
+	case 1337, 31337:
+		localhost, err := NewSpaceContractLocalhost(za.ethClient)
+		if err != nil {
+			log.Errorf("error instantiating SpaceContractLocalhost. Error: %v", err)
+			return nil, err
+		}
+		za.spaceContract = localhost
+	case 5:
+		goerli, err := NewSpaceContractGoerli(za.ethClient)
+		if err != nil {
+			log.Errorf("error instantiating SpaceContractGoerli. Error: %v", err)
+			return nil, err
+		}
+		za.spaceContract = goerli
+	default:
+		errMsg := fmt.Sprintf("unsupported chain id: %d", za.chainId)
+		log.Error(errMsg)
+		return nil, errors.New(errMsg)
+	}
+	// no errors.
+	return za, nil
 }
 
 func (za *ZionAuthorization) IsAllowed(args authorization.AuthorizationArgs) (bool, error) {
@@ -93,112 +80,54 @@ func (za *ZionAuthorization) IsAllowed(args authorization.AuthorizationArgs) (bo
 		return true, nil
 	}
 
-	switch za.chainId {
-	case 1337, 31337:
-		return za.isAllowedLocalhost(roomInfo, userIdentifier.AccountAddress, args.Permission)
-	case 5:
-		return za.isAllowedGoerli(roomInfo, userIdentifier.AccountAddress, args.Permission)
+	// Check if user is entitled to space / channel.
+	switch roomInfo.RoomType {
+	case Space:
+		isEntitled, err := za.isEntitledToSpace(roomInfo, userIdentifier.AccountAddress, args.Permission)
+		return isEntitled, err
+	case Channel:
+		isEntitled, err := za.isEntitledToChannel(roomInfo, userIdentifier.AccountAddress, args.Permission)
+		return isEntitled, err
 	default:
-		log.Errorf("Unsupported chain id: %d", userIdentifier.ChainId)
+		errMsg := fmt.Sprintf("unhandled room type: %s", roomInfo.RoomType)
+		log.Error("IsAllowed", errMsg)
+		return false, errors.New(errMsg)
 	}
-
-	return false, nil
 }
 
-func (za *ZionAuthorization) isAllowedLocalhost(
-	roomInfo RoomInfo,
-	user common.Address,
-	permission authorization.Permission,
-) (bool, error) {
-	if za.spaceManagerLocalhost != nil {
-		permission := zion_localhost.DataTypesPermission{
-			Name: permission.String(),
-		}
-
-		isEntitled, err := za.spaceManagerLocalhost.IsEntitled(
-			nil,
-			roomInfo.SpaceNetworkId,
-			roomInfo.ChannelNetworkId,
-			user,
-			permission,
-		)
-
-		if err != nil {
-			return false, err
-		}
-
-		return isEntitled, nil
+func (za *ZionAuthorization) isEntitledToSpace(roomInfo RoomInfo, user common.Address, permission authorization.Permission) (bool, error) {
+	// space disabled check.
+	isDisabled, err := za.spaceContract.IsSpaceDisabled(roomInfo.SpaceNetworkId)
+	if err != nil {
+		return false, err
+	} else if isDisabled {
+		return false, ErrSpaceDisabled
 	}
 
-	return false, nil
+	// space entitlement check.
+	isEntitled, err := za.spaceContract.IsEntitledToSpace(
+		roomInfo.SpaceNetworkId,
+		user,
+		permission,
+	)
+	return isEntitled, err
 }
 
-func (za *ZionAuthorization) isAllowedGoerli(
-	roomInfo RoomInfo,
-	user common.Address,
-	permission authorization.Permission,
-) (bool, error) {
-	if za.spaceManagerGoerli != nil {
-		permission := zion_goerli.DataTypesPermission{
-			Name: permission.String(),
-		}
-
-		isEntitled, err := za.spaceManagerGoerli.IsEntitled(
-			nil,
-			roomInfo.SpaceNetworkId,
-			roomInfo.ChannelNetworkId,
-			user,
-			permission,
-		)
-
-		if err != nil {
-			return false, err
-		}
-
-		return isEntitled, nil
-	}
-
-	return false, nil
-}
-
-func newZionSpaceManagerLocalhost(endpointUrl string) (*zion_localhost.ZionSpaceManagerLocalhost, error) {
-	addresses, err := loadSpaceManagerAddresses(localhostJson)
+func (za *ZionAuthorization) isEntitledToChannel(roomInfo RoomInfo, user common.Address, permission authorization.Permission) (bool, error) {
+	// channel disabled check.
+	isDisabled, err := za.spaceContract.IsChannelDisabled(roomInfo.SpaceNetworkId, roomInfo.ChannelNetworkId)
 	if err != nil {
-		return nil, err
+		return false, err
+	} else if isDisabled {
+		return false, ErrSpaceDisabled
 	}
 
-	address := common.HexToAddress(addresses.Spacemanager)
-
-	client, err := GetEthClient(endpointUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	spaceManager, err := zion_localhost.NewZionSpaceManagerLocalhost(address, client)
-	if err != nil {
-		return nil, err
-	}
-
-	return spaceManager, nil
-}
-
-func newZionSpaceManagerGoerli(endpointUrl string) (*zion_goerli.ZionSpaceManagerGoerli, error) {
-	addresses, err := loadSpaceManagerAddresses(goerliJson)
-	if err != nil {
-		return nil, err
-	}
-
-	address := common.HexToAddress((addresses.Spacemanager))
-
-	client, err := GetEthClient(endpointUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	spaceManager, err := zion_goerli.NewZionSpaceManagerGoerli(address, client)
-	if err != nil {
-		return nil, err
-	}
-
-	return spaceManager, nil
+	// channel entitlement check.
+	isEntitled, err := za.spaceContract.IsEntitledToChannel(
+		roomInfo.SpaceNetworkId,
+		roomInfo.ChannelNetworkId,
+		user,
+		permission,
+	)
+	return isEntitled, err
 }

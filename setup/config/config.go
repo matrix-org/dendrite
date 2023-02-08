@@ -630,14 +630,10 @@ func (config *Dendrite) replaceWithEnvVariables() {
 		config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl =
 			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl)
 
-		config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz =
-			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz)
-
 		logrus.Infof(
-			"Supported Ethereum chain_id=%v, network_url=%v, enable_authz=%v",
+			"Supported Ethereum chain_id=%v, network_url=%v",
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID,
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl,
-			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigEnableAuthz,
 		)
 	}
 }

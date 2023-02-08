@@ -12,19 +12,17 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
-type ClientRoomserverStore struct {
-	rsAPI roomserver.ClientRoomserverAPI
+type Store struct {
+	roomQuery roomserver.QueryEventsAPI
 }
 
-type SyncRoomserverStore struct {
-	rsAPI roomserver.SyncRoomserverAPI
+func NewStore(roomQuery roomserver.QueryEventsAPI) Store {
+	return Store{
+		roomQuery: roomQuery,
+	}
 }
 
-type StoreAPI interface {
-	GetRoomInfo(roomId string, userId UserIdentifier) RoomInfo
-}
-
-func (s *ClientRoomserverStore) GetRoomInfo(roomId string, userId UserIdentifier) RoomInfo {
+func (s *Store) GetRoomInfo(roomId string, userId UserIdentifier) RoomInfo {
 	result := RoomInfo{
 		QueryUserId:      userId.MatrixUserId,
 		SpaceNetworkId:   "",
@@ -49,7 +47,7 @@ func (s *ClientRoomserverStore) GetRoomInfo(roomId string, userId UserIdentifier
 	}
 
 	var roomEvents roomserver.QueryCurrentStateResponse
-	err := s.rsAPI.QueryCurrentState(context.Background(), &roomserver.QueryCurrentStateRequest{
+	err := s.roomQuery.QueryCurrentState(context.Background(), &roomserver.QueryCurrentStateRequest{
 		RoomID:         roomId,
 		AllowWildcards: true,
 		StateTuples: []gomatrixserverlib.StateKeyTuple{
@@ -63,9 +61,11 @@ func (s *ClientRoomserverStore) GetRoomInfo(roomId string, userId UserIdentifier
 		return result
 	}
 	//TODO: replace with HydrateRoomInfoWithStateEvents when you have a practical way to flatten roomEvents map
+	doneSearching := false
 	for _, state := range roomEvents.StateEvents {
 		switch state.Type() {
 		case gomatrixserverlib.MRoomCreate:
+			// Space is created with no children yet.
 			var creatorEvent CreatorEvent
 			err := json.Unmarshal(roomEvents.StateEvents[createTuple].Content(), &creatorEvent)
 			result.IsOwner = strings.HasPrefix(
@@ -77,96 +77,21 @@ func (s *ClientRoomserverStore) GetRoomInfo(roomId string, userId UserIdentifier
 				result.SpaceNetworkId = roomId
 			}
 		case ConstSpaceChildEventType:
+			// Space is created and has one or more children.
 			result.RoomType = Space
 			result.SpaceNetworkId = roomId
+			doneSearching = true
 		case ConstSpaceParentEventType:
+			// Channel is created and has a reference to the parent.
 			result.RoomType = Channel
 			result.SpaceNetworkId = *state.StateKey()
 			result.ChannelNetworkId = roomId
+			doneSearching = true
+		}
+		if doneSearching {
+			break
 		}
 	}
 
 	return result
-}
-
-func (s *SyncRoomserverStore) GetRoomInfo(roomId string, userId UserIdentifier) RoomInfo {
-	result := RoomInfo{
-		QueryUserId:      userId.MatrixUserId,
-		SpaceNetworkId:   "",
-		ChannelNetworkId: "",
-		RoomType:         Unknown,
-		IsOwner:          false,
-	}
-
-	createTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: gomatrixserverlib.MRoomCreate,
-		StateKey:  "",
-	}
-
-	spaceChildTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: ConstSpaceChildEventType,
-		StateKey:  "*",
-	}
-
-	spaceParentTuple := gomatrixserverlib.StateKeyTuple{
-		EventType: ConstSpaceParentEventType,
-		StateKey:  "*",
-	}
-
-	var roomEvents roomserver.QueryLatestEventsAndStateResponse
-	err := s.rsAPI.QueryLatestEventsAndState(context.Background(),
-		&roomserver.QueryLatestEventsAndStateRequest{
-			RoomID: roomId,
-			StateToFetch: []gomatrixserverlib.StateKeyTuple{
-				createTuple,
-				spaceParentTuple,
-				spaceChildTuple,
-			},
-		}, &roomEvents)
-
-	if err != nil {
-		return result
-	}
-
-	HydrateRoomInfoWithStateEvents(roomId, userId, &result, roomEvents.StateEvents)
-
-	return result
-}
-
-func HydrateRoomInfoWithStateEvents(roomId string, userId UserIdentifier, r *RoomInfo, stateEvents []*gomatrixserverlib.HeaderedEvent) {
-	for _, state := range stateEvents {
-		switch state.Type() {
-		case gomatrixserverlib.MRoomCreate:
-			var creatorEvent CreatorEvent
-			err := json.Unmarshal(state.Content(), &creatorEvent)
-			r.IsOwner = strings.HasPrefix(
-				creatorEvent.Creator,
-				userId.LocalPart,
-			)
-			if err == nil {
-				r.RoomType = Space
-				r.SpaceNetworkId = roomId
-			}
-		case ConstSpaceChildEventType:
-			r.RoomType = Space
-			r.SpaceNetworkId = roomId
-		case ConstSpaceParentEventType:
-			r.RoomType = Channel
-			r.SpaceNetworkId = *state.StateKey()
-			r.ChannelNetworkId = roomId
-		}
-	}
-
-}
-
-func NewClientRoomserverStore(rsAPI roomserver.ClientRoomserverAPI) StoreAPI {
-	return &ClientRoomserverStore{
-		rsAPI: rsAPI,
-	}
-}
-
-func NewSyncRoomserverStore(rsAPI roomserver.SyncRoomserverAPI) StoreAPI {
-	return &SyncRoomserverStore{
-		rsAPI: rsAPI,
-	}
 }

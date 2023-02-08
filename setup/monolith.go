@@ -72,7 +72,7 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 		base, m.UserAPI, m.Client,
 	)
 	syncapi.AddPublicRoutes(
-		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI,
+		base, m.UserAPI, m.RoomserverAPI, m.RoomserverAPI, m.KeyAPI,
 	)
 
 	if m.RelayAPI != nil {
