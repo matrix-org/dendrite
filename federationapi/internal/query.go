@@ -16,7 +16,7 @@ func (f *FederationInternalAPI) QueryJoinedHostServerNamesInRoom(
 	request *api.QueryJoinedHostServerNamesInRoomRequest,
 	response *api.QueryJoinedHostServerNamesInRoomResponse,
 ) (err error) {
-	joinedHosts, err := f.db.GetJoinedHostsForRooms(ctx, []string{request.RoomID}, request.ExcludeSelf, request.ExcludeBlacklisted)
+	joinedHosts, err := f.db.GetJoinedHostsForRooms(ctx, []string{request.RoomID}, request.ExcludeSelf)
 	if err != nil {
 		return
 	}

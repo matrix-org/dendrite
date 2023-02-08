@@ -15,8 +15,6 @@
 package sqlite3
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -43,23 +41,17 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		Up:      deltas.UpRenameTables,
 		Down:    deltas.DownRenameTables,
 	})
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: server names",
-		Up: func(ctx context.Context, txn *sql.Tx) error {
-			return deltas.UpServerNames(ctx, txn, serverName)
-		},
-	})
 	if err = m.Up(base.Context()); err != nil {
 		return nil, err
 	}
 
-	accountsTable, err := NewSQLiteAccountsTable(db, serverName)
-	if err != nil {
-		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
-	}
 	accountDataTable, err := NewSQLiteAccountDataTable(db)
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteAccountDataTable: %w", err)
+	}
+	accountsTable, err := NewSQLiteAccountsTable(db, serverName)
+	if err != nil {
+		return nil, fmt.Errorf("NewSQLiteAccountsTable: %w", err)
 	}
 	devicesTable, err := NewSQLiteDevicesTable(db, serverName)
 	if err != nil {
@@ -101,18 +93,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, fmt.Errorf("NewSQLiteStatsTable: %w", err)
 	}
-
-	m = sqlutil.NewMigrator(db)
-	m.AddMigrations(sqlutil.Migration{
-		Version: "userapi: server names populate",
-		Up: func(ctx context.Context, txn *sql.Tx) error {
-			return deltas.UpServerNamesPopulate(ctx, txn, serverName)
-		},
-	})
-	if err = m.Up(base.Context()); err != nil {
-		return nil, err
-	}
-
 	return &shared.Database{
 		AccountDatas:          accountDataTable,
 		Accounts:              accountsTable,

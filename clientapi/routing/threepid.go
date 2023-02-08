@@ -136,17 +136,16 @@ func CheckAndSave3PIDAssociation(
 	}
 
 	// Save the association in the database
-	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
 	}
 
 	if err = threePIDAPI.PerformSaveThreePIDAssociation(req.Context(), &api.PerformSaveThreePIDAssociationRequest{
-		ThreePID:   address,
-		Localpart:  localpart,
-		ServerName: domain,
-		Medium:     medium,
+		ThreePID:  address,
+		Localpart: localpart,
+		Medium:    medium,
 	}, &struct{}{}); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threePIDAPI.PerformSaveThreePIDAssociation failed")
 		return jsonerror.InternalServerError()
@@ -162,7 +161,7 @@ func CheckAndSave3PIDAssociation(
 func GetAssociated3PIDs(
 	req *http.Request, threepidAPI api.ClientUserAPI, device *api.Device,
 ) util.JSONResponse {
-	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
@@ -170,8 +169,7 @@ func GetAssociated3PIDs(
 
 	res := &api.QueryThreePIDsForLocalpartResponse{}
 	err = threepidAPI.QueryThreePIDsForLocalpart(req.Context(), &api.QueryThreePIDsForLocalpartRequest{
-		Localpart:  localpart,
-		ServerName: domain,
+		Localpart: localpart,
 	}, res)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("threepidAPI.QueryThreePIDsForLocalpart failed")

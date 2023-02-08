@@ -11,7 +11,6 @@ func UpIsActive(ctx context.Context, tx *sql.Tx) error {
 	ALTER TABLE userapi_accounts RENAME TO userapi_accounts_tmp;
 CREATE TABLE userapi_accounts (
     localpart TEXT NOT NULL PRIMARY KEY,
-	server_name TEXT NOT NULL,
     created_ts BIGINT NOT NULL,
     password_hash TEXT,
     appservice_id TEXT,

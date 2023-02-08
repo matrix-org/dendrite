@@ -11,27 +11,22 @@ import (
 // kind and a tweaks map. Returns a nil map if it would have been
 // empty.
 func ActionsToTweaks(as []*Action) (ActionKind, map[string]interface{}, error) {
-	var kind ActionKind
-	var tweaks map[string]interface{}
+	kind := UnknownAction
+	tweaks := map[string]interface{}{}
 
 	for _, a := range as {
-		switch a.Kind {
-		case DontNotifyAction:
-			// Don't bother processing any further
-			return DontNotifyAction, nil, nil
-
-		case SetTweakAction:
-			if tweaks == nil {
-				tweaks = map[string]interface{}{}
-			}
+		if a.Kind == SetTweakAction {
 			tweaks[string(a.Tweak)] = a.Value
-
-		default:
-			if kind != UnknownAction {
-				return UnknownAction, nil, fmt.Errorf("got multiple primary actions: already had %q, got %s", kind, a.Kind)
-			}
-			kind = a.Kind
+			continue
 		}
+		if kind != UnknownAction {
+			return UnknownAction, nil, fmt.Errorf("got multiple primary actions: already had %q, got %s", kind, a.Kind)
+		}
+		kind = a.Kind
+	}
+
+	if len(tweaks) == 0 {
+		tweaks = nil
 	}
 
 	return kind, tweaks, nil
@@ -127,8 +122,4 @@ func parseRoomMemberCountCondition(s string) (func(int) bool, error) {
 	}
 	b = int(v)
 	return cmp, nil
-}
-
-func pointer[t any](s t) *t {
-	return &s
 }

@@ -145,12 +145,12 @@ func (rp *RequestPool) updatePresence(db storage.Presence, presence string, user
 	}
 
 	// ensure we also send the current status_msg to federated servers and not nil
-	dbPresence, err := db.GetPresences(context.Background(), []string{userID})
+	dbPresence, err := db.GetPresence(context.Background(), userID)
 	if err != nil && err != sql.ErrNoRows {
 		return
 	}
-	if len(dbPresence) > 0 && dbPresence[0] != nil {
-		newPresence.ClientFields = dbPresence[0].ClientFields
+	if dbPresence != nil {
+		newPresence.ClientFields = dbPresence.ClientFields
 	}
 	newPresence.ClientFields.Presence = presenceID.String()
 

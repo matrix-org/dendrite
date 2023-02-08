@@ -137,11 +137,6 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 	request *api.RemoveRoomAliasRequest,
 	response *api.RemoveRoomAliasResponse,
 ) error {
-	_, virtualHost, err := r.Cfg.Matrix.SplitLocalID('@', request.UserID)
-	if err != nil {
-		return err
-	}
-
 	roomID, err := r.DB.GetRoomIDForAlias(ctx, request.Alias)
 	if err != nil {
 		return fmt.Errorf("r.DB.GetRoomIDForAlias: %w", err)
@@ -195,16 +190,6 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				sender = ev.Sender()
 			}
 
-			_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', sender)
-			if err != nil {
-				return err
-			}
-
-			identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
-			if err != nil {
-				return err
-			}
-
 			builder := &gomatrixserverlib.EventBuilder{
 				Sender:   sender,
 				RoomID:   ev.RoomID(),
@@ -226,12 +211,12 @@ func (r *RoomserverInternalAPI) RemoveRoomAlias(
 				return err
 			}
 
-			newEvent, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, stateRes)
+			newEvent, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, time.Now(), &eventsNeeded, stateRes)
 			if err != nil {
 				return err
 			}
 
-			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, virtualHost, r.ServerName, r.ServerName, nil, false)
+			err = api.SendEvents(ctx, r, api.KindNew, []*gomatrixserverlib.HeaderedEvent{newEvent}, r.ServerName, r.ServerName, nil, false)
 			if err != nil {
 				return err
 			}

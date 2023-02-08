@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"path/filepath"
 	"testing"
 
 	"github.com/lib/pq"
@@ -101,12 +100,16 @@ func currentUser() string {
 // Returns the connection string to use and a close function which must be called when the test finishes.
 // Calling this function twice will return the same database, which will have data from previous tests
 // unless close() is called.
+// TODO: namespace for concurrent package tests
 func PrepareDBConnectionString(t *testing.T, dbType DBType) (connStr string, close func()) {
 	if dbType == DBTypeSQLite {
-		// this will be made in the t.TempDir, which is unique per test
-		dbname := filepath.Join(t.TempDir(), "dendrite_test.db")
+		// this will be made in the current working directory which namespaces concurrent package runs correctly
+		dbname := "dendrite_test.db"
 		return fmt.Sprintf("file:%s", dbname), func() {
-			t.Cleanup(func() {}) // removes the t.TempDir
+			err := os.Remove(dbname)
+			if err != nil {
+				t.Fatalf("failed to cleanup sqlite db '%s': %s", dbname, err)
+			}
 		}
 	}
 
@@ -173,7 +176,7 @@ func WithAllDatabases(t *testing.T, testFn func(t *testing.T, db DBType)) {
 	for dbName, dbType := range dbs {
 		dbt := dbType
 		t.Run(dbName, func(tt *testing.T) {
-			tt.Parallel()
+			//tt.Parallel()
 			testFn(tt, dbt)
 		})
 	}

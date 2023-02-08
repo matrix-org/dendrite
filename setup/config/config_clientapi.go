@@ -84,6 +84,9 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 	c.TURN.Verify(configErrs)
 	c.RateLimiting.Verify(configErrs)
 	if c.RecaptchaEnabled {
+		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
+		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
+		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", c.RecaptchaSiteVerifyAPI)
 		if c.RecaptchaSiteVerifyAPI == "" {
 			c.RecaptchaSiteVerifyAPI = "https://www.google.com/recaptcha/api/siteverify"
 		}
@@ -91,15 +94,11 @@ func (c *ClientAPI) Verify(configErrs *ConfigErrors, isMonolith bool) {
 			c.RecaptchaApiJsUrl = "https://www.google.com/recaptcha/api.js"
 		}
 		if c.RecaptchaFormField == "" {
-			c.RecaptchaFormField = "g-recaptcha-response"
+			c.RecaptchaFormField = "g-recaptcha"
 		}
 		if c.RecaptchaSitekeyClass == "" {
-			c.RecaptchaSitekeyClass = "g-recaptcha"
+			c.RecaptchaSitekeyClass = "g-recaptcha-response"
 		}
-		checkNotEmpty(configErrs, "client_api.recaptcha_public_key", c.RecaptchaPublicKey)
-		checkNotEmpty(configErrs, "client_api.recaptcha_private_key", c.RecaptchaPrivateKey)
-		checkNotEmpty(configErrs, "client_api.recaptcha_siteverify_api", c.RecaptchaSiteVerifyAPI)
-		checkNotEmpty(configErrs, "client_api.recaptcha_sitekey_class", c.RecaptchaSitekeyClass)
 	}
 	// Ensure there is any spam counter measure when enabling registration
 	if !c.RegistrationDisabled && !c.OpenRegistrationWithoutVerificationEnabled {

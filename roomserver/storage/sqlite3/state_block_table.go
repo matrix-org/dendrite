@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
+	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/util"
 )
@@ -67,7 +68,7 @@ func CreateStateBlockTable(db *sql.DB) error {
 	return err
 }
 
-func PrepareStateBlockTable(db *sql.DB) (*stateBlockStatements, error) {
+func PrepareStateBlockTable(db *sql.DB) (tables.StateBlock, error) {
 	s := &stateBlockStatements{
 		db: db,
 	}

@@ -249,13 +249,3 @@ func (d *Database) StoreCrossSigningSigsForTarget(
 		return nil
 	})
 }
-
-// DeleteStaleDeviceLists deletes stale device list entries for users we don't share a room with anymore.
-func (d *Database) DeleteStaleDeviceLists(
-	ctx context.Context,
-	userIDs []string,
-) error {
-	return d.Writer.Do(d.DB, nil, func(txn *sql.Tx) error {
-		return d.StaleDeviceListsTable.DeleteStaleDeviceLists(ctx, txn, userIDs)
-	})
-}

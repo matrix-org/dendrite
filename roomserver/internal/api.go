@@ -4,10 +4,6 @@ import (
 	"context"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -23,6 +19,9 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -88,10 +87,10 @@ func NewRoomserverAPI(
 		Durable:                base.Cfg.Global.JetStream.Durable("RoomserverInputConsumer"),
 		ServerACLs:             serverACLs,
 		Queryer: &query.Queryer{
-			DB:                roomserverDB,
-			Cache:             base.Caches,
-			IsLocalServerName: base.Cfg.Global.IsLocalServerName,
-			ServerACLs:        serverACLs,
+			DB:         roomserverDB,
+			Cache:      base.Caches,
+			ServerName: base.Cfg.Global.ServerName,
+			ServerACLs: serverACLs,
 		},
 		// perform-er structs get initialised when we have a federation sender to use
 	}
@@ -105,11 +104,6 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(r.ServerName)
-	if err != nil {
-		logrus.Panic(err)
-	}
-
 	r.Inputer = &input.Inputer{
 		Cfg:                 &r.Base.Cfg.RoomServer,
 		Base:                r.Base,
@@ -120,8 +114,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		JetStream:           r.JetStream,
 		NATSClient:          r.NATSClient,
 		Durable:             nats.Durable(r.Durable),
-		ServerName:          r.ServerName,
-		SigningIdentity:     identity,
+		ServerName:          r.Cfg.Matrix.ServerName,
 		FSAPI:               fsAPI,
 		KeyRing:             keyRing,
 		ACLs:                r.ServerACLs,
@@ -134,15 +127,16 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Inputer: r.Inputer,
 	}
 	r.Joiner = &perform.Joiner{
-		Cfg:     r.Cfg,
-		DB:      r.DB,
-		FSAPI:   r.fsAPI,
-		RSAPI:   r,
-		Inputer: r.Inputer,
-		Queryer: r.Queryer,
+		ServerName: r.Cfg.Matrix.ServerName,
+		Cfg:        r.Cfg,
+		DB:         r.DB,
+		FSAPI:      r.fsAPI,
+		RSAPI:      r,
+		Inputer:    r.Inputer,
+		Queryer:    r.Queryer,
 	}
 	r.Peeker = &perform.Peeker{
-		ServerName: r.ServerName,
+		ServerName: r.Cfg.Matrix.ServerName,
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
@@ -153,7 +147,7 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		Inputer: r.Inputer,
 	}
 	r.Unpeeker = &perform.Unpeeker{
-		ServerName: r.ServerName,
+		ServerName: r.Cfg.Matrix.ServerName,
 		Cfg:        r.Cfg,
 		DB:         r.DB,
 		FSAPI:      r.fsAPI,
@@ -169,10 +163,10 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 		DB: r.DB,
 	}
 	r.Backfiller = &perform.Backfiller{
-		IsLocalServerName: r.Cfg.Matrix.IsLocalServerName,
-		DB:                r.DB,
-		FSAPI:             r.fsAPI,
-		KeyRing:           r.KeyRing,
+		ServerName: r.ServerName,
+		DB:         r.DB,
+		FSAPI:      r.fsAPI,
+		KeyRing:    r.KeyRing,
 		// Perspective servers are trusted to not lie about server keys, so we will also
 		// prefer these servers when backfilling (assuming they are in the room) rather
 		// than trying random servers
@@ -200,7 +194,6 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederatio
 
 func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	r.Leaver.UserAPI = userAPI
-	r.Inputer.UserAPI = userAPI
 }
 
 func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {

@@ -25,10 +25,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/tidwall/gjson"
 
 	"github.com/sirupsen/logrus"
@@ -58,14 +58,15 @@ Arguments:
 `
 
 var (
-	username      = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
-	password      = flag.String("password", "", "The password to associate with the account")
-	pwdFile       = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
-	pwdStdin      = flag.Bool("passwordstdin", false, "Reads the password from stdin")
-	isAdmin       = flag.Bool("admin", false, "Create an admin account")
-	resetPassword = flag.Bool("reset-password", false, "Deprecated")
-	serverURL     = flag.String("url", "http://localhost:8008", "The URL to connect to.")
-	timeout       = flag.Duration("timeout", time.Second*30, "Timeout for the http client when connecting to the server")
+	username           = flag.String("username", "", "The username of the account to register (specify the localpart only, e.g. 'alice' for '@alice:domain.com')")
+	password           = flag.String("password", "", "The password to associate with the account")
+	pwdFile            = flag.String("passwordfile", "", "The file to use for the password (e.g. for automated account creation)")
+	pwdStdin           = flag.Bool("passwordstdin", false, "Reads the password from stdin")
+	isAdmin            = flag.Bool("admin", false, "Create an admin account")
+	resetPassword      = flag.Bool("reset-password", false, "Deprecated")
+	serverURL          = flag.String("url", "http://localhost:8008", "The URL to connect to.")
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
+	timeout            = flag.Duration("timeout", time.Second*30, "Timeout for the http client when connecting to the server")
 )
 
 var cl = http.Client{
@@ -94,19 +95,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := internal.ValidateUsername(*username, cfg.Global.ServerName); err != nil {
-		logrus.WithError(err).Error("Specified username is invalid")
+	if !validUsernameRegex.MatchString(*username) {
+		logrus.Warn("Username can only contain characters a-z, 0-9, or '_-./='")
 		os.Exit(1)
+	}
+
+	if len(fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName)) > 255 {
+		logrus.Fatalf("Username can not be longer than 255 characters: %s", fmt.Sprintf("@%s:%s", *username, cfg.Global.ServerName))
 	}
 
 	pass, err := getPassword(*password, *pwdFile, *pwdStdin, os.Stdin)
 	if err != nil {
 		logrus.Fatalln(err)
-	}
-
-	if err = internal.ValidatePassword(pass); err != nil {
-		logrus.WithError(err).Error("Specified password is invalid")
-		os.Exit(1)
 	}
 
 	cl.Timeout = *timeout
@@ -177,7 +177,7 @@ func sharedSecretRegister(sharedSecret, serverURL, localpart, password string, a
 	defer regResp.Body.Close() // nolint: errcheck
 	if regResp.StatusCode < 200 || regResp.StatusCode >= 300 {
 		body, _ = io.ReadAll(regResp.Body)
-		return "", fmt.Errorf("got HTTP %d error from server: %s", regResp.StatusCode, string(body))
+		return "", fmt.Errorf(gjson.GetBytes(body, "error").Str)
 	}
 	r, err := io.ReadAll(regResp.Body)
 	if err != nil {

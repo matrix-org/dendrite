@@ -19,12 +19,6 @@ type RoomserverInternalAPITrace struct {
 	Impl RoomserverInternalAPI
 }
 
-func (t *RoomserverInternalAPITrace) QueryLeftUsers(ctx context.Context, req *QueryLeftUsersRequest, res *QueryLeftUsersResponse) error {
-	err := t.Impl.QueryLeftUsers(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("QueryLeftUsers req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
 func (t *RoomserverInternalAPITrace) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	t.Impl.SetFederationAPI(fsAPI, keyRing)
 }
@@ -134,16 +128,6 @@ func (t *RoomserverInternalAPITrace) PerformAdminEvacuateUser(
 ) error {
 	err := t.Impl.PerformAdminEvacuateUser(ctx, req, res)
 	util.GetLogger(ctx).WithError(err).Infof("PerformAdminEvacuateUser req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
-func (t *RoomserverInternalAPITrace) PerformAdminPurgeRoom(
-	ctx context.Context,
-	req *PerformAdminPurgeRoomRequest,
-	res *PerformAdminPurgeRoomResponse,
-) error {
-	err := t.Impl.PerformAdminPurgeRoom(ctx, req, res)
-	util.GetLogger(ctx).WithError(err).Infof("PerformAdminPurgeRoom req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

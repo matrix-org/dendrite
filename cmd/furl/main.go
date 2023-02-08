@@ -48,15 +48,10 @@ func main() {
 		panic("unexpected key block")
 	}
 
-	serverName := gomatrixserverlib.ServerName(*requestFrom)
 	client := gomatrixserverlib.NewFederationClient(
-		[]*gomatrixserverlib.SigningIdentity{
-			{
-				ServerName: serverName,
-				KeyID:      gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
-				PrivateKey: privateKey,
-			},
-		},
+		gomatrixserverlib.ServerName(*requestFrom),
+		gomatrixserverlib.KeyID(keyBlock.Headers["Key-ID"]),
+		privateKey,
 	)
 
 	u, err := url.Parse(flag.Arg(0))
@@ -84,7 +79,6 @@ func main() {
 
 	req := gomatrixserverlib.NewFederationRequest(
 		method,
-		serverName,
 		gomatrixserverlib.ServerName(u.Host),
 		u.RequestURI(),
 	)

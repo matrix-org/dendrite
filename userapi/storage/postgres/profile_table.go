@@ -23,46 +23,42 @@ import (
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const profilesSchema = `
 -- Stores data about accounts profiles.
 CREATE TABLE IF NOT EXISTS userapi_profiles (
     -- The Matrix user ID localpart for this account
-    localpart TEXT NOT NULL,
-	server_name TEXT NOT NULL,
+    localpart TEXT NOT NULL PRIMARY KEY,
     -- The display name for this account
     display_name TEXT,
     -- The URL of the avatar for this account
     avatar_url TEXT
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS userapi_profiles_idx ON userapi_profiles(localpart, server_name);
 `
 
 const insertProfileSQL = "" +
-	"INSERT INTO userapi_profiles(localpart, server_name, display_name, avatar_url) VALUES ($1, $2, $3, $4)"
+	"INSERT INTO userapi_profiles(localpart, display_name, avatar_url) VALUES ($1, $2, $3)"
 
 const selectProfileByLocalpartSQL = "" +
-	"SELECT localpart, server_name, display_name, avatar_url FROM userapi_profiles WHERE localpart = $1 AND server_name = $2"
+	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart = $1"
 
 const setAvatarURLSQL = "" +
 	"UPDATE userapi_profiles AS new" +
 	" SET avatar_url = $1" +
 	" FROM userapi_profiles AS old" +
-	" WHERE new.localpart = $2 AND new.server_name = $3" +
+	" WHERE new.localpart = $2" +
 	" RETURNING new.display_name, old.avatar_url <> new.avatar_url"
 
 const setDisplayNameSQL = "" +
 	"UPDATE userapi_profiles AS new" +
 	" SET display_name = $1" +
 	" FROM userapi_profiles AS old" +
-	" WHERE new.localpart = $2 AND new.server_name = $3" +
+	" WHERE new.localpart = $2" +
 	" RETURNING new.avatar_url, old.display_name <> new.display_name"
 
 const selectProfilesBySearchSQL = "" +
-	"SELECT localpart, server_name, display_name, avatar_url FROM userapi_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
+	"SELECT localpart, display_name, avatar_url FROM userapi_profiles WHERE localpart LIKE $1 OR display_name LIKE $1 LIMIT $2"
 
 type profilesStatements struct {
 	serverNoticesLocalpart       string
@@ -91,20 +87,18 @@ func NewPostgresProfilesTable(db *sql.DB, serverNoticesLocalpart string) (tables
 }
 
 func (s *profilesStatements) InsertProfile(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, txn *sql.Tx, localpart string,
 ) (err error) {
-	_, err = sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, serverName, "", "")
+	_, err = sqlutil.TxStmt(txn, s.insertProfileStmt).ExecContext(ctx, localpart, "", "")
 	return
 }
 
 func (s *profilesStatements) SelectProfileByLocalpart(
-	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, localpart string,
 ) (*authtypes.Profile, error) {
 	var profile authtypes.Profile
-	err := s.selectProfileByLocalpartStmt.QueryRowContext(ctx, localpart, serverName).Scan(
-		&profile.Localpart, &profile.ServerName, &profile.DisplayName, &profile.AvatarURL,
+	err := s.selectProfileByLocalpartStmt.QueryRowContext(ctx, localpart).Scan(
+		&profile.Localpart, &profile.DisplayName, &profile.AvatarURL,
 	)
 	if err != nil {
 		return nil, err
@@ -113,34 +107,28 @@ func (s *profilesStatements) SelectProfileByLocalpart(
 }
 
 func (s *profilesStatements) SetAvatarURL(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
-	avatarURL string,
+	ctx context.Context, txn *sql.Tx, localpart string, avatarURL string,
 ) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{
-		Localpart:  localpart,
-		ServerName: string(serverName),
-		AvatarURL:  avatarURL,
+		Localpart: localpart,
+		AvatarURL: avatarURL,
 	}
 	var changed bool
 	stmt := sqlutil.TxStmt(txn, s.setAvatarURLStmt)
-	err := stmt.QueryRowContext(ctx, avatarURL, localpart, serverName).Scan(&profile.DisplayName, &changed)
+	err := stmt.QueryRowContext(ctx, avatarURL, localpart).Scan(&profile.DisplayName, &changed)
 	return profile, changed, err
 }
 
 func (s *profilesStatements) SetDisplayName(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
-	displayName string,
+	ctx context.Context, txn *sql.Tx, localpart string, displayName string,
 ) (*authtypes.Profile, bool, error) {
 	profile := &authtypes.Profile{
 		Localpart:   localpart,
-		ServerName:  string(serverName),
 		DisplayName: displayName,
 	}
 	var changed bool
 	stmt := sqlutil.TxStmt(txn, s.setDisplayNameStmt)
-	err := stmt.QueryRowContext(ctx, displayName, localpart, serverName).Scan(&profile.AvatarURL, &changed)
+	err := stmt.QueryRowContext(ctx, displayName, localpart).Scan(&profile.AvatarURL, &changed)
 	return profile, changed, err
 }
 
@@ -158,7 +146,7 @@ func (s *profilesStatements) SelectProfilesBySearch(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectProfilesBySearch: rows.close() failed")
 	for rows.Next() {
 		var profile authtypes.Profile
-		if err := rows.Scan(&profile.Localpart, &profile.ServerName, &profile.DisplayName, &profile.AvatarURL); err != nil {
+		if err := rows.Scan(&profile.Localpart, &profile.DisplayName, &profile.AvatarURL); err != nil {
 			return nil, err
 		}
 		if profile.Localpart != s.serverNoticesLocalpart {

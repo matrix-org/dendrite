@@ -26,7 +26,7 @@ func Appservice(base *base.BaseDendrite, cfg *config.Dendrite) {
 	rsAPI := base.RoomserverHTTPClient()
 
 	intAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
-	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI, base.EnableMetrics)
+	appservice.AddInternalRoutes(base.InternalAPIMux, intAPI)
 
 	base.SetupAndServeHTTP(
 		base.Cfg.AppServiceAPI.InternalAPI.Listen, // internal listener

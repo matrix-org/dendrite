@@ -21,13 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/gomatrixserverlib"
-
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/sqlite3/deltas"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const membershipSchema = `
@@ -134,12 +133,6 @@ const selectServerInRoomSQL = "" +
 const deleteMembershipSQL = "" +
 	"DELETE FROM roomserver_membership WHERE room_nid = $1 AND target_nid = $2"
 
-const selectJoinedUsersSQL = `
-SELECT DISTINCT target_nid
-FROM roomserver_membership m
-WHERE membership_nid > $1 AND target_nid IN ($2)
-`
-
 type membershipStatements struct {
 	db                                              *sql.DB
 	insertMembershipStmt                            *sql.Stmt
@@ -156,7 +149,6 @@ type membershipStatements struct {
 	selectLocalServerInRoomStmt                     *sql.Stmt
 	selectServerInRoomStmt                          *sql.Stmt
 	deleteMembershipStmt                            *sql.Stmt
-	// selectJoinedUsersStmt                           *sql.Stmt // Prepared at runtime
 }
 
 func CreateMembershipTable(db *sql.DB) error {
@@ -419,41 +411,4 @@ func (s *membershipStatements) DeleteMembership(
 		ctx, roomNID, targetUserNID,
 	)
 	return err
-}
-
-func (s *membershipStatements) SelectJoinedUsers(
-	ctx context.Context, txn *sql.Tx,
-	targetUserNIDs []types.EventStateKeyNID,
-) ([]types.EventStateKeyNID, error) {
-	result := make([]types.EventStateKeyNID, 0, len(targetUserNIDs))
-
-	qry := strings.Replace(selectJoinedUsersSQL, "($2)", sqlutil.QueryVariadicOffset(len(targetUserNIDs), 1), 1)
-
-	stmt, err := s.db.Prepare(qry)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, stmt, "SelectJoinedUsers: stmt.Close failed")
-
-	params := make([]any, len(targetUserNIDs)+1)
-	params[0] = tables.MembershipStateLeaveOrBan
-	for i := range targetUserNIDs {
-		params[i+1] = targetUserNIDs[i]
-	}
-
-	stmt = sqlutil.TxStmt(txn, stmt)
-	rows, err := stmt.QueryContext(ctx, params...)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectJoinedUsers: rows.close() failed")
-	var targetNID types.EventStateKeyNID
-	for rows.Next() {
-		if err = rows.Scan(&targetNID); err != nil {
-			return nil, err
-		}
-		result = append(result, targetNID)
-	}
-
-	return result, rows.Err()
 }

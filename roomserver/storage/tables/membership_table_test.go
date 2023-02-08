@@ -129,11 +129,5 @@ func TestMembershipTable(t *testing.T) {
 		knownUsers, err := tab.SelectKnownUsers(ctx, nil, userNIDs[0], "localhost", 2)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(knownUsers))
-
-		// get users we share a room with, given their userNID
-		joinedUsers, err := tab.SelectJoinedUsers(ctx, nil, userNIDs)
-		assert.NoError(t, err)
-		// Only userNIDs[0] is actually joined, so we only expect this userNID
-		assert.Equal(t, userNIDs[:1], joinedUsers)
 	})
 }

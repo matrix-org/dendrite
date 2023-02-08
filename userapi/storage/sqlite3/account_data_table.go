@@ -21,7 +21,6 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 const accountDataSchema = `
@@ -29,28 +28,27 @@ const accountDataSchema = `
 CREATE TABLE IF NOT EXISTS userapi_account_datas (
     -- The Matrix user ID localpart for this account
     localpart TEXT NOT NULL,
-	server_name TEXT NOT NULL,
     -- The room ID for this data (empty string if not specific to a room)
     room_id TEXT,
     -- The account data type
     type TEXT NOT NULL,
     -- The account data content
-    content TEXT NOT NULL
-);
+    content TEXT NOT NULL,
 
-CREATE UNIQUE INDEX IF NOT EXISTS userapi_account_datas_idx ON userapi_account_datas(localpart, server_name, room_id, type);
+    PRIMARY KEY(localpart, room_id, type)
+);
 `
 
 const insertAccountDataSQL = `
-	INSERT INTO userapi_account_datas(localpart, server_name, room_id, type, content) VALUES($1, $2, $3, $4, $5)
-	ON CONFLICT (localpart, server_name, room_id, type) DO UPDATE SET content = $5
+	INSERT INTO userapi_account_datas(localpart, room_id, type, content) VALUES($1, $2, $3, $4)
+	ON CONFLICT (localpart, room_id, type) DO UPDATE SET content = $4
 `
 
 const selectAccountDataSQL = "" +
-	"SELECT room_id, type, content FROM userapi_account_datas WHERE localpart = $1 AND server_name = $2"
+	"SELECT room_id, type, content FROM userapi_account_datas WHERE localpart = $1"
 
 const selectAccountDataByTypeSQL = "" +
-	"SELECT content FROM userapi_account_datas WHERE localpart = $1 AND server_name = $2 AND room_id = $3 AND type = $4"
+	"SELECT content FROM userapi_account_datas WHERE localpart = $1 AND room_id = $2 AND type = $3"
 
 type accountDataStatements struct {
 	db                          *sql.DB
@@ -75,23 +73,20 @@ func NewSQLiteAccountDataTable(db *sql.DB) (tables.AccountDataTable, error) {
 }
 
 func (s *accountDataStatements) InsertAccountData(
-	ctx context.Context, txn *sql.Tx,
-	localpart string, serverName gomatrixserverlib.ServerName,
-	roomID, dataType string, content json.RawMessage,
+	ctx context.Context, txn *sql.Tx, localpart, roomID, dataType string, content json.RawMessage,
 ) error {
-	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, serverName, roomID, dataType, content)
+	_, err := sqlutil.TxStmt(txn, s.insertAccountDataStmt).ExecContext(ctx, localpart, roomID, dataType, content)
 	return err
 }
 
 func (s *accountDataStatements) SelectAccountData(
-	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
+	ctx context.Context, localpart string,
 ) (
 	/* global */ map[string]json.RawMessage,
 	/* rooms */ map[string]map[string]json.RawMessage,
 	error,
 ) {
-	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart, serverName)
+	rows, err := s.selectAccountDataStmt.QueryContext(ctx, localpart)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -122,13 +117,11 @@ func (s *accountDataStatements) SelectAccountData(
 }
 
 func (s *accountDataStatements) SelectAccountDataByType(
-	ctx context.Context,
-	localpart string, serverName gomatrixserverlib.ServerName,
-	roomID, dataType string,
+	ctx context.Context, localpart, roomID, dataType string,
 ) (data json.RawMessage, err error) {
 	var bytes []byte
 	stmt := s.selectAccountDataByTypeStmt
-	if err = stmt.QueryRowContext(ctx, localpart, serverName, roomID, dataType).Scan(&bytes); err != nil {
+	if err = stmt.QueryRowContext(ctx, localpart, roomID, dataType).Scan(&bytes); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}

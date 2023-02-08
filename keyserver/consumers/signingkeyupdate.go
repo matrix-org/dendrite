@@ -31,13 +31,12 @@ import (
 
 // SigningKeyUpdateConsumer consumes signing key updates that came in over federation.
 type SigningKeyUpdateConsumer struct {
-	ctx               context.Context
-	jetstream         nats.JetStreamContext
-	durable           string
-	topic             string
-	keyAPI            *internal.KeyInternalAPI
-	cfg               *config.KeyServer
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
+	ctx       context.Context
+	jetstream nats.JetStreamContext
+	durable   string
+	topic     string
+	keyAPI    *internal.KeyInternalAPI
+	cfg       *config.KeyServer
 }
 
 // NewSigningKeyUpdateConsumer creates a new SigningKeyUpdateConsumer. Call Start() to begin consuming from key servers.
@@ -48,13 +47,12 @@ func NewSigningKeyUpdateConsumer(
 	keyAPI *internal.KeyInternalAPI,
 ) *SigningKeyUpdateConsumer {
 	return &SigningKeyUpdateConsumer{
-		ctx:               process.Context(),
-		jetstream:         js,
-		durable:           cfg.Matrix.JetStream.Prefixed("KeyServerSigningKeyConsumer"),
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
-		keyAPI:            keyAPI,
-		cfg:               cfg,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
+		ctx:       process.Context(),
+		jetstream: js,
+		durable:   cfg.Matrix.JetStream.Prefixed("KeyServerSigningKeyConsumer"),
+		topic:     cfg.Matrix.JetStream.Prefixed(jetstream.InputSigningKeyUpdate),
+		keyAPI:    keyAPI,
+		cfg:       cfg,
 	}
 }
 
@@ -79,7 +77,7 @@ func (t *SigningKeyUpdateConsumer) onMessage(ctx context.Context, msgs []*nats.M
 	if _, serverName, err := gomatrixserverlib.SplitID('@', updatePayload.UserID); err != nil {
 		logrus.WithError(err).Error("failed to split user id")
 		return true
-	} else if t.isLocalServerName(serverName) {
+	} else if serverName == t.cfg.Matrix.ServerName {
 		logrus.Warn("dropping device key update from ourself")
 		return true
 	} else if serverName != origin {

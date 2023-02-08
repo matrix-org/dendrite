@@ -94,9 +94,8 @@ type TransactionID struct {
 
 // InputRoomEventsRequest is a request to InputRoomEvents
 type InputRoomEventsRequest struct {
-	InputRoomEvents []InputRoomEvent             `json:"input_room_events"`
-	Asynchronous    bool                         `json:"async"`
-	VirtualHost     gomatrixserverlib.ServerName `json:"virtual_host"`
+	InputRoomEvents []InputRoomEvent `json:"input_room_events"`
+	Asynchronous    bool             `json:"async"`
 }
 
 // InputRoomEventsResponse is a response to InputRoomEvents

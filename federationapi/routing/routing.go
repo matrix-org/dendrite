@@ -32,19 +32,12 @@ import (
 	keyserverAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
-	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	SendRouteName           = "Send"
-	QueryDirectoryRouteName = "QueryDirectory"
-	QueryProfileRouteName   = "QueryProfile"
 )
 
 // Setup registers HTTP handlers with the given ServeMux.
@@ -56,7 +49,8 @@ const (
 // applied:
 // nolint: gocyclo
 func Setup(
-	base *base.BaseDendrite,
+	fedMux, keyMux, wkMux *mux.Router,
+	cfg *config.FederationAPI,
 	rsAPI roomserverAPI.FederationRoomserverAPI,
 	fsAPI *fedInternal.FederationInternalAPI,
 	keys gomatrixserverlib.JSONVerifier,
@@ -67,16 +61,9 @@ func Setup(
 	servers federationAPI.ServersInRoomProvider,
 	producer *producers.SyncAPIProducer,
 ) {
-	fedMux := base.PublicFederationAPIMux
-	keyMux := base.PublicKeyAPIMux
-	wkMux := base.PublicWellKnownAPIMux
-	cfg := &base.Cfg.FederationAPI
-
-	if base.EnableMetrics {
-		prometheus.MustRegister(
-			internal.PDUCountTotal, internal.EDUCountTotal,
-		)
-	}
+	prometheus.MustRegister(
+		pduCountTotal, eduCountTotal,
+	)
 
 	v2keysmux := keyMux.PathPrefix("/v2").Subrouter()
 	v1fedmux := fedMux.PathPrefix("/v1").Subrouter()
@@ -87,7 +74,7 @@ func Setup(
 	}
 
 	localKeys := httputil.MakeExternalAPI("localkeys", func(req *http.Request) util.JSONResponse {
-		return LocalKeys(cfg, gomatrixserverlib.ServerName(req.Host))
+		return LocalKeys(cfg)
 	})
 
 	notaryKeys := httputil.MakeExternalAPI("notarykeys", func(req *http.Request) util.JSONResponse {
@@ -144,7 +131,7 @@ func Setup(
 				cfg, rsAPI, keyAPI, keys, federation, mu, servers, producer,
 			)
 		},
-	)).Methods(http.MethodPut, http.MethodOptions).Name(SendRouteName)
+	)).Methods(http.MethodPut, http.MethodOptions)
 
 	v1fedmux.Handle("/invite/{roomID}/{eventID}", MakeFedAPI(
 		"federation_invite", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
@@ -254,7 +241,7 @@ func Setup(
 				httpReq, federation, cfg, rsAPI, fsAPI,
 			)
 		},
-	)).Methods(http.MethodGet).Name(QueryDirectoryRouteName)
+	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/query/profile", MakeFedAPI(
 		"federation_query_profile", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,
@@ -263,7 +250,7 @@ func Setup(
 				httpReq, userAPI, cfg,
 			)
 		},
-	)).Methods(http.MethodGet).Name(QueryProfileRouteName)
+	)).Methods(http.MethodGet)
 
 	v1fedmux.Handle("/user/devices/{userID}", MakeFedAPI(
 		"federation_user_devices", cfg.Matrix.ServerName, cfg.Matrix.IsLocalServerName, keys, wakeup,

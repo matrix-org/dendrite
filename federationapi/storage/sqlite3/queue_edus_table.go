@@ -63,6 +63,10 @@ const selectQueueEDUReferenceJSONCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_edus" +
 	" WHERE json_nid = $1"
 
+const selectQueueEDUCountSQL = "" +
+	"SELECT COUNT(*) FROM federationsender_queue_edus" +
+	" WHERE server_name = $1"
+
 const selectQueueServerNamesSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_queue_edus"
 
@@ -78,6 +82,7 @@ type queueEDUsStatements struct {
 	// deleteQueueEDUStmt                *sql.Stmt - prepared at runtime due to variadic
 	selectQueueEDUStmt                   *sql.Stmt
 	selectQueueEDUReferenceJSONCountStmt *sql.Stmt
+	selectQueueEDUCountStmt              *sql.Stmt
 	selectQueueEDUServerNamesStmt        *sql.Stmt
 	selectExpiredEDUsStmt                *sql.Stmt
 	deleteExpiredEDUsStmt                *sql.Stmt
@@ -111,6 +116,7 @@ func (s *queueEDUsStatements) Prepare() error {
 		{&s.insertQueueEDUStmt, insertQueueEDUSQL},
 		{&s.selectQueueEDUStmt, selectQueueEDUSQL},
 		{&s.selectQueueEDUReferenceJSONCountStmt, selectQueueEDUReferenceJSONCountSQL},
+		{&s.selectQueueEDUCountStmt, selectQueueEDUCountSQL},
 		{&s.selectQueueEDUServerNamesStmt, selectQueueServerNamesSQL},
 		{&s.selectExpiredEDUsStmt, selectExpiredEDUsSQL},
 		{&s.deleteExpiredEDUsStmt, deleteExpiredEDUsSQL},
@@ -188,6 +194,21 @@ func (s *queueEDUsStatements) SelectQueueEDUReferenceJSONCount(
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
 	if err == sql.ErrNoRows {
 		return -1, nil
+	}
+	return count, err
+}
+
+func (s *queueEDUsStatements) SelectQueueEDUCount(
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+) (int64, error) {
+	var count int64
+	stmt := sqlutil.TxStmt(txn, s.selectQueueEDUCountStmt)
+	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
+	if err == sql.ErrNoRows {
+		// It's acceptable for there to be no rows referencing a given
+		// JSON NID but it's not an error condition. Just return as if
+		// there's a zero count.
+		return 0, nil
 	}
 	return count, err
 }

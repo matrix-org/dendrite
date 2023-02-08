@@ -83,7 +83,7 @@ func RoomAliasToID(
 			}
 		}
 	} else {
-		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, cfg.Matrix.ServerName, roomAlias)
+		resp, err = federation.LookupRoomAlias(httpReq.Context(), domain, roomAlias)
 		if err != nil {
 			switch x := err.(type) {
 			case gomatrix.HTTPError:

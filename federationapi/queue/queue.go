@@ -15,6 +15,7 @@
 package queue
 
 import (
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -30,7 +31,7 @@ import (
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -45,7 +46,7 @@ type OutgoingQueues struct {
 	origin      gomatrixserverlib.ServerName
 	client      fedapi.FederationClient
 	statistics  *statistics.Statistics
-	signing     map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
+	signing     *SigningInfo
 	queuesMutex sync.Mutex // protects the below
 	queues      map[gomatrixserverlib.ServerName]*destinationQueue
 }
@@ -90,7 +91,7 @@ func NewOutgoingQueues(
 	client fedapi.FederationClient,
 	rsAPI api.FederationRoomserverAPI,
 	statistics *statistics.Statistics,
-	signing []*gomatrixserverlib.SigningIdentity,
+	signing *SigningInfo,
 ) *OutgoingQueues {
 	queues := &OutgoingQueues{
 		disabled:   disabled,
@@ -100,11 +101,8 @@ func NewOutgoingQueues(
 		origin:     origin,
 		client:     client,
 		statistics: statistics,
-		signing:    map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity{},
+		signing:    signing,
 		queues:     map[gomatrixserverlib.ServerName]*destinationQueue{},
-	}
-	for _, identity := range signing {
-		queues.signing[identity.ServerName] = identity
 	}
 	// Look up which servers we have pending items for and then rehydrate those queues.
 	if !disabled {
@@ -137,14 +135,22 @@ func NewOutgoingQueues(
 	return queues
 }
 
+// TODO: Move this somewhere useful for other components as we often need to ferry these 3 variables
+// around together
+type SigningInfo struct {
+	ServerName gomatrixserverlib.ServerName
+	KeyID      gomatrixserverlib.KeyID
+	PrivateKey ed25519.PrivateKey
+}
+
 type queuedPDU struct {
-	dbReceipt *receipt.Receipt
-	pdu       *gomatrixserverlib.HeaderedEvent
+	receipt *shared.Receipt
+	pdu     *gomatrixserverlib.HeaderedEvent
 }
 
 type queuedEDU struct {
-	dbReceipt *receipt.Receipt
-	edu       *gomatrixserverlib.EDU
+	receipt *shared.Receipt
+	edu     *gomatrixserverlib.EDU
 }
 
 func (oqs *OutgoingQueues) getQueue(destination gomatrixserverlib.ServerName) *destinationQueue {
@@ -193,10 +199,11 @@ func (oqs *OutgoingQueues) SendEvent(
 		log.Trace("Federation is disabled, not sending event")
 		return nil
 	}
-	if _, ok := oqs.signing[origin]; !ok {
+	if origin != oqs.origin {
+		// TODO: Support virtual hosting; gh issue #577.
 		return fmt.Errorf(
-			"sendevent: unexpected server to send as %q",
-			origin,
+			"sendevent: unexpected server to send as: got %q expected %q",
+			origin, oqs.origin,
 		)
 	}
 
@@ -207,9 +214,7 @@ func (oqs *OutgoingQueues) SendEvent(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
-	for local := range oqs.signing {
-		delete(destmap, local)
-	}
+	delete(destmap, oqs.signing.ServerName)
 
 	// Check if any of the destinations are prohibited by server ACLs.
 	for destination := range destmap {
@@ -283,10 +288,11 @@ func (oqs *OutgoingQueues) SendEDU(
 		log.Trace("Federation is disabled, not sending EDU")
 		return nil
 	}
-	if _, ok := oqs.signing[origin]; !ok {
+	if origin != oqs.origin {
+		// TODO: Support virtual hosting; gh issue #577.
 		return fmt.Errorf(
-			"sendevent: unexpected server to send as %q",
-			origin,
+			"sendevent: unexpected server to send as: got %q expected %q",
+			origin, oqs.origin,
 		)
 	}
 
@@ -297,9 +303,7 @@ func (oqs *OutgoingQueues) SendEDU(
 		destmap[d] = struct{}{}
 	}
 	delete(destmap, oqs.origin)
-	for local := range oqs.signing {
-		delete(destmap, local)
-	}
+	delete(destmap, oqs.signing.ServerName)
 
 	// There is absolutely no guarantee that the EDU will have a room_id
 	// field, as it is not required by the spec. However, if it *does*
@@ -375,12 +379,13 @@ func (oqs *OutgoingQueues) SendEDU(
 }
 
 // RetryServer attempts to resend events to the given server if we had given up.
-func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName, wasBlacklisted bool) {
+func (oqs *OutgoingQueues) RetryServer(srv gomatrixserverlib.ServerName) {
 	if oqs.disabled {
 		return
 	}
-
+	oqs.statistics.ForServer(srv).RemoveBlacklist()
 	if queue := oqs.getQueue(srv); queue != nil {
-		queue.wakeQueueIfEventsPending(wasBlacklisted)
+		queue.statistics.ClearBackoff()
+		queue.wakeQueueIfNeeded()
 	}
 }

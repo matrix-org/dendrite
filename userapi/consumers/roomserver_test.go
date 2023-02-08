@@ -81,6 +81,11 @@ func Test_evaluatePushRules(t *testing.T) {
 				wantAction:   pushrules.NotifyAction,
 				wantActions: []*pushrules.Action{
 					{Kind: pushrules.NotifyAction},
+					{
+						Kind:  pushrules.SetTweakAction,
+						Tweak: pushrules.HighlightTweak,
+						Value: false,
+					},
 				},
 			},
 			{
@@ -98,6 +103,7 @@ func Test_evaluatePushRules(t *testing.T) {
 					{
 						Kind:  pushrules.SetTweakAction,
 						Tweak: pushrules.HighlightTweak,
+						Value: true,
 					},
 				},
 			},

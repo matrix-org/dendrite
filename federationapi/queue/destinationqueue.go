@@ -29,7 +29,7 @@ import (
 	fedapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/federationapi/statistics"
 	"github.com/matrix-org/dendrite/federationapi/storage"
-	"github.com/matrix-org/dendrite/federationapi/storage/shared/receipt"
+	"github.com/matrix-org/dendrite/federationapi/storage/shared"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/process"
 )
@@ -50,7 +50,7 @@ type destinationQueue struct {
 	queues             *OutgoingQueues
 	db                 storage.Database
 	process            *process.ProcessContext
-	signing            map[gomatrixserverlib.ServerName]*gomatrixserverlib.SigningIdentity
+	signing            *SigningInfo
 	rsAPI              api.FederationRoomserverAPI
 	client             fedapi.FederationClient         // federation client
 	origin             gomatrixserverlib.ServerName    // origin of requests
@@ -70,7 +70,7 @@ type destinationQueue struct {
 // Send event adds the event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, dbReceipt *receipt.Receipt) {
+func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, receipt *shared.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil PDU with destination %q", oq.destination)
 		return
@@ -84,8 +84,8 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, db
 		oq.pendingMutex.Lock()
 		if len(oq.pendingPDUs) < maxPDUsInMemory {
 			oq.pendingPDUs = append(oq.pendingPDUs, &queuedPDU{
-				pdu:       event,
-				dbReceipt: dbReceipt,
+				pdu:     event,
+				receipt: receipt,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -101,7 +101,7 @@ func (oq *destinationQueue) sendEvent(event *gomatrixserverlib.HeaderedEvent, db
 // sendEDU adds the EDU event to the pending queue for the destination.
 // If the queue is empty then it starts a background goroutine to
 // start sending events to that destination.
-func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *receipt.Receipt) {
+func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, receipt *shared.Receipt) {
 	if event == nil {
 		logrus.Errorf("attempt to send nil EDU with destination %q", oq.destination)
 		return
@@ -115,8 +115,8 @@ func (oq *destinationQueue) sendEDU(event *gomatrixserverlib.EDU, dbReceipt *rec
 		oq.pendingMutex.Lock()
 		if len(oq.pendingEDUs) < maxEDUsInMemory {
 			oq.pendingEDUs = append(oq.pendingEDUs, &queuedEDU{
-				edu:       event,
-				dbReceipt: dbReceipt,
+				edu:     event,
+				receipt: receipt,
 			})
 		} else {
 			oq.overflowed.Store(true)
@@ -141,44 +141,23 @@ func (oq *destinationQueue) handleBackoffNotifier() {
 	}
 }
 
-// wakeQueueIfEventsPending calls wakeQueueAndNotify only if there are
-// pending events or if forceWakeup is true. This prevents starting the
-// queue unnecessarily.
-func (oq *destinationQueue) wakeQueueIfEventsPending(forceWakeup bool) {
-	eventsPending := func() bool {
-		oq.pendingMutex.Lock()
-		defer oq.pendingMutex.Unlock()
-		return len(oq.pendingPDUs) > 0 || len(oq.pendingEDUs) > 0
-	}
-
-	// NOTE : Only wakeup and notify the queue if there are pending events
-	// or if forceWakeup is true. Otherwise there is no reason to start the
-	// queue goroutine and waste resources.
-	if forceWakeup || eventsPending() {
-		logrus.Info("Starting queue due to pending events or forceWakeup")
-		oq.wakeQueueAndNotify()
-	}
-}
-
 // wakeQueueAndNotify ensures the destination queue is running and notifies it
 // that there is pending work.
 func (oq *destinationQueue) wakeQueueAndNotify() {
-	// NOTE : Send notification before waking queue to prevent a race
-	// where the queue was running and stops due to a timeout in between
-	// checking it and sending the notification.
+	// Wake up the queue if it's asleep.
+	oq.wakeQueueIfNeeded()
 
 	// Notify the queue that there are events ready to send.
 	select {
 	case oq.notify <- struct{}{}:
 	default:
 	}
-
-	// Wake up the queue if it's asleep.
-	oq.wakeQueueIfNeeded()
 }
 
 // wakeQueueIfNeeded will wake up the destination queue if it is
-// not already running.
+// not already running. If it is running but it is backing off
+// then we will interrupt the backoff, causing any federation
+// requests to retry.
 func (oq *destinationQueue) wakeQueueIfNeeded() {
 	// Clear the backingOff flag and update the backoff metrics if it was set.
 	if oq.backingOff.CompareAndSwap(true, false) {
@@ -210,10 +189,10 @@ func (oq *destinationQueue) getPendingFromDatabase() {
 	gotPDUs := map[string]struct{}{}
 	gotEDUs := map[string]struct{}{}
 	for _, pdu := range oq.pendingPDUs {
-		gotPDUs[pdu.dbReceipt.String()] = struct{}{}
+		gotPDUs[pdu.receipt.String()] = struct{}{}
 	}
 	for _, edu := range oq.pendingEDUs {
-		gotEDUs[edu.dbReceipt.String()] = struct{}{}
+		gotEDUs[edu.receipt.String()] = struct{}{}
 	}
 
 	overflowed := false
@@ -371,7 +350,7 @@ func (oq *destinationQueue) backgroundSend() {
 
 		// If we have pending PDUs or EDUs then construct a transaction.
 		// Try sending the next transaction and see what happens.
-		terr, sendMethod := oq.nextTransaction(toSendPDUs, toSendEDUs)
+		terr := oq.nextTransaction(toSendPDUs, toSendEDUs)
 		if terr != nil {
 			// We failed to send the transaction. Mark it as a failure.
 			_, blacklisted := oq.statistics.Failure()
@@ -388,19 +367,18 @@ func (oq *destinationQueue) backgroundSend() {
 				return
 			}
 		} else {
-			oq.handleTransactionSuccess(pduCount, eduCount, sendMethod)
+			oq.handleTransactionSuccess(pduCount, eduCount)
 		}
 	}
 }
 
 // nextTransaction creates a new transaction from the pending event
 // queue and sends it.
-// Returns an error if the transaction wasn't sent. And whether the success
-// was to a relay server or not.
+// Returns an error if the transaction wasn't sent.
 func (oq *destinationQueue) nextTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) (err error, sendMethod statistics.SendMethod) {
+) error {
 	// Create the transaction.
 	t, pduReceipts, eduReceipts := oq.createTransaction(pdus, edus)
 	logrus.WithField("server_name", oq.destination).Debugf("Sending transaction %q containing %d PDUs, %d EDUs", t.TransactionID, len(t.PDUs), len(t.EDUs))
@@ -408,52 +386,7 @@ func (oq *destinationQueue) nextTransaction(
 	// Try to send the transaction to the destination server.
 	ctx, cancel := context.WithTimeout(oq.process.Context(), time.Minute*5)
 	defer cancel()
-
-	relayServers := oq.statistics.KnownRelayServers()
-	hasRelayServers := len(relayServers) > 0
-	shouldSendToRelays := oq.statistics.AssumedOffline() && hasRelayServers
-	if !shouldSendToRelays {
-		sendMethod = statistics.SendDirect
-		_, err = oq.client.SendTransaction(ctx, t)
-	} else {
-		// Try sending directly to the destination first in case they came back online.
-		sendMethod = statistics.SendDirect
-		_, err = oq.client.SendTransaction(ctx, t)
-		if err != nil {
-			// The destination is still offline, try sending to relays.
-			sendMethod = statistics.SendViaRelay
-			relaySuccess := false
-			logrus.Infof("Sending %q to relay servers: %v", t.TransactionID, relayServers)
-			// TODO : how to pass through actual userID here?!?!?!?!
-			userID, userErr := gomatrixserverlib.NewUserID("@user:"+string(oq.destination), false)
-			if userErr != nil {
-				return userErr, sendMethod
-			}
-
-			// Attempt sending to each known relay server.
-			for _, relayServer := range relayServers {
-				_, relayErr := oq.client.P2PSendTransactionToRelay(ctx, *userID, t, relayServer)
-				if relayErr != nil {
-					err = relayErr
-				} else {
-					// If sending to one of the relay servers succeeds, consider the send successful.
-					relaySuccess = true
-
-					// TODO : what about if the dest comes back online but can't see their relay?
-					// How do I sync with the dest in that case?
-					// Should change the database to have a "relay success" flag on events and if
-					// I see the node back online, maybe directly send through the backlog of events
-					// with "relay success"... could lead to duplicate events, but only those that
-					// I sent. And will lead to a much more consistent experience.
-				}
-			}
-
-			// Clear the error if sending to any of the relay servers succeeded.
-			if relaySuccess {
-				err = nil
-			}
-		}
-	}
+	_, err := oq.client.SendTransaction(ctx, t)
 	switch errResponse := err.(type) {
 	case nil:
 		// Clean up the transaction in the database.
@@ -473,7 +406,7 @@ func (oq *destinationQueue) nextTransaction(
 		oq.transactionIDMutex.Lock()
 		oq.transactionID = ""
 		oq.transactionIDMutex.Unlock()
-		return nil, sendMethod
+		return nil
 	case gomatrix.HTTPError:
 		// Report that we failed to send the transaction and we
 		// will retry again, subject to backoff.
@@ -483,13 +416,13 @@ func (oq *destinationQueue) nextTransaction(
 		// to a 400-ish error
 		code := errResponse.Code
 		logrus.Debug("Transaction failed with HTTP", code)
-		return err, sendMethod
+		return err
 	default:
 		logrus.WithFields(logrus.Fields{
 			"destination":   oq.destination,
 			logrus.ErrorKey: err,
 		}).Debugf("Failed to send transaction %q", t.TransactionID)
-		return err, sendMethod
+		return err
 	}
 }
 
@@ -499,7 +432,7 @@ func (oq *destinationQueue) nextTransaction(
 func (oq *destinationQueue) createTransaction(
 	pdus []*queuedPDU,
 	edus []*queuedEDU,
-) (gomatrixserverlib.Transaction, []*receipt.Receipt, []*receipt.Receipt) {
+) (gomatrixserverlib.Transaction, []*shared.Receipt, []*shared.Receipt) {
 	// If there's no projected transaction ID then generate one. If
 	// the transaction succeeds then we'll set it back to "" so that
 	// we generate a new one next time. If it fails, we'll preserve
@@ -520,8 +453,8 @@ func (oq *destinationQueue) createTransaction(
 	t.OriginServerTS = gomatrixserverlib.AsTimestamp(time.Now())
 	t.TransactionID = oq.transactionID
 
-	var pduReceipts []*receipt.Receipt
-	var eduReceipts []*receipt.Receipt
+	var pduReceipts []*shared.Receipt
+	var eduReceipts []*shared.Receipt
 
 	// Go through PDUs that we retrieved from the database, if any,
 	// and add them into the transaction.
@@ -533,7 +466,7 @@ func (oq *destinationQueue) createTransaction(
 		// Append the JSON of the event, since this is a json.RawMessage type in the
 		// gomatrixserverlib.Transaction struct
 		t.PDUs = append(t.PDUs, pdu.pdu.JSON())
-		pduReceipts = append(pduReceipts, pdu.dbReceipt)
+		pduReceipts = append(pduReceipts, pdu.receipt)
 	}
 
 	// Do the same for pending EDUS in the queue.
@@ -543,7 +476,7 @@ func (oq *destinationQueue) createTransaction(
 			continue
 		}
 		t.EDUs = append(t.EDUs, *edu.edu)
-		eduReceipts = append(eduReceipts, edu.dbReceipt)
+		eduReceipts = append(eduReceipts, edu.receipt)
 	}
 
 	return t, pduReceipts, eduReceipts
@@ -576,11 +509,10 @@ func (oq *destinationQueue) blacklistDestination() {
 
 // handleTransactionSuccess updates the cached event queues as well as the success and
 // backoff information for this server.
-func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int, sendMethod statistics.SendMethod) {
+func (oq *destinationQueue) handleTransactionSuccess(pduCount int, eduCount int) {
 	// If we successfully sent the transaction then clear out
 	// the pending events and EDUs, and wipe our transaction ID.
-
-	oq.statistics.Success(sendMethod)
+	oq.statistics.Success()
 	oq.pendingMutex.Lock()
 	defer oq.pendingMutex.Unlock()
 

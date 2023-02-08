@@ -44,13 +44,13 @@ const selectInboundPeekSQL = "" +
 	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
 
 const selectInboundPeeksSQL = "" +
-	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1 ORDER BY creation_ts"
+	"SELECT room_id, server_name, peek_id, creation_ts, renewed_ts, renewal_interval FROM federationsender_inbound_peeks WHERE room_id = $1"
 
 const renewInboundPeekSQL = "" +
 	"UPDATE federationsender_inbound_peeks SET renewed_ts=$1, renewal_interval=$2 WHERE room_id = $3 and server_name = $4 and peek_id = $5"
 
 const deleteInboundPeekSQL = "" +
-	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2 and peek_id = $3"
+	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1 and server_name = $2"
 
 const deleteInboundPeeksSQL = "" +
 	"DELETE FROM federationsender_inbound_peeks WHERE room_id = $1"
@@ -74,15 +74,25 @@ func NewSQLiteInboundPeeksTable(db *sql.DB) (s *inboundPeeksStatements, err erro
 		return
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.insertInboundPeekStmt, insertInboundPeekSQL},
-		{&s.selectInboundPeekStmt, selectInboundPeekSQL},
-		{&s.selectInboundPeekStmt, selectInboundPeekSQL},
-		{&s.selectInboundPeeksStmt, selectInboundPeeksSQL},
-		{&s.renewInboundPeekStmt, renewInboundPeekSQL},
-		{&s.deleteInboundPeeksStmt, deleteInboundPeeksSQL},
-		{&s.deleteInboundPeekStmt, deleteInboundPeekSQL},
-	}.Prepare(db)
+	if s.insertInboundPeekStmt, err = db.Prepare(insertInboundPeekSQL); err != nil {
+		return
+	}
+	if s.selectInboundPeekStmt, err = db.Prepare(selectInboundPeekSQL); err != nil {
+		return
+	}
+	if s.selectInboundPeeksStmt, err = db.Prepare(selectInboundPeeksSQL); err != nil {
+		return
+	}
+	if s.renewInboundPeekStmt, err = db.Prepare(renewInboundPeekSQL); err != nil {
+		return
+	}
+	if s.deleteInboundPeeksStmt, err = db.Prepare(deleteInboundPeeksSQL); err != nil {
+		return
+	}
+	if s.deleteInboundPeekStmt, err = db.Prepare(deleteInboundPeekSQL); err != nil {
+		return
+	}
+	return
 }
 
 func (s *inboundPeeksStatements) InsertInboundPeek(

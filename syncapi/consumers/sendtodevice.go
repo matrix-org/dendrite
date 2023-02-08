@@ -37,15 +37,15 @@ import (
 
 // OutputSendToDeviceEventConsumer consumes events that originated in the EDU server.
 type OutputSendToDeviceEventConsumer struct {
-	ctx               context.Context
-	jetstream         nats.JetStreamContext
-	durable           string
-	topic             string
-	db                storage.Database
-	keyAPI            keyapi.SyncKeyAPI
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
-	stream            streams.StreamProvider
-	notifier          *notifier.Notifier
+	ctx        context.Context
+	jetstream  nats.JetStreamContext
+	durable    string
+	topic      string
+	db         storage.Database
+	keyAPI     keyapi.SyncKeyAPI
+	serverName gomatrixserverlib.ServerName // our server name
+	stream     streams.StreamProvider
+	notifier   *notifier.Notifier
 }
 
 // NewOutputSendToDeviceEventConsumer creates a new OutputSendToDeviceEventConsumer.
@@ -60,15 +60,15 @@ func NewOutputSendToDeviceEventConsumer(
 	stream streams.StreamProvider,
 ) *OutputSendToDeviceEventConsumer {
 	return &OutputSendToDeviceEventConsumer{
-		ctx:               process.Context(),
-		jetstream:         js,
-		topic:             cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
-		durable:           cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
-		db:                store,
-		keyAPI:            keyAPI,
-		isLocalServerName: cfg.Matrix.IsLocalServerName,
-		notifier:          notifier,
-		stream:            stream,
+		ctx:        process.Context(),
+		jetstream:  js,
+		topic:      cfg.Matrix.JetStream.Prefixed(jetstream.OutputSendToDeviceEvent),
+		durable:    cfg.Matrix.JetStream.Durable("SyncAPISendToDeviceConsumer"),
+		db:         store,
+		keyAPI:     keyAPI,
+		serverName: cfg.Matrix.ServerName,
+		notifier:   notifier,
+		stream:     stream,
 	}
 }
 
@@ -89,7 +89,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 		log.WithError(err).Errorf("send-to-device: failed to split user id, dropping message")
 		return true
 	}
-	if !s.isLocalServerName(domain) {
+	if domain != s.serverName {
 		log.Tracef("ignoring send-to-device event with destination %s", domain)
 		return true
 	}
@@ -114,7 +114,7 @@ func (s *OutputSendToDeviceEventConsumer) onMessage(ctx context.Context, msgs []
 	if output.Type == "m.room_key_request" {
 		requestingDeviceID := gjson.GetBytes(output.SendToDeviceEvent.Content, "requesting_device_id").Str
 		_, senderDomain, _ := gomatrixserverlib.SplitID('@', output.Sender)
-		if requestingDeviceID != "" && !s.isLocalServerName(senderDomain) {
+		if requestingDeviceID != "" && senderDomain != s.serverName {
 			// Mark the requesting device as stale, if we don't know about it.
 			if err = s.keyAPI.PerformMarkAsStaleIfNeeded(ctx, &keyapi.PerformMarkAsStaleRequest{
 				UserID: output.Sender, Domain: senderDomain, DeviceID: requestingDeviceID,

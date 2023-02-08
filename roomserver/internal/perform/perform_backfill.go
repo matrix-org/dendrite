@@ -38,10 +38,10 @@ import (
 const maxBackfillServers = 5
 
 type Backfiller struct {
-	IsLocalServerName func(gomatrixserverlib.ServerName) bool
-	DB                storage.Database
-	FSAPI             federationAPI.RoomserverFederationAPI
-	KeyRing           gomatrixserverlib.JSONVerifier
+	ServerName gomatrixserverlib.ServerName
+	DB         storage.Database
+	FSAPI      federationAPI.RoomserverFederationAPI
+	KeyRing    gomatrixserverlib.JSONVerifier
 
 	// The servers which should be preferred above other servers when backfilling
 	PreferServers []gomatrixserverlib.ServerName
@@ -56,7 +56,7 @@ func (r *Backfiller) PerformBackfill(
 	// if we are requesting the backfill then we need to do a federation hit
 	// TODO: we could be more sensible and fetch as many events we already have then request the rest
 	//       which is what the syncapi does already.
-	if r.IsLocalServerName(request.ServerName) {
+	if request.ServerName == r.ServerName {
 		return r.backfillViaFederation(ctx, request, response)
 	}
 	// someone else is requesting the backfill, try to service their request.
@@ -113,24 +113,19 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 	if info == nil || info.IsStub() {
 		return fmt.Errorf("backfillViaFederation: missing room info for room %s", req.RoomID)
 	}
-	requester := newBackfillRequester(r.DB, r.FSAPI, req.VirtualHost, r.IsLocalServerName, req.BackwardsExtremities, r.PreferServers)
+	requester := newBackfillRequester(r.DB, r.FSAPI, r.ServerName, req.BackwardsExtremities, r.PreferServers)
 	// Request 100 items regardless of what the query asks for.
 	// We don't want to go much higher than this.
 	// We can't honour exactly the limit as some sytests rely on requesting more for tests to pass
 	// (so we don't need to hit /state_ids which the test has no listener for)
 	// Specifically the test "Outbound federation can backfill events"
 	events, err := gomatrixserverlib.RequestBackfill(
-		ctx, req.VirtualHost, requester,
-		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100,
-	)
-	// Only return an error if we really couldn't get any events.
-	if err != nil && len(events) == 0 {
-		logrus.WithError(err).Errorf("gomatrixserverlib.RequestBackfill failed")
+		ctx, requester,
+		r.KeyRing, req.RoomID, info.RoomVersion, req.PrevEventIDs(), 100)
+	if err != nil {
 		return err
 	}
-	// If we got an error but still got events, that's fine, because a server might have returned a 404 (or something)
-	// but other servers could provide the missing event.
-	logrus.WithError(err).WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
+	logrus.WithField("room_id", req.RoomID).Infof("backfilled %d events", len(events))
 
 	// persist these new events - auth checks have already been done
 	roomNID, backfilledEventMap := persistEvents(ctx, r.DB, events)
@@ -150,7 +145,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 		var entries []types.StateEntry
 		if entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true); err != nil {
 			// attempt to fetch the missing events
-			r.fetchAndStoreMissingEvents(ctx, info.RoomVersion, requester, stateIDs, req.VirtualHost)
+			r.fetchAndStoreMissingEvents(ctx, info.RoomVersion, requester, stateIDs)
 			// try again
 			entries, err = r.DB.StateEntriesForEventIDs(ctx, stateIDs, true)
 			if err != nil {
@@ -179,7 +174,7 @@ func (r *Backfiller) backfillViaFederation(ctx context.Context, req *api.Perform
 // fetchAndStoreMissingEvents does a best-effort fetch and store of missing events specified in stateIDs. Returns no error as it is just
 // best effort.
 func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gomatrixserverlib.RoomVersion,
-	backfillRequester *backfillRequester, stateIDs []string, virtualHost gomatrixserverlib.ServerName) {
+	backfillRequester *backfillRequester, stateIDs []string) {
 
 	servers := backfillRequester.servers
 
@@ -204,7 +199,7 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 				continue // already found
 			}
 			logger := util.GetLogger(ctx).WithField("server", srv).WithField("event_id", id)
-			res, err := r.FSAPI.GetEvent(ctx, virtualHost, srv, id)
+			res, err := r.FSAPI.GetEvent(ctx, srv, id)
 			if err != nil {
 				logger.WithError(err).Warn("failed to get event from server")
 				continue
@@ -247,12 +242,11 @@ func (r *Backfiller) fetchAndStoreMissingEvents(ctx context.Context, roomVer gom
 
 // backfillRequester implements gomatrixserverlib.BackfillRequester
 type backfillRequester struct {
-	db                storage.Database
-	fsAPI             federationAPI.RoomserverFederationAPI
-	virtualHost       gomatrixserverlib.ServerName
-	isLocalServerName func(gomatrixserverlib.ServerName) bool
-	preferServer      map[gomatrixserverlib.ServerName]bool
-	bwExtrems         map[string][]string
+	db           storage.Database
+	fsAPI        federationAPI.RoomserverFederationAPI
+	thisServer   gomatrixserverlib.ServerName
+	preferServer map[gomatrixserverlib.ServerName]bool
+	bwExtrems    map[string][]string
 
 	// per-request state
 	servers                 []gomatrixserverlib.ServerName
@@ -262,9 +256,7 @@ type backfillRequester struct {
 }
 
 func newBackfillRequester(
-	db storage.Database, fsAPI federationAPI.RoomserverFederationAPI,
-	virtualHost gomatrixserverlib.ServerName,
-	isLocalServerName func(gomatrixserverlib.ServerName) bool,
+	db storage.Database, fsAPI federationAPI.RoomserverFederationAPI, thisServer gomatrixserverlib.ServerName,
 	bwExtrems map[string][]string, preferServers []gomatrixserverlib.ServerName,
 ) *backfillRequester {
 	preferServer := make(map[gomatrixserverlib.ServerName]bool)
@@ -274,8 +266,7 @@ func newBackfillRequester(
 	return &backfillRequester{
 		db:                      db,
 		fsAPI:                   fsAPI,
-		virtualHost:             virtualHost,
-		isLocalServerName:       isLocalServerName,
+		thisServer:              thisServer,
 		eventIDToBeforeStateIDs: make(map[string][]string),
 		eventIDMap:              make(map[string]*gomatrixserverlib.Event),
 		bwExtrems:               bwExtrems,
@@ -323,7 +314,6 @@ FederationHit:
 			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
-			Origin:             b.virtualHost,
 		}
 		res, err := c.StateIDsBeforeEvent(ctx, targetEvent)
 		if err != nil {
@@ -400,7 +390,6 @@ func (b *backfillRequester) StateBeforeEvent(ctx context.Context, roomVer gomatr
 			FedClient:          b.fsAPI,
 			RememberAuthEvents: false,
 			Server:             srv,
-			Origin:             b.virtualHost,
 		}
 		result, err := c.StateBeforeEvent(ctx, roomVer, event, eventIDs)
 		if err != nil {
@@ -463,7 +452,7 @@ FindSuccessor:
 	}
 
 	// possibly return all joined servers depending on history visiblity
-	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries, b.virtualHost)
+	memberEventsFromVis, visibility, err := joinEventsFromHistoryVisibility(ctx, b.db, roomID, stateEntries, b.thisServer)
 	b.historyVisiblity = visibility
 	if err != nil {
 		logrus.WithError(err).Error("ServersAtEvent: failed calculate servers from history visibility rules")
@@ -490,7 +479,7 @@ FindSuccessor:
 	}
 	var servers []gomatrixserverlib.ServerName
 	for server := range serverSet {
-		if b.isLocalServerName(server) {
+		if server == b.thisServer {
 			continue
 		}
 		if b.preferServer[server] { // insert at the front
@@ -509,10 +498,10 @@ FindSuccessor:
 
 // Backfill performs a backfill request to the given server.
 // https://matrix.org/docs/spec/server_server/latest#get-matrix-federation-v1-backfill-roomid
-func (b *backfillRequester) Backfill(ctx context.Context, origin, server gomatrixserverlib.ServerName, roomID string,
+func (b *backfillRequester) Backfill(ctx context.Context, server gomatrixserverlib.ServerName, roomID string,
 	limit int, fromEventIDs []string) (gomatrixserverlib.Transaction, error) {
 
-	tx, err := b.fsAPI.Backfill(ctx, origin, server, roomID, limit, fromEventIDs)
+	tx, err := b.fsAPI.Backfill(ctx, server, roomID, limit, fromEventIDs)
 	return tx, err
 }
 

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -110,7 +109,7 @@ func (r *Leaver) performLeaveRoomByID(
 					// mimic the returned values from Synapse
 					res.Message = "You cannot reject this invite"
 					res.Code = 403
-					return nil, jsonerror.LeaveServerNoticeError()
+					return nil, fmt.Errorf("You cannot reject this invite")
 				}
 			}
 		}
@@ -163,19 +162,19 @@ func (r *Leaver) performLeaveRoomByID(
 		return nil, fmt.Errorf("eb.SetUnsigned: %w", err)
 	}
 
-	// Get the sender domain.
-	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', eb.Sender)
-	if serr != nil {
-		return nil, fmt.Errorf("sender %q is invalid", eb.Sender)
-	}
-
 	// We know that the user is in the room at this point so let's build
 	// a leave event.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, senderDomain, &eb)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
 	if err != nil {
 		return nil, fmt.Errorf("eventutil.BuildEvent: %w", err)
+	}
+
+	// Get the sender domain.
+	_, senderDomain, serr := gomatrixserverlib.SplitID('@', event.Sender())
+	if serr != nil {
+		return nil, fmt.Errorf("sender %q is invalid", event.Sender())
 	}
 
 	// Give our leave event to the roomserver input stream. The

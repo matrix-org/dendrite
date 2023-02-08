@@ -58,6 +58,10 @@ const selectQueuePDUReferenceJSONCountSQL = "" +
 	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
 	" WHERE json_nid = $1"
 
+const selectQueuePDUsCountSQL = "" +
+	"SELECT COUNT(*) FROM federationsender_queue_pdus" +
+	" WHERE server_name = $1"
+
 const selectQueuePDUServerNamesSQL = "" +
 	"SELECT DISTINCT server_name FROM federationsender_queue_pdus"
 
@@ -67,6 +71,7 @@ type queuePDUsStatements struct {
 	deleteQueuePDUsStmt                  *sql.Stmt
 	selectQueuePDUsStmt                  *sql.Stmt
 	selectQueuePDUReferenceJSONCountStmt *sql.Stmt
+	selectQueuePDUsCountStmt             *sql.Stmt
 	selectQueuePDUServerNamesStmt        *sql.Stmt
 }
 
@@ -88,6 +93,9 @@ func NewPostgresQueuePDUsTable(db *sql.DB) (s *queuePDUsStatements, err error) {
 		return
 	}
 	if s.selectQueuePDUReferenceJSONCountStmt, err = s.db.Prepare(selectQueuePDUReferenceJSONCountSQL); err != nil {
+		return
+	}
+	if s.selectQueuePDUsCountStmt, err = s.db.Prepare(selectQueuePDUsCountSQL); err != nil {
 		return
 	}
 	if s.selectQueuePDUServerNamesStmt, err = s.db.Prepare(selectQueuePDUServerNamesSQL); err != nil {
@@ -129,6 +137,21 @@ func (s *queuePDUsStatements) SelectQueuePDUReferenceJSONCount(
 	var count int64
 	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUReferenceJSONCountStmt)
 	err := stmt.QueryRowContext(ctx, jsonNID).Scan(&count)
+	if err == sql.ErrNoRows {
+		// It's acceptable for there to be no rows referencing a given
+		// JSON NID but it's not an error condition. Just return as if
+		// there's a zero count.
+		return 0, nil
+	}
+	return count, err
+}
+
+func (s *queuePDUsStatements) SelectQueuePDUCount(
+	ctx context.Context, txn *sql.Tx, serverName gomatrixserverlib.ServerName,
+) (int64, error) {
+	var count int64
+	stmt := sqlutil.TxStmt(txn, s.selectQueuePDUsCountStmt)
+	err := stmt.QueryRowContext(ctx, serverName).Scan(&count)
 	if err == sql.ErrNoRows {
 		// It's acceptable for there to be no rows referencing a given
 		// JSON NID but it's not an error condition. Just return as if

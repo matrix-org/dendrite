@@ -27,13 +27,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/dendrite/userapi"
+	"github.com/matrix-org/dendrite/userapi/inthttp"
+
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/dendrite/userapi/internal"
-	"github.com/matrix-org/dendrite/userapi/inthttp"
 	"github.com/matrix-org/dendrite/userapi/storage"
 )
 
@@ -60,9 +61,7 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 
 	cfg := &config.UserAPI{
 		Matrix: &config.Global{
-			SigningIdentity: gomatrixserverlib.SigningIdentity{
-				ServerName: serverName,
-			},
+			ServerName: serverName,
 		},
 	}
 
@@ -78,6 +77,19 @@ func MustMakeInternalAPI(t *testing.T, opts apiTestOpts, dbType test.DBType) (ap
 func TestQueryProfile(t *testing.T) {
 	aliceAvatarURL := "mxc://example.com/alice"
 	aliceDisplayName := "Alice"
+	// only one DBType, since userapi.AddInternalRoutes complains about multiple prometheus counters added
+	userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, test.DBTypeSQLite)
+	defer close()
+	_, err := accountDB.CreateAccount(context.TODO(), "alice", "foobar", "", api.AccountTypeUser)
+	if err != nil {
+		t.Fatalf("failed to make account: %s", err)
+	}
+	if _, _, err := accountDB.SetAvatarURL(context.TODO(), "alice", aliceAvatarURL); err != nil {
+		t.Fatalf("failed to set avatar url: %s", err)
+	}
+	if _, _, err := accountDB.SetDisplayName(context.TODO(), "alice", aliceDisplayName); err != nil {
+		t.Fatalf("failed to set display name: %s", err)
+	}
 
 	testCases := []struct {
 		req     api.QueryProfileRequest
@@ -128,34 +140,19 @@ func TestQueryProfile(t *testing.T) {
 		}
 	}
 
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
-		defer close()
-		_, err := accountDB.CreateAccount(context.TODO(), "alice", serverName, "foobar", "", api.AccountTypeUser)
+	t.Run("HTTP API", func(t *testing.T) {
+		router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
+		userapi.AddInternalRoutes(router, userAPI)
+		apiURL, cancel := test.ListenAndServe(t, router, false)
+		defer cancel()
+		httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
 		if err != nil {
-			t.Fatalf("failed to make account: %s", err)
+			t.Fatalf("failed to create HTTP client")
 		}
-		if _, _, err := accountDB.SetAvatarURL(context.TODO(), "alice", serverName, aliceAvatarURL); err != nil {
-			t.Fatalf("failed to set avatar url: %s", err)
-		}
-		if _, _, err := accountDB.SetDisplayName(context.TODO(), "alice", serverName, aliceDisplayName); err != nil {
-			t.Fatalf("failed to set display name: %s", err)
-		}
-
-		t.Run("HTTP API", func(t *testing.T) {
-			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-			userapi.AddInternalRoutes(router, userAPI, false)
-			apiURL, cancel := test.ListenAndServe(t, router, false)
-			defer cancel()
-			httpAPI, err := inthttp.NewUserAPIClient(apiURL, &http.Client{})
-			if err != nil {
-				t.Fatalf("failed to create HTTP client")
-			}
-			runCases(httpAPI, true)
-		})
-		t.Run("Monolith", func(t *testing.T) {
-			runCases(userAPI, false)
-		})
+		runCases(httpAPI, true)
+	})
+	t.Run("Monolith", func(t *testing.T) {
+		runCases(userAPI, false)
 	})
 }
 
@@ -167,7 +164,7 @@ func TestPasswordlessLoginFails(t *testing.T) {
 	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 		userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
 		defer close()
-		_, err := accountDB.CreateAccount(ctx, "auser", serverName, "", "", api.AccountTypeAppService)
+		_, err := accountDB.CreateAccount(ctx, "auser", "", "", api.AccountTypeAppService)
 		if err != nil {
 			t.Fatalf("failed to make account: %s", err)
 		}
@@ -193,7 +190,7 @@ func TestLoginToken(t *testing.T) {
 		test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
 			userAPI, accountDB, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
 			defer close()
-			_, err := accountDB.CreateAccount(ctx, "auser", serverName, "apassword", "", api.AccountTypeUser)
+			_, err := accountDB.CreateAccount(ctx, "auser", "apassword", "", api.AccountTypeUser)
 			if err != nil {
 				t.Fatalf("failed to make account: %s", err)
 			}
@@ -304,67 +301,6 @@ func TestLoginToken(t *testing.T) {
 			if err := userAPI.PerformLoginTokenDeletion(ctx, &dreq, &dresp); err != nil {
 				t.Fatalf("PerformLoginTokenDeletion failed: %v", err)
 			}
-		})
-	})
-}
-
-func TestQueryAccountByLocalpart(t *testing.T) {
-	alice := test.NewUser(t)
-
-	localpart, userServername, _ := gomatrixserverlib.SplitID('@', alice.ID)
-
-	ctx := context.Background()
-	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
-		intAPI, db, close := MustMakeInternalAPI(t, apiTestOpts{}, dbType)
-		defer close()
-
-		createdAcc, err := db.CreateAccount(ctx, localpart, userServername, "", "", alice.AccountType)
-		if err != nil {
-			t.Error(err)
-		}
-
-		testCases := func(t *testing.T, internalAPI api.UserInternalAPI) {
-			// Query existing account
-			queryAccResp := &api.QueryAccountByLocalpartResponse{}
-			if err = internalAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
-				Localpart:  localpart,
-				ServerName: userServername,
-			}, queryAccResp); err != nil {
-				t.Error(err)
-			}
-			if !reflect.DeepEqual(createdAcc, queryAccResp.Account) {
-				t.Fatalf("created and queried accounts don't match:\n%+v vs.\n%+v", createdAcc, queryAccResp.Account)
-			}
-
-			// Query non-existent account, this should result in an error
-			err = internalAPI.QueryAccountByLocalpart(ctx, &api.QueryAccountByLocalpartRequest{
-				Localpart:  "doesnotexist",
-				ServerName: userServername,
-			}, queryAccResp)
-
-			if err == nil {
-				t.Fatalf("expected an error, but got none: %+v", queryAccResp)
-			}
-		}
-
-		t.Run("Monolith", func(t *testing.T) {
-			testCases(t, intAPI)
-			// also test tracing
-			testCases(t, &api.UserInternalAPITrace{Impl: intAPI})
-		})
-
-		t.Run("HTTP API", func(t *testing.T) {
-			router := mux.NewRouter().PathPrefix(httputil.InternalPathPrefix).Subrouter()
-			userapi.AddInternalRoutes(router, intAPI, false)
-			apiURL, cancel := test.ListenAndServe(t, router, false)
-			defer cancel()
-
-			userHTTPApi, err := inthttp.NewUserAPIClient(apiURL, &http.Client{Timeout: time.Second * 5})
-			if err != nil {
-				t.Fatalf("failed to create HTTP client: %s", err)
-			}
-			testCases(t, userHTTPApi)
-
 		})
 	})
 }

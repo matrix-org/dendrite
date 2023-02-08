@@ -140,21 +140,6 @@ func processInvite(
 		}
 	}
 
-	if event.StateKey() == nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("The invite event has no state key"),
-		}
-	}
-
-	_, domain, err := cfg.Matrix.SplitLocalID('@', *event.StateKey())
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(fmt.Sprintf("The user ID is invalid or domain %q does not belong to this server", domain)),
-		}
-	}
-
 	// Check that the event is signed by the server sending the request.
 	redacted, err := gomatrixserverlib.RedactEventJSON(event.JSON(), event.Version())
 	if err != nil {
@@ -190,7 +175,7 @@ func processInvite(
 
 	// Sign the event so that other servers will know that we have received the invite.
 	signedEvent := event.Sign(
-		string(domain), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
+		string(cfg.Matrix.ServerName), cfg.Matrix.KeyID, cfg.Matrix.PrivateKey,
 	)
 
 	// Add the invite event to the roomserver.

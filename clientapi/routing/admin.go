@@ -1,14 +1,12 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/nats-io/nats.go"
@@ -99,77 +97,22 @@ func AdminEvacuateUser(req *http.Request, cfg *config.ClientAPI, device *userapi
 	}
 }
 
-func AdminPurgeRoom(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, rsAPI roomserverAPI.ClientRoomserverAPI) util.JSONResponse {
+func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
 	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
 	if err != nil {
 		return util.ErrorResponse(err)
 	}
-	roomID, ok := vars["roomID"]
+	localpart, ok := vars["localpart"]
 	if !ok {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
-			JSON: jsonerror.MissingArgument("Expecting room ID."),
-		}
-	}
-	res := &roomserverAPI.PerformAdminPurgeRoomResponse{}
-	if err := rsAPI.PerformAdminPurgeRoom(
-		context.Background(),
-		&roomserverAPI.PerformAdminPurgeRoomRequest{
-			RoomID: roomID,
-		},
-		res,
-	); err != nil {
-		return util.ErrorResponse(err)
-	}
-	if err := res.Error; err != nil {
-		return err.JSONResponse()
-	}
-	return util.JSONResponse{
-		Code: 200,
-		JSON: res,
-	}
-}
-
-func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userapi.Device, userAPI userapi.ClientUserAPI) util.JSONResponse {
-	if req.Body == nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.Unknown("Missing request body"),
-		}
-	}
-	vars, err := httputil.URLDecodeMapValues(mux.Vars(req))
-	if err != nil {
-		return util.ErrorResponse(err)
-	}
-	var localpart string
-	userID := vars["userID"]
-	localpart, serverName, err := cfg.Matrix.SplitLocalID('@', userID)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.InvalidArgumentValue(err.Error()),
-		}
-	}
-	accAvailableResp := &userapi.QueryAccountAvailabilityResponse{}
-	if err = userAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
-		Localpart:  localpart,
-		ServerName: serverName,
-	}, accAvailableResp); err != nil {
-		return util.JSONResponse{
-			Code: http.StatusInternalServerError,
-			JSON: jsonerror.InternalAPIError(req.Context(), err),
-		}
-	}
-	if accAvailableResp.Available {
-		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.Unknown("User does not exist"),
+			JSON: jsonerror.MissingArgument("Expecting user localpart."),
 		}
 	}
 	request := struct {
 		Password string `json:"password"`
 	}{}
-	if err = json.NewDecoder(req.Body).Decode(&request); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.Unknown("Failed to decode request body: " + err.Error()),
@@ -181,14 +124,8 @@ func AdminResetPassword(req *http.Request, cfg *config.ClientAPI, device *userap
 			JSON: jsonerror.MissingArgument("Expecting non-empty password."),
 		}
 	}
-
-	if err = internal.ValidatePassword(request.Password); err != nil {
-		return *internal.PasswordResponse(err)
-	}
-
 	updateReq := &userapi.PerformPasswordUpdateRequest{
 		Localpart:     localpart,
-		ServerName:    serverName,
 		Password:      request.Password,
 		LogoutDevices: true,
 	}

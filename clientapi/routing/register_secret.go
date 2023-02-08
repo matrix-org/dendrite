@@ -18,13 +18,12 @@ import (
 )
 
 type SharedSecretRegistrationRequest struct {
-	User        string `json:"username"`
-	Password    string `json:"password"`
-	Nonce       string `json:"nonce"`
-	MacBytes    []byte
-	MacStr      string `json:"mac"`
-	Admin       bool   `json:"admin"`
-	DisplayName string `json:"displayname,omitempty"`
+	User     string `json:"username"`
+	Password string `json:"password"`
+	Nonce    string `json:"nonce"`
+	MacBytes []byte
+	MacStr   string `json:"mac"`
+	Admin    bool   `json:"admin"`
 }
 
 func NewSharedSecretRegistrationRequest(reader io.ReadCloser) (*SharedSecretRegistrationRequest, error) {

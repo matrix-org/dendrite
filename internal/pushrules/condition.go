@@ -14,7 +14,7 @@ type Condition struct {
 
 	// Pattern indicates the value pattern that must match. Required
 	// for EventMatchCondition.
-	Pattern *string `json:"pattern,omitempty"`
+	Pattern string `json:"pattern,omitempty"`
 
 	// Is indicates the condition that must be fulfilled. Required for
 	// RoomMemberCountCondition.

@@ -15,7 +15,13 @@ func mRuleContainsUserNameDefinition(localpart string) *Rule {
 		RuleID:  MRuleContainsUserName,
 		Default: true,
 		Enabled: true,
-		Pattern: &localpart,
+		Pattern: localpart,
+		Conditions: []*Condition{
+			{
+				Kind: EventMatchCondition,
+				Key:  "content.body",
+			},
+		},
 		Actions: []*Action{
 			{Kind: NotifyAction},
 			{
@@ -26,6 +32,7 @@ func mRuleContainsUserNameDefinition(localpart string) *Rule {
 			{
 				Kind:  SetTweakAction,
 				Tweak: HighlightTweak,
+				Value: true,
 			},
 		},
 	}

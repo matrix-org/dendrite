@@ -477,7 +477,7 @@ func createRoom(
 			SendAsServer: roomserverAPI.DoNotSendToOtherServers,
 		})
 	}
-	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, device.UserDomain(), inputs, false); err != nil {
+	if err = roomserverAPI.SendInputRoomEvents(ctx, rsAPI, inputs, false); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("roomserverAPI.SendInputRoomEvents failed")
 		return jsonerror.InternalServerError()
 	}

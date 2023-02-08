@@ -90,17 +90,7 @@ func CreateInvitesFrom3PIDInvites(
 	}
 
 	// Send all the events
-	if err := api.SendEvents(
-		req.Context(),
-		rsAPI,
-		api.KindNew,
-		evs,
-		cfg.Matrix.ServerName, // TODO: which virtual host?
-		"TODO",
-		cfg.Matrix.ServerName,
-		nil,
-		false,
-	); err != nil {
+	if err := api.SendEvents(req.Context(), rsAPI, api.KindNew, evs, "TODO", cfg.Matrix.ServerName, nil, false); err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError()
 	}
@@ -133,14 +123,6 @@ func ExchangeThirdPartyInvite(
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.BadJSON("The room ID in the request path must match the room ID in the invite event JSON"),
-		}
-	}
-
-	_, senderDomain, err := cfg.Matrix.SplitLocalID('@', builder.Sender)
-	if err != nil {
-		return util.JSONResponse{
-			Code: http.StatusBadRequest,
-			JSON: jsonerror.BadJSON("Invalid sender ID: " + err.Error()),
 		}
 	}
 
@@ -189,7 +171,7 @@ func ExchangeThirdPartyInvite(
 		util.GetLogger(httpReq.Context()).WithError(err).Error("failed to make invite v2 request")
 		return jsonerror.InternalServerError()
 	}
-	signedEvent, err := federation.SendInviteV2(httpReq.Context(), senderDomain, request.Origin(), inviteReq)
+	signedEvent, err := federation.SendInviteV2(httpReq.Context(), request.Origin(), inviteReq)
 	if err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("federation.SendInvite failed")
 		return jsonerror.InternalServerError()
@@ -207,7 +189,6 @@ func ExchangeThirdPartyInvite(
 		[]*gomatrixserverlib.HeaderedEvent{
 			inviteEvent.Headered(verRes.RoomVersion),
 		},
-		request.Destination(),
 		request.Origin(),
 		cfg.Matrix.ServerName,
 		nil,
@@ -360,7 +341,7 @@ func buildMembershipEvent(
 // them responded with an error.
 func sendToRemoteServer(
 	ctx context.Context, inv invite,
-	federation federationAPI.FederationClient, cfg *config.FederationAPI,
+	federation federationAPI.FederationClient, _ *config.FederationAPI,
 	builder gomatrixserverlib.EventBuilder,
 ) (err error) {
 	remoteServers := make([]gomatrixserverlib.ServerName, 2)
@@ -376,7 +357,7 @@ func sendToRemoteServer(
 	}
 
 	for _, server := range remoteServers {
-		err = federation.ExchangeThirdPartyInvite(ctx, cfg.Matrix.ServerName, server, builder)
+		err = federation.ExchangeThirdPartyInvite(ctx, server, builder)
 		if err == nil {
 			return
 		}

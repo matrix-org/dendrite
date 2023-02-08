@@ -42,10 +42,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if d.db, d.writer, err = base.DatabaseConnection(dbProperties, sqlutil.NewDummyWriter()); err != nil {
 		return nil, err
 	}
-	blacklist, err := NewPostgresBlacklistTable(d.db)
-	if err != nil {
-		return nil, err
-	}
 	joinedHosts, err := NewPostgresJoinedHostsTable(d.db)
 	if err != nil {
 		return nil, err
@@ -62,11 +58,7 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 	if err != nil {
 		return nil, err
 	}
-	assumedOffline, err := NewPostgresAssumedOfflineTable(d.db)
-	if err != nil {
-		return nil, err
-	}
-	relayServers, err := NewPostgresRelayServersTable(d.db)
+	blacklist, err := NewPostgresBlacklistTable(d.db)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +104,6 @@ func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, 
 		FederationQueueEDUs:      queueEDUs,
 		FederationQueueJSON:      queueJSON,
 		FederationBlacklist:      blacklist,
-		FederationAssumedOffline: assumedOffline,
-		FederationRelayServers:   relayServers,
 		FederationInboundPeeks:   inboundPeeks,
 		FederationOutboundPeeks:  outboundPeeks,
 		NotaryServerKeysJSON:     notaryJSON,

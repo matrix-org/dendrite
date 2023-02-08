@@ -40,17 +40,16 @@ func GetNotifications(
 	}
 
 	var queryRes userapi.QueryNotificationsResponse
-	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("SplitID failed")
 		return jsonerror.InternalServerError()
 	}
 	err = userAPI.QueryNotifications(req.Context(), &userapi.QueryNotificationsRequest{
-		Localpart:  localpart,
-		ServerName: domain,
-		From:       req.URL.Query().Get("from"),
-		Limit:      int(limit),
-		Only:       req.URL.Query().Get("only"),
+		Localpart: localpart,
+		From:      req.URL.Query().Get("from"),
+		Limit:     int(limit),
+		Only:      req.URL.Query().Get("only"),
 	}, &queryRes)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("QueryNotifications failed")

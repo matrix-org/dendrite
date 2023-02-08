@@ -28,22 +28,18 @@ RUN mkdir /dendrite
 
 # Utilise Docker caching when downloading dependencies, this stops us needlessly
 # downloading dependencies every time.
-ARG CGO
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-config && \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-keys && \
-    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/dendrite-monolith-server && \
-    CGO_ENABLED=${CGO} go test --race -c -cover -covermode=atomic -o /dendrite/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server && \
-    cp build/scripts/complement-cmd.sh /complement-cmd.sh
+    go build --race -o /dendrite ./cmd/generate-config && \
+    go build --race -o /dendrite ./cmd/generate-keys && \
+    go build --race -o /dendrite ./cmd/dendrite-monolith-server
 
 WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost
 ENV API=0
-ENV COVER=0
 EXPOSE 8008 8448
 
 
@@ -54,6 +50,4 @@ CMD /build/run_postgres.sh && ./generate-keys --keysize 1024 --server $SERVER_NA
     # Bump max_open_conns up here in the global database config
     sed -i 's/max_open_conns:.*$/max_open_conns: 1990/g' dendrite.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
-    <<<<<<< HEAD
-exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
-exec /complement-cmd.sh
+    exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}

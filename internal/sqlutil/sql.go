@@ -124,11 +124,6 @@ type QueryProvider interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 }
 
-// ExecProvider defines the interface for querys used by RunLimitedVariablesExec.
-type ExecProvider interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-}
-
 // SQLite3MaxVariables is the default maximum number of host parameters in a single SQL statement
 // SQLlite can handle. See https://www.sqlite.org/limits.html for more information.
 const SQLite3MaxVariables = 999
@@ -151,22 +146,6 @@ func RunLimitedVariablesQuery(ctx context.Context, query string, qp QueryProvide
 		}
 		if err != nil {
 			util.GetLogger(ctx).WithError(err).Error("RunLimitedVariablesQuery: rowHandler returned error")
-			return err
-		}
-		start = start + n
-	}
-	return nil
-}
-
-// RunLimitedVariablesExec split up a query with more variables than the used database can handle in multiple queries.
-func RunLimitedVariablesExec(ctx context.Context, query string, qp ExecProvider, variables []interface{}, limit uint) error {
-	var start int
-	for start < len(variables) {
-		n := minOfInts(len(variables)-start, int(limit))
-		nextQuery := strings.Replace(query, "($1)", QueryVariadic(n), 1)
-		_, err := qp.ExecContext(ctx, nextQuery, variables[start:start+n]...)
-		if err != nil {
-			util.GetLogger(ctx).WithError(err).Error("ExecContext returned an error")
 			return err
 		}
 		start = start + n

@@ -60,7 +60,7 @@ func (r *Upgrader) performRoomUpgrade(
 ) (string, *api.PerformError) {
 	roomID := req.RoomID
 	userID := req.UserID
-	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
+	_, userDomain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return "", &api.PerformError{
 			Code: api.PerformErrorNotAllowed,
@@ -558,7 +558,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 			SendAsServer: api.DoNotSendToOtherServers,
 		})
 	}
-	if err = api.SendInputRoomEvents(ctx, r.URSAPI, userDomain, inputs, false); err != nil {
+	if err = api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
 		return &api.PerformError{
 			Msg: fmt.Sprintf("Failed to send new room %q to roomserver: %s", newRoomID, err),
 		}
@@ -595,21 +595,8 @@ func (r *Upgrader) makeHeaderedEvent(ctx context.Context, evTime time.Time, user
 			Msg: fmt.Sprintf("Failed to set new %q event content: %s", builder.Type, err),
 		}
 	}
-	// Get the sender domain.
-	_, senderDomain, serr := r.Cfg.Matrix.SplitLocalID('@', builder.Sender)
-	if serr != nil {
-		return nil, &api.PerformError{
-			Msg: fmt.Sprintf("Failed to split user ID %q: %s", builder.Sender, err),
-		}
-	}
-	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
-	if err != nil {
-		return nil, &api.PerformError{
-			Msg: fmt.Sprintf("Failed to get signing identity for %q: %s", senderDomain, err),
-		}
-	}
 	var queryRes api.QueryLatestEventsAndStateResponse
-	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &builder, r.Cfg.Matrix, identity, evTime, r.URSAPI, &queryRes)
+	headeredEvent, err := eventutil.QueryAndBuildEvent(ctx, &builder, r.Cfg.Matrix, evTime, r.URSAPI, &queryRes)
 	if err == eventutil.ErrRoomNoExists {
 		return nil, &api.PerformError{
 			Code: api.PerformErrorNoRoom,
@@ -699,7 +686,7 @@ func (r *Upgrader) sendHeaderedEvent(
 		Origin:       serverName,
 		SendAsServer: sendAsServer,
 	})
-	if err := api.SendInputRoomEvents(ctx, r.URSAPI, serverName, inputs, false); err != nil {
+	if err := api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
 		return &api.PerformError{
 			Msg: fmt.Sprintf("Failed to send new %q event to roomserver: %s", headeredEvent.Type(), err),
 		}

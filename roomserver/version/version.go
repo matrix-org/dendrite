@@ -23,7 +23,7 @@ import (
 // DefaultRoomVersion contains the room version that will, by
 // default, be used to create new rooms on this server.
 func DefaultRoomVersion() gomatrixserverlib.RoomVersion {
-	return gomatrixserverlib.RoomVersionV10
+	return gomatrixserverlib.RoomVersionV9
 }
 
 // RoomVersions returns a map of all known room versions to this

@@ -19,7 +19,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -96,15 +95,6 @@ const selectSharedUsersSQL = "" +
 	"	SELECT DISTINCT room_id FROM syncapi_current_room_state WHERE state_key = $1 AND membership='join'" +
 	") AND type = 'm.room.member' AND state_key IN ($2) AND membership IN ('join', 'invite');"
 
-const selectMembershipCount = `SELECT count(*) FROM syncapi_current_room_state WHERE type = 'm.room.member' AND room_id = $1 AND membership = $2`
-
-const selectRoomHeroes = `
-SELECT state_key FROM syncapi_current_room_state
-WHERE type = 'm.room.member' AND room_id = $1 AND state_key != $2 AND membership IN ($3)
-ORDER BY added_at, state_key
-LIMIT 5
-`
-
 type currentRoomStateStatements struct {
 	db                                 *sql.DB
 	streamIDStatements                 *StreamIDStatements
@@ -117,8 +107,6 @@ type currentRoomStateStatements struct {
 	//selectJoinedUsersInRoomStmt      *sql.Stmt - prepared at runtime due to variadic
 	selectStateEventStmt *sql.Stmt
 	//selectSharedUsersSQL             *sql.Stmt - prepared at runtime due to variadic
-	selectMembershipCountStmt *sql.Stmt
-	//selectRoomHeroes          *sql.Stmt - prepared at runtime due to variadic
 }
 
 func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (tables.CurrentRoomState, error) {
@@ -141,16 +129,31 @@ func NewSqliteCurrentRoomStateTable(db *sql.DB, streamID *StreamIDStatements) (t
 		return nil, err
 	}
 
-	return s, sqlutil.StatementList{
-		{&s.upsertRoomStateStmt, upsertRoomStateSQL},
-		{&s.deleteRoomStateByEventIDStmt, deleteRoomStateByEventIDSQL},
-		{&s.deleteRoomStateForRoomStmt, deleteRoomStateForRoomSQL},
-		{&s.selectRoomIDsWithMembershipStmt, selectRoomIDsWithMembershipSQL},
-		{&s.selectRoomIDsWithAnyMembershipStmt, selectRoomIDsWithAnyMembershipSQL},
-		{&s.selectJoinedUsersStmt, selectJoinedUsersSQL},
-		{&s.selectStateEventStmt, selectStateEventSQL},
-		{&s.selectMembershipCountStmt, selectMembershipCount},
-	}.Prepare(db)
+	if s.upsertRoomStateStmt, err = db.Prepare(upsertRoomStateSQL); err != nil {
+		return nil, err
+	}
+	if s.deleteRoomStateByEventIDStmt, err = db.Prepare(deleteRoomStateByEventIDSQL); err != nil {
+		return nil, err
+	}
+	if s.deleteRoomStateForRoomStmt, err = db.Prepare(deleteRoomStateForRoomSQL); err != nil {
+		return nil, err
+	}
+	if s.selectRoomIDsWithMembershipStmt, err = db.Prepare(selectRoomIDsWithMembershipSQL); err != nil {
+		return nil, err
+	}
+	if s.selectRoomIDsWithAnyMembershipStmt, err = db.Prepare(selectRoomIDsWithAnyMembershipSQL); err != nil {
+		return nil, err
+	}
+	if s.selectJoinedUsersStmt, err = db.Prepare(selectJoinedUsersSQL); err != nil {
+		return nil, err
+	}
+	//if s.selectJoinedUsersInRoomStmt, err = db.Prepare(selectJoinedUsersInRoomSQL); err != nil {
+	//	return nil, err
+	//}
+	if s.selectStateEventStmt, err = db.Prepare(selectStateEventSQL); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // SelectJoinedUsers returns a map of room ID to a list of joined user IDs.
@@ -481,54 +484,4 @@ func (s *currentRoomStateStatements) SelectSharedUsers(
 	)
 
 	return result, err
-}
-
-func (s *currentRoomStateStatements) SelectRoomHeroes(ctx context.Context, txn *sql.Tx, roomID, excludeUserID string, memberships []string) ([]string, error) {
-	params := make([]interface{}, len(memberships)+2)
-	params[0] = roomID
-	params[1] = excludeUserID
-	for k, v := range memberships {
-		params[k+2] = v
-	}
-
-	query := strings.Replace(selectRoomHeroes, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
-	var stmt *sql.Stmt
-	var err error
-	if txn != nil {
-		stmt, err = txn.Prepare(query)
-	} else {
-		stmt, err = s.db.Prepare(query)
-	}
-	if err != nil {
-		return []string{}, err
-	}
-	defer internal.CloseAndLogIfError(ctx, stmt, "selectRoomHeroes: stmt.close() failed")
-
-	rows, err := stmt.QueryContext(ctx, params...)
-	if err != nil {
-		return nil, err
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "selectRoomHeroes: rows.close() failed")
-
-	var stateKey string
-	result := make([]string, 0, 5)
-	for rows.Next() {
-		if err = rows.Scan(&stateKey); err != nil {
-			return nil, err
-		}
-		result = append(result, stateKey)
-	}
-	return result, rows.Err()
-}
-
-func (s *currentRoomStateStatements) SelectMembershipCount(ctx context.Context, txn *sql.Tx, roomID, membership string) (count int, err error) {
-	stmt := sqlutil.TxStmt(txn, s.selectMembershipCountStmt)
-	err = stmt.QueryRowContext(ctx, roomID, membership).Scan(&count)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	return count, nil
 }

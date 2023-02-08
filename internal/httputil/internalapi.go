@@ -22,7 +22,7 @@ import (
 	"reflect"
 
 	"github.com/matrix-org/util"
-	"github.com/opentracing/opentracing-go"
+	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type InternalAPIError struct {
@@ -34,8 +34,8 @@ func (e InternalAPIError) Error() string {
 	return fmt.Sprintf("internal API returned %q error: %s", e.Type, e.Message)
 }
 
-func MakeInternalRPCAPI[reqtype, restype any](metricsName string, enableMetrics bool, f func(context.Context, *reqtype, *restype) error) http.Handler {
-	return MakeInternalAPI(metricsName, enableMetrics, func(req *http.Request) util.JSONResponse {
+func MakeInternalRPCAPI[reqtype, restype any](metricsName string, f func(context.Context, *reqtype, *restype) error) http.Handler {
+	return MakeInternalAPI(metricsName, func(req *http.Request) util.JSONResponse {
 		var request reqtype
 		var response restype
 		if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
@@ -57,8 +57,8 @@ func MakeInternalRPCAPI[reqtype, restype any](metricsName string, enableMetrics 
 	})
 }
 
-func MakeInternalProxyAPI[reqtype, restype any](metricsName string, enableMetrics bool, f func(context.Context, *reqtype) (*restype, error)) http.Handler {
-	return MakeInternalAPI(metricsName, enableMetrics, func(req *http.Request) util.JSONResponse {
+func MakeInternalProxyAPI[reqtype, restype any](metricsName string, f func(context.Context, *reqtype) (*restype, error)) http.Handler {
+	return MakeInternalAPI(metricsName, func(req *http.Request) util.JSONResponse {
 		var request reqtype
 		if err := json.NewDecoder(req.Body).Decode(&request); err != nil {
 			return util.MessageResponse(http.StatusBadRequest, err.Error())

@@ -24,8 +24,6 @@ import (
 	"sync"
 	"time"
 
-	rsapi "github.com/matrix-org/dendrite/roomserver/api"
-
 	"github.com/matrix-org/gomatrix"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
@@ -49,6 +47,7 @@ var (
 	)
 )
 
+const defaultWaitTime = time.Minute
 const requestTimeout = time.Second * 30
 
 func init() {
@@ -98,13 +97,11 @@ type DeviceListUpdater struct {
 	producer    KeyChangeProducer
 	fedClient   fedsenderapi.KeyserverFederationAPI
 	workerChans []chan gomatrixserverlib.ServerName
-	thisServer  gomatrixserverlib.ServerName
 
 	// When device lists are stale for a user, they get inserted into this map with a channel which `Update` will
 	// block on or timeout via a select.
 	userIDToChan   map[string]chan bool
 	userIDToChanMu *sync.Mutex
-	rsAPI          rsapi.KeyserverRoomserverAPI
 }
 
 // DeviceListUpdaterDatabase is the subset of functionality from storage.Database required for the updater.
@@ -127,8 +124,6 @@ type DeviceListUpdaterDatabase interface {
 
 	// DeviceKeysJSON populates the KeyJSON for the given keys. If any proided `keys` have a `KeyJSON` or `StreamID` already then it will be replaced.
 	DeviceKeysJSON(ctx context.Context, keys []api.DeviceMessage) error
-
-	DeleteStaleDeviceLists(ctx context.Context, userIDs []string) error
 }
 
 type DeviceListUpdaterAPI interface {
@@ -145,7 +140,6 @@ func NewDeviceListUpdater(
 	process *process.ProcessContext, db DeviceListUpdaterDatabase,
 	api DeviceListUpdaterAPI, producer KeyChangeProducer,
 	fedClient fedsenderapi.KeyserverFederationAPI, numWorkers int,
-	rsAPI rsapi.KeyserverRoomserverAPI, thisServer gomatrixserverlib.ServerName,
 ) *DeviceListUpdater {
 	return &DeviceListUpdater{
 		process:        process,
@@ -155,11 +149,9 @@ func NewDeviceListUpdater(
 		api:            api,
 		producer:       producer,
 		fedClient:      fedClient,
-		thisServer:     thisServer,
 		workerChans:    make([]chan gomatrixserverlib.ServerName, numWorkers),
 		userIDToChan:   make(map[string]chan bool),
 		userIDToChanMu: &sync.Mutex{},
-		rsAPI:          rsAPI,
 	}
 }
 
@@ -174,7 +166,7 @@ func (u *DeviceListUpdater) Start() error {
 		go u.worker(ch)
 	}
 
-	staleLists, err := u.db.StaleDeviceLists(u.process.Context(), []gomatrixserverlib.ServerName{})
+	staleLists, err := u.db.StaleDeviceLists(context.Background(), []gomatrixserverlib.ServerName{})
 	if err != nil {
 		return err
 	}
@@ -190,25 +182,6 @@ func (u *DeviceListUpdater) Start() error {
 		offset += step
 	}
 	return nil
-}
-
-// CleanUp removes stale device entries for users we don't share a room with anymore
-func (u *DeviceListUpdater) CleanUp() error {
-	staleUsers, err := u.db.StaleDeviceLists(u.process.Context(), []gomatrixserverlib.ServerName{})
-	if err != nil {
-		return err
-	}
-
-	res := rsapi.QueryLeftUsersResponse{}
-	if err = u.rsAPI.QueryLeftUsers(u.process.Context(), &rsapi.QueryLeftUsersRequest{StaleDeviceListUsers: staleUsers}, &res); err != nil {
-		return err
-	}
-
-	if len(res.LeftUsers) == 0 {
-		return nil
-	}
-	logrus.Debugf("Deleting %d stale device list entries", len(res.LeftUsers))
-	return u.db.DeleteStaleDeviceLists(u.process.Context(), res.LeftUsers)
 }
 
 func (u *DeviceListUpdater) mutex(userID string) *sync.Mutex {
@@ -463,7 +436,8 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 		"server_name": serverName,
 		"user_id":     userID,
 	})
-	res, err := u.fedClient.GetUserDevices(ctx, u.thisServer, serverName, userID)
+
+	res, err := u.fedClient.GetUserDevices(ctx, serverName, userID)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return time.Minute * 10, err
@@ -480,7 +454,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			} else if e.Code >= 300 {
 				// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
 				// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
-				return hourWaitTime, err
+				return time.Hour, err
 			}
 		case net.Error:
 			// Use the default waitTime, if it's a timeout.
@@ -494,7 +468,7 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 			// This is to avoid spamming remote servers, which may not be Matrix servers anymore.
 			if e.Code >= 300 {
 				logger.WithError(e).Debug("GetUserDevices returned gomatrix.HTTPError")
-				return hourWaitTime, err
+				return time.Hour, err
 			}
 		default:
 			// Something else failed

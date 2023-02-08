@@ -16,7 +16,6 @@ package perform
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -40,10 +39,11 @@ import (
 )
 
 type Joiner struct {
-	Cfg   *config.RoomServer
-	FSAPI fsAPI.RoomserverFederationAPI
-	RSAPI rsAPI.RoomserverInternalAPI
-	DB    storage.Database
+	ServerName gomatrixserverlib.ServerName
+	Cfg        *config.RoomServer
+	FSAPI      fsAPI.RoomserverFederationAPI
+	RSAPI      rsAPI.RoomserverInternalAPI
+	DB         storage.Database
 
 	Inputer *input.Inputer
 	Queryer *query.Queryer
@@ -197,7 +197,7 @@ func (r *Joiner) performJoinRoomByID(
 
 	// Prepare the template for the join event.
 	userID := req.UserID
-	_, userDomain, err := r.Cfg.Matrix.SplitLocalID('@', userID)
+	_, userDomain, err := gomatrixserverlib.SplitID('@', userID)
 	if err != nil {
 		return "", "", &rsAPI.PerformError{
 			Code: rsAPI.PerformErrorBadRequest,
@@ -271,28 +271,6 @@ func (r *Joiner) performJoinRoomByID(
 		}
 	}
 
-	// If a guest is trying to join a room, check that the room has a m.room.guest_access event
-	if req.IsGuest {
-		var guestAccessEvent *gomatrixserverlib.HeaderedEvent
-		guestAccess := "forbidden"
-		guestAccessEvent, err = r.DB.GetStateEvent(ctx, req.RoomIDOrAlias, gomatrixserverlib.MRoomGuestAccess, "")
-		if (err != nil && !errors.Is(err, sql.ErrNoRows)) || guestAccessEvent == nil {
-			logrus.WithError(err).Warn("unable to get m.room.guest_access event, defaulting to 'forbidden'")
-		}
-		if guestAccessEvent != nil {
-			guestAccess = gjson.GetBytes(guestAccessEvent.Content(), "guest_access").String()
-		}
-
-		// Servers MUST only allow guest users to join rooms if the m.room.guest_access state event
-		// is present on the room and has the guest_access value can_join.
-		if guestAccess != "can_join" {
-			return "", "", &rsAPI.PerformError{
-				Code: rsAPI.PerformErrorNotAllowed,
-				Msg:  "Guest access is forbidden",
-			}
-		}
-	}
-
 	// If we should do a forced federated join then do that.
 	var joinedVia gomatrixserverlib.ServerName
 	if forceFederatedJoin {
@@ -305,7 +283,7 @@ func (r *Joiner) performJoinRoomByID(
 	// locally on the homeserver.
 	// TODO: Check what happens if the room exists on the server
 	// but everyone has since left. I suspect it does the wrong thing.
-	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, userDomain, &eb)
+	event, buildRes, err := buildEvent(ctx, r.DB, r.Cfg.Matrix, &eb)
 
 	switch err {
 	case nil:
@@ -432,9 +410,7 @@ func (r *Joiner) populateAuthorisedViaUserForRestrictedJoin(
 }
 
 func buildEvent(
-	ctx context.Context, db storage.Database, cfg *config.Global,
-	senderDomain gomatrixserverlib.ServerName,
-	builder *gomatrixserverlib.EventBuilder,
+	ctx context.Context, db storage.Database, cfg *config.Global, builder *gomatrixserverlib.EventBuilder,
 ) (*gomatrixserverlib.HeaderedEvent, *rsAPI.QueryLatestEventsAndStateResponse, error) {
 	eventsNeeded, err := gomatrixserverlib.StateNeededForEventBuilder(builder)
 	if err != nil {
@@ -462,12 +438,7 @@ func buildEvent(
 		}
 	}
 
-	identity, err := cfg.SigningIdentityFor(senderDomain)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	ev, err := eventutil.BuildEvent(ctx, builder, cfg, identity, time.Now(), &eventsNeeded, &queryRes)
+	ev, err := eventutil.BuildEvent(ctx, builder, cfg, time.Now(), &eventsNeeded, &queryRes)
 	if err != nil {
 		return nil, nil, err
 	}

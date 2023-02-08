@@ -47,14 +47,10 @@ const selectBackwardExtremitiesForRoomSQL = "" +
 const deleteBackwardExtremitySQL = "" +
 	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1 AND prev_event_id = $2"
 
-const purgeBackwardExtremitiesSQL = "" +
-	"DELETE FROM syncapi_backward_extremities WHERE room_id = $1"
-
 type backwardExtremitiesStatements struct {
 	insertBackwardExtremityStmt          *sql.Stmt
 	selectBackwardExtremitiesForRoomStmt *sql.Stmt
 	deleteBackwardExtremityStmt          *sql.Stmt
-	purgeBackwardExtremitiesStmt         *sql.Stmt
 }
 
 func NewPostgresBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremities, error) {
@@ -63,12 +59,16 @@ func NewPostgresBackwardsExtremitiesTable(db *sql.DB) (tables.BackwardsExtremiti
 	if err != nil {
 		return nil, err
 	}
-	return s, sqlutil.StatementList{
-		{&s.insertBackwardExtremityStmt, insertBackwardExtremitySQL},
-		{&s.selectBackwardExtremitiesForRoomStmt, selectBackwardExtremitiesForRoomSQL},
-		{&s.deleteBackwardExtremityStmt, deleteBackwardExtremitySQL},
-		{&s.purgeBackwardExtremitiesStmt, purgeBackwardExtremitiesSQL},
-	}.Prepare(db)
+	if s.insertBackwardExtremityStmt, err = db.Prepare(insertBackwardExtremitySQL); err != nil {
+		return nil, err
+	}
+	if s.selectBackwardExtremitiesForRoomStmt, err = db.Prepare(selectBackwardExtremitiesForRoomSQL); err != nil {
+		return nil, err
+	}
+	if s.deleteBackwardExtremityStmt, err = db.Prepare(deleteBackwardExtremitySQL); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *backwardExtremitiesStatements) InsertsBackwardExtremity(
@@ -105,11 +105,4 @@ func (s *backwardExtremitiesStatements) DeleteBackwardExtremity(
 ) (err error) {
 	_, err = sqlutil.TxStmt(txn, s.deleteBackwardExtremityStmt).ExecContext(ctx, roomID, knownEventID)
 	return
-}
-
-func (s *backwardExtremitiesStatements) PurgeBackwardExtremities(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeBackwardExtremitiesStmt).ExecContext(ctx, roomID)
-	return err
 }

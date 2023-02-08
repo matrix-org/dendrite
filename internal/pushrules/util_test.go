@@ -17,7 +17,6 @@ func TestActionsToTweaks(t *testing.T) {
 		{"empty", nil, UnknownAction, nil},
 		{"zero", []*Action{{}}, UnknownAction, nil},
 		{"onlyPrimary", []*Action{{Kind: NotifyAction}}, NotifyAction, nil},
-		{"onlyPrimaryDontNotify", []*Action{{Kind: DontNotifyAction}}, DontNotifyAction, nil},
 		{"onlyTweak", []*Action{{Kind: SetTweakAction, Tweak: HighlightTweak}}, UnknownAction, map[string]interface{}{"highlight": nil}},
 		{"onlyTweakWithValue", []*Action{{Kind: SetTweakAction, Tweak: SoundTweak, Value: "default"}}, UnknownAction, map[string]interface{}{"sound": "default"}},
 		{

@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/matrix-org/gomatrixserverlib"
@@ -62,104 +61,5 @@ func TestNewInviteResponse(t *testing.T) {
 
 	if string(j) != expected {
 		t.Fatalf("Invite response didn't contain correct info")
-	}
-}
-
-func TestJoinResponse_MarshalJSON(t *testing.T) {
-	type fields struct {
-		Summary             *Summary
-		State               *ClientEvents
-		Timeline            *Timeline
-		Ephemeral           *ClientEvents
-		AccountData         *ClientEvents
-		UnreadNotifications *UnreadNotifications
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		want    []byte
-		wantErr bool
-	}{
-		{
-			name: "empty state is removed",
-			fields: fields{
-				State: &ClientEvents{},
-			},
-			want: []byte("{}"),
-		},
-		{
-			name: "empty accountdata is removed",
-			fields: fields{
-				AccountData: &ClientEvents{},
-			},
-			want: []byte("{}"),
-		},
-		{
-			name: "empty ephemeral is removed",
-			fields: fields{
-				Ephemeral: &ClientEvents{},
-			},
-			want: []byte("{}"),
-		},
-		{
-			name: "empty timeline is removed",
-			fields: fields{
-				Timeline: &Timeline{},
-			},
-			want: []byte("{}"),
-		},
-		{
-			name: "empty summary is removed",
-			fields: fields{
-				Summary: &Summary{},
-			},
-			want: []byte("{}"),
-		},
-		{
-			name: "unread notifications are removed, if everything else is empty",
-			fields: fields{
-				UnreadNotifications: &UnreadNotifications{},
-			},
-			want: []byte("{}"),
-		},
-		{
-			name: "unread notifications are NOT removed, if state is set",
-			fields: fields{
-				State:               &ClientEvents{Events: []gomatrixserverlib.ClientEvent{{Content: []byte("{}")}}},
-				UnreadNotifications: &UnreadNotifications{NotificationCount: 1},
-			},
-			want: []byte(`{"state":{"events":[{"content":{},"type":""}]},"unread_notifications":{"highlight_count":0,"notification_count":1}}`),
-		},
-		{
-			name: "roomID is removed from EDUs",
-			fields: fields{
-				Ephemeral: &ClientEvents{
-					Events: []gomatrixserverlib.ClientEvent{
-						{RoomID: "!someRandomRoomID:test", Content: []byte("{}")},
-					},
-				},
-			},
-			want: []byte(`{"ephemeral":{"events":[{"content":{},"type":""}]}}`),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			jr := JoinResponse{
-				Summary:             tt.fields.Summary,
-				State:               tt.fields.State,
-				Timeline:            tt.fields.Timeline,
-				Ephemeral:           tt.fields.Ephemeral,
-				AccountData:         tt.fields.AccountData,
-				UnreadNotifications: tt.fields.UnreadNotifications,
-			}
-			got, err := jr.MarshalJSON()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MarshalJSON() got = %v, want %v", string(got), string(tt.want))
-			}
-		})
 	}
 }

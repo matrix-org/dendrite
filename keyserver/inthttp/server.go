@@ -21,59 +21,59 @@ import (
 	"github.com/matrix-org/dendrite/keyserver/api"
 )
 
-func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI, enableMetrics bool) {
+func AddRoutes(internalAPIMux *mux.Router, s api.KeyInternalAPI) {
 	internalAPIMux.Handle(
 		PerformClaimKeysPath,
-		httputil.MakeInternalRPCAPI("KeyserverPerformClaimKeys", enableMetrics, s.PerformClaimKeys),
+		httputil.MakeInternalRPCAPI("KeyserverPerformClaimKeys", s.PerformClaimKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformDeleteKeysPath,
-		httputil.MakeInternalRPCAPI("KeyserverPerformDeleteKeys", enableMetrics, s.PerformDeleteKeys),
+		httputil.MakeInternalRPCAPI("KeyserverPerformDeleteKeys", s.PerformDeleteKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformUploadKeysPath,
-		httputil.MakeInternalRPCAPI("KeyserverPerformUploadKeys", enableMetrics, s.PerformUploadKeys),
+		httputil.MakeInternalRPCAPI("KeyserverPerformUploadKeys", s.PerformUploadKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformUploadDeviceKeysPath,
-		httputil.MakeInternalRPCAPI("KeyserverPerformUploadDeviceKeys", enableMetrics, s.PerformUploadDeviceKeys),
+		httputil.MakeInternalRPCAPI("KeyserverPerformUploadDeviceKeys", s.PerformUploadDeviceKeys),
 	)
 
 	internalAPIMux.Handle(
 		PerformUploadDeviceSignaturesPath,
-		httputil.MakeInternalRPCAPI("KeyserverPerformUploadDeviceSignatures", enableMetrics, s.PerformUploadDeviceSignatures),
+		httputil.MakeInternalRPCAPI("KeyserverPerformUploadDeviceSignatures", s.PerformUploadDeviceSignatures),
 	)
 
 	internalAPIMux.Handle(
 		QueryKeysPath,
-		httputil.MakeInternalRPCAPI("KeyserverQueryKeys", enableMetrics, s.QueryKeys),
+		httputil.MakeInternalRPCAPI("KeyserverQueryKeys", s.QueryKeys),
 	)
 
 	internalAPIMux.Handle(
 		QueryOneTimeKeysPath,
-		httputil.MakeInternalRPCAPI("KeyserverQueryOneTimeKeys", enableMetrics, s.QueryOneTimeKeys),
+		httputil.MakeInternalRPCAPI("KeyserverQueryOneTimeKeys", s.QueryOneTimeKeys),
 	)
 
 	internalAPIMux.Handle(
 		QueryDeviceMessagesPath,
-		httputil.MakeInternalRPCAPI("KeyserverQueryDeviceMessages", enableMetrics, s.QueryDeviceMessages),
+		httputil.MakeInternalRPCAPI("KeyserverQueryDeviceMessages", s.QueryDeviceMessages),
 	)
 
 	internalAPIMux.Handle(
 		QueryKeyChangesPath,
-		httputil.MakeInternalRPCAPI("KeyserverQueryKeyChanges", enableMetrics, s.QueryKeyChanges),
+		httputil.MakeInternalRPCAPI("KeyserverQueryKeyChanges", s.QueryKeyChanges),
 	)
 
 	internalAPIMux.Handle(
 		QuerySignaturesPath,
-		httputil.MakeInternalRPCAPI("KeyserverQuerySignatures", enableMetrics, s.QuerySignatures),
+		httputil.MakeInternalRPCAPI("KeyserverQuerySignatures", s.QuerySignatures),
 	)
 
 	internalAPIMux.Handle(
 		PerformMarkAsStalePath,
-		httputil.MakeInternalRPCAPI("KeyserverMarkAsStale", enableMetrics, s.PerformMarkAsStaleIfNeeded),
+		httputil.MakeInternalRPCAPI("KeyserverMarkAsStale", s.PerformMarkAsStaleIfNeeded),
 	)
 }

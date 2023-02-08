@@ -78,7 +78,7 @@ func (s *PresenceConsumer) Start() error {
 	// Normal NATS subscription, used by Request/Reply
 	_, err := s.nats.Subscribe(s.requestTopic, func(msg *nats.Msg) {
 		userID := msg.Header.Get(jetstream.UserID)
-		presences, err := s.db.GetPresences(context.Background(), []string{userID})
+		presence, err := s.db.GetPresence(context.Background(), userID)
 		m := &nats.Msg{
 			Header: nats.Header{},
 		}
@@ -89,12 +89,10 @@ func (s *PresenceConsumer) Start() error {
 			}
 			return
 		}
-
-		presence := &types.PresenceInternal{
-			UserID: userID,
-		}
-		if len(presences) > 0 {
-			presence = presences[0]
+		if presence == nil {
+			presence = &types.PresenceInternal{
+				UserID: userID,
+			}
 		}
 
 		deviceRes := api.QueryDevicesResponse{}

@@ -156,8 +156,8 @@ func (t *UserInternalAPITrace) SetAvatarURL(ctx context.Context, req *PerformSet
 	return err
 }
 
-func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, req *QueryNumericLocalpartRequest, res *QueryNumericLocalpartResponse) error {
-	err := t.Impl.QueryNumericLocalpart(ctx, req, res)
+func (t *UserInternalAPITrace) QueryNumericLocalpart(ctx context.Context, res *QueryNumericLocalpartResponse) error {
+	err := t.Impl.QueryNumericLocalpart(ctx, res)
 	util.GetLogger(ctx).Infof("QueryNumericLocalpart req= res=%+v", js(res))
 	return err
 }
@@ -201,12 +201,6 @@ func (t *UserInternalAPITrace) PerformForgetThreePID(ctx context.Context, req *P
 func (t *UserInternalAPITrace) PerformSaveThreePIDAssociation(ctx context.Context, req *PerformSaveThreePIDAssociationRequest, res *struct{}) error {
 	err := t.Impl.PerformSaveThreePIDAssociation(ctx, req, res)
 	util.GetLogger(ctx).Infof("PerformSaveThreePIDAssociation req=%+v res=%+v", js(req), js(res))
-	return err
-}
-
-func (t *UserInternalAPITrace) QueryAccountByLocalpart(ctx context.Context, req *QueryAccountByLocalpartRequest, res *QueryAccountByLocalpartResponse) error {
-	err := t.Impl.QueryAccountByLocalpart(ctx, req, res)
-	util.GetLogger(ctx).Infof("QueryAccountByLocalpart req=%+v res=%+v", js(req), js(res))
 	return err
 }
 

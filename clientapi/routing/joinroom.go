@@ -37,7 +37,6 @@ func JoinRoomByIDOrAlias(
 	joinReq := roomserverAPI.PerformJoinRequest{
 		RoomIDOrAlias: roomIDOrAlias,
 		UserID:        device.UserID,
-		IsGuest:       device.AccountType == api.AccountTypeGuest,
 		Content:       map[string]interface{}{},
 	}
 	joinRes := roomserverAPI.PerformJoinResponse{}
@@ -85,14 +84,7 @@ func JoinRoomByIDOrAlias(
 		if err := rsAPI.PerformJoin(req.Context(), &joinReq, &joinRes); err != nil {
 			done <- jsonerror.InternalAPIError(req.Context(), err)
 		} else if joinRes.Error != nil {
-			if joinRes.Error.Code == roomserverAPI.PerformErrorNotAllowed && device.AccountType == api.AccountTypeGuest {
-				done <- util.JSONResponse{
-					Code: http.StatusForbidden,
-					JSON: jsonerror.GuestAccessForbidden(joinRes.Error.Msg),
-				}
-			} else {
-				done <- joinRes.Error.JSONResponse()
-			}
+			done <- joinRes.Error.JSONResponse()
 		} else {
 			done <- util.JSONResponse{
 				Code: http.StatusOK,

@@ -18,21 +18,18 @@ package routing
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/matrix-org/dendrite/internal"
-	internalHTTPUtil "github.com/matrix-org/dendrite/internal/httputil"
-	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/tidwall/gjson"
 
 	"github.com/matrix-org/dendrite/internal/eventutil"
@@ -63,7 +60,12 @@ var (
 	)
 )
 
-const sessionIDLength = 24
+const (
+	minPasswordLength = 8   // http://matrix.org/docs/spec/client_server/r0.2.0.html#password-based
+	maxPasswordLength = 512 // https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	maxUsernameLength = 254 // http://matrix.org/speculator/spec/HEAD/intro.html#user-identifiers TODO account for domain
+	sessionIDLength   = 24
+)
 
 // sessionsDict keeps track of completed auth stages for each session.
 // It shouldn't be passed by value because it contains a mutex.
@@ -205,7 +207,8 @@ func (d *sessionsDict) getDeviceToDelete(sessionID string) (string, bool) {
 }
 
 var (
-	sessions = newSessionsDict()
+	sessions           = newSessionsDict()
+	validUsernameRegex = regexp.MustCompile(`^[0-9a-z_\-=./]+$`)
 )
 
 // registerRequest represents the submitted registration request.
@@ -216,10 +219,9 @@ var (
 // previous parameters with the ones supplied. This mean you cannot "build up" request params.
 type registerRequest struct {
 	// registration parameters
-	Password   string                       `json:"password"`
-	Username   string                       `json:"username"`
-	ServerName gomatrixserverlib.ServerName `json:"-"`
-	Admin      bool                         `json:"admin"`
+	Password string `json:"password"`
+	Username string `json:"username"`
+	Admin    bool   `json:"admin"`
 	// user-interactive auth params
 	Auth authDict `json:"auth"`
 
@@ -277,9 +279,10 @@ func newUserInteractiveResponse(
 
 // http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#post-matrix-client-unstable-register
 type registerResponse struct {
-	UserID      string `json:"user_id"`
-	AccessToken string `json:"access_token,omitempty"`
-	DeviceID    string `json:"device_id,omitempty"`
+	UserID      string                       `json:"user_id"`
+	AccessToken string                       `json:"access_token,omitempty"`
+	HomeServer  gomatrixserverlib.ServerName `json:"home_server"`
+	DeviceID    string                       `json:"device_id,omitempty"`
 }
 
 // recaptchaResponse represents the HTTP response from a Google Recaptcha server
@@ -290,28 +293,83 @@ type recaptchaResponse struct {
 	ErrorCodes  []int     `json:"error-codes"`
 }
 
-var (
-	ErrInvalidCaptcha  = errors.New("invalid captcha response")
-	ErrMissingResponse = errors.New("captcha response is required")
-	ErrCaptchaDisabled = errors.New("captcha registration is disabled")
-)
+// validateUsername returns an error response if the username is invalid
+func validateUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
+	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
+		}
+	} else if !validUsernameRegex.MatchString(localpart) {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
+		}
+	} else if localpart[0] == '_' { // Regex checks its not a zero length string
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("Username cannot start with a '_'"),
+		}
+	}
+	return nil
+}
+
+// validateApplicationServiceUsername returns an error response if the username is invalid for an application service
+func validateApplicationServiceUsername(localpart string, domain gomatrixserverlib.ServerName) *util.JSONResponse {
+	if id := fmt.Sprintf("@%s:%s", localpart, domain); len(id) > maxUsernameLength {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("%q exceeds the maximum length of %d characters", id, maxUsernameLength)),
+		}
+	} else if !validUsernameRegex.MatchString(localpart) {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.InvalidUsername("Username can only contain characters a-z, 0-9, or '_-./='"),
+		}
+	}
+	return nil
+}
+
+// validatePassword returns an error response if the password is invalid
+func validatePassword(password string) *util.JSONResponse {
+	// https://github.com/matrix-org/synapse/blob/v0.20.0/synapse/rest/client/v2_alpha/register.py#L161
+	if len(password) > maxPasswordLength {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON(fmt.Sprintf("'password' >%d characters", maxPasswordLength)),
+		}
+	} else if len(password) > 0 && len(password) < minPasswordLength {
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.WeakPassword(fmt.Sprintf("password too weak: min %d chars", minPasswordLength)),
+		}
+	}
+	return nil
+}
 
 // validateRecaptcha returns an error response if the captcha response is invalid
 func validateRecaptcha(
 	cfg *config.ClientAPI,
 	response string,
 	clientip string,
-) error {
+) *util.JSONResponse {
 	ip, _, _ := net.SplitHostPort(clientip)
 	if !cfg.RecaptchaEnabled {
-		return ErrCaptchaDisabled
+		return &util.JSONResponse{
+			Code: http.StatusConflict,
+			JSON: jsonerror.Unknown("Captcha registration is disabled"),
+		}
 	}
 
 	if response == "" {
-		return ErrMissingResponse
+		return &util.JSONResponse{
+			Code: http.StatusBadRequest,
+			JSON: jsonerror.BadJSON("Captcha response is required"),
+		}
 	}
 
-	// Make a POST request to the captcha provider API to check the captcha response
+	// Make a POST request to Google's API to check the captcha response
 	resp, err := http.PostForm(cfg.RecaptchaSiteVerifyAPI,
 		url.Values{
 			"secret":   {cfg.RecaptchaPrivateKey},
@@ -321,7 +379,10 @@ func validateRecaptcha(
 	)
 
 	if err != nil {
-		return err
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.BadJSON("Error in requesting validation of captcha response"),
+		}
 	}
 
 	// Close the request once we're finishing reading from it
@@ -331,16 +392,25 @@ func validateRecaptcha(
 	var r recaptchaResponse
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return &util.JSONResponse{
+			Code: http.StatusGatewayTimeout,
+			JSON: jsonerror.Unknown("Error in contacting captcha server" + err.Error()),
+		}
 	}
 	err = json.Unmarshal(body, &r)
 	if err != nil {
-		return err
+		return &util.JSONResponse{
+			Code: http.StatusInternalServerError,
+			JSON: jsonerror.BadJSON("Error in unmarshaling captcha server's response: " + err.Error()),
+		}
 	}
 
 	// Check that we received a "success"
 	if !r.Success {
-		return ErrInvalidCaptcha
+		return &util.JSONResponse{
+			Code: http.StatusUnauthorized,
+			JSON: jsonerror.BadJSON("Invalid captcha response. Please try again."),
+		}
 	}
 	return nil
 }
@@ -472,8 +542,8 @@ func validateApplicationService(
 	}
 
 	// Check username application service is trying to register is valid
-	if err := internal.ValidateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
-		return "", internal.UsernameResponse(err)
+	if err := validateApplicationServiceUsername(username, cfg.Matrix.ServerName); err != nil {
+		return "", err
 	}
 
 	// No errors, registration valid
@@ -497,12 +567,6 @@ func Register(
 	}
 
 	var r registerRequest
-	host := gomatrixserverlib.ServerName(req.Host)
-	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
-		r.ServerName = v.ServerName
-	} else {
-		r.ServerName = cfg.Matrix.ServerName
-	}
 	sessionID := gjson.GetBytes(reqBody, "auth.session").String()
 	if sessionID == "" {
 		// Generate a new, random session ID
@@ -512,7 +576,6 @@ func Register(
 		// Some of these might end up being overwritten if the
 		// values are specified again in the request body.
 		r.Username = data.Username
-		r.ServerName = data.ServerName
 		r.Password = data.Password
 		r.DeviceID = data.DeviceID
 		r.InitialDisplayName = data.InitialDisplayName
@@ -524,6 +587,7 @@ func Register(
 				JSON: response,
 			}
 		}
+
 	}
 	if resErr := httputil.UnmarshalJSON(reqBody, &r); resErr != nil {
 		return *resErr
@@ -533,7 +597,7 @@ func Register(
 	}
 
 	// Don't allow numeric usernames less than MAX_INT64.
-	if _, err = strconv.ParseInt(r.Username, 10, 64); err == nil {
+	if _, err := strconv.ParseInt(r.Username, 10, 64); err == nil {
 		return util.JSONResponse{
 			Code: http.StatusBadRequest,
 			JSON: jsonerror.InvalidUsername("Numeric user IDs are reserved"),
@@ -541,15 +605,12 @@ func Register(
 	}
 	// Auto generate a numeric username if r.Username is empty
 	if r.Username == "" {
-		nreq := &userapi.QueryNumericLocalpartRequest{
-			ServerName: r.ServerName,
-		}
-		nres := &userapi.QueryNumericLocalpartResponse{}
-		if err = userAPI.QueryNumericLocalpart(req.Context(), nreq, nres); err != nil {
+		res := &userapi.QueryNumericLocalpartResponse{}
+		if err := userAPI.QueryNumericLocalpart(req.Context(), res); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("userAPI.QueryNumericLocalpart failed")
 			return jsonerror.InternalServerError()
 		}
-		r.Username = strconv.FormatInt(nres.ID, 10)
+		r.Username = strconv.FormatInt(res.ID, 10)
 	}
 
 	// Is this an appservice registration? It will be if the access
@@ -562,8 +623,8 @@ func Register(
 	case r.Type == authtypes.LoginTypeApplicationService && accessTokenErr == nil:
 		// Spec-compliant case (the access_token is specified and the login type
 		// is correctly set, so it's an appservice registration)
-		if err = internal.ValidateApplicationServiceUsername(r.Username, r.ServerName); err != nil {
-			return *internal.UsernameResponse(err)
+		if resErr := validateApplicationServiceUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
+			return *resErr
 		}
 	case accessTokenErr == nil:
 		// Non-spec-compliant case (the access_token is specified but the login
@@ -579,12 +640,12 @@ func Register(
 	default:
 		// Spec-compliant case (neither the access_token nor the login type are
 		// specified, so it's a normal user registration)
-		if err = internal.ValidateUsername(r.Username, r.ServerName); err != nil {
-			return *internal.UsernameResponse(err)
+		if resErr := validateUsername(r.Username, cfg.Matrix.ServerName); resErr != nil {
+			return *resErr
 		}
 	}
-	if err = internal.ValidatePassword(r.Password); err != nil {
-		return *internal.PasswordResponse(err)
+	if resErr := validatePassword(r.Password); resErr != nil {
+		return *resErr
 	}
 
 	logger := util.GetLogger(req.Context())
@@ -603,25 +664,16 @@ func handleGuestRegistration(
 	cfg *config.ClientAPI,
 	userAPI userapi.ClientUserAPI,
 ) util.JSONResponse {
-	registrationEnabled := !cfg.RegistrationDisabled
-	guestsEnabled := !cfg.GuestsDisabled
-	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
-		registrationEnabled, guestsEnabled = v.RegistrationAllowed()
-	}
-
-	if !registrationEnabled || !guestsEnabled {
+	if cfg.RegistrationDisabled || cfg.GuestsDisabled {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(
-				fmt.Sprintf("Guest registration is disabled on %q", r.ServerName),
-			),
+			JSON: jsonerror.Forbidden("Guest registration is disabled"),
 		}
 	}
 
 	var res userapi.PerformAccountCreationResponse
 	err := userAPI.PerformAccountCreation(req.Context(), &userapi.PerformAccountCreationRequest{
 		AccountType: userapi.AccountTypeGuest,
-		ServerName:  r.ServerName,
 	}, &res)
 	if err != nil {
 		return util.JSONResponse{
@@ -645,7 +697,6 @@ func handleGuestRegistration(
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(req.Context(), &userapi.PerformDeviceCreationRequest{
 		Localpart:         res.Account.Localpart,
-		ServerName:        res.Account.ServerName,
 		DeviceDisplayName: r.InitialDisplayName,
 		AccessToken:       token,
 		IPAddr:            req.RemoteAddr,
@@ -662,6 +713,7 @@ func handleGuestRegistration(
 		JSON: registerResponse{
 			UserID:      devRes.Device.UserID,
 			AccessToken: devRes.Device.AccessToken,
+			HomeServer:  res.Account.ServerName,
 			DeviceID:    devRes.Device.ID,
 		},
 	}
@@ -698,16 +750,10 @@ func handleRegistrationFlow(
 		)
 	}
 
-	registrationEnabled := !cfg.RegistrationDisabled
-	if v := cfg.Matrix.VirtualHost(r.ServerName); v != nil {
-		registrationEnabled, _ = v.RegistrationAllowed()
-	}
-	if !registrationEnabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
+	if cfg.RegistrationDisabled && r.Auth.Type != authtypes.LoginTypeSharedSecret {
 		return util.JSONResponse{
 			Code: http.StatusForbidden,
-			JSON: jsonerror.Forbidden(
-				fmt.Sprintf("Registration is disabled on %q", r.ServerName),
-			),
+			JSON: jsonerror.Forbidden("Registration is disabled"),
 		}
 	}
 
@@ -726,18 +772,9 @@ func handleRegistrationFlow(
 	switch r.Auth.Type {
 	case authtypes.LoginTypeRecaptcha:
 		// Check given captcha response
-		err := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
-		switch err {
-		case ErrCaptchaDisabled:
-			return util.JSONResponse{Code: http.StatusForbidden, JSON: jsonerror.Unknown(err.Error())}
-		case ErrMissingResponse:
-			return util.JSONResponse{Code: http.StatusBadRequest, JSON: jsonerror.BadJSON(err.Error())}
-		case ErrInvalidCaptcha:
-			return util.JSONResponse{Code: http.StatusUnauthorized, JSON: jsonerror.BadJSON(err.Error())}
-		case nil:
-		default:
-			util.GetLogger(req.Context()).WithError(err).Error("failed to validate recaptcha")
-			return util.JSONResponse{Code: http.StatusInternalServerError, JSON: jsonerror.InternalServerError()}
+		resErr := validateRecaptcha(cfg, r.Auth.Response, req.RemoteAddr)
+		if resErr != nil {
+			return *resErr
 		}
 
 		// Add Recaptcha to the list of completed registration stages
@@ -814,9 +851,8 @@ func handleApplicationServiceRegistration(
 	// Don't need to worry about appending to registration stages as
 	// application service registration is entirely separate.
 	return completeRegistration(
-		req.Context(), userAPI, r.Username, r.ServerName, "", "", appserviceID, req.RemoteAddr,
-		req.UserAgent(), r.Auth.Session, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
-		userapi.AccountTypeAppService,
+		req.Context(), userAPI, r.Username, "", appserviceID, req.RemoteAddr, req.UserAgent(), r.Auth.Session,
+		r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeAppService,
 	)
 }
 
@@ -834,9 +870,8 @@ func checkAndCompleteFlow(
 	if checkFlowCompleted(flow, cfg.Derived.Registration.Flows) {
 		// This flow was completed, registration can continue
 		return completeRegistration(
-			req.Context(), userAPI, r.Username, r.ServerName, "", r.Password, "", req.RemoteAddr,
-			req.UserAgent(), sessionID, r.InhibitLogin, r.InitialDisplayName, r.DeviceID,
-			userapi.AccountTypeUser,
+			req.Context(), userAPI, r.Username, r.Password, "", req.RemoteAddr, req.UserAgent(), sessionID,
+			r.InhibitLogin, r.InitialDisplayName, r.DeviceID, userapi.AccountTypeUser,
 		)
 	}
 	sessions.addParams(sessionID, r)
@@ -858,10 +893,9 @@ func checkAndCompleteFlow(
 func completeRegistration(
 	ctx context.Context,
 	userAPI userapi.ClientUserAPI,
-	username string, serverName gomatrixserverlib.ServerName, displayName string,
-	password, appserviceID, ipAddr, userAgent, sessionID string,
+	username, password, appserviceID, ipAddr, userAgent, sessionID string,
 	inhibitLogin eventutil.WeakBoolean,
-	deviceDisplayName, deviceID *string,
+	displayName, deviceID *string,
 	accType userapi.AccountType,
 ) util.JSONResponse {
 	if username == "" {
@@ -881,7 +915,6 @@ func completeRegistration(
 	err := userAPI.PerformAccountCreation(ctx, &userapi.PerformAccountCreationRequest{
 		AppServiceID: appserviceID,
 		Localpart:    username,
-		ServerName:   serverName,
 		Password:     password,
 		AccountType:  accType,
 		OnConflict:   userapi.ConflictAbort,
@@ -891,16 +924,6 @@ func completeRegistration(
 			return util.JSONResponse{
 				Code: http.StatusBadRequest,
 				JSON: jsonerror.UserInUse("Desired user ID is already taken."),
-			}
-		}
-		switch e := err.(type) {
-		case internalHTTPUtil.InternalAPIError:
-			conflictErr := &userapi.ErrorConflict{Message: sqlutil.ErrUserExists.Error()}
-			if e.Message == conflictErr.Error() {
-				return util.JSONResponse{
-					Code: http.StatusBadRequest,
-					JSON: jsonerror.UserInUse("Desired user ID is already taken."),
-				}
 			}
 		}
 		return util.JSONResponse{
@@ -918,7 +941,8 @@ func completeRegistration(
 		return util.JSONResponse{
 			Code: http.StatusOK,
 			JSON: registerResponse{
-				UserID: userutil.MakeUserID(username, accRes.Account.ServerName),
+				UserID:     userutil.MakeUserID(username, accRes.Account.ServerName),
+				HomeServer: accRes.Account.ServerName,
 			},
 		}
 	}
@@ -931,28 +955,11 @@ func completeRegistration(
 		}
 	}
 
-	if displayName != "" {
-		nameReq := userapi.PerformUpdateDisplayNameRequest{
-			Localpart:   username,
-			ServerName:  serverName,
-			DisplayName: displayName,
-		}
-		var nameRes userapi.PerformUpdateDisplayNameResponse
-		err = userAPI.SetDisplayName(ctx, &nameReq, &nameRes)
-		if err != nil {
-			return util.JSONResponse{
-				Code: http.StatusInternalServerError,
-				JSON: jsonerror.Unknown("failed to set display name: " + err.Error()),
-			}
-		}
-	}
-
 	var devRes userapi.PerformDeviceCreationResponse
 	err = userAPI.PerformDeviceCreation(ctx, &userapi.PerformDeviceCreationRequest{
 		Localpart:         username,
-		ServerName:        serverName,
 		AccessToken:       token,
-		DeviceDisplayName: deviceDisplayName,
+		DeviceDisplayName: displayName,
 		DeviceID:          deviceID,
 		IPAddr:            ipAddr,
 		UserAgent:         userAgent,
@@ -967,6 +974,7 @@ func completeRegistration(
 	result := registerResponse{
 		UserID:      devRes.Device.UserID,
 		AccessToken: devRes.Device.AccessToken,
+		HomeServer:  accRes.Account.ServerName,
 		DeviceID:    devRes.Device.ID,
 	}
 	sessions.addCompletedRegistration(sessionID, result)
@@ -1043,31 +1051,13 @@ func RegisterAvailable(
 
 	// Squash username to all lowercase letters
 	username = strings.ToLower(username)
-	domain := cfg.Matrix.ServerName
-	host := gomatrixserverlib.ServerName(req.Host)
-	if v := cfg.Matrix.VirtualHostForHTTPHost(host); v != nil {
-		domain = v.ServerName
-	}
-	if u, l, err := cfg.Matrix.SplitLocalID('@', username); err == nil {
-		username, domain = u, l
-	}
-	for _, v := range cfg.Matrix.VirtualHosts {
-		if v.ServerName == domain && !v.AllowRegistration {
-			return util.JSONResponse{
-				Code: http.StatusForbidden,
-				JSON: jsonerror.Forbidden(
-					fmt.Sprintf("Registration is not allowed on %q", string(v.ServerName)),
-				),
-			}
-		}
-	}
 
-	if err := internal.ValidateUsername(username, domain); err != nil {
-		return *internal.UsernameResponse(err)
+	if err := validateUsername(username, cfg.Matrix.ServerName); err != nil {
+		return *err
 	}
 
 	// Check if this username is reserved by an application service
-	userID := userutil.MakeUserID(username, domain)
+	userID := userutil.MakeUserID(username, cfg.Matrix.ServerName)
 	for _, appservice := range cfg.Derived.ApplicationServices {
 		if appservice.OwnsNamespaceCoveringUserId(userID) {
 			return util.JSONResponse{
@@ -1079,8 +1069,7 @@ func RegisterAvailable(
 
 	res := &userapi.QueryAccountAvailabilityResponse{}
 	err := registerAPI.QueryAccountAvailability(req.Context(), &userapi.QueryAccountAvailabilityRequest{
-		Localpart:  username,
-		ServerName: domain,
+		Localpart: username,
 	}, res)
 	if err != nil {
 		return util.JSONResponse{
@@ -1125,11 +1114,11 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	// downcase capitals
 	ssrr.User = strings.ToLower(ssrr.User)
 
-	if err = internal.ValidateUsername(ssrr.User, cfg.Matrix.ServerName); err != nil {
-		return *internal.UsernameResponse(err)
+	if resErr := validateUsername(ssrr.User, cfg.Matrix.ServerName); resErr != nil {
+		return *resErr
 	}
-	if err = internal.ValidatePassword(ssrr.Password); err != nil {
-		return *internal.PasswordResponse(err)
+	if resErr := validatePassword(ssrr.Password); resErr != nil {
+		return *resErr
 	}
 	deviceID := "shared_secret_registration"
 
@@ -1137,5 +1126,5 @@ func handleSharedSecretRegistration(cfg *config.ClientAPI, userAPI userapi.Clien
 	if ssrr.Admin {
 		accType = userapi.AccountTypeAdmin
 	}
-	return completeRegistration(req.Context(), userAPI, ssrr.User, cfg.Matrix.ServerName, ssrr.DisplayName, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
+	return completeRegistration(req.Context(), userAPI, ssrr.User, ssrr.Password, "", req.RemoteAddr, req.UserAgent(), "", false, &ssrr.User, &deviceID, accType)
 }

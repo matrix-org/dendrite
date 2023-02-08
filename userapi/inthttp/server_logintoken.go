@@ -16,25 +16,24 @@ package inthttp
 
 import (
 	"github.com/gorilla/mux"
-
 	"github.com/matrix-org/dendrite/internal/httputil"
 	"github.com/matrix-org/dendrite/userapi/api"
 )
 
 // addRoutesLoginToken adds routes for all login token API calls.
-func addRoutesLoginToken(internalAPIMux *mux.Router, s api.UserInternalAPI, enableMetrics bool) {
+func addRoutesLoginToken(internalAPIMux *mux.Router, s api.UserInternalAPI) {
 	internalAPIMux.Handle(
 		PerformLoginTokenCreationPath,
-		httputil.MakeInternalRPCAPI("UserAPIPerformLoginTokenCreation", enableMetrics, s.PerformLoginTokenCreation),
+		httputil.MakeInternalRPCAPI("UserAPIPerformLoginTokenCreation", s.PerformLoginTokenCreation),
 	)
 
 	internalAPIMux.Handle(
 		PerformLoginTokenDeletionPath,
-		httputil.MakeInternalRPCAPI("UserAPIPerformLoginTokenDeletion", enableMetrics, s.PerformLoginTokenDeletion),
+		httputil.MakeInternalRPCAPI("UserAPIPerformLoginTokenDeletion", s.PerformLoginTokenDeletion),
 	)
 
 	internalAPIMux.Handle(
 		QueryLoginTokenPath,
-		httputil.MakeInternalRPCAPI("UserAPIQueryLoginToken", enableMetrics, s.QueryLoginToken),
+		httputil.MakeInternalRPCAPI("UserAPIQueryLoginToken", s.QueryLoginToken),
 	)
 }

@@ -197,11 +197,6 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 	if err != nil {
 		return err
 	}
-	purge, err := PreparePurgeStatements(db, stateSnapshot)
-	if err != nil {
-		return err
-	}
-
 	d.Database = shared.Database{
 		DB:                  db,
 		Cache:               cache,
@@ -220,7 +215,6 @@ func (d *Database) prepare(db *sql.DB, writer sqlutil.Writer, cache caching.Room
 		PublishedTable:      published,
 		RedactionsTable:     redactions,
 		GetRoomUpdaterFn:    d.GetRoomUpdater,
-		Purge:               purge,
 	}
 	return nil
 }

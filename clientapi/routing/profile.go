@@ -284,7 +284,7 @@ func updateProfile(
 	}
 
 	events, err := buildMembershipEvents(
-		ctx, device, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
+		ctx, res.RoomIDs, *profile, userID, cfg, evTime, rsAPI,
 	)
 	switch e := err.(type) {
 	case nil:
@@ -298,7 +298,7 @@ func updateProfile(
 		return jsonerror.InternalServerError(), e
 	}
 
-	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, device.UserDomain(), domain, domain, nil, true); err != nil {
+	if err := api.SendEvents(ctx, rsAPI, api.KindNew, events, domain, domain, nil, true); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("SendEvents failed")
 		return jsonerror.InternalServerError(), err
 	}
@@ -321,7 +321,7 @@ func getProfile(
 	}
 
 	if !cfg.Matrix.IsLocalServerName(domain) {
-		profile, fedErr := federation.LookupProfile(ctx, cfg.Matrix.ServerName, domain, userID, "")
+		profile, fedErr := federation.LookupProfile(ctx, domain, userID, "")
 		if fedErr != nil {
 			if x, ok := fedErr.(gomatrix.HTTPError); ok {
 				if x.Code == http.StatusNotFound {
@@ -349,7 +349,6 @@ func getProfile(
 
 func buildMembershipEvents(
 	ctx context.Context,
-	device *userapi.Device,
 	roomIDs []string,
 	newProfile authtypes.Profile, userID string, cfg *config.ClientAPI,
 	evTime time.Time, rsAPI api.ClientRoomserverAPI,
@@ -381,12 +380,7 @@ func buildMembershipEvents(
 			return nil, err
 		}
 
-		identity, err := cfg.Matrix.SigningIdentityFor(device.UserDomain())
-		if err != nil {
-			return nil, err
-		}
-
-		event, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, identity, evTime, rsAPI, nil)
+		event, err := eventutil.QueryAndBuildEvent(ctx, &builder, cfg.Matrix, evTime, rsAPI, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -41,7 +41,6 @@ func (p *parsedRespState) Events() []*gomatrixserverlib.Event {
 
 type missingStateReq struct {
 	log             *logrus.Entry
-	virtualHost     gomatrixserverlib.ServerName
 	origin          gomatrixserverlib.ServerName
 	db              storage.Database
 	roomInfo        *types.RoomInfo
@@ -102,7 +101,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		// we can just inject all the newEvents as new as we may have only missed 1 or 2 events and have filled
 		// in the gap in the DAG
 		for _, newEvent := range newEvents {
-			err = t.inputer.processRoomEvent(ctx, t.virtualHost, &api.InputRoomEvent{
+			err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 				Kind:         api.KindOld,
 				Event:        newEvent.Headered(roomVersion),
 				Origin:       t.origin,
@@ -158,7 +157,7 @@ func (t *missingStateReq) processEventWithMissingState(
 			})
 		}
 		for _, ire := range outlierRoomEvents {
-			if err = t.inputer.processRoomEvent(ctx, t.virtualHost, &ire); err != nil {
+			if err = t.inputer.processRoomEvent(ctx, &ire); err != nil {
 				if _, ok := err.(types.RejectedError); !ok {
 					return fmt.Errorf("t.inputer.processRoomEvent (outlier): %w", err)
 				}
@@ -181,7 +180,7 @@ func (t *missingStateReq) processEventWithMissingState(
 		stateIDs = append(stateIDs, event.EventID())
 	}
 
-	err = t.inputer.processRoomEvent(ctx, t.virtualHost, &api.InputRoomEvent{
+	err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 		Kind:          api.KindOld,
 		Event:         backwardsExtremity.Headered(roomVersion),
 		Origin:        t.origin,
@@ -200,7 +199,7 @@ func (t *missingStateReq) processEventWithMissingState(
 	// they will automatically fast-forward based on the room state at the
 	// extremity in the last step.
 	for _, newEvent := range newEvents {
-		err = t.inputer.processRoomEvent(ctx, t.virtualHost, &api.InputRoomEvent{
+		err = t.inputer.processRoomEvent(ctx, &api.InputRoomEvent{
 			Kind:         api.KindOld,
 			Event:        newEvent.Headered(roomVersion),
 			Origin:       t.origin,
@@ -520,7 +519,7 @@ func (t *missingStateReq) getMissingEvents(ctx context.Context, e *gomatrixserve
 	var missingResp *gomatrixserverlib.RespMissingEvents
 	for _, server := range t.servers {
 		var m gomatrixserverlib.RespMissingEvents
-		if m, err = t.federation.LookupMissingEvents(ctx, t.virtualHost, server, e.RoomID(), gomatrixserverlib.MissingEvents{
+		if m, err = t.federation.LookupMissingEvents(ctx, server, e.RoomID(), gomatrixserverlib.MissingEvents{
 			Limit: 20,
 			// The latest event IDs that the sender already has. These are skipped when retrieving the previous events of latest_events.
 			EarliestEvents: latestEvents,
@@ -636,7 +635,7 @@ func (t *missingStateReq) lookupMissingStateViaState(
 	span, ctx := opentracing.StartSpanFromContext(ctx, "lookupMissingStateViaState")
 	defer span.Finish()
 
-	state, err := t.federation.LookupState(ctx, t.virtualHost, t.origin, roomID, eventID, roomVersion)
+	state, err := t.federation.LookupState(ctx, t.origin, roomID, eventID, roomVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +675,7 @@ func (t *missingStateReq) lookupMissingStateViaStateIDs(ctx context.Context, roo
 	totalctx, totalcancel := context.WithTimeout(ctx, time.Minute*5)
 	for _, serverName := range t.servers {
 		reqctx, reqcancel := context.WithTimeout(totalctx, time.Second*20)
-		stateIDs, err = t.federation.LookupStateIDs(reqctx, t.virtualHost, serverName, roomID, eventID)
+		stateIDs, err = t.federation.LookupStateIDs(reqctx, serverName, roomID, eventID)
 		reqcancel()
 		if err == nil {
 			break
@@ -856,7 +855,7 @@ func (t *missingStateReq) lookupEvent(ctx context.Context, roomVersion gomatrixs
 	for _, serverName := range t.servers {
 		reqctx, cancel := context.WithTimeout(ctx, time.Second*30)
 		defer cancel()
-		txn, err := t.federation.GetEvent(reqctx, t.virtualHost, serverName, missingEventID)
+		txn, err := t.federation.GetEvent(reqctx, serverName, missingEventID)
 		if err != nil || len(txn.PDUs) == 0 {
 			t.log.WithError(err).WithField("missing_event_id", missingEventID).Warn("Failed to get missing /event for event ID")
 			if errors.Is(err, context.DeadlineExceeded) {

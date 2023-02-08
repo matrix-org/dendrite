@@ -23,7 +23,6 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -128,12 +127,6 @@ func (s *OutputRoomEventConsumer) onMessage(ctx context.Context, msgs []*nats.Ms
 		s.onRetirePeek(s.ctx, *output.RetirePeek)
 	case api.OutputTypeRedactedEvent:
 		err = s.onRedactEvent(s.ctx, *output.RedactedEvent)
-	case api.OutputTypePurgeRoom:
-		err = s.onPurgeRoom(s.ctx, *output.PurgeRoom)
-		if err != nil {
-			logrus.WithField("room_id", output.PurgeRoom.RoomID).WithError(err).Error("Failed to purge room from sync API")
-			return true // non-fatal, as otherwise we end up in a loop of trying to purge the room
-		}
 	default:
 		log.WithField("type", output.Type).Debug(
 			"roomserver output log: ignoring unknown output type",
@@ -371,7 +364,11 @@ func (s *OutputRoomEventConsumer) notifyJoinedPeeks(ctx context.Context, ev *gom
 	// TODO: check that it's a join and not a profile change (means unmarshalling prev_content)
 	if membership == gomatrixserverlib.Join {
 		// check it's a local join
-		if _, _, err := s.cfg.Matrix.SplitLocalID('@', *ev.StateKey()); err != nil {
+		_, domain, err := gomatrixserverlib.SplitID('@', *ev.StateKey())
+		if err != nil {
+			return sp, fmt.Errorf("gomatrixserverlib.SplitID: %w", err)
+		}
+		if domain != s.cfg.Matrix.ServerName {
 			return sp, nil
 		}
 
@@ -393,7 +390,9 @@ func (s *OutputRoomEventConsumer) onNewInviteEvent(
 	if msg.Event.StateKey() == nil {
 		return
 	}
-	if _, _, err := s.cfg.Matrix.SplitLocalID('@', *msg.Event.StateKey()); err != nil {
+	if _, serverName, err := gomatrixserverlib.SplitID('@', *msg.Event.StateKey()); err != nil {
+		return
+	} else if serverName != s.cfg.Matrix.ServerName {
 		return
 	}
 	pduPos, err := s.db.AddInviteEvent(ctx, msg.Event)
@@ -478,20 +477,6 @@ func (s *OutputRoomEventConsumer) onRetirePeek(
 	// index as PDUs, but we should fix this
 	s.pduStream.Advance(sp)
 	s.notifier.OnRetirePeek(msg.RoomID, msg.UserID, msg.DeviceID, types.StreamingToken{PDUPosition: sp})
-}
-
-func (s *OutputRoomEventConsumer) onPurgeRoom(
-	ctx context.Context, req api.OutputPurgeRoom,
-) error {
-	logrus.WithField("room_id", req.RoomID).Warn("Purging room from sync API")
-
-	if err := s.db.PurgeRoom(ctx, req.RoomID); err != nil {
-		logrus.WithField("room_id", req.RoomID).WithError(err).Error("Failed to purge room from sync API")
-		return err
-	} else {
-		logrus.WithField("room_id", req.RoomID).Warn("Room purged from sync API")
-		return nil
-	}
 }
 
 func (s *OutputRoomEventConsumer) updateStateEvent(event *gomatrixserverlib.HeaderedEvent) (*gomatrixserverlib.HeaderedEvent, error) {

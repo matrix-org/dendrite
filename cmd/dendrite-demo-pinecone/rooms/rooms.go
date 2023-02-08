@@ -58,17 +58,13 @@ func (p *PineconeRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
 	for _, k := range p.r.Peers() {
 		list[gomatrixserverlib.ServerName(k.PublicKey)] = struct{}{}
 	}
-	return bulkFetchPublicRoomsFromServers(
-		context.Background(), p.fedClient,
-		gomatrixserverlib.ServerName(p.r.PublicKey().String()), list,
-	)
+	return bulkFetchPublicRoomsFromServers(context.Background(), p.fedClient, list)
 }
 
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
 	ctx context.Context, fedClient *gomatrixserverlib.FederationClient,
-	origin gomatrixserverlib.ServerName,
 	homeservers map[gomatrixserverlib.ServerName]struct{},
 ) (publicRooms []gomatrixserverlib.PublicRoom) {
 	limit := 200
@@ -86,7 +82,7 @@ func bulkFetchPublicRoomsFromServers(
 		go func(homeserverDomain gomatrixserverlib.ServerName) {
 			defer wg.Done()
 			util.GetLogger(reqctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
-			fres, err := fedClient.GetPublicRooms(reqctx, origin, homeserverDomain, int(limit), "", false, "")
+			fres, err := fedClient.GetPublicRooms(reqctx, homeserverDomain, int(limit), "", false, "")
 			if err != nil {
 				util.GetLogger(reqctx).WithError(err).WithField("hs", homeserverDomain).Warn(
 					"bulkFetchPublicRoomsFromServers: failed to query hs",

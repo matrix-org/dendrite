@@ -8,7 +8,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/pushgateway"
 	"github.com/matrix-org/dendrite/userapi/storage"
 	"github.com/matrix-org/dendrite/userapi/storage/tables"
-	"github.com/matrix-org/gomatrixserverlib"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,8 @@ import (
 // a single goroutine is started when talking to the Push
 // gateways. There is no way to know when the background goroutine has
 // finished.
-func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, localpart string, serverName gomatrixserverlib.ServerName, db storage.Database) error {
-	pusherDevices, err := GetPushDevices(ctx, localpart, serverName, nil, db)
+func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, localpart string, db storage.Database) error {
+	pusherDevices, err := GetPushDevices(ctx, localpart, nil, db)
 	if err != nil {
 		return err
 	}
@@ -27,7 +26,7 @@ func NotifyUserCountsAsync(ctx context.Context, pgClient pushgateway.Client, loc
 		return nil
 	}
 
-	userNumUnreadNotifs, err := db.GetNotificationCount(ctx, localpart, serverName, tables.AllNotifications)
+	userNumUnreadNotifs, err := db.GetNotificationCount(ctx, localpart, tables.AllNotifications)
 	if err != nil {
 		return err
 	}

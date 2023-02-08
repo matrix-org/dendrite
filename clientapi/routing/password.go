@@ -7,7 +7,6 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/auth/authtypes"
 	"github.com/matrix-org/dendrite/clientapi/httputil"
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -82,12 +81,12 @@ func Password(
 	sessions.addCompletedSessionStage(sessionID, authtypes.LoginTypePassword)
 
 	// Check the new password strength.
-	if err := internal.ValidatePassword(r.NewPassword); err != nil {
-		return *internal.PasswordResponse(err)
+	if resErr = validatePassword(r.NewPassword); resErr != nil {
+		return *resErr
 	}
 
 	// Get the local part.
-	localpart, domain, err := gomatrixserverlib.SplitID('@', device.UserID)
+	localpart, _, err := gomatrixserverlib.SplitID('@', device.UserID)
 	if err != nil {
 		util.GetLogger(req.Context()).WithError(err).Error("gomatrixserverlib.SplitID failed")
 		return jsonerror.InternalServerError()
@@ -95,9 +94,8 @@ func Password(
 
 	// Ask the user API to perform the password change.
 	passwordReq := &api.PerformPasswordUpdateRequest{
-		Localpart:  localpart,
-		ServerName: domain,
-		Password:   r.NewPassword,
+		Localpart: localpart,
+		Password:  r.NewPassword,
 	}
 	passwordRes := &api.PerformPasswordUpdateResponse{}
 	if err := userAPI.PerformPasswordUpdate(req.Context(), passwordReq, passwordRes); err != nil {
@@ -124,9 +122,8 @@ func Password(
 		}
 
 		pushersReq := &api.PerformPusherDeletionRequest{
-			Localpart:  localpart,
-			ServerName: domain,
-			SessionID:  device.SessionID,
+			Localpart: localpart,
+			SessionID: device.SessionID,
 		}
 		if err := userAPI.PerformPusherDeletion(req.Context(), pushersReq, &struct{}{}); err != nil {
 			util.GetLogger(req.Context()).WithError(err).Error("PerformPusherDeletion failed")

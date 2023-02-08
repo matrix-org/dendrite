@@ -104,7 +104,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 		return false
 	}
 
-	updated, err := s.db.SetNotificationsRead(ctx, localpart, domain, roomID, uint64(gomatrixserverlib.AsTimestamp(metadata.Timestamp)), true)
+	updated, err := s.db.SetNotificationsRead(ctx, localpart, roomID, uint64(gomatrixserverlib.AsTimestamp(metadata.Timestamp)), true)
 	if err != nil {
 		log.WithError(err).Error("userapi EDU consumer")
 		return false
@@ -118,7 +118,7 @@ func (s *OutputReceiptEventConsumer) onMessage(ctx context.Context, msgs []*nats
 	if !updated {
 		return true
 	}
-	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, domain, s.db); err != nil {
+	if err = util.NotifyUserCountsAsync(ctx, s.pgClient, localpart, s.db); err != nil {
 		log.WithError(err).Error("userapi EDU consumer: NotifyUserCounts failed")
 		return false
 	}

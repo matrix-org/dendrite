@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/matrix-org/util"
 
@@ -33,12 +32,6 @@ import (
 
 	"github.com/matrix-org/dendrite/setup/config"
 )
-
-// logrus is using a global variable when we're using `logrus.AddHook`
-// this unfortunately results in us adding the same hook multiple times.
-// This map ensures we only ever add one level hook.
-var stdLevelLogAdded = make(map[logrus.Level]bool)
-var levelLogAddedMu = &sync.Mutex{}
 
 type utcFormatter struct {
 	logrus.Formatter
@@ -101,8 +94,6 @@ func SetupPprof() {
 
 // SetupStdLogging configures the logging format to standard output. Typically, it is called when the config is not yet loaded.
 func SetupStdLogging() {
-	levelLogAddedMu.Lock()
-	defer levelLogAddedMu.Unlock()
 	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&utcFormatter{
 		&logrus.TextFormatter{

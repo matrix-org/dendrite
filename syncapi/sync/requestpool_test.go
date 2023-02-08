@@ -29,8 +29,8 @@ func (d dummyDB) UpdatePresence(ctx context.Context, userID string, presence typ
 	return 0, nil
 }
 
-func (d dummyDB) GetPresences(ctx context.Context, userID []string) ([]*types.PresenceInternal, error) {
-	return []*types.PresenceInternal{}, nil
+func (d dummyDB) GetPresence(ctx context.Context, userID string) (*types.PresenceInternal, error) {
+	return &types.PresenceInternal{}, nil
 }
 
 func (d dummyDB) PresenceAfter(ctx context.Context, after types.StreamPosition, filter gomatrixserverlib.EventFilter) (map[string]*types.PresenceInternal, error) {

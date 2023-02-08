@@ -40,7 +40,6 @@ const (
 	RoomserverPerformAdminEvacuateRoomPath  = "/roomserver/performAdminEvacuateRoom"
 	RoomserverPerformAdminEvacuateUserPath  = "/roomserver/performAdminEvacuateUser"
 	RoomserverPerformAdminDownloadStatePath = "/roomserver/performAdminDownloadState"
-	RoomserverPerformAdminPurgeRoomPath     = "/roomserver/performAdminPurgeRoom"
 
 	// Query operations
 	RoomserverQueryLatestEventsAndStatePath    = "/roomserver/queryLatestEventsAndState"
@@ -64,7 +63,6 @@ const (
 	RoomserverQueryAuthChainPath               = "/roomserver/queryAuthChain"
 	RoomserverQueryRestrictedJoinAllowed       = "/roomserver/queryRestrictedJoinAllowed"
 	RoomserverQueryMembershipAtEventPath       = "/roomserver/queryMembershipAtEvent"
-	RoomserverQueryLeftMembersPath             = "/roomserver/queryLeftMembers"
 )
 
 type httpRoomserverInternalAPI struct {
@@ -282,17 +280,6 @@ func (h *httpRoomserverInternalAPI) PerformAdminEvacuateUser(
 ) error {
 	return httputil.CallInternalRPCAPI(
 		"PerformAdminEvacuateUser", h.roomserverURL+RoomserverPerformAdminEvacuateUserPath,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpRoomserverInternalAPI) PerformAdminPurgeRoom(
-	ctx context.Context,
-	request *api.PerformAdminPurgeRoomRequest,
-	response *api.PerformAdminPurgeRoomResponse,
-) error {
-	return httputil.CallInternalRPCAPI(
-		"PerformAdminPurgeRoom", h.roomserverURL+RoomserverPerformAdminPurgeRoomPath,
 		h.httpClient, ctx, request, response,
 	)
 }
@@ -563,13 +550,6 @@ func (h *httpRoomserverInternalAPI) PerformForget(
 func (h *httpRoomserverInternalAPI) QueryMembershipAtEvent(ctx context.Context, request *api.QueryMembershipAtEventRequest, response *api.QueryMembershipAtEventResponse) error {
 	return httputil.CallInternalRPCAPI(
 		"QueryMembershiptAtEvent", h.roomserverURL+RoomserverQueryMembershipAtEventPath,
-		h.httpClient, ctx, request, response,
-	)
-}
-
-func (h *httpRoomserverInternalAPI) QueryLeftUsers(ctx context.Context, request *api.QueryLeftUsersRequest, response *api.QueryLeftUsersResponse) error {
-	return httputil.CallInternalRPCAPI(
-		"RoomserverQueryLeftMembers", h.roomserverURL+RoomserverQueryLeftMembersPath,
 		h.httpClient, ctx, request, response,
 	)
 }

@@ -101,7 +101,9 @@ func CreateFederationClient(
 	base *base.BaseDendrite, s *pineconeSessions.Sessions,
 ) *gomatrixserverlib.FederationClient {
 	return gomatrixserverlib.NewFederationClient(
-		base.Cfg.Global.SigningIdentities(),
+		base.Cfg.Global.ServerName,
+		base.Cfg.Global.KeyID,
+		base.Cfg.Global.PrivateKey,
 		gomatrixserverlib.WithTransport(createTransport(s)),
 	)
 }

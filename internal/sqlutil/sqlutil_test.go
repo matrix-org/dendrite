@@ -3,11 +3,10 @@ package sqlutil
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"reflect"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestShouldReturnCorrectAmountOfResulstIfFewerVariablesThanLimit(t *testing.T) {
@@ -162,54 +161,6 @@ func TestShouldReturnErrorIfRowsScanReturnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("Call did not return an error")
-	}
-}
-
-func TestRunLimitedVariablesExec(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	assertNoError(t, err, "Failed to make DB")
-
-	// Query and expect two queries to be executed
-	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\, \$2\)`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\, \$2\)`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-
-	variables := []interface{}{
-		1, 2, 3, 4,
-	}
-
-	query := "DELETE FROM WHERE id IN ($1)"
-
-	if err = RunLimitedVariablesExec(context.Background(), query, db, variables, 2); err != nil {
-		t.Fatal(err)
-	}
-
-	// Query again, but only 3 parameters, still queries two times
-	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\, \$2\)`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\)`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-
-	if err = RunLimitedVariablesExec(context.Background(), query, db, variables[:3], 2); err != nil {
-		t.Fatal(err)
-	}
-
-	// Query again, but only 2 parameters, queries only once
-	mock.ExpectExec(`DELETE FROM WHERE id IN \(\$1\, \$2\)`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-
-	if err = RunLimitedVariablesExec(context.Background(), query, db, variables[:2], 2); err != nil {
-		t.Fatal(err)
-	}
-
-	// Test with invalid query (typo) should return an error
-	mock.ExpectExec(`DELTE FROM`).
-		WillReturnResult(sqlmock.NewResult(0, 0)).
-		WillReturnError(errors.New("typo in query"))
-
-	if err = RunLimitedVariablesExec(context.Background(), "DELTE FROM", db, variables[:2], 2); err == nil {
-		t.Fatal("expected an error, but got none")
 	}
 }
 

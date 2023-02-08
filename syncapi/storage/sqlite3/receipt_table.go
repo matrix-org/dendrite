@@ -58,16 +58,12 @@ const selectRoomReceipts = "" +
 const selectMaxReceiptIDSQL = "" +
 	"SELECT MAX(id) FROM syncapi_receipts"
 
-const purgeReceiptsSQL = "" +
-	"DELETE FROM syncapi_receipts WHERE room_id = $1"
-
 type receiptStatements struct {
 	db                 *sql.DB
 	streamIDStatements *StreamIDStatements
 	upsertReceipt      *sql.Stmt
 	selectRoomReceipts *sql.Stmt
 	selectMaxReceiptID *sql.Stmt
-	purgeReceiptsStmt  *sql.Stmt
 }
 
 func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Receipts, error) {
@@ -88,12 +84,16 @@ func NewSqliteReceiptsTable(db *sql.DB, streamID *StreamIDStatements) (tables.Re
 		db:                 db,
 		streamIDStatements: streamID,
 	}
-	return r, sqlutil.StatementList{
-		{&r.upsertReceipt, upsertReceipt},
-		{&r.selectRoomReceipts, selectRoomReceipts},
-		{&r.selectMaxReceiptID, selectMaxReceiptIDSQL},
-		{&r.purgeReceiptsStmt, purgeReceiptsSQL},
-	}.Prepare(db)
+	if r.upsertReceipt, err = db.Prepare(upsertReceipt); err != nil {
+		return nil, fmt.Errorf("unable to prepare upsertReceipt statement: %w", err)
+	}
+	if r.selectRoomReceipts, err = db.Prepare(selectRoomReceipts); err != nil {
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
+	}
+	if r.selectMaxReceiptID, err = db.Prepare(selectMaxReceiptIDSQL); err != nil {
+		return nil, fmt.Errorf("unable to prepare selectRoomReceipts statement: %w", err)
+	}
+	return r, nil
 }
 
 // UpsertReceipt creates new user receipts
@@ -152,11 +152,4 @@ func (s *receiptStatements) SelectMaxReceiptID(
 		id = nullableID.Int64
 	}
 	return
-}
-
-func (s *receiptStatements) PurgeReceipts(
-	ctx context.Context, txn *sql.Tx, roomID string,
-) error {
-	_, err := sqlutil.TxStmt(txn, s.purgeReceiptsStmt).ExecContext(ctx, roomID)
-	return err
 }

@@ -66,7 +66,7 @@ func (a *UserInternalAPI) QueryLoginToken(ctx context.Context, req *api.QueryLog
 	if !a.Config.Matrix.IsLocalServerName(domain) {
 		return fmt.Errorf("cannot return a login token for a remote user (server name %s)", domain)
 	}
-	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart, domain); err != nil {
+	if _, err := a.DB.GetAccountByLocalpart(ctx, localpart); err != nil {
 		res.Data = nil
 		if err == sql.ErrNoRows {
 			return nil

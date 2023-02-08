@@ -104,10 +104,7 @@ func ruleMatches(rule *Rule, kind Kind, event *gomatrixserverlib.Event, ec Evalu
 	case ContentKind:
 		// TODO: "These configure behaviour for (unencrypted) messages
 		// that match certain patterns." - Does that mean "content.body"?
-		if rule.Pattern == nil {
-			return false, nil
-		}
-		return patternMatches("content.body", *rule.Pattern, event)
+		return patternMatches("content.body", rule.Pattern, event)
 
 	case RoomKind:
 		return rule.RuleID == event.RoomID(), nil
@@ -123,10 +120,7 @@ func ruleMatches(rule *Rule, kind Kind, event *gomatrixserverlib.Event, ec Evalu
 func conditionMatches(cond *Condition, event *gomatrixserverlib.Event, ec EvaluationContext) (bool, error) {
 	switch cond.Kind {
 	case EventMatchCondition:
-		if cond.Pattern == nil {
-			return false, fmt.Errorf("missing condition pattern")
-		}
-		return patternMatches(cond.Key, *cond.Pattern, event)
+		return patternMatches(cond.Key, cond.Pattern, event)
 
 	case ContainsDisplayNameCondition:
 		return patternMatches("content.body", ec.UserDisplayName(), event)
@@ -151,11 +145,6 @@ func conditionMatches(cond *Condition, event *gomatrixserverlib.Event, ec Evalua
 }
 
 func patternMatches(key, pattern string, event *gomatrixserverlib.Event) (bool, error) {
-	// It doesn't make sense for an empty pattern to match anything.
-	if pattern == "" {
-		return false, nil
-	}
-
 	re, err := globToRegexp(pattern)
 	if err != nil {
 		return false, err
@@ -165,18 +154,10 @@ func patternMatches(key, pattern string, event *gomatrixserverlib.Event) (bool, 
 	if err = json.Unmarshal(event.JSON(), &eventMap); err != nil {
 		return false, fmt.Errorf("parsing event: %w", err)
 	}
-	// From the spec:
-	// "If the property specified by key is completely absent from
-	// the event, or does not have a string value, then the condition
-	// will not match, even if pattern is *."
 	v, err := lookupMapPath(strings.Split(key, "."), eventMap)
 	if err != nil {
 		// An unknown path is a benign error that shouldn't stop rule
 		// processing. It's just a non-match.
-		return false, nil
-	}
-	if _, ok := v.(string); !ok {
-		// A non-string never matches.
 		return false, nil
 	}
 

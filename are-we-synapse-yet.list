@@ -937,11 +937,3 @@ fst Room state after a rejected state event is the same as before
 fpb Federation publicRoom Name/topic keys are correct
 fed New federated private chats get full presence information (SYN-115) (10 subtests)
 dvk Rejects invalid device keys
-rmv User can create and send/receive messages in a room with version 10
-rmv local user can join room with version 10
-rmv User can invite local user to room with version 10
-rmv remote user can join room with version 10
-rmv User can invite remote user to room with version 10
-rmv Remote user can backfill in a room with version 10
-rmv Can reject invites over federation for rooms with version 10
-rmv Can receive redactions from regular users over federation in room version 10

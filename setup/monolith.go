@@ -23,8 +23,6 @@ import (
 	"github.com/matrix-org/dendrite/internal/transactions"
 	keyAPI "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/mediaapi"
-	"github.com/matrix-org/dendrite/relayapi"
-	relayAPI "github.com/matrix-org/dendrite/relayapi/api"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
@@ -46,7 +44,6 @@ type Monolith struct {
 	RoomserverAPI roomserverAPI.RoomserverInternalAPI
 	UserAPI       userapi.UserInternalAPI
 	KeyAPI        keyAPI.KeyInternalAPI
-	RelayAPI      relayAPI.RelayInternalAPI
 
 	// Optional
 	ExtPublicRoomsProvider   api.ExtraPublicRoomsProvider
@@ -74,8 +71,4 @@ func (m *Monolith) AddAllPublicRoutes(base *base.BaseDendrite) {
 	syncapi.AddPublicRoutes(
 		base, m.UserAPI, m.RoomserverAPI, m.KeyAPI,
 	)
-
-	if m.RelayAPI != nil {
-		relayapi.AddPublicRoutes(base, m.KeyRing, m.RelayAPI)
-	}
 }
