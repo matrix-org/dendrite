@@ -119,7 +119,7 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 	// Check signature to verify message was not tempered
 	_, err = message.Verify(pk.Signature, (*string)(&pk.config.Matrix.ServerName), nil, nil)
 	if err != nil {
-		return false, jsonerror.InvalidSignature(err.Error() + " " + pk.Signature + " " + string(pk.config.Matrix.ServerName))
+		return false, jsonerror.InvalidSignature(err.Error())
 	}
 
 	// Error if the user ID does not match the signed message.
