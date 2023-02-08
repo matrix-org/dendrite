@@ -28,6 +28,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/sirupsen/logrus"
 )
 
 type Admin struct {
@@ -139,7 +140,12 @@ func (r *Admin) PerformAdminEvacuateRoom(
 			return nil
 		}
 
-		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, time.Now(), &eventsNeeded, latestRes)
+		identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+		if err != nil {
+			continue
+		}
+
+		event, err := eventutil.BuildEvent(ctx, fledglingEvent, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, latestRes)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
@@ -237,11 +243,56 @@ func (r *Admin) PerformAdminEvacuateUser(
 	return nil
 }
 
+func (r *Admin) PerformAdminPurgeRoom(
+	ctx context.Context,
+	req *api.PerformAdminPurgeRoomRequest,
+	res *api.PerformAdminPurgeRoomResponse,
+) error {
+	// Validate we actually got a room ID and nothing else
+	if _, _, err := gomatrixserverlib.SplitID('!', req.RoomID); err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("Malformed room ID: %s", err),
+		}
+		return nil
+	}
+
+	logrus.WithField("room_id", req.RoomID).Warn("Purging room from roomserver")
+	if err := r.DB.PurgeRoom(ctx, req.RoomID); err != nil {
+		logrus.WithField("room_id", req.RoomID).WithError(err).Warn("Failed to purge room from roomserver")
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  err.Error(),
+		}
+		return nil
+	}
+
+	logrus.WithField("room_id", req.RoomID).Warn("Room purged from roomserver")
+
+	return r.Inputer.OutputProducer.ProduceRoomEvents(req.RoomID, []api.OutputEvent{
+		{
+			Type: api.OutputTypePurgeRoom,
+			PurgeRoom: &api.OutputPurgeRoom{
+				RoomID: req.RoomID,
+			},
+		},
+	})
+}
+
 func (r *Admin) PerformAdminDownloadState(
 	ctx context.Context,
 	req *api.PerformAdminDownloadStateRequest,
 	res *api.PerformAdminDownloadStateResponse,
 ) error {
+	_, senderDomain, err := r.Cfg.Matrix.SplitLocalID('@', req.UserID)
+	if err != nil {
+		res.Error = &api.PerformError{
+			Code: api.PerformErrorBadRequest,
+			Msg:  fmt.Sprintf("r.Cfg.Matrix.SplitLocalID: %s", err),
+		}
+		return nil
+	}
+
 	roomInfo, err := r.DB.RoomInfo(ctx, req.RoomID)
 	if err != nil {
 		res.Error = &api.PerformError{
@@ -273,7 +324,7 @@ func (r *Admin) PerformAdminDownloadState(
 
 	for _, fwdExtremity := range fwdExtremities {
 		var state gomatrixserverlib.RespState
-		state, err = r.Inputer.FSAPI.LookupState(ctx, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
+		state, err = r.Inputer.FSAPI.LookupState(ctx, r.Inputer.ServerName, req.ServerName, req.RoomID, fwdExtremity.EventID, roomInfo.RoomVersion)
 		if err != nil {
 			res.Error = &api.PerformError{
 				Code: api.PerformErrorBadRequest,
@@ -331,7 +382,12 @@ func (r *Admin) PerformAdminDownloadState(
 		Depth:        depth,
 	}
 
-	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, time.Now(), &eventsNeeded, queryRes)
+	identity, err := r.Cfg.Matrix.SigningIdentityFor(senderDomain)
+	if err != nil {
+		return err
+	}
+
+	ev, err := eventutil.BuildEvent(ctx, builder, r.Cfg.Matrix, identity, time.Now(), &eventsNeeded, queryRes)
 	if err != nil {
 		res.Error = &api.PerformError{
 			Code: api.PerformErrorBadRequest,

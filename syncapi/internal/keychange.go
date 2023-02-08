@@ -144,38 +144,42 @@ func TrackChangedUsers(
 	// - Loop set of users and decrement by 1 for each user in newly left room.
 	// - If count=0 then they share no more rooms so inform BOTH parties of this via 'left'=[...] in /sync.
 	var queryRes roomserverAPI.QuerySharedUsersResponse
-	err = rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
-		UserID:         userID,
-		IncludeRoomIDs: newlyLeftRooms,
-	}, &queryRes)
-	if err != nil {
-		return nil, nil, err
-	}
 	var stateRes roomserverAPI.QueryBulkStateContentResponse
-	err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
-		RoomIDs: newlyLeftRooms,
-		StateTuples: []gomatrixserverlib.StateKeyTuple{
-			{
-				EventType: gomatrixserverlib.MRoomMember,
-				StateKey:  "*",
-			},
-		},
-		AllowWildcards: true,
-	}, &stateRes)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, state := range stateRes.Rooms {
-		for tuple, membership := range state {
-			if membership != gomatrixserverlib.Join {
-				continue
-			}
-			queryRes.UserIDsToCount[tuple.StateKey]--
+	if len(newlyLeftRooms) > 0 {
+		err = rsAPI.QuerySharedUsers(ctx, &roomserverAPI.QuerySharedUsersRequest{
+			UserID:         userID,
+			IncludeRoomIDs: newlyLeftRooms,
+		}, &queryRes)
+		if err != nil {
+			return nil, nil, err
 		}
-	}
-	for userID, count := range queryRes.UserIDsToCount {
-		if count <= 0 {
-			left = append(left, userID) // left is returned
+
+		err = rsAPI.QueryBulkStateContent(ctx, &roomserverAPI.QueryBulkStateContentRequest{
+			RoomIDs: newlyLeftRooms,
+			StateTuples: []gomatrixserverlib.StateKeyTuple{
+				{
+					EventType: gomatrixserverlib.MRoomMember,
+					StateKey:  "*",
+				},
+			},
+			AllowWildcards: true,
+		}, &stateRes)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, state := range stateRes.Rooms {
+			for tuple, membership := range state {
+				if membership != gomatrixserverlib.Join {
+					continue
+				}
+				queryRes.UserIDsToCount[tuple.StateKey]--
+			}
+		}
+
+		for userID, count := range queryRes.UserIDsToCount {
+			if count <= 0 {
+				left = append(left, userID) // left is returned
+			}
 		}
 	}
 

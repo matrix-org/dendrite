@@ -27,6 +27,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	testutil "github.com/matrix-org/dendrite/test"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,8 +38,9 @@ type loginContext struct {
 
 func createLoginContext(_ *testing.T) *loginContext {
 	cfg := &config.ClientAPI{
-		Matrix: &config.Global{
-			ServerName: testutil.TestServerName,
+		Matrix: &config.Global{SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: gomatrixserverlib.ServerName("localhost"),
+		},
 		},
 		Derived:                        &config.Derived{},
 		PasswordAuthenticationDisabled: true,

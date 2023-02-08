@@ -18,11 +18,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/matrix-org/gomatrixserverlib"
 
-	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/syncapi/storage/tables"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -64,9 +62,6 @@ const selectMembershipCountSQL = "" +
 	" SELECT * FROM syncapi_memberships WHERE room_id = $1 AND stream_pos <= $2 GROUP BY user_id HAVING(max(stream_pos))" +
 	") t WHERE t.membership = $3"
 
-const selectHeroesSQL = "" +
-	"SELECT DISTINCT user_id FROM syncapi_memberships WHERE room_id = $1 AND user_id != $2 AND membership IN ($3) LIMIT 5"
-
 const selectMembershipBeforeSQL = "" +
 	"SELECT membership, topological_pos FROM syncapi_memberships WHERE room_id = $1 and user_id = $2 AND topological_pos <= $3 ORDER BY topological_pos DESC LIMIT 1"
 
@@ -77,6 +72,9 @@ SELECT event_id FROM
 		 	AND ($4 IS NULL OR t.membership <> $4)
 `
 
+const purgeMembershipsSQL = "" +
+	"DELETE FROM syncapi_memberships WHERE room_id = $1"
+
 type membershipsStatements struct {
 	db                        *sql.DB
 	upsertMembershipStmt      *sql.Stmt
@@ -84,6 +82,7 @@ type membershipsStatements struct {
 	//selectHeroesStmt          *sql.Stmt - prepared at runtime due to variadic
 	selectMembershipForUserStmt *sql.Stmt
 	selectMembersStmt           *sql.Stmt
+	purgeMembershipsStmt        *sql.Stmt
 }
 
 func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
@@ -99,7 +98,7 @@ func NewSqliteMembershipsTable(db *sql.DB) (tables.Memberships, error) {
 		{&s.selectMembershipCountStmt, selectMembershipCountSQL},
 		{&s.selectMembershipForUserStmt, selectMembershipBeforeSQL},
 		{&s.selectMembersStmt, selectMembersSQL},
-		// {&s.selectHeroesStmt, selectHeroesSQL}, - prepared at runtime due to variadic
+		{&s.purgeMembershipsStmt, purgeMembershipsSQL},
 	}.Prepare(db)
 }
 
@@ -131,39 +130,6 @@ func (s *membershipsStatements) SelectMembershipCount(
 	return
 }
 
-func (s *membershipsStatements) SelectHeroes(
-	ctx context.Context, txn *sql.Tx, roomID, userID string, memberships []string,
-) (heroes []string, err error) {
-	stmtSQL := strings.Replace(selectHeroesSQL, "($3)", sqlutil.QueryVariadicOffset(len(memberships), 2), 1)
-	stmt, err := s.db.PrepareContext(ctx, stmtSQL)
-	if err != nil {
-		return
-	}
-	defer internal.CloseAndLogIfError(ctx, stmt, "SelectHeroes: stmt.close() failed")
-	params := []interface{}{
-		roomID, userID,
-	}
-	for _, membership := range memberships {
-		params = append(params, membership)
-	}
-
-	stmt = sqlutil.TxStmt(txn, stmt)
-	var rows *sql.Rows
-	rows, err = stmt.QueryContext(ctx, params...)
-	if err != nil {
-		return
-	}
-	defer internal.CloseAndLogIfError(ctx, rows, "SelectHeroes: rows.close() failed")
-	var hero string
-	for rows.Next() {
-		if err = rows.Scan(&hero); err != nil {
-			return
-		}
-		heroes = append(heroes, hero)
-	}
-	return heroes, rows.Err()
-}
-
 // SelectMembershipForUser returns the membership of the user before and including the given position. If no membership can be found
 // returns "leave", the topological position and no error. If an error occurs, other than sql.ErrNoRows, returns that and an empty
 // string as the membership.
@@ -179,6 +145,13 @@ func (s *membershipsStatements) SelectMembershipForUser(
 		return "", 0, err
 	}
 	return membership, topologyPos, nil
+}
+
+func (s *membershipsStatements) PurgeMemberships(
+	ctx context.Context, txn *sql.Tx, roomID string,
+) error {
+	_, err := sqlutil.TxStmt(txn, s.purgeMembershipsStmt).ExecContext(ctx, roomID)
+	return err
 }
 
 func (s *membershipsStatements) SelectMemberships(

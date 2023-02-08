@@ -17,7 +17,10 @@ package sqlite3
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
+
+	"github.com/matrix-org/dendrite/internal/sqlutil"
 
 	"github.com/matrix-org/dendrite/internal"
 	"github.com/matrix-org/dendrite/keyserver/storage/tables"
@@ -43,16 +46,20 @@ const upsertStaleDeviceListSQL = "" +
 	" DO UPDATE SET is_stale = $3, ts_added_secs = $4"
 
 const selectStaleDeviceListsWithDomainsSQL = "" +
-	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2"
+	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 AND domain = $2 ORDER BY ts_added_secs DESC"
 
 const selectStaleDeviceListsSQL = "" +
-	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1"
+	"SELECT user_id FROM keyserver_stale_device_lists WHERE is_stale = $1 ORDER BY ts_added_secs DESC"
+
+const deleteStaleDevicesSQL = "" +
+	"DELETE FROM keyserver_stale_device_lists WHERE user_id IN ($1)"
 
 type staleDeviceListsStatements struct {
 	db                                    *sql.DB
 	upsertStaleDeviceListStmt             *sql.Stmt
 	selectStaleDeviceListsWithDomainsStmt *sql.Stmt
 	selectStaleDeviceListsStmt            *sql.Stmt
+	// deleteStaleDeviceListsStmt            *sql.Stmt // Prepared at runtime
 }
 
 func NewSqliteStaleDeviceListsTable(db *sql.DB) (tables.StaleDeviceLists, error) {
@@ -63,16 +70,12 @@ func NewSqliteStaleDeviceListsTable(db *sql.DB) (tables.StaleDeviceLists, error)
 	if err != nil {
 		return nil, err
 	}
-	if s.upsertStaleDeviceListStmt, err = db.Prepare(upsertStaleDeviceListSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStaleDeviceListsStmt, err = db.Prepare(selectStaleDeviceListsSQL); err != nil {
-		return nil, err
-	}
-	if s.selectStaleDeviceListsWithDomainsStmt, err = db.Prepare(selectStaleDeviceListsWithDomainsSQL); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return s, sqlutil.StatementList{
+		{&s.upsertStaleDeviceListStmt, upsertStaleDeviceListSQL},
+		{&s.selectStaleDeviceListsStmt, selectStaleDeviceListsSQL},
+		{&s.selectStaleDeviceListsWithDomainsStmt, selectStaleDeviceListsWithDomainsSQL},
+		// { &s.deleteStaleDeviceListsStmt, deleteStaleDevicesSQL}, // Prepared at runtime
+	}.Prepare(db)
 }
 
 func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, userID string, isStale bool) error {
@@ -80,7 +83,7 @@ func (s *staleDeviceListsStatements) InsertStaleDeviceList(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, time.Now().Unix())
+	_, err = s.upsertStaleDeviceListStmt.ExecContext(ctx, userID, string(domain), isStale, gomatrixserverlib.AsTimestamp(time.Now()))
 	return err
 }
 
@@ -106,6 +109,27 @@ func (s *staleDeviceListsStatements) SelectUserIDsWithStaleDeviceLists(ctx conte
 		result = append(result, userIDs...)
 	}
 	return result, nil
+}
+
+// DeleteStaleDeviceLists removes users from stale device lists
+func (s *staleDeviceListsStatements) DeleteStaleDeviceLists(
+	ctx context.Context, txn *sql.Tx, userIDs []string,
+) error {
+	qry := strings.Replace(deleteStaleDevicesSQL, "($1)", sqlutil.QueryVariadic(len(userIDs)), 1)
+	stmt, err := s.db.Prepare(qry)
+	if err != nil {
+		return err
+	}
+	defer internal.CloseAndLogIfError(ctx, stmt, "DeleteStaleDeviceLists: stmt.Close failed")
+	stmt = sqlutil.TxStmt(txn, stmt)
+
+	params := make([]any, len(userIDs))
+	for i := range userIDs {
+		params[i] = userIDs[i]
+	}
+
+	_, err = stmt.ExecContext(ctx, params...)
+	return err
 }
 
 func rowsToUserIDs(ctx context.Context, rows *sql.Rows) (result []string, err error) {

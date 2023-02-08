@@ -1,6 +1,6 @@
 #syntax=docker/dockerfile:1.2
 
-FROM golang:1.18-stretch as build
+FROM golang:1.19-buster as build
 RUN apt-get update && apt-get install -y sqlite3
 WORKDIR /build
 
@@ -10,18 +10,22 @@ RUN mkdir /dendrite
 
 # Utilise Docker caching when downloading dependencies, this stops us needlessly
 # downloading dependencies every time.
+ARG CGO
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o /dendrite ./cmd/generate-config && \
-    go build -o /dendrite ./cmd/generate-keys && \
-    go build -o /dendrite ./cmd/dendrite-monolith-server
+    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-config && \
+    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/generate-keys && \
+    CGO_ENABLED=${CGO} go build --race -o /dendrite ./cmd/dendrite-monolith-server && \
+    CGO_ENABLED=${CGO} go test --race -c -cover -covermode=atomic -o /dendrite/dendrite-monolith-server-cover -coverpkg "github.com/matrix-org/..." ./cmd/dendrite-monolith-server && \
+    cp build/scripts/complement-cmd.sh /complement-cmd.sh
 
 WORKDIR /dendrite
 RUN ./generate-keys --private-key matrix_key.pem
 
 ENV SERVER_NAME=localhost
 ENV API=0
+ENV COVER=0
 EXPOSE 8008 8448
 
 # At runtime, generate TLS cert based on the CA now mounted at /ca
@@ -29,4 +33,4 @@ EXPOSE 8008 8448
 CMD ./generate-keys -keysize 1024 --server $SERVER_NAME --tls-cert server.crt --tls-key server.key --tls-authority-cert /complement/ca/ca.crt --tls-authority-key /complement/ca/ca.key && \
     ./generate-config -server $SERVER_NAME --ci > dendrite.yaml && \
     cp /complement/ca/ca.crt /usr/local/share/ca-certificates/ && update-ca-certificates && \
-    exec ./dendrite-monolith-server --really-enable-open-registration --tls-cert server.crt --tls-key server.key --config dendrite.yaml -api=${API:-0}
+    exec /complement-cmd.sh

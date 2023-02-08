@@ -87,8 +87,7 @@ func (p *ReceiptStreamProvider) IncrementalSync(
 		}
 
 		ev := gomatrixserverlib.ClientEvent{
-			Type:   gomatrixserverlib.MReceipt,
-			RoomID: roomID,
+			Type: gomatrixserverlib.MReceipt,
 		}
 		content := make(map[string]ReceiptMRead)
 		for _, receipt := range receipts {

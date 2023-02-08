@@ -18,6 +18,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/appservice"
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/keyserver"
@@ -29,7 +31,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/userapi"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -75,7 +76,7 @@ func main() {
 	// call functions directly on the impl unless running in HTTP mode
 	rsAPI := rsImpl
 	if base.UseHTTPAPIs {
-		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl)
+		roomserver.AddInternalRoutes(base.InternalAPIMux, rsImpl, base.EnableMetrics)
 		rsAPI = base.RoomserverHTTPClient()
 	}
 	if traceInternal {
@@ -89,15 +90,15 @@ func main() {
 	)
 	fsImplAPI := fsAPI
 	if base.UseHTTPAPIs {
-		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI)
+		federationapi.AddInternalRoutes(base.InternalAPIMux, fsAPI, base.EnableMetrics)
 		fsAPI = base.FederationAPIHTTPClient()
 	}
 	keyRing := fsAPI.KeyRing()
 
-	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI)
+	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
 	keyAPI := keyImpl
 	if base.UseHTTPAPIs {
-		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI)
+		keyserver.AddInternalRoutes(base.InternalAPIMux, keyAPI, base.EnableMetrics)
 		keyAPI = base.KeyServerHTTPClient()
 	}
 
@@ -105,7 +106,7 @@ func main() {
 	userImpl := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
 	userAPI := userImpl
 	if base.UseHTTPAPIs {
-		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI)
+		userapi.AddInternalRoutes(base.InternalAPIMux, userAPI, base.EnableMetrics)
 		userAPI = base.UserAPIClient()
 	}
 	if traceInternal {
@@ -119,7 +120,7 @@ func main() {
 	// before the listeners are up.
 	asAPI := appservice.NewInternalAPI(base, userImpl, rsAPI)
 	if base.UseHTTPAPIs {
-		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI)
+		appservice.AddInternalRoutes(base.InternalAPIMux, asAPI, base.EnableMetrics)
 		asAPI = base.AppserviceHTTPClient()
 	}
 

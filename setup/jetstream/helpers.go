@@ -2,6 +2,7 @@ package jetstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
@@ -72,7 +73,15 @@ func JetStreamConsumer(
 						// just timed out and we should try again.
 						continue
 					}
+				} else if errors.Is(err, nats.ErrConsumerDeleted) {
+					// The consumer was deleted so stop.
+					return
 				} else {
+					// Unfortunately, there's no ErrServerShutdown or similar, so we need to compare the string
+					if err.Error() == "nats: Server Shutdown" {
+						logrus.WithContext(ctx).Warn("nats server shutting down")
+						return
+					}
 					// Something else went wrong, so we'll panic.
 					sentry.CaptureException(err)
 					logrus.WithContext(ctx).WithField("subject", subj).Fatal(err)

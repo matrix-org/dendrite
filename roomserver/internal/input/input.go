@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	userapi "github.com/matrix-org/dendrite/userapi/api"
+
 	"github.com/Arceliar/phony"
 	"github.com/getsentry/sentry-go"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -79,6 +81,7 @@ type Inputer struct {
 	JetStream           nats.JetStreamContext
 	Durable             nats.SubOpt
 	ServerName          gomatrixserverlib.ServerName
+	SigningIdentity     *gomatrixserverlib.SigningIdentity
 	FSAPI               fedapi.RoomserverFederationAPI
 	KeyRing             gomatrixserverlib.JSONVerifier
 	ACLs                *acls.ServerACLs
@@ -87,6 +90,7 @@ type Inputer struct {
 	workers             sync.Map // room ID -> *worker
 
 	Queryer *query.Queryer
+	UserAPI userapi.RoomserverUserAPI
 }
 
 // If a room consumer is inactive for a while then we will allow NATS
@@ -278,7 +282,11 @@ func (w *worker) _next() {
 	// a string, because we might want to return that to the caller if
 	// it was a synchronous request.
 	var errString string
-	if err = w.r.processRoomEvent(w.r.ProcessContext.Context(), &inputRoomEvent); err != nil {
+	if err = w.r.processRoomEvent(
+		w.r.ProcessContext.Context(),
+		gomatrixserverlib.ServerName(msg.Header.Get("virtual_host")),
+		&inputRoomEvent,
+	); err != nil {
 		switch err.(type) {
 		case types.RejectedError:
 			// Don't send events that were rejected to Sentry
@@ -358,6 +366,7 @@ func (r *Inputer) queueInputRoomEvents(
 		if replyTo != "" {
 			msg.Header.Set("sync", replyTo)
 		}
+		msg.Header.Set("virtual_host", string(request.VirtualHost))
 		msg.Data, err = json.Marshal(e)
 		if err != nil {
 			return nil, fmt.Errorf("json.Marshal: %w", err)
