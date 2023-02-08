@@ -275,6 +275,15 @@ func (s *currentRoomStateStatements) SelectCurrentState(
 ) ([]*gomatrixserverlib.HeaderedEvent, error) {
 	stmt := sqlutil.TxStmt(txn, s.selectCurrentStateStmt)
 	senders, notSenders := getSendersStateFilterFilter(stateFilter)
+	// We're going to query members later, so remove them from this request
+	if stateFilter.LazyLoadMembers && !stateFilter.IncludeRedundantMembers {
+		notTypes := &[]string{gomatrixserverlib.MRoomMember}
+		if stateFilter.NotTypes != nil {
+			*stateFilter.NotTypes = append(*stateFilter.NotTypes, gomatrixserverlib.MRoomMember)
+		} else {
+			stateFilter.NotTypes = notTypes
+		}
+	}
 	rows, err := stmt.QueryContext(ctx, roomID,
 		pq.StringArray(senders),
 		pq.StringArray(notSenders),

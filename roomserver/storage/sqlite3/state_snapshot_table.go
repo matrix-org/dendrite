@@ -26,6 +26,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/roomserver/storage/tables"
 	"github.com/matrix-org/dendrite/roomserver/types"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -149,6 +150,10 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 func (s *stateSnapshotStatements) BulkSelectStateForHistoryVisibility(
 	ctx context.Context, txn *sql.Tx, stateSnapshotNID types.StateSnapshotNID, domain string,
 ) ([]types.EventNID, error) {
+	return nil, tables.OptimisationNotSupportedError
+}
+
+func (s *stateSnapshotStatements) BulkSelectMembershipForHistoryVisibility(ctx context.Context, txn *sql.Tx, userNID types.EventStateKeyNID, roomInfo *types.RoomInfo, eventIDs ...string) (map[string]*gomatrixserverlib.HeaderedEvent, error) {
 	return nil, tables.OptimisationNotSupportedError
 }
 

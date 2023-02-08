@@ -69,6 +69,9 @@ CREATE TABLE IF NOT EXISTS roomserver_events (
 	auth_event_nids BIGINT[] NOT NULL,
 	is_rejected BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- Create an index which helps in resolving membership events (event_type_nid = 5) - (used for history visibility)
+CREATE INDEX IF NOT EXISTS roomserver_events_memberships_idx ON roomserver_events (room_nid, event_state_key_nid) WHERE (event_type_nid = 5);
 `
 
 const insertEventSQL = "" +
