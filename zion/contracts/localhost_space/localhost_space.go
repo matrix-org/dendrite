@@ -30,10 +30,10 @@ var (
 
 // DataTypesChannel is an auto generated low-level Go binding around an user-defined struct.
 type DataTypesChannel struct {
-	Name      string
-	ChannelId [32]byte
-	CreatedAt *big.Int
-	Disabled  bool
+	Name        string
+	ChannelHash [32]byte
+	CreatedAt   *big.Int
+	Disabled    bool
 }
 
 // DataTypesEntitlement is an auto generated low-level Go binding around an user-defined struct.
@@ -50,7 +50,7 @@ type DataTypesRole struct {
 
 // LocalhostSpaceMetaData contains all meta data concerning the LocalhostSpace contract.
 var LocalhostSpaceMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AddRoleFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ChannelAlreadyRegistered\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ChannelDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementAlreadyExists\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementAlreadyWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementModuleNotSupported\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementNotWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidParameters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MissingOwnerPermission\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotAllowed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionAlreadyExists\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RoleDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RoleIsAssignedToEntitlement\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAdmin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"beacon\",\"type\":\"address\"}],\"name\":\"BeaconUpgraded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"version\",\"type\":\"uint8\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"addPermissionToRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"addRoleToChannel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structDataTypes.Entitlement\",\"name\":\"_entitlement\",\"type\":\"tuple\"}],\"name\":\"addRoleToEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"channels\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"channelsByHash\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"channelName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"uint256[]\",\"name\":\"roleIds\",\"type\":\"uint256[]\"}],\"name\":\"createChannel\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_roleName\",\"type\":\"string\"},{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structDataTypes.Entitlement[]\",\"name\":\"_entitlements\",\"type\":\"tuple[]\"}],\"name\":\"createRole\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"defaultEntitlements\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"disabled\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"entitlements\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_channelHash\",\"type\":\"bytes32\"}],\"name\":\"getChannelByHash\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.Channel\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getChannels\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_moduleType\",\"type\":\"string\"}],\"name\":\"getEntitlementByModuleType\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"getEntitlementIdsByRoleId\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getEntitlements\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"getPermissionsByRoleId\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"getRoleById\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Role\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRoles\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"hasEntitlement\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_networkId\",\"type\":\"string\"},{\"internalType\":\"address[]\",\"name\":\"_entitlements\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_tokenId\",\"type\":\"uint256\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"_user\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"isEntitledToChannel\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"_entitled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_user\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"isEntitledToSpace\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"_entitled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"data\",\"type\":\"bytes[]\"}],\"name\":\"multicall\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"results\",\"type\":\"bytes[]\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"networkId\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"ownerRoleId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"proxiableUUID\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"removePermissionFromRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"removeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"removeRoleFromChannel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structDataTypes.Entitlement\",\"name\":\"_entitlement\",\"type\":\"tuple\"}],\"name\":\"removeRoleFromEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"roleCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"rolesById\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelId\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"_disabled\",\"type\":\"bool\"}],\"name\":\"setChannelAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"_whitelist\",\"type\":\"bool\"}],\"name\":\"setEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"setOwnerRoleId\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"_disabled\",\"type\":\"bool\"}],\"name\":\"setSpaceAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"token\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"tokenId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_channelName\",\"type\":\"string\"}],\"name\":\"updateChannel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_roleName\",\"type\":\"string\"}],\"name\":\"updateRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_newEntitlement\",\"type\":\"address\"}],\"name\":\"upgradeEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"}],\"name\":\"upgradeTo\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"upgradeToAndCall\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"AddRoleFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ChannelAlreadyRegistered\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ChannelDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementAlreadyExists\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementAlreadyWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementModuleNotSupported\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EntitlementNotWhitelisted\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidParameters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MissingOwnerPermission\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NameContainsInvalidCharacters\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NameLengthInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotAllowed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PermissionAlreadyExists\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RoleDoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RoleIsAssignedToEntitlement\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAdmin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"beacon\",\"type\":\"address\"}],\"name\":\"BeaconUpgraded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"version\",\"type\":\"uint8\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"addPermissionToRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"addRoleToChannel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structDataTypes.Entitlement\",\"name\":\"_entitlement\",\"type\":\"tuple\"}],\"name\":\"addRoleToEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"channels\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"channelsByHash\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"bytes32\",\"name\":\"channelHash\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"channelName\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"uint256[]\",\"name\":\"roleIds\",\"type\":\"uint256[]\"}],\"name\":\"createChannel\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_roleName\",\"type\":\"string\"},{\"internalType\":\"string[]\",\"name\":\"_permissions\",\"type\":\"string[]\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structDataTypes.Entitlement[]\",\"name\":\"_entitlements\",\"type\":\"tuple[]\"}],\"name\":\"createRole\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"defaultEntitlements\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"disabled\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"entitlements\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_channelHash\",\"type\":\"bytes32\"}],\"name\":\"getChannelByHash\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"bytes32\",\"name\":\"channelHash\",\"type\":\"bytes32\"},{\"internalType\":\"uint256\",\"name\":\"createdAt\",\"type\":\"uint256\"},{\"internalType\":\"bool\",\"name\":\"disabled\",\"type\":\"bool\"}],\"internalType\":\"structDataTypes.Channel\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getChannels\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_moduleType\",\"type\":\"string\"}],\"name\":\"getEntitlementByModuleType\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"getEntitlementIdsByRoleId\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getEntitlements\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"getPermissionsByRoleId\",\"outputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"\",\"type\":\"bytes32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"getRoleById\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Role\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRoles\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"internalType\":\"structDataTypes.Role[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"hasEntitlement\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_networkId\",\"type\":\"string\"},{\"internalType\":\"address[]\",\"name\":\"_entitlements\",\"type\":\"address[]\"},{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_tokenId\",\"type\":\"uint256\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"_user\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"isEntitledToChannel\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"_entitled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_user\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"isEntitledToSpace\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"_entitled\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"data\",\"type\":\"bytes[]\"}],\"name\":\"multicall\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"results\",\"type\":\"bytes[]\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"networkId\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"ownerRoleId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"proxiableUUID\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_permission\",\"type\":\"string\"}],\"name\":\"removePermissionFromRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"removeRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"_channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"removeRoleFromChannel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"internalType\":\"structDataTypes.Entitlement\",\"name\":\"_entitlement\",\"type\":\"tuple\"}],\"name\":\"removeRoleFromEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"roleCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"rolesById\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"disableChannel\",\"type\":\"bool\"}],\"name\":\"setChannelAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"_whitelist\",\"type\":\"bool\"}],\"name\":\"setEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"}],\"name\":\"setOwnerRoleId\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"_disabled\",\"type\":\"bool\"}],\"name\":\"setSpaceAccess\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"token\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"tokenId\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"channelNetworkId\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"channelName\",\"type\":\"string\"}],\"name\":\"updateChannel\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_roleId\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_roleName\",\"type\":\"string\"}],\"name\":\"updateRole\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_entitlement\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_newEntitlement\",\"type\":\"address\"}],\"name\":\"upgradeEntitlement\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"}],\"name\":\"upgradeTo\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"upgradeToAndCall\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
 }
 
 // LocalhostSpaceABI is the input ABI used to generate the binding from.
@@ -232,28 +232,28 @@ func (_LocalhostSpace *LocalhostSpaceCallerSession) Channels(arg0 *big.Int) ([32
 
 // ChannelsByHash is a free data retrieval call binding the contract method 0x129ab3c8.
 //
-// Solidity: function channelsByHash(bytes32 ) view returns(string name, bytes32 channelId, uint256 createdAt, bool disabled)
+// Solidity: function channelsByHash(bytes32 ) view returns(string name, bytes32 channelHash, uint256 createdAt, bool disabled)
 func (_LocalhostSpace *LocalhostSpaceCaller) ChannelsByHash(opts *bind.CallOpts, arg0 [32]byte) (struct {
-	Name      string
-	ChannelId [32]byte
-	CreatedAt *big.Int
-	Disabled  bool
+	Name        string
+	ChannelHash [32]byte
+	CreatedAt   *big.Int
+	Disabled    bool
 }, error) {
 	var out []interface{}
 	err := _LocalhostSpace.contract.Call(opts, &out, "channelsByHash", arg0)
 
 	outstruct := new(struct {
-		Name      string
-		ChannelId [32]byte
-		CreatedAt *big.Int
-		Disabled  bool
+		Name        string
+		ChannelHash [32]byte
+		CreatedAt   *big.Int
+		Disabled    bool
 	})
 	if err != nil {
 		return *outstruct, err
 	}
 
 	outstruct.Name = *abi.ConvertType(out[0], new(string)).(*string)
-	outstruct.ChannelId = *abi.ConvertType(out[1], new([32]byte)).(*[32]byte)
+	outstruct.ChannelHash = *abi.ConvertType(out[1], new([32]byte)).(*[32]byte)
 	outstruct.CreatedAt = *abi.ConvertType(out[2], new(*big.Int)).(**big.Int)
 	outstruct.Disabled = *abi.ConvertType(out[3], new(bool)).(*bool)
 
@@ -263,24 +263,24 @@ func (_LocalhostSpace *LocalhostSpaceCaller) ChannelsByHash(opts *bind.CallOpts,
 
 // ChannelsByHash is a free data retrieval call binding the contract method 0x129ab3c8.
 //
-// Solidity: function channelsByHash(bytes32 ) view returns(string name, bytes32 channelId, uint256 createdAt, bool disabled)
+// Solidity: function channelsByHash(bytes32 ) view returns(string name, bytes32 channelHash, uint256 createdAt, bool disabled)
 func (_LocalhostSpace *LocalhostSpaceSession) ChannelsByHash(arg0 [32]byte) (struct {
-	Name      string
-	ChannelId [32]byte
-	CreatedAt *big.Int
-	Disabled  bool
+	Name        string
+	ChannelHash [32]byte
+	CreatedAt   *big.Int
+	Disabled    bool
 }, error) {
 	return _LocalhostSpace.Contract.ChannelsByHash(&_LocalhostSpace.CallOpts, arg0)
 }
 
 // ChannelsByHash is a free data retrieval call binding the contract method 0x129ab3c8.
 //
-// Solidity: function channelsByHash(bytes32 ) view returns(string name, bytes32 channelId, uint256 createdAt, bool disabled)
+// Solidity: function channelsByHash(bytes32 ) view returns(string name, bytes32 channelHash, uint256 createdAt, bool disabled)
 func (_LocalhostSpace *LocalhostSpaceCallerSession) ChannelsByHash(arg0 [32]byte) (struct {
-	Name      string
-	ChannelId [32]byte
-	CreatedAt *big.Int
-	Disabled  bool
+	Name        string
+	ChannelHash [32]byte
+	CreatedAt   *big.Int
+	Disabled    bool
 }, error) {
 	return _LocalhostSpace.Contract.ChannelsByHash(&_LocalhostSpace.CallOpts, arg0)
 }
@@ -659,10 +659,10 @@ func (_LocalhostSpace *LocalhostSpaceCallerSession) HasEntitlement(arg0 common.A
 
 // IsEntitledToChannel is a free data retrieval call binding the contract method 0xcea632bc.
 //
-// Solidity: function isEntitledToChannel(string _channelId, address _user, string _permission) view returns(bool _entitled)
-func (_LocalhostSpace *LocalhostSpaceCaller) IsEntitledToChannel(opts *bind.CallOpts, _channelId string, _user common.Address, _permission string) (bool, error) {
+// Solidity: function isEntitledToChannel(string _channelNetworkId, address _user, string _permission) view returns(bool _entitled)
+func (_LocalhostSpace *LocalhostSpaceCaller) IsEntitledToChannel(opts *bind.CallOpts, _channelNetworkId string, _user common.Address, _permission string) (bool, error) {
 	var out []interface{}
-	err := _LocalhostSpace.contract.Call(opts, &out, "isEntitledToChannel", _channelId, _user, _permission)
+	err := _LocalhostSpace.contract.Call(opts, &out, "isEntitledToChannel", _channelNetworkId, _user, _permission)
 
 	if err != nil {
 		return *new(bool), err
@@ -676,16 +676,16 @@ func (_LocalhostSpace *LocalhostSpaceCaller) IsEntitledToChannel(opts *bind.Call
 
 // IsEntitledToChannel is a free data retrieval call binding the contract method 0xcea632bc.
 //
-// Solidity: function isEntitledToChannel(string _channelId, address _user, string _permission) view returns(bool _entitled)
-func (_LocalhostSpace *LocalhostSpaceSession) IsEntitledToChannel(_channelId string, _user common.Address, _permission string) (bool, error) {
-	return _LocalhostSpace.Contract.IsEntitledToChannel(&_LocalhostSpace.CallOpts, _channelId, _user, _permission)
+// Solidity: function isEntitledToChannel(string _channelNetworkId, address _user, string _permission) view returns(bool _entitled)
+func (_LocalhostSpace *LocalhostSpaceSession) IsEntitledToChannel(_channelNetworkId string, _user common.Address, _permission string) (bool, error) {
+	return _LocalhostSpace.Contract.IsEntitledToChannel(&_LocalhostSpace.CallOpts, _channelNetworkId, _user, _permission)
 }
 
 // IsEntitledToChannel is a free data retrieval call binding the contract method 0xcea632bc.
 //
-// Solidity: function isEntitledToChannel(string _channelId, address _user, string _permission) view returns(bool _entitled)
-func (_LocalhostSpace *LocalhostSpaceCallerSession) IsEntitledToChannel(_channelId string, _user common.Address, _permission string) (bool, error) {
-	return _LocalhostSpace.Contract.IsEntitledToChannel(&_LocalhostSpace.CallOpts, _channelId, _user, _permission)
+// Solidity: function isEntitledToChannel(string _channelNetworkId, address _user, string _permission) view returns(bool _entitled)
+func (_LocalhostSpace *LocalhostSpaceCallerSession) IsEntitledToChannel(_channelNetworkId string, _user common.Address, _permission string) (bool, error) {
+	return _LocalhostSpace.Contract.IsEntitledToChannel(&_LocalhostSpace.CallOpts, _channelNetworkId, _user, _permission)
 }
 
 // IsEntitledToSpace is a free data retrieval call binding the contract method 0x20759f9e.
@@ -1035,23 +1035,23 @@ func (_LocalhostSpace *LocalhostSpaceTransactorSession) AddPermissionToRole(_rol
 
 // AddRoleToChannel is a paid mutator transaction binding the contract method 0x1dea616a.
 //
-// Solidity: function addRoleToChannel(string _channelId, address _entitlement, uint256 _roleId) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactor) AddRoleToChannel(opts *bind.TransactOpts, _channelId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
-	return _LocalhostSpace.contract.Transact(opts, "addRoleToChannel", _channelId, _entitlement, _roleId)
+// Solidity: function addRoleToChannel(string _channelNetworkId, address _entitlement, uint256 _roleId) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactor) AddRoleToChannel(opts *bind.TransactOpts, _channelNetworkId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
+	return _LocalhostSpace.contract.Transact(opts, "addRoleToChannel", _channelNetworkId, _entitlement, _roleId)
 }
 
 // AddRoleToChannel is a paid mutator transaction binding the contract method 0x1dea616a.
 //
-// Solidity: function addRoleToChannel(string _channelId, address _entitlement, uint256 _roleId) returns()
-func (_LocalhostSpace *LocalhostSpaceSession) AddRoleToChannel(_channelId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.AddRoleToChannel(&_LocalhostSpace.TransactOpts, _channelId, _entitlement, _roleId)
+// Solidity: function addRoleToChannel(string _channelNetworkId, address _entitlement, uint256 _roleId) returns()
+func (_LocalhostSpace *LocalhostSpaceSession) AddRoleToChannel(_channelNetworkId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.AddRoleToChannel(&_LocalhostSpace.TransactOpts, _channelNetworkId, _entitlement, _roleId)
 }
 
 // AddRoleToChannel is a paid mutator transaction binding the contract method 0x1dea616a.
 //
-// Solidity: function addRoleToChannel(string _channelId, address _entitlement, uint256 _roleId) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactorSession) AddRoleToChannel(_channelId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.AddRoleToChannel(&_LocalhostSpace.TransactOpts, _channelId, _entitlement, _roleId)
+// Solidity: function addRoleToChannel(string _channelNetworkId, address _entitlement, uint256 _roleId) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactorSession) AddRoleToChannel(_channelNetworkId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.AddRoleToChannel(&_LocalhostSpace.TransactOpts, _channelNetworkId, _entitlement, _roleId)
 }
 
 // AddRoleToEntitlement is a paid mutator transaction binding the contract method 0xba201ba8.
@@ -1203,23 +1203,23 @@ func (_LocalhostSpace *LocalhostSpaceTransactorSession) RemoveRole(_roleId *big.
 
 // RemoveRoleFromChannel is a paid mutator transaction binding the contract method 0xbaaf3d57.
 //
-// Solidity: function removeRoleFromChannel(string _channelId, address _entitlement, uint256 _roleId) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactor) RemoveRoleFromChannel(opts *bind.TransactOpts, _channelId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
-	return _LocalhostSpace.contract.Transact(opts, "removeRoleFromChannel", _channelId, _entitlement, _roleId)
+// Solidity: function removeRoleFromChannel(string _channelNetworkId, address _entitlement, uint256 _roleId) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactor) RemoveRoleFromChannel(opts *bind.TransactOpts, _channelNetworkId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
+	return _LocalhostSpace.contract.Transact(opts, "removeRoleFromChannel", _channelNetworkId, _entitlement, _roleId)
 }
 
 // RemoveRoleFromChannel is a paid mutator transaction binding the contract method 0xbaaf3d57.
 //
-// Solidity: function removeRoleFromChannel(string _channelId, address _entitlement, uint256 _roleId) returns()
-func (_LocalhostSpace *LocalhostSpaceSession) RemoveRoleFromChannel(_channelId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.RemoveRoleFromChannel(&_LocalhostSpace.TransactOpts, _channelId, _entitlement, _roleId)
+// Solidity: function removeRoleFromChannel(string _channelNetworkId, address _entitlement, uint256 _roleId) returns()
+func (_LocalhostSpace *LocalhostSpaceSession) RemoveRoleFromChannel(_channelNetworkId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.RemoveRoleFromChannel(&_LocalhostSpace.TransactOpts, _channelNetworkId, _entitlement, _roleId)
 }
 
 // RemoveRoleFromChannel is a paid mutator transaction binding the contract method 0xbaaf3d57.
 //
-// Solidity: function removeRoleFromChannel(string _channelId, address _entitlement, uint256 _roleId) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactorSession) RemoveRoleFromChannel(_channelId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.RemoveRoleFromChannel(&_LocalhostSpace.TransactOpts, _channelId, _entitlement, _roleId)
+// Solidity: function removeRoleFromChannel(string _channelNetworkId, address _entitlement, uint256 _roleId) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactorSession) RemoveRoleFromChannel(_channelNetworkId string, _entitlement common.Address, _roleId *big.Int) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.RemoveRoleFromChannel(&_LocalhostSpace.TransactOpts, _channelNetworkId, _entitlement, _roleId)
 }
 
 // RemoveRoleFromEntitlement is a paid mutator transaction binding the contract method 0xdba81864.
@@ -1245,23 +1245,23 @@ func (_LocalhostSpace *LocalhostSpaceTransactorSession) RemoveRoleFromEntitlemen
 
 // SetChannelAccess is a paid mutator transaction binding the contract method 0x5de151b8.
 //
-// Solidity: function setChannelAccess(string _channelId, bool _disabled) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactor) SetChannelAccess(opts *bind.TransactOpts, _channelId string, _disabled bool) (*types.Transaction, error) {
-	return _LocalhostSpace.contract.Transact(opts, "setChannelAccess", _channelId, _disabled)
+// Solidity: function setChannelAccess(string channelNetworkId, bool disableChannel) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactor) SetChannelAccess(opts *bind.TransactOpts, channelNetworkId string, disableChannel bool) (*types.Transaction, error) {
+	return _LocalhostSpace.contract.Transact(opts, "setChannelAccess", channelNetworkId, disableChannel)
 }
 
 // SetChannelAccess is a paid mutator transaction binding the contract method 0x5de151b8.
 //
-// Solidity: function setChannelAccess(string _channelId, bool _disabled) returns()
-func (_LocalhostSpace *LocalhostSpaceSession) SetChannelAccess(_channelId string, _disabled bool) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.SetChannelAccess(&_LocalhostSpace.TransactOpts, _channelId, _disabled)
+// Solidity: function setChannelAccess(string channelNetworkId, bool disableChannel) returns()
+func (_LocalhostSpace *LocalhostSpaceSession) SetChannelAccess(channelNetworkId string, disableChannel bool) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.SetChannelAccess(&_LocalhostSpace.TransactOpts, channelNetworkId, disableChannel)
 }
 
 // SetChannelAccess is a paid mutator transaction binding the contract method 0x5de151b8.
 //
-// Solidity: function setChannelAccess(string _channelId, bool _disabled) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactorSession) SetChannelAccess(_channelId string, _disabled bool) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.SetChannelAccess(&_LocalhostSpace.TransactOpts, _channelId, _disabled)
+// Solidity: function setChannelAccess(string channelNetworkId, bool disableChannel) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactorSession) SetChannelAccess(channelNetworkId string, disableChannel bool) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.SetChannelAccess(&_LocalhostSpace.TransactOpts, channelNetworkId, disableChannel)
 }
 
 // SetEntitlement is a paid mutator transaction binding the contract method 0xf3b96ab4.
@@ -1329,23 +1329,23 @@ func (_LocalhostSpace *LocalhostSpaceTransactorSession) SetSpaceAccess(_disabled
 
 // UpdateChannel is a paid mutator transaction binding the contract method 0x34a1dd26.
 //
-// Solidity: function updateChannel(string _channelId, string _channelName) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactor) UpdateChannel(opts *bind.TransactOpts, _channelId string, _channelName string) (*types.Transaction, error) {
-	return _LocalhostSpace.contract.Transact(opts, "updateChannel", _channelId, _channelName)
+// Solidity: function updateChannel(string channelNetworkId, string channelName) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactor) UpdateChannel(opts *bind.TransactOpts, channelNetworkId string, channelName string) (*types.Transaction, error) {
+	return _LocalhostSpace.contract.Transact(opts, "updateChannel", channelNetworkId, channelName)
 }
 
 // UpdateChannel is a paid mutator transaction binding the contract method 0x34a1dd26.
 //
-// Solidity: function updateChannel(string _channelId, string _channelName) returns()
-func (_LocalhostSpace *LocalhostSpaceSession) UpdateChannel(_channelId string, _channelName string) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.UpdateChannel(&_LocalhostSpace.TransactOpts, _channelId, _channelName)
+// Solidity: function updateChannel(string channelNetworkId, string channelName) returns()
+func (_LocalhostSpace *LocalhostSpaceSession) UpdateChannel(channelNetworkId string, channelName string) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.UpdateChannel(&_LocalhostSpace.TransactOpts, channelNetworkId, channelName)
 }
 
 // UpdateChannel is a paid mutator transaction binding the contract method 0x34a1dd26.
 //
-// Solidity: function updateChannel(string _channelId, string _channelName) returns()
-func (_LocalhostSpace *LocalhostSpaceTransactorSession) UpdateChannel(_channelId string, _channelName string) (*types.Transaction, error) {
-	return _LocalhostSpace.Contract.UpdateChannel(&_LocalhostSpace.TransactOpts, _channelId, _channelName)
+// Solidity: function updateChannel(string channelNetworkId, string channelName) returns()
+func (_LocalhostSpace *LocalhostSpaceTransactorSession) UpdateChannel(channelNetworkId string, channelName string) (*types.Transaction, error) {
+	return _LocalhostSpace.Contract.UpdateChannel(&_LocalhostSpace.TransactOpts, channelNetworkId, channelName)
 }
 
 // UpdateRole is a paid mutator transaction binding the contract method 0x32e704cc.
