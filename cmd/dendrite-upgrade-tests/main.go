@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -496,7 +497,7 @@ func testCreateAccount(dockerClient *client.Client, v string, containerID string
 	}
 	defer response.Close()
 
-	data, err := io.ReadAll(response.Reader)
+	data, err := ioutil.ReadAll(response.Reader)
 	if err != nil {
 		return err
 	}
