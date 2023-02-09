@@ -25,6 +25,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/sirupsen/logrus"
 	"github.com/spruceid/siwe-go"
 )
 
@@ -70,22 +71,27 @@ func (pk LoginPublicKeyEthereum) AccountExists(ctx context.Context) (string, *js
 	localPart, _, err := userutil.ParseUsernameParam(pk.UserId, pk.config.Matrix)
 	if err != nil {
 		// userId does not exist
-		return "", jsonerror.Forbidden("the address is incorrect, or the account does not exist.")
+		logrus.WithError(err).Error("the address is incorrect, userId does not exist", pk.UserId)
+		return "", jsonerror.Forbidden("the address is incorrect, userId does not exist")
 	}
 
 	if !pk.IsValidUserId(localPart) {
+		logrus.Warn("the username is not valid", pk.UserId, localPart)
 		return "", jsonerror.InvalidUsername("the username is not valid.")
 	}
 
 	res := userapi.QueryAccountAvailabilityResponse{}
 	if err := pk.userAPI.QueryAccountAvailability(ctx, &userapi.QueryAccountAvailabilityRequest{
-		Localpart: localPart,
+		Localpart:  localPart,
+		ServerName: pk.config.Matrix.ServerName,
 	}, &res); err != nil {
-		return "", jsonerror.Unknown("failed to check availability: " + err.Error())
+		logrus.WithError(err).Error("failed to check availability")
+		return "", jsonerror.Unknown("failed to check availability")
 	}
 
 	if localPart == "" || res.Available {
-		return "", jsonerror.Forbidden("the address is incorrect, account does not exist")
+		logrus.Warn("the address is incorrect, or the account does not exist", pk.UserId, localPart, res)
+		return "", jsonerror.Forbidden("the address is incorrect, or the account does not exist")
 	}
 
 	return localPart, nil
@@ -121,7 +127,7 @@ func (pk LoginPublicKeyEthereum) ValidateLoginResponse() (bool, *jsonerror.Matri
 	// Check signature to verify message was not tempered
 	_, err = message.Verify(pk.Signature, (*string)(&serverName), nil, nil)
 	if err != nil {
-		return false, jsonerror.InvalidSignature(err.Error() + " signature:" + pk.Signature + " server_name:" + string(serverName) + " messageDomain:" + message.GetDomain())
+		return false, jsonerror.InvalidSignature(fmt.Sprintf("%s signature:%+v server_name:%+v messsage_domain:%+v", err.Error(), pk.Signature, serverName, message.GetDomain()))
 	}
 
 	// Error if the user ID does not match the signed message.
