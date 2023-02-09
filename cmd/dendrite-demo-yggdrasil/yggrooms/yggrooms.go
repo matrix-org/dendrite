@@ -43,13 +43,18 @@ func NewYggdrasilRoomProvider(
 }
 
 func (p *YggdrasilRoomProvider) Rooms() []gomatrixserverlib.PublicRoom {
-	return bulkFetchPublicRoomsFromServers(context.Background(), p.fedClient, p.node.KnownNodes())
+	return bulkFetchPublicRoomsFromServers(
+		context.Background(), p.fedClient,
+		gomatrixserverlib.ServerName(p.node.DerivedServerName()),
+		p.node.KnownNodes(),
+	)
 }
 
 // bulkFetchPublicRoomsFromServers fetches public rooms from the list of homeservers.
 // Returns a list of public rooms.
 func bulkFetchPublicRoomsFromServers(
 	ctx context.Context, fedClient *gomatrixserverlib.FederationClient,
+	origin gomatrixserverlib.ServerName,
 	homeservers []gomatrixserverlib.ServerName,
 ) (publicRooms []gomatrixserverlib.PublicRoom) {
 	limit := 200
@@ -66,7 +71,7 @@ func bulkFetchPublicRoomsFromServers(
 		go func(homeserverDomain gomatrixserverlib.ServerName) {
 			defer wg.Done()
 			util.GetLogger(ctx).WithField("hs", homeserverDomain).Info("Querying HS for public rooms")
-			fres, err := fedClient.GetPublicRooms(ctx, homeserverDomain, int(limit), "", false, "")
+			fres, err := fedClient.GetPublicRooms(ctx, origin, homeserverDomain, int(limit), "", false, "")
 			if err != nil {
 				util.GetLogger(ctx).WithError(err).WithField("hs", homeserverDomain).Warn(
 					"bulkFetchPublicRoomsFromServers: failed to query hs",

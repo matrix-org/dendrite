@@ -22,8 +22,10 @@ import (
 	"testing"
 
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
+	"github.com/matrix-org/dendrite/clientapi/userutil"
 	"github.com/matrix-org/dendrite/setup/config"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 )
 
@@ -46,7 +48,7 @@ func TestLoginFromJSONReader(t *testing.T) {
 				"password": "herpassword",
 				"device_id": "adevice"
             }`,
-			WantUsername: "alice",
+			WantUsername: "@alice:example.com",
 			WantDeviceID: "adevice",
 		},
 		{
@@ -73,7 +75,9 @@ func TestLoginFromJSONReader(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
 				Matrix: &config.Global{
-					ServerName: serverName,
+					SigningIdentity: gomatrixserverlib.SigningIdentity{
+						ServerName: serverName,
+					},
 				},
 			}
 			login, cleanup, err := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, &userAPI, &userInteractive, cfg)
@@ -158,7 +162,9 @@ func TestBadLoginFromJSONReader(t *testing.T) {
 			var userAPI fakeUserInternalAPI
 			cfg := &config.ClientAPI{
 				Matrix: &config.Global{
-					ServerName: serverName,
+					SigningIdentity: gomatrixserverlib.SigningIdentity{
+						ServerName: serverName,
+					},
 				},
 			}
 			_, cleanup, errRes := LoginFromJSONReader(ctx, strings.NewReader(tst.Body), &userAPI, &userAPI, &userAPI, &userInteractive, cfg)
@@ -185,7 +191,7 @@ func (ua *fakeUserInternalAPI) QueryAccountByPassword(ctx context.Context, req *
 		return nil
 	}
 	res.Exists = true
-	res.Account = &uapi.Account{}
+	res.Account = &uapi.Account{UserID: userutil.MakeUserID(req.Localpart, req.ServerName)}
 	return nil
 }
 

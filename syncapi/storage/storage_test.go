@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/test"
 	"github.com/matrix-org/dendrite/test/testrig"
 	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/stretchr/testify/assert"
 )
 
 var ctx = context.Background()
@@ -154,12 +156,12 @@ func TestRecentEventsPDU(t *testing.T) {
 			tc := testCases[i]
 			t.Run(tc.Name, func(st *testing.T) {
 				var filter gomatrixserverlib.RoomEventFilter
-				var gotEvents []types.StreamEvent
+				var gotEvents map[string]types.RecentEvents
 				var limited bool
 				filter.Limit = tc.Limit
 				WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
 					var err error
-					gotEvents, limited, err = snapshot.RecentEvents(ctx, r.ID, types.Range{
+					gotEvents, err = snapshot.RecentEvents(ctx, []string{r.ID}, types.Range{
 						From: tc.From,
 						To:   tc.To,
 					}, &filter, !tc.ReverseOrder, true)
@@ -167,15 +169,18 @@ func TestRecentEventsPDU(t *testing.T) {
 						st.Fatalf("failed to do sync: %s", err)
 					}
 				})
+				streamEvents := gotEvents[r.ID]
+				limited = streamEvents.Limited
 				if limited != tc.WantLimited {
 					st.Errorf("got limited=%v want %v", limited, tc.WantLimited)
 				}
-				if len(gotEvents) != len(tc.WantEvents) {
+				if len(streamEvents.Events) != len(tc.WantEvents) {
 					st.Errorf("got %d events, want %d", len(gotEvents), len(tc.WantEvents))
 				}
-				for j := range gotEvents {
-					if !reflect.DeepEqual(gotEvents[j].JSON(), tc.WantEvents[j].JSON()) {
-						st.Errorf("event %d got %s want %s", j, string(gotEvents[j].JSON()), string(tc.WantEvents[j].JSON()))
+
+				for j := range streamEvents.Events {
+					if !reflect.DeepEqual(streamEvents.Events[j].JSON(), tc.WantEvents[j].JSON()) {
+						st.Errorf("event %d got %s want %s", j, string(streamEvents.Events[j].JSON()), string(tc.WantEvents[j].JSON()))
 					}
 				}
 			})
@@ -198,10 +203,7 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 		_ = MustWriteEvents(t, db, events)
 
 		WithSnapshot(t, db, func(snapshot storage.DatabaseTransaction) {
-			from, err := snapshot.MaxTopologicalPosition(ctx, r.ID)
-			if err != nil {
-				t.Fatalf("failed to get MaxTopologicalPosition: %s", err)
-			}
+			from := types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64}
 			t.Logf("max topo pos = %+v", from)
 			// head towards the beginning of time
 			to := types.TopologyToken{}
@@ -215,6 +217,88 @@ func TestGetEventsInRangeWithTopologyToken(t *testing.T) {
 			gots := snapshot.StreamEventsToEvents(nil, paginatedEvents)
 			test.AssertEventsEqual(t, gots, test.Reversed(events[len(events)-5:]))
 		})
+	})
+}
+
+func TestStreamToTopologicalPosition(t *testing.T) {
+	alice := test.NewUser(t)
+	r := test.NewRoom(t, alice)
+
+	testCases := []struct {
+		name             string
+		roomID           string
+		streamPos        types.StreamPosition
+		backwardOrdering bool
+		wantToken        types.TopologyToken
+	}{
+		{
+			name:             "forward ordering found streamPos returns found position",
+			roomID:           r.ID,
+			streamPos:        1,
+			backwardOrdering: false,
+			wantToken:        types.TopologyToken{Depth: 1, PDUPosition: 1},
+		},
+		{
+			name:             "forward ordering not found streamPos returns max position",
+			roomID:           r.ID,
+			streamPos:        100,
+			backwardOrdering: false,
+			wantToken:        types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64},
+		},
+		{
+			name:             "backward ordering found streamPos returns found position",
+			roomID:           r.ID,
+			streamPos:        1,
+			backwardOrdering: true,
+			wantToken:        types.TopologyToken{Depth: 1, PDUPosition: 1},
+		},
+		{
+			name:             "backward ordering not found streamPos returns maxDepth with param pduPosition",
+			roomID:           r.ID,
+			streamPos:        100,
+			backwardOrdering: true,
+			wantToken:        types.TopologyToken{Depth: 5, PDUPosition: 100},
+		},
+		{
+			name:             "backward non-existent room returns zero token",
+			roomID:           "!doesnotexist:localhost",
+			streamPos:        1,
+			backwardOrdering: true,
+			wantToken:        types.TopologyToken{Depth: 0, PDUPosition: 1},
+		},
+		{
+			name:             "forward non-existent room returns max token",
+			roomID:           "!doesnotexist:localhost",
+			streamPos:        1,
+			backwardOrdering: false,
+			wantToken:        types.TopologyToken{Depth: math.MaxInt64, PDUPosition: math.MaxInt64},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		defer close()
+		defer closeBase()
+
+		txn, err := db.NewDatabaseTransaction(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer txn.Rollback()
+		MustWriteEvents(t, db, r.Events())
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				token, err := txn.StreamToTopologicalPosition(ctx, tc.roomID, tc.streamPos, tc.backwardOrdering)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.wantToken != token {
+					t.Fatalf("expected token %q, got %q", tc.wantToken, token)
+				}
+			})
+		}
+
 	})
 }
 
@@ -664,3 +748,239 @@ func topologyTokenBefore(t *testing.T, db storage.Database, eventID string) *typ
 	return &tok
 }
 */
+
+func pointer[t any](s t) *t {
+	return &s
+}
+
+func TestRoomSummary(t *testing.T) {
+
+	alice := test.NewUser(t)
+	bob := test.NewUser(t)
+	charlie := test.NewUser(t)
+
+	// Create some dummy users
+	moreUsers := []*test.User{}
+	moreUserIDs := []string{}
+	for i := 0; i < 10; i++ {
+		u := test.NewUser(t)
+		moreUsers = append(moreUsers, u)
+		moreUserIDs = append(moreUserIDs, u.ID)
+	}
+
+	testCases := []struct {
+		name             string
+		wantSummary      *types.Summary
+		additionalEvents func(t *testing.T, room *test.Room)
+	}{
+		{
+			name:        "after initial creation",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{}},
+		},
+		{
+			name:        "invited user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(1), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "invited user, but declined",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "joined user after invitation",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(0), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "multiple joined user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(3), InvitedMemberCount: pointer(0), Heroes: []string{charlie.ID, bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, charlie, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(charlie.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "multiple joined/invited user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(1), Heroes: []string{charlie.ID, bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(charlie.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "multiple joined/invited/left user",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(1), Heroes: []string{charlie.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "invite",
+				}, test.WithStateKey(charlie.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "leaving user after joining",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(1), InvitedMemberCount: pointer(0), Heroes: []string{bob.ID}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "leave",
+				}, test.WithStateKey(bob.ID))
+			},
+		},
+		{
+			name:        "many users", // heroes ordered by stream id
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(len(moreUserIDs) + 1), InvitedMemberCount: pointer(0), Heroes: moreUserIDs[:5]},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				for _, x := range moreUsers {
+					room.CreateAndInsert(t, x, gomatrixserverlib.MRoomMember, map[string]interface{}{
+						"membership": "join",
+					}, test.WithStateKey(x.ID))
+				}
+			},
+		},
+		{
+			name:        "canonical alias set",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(0), Heroes: []string{}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomCanonicalAlias, map[string]interface{}{
+					"alias": "myalias",
+				}, test.WithStateKey(""))
+			},
+		},
+		{
+			name:        "room name set",
+			wantSummary: &types.Summary{JoinedMemberCount: pointer(2), InvitedMemberCount: pointer(0), Heroes: []string{}},
+			additionalEvents: func(t *testing.T, room *test.Room) {
+				room.CreateAndInsert(t, bob, gomatrixserverlib.MRoomMember, map[string]interface{}{
+					"membership": "join",
+				}, test.WithStateKey(bob.ID))
+				room.CreateAndInsert(t, alice, gomatrixserverlib.MRoomName, map[string]interface{}{
+					"name": "my room name",
+				}, test.WithStateKey(""))
+			},
+		},
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		defer close()
+		defer closeBase()
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+
+				r := test.NewRoom(t, alice)
+
+				if tc.additionalEvents != nil {
+					tc.additionalEvents(t, r)
+				}
+
+				// write the room before creating a transaction
+				MustWriteEvents(t, db, r.Events())
+
+				transaction, err := db.NewDatabaseTransaction(ctx)
+				assert.NoError(t, err)
+				defer transaction.Rollback()
+
+				summary, err := transaction.GetRoomSummary(ctx, r.ID, alice.ID)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantSummary, summary)
+			})
+		}
+	})
+}
+
+func TestRecentEvents(t *testing.T) {
+	alice := test.NewUser(t)
+	room1 := test.NewRoom(t, alice)
+	room2 := test.NewRoom(t, alice)
+	roomIDs := []string{room1.ID, room2.ID}
+	rooms := map[string]*test.Room{
+		room1.ID: room1,
+		room2.ID: room2,
+	}
+
+	test.WithAllDatabases(t, func(t *testing.T, dbType test.DBType) {
+		filter := gomatrixserverlib.DefaultRoomEventFilter()
+		db, close, closeBase := MustCreateDatabase(t, dbType)
+		t.Cleanup(func() {
+			close()
+			closeBase()
+		})
+
+		MustWriteEvents(t, db, room1.Events())
+		MustWriteEvents(t, db, room2.Events())
+
+		transaction, err := db.NewDatabaseTransaction(ctx)
+		assert.NoError(t, err)
+		defer transaction.Rollback()
+
+		// get all recent events from 0 to 100 (we only created 5 events, so we should get 5 back)
+		roomEvs, err := transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, true, true)
+		assert.NoError(t, err)
+		assert.Equal(t, len(roomEvs), 2, "unexpected recent events response")
+		for _, recentEvents := range roomEvs {
+			assert.Equal(t, 5, len(recentEvents.Events), "unexpected recent events for room")
+		}
+
+		// update the filter to only return one event
+		filter.Limit = 1
+		roomEvs, err = transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, true, true)
+		assert.NoError(t, err)
+		assert.Equal(t, len(roomEvs), 2, "unexpected recent events response")
+		for roomID, recentEvents := range roomEvs {
+			origEvents := rooms[roomID].Events()
+			assert.Equal(t, true, recentEvents.Limited, "expected events to be limited")
+			assert.Equal(t, 1, len(recentEvents.Events), "unexpected recent events for room")
+			assert.Equal(t, origEvents[len(origEvents)-1].EventID(), recentEvents.Events[0].EventID())
+		}
+
+		// not chronologically ordered still returns the events in order (given ORDER BY id DESC)
+		roomEvs, err = transaction.RecentEvents(ctx, roomIDs, types.Range{From: 0, To: 100}, &filter, false, true)
+		assert.NoError(t, err)
+		assert.Equal(t, len(roomEvs), 2, "unexpected recent events response")
+		for roomID, recentEvents := range roomEvs {
+			origEvents := rooms[roomID].Events()
+			assert.Equal(t, true, recentEvents.Limited, "expected events to be limited")
+			assert.Equal(t, 1, len(recentEvents.Events), "unexpected recent events for room")
+			assert.Equal(t, origEvents[len(origEvents)-1].EventID(), recentEvents.Events[0].EventID())
+		}
+	})
+}

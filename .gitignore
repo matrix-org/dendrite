@@ -57,6 +57,7 @@ zion-appservice.yaml
 
 # Database files
 *.db
+*.db-journal
 
 # Log files
 *.log*
@@ -79,3 +80,4 @@ media_store/
 **/__debug_bin
 
 .env
+build/*

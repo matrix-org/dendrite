@@ -11,7 +11,7 @@ import (
 )
 
 func NewRoomserverAuthorization(cfg *config.ClientAPI, roomQueryAPI roomserver.QueryEventsAPI) authorization.Authorization {
-
+	// Load authorization manager for Zion
 	if flag.Lookup("test.v") == nil {
 		// normal run
 		// Load authorization manager for Zion
@@ -26,5 +26,4 @@ func NewRoomserverAuthorization(cfg *config.ClientAPI, roomQueryAPI roomserver.Q
 		// run under go test
 		return &authorization.DefaultAuthorization{}
 	}
-
 }

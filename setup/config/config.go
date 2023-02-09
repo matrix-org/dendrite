@@ -31,7 +31,7 @@ import (
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	jaegerconfig "github.com/uber/jaeger-client-go/config"
 	jaegermetrics "github.com/uber/jaeger-lib/metrics"
@@ -64,6 +64,7 @@ type Dendrite struct {
 	RoomServer    RoomServer    `yaml:"room_server"`
 	SyncAPI       SyncAPI       `yaml:"sync_api"`
 	UserAPI       UserAPI       `yaml:"user_api"`
+	RelayAPI      RelayAPI      `yaml:"relay_api"`
 
 	MSCs MSCs `yaml:"mscs"`
 
@@ -230,7 +231,22 @@ func loadConfig(
 
 	privateKeyPath := absPath(basePath, c.Global.PrivateKeyPath)
 	if c.Global.KeyID, c.Global.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load private_key: %w", err)
+	}
+
+	for _, v := range c.Global.VirtualHosts {
+		if v.KeyValidityPeriod == 0 {
+			v.KeyValidityPeriod = c.Global.KeyValidityPeriod
+		}
+		if v.PrivateKeyPath == "" || v.PrivateKey == nil || v.KeyID == "" {
+			v.KeyID = c.Global.KeyID
+			v.PrivateKey = c.Global.PrivateKey
+			continue
+		}
+		privateKeyPath := absPath(basePath, v.PrivateKeyPath)
+		if v.KeyID, v.PrivateKey, err = LoadMatrixKey(privateKeyPath, readFile); err != nil {
+			return nil, fmt.Errorf("failed to load private_key for virtualhost %s: %w", v.ServerName, err)
+		}
 	}
 
 	for _, key := range c.Global.OldVerifyKeys {
@@ -347,6 +363,7 @@ func (c *Dendrite) Defaults(opts DefaultOpts) {
 	c.SyncAPI.Defaults(opts)
 	c.UserAPI.Defaults(opts)
 	c.AppServiceAPI.Defaults(opts)
+	c.RelayAPI.Defaults(opts)
 	c.MSCs.Defaults(opts)
 	c.Wiring()
 }
@@ -359,7 +376,7 @@ func (c *Dendrite) Verify(configErrs *ConfigErrors, isMonolith bool) {
 		&c.Global, &c.ClientAPI, &c.FederationAPI,
 		&c.KeyServer, &c.MediaAPI, &c.RoomServer,
 		&c.SyncAPI, &c.UserAPI,
-		&c.AppServiceAPI, &c.MSCs,
+		&c.AppServiceAPI, &c.RelayAPI, &c.MSCs,
 	} {
 		c.Verify(configErrs, isMonolith)
 	}
@@ -375,6 +392,7 @@ func (c *Dendrite) Wiring() {
 	c.SyncAPI.Matrix = &c.Global
 	c.UserAPI.Matrix = &c.Global
 	c.AppServiceAPI.Matrix = &c.Global
+	c.RelayAPI.Matrix = &c.Global
 	c.MSCs.Matrix = &c.Global
 
 	c.ClientAPI.Derived = &c.Derived
@@ -589,9 +607,9 @@ func (config *Dendrite) replaceWithEnvVariables() {
 	// If env variable is set, get the value from the env
 	// variable and replace it in each supported field.
 
-	err := godotenv.Load()
+	err := godotenv.Load(".env")
 	if err != nil {
-		logrus.Warningln(err)
+		logrus.Errorln("error loading .env file", err)
 	}
 
 	config.Global.ServerName = gomatrixserverlib.ServerName(
@@ -613,7 +631,7 @@ func (config *Dendrite) replaceWithEnvVariables() {
 			replaceWithEnvVariables(config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl)
 
 		logrus.Infof(
-			"Loaded config for Ethereum chain_id=%v, network_url=%v",
+			"Supported Ethereum chain_id=%v, network_url=%v",
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.ConfigChainID,
 			config.ClientAPI.PublicKeyAuthentication.Ethereum.NetworkUrl,
 		)

@@ -82,7 +82,8 @@ func Backfill(
 		BackwardsExtremities: map[string][]string{
 			"": eIDs,
 		},
-		ServerName: request.Origin(),
+		ServerName:  request.Origin(),
+		VirtualHost: request.Destination(),
 	}
 	if req.Limit, err = strconv.Atoi(limit); err != nil {
 		util.GetLogger(httpReq.Context()).WithError(err).Error("strconv.Atoi failed")
@@ -123,7 +124,7 @@ func Backfill(
 	}
 
 	txn := gomatrixserverlib.Transaction{
-		Origin:         cfg.Matrix.ServerName,
+		Origin:         request.Destination(),
 		PDUs:           eventJSONs,
 		OriginServerTS: gomatrixserverlib.AsTimestamp(time.Now()),
 	}

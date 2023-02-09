@@ -63,6 +63,11 @@ type StreamEvent struct {
 	ExcludeFromSync bool
 }
 
+type RecentEvents struct {
+	Limited bool
+	Events  []StreamEvent
+}
+
 // Range represents a range between two stream positions.
 type Range struct {
 	// From is the position the client has already received.
@@ -494,6 +499,13 @@ func (jr JoinResponse) MarshalJSON() ([]byte, error) {
 	}
 	if jr.Ephemeral != nil && len(jr.Ephemeral.Events) == 0 {
 		a.Ephemeral = nil
+	}
+	if jr.Ephemeral != nil {
+		// Remove the room_id from EDUs, as this seems to cause Element Web
+		// to trigger notifications - https://github.com/vector-im/element-web/issues/17263
+		for i := range jr.Ephemeral.Events {
+			jr.Ephemeral.Events[i].RoomID = ""
+		}
 	}
 	if jr.AccountData != nil && len(jr.AccountData.Events) == 0 {
 		a.AccountData = nil

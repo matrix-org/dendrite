@@ -16,18 +16,19 @@ package roomserver
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/roomserver/internal"
 	"github.com/matrix-org/dendrite/roomserver/inthttp"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/setup/base"
-	"github.com/sirupsen/logrus"
 )
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI) {
-	inthttp.AddRoutes(intAPI, router)
+func AddInternalRoutes(router *mux.Router, intAPI api.RoomserverInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(intAPI, router, enableMetrics)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers

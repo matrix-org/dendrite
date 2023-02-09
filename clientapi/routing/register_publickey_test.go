@@ -29,6 +29,7 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 	testutil "github.com/matrix-org/dendrite/test"
 	uapi "github.com/matrix-org/dendrite/userapi/api"
+	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,9 +43,9 @@ type registerContext struct {
 
 func createRegisterContext(_ *testing.T) *registerContext {
 	cfg := &config.ClientAPI{
-		Matrix: &config.Global{
-			ServerName: testutil.TestServerName,
-		},
+		Matrix: &config.Global{SigningIdentity: gomatrixserverlib.SigningIdentity{
+			ServerName: gomatrixserverlib.ServerName("localhost"),
+		}},
 		Derived:                        &config.Derived{},
 		PasswordAuthenticationDisabled: true,
 		PublicKeyAuthentication: config.PublicKeyAuthentication{
@@ -266,6 +267,7 @@ func TestRegisterEthereum(t *testing.T) {
 	// Asserts
 	assert := assert.New(t)
 	assert.NotNil(response, "response actual: nil, expected: not nil")
+	fmt.Println(response.JSON)
 	registerRes := response.JSON.(registerResponse)
 	assert.Truef(
 		registerRes.UserID == wallet.Eip155UserId,

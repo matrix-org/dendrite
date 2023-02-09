@@ -36,9 +36,15 @@ func Protocols(req *http.Request, asAPI appserviceAPI.AppServiceInternalAPI, dev
 		return jsonerror.InternalServerError()
 	}
 	if !resp.Exists {
+		if protocol != "" {
+			return util.JSONResponse{
+				Code: http.StatusNotFound,
+				JSON: jsonerror.NotFound("The protocol is unknown."),
+			}
+		}
 		return util.JSONResponse{
-			Code: http.StatusNotFound,
-			JSON: jsonerror.NotFound("The protocol is unknown."),
+			Code: http.StatusOK,
+			JSON: struct{}{},
 		}
 	}
 	if protocol != "" {

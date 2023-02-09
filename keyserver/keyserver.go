@@ -18,6 +18,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	rsapi "github.com/matrix-org/dendrite/roomserver/api"
+
 	fedsenderapi "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/dendrite/keyserver/consumers"
@@ -32,14 +34,15 @@ import (
 
 // AddInternalRoutes registers HTTP handlers for the internal API. Invokes functions
 // on the given input API.
-func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI) {
-	inthttp.AddRoutes(router, intAPI)
+func AddInternalRoutes(router *mux.Router, intAPI api.KeyInternalAPI, enableMetrics bool) {
+	inthttp.AddRoutes(router, intAPI, enableMetrics)
 }
 
 // NewInternalAPI returns a concerete implementation of the internal API. Callers
 // can call functions directly on the returned API or via an HTTP interface using AddInternalRoutes.
 func NewInternalAPI(
 	base *base.BaseDendrite, cfg *config.KeyServer, fedClient fedsenderapi.KeyserverFederationAPI,
+	rsAPI rsapi.KeyserverRoomserverAPI,
 ) api.KeyInternalAPI {
 	js, _ := base.NATS.Prepare(base.ProcessContext, &cfg.Matrix.JetStream)
 
@@ -47,19 +50,26 @@ func NewInternalAPI(
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to connect to key server database")
 	}
+
 	keyChangeProducer := &producers.KeyChange{
 		Topic:     string(cfg.Matrix.JetStream.Prefixed(jetstream.OutputKeyChangeEvent)),
 		JetStream: js,
 		DB:        db,
 	}
 	ap := &internal.KeyInternalAPI{
-		DB:         db,
-		ThisServer: cfg.Matrix.ServerName,
-		FedClient:  fedClient,
-		Producer:   keyChangeProducer,
+		DB:        db,
+		Cfg:       cfg,
+		FedClient: fedClient,
+		Producer:  keyChangeProducer,
 	}
-	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8) // 8 workers TODO: configurable
+	updater := internal.NewDeviceListUpdater(base.ProcessContext, db, ap, keyChangeProducer, fedClient, 8, rsAPI, cfg.Matrix.ServerName) // 8 workers TODO: configurable
 	ap.Updater = updater
+
+	// Remove users which we don't share a room with anymore
+	if err := updater.CleanUp(); err != nil {
+		logrus.WithError(err).Error("failed to cleanup stale device lists")
+	}
+
 	go func() {
 		if err := updater.Start(); err != nil {
 			logrus.WithError(err).Panicf("failed to start device list updater")
