@@ -110,6 +110,8 @@ func main() {
 		userAPI = base.UserAPIClient()
 	}
 	if traceInternal {
+		logrus.Warnf("The traceInternal option is enabled")
+
 		userAPI = &uapi.UserInternalAPITrace{
 			Impl: userAPI,
 		}
