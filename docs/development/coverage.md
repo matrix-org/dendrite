@@ -57,22 +57,16 @@ github.com/matrix-org/util/unique.go:55:										UniqueStrings					100.0%
 total:															(statements)					53.7%
 ```
 The total coverage for this run is the last line at the bottom. However, this value is misleading because Dendrite can run in many different configurations,
-which will never be tested in a single test run (e.g sqlite or postgres, monolith or polylith). To get a more accurate value, additional processing is required
+which will never be tested in a single test run (e.g sqlite or postgres). To get a more accurate value, additional processing is required
 to remove packages which will never be tested and extension MSCs:
 ```bash
 # These commands are all similar but change which package paths are _removed_ from the output.
 
-# For Postgres (monolith)
+# For Postgres
 go tool cover -func=/path/to/server-0/integrationcover.log | grep 'github.com/matrix-org/dendrite' | grep -Ev 'inthttp|sqlite|setup/mscs|api_trace' > coverage.txt
 
-# For Postgres (polylith)
-go tool cover -func=/path/to/server-0/integrationcover.log | grep 'github.com/matrix-org/dendrite' | grep -Ev 'sqlite|setup/mscs|api_trace' > coverage.txt
-
-# For SQLite (monolith)
+# For SQLite
 go tool cover -func=/path/to/server-0/integrationcover.log | grep 'github.com/matrix-org/dendrite' | grep -Ev 'inthttp|postgres|setup/mscs|api_trace' > coverage.txt
-
-# For SQLite (polylith)
-go tool cover -func=/path/to/server-0/integrationcover.log | grep 'github.com/matrix-org/dendrite' | grep -Ev 'postgres|setup/mscs|api_trace' > coverage.txt
 ```
 
 A total value can then be calculated using:

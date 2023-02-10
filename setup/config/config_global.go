@@ -363,8 +363,7 @@ func (c *DatabaseOptions) Defaults(conns int) {
 	c.ConnMaxLifetimeSeconds = -1
 }
 
-func (c *DatabaseOptions) Verify(configErrs *ConfigErrors, isMonolith bool) {
-}
+func (c *DatabaseOptions) Verify(configErrs *ConfigErrors) {}
 
 // MaxIdleConns returns maximum idle connections to the DB
 func (c DatabaseOptions) MaxIdleConns() int {
