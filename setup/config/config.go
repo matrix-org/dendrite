@@ -112,15 +112,6 @@ type Derived struct {
 	// servers from creating RoomIDs in exclusive application service namespaces
 }
 
-type InternalAPIOptions struct {
-	Listen  HTTPAddress `yaml:"listen"`
-	Connect HTTPAddress `yaml:"connect"`
-}
-
-type ExternalAPIOptions struct {
-	Listen HTTPAddress `yaml:"listen"`
-}
-
 // A Path on the filesystem.
 type Path string
 
