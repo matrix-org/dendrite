@@ -58,7 +58,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 			MaxIdleConnections:     2,
 			ConnMaxLifetimeSeconds: 60,
 		}
-		base := base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics)
+		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
 		return base, func() {
 			base.ShutdownDendrite()
 			base.WaitForShutdown()
@@ -86,7 +86,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 		cfg.UserAPI.AccountDatabase.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "userapi.db"))
 		cfg.RelayAPI.Database.ConnectionString = config.DataSource(filepath.Join("file://", tempDir, "relayapi.db"))
 
-		base := base.NewBaseDendrite(&cfg, "Test", base.DisableMetrics)
+		base := base.NewBaseDendrite(&cfg, base.DisableMetrics)
 		return base, func() {
 			base.ShutdownDendrite()
 			base.WaitForShutdown()
@@ -109,7 +109,7 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 	cfg.Global.JetStream.InMemory = true
 	cfg.SyncAPI.Fulltext.InMemory = true
 	cfg.FederationAPI.KeyPerspectives = nil
-	base := base.NewBaseDendrite(cfg, "Tests", base.DisableMetrics)
+	base := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	js, jc := base.NATS.Prepare(base.ProcessContext, &cfg.Global.JetStream)
 	return base, js, jc
 }

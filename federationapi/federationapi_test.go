@@ -273,7 +273,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")
 	cfg.Global.PrivateKey = privKey
 	cfg.Global.JetStream.InMemory = true
-	b := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+	b := base.NewBaseDendrite(cfg, base.DisableMetrics)
 	keyRing := &test.NopJSONVerifier{}
 	// TODO: This is pretty fragile, as if anything calls anything on these nils this test will break.
 	// Unfortunately, it makes little sense to instantiate these dependencies when we just want to test routing.

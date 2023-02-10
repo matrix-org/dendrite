@@ -16,7 +16,6 @@ package main
 
 import (
 	"flag"
-	"os"
 
 	"github.com/sirupsen/logrus"
 
@@ -36,7 +35,6 @@ var (
 	httpsBindAddr = flag.String("https-bind-address", ":8448", "The HTTPS listening port for the server")
 	certFile      = flag.String("tls-cert", "", "The PEM formatted X509 certificate to use for TLS")
 	keyFile       = flag.String("tls-key", "", "The PEM private key to use for TLS")
-	traceInternal = os.Getenv("DENDRITE_TRACE_INTERNAL") == "1"
 )
 
 func main() {
@@ -45,7 +43,7 @@ func main() {
 	httpsAddr := config.HTTPAddress("https://" + *httpsBindAddr)
 	options := []basepkg.BaseDendriteOptions{}
 
-	base := basepkg.NewBaseDendrite(cfg, "Monolith", options...)
+	base := basepkg.NewBaseDendrite(cfg, options...)
 	defer base.Close() // nolint: errcheck
 
 	federation := base.CreateFederationClient()
@@ -58,8 +56,7 @@ func main() {
 
 	keyRing := fsAPI.KeyRing()
 
-	keyImpl := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
-	keyAPI := keyImpl
+	keyAPI := keyserver.NewInternalAPI(base, &base.Cfg.KeyServer, fsAPI, rsAPI)
 
 	pgClient := base.PushGatewayHTTPClient()
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
@@ -72,7 +69,7 @@ func main() {
 	rsAPI.SetFederationAPI(fsAPI, keyRing)
 	rsAPI.SetAppserviceAPI(asAPI)
 	rsAPI.SetUserAPI(userAPI)
-	keyImpl.SetUserAPI(userAPI)
+	keyAPI.SetUserAPI(userAPI)
 
 	monolith := setup.Monolith{
 		Config:    base.Cfg,

@@ -121,9 +121,9 @@ func (p *P2PMonolith) SetupPinecone(sk ed25519.PrivateKey) {
 
 func (p *P2PMonolith) SetupDendrite(cfg *config.Dendrite, port int, enableRelaying bool, enableMetrics bool, enableWebsockets bool) {
 	if enableMetrics {
-		p.BaseDendrite = base.NewBaseDendrite(cfg, "Monolith")
+		p.BaseDendrite = base.NewBaseDendrite(cfg)
 	} else {
-		p.BaseDendrite = base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+		p.BaseDendrite = base.NewBaseDendrite(cfg, base.DisableMetrics)
 	}
 	p.port = port
 	p.BaseDendrite.ConfigureAdminEndpoints()

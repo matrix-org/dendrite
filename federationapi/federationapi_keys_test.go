@@ -109,7 +109,7 @@ func TestMain(m *testing.M) {
 			)
 
 			// Finally, build the server key APIs.
-			sbase := base.NewBaseDendrite(cfg, "Monolith", base.DisableMetrics)
+			sbase := base.NewBaseDendrite(cfg, base.DisableMetrics)
 			s.api = NewInternalAPI(sbase, s.fedclient, nil, s.cache, nil, true)
 		}
 

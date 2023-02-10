@@ -177,7 +177,7 @@ func startup() {
 	if err := cfg.Derive(); err != nil {
 		logrus.Fatalf("Failed to derive values from config: %s", err)
 	}
-	base := base.NewBaseDendrite(cfg, "Monolith")
+	base := base.NewBaseDendrite(cfg)
 	defer base.Close() // nolint: errcheck
 
 	rsAPI := roomserver.NewInternalAPI(base)

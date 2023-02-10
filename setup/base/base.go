@@ -98,9 +98,7 @@ const (
 )
 
 // NewBaseDendrite creates a new instance to be used by a component.
-// The componentName is used for logging purposes, and should be a friendly name
-// of the compontent running, e.g. "SyncAPI"
-func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...BaseDendriteOptions) *BaseDendrite {
+func NewBaseDendrite(cfg *config.Dendrite, options ...BaseDendriteOptions) *BaseDendrite {
 	platformSanityChecks()
 	enableMetrics := true
 	for _, opt := range options {
@@ -129,7 +127,7 @@ func NewBaseDendrite(cfg *config.Dendrite, componentName string, options ...Base
 		logrus.Warn("Open registration is enabled")
 	}
 
-	closer, err := cfg.SetupTracing("Dendrite" + componentName)
+	closer, err := cfg.SetupTracing()
 	if err != nil {
 		logrus.WithError(err).Panicf("failed to start opentracing")
 	}

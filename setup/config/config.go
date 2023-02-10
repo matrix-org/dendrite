@@ -411,39 +411,11 @@ func checkNotEmpty(configErrs *ConfigErrors, key, value string) {
 	}
 }
 
-// checkNotZero verifies the given value is not zero in the configuration.
-// If it is, adds an error to the list.
-func checkNotZero(configErrs *ConfigErrors, key string, value int64) {
-	if value == 0 {
-		configErrs.Add(fmt.Sprintf("missing config key %q", key))
-	}
-}
-
 // checkPositive verifies the given value is positive (zero included)
 // in the configuration. If it is not, adds an error to the list.
 func checkPositive(configErrs *ConfigErrors, key string, value int64) {
 	if value < 0 {
 		configErrs.Add(fmt.Sprintf("invalid value for config key %q: %d", key, value))
-	}
-}
-
-// checkURL verifies that the parameter is a valid URL
-func checkURL(configErrs *ConfigErrors, key, value string) {
-	if value == "" {
-		configErrs.Add(fmt.Sprintf("missing config key %q", key))
-		return
-	}
-	url, err := url.Parse(value)
-	if err != nil {
-		configErrs.Add(fmt.Sprintf("config key %q contains invalid URL (%s)", key, err.Error()))
-		return
-	}
-	switch url.Scheme {
-	case "http":
-	case "https":
-	default:
-		configErrs.Add(fmt.Sprintf("config key %q URL should be http:// or https://", key))
-		return
 	}
 }
 
@@ -525,12 +497,12 @@ func readKeyPEM(path string, data []byte, enforceKeyIDFormat bool) (gomatrixserv
 }
 
 // SetupTracing configures the opentracing using the supplied configuration.
-func (config *Dendrite) SetupTracing(serviceName string) (closer io.Closer, err error) {
+func (config *Dendrite) SetupTracing() (closer io.Closer, err error) {
 	if !config.Tracing.Enabled {
 		return io.NopCloser(bytes.NewReader([]byte{})), nil
 	}
 	return config.Tracing.Jaeger.InitGlobalTracer(
-		serviceName,
+		"Dendrite",
 		jaegerconfig.Logger(logrusLogger{logrus.StandardLogger()}),
 		jaegerconfig.Metrics(jaegermetrics.NullFactory),
 	)
