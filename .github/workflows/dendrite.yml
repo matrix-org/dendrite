@@ -130,7 +130,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.18", "1.19", "1.20.0"]
         goos: ["linux"]
         goarch: ["amd64", "386"]
     steps:
@@ -138,7 +138,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go }}go
       - uses: actions/cache@v3
         with:
           path: |
@@ -164,7 +164,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.18", "1.19"]
+        go: ["1.18", "1.19", "1.20.0"]
         goos: ["windows"]
         goarch: ["amd64"]
     steps:
