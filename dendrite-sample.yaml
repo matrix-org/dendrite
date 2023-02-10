@@ -113,8 +113,7 @@ global:
   jetstream:
     # A list of NATS Server addresses to connect to. If none are specified, an
     # internal NATS server will be started automatically when running Dendrite in
-    # monolith mode. For polylith deployments, it is required to specify the address
-    # of at least one NATS Server node.
+    # monolith mode.
     addresses:
     # - localhost:4222
 

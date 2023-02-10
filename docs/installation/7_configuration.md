@@ -7,11 +7,10 @@ permalink: /installation/configuration
 
 # Configuring Dendrite
 
-A YAML configuration file is used to configure Dendrite. Sample configuration files are
+A YAML configuration file is used to configure Dendrite. A sample configuration file is
 present in the top level of the Dendrite repository:
 
 * [`dendrite-sample.monolith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.monolith.yaml)
-* [`dendrite-sample.polylith.yaml`](https://github.com/matrix-org/dendrite/blob/main/dendrite-sample.polylith.yaml)
 
 You will need to duplicate the sample, calling it `dendrite.yaml` for example, and then
 tailor it to your installation. At a minimum, you will need to populate the following
@@ -46,10 +45,9 @@ global:
 ## JetStream configuration
 
 Monolith deployments can use the built-in NATS Server rather than running a standalone
-server. If you are building a polylith deployment, or you want to use a standalone NATS
-Server anyway, you can also configure that too.
+server. If you want to use a standalone NATS Server anyway, you can also configure that too.
 
-### Built-in NATS Server (monolith only)
+### Built-in NATS Server
 
 In the `global` section, under the `jetstream` key, ensure that no server addresses are
 configured and set a `storage_path` to a persistent folder on the filesystem:
@@ -63,7 +61,7 @@ global:
     topic_prefix: Dendrite
 ```
 
-### Standalone NATS Server (monolith and polylith)
+### Standalone NATS Server
 
 To use a standalone NATS Server instance, you will need to configure `addresses` field
 to point to the port that your NATS Server is listening on:
@@ -86,7 +84,7 @@ one address in the `addresses` field.
 Configuring database connections varies based on the [database configuration](database)
 that you chose.
 
-### Global connection pool (monolith with a single PostgreSQL database only)
+### Global connection pool
 
 If you are running a monolith deployment and want to use a single connection pool to a
 single PostgreSQL database, then you must uncomment and configure the `database` section
@@ -109,7 +107,7 @@ override the `global` database configuration.
 
 ### Per-component connections (all other configurations)
 
-If you are building a polylith deployment, are using SQLite databases or separate PostgreSQL
+If you are are using SQLite databases or separate PostgreSQL
 databases per component, then you must instead configure the `database` sections under each
 of the component blocks ,e.g. under the `app_service_api`, `federation_api`, `key_server`,
 `media_api`, `mscs`, `room_server`, `sync_api` and `user_api` blocks.

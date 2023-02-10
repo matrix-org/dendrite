@@ -477,10 +477,6 @@ func (u *DeviceListUpdater) processServerUser(ctx context.Context, serverName go
 				return e.RetryAfter, err
 			} else if e.Blacklisted {
 				return time.Hour * 8, err
-			} else if e.Code >= 300 {
-				// We didn't get a real FederationClientError (e.g. in polylith mode, where gomatrix.HTTPError
-				// are "converted" to FederationClientError), but we probably shouldn't hit them every $waitTime seconds.
-				return hourWaitTime, err
 			}
 		case net.Error:
 			// Use the default waitTime, if it's a timeout.
