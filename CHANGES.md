@@ -1,5 +1,20 @@
 # Changelog
 
+## Dendrite 0.11.1 (2023-02-10)
+
+**⚠️ DEPRECATION WARNING: This is the last release to have polylith and HTTP API mode. Future releases are monolith only.**
+
+### Features
+
+* Initial store and forward support has been added
+* A landing page showing that Dendrite is running has been added (contributed by [LukasLJL](https://github.com/LukasLJL))
+
+### Fixes
+
+- `/sync` is now using significantly less database round trips when using Postgres, resulting in faster initial syncs, allowing larger accounts to login again
+- Many under the hood pinecone improvements
+- Publishing rooms is now possible again
+
 ## Dendrite 0.11.0 (2023-01-20)
 
 The last three missing federation API Sytests have been fixed - bringing us to 100% server-server Synapse parity, with client-server parity at 93% 🎉
