@@ -1,6 +1,8 @@
 package config
 
-import "github.com/matrix-org/gomatrixserverlib"
+import (
+	"github.com/matrix-org/gomatrixserverlib"
+)
 
 type FederationAPI struct {
 	Matrix *Global `yaml:"-"`

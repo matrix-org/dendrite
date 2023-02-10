@@ -267,7 +267,7 @@ func TestRoomsV3URLEscapeDoNot404(t *testing.T) {
 	cfg := &config.Dendrite{}
 	cfg.Defaults(config.DefaultOpts{
 		Generate:       true,
-		SingleDatabase: true,
+		SingleDatabase: false,
 	})
 	cfg.Global.KeyID = gomatrixserverlib.KeyID("ed25519:auto")
 	cfg.Global.ServerName = gomatrixserverlib.ServerName("localhost")

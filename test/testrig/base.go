@@ -67,7 +67,7 @@ func CreateBaseDendrite(t *testing.T, dbType test.DBType) (*base.BaseDendrite, f
 	case test.DBTypeSQLite:
 		cfg.Defaults(config.DefaultOpts{
 			Generate:       true,
-			SingleDatabase: true,
+			SingleDatabase: false,
 		})
 		cfg.Global.ServerName = "test"
 
@@ -103,7 +103,7 @@ func Base(cfg *config.Dendrite) (*base.BaseDendrite, nats.JetStreamContext, *nat
 		cfg = &config.Dendrite{}
 		cfg.Defaults(config.DefaultOpts{
 			Generate:       true,
-			SingleDatabase: true,
+			SingleDatabase: false,
 		})
 	}
 	cfg.Global.JetStream.InMemory = true

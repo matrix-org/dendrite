@@ -24,13 +24,11 @@ import (
 	"github.com/matrix-org/dendrite/federationapi"
 	"github.com/matrix-org/dendrite/keyserver"
 	"github.com/matrix-org/dendrite/roomserver"
-	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup"
 	basepkg "github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/dendrite/setup/mscs"
 	"github.com/matrix-org/dendrite/userapi"
-	uapi "github.com/matrix-org/dendrite/userapi/api"
 )
 
 var (
@@ -52,14 +50,7 @@ func main() {
 
 	federation := base.CreateFederationClient()
 
-	rsImpl := roomserver.NewInternalAPI(base)
-	// call functions directly on the impl unless running in HTTP mode
-	rsAPI := rsImpl
-	if traceInternal {
-		rsAPI = &api.RoomserverInternalAPITrace{
-			Impl: rsAPI,
-		}
-	}
+	rsAPI := roomserver.NewInternalAPI(base)
 
 	fsAPI := federationapi.NewInternalAPI(
 		base, federation, rsAPI, base.Caches, nil, false,
@@ -73,20 +64,14 @@ func main() {
 	pgClient := base.PushGatewayHTTPClient()
 	userAPI := userapi.NewInternalAPI(base, &cfg.UserAPI, cfg.Derived.ApplicationServices, keyAPI, rsAPI, pgClient)
 
-	if traceInternal {
-		userAPI = &uapi.UserInternalAPITrace{
-			Impl: userAPI,
-		}
-	}
-
 	asAPI := appservice.NewInternalAPI(base, userAPI, rsAPI)
 
 	// The underlying roomserver implementation needs to be able to call the fedsender.
 	// This is different to rsAPI which can be the http client which doesn't need this
 	// dependency. Other components also need updating after their dependencies are up.
-	rsImpl.SetFederationAPI(fsAPI, keyRing)
-	rsImpl.SetAppserviceAPI(asAPI)
-	rsImpl.SetUserAPI(userAPI)
+	rsAPI.SetFederationAPI(fsAPI, keyRing)
+	rsAPI.SetAppserviceAPI(asAPI)
+	rsAPI.SetUserAPI(userAPI)
 	keyImpl.SetUserAPI(userAPI)
 
 	monolith := setup.Monolith{

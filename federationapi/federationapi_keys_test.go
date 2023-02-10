@@ -78,7 +78,7 @@ func TestMain(m *testing.M) {
 			cfg := &config.Dendrite{}
 			cfg.Defaults(config.DefaultOpts{
 				Generate:       true,
-				SingleDatabase: true,
+				SingleDatabase: false,
 			})
 			cfg.Global.ServerName = gomatrixserverlib.ServerName(s.name)
 			cfg.Global.PrivateKey = testPriv

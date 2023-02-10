@@ -330,7 +330,5 @@ func TestQueryAccountByLocalpart(t *testing.T) {
 		}
 
 		testCases(t, intAPI)
-		// also test tracing
-		testCases(t, &api.UserInternalAPITrace{Impl: intAPI})
 	})
 }

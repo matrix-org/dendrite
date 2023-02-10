@@ -647,7 +647,7 @@ func init() {
 }
 
 type testRoomserverAPI struct {
-	rsAPI.RoomserverInternalAPITrace
+	rsAPI.RoomserverInternalAPI
 	inputRoomEvents           []rsAPI.InputRoomEvent
 	queryStateAfterEvents     func(*rsAPI.QueryStateAfterEventsRequest) rsAPI.QueryStateAfterEventsResponse
 	queryEventsByID           func(req *rsAPI.QueryEventsByIDRequest) rsAPI.QueryEventsByIDResponse

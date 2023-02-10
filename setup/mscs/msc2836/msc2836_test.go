@@ -499,7 +499,7 @@ func assertUnsignedChildren(t *testing.T, ev gomatrixserverlib.ClientEvent, relT
 }
 
 type testUserAPI struct {
-	userapi.UserInternalAPITrace
+	userapi.UserInternalAPI
 	accessTokens map[string]userapi.Device
 }
 
@@ -516,7 +516,7 @@ func (u *testUserAPI) QueryAccessToken(ctx context.Context, req *userapi.QueryAc
 type testRoomserverAPI struct {
 	// use a trace API as it implements method stubs so we don't need to have them here.
 	// We'll override the functions we care about.
-	roomserver.RoomserverInternalAPITrace
+	roomserver.RoomserverInternalAPI
 	userToJoinedRooms map[string][]string
 	events            map[string]*gomatrixserverlib.HeaderedEvent
 }
